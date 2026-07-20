@@ -44,6 +44,36 @@
     --accent:#ffe600; --accent-2:#ff2d55; --daub:#ff2d55; --daub-ink:#000;
     --text:#ffffff; --muted:#8a8a92; --marquee:#ffe600;
   }
+  /* E-book / e-ink: pure monochrome, flat, no motion */
+  :root[data-theme="ebook"]{
+    --bg1:#ffffff; --bg2:#ffffff; --bg3:#ffffff;
+    --panel:#ffffff; --panel-line:#000000;
+    --cell:#ffffff; --cell-edge:#000000; --cell-text:#000000;
+    --accent:#000000; --accent-2:#000000; --daub:#000000; --daub-ink:#ffffff;
+    --text:#000000; --muted:#555555; --marquee:#000000;
+  }
+  :root[data-theme="ebook"] *{animation:none!important;transition:none!important;text-shadow:none!important;backdrop-filter:none!important}
+  :root[data-theme="ebook"] body{background:#fff!important}
+  :root[data-theme="ebook"] .panel,
+  :root[data-theme="ebook"] .status,
+  :root[data-theme="ebook"] .icon-btn{background:#fff;box-shadow:none}
+  :root[data-theme="ebook"] .cell{box-shadow:none;border-width:2px}
+  :root[data-theme="ebook"] .cell .daub{display:none}
+  :root[data-theme="ebook"] .cell.marked{background:#000;border-color:#000}
+  :root[data-theme="ebook"] .cell.marked .num{color:#fff;transform:none}
+  :root[data-theme="ebook"] .cell.inline{box-shadow:inset 0 0 0 3px #fff;border-color:#000}
+  :root[data-theme="ebook"] .seg{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .seg button.on{background:#000;color:#fff}
+  :root[data-theme="ebook"] .btn.primary{background:#000;color:#fff}
+  :root[data-theme="ebook"] .btn.ghost,
+  :root[data-theme="ebook"] .mini{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .marquee .bulb{color:#bbb;opacity:1}
+  :root[data-theme="ebook"] .marquee .bulb.lit{color:#000;transform:none}
+  :root[data-theme="ebook"] .veil{background:rgba(255,255,255,.9)}
+  :root[data-theme="ebook"] .win-card{background:#fff;border:2px solid #000}
+  :root[data-theme="ebook"] .win-card .word{background:none;color:#000;-webkit-text-fill-color:#000}
+  :root[data-theme="ebook"] .cell.empty-cell{background:#fff;border:2px dashed #999;color:#999}
+
 
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
@@ -85,6 +115,9 @@
   }
   .icon-btn:hover{transform:translateY(-2px)}
   .icon-btn:active{transform:scale(.94)}
+  .icon-btn.active{background:var(--accent);border-color:var(--accent)}
+  .icon-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+  :root[data-theme="ebook"] .icon-btn.active{background:#000;border-color:#000}
   .icon-btn:focus-visible,.btn:focus-visible,.cell:focus-visible,.mini:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
 
   /* ---------- Panel ---------- */
@@ -187,6 +220,15 @@
   canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
 
   .hidden{display:none!important}
+  #toast{
+    position:fixed;top:68px;left:50%;transform:translateX(-50%) translateY(-14px);
+    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-weight:600;
+    padding:8px 18px;border-radius:999px;font-size:15px;z-index:70;
+    opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;
+    box-shadow:0 6px 18px rgba(0,0,0,.25);
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  :root[data-theme="ebook"] #toast{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
   footer{color:var(--muted);font-size:12px;margin-top:auto;padding-top:8px;opacity:.7}
 
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}}
@@ -200,6 +242,7 @@
     </div>
     <div class="tools">
       <button class="icon-btn" id="muteBtn" title="音效開關" aria-label="音效開關">🔊</button>
+      <button class="icon-btn" id="ebookBtn" title="電子書模式" aria-label="電子書模式">📖</button>
       <button class="icon-btn" id="themeBtn" title="切換主題" aria-label="切換主題">🎨</button>
       <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
     </div>
@@ -266,6 +309,7 @@
 (function(){
   "use strict";
   const THEMES=["sunset","midnight","bubblegum","meadow","arcade"];
+  const THEME_NAMES={sunset:"落日",midnight:"午夜霓虹",bubblegum:"泡泡糖",meadow:"草原",arcade:"街機",ebook:"電子書"};
   const LINES=[
     [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
     [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
@@ -462,6 +506,7 @@
 
   /* ---------- Confetti ---------- */
   function burst(){
+    if(document.documentElement.getAttribute("data-theme")==="ebook")return;
     const cv=$("confetti"),ctx=cv.getContext("2d");
     cv.width=innerWidth;cv.height=innerHeight;
     const cs=getComputedStyle(document.documentElement);
@@ -484,10 +529,36 @@
   }
 
   /* ---------- Theme & fullscreen ---------- */
+  let lastColorTheme="sunset";
   function cycleTheme(){
     const cur=document.documentElement.getAttribute("data-theme");
+    if(cur==="ebook")return;                 // locked while in e-book mode
     const next=THEMES[(THEMES.indexOf(cur)+1)%THEMES.length];
     document.documentElement.setAttribute("data-theme",next);
+    lastColorTheme=next;
+    showToast(THEME_NAMES[next]);
+  }
+  function toggleEbook(){
+    const root=document.documentElement;
+    const on=root.getAttribute("data-theme")!=="ebook";
+    if(on){
+      lastColorTheme=root.getAttribute("data-theme");
+      root.setAttribute("data-theme","ebook");
+    }else{
+      root.setAttribute("data-theme",lastColorTheme);
+    }
+    $("ebookBtn").classList.toggle("active",on);
+    $("themeBtn").disabled=on;                // can't switch themes in e-book mode
+    showToast(on?"電子書模式":THEME_NAMES[lastColorTheme]);
+  }
+  let toastT;
+  function showToast(txt){
+    let el=$("toast");
+    if(!el){el=document.createElement("div");el.id="toast";document.body.appendChild(el);}
+    el.textContent=txt;
+    el.classList.add("show");
+    clearTimeout(toastT);
+    toastT=setTimeout(()=>el.classList.remove("show"),1100);
   }
   function toggleFull(){
     if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}
@@ -511,6 +582,7 @@
   $("restartBtn").addEventListener("click",restart);
   $("editBtn").addEventListener("click",toSetup);
   $("themeBtn").addEventListener("click",cycleTheme);
+  $("ebookBtn").addEventListener("click",toggleEbook);
   $("muteBtn").addEventListener("click",()=>{ const m=Sound.toggle(); $("muteBtn").textContent=m?"🔇":"🔊"; });
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
