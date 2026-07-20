@@ -199,6 +199,7 @@
       <span class="bulb">B</span><span class="bulb">I</span><span class="bulb">N</span><span class="bulb">G</span><span class="bulb">O</span>
     </div>
     <div class="tools">
+      <button class="icon-btn" id="muteBtn" title="音效開關" aria-label="音效開關">🔊</button>
       <button class="icon-btn" id="themeBtn" title="切換主題" aria-label="切換主題">🎨</button>
       <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
     </div>
@@ -273,12 +274,48 @@
   const $=id=>document.getElementById(id);
   const grid=$("grid");
 
+  /* ---------- Sound (Web Audio, no files) ---------- */
+  const Sound=(function(){
+    let ctx=null, muted=false;
+    function ac(){
+      if(!ctx){const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return null; ctx=new AC();}
+      if(ctx.state==="suspended")ctx.resume();
+      return ctx;
+    }
+    function tone(freq,o){
+      if(muted)return; const c=ac(); if(!c)return;
+      o=o||{}; const type=o.type||"sine",dur=o.dur||0.12,vol=o.vol||0.2,delay=o.delay||0,slide=o.slideTo||null;
+      const t=c.currentTime+delay;
+      const osc=c.createOscillator(),g=c.createGain();
+      osc.type=type; osc.frequency.setValueAtTime(freq,t);
+      if(slide)osc.frequency.exponentialRampToValueAtTime(slide,t+dur);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(vol,t+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+      osc.connect(g).connect(c.destination);
+      osc.start(t); osc.stop(t+dur+0.03);
+    }
+    return {
+      toggle(){muted=!muted; if(!muted)tone(660,{type:"triangle",dur:0.08,vol:0.15}); return muted;},
+      isMuted(){return muted;},
+      wake(){ac();},
+      place(){tone(520,{type:"triangle",dur:0.10,vol:0.18,slideTo:820});},
+      takeback(){tone(500,{type:"triangle",dur:0.13,vol:0.15,slideTo:240});},
+      mark(){tone(300,{type:"sine",dur:0.09,vol:0.28,slideTo:560}); tone(760,{type:"sine",dur:0.05,vol:0.10,delay:0.02});},
+      unmark(){tone(360,{type:"sine",dur:0.08,vol:0.12,slideTo:210});},
+      start(){[392,523,659].forEach((f,i)=>tone(f,{type:"triangle",dur:0.12,vol:0.16,delay:i*0.05}));},
+      line(){[523,659,784].forEach((f,i)=>tone(f,{type:"triangle",dur:0.17,vol:0.18,delay:i*0.06}));},
+      win(){[523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46});}
+    };
+  })();
+
   let state={
     mode:"setup",        // setup | play
     fill:"auto",         // auto | manual
     target:5,
     card:shuffled(),     // 25 numbers (0 = empty in manual)
     marked:Array(25).fill(false),
+    lastLines:0,
     won:false
   };
 
@@ -324,10 +361,12 @@
     const had=state.card[i]>0;
     if(had){                          // take back -> free just this number
       state.card[i]=0;
+      Sound.takeback();
     }else{                            // place the smallest available number
       const n=smallestMissing();
       if(n==null)return;
       state.card[i]=n;
+      Sound.place();
     }
     render();
     if(!had){                         // little pop on the newly placed cell
@@ -349,6 +388,7 @@
   function toggle(i){
     if(state.won)return;
     state.marked[i]=!state.marked[i];
+    state.marked[i]?Sound.mark():Sound.unmark();
     const cell=grid.children[i];
     cell.classList.toggle("marked",state.marked[i]);
     cell.setAttribute("aria-pressed",state.marked[i]?"true":"false");
@@ -369,11 +409,14 @@
     const bulbs=$("marquee").children;
     for(let k=0;k<5;k++)bulbs[k].classList.toggle("lit", k < Math.min(done,5));
 
+    if(done>state.lastLines && done<state.target)Sound.line();
+    state.lastLines=done;
     if(done>=state.target && !state.won){ state.won=true; win(done); }
   }
 
   /* ---------- Win ---------- */
   function win(done){
+    Sound.win();
     $("winMsg").textContent=`你完成了 ${done} 條線 🎉`;
     $("veil").classList.add("show");
     burst();
@@ -393,7 +436,8 @@
   }
   function startGame(){
     if(state.fill==="manual" && state.card.some(n=>!n))return;
-    state.mode="play";state.marked=Array(25).fill(false);state.won=false;
+    state.mode="play";state.marked=Array(25).fill(false);state.won=false;state.lastLines=0;
+    Sound.start();
     $("setup").classList.add("hidden");
     $("setupActions").classList.add("hidden");
     $("playStatus").classList.remove("hidden");
@@ -401,7 +445,7 @@
     render();
   }
   function restart(){
-    state.marked=Array(25).fill(false);state.won=false;closeWin();
+    state.marked=Array(25).fill(false);state.won=false;state.lastLines=0;closeWin();
     resetMarquee();render();
   }
   function resetMarquee(){[...$("marquee").children].forEach(b=>b.classList.remove("lit"));}
@@ -467,6 +511,7 @@
   $("restartBtn").addEventListener("click",restart);
   $("editBtn").addEventListener("click",toSetup);
   $("themeBtn").addEventListener("click",cycleTheme);
+  $("muteBtn").addEventListener("click",()=>{ const m=Sound.toggle(); $("muteBtn").textContent=m?"🔇":"🔊"; });
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
