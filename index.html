@@ -148,14 +148,11 @@
   .cell.marked .num{color:var(--daub-ink);transform:scale(1.05)}
   .cell.inline{border-color:var(--accent-2);box-shadow:0 0 0 3px var(--accent-2), 0 0 18px var(--accent-2)}
 
-  /* manual inputs */
-  .cell.input-mode{padding:0}
-  .cell input{
-    width:100%;height:100%;border:0;background:transparent;text-align:center;
-    font-family:'Fredoka';font-weight:600;font-size:clamp(20px,6.5vw,40px);
-    color:var(--cell-text);outline:none;
-  }
-  .cell.bad{border-color:var(--daub);box-shadow:0 0 0 3px var(--daub)}
+  /* manual tap-to-place */
+  .cell.empty-cell{background:var(--panel);border:2px dashed var(--panel-line);box-shadow:none;color:var(--muted)}
+  .cell.empty-cell:hover{border-color:var(--accent);border-style:solid;transform:translateY(-2px)}
+  .cell.just-placed{animation:place .25s ease}
+  @keyframes place{from{transform:scale(.78)}to{transform:scale(1)}}
 
   /* ---------- Buttons ---------- */
   .actions{display:flex;gap:10px;width:min(92vw,520px);flex-wrap:wrap}
@@ -280,7 +277,7 @@
     mode:"setup",        // setup | play
     fill:"auto",         // auto | manual
     target:5,
-    card:shuffled(),     // 25 numbers
+    card:shuffled(),     // 25 numbers (0 = empty in manual)
     marked:Array(25).fill(false),
     won:false
   };
@@ -294,65 +291,58 @@
   /* ---------- Rendering ---------- */
   function render(){
     grid.innerHTML="";
+    const manual = state.mode==="setup" && state.fill==="manual";
     for(let i=0;i<25;i++){
-      const cell=document.createElement(state.mode==="setup"&&state.fill==="manual"?"div":"button");
+      const cell=document.createElement("button");
       cell.className="cell";
       cell.dataset.i=i;
+      const val=state.card[i];
+      cell.innerHTML=`<span class="daub"></span><span class="num">${val?val:""}</span>`;
 
-      if(state.mode==="setup"&&state.fill==="manual"){
-        cell.classList.add("input-mode");
-        const inp=document.createElement("input");
-        inp.type="text";inp.inputMode="numeric";inp.maxLength=2;
-        inp.value=state.card[i]?state.card[i]:"";
-        inp.addEventListener("input",e=>onManualInput(e,i,inp));
-        inp.addEventListener("focus",()=>inp.select());
-        cell.appendChild(inp);
-      }else{
-        cell.innerHTML=`<span class="daub"></span><span class="num">${state.card[i]}</span>`;
-        if(state.mode==="play"){
-          if(state.marked[i])cell.classList.add("marked");
-          cell.addEventListener("click",()=>toggle(i));
-          cell.setAttribute("aria-pressed",state.marked[i]?"true":"false");
-        }else{
-          cell.disabled=true;cell.style.cursor="default";
-        }
+      if(state.mode==="play"){
+        if(state.marked[i])cell.classList.add("marked");
+        cell.addEventListener("click",()=>toggle(i));
+        cell.setAttribute("aria-pressed",state.marked[i]?"true":"false");
+      }else if(manual){
+        if(!val)cell.classList.add("empty-cell");
+        cell.addEventListener("click",()=>manualTap(i));
+      }else{ // auto preview
+        cell.disabled=true;cell.style.cursor="default";
       }
       grid.appendChild(cell);
     }
     if(state.mode==="play")refreshLines();
   }
 
-  /* ---------- Manual entry ---------- */
-  function onManualInput(e,i,inp){
-    let v=inp.value.replace(/[^0-9]/g,"");
-    if(v.length>2)v=v.slice(0,2);
-    let n=parseInt(v,10);
-    if(v==="")n=0;
-    if(n>25){n=25;v="25";inp.value="25";}
-    state.card[i]=n||0;
-    inp.value=v;
-    validateManual();
-    // auto-advance when this cell can't be a prefix of a bigger valid number
-    const advance = v.length===2 || (n>=3 && n<=25);
-    if(advance){
-      const inputs=grid.querySelectorAll("input");
-      if(inputs[i+1])inputs[i+1].focus();
-    }
+  /* ---------- Manual: tap to place ---------- */
+  function smallestMissing(){
+    const used=new Set(state.card.filter(n=>n>0));
+    for(let n=1;n<=25;n++) if(!used.has(n)) return n;
+    return null;
   }
-  function validateManual(){
-    const counts={};
-    state.card.forEach(n=>{if(n)counts[n]=(counts[n]||0)+1;});
-    const cells=grid.querySelectorAll(".cell");
-    let ok=true;
-    cells.forEach((c,i)=>{
-      const n=state.card[i];
-      const bad = !n || n<1 || n>25 || counts[n]>1;
-      c.classList.toggle("bad", !!(n && counts[n]>1));
-      if(bad)ok=false;
-    });
+  function manualTap(i){
+    const had=state.card[i]>0;
+    if(had){                          // take back -> free just this number
+      state.card[i]=0;
+    }else{                            // place the smallest available number
+      const n=smallestMissing();
+      if(n==null)return;
+      state.card[i]=n;
+    }
+    render();
+    if(!had){                         // little pop on the newly placed cell
+      grid.children[i].classList.add("just-placed");
+    }
+    updateManualUI();
+  }
+  function updateManualUI(){
+    const filled=state.card.filter(n=>n>0).length, ok=filled===25;
     $("startBtn").disabled=!ok;
     $("startBtn").style.opacity=ok?"1":".5";
-    return ok;
+    const next=smallestMissing();
+    $("fillHint").textContent = ok
+      ? "25 格都填好了,可以開始! ▸"
+      : `點空格會填入目前最小的可用號碼,下一個是 ${next}。點已填的格子可收回該號碼(其他號碼不變)。`;
   }
 
   /* ---------- Play ---------- */
@@ -402,7 +392,7 @@
     applyFillUI();
   }
   function startGame(){
-    if(state.fill==="manual" && !validateManual())return;
+    if(state.fill==="manual" && state.card.some(n=>!n))return;
     state.mode="play";state.marked=Array(25).fill(false);state.won=false;
     $("setup").classList.add("hidden");
     $("setupActions").classList.add("hidden");
@@ -419,11 +409,11 @@
   function applyFillUI(){
     const manual=state.fill==="manual";
     $("reshuffleBtn").classList.toggle("hidden",manual);
-    $("fillHint").textContent=manual
-      ? "在每格輸入 1–25(不可重複),填滿後就能開始。"
-      : "已隨機排好,按「重洗」可換一組數字。";
-    if(manual){ if(!$("startBtn").disabled)validateManual(); }
-    else { $("startBtn").disabled=false;$("startBtn").style.opacity="1"; }
+    if(manual){ updateManualUI(); }
+    else {
+      $("fillHint").textContent="已隨機排好,按「重洗」可換一組數字。";
+      $("startBtn").disabled=false;$("startBtn").style.opacity="1";
+    }
   }
 
   /* ---------- Confetti ---------- */
@@ -466,8 +456,8 @@
     [...$("fillSeg").children].forEach(x=>x.classList.remove("on"));
     b.classList.add("on");
     state.fill=b.dataset.fill;
-    if(state.fill==="auto")state.card=shuffled();
-    else if(state.card.some(n=>!n))state.card=Array(25).fill(0);
+    if(state.fill==="auto"){ state.card=shuffled(); }
+    else { state.card=Array(25).fill(0); }
     render();applyFillUI();
   });
   $("tMinus").addEventListener("click",()=>{state.target=Math.max(1,state.target-1);$("targetVal").textContent=state.target;});
