@@ -341,6 +341,7 @@
     }
     return {
       toggle(){muted=!muted; if(!muted)tone(660,{type:"triangle",dur:0.08,vol:0.15}); return muted;},
+      setMuted(m){muted=!!m;},
       isMuted(){return muted;},
       wake(){ac();},
       place(){tone(520,{type:"triangle",dur:0.10,vol:0.18,slideTo:820});},
@@ -530,6 +531,31 @@
 
   /* ---------- Theme & fullscreen ---------- */
   let lastColorTheme="sunset";
+  const STORE_KEY="bingo.prefs.v1";
+  function savePrefs(){
+    try{
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        theme:lastColorTheme,
+        ebook:document.documentElement.getAttribute("data-theme")==="ebook",
+        muted:Sound.isMuted(),
+        target:state.target
+      }));
+    }catch(e){/* storage unavailable -> just don't persist */}
+  }
+  function loadPrefs(){
+    let p={}; try{ p=JSON.parse(localStorage.getItem(STORE_KEY))||{}; }catch(e){ p={}; }
+    if(p.theme && THEMES.indexOf(p.theme)>=0){
+      lastColorTheme=p.theme;
+      document.documentElement.setAttribute("data-theme",p.theme);
+    }
+    if(typeof p.target==="number"){
+      state.target=Math.min(12,Math.max(1,p.target));
+      $("targetVal").textContent=state.target;
+    }
+    if(p.muted){ Sound.setMuted(true); $("muteBtn").textContent="🔇"; }
+    if(p.ebook){ setEbook(true,true); }
+  }
+
   function cycleTheme(){
     const cur=document.documentElement.getAttribute("data-theme");
     if(cur==="ebook")return;                 // locked while in e-book mode
@@ -537,20 +563,22 @@
     document.documentElement.setAttribute("data-theme",next);
     lastColorTheme=next;
     showToast(THEME_NAMES[next]);
+    savePrefs();
   }
-  function toggleEbook(){
+  function setEbook(on,silent){
     const root=document.documentElement;
-    const on=root.getAttribute("data-theme")!=="ebook";
     if(on){
-      lastColorTheme=root.getAttribute("data-theme");
+      if(root.getAttribute("data-theme")!=="ebook")lastColorTheme=root.getAttribute("data-theme");
       root.setAttribute("data-theme","ebook");
     }else{
       root.setAttribute("data-theme",lastColorTheme);
     }
     $("ebookBtn").classList.toggle("active",on);
     $("themeBtn").disabled=on;                // can't switch themes in e-book mode
-    showToast(on?"電子書模式":THEME_NAMES[lastColorTheme]);
+    if(!silent)showToast(on?"電子書模式":THEME_NAMES[lastColorTheme]);
+    savePrefs();
   }
+  function toggleEbook(){ setEbook(document.documentElement.getAttribute("data-theme")!=="ebook"); }
   let toastT;
   function showToast(txt){
     let el=$("toast");
@@ -575,20 +603,21 @@
     else { state.card=Array(25).fill(0); }
     render();applyFillUI();
   });
-  $("tMinus").addEventListener("click",()=>{state.target=Math.max(1,state.target-1);$("targetVal").textContent=state.target;});
-  $("tPlus").addEventListener("click",()=>{state.target=Math.min(12,state.target+1);$("targetVal").textContent=state.target;});
+  $("tMinus").addEventListener("click",()=>{state.target=Math.max(1,state.target-1);$("targetVal").textContent=state.target;savePrefs();});
+  $("tPlus").addEventListener("click",()=>{state.target=Math.min(12,state.target+1);$("targetVal").textContent=state.target;savePrefs();});
   $("reshuffleBtn").addEventListener("click",()=>{state.card=shuffled();render();});
   $("startBtn").addEventListener("click",startGame);
   $("restartBtn").addEventListener("click",restart);
   $("editBtn").addEventListener("click",toSetup);
   $("themeBtn").addEventListener("click",cycleTheme);
   $("ebookBtn").addEventListener("click",toggleEbook);
-  $("muteBtn").addEventListener("click",()=>{ const m=Sound.toggle(); $("muteBtn").textContent=m?"🔇":"🔊"; });
+  $("muteBtn").addEventListener("click",()=>{ const m=Sound.toggle(); $("muteBtn").textContent=m?"🔇":"🔊"; savePrefs(); });
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
   addEventListener("resize",()=>{if(state.won){const cv=$("confetti");cv.width=innerWidth;cv.height=innerHeight;}});
 
+  loadPrefs();
   render();applyFillUI();
 })();
 </script>
