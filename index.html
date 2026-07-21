@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.10.1 -->
-<meta name="version" content="1.10.1">
+<!-- BINGO 賓果遊戲 · v1.11.0 -->
+<meta name="version" content="1.11.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -345,6 +345,17 @@
   .room-item.busy:hover{transform:none;border-color:var(--panel-line)}
   .room-empty{color:var(--muted);font-size:13px;padding:6px 2px}
   :root[data-theme="ebook"] .room-item{background:#fff;border:1px solid #000}
+  /* 大廳即時房間狀態膠囊:一眼看出現在有沒有人開房,不必一直按🔍 */
+  .mp-live{display:inline-flex;align-items:center;gap:9px;max-width:100%;margin:0 2px;
+    padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.06);
+    border:1px solid var(--panel-line);color:var(--muted);font-weight:800;font-size:13px;line-height:1.3}
+  .mp-live .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+  .mp-live[data-state="open"]{color:var(--accent);border-color:var(--accent);background:rgba(255,255,255,.10)}
+  .mp-live[data-state="open"] .dot{animation:mpPulse 1.6s ease-out infinite}
+  .mp-live[data-state="busy"]{color:var(--accent-2)}
+  .mp-live[data-state="error"]{color:var(--daub)}
+  @keyframes mpPulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  :root[data-theme="ebook"] .mp-live{background:#fff;border:1px solid #000}
   .mp-status{font-weight:800;font-size:13px;color:var(--accent)}
   .mp-players{display:flex;flex-wrap:wrap;gap:14px 12px;margin-top:12px}
   .mp-chip{
@@ -647,10 +658,13 @@
     <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
 
     <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
+    <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
+      <span class="dot" aria-hidden="true"></span><span id="mpLiveTxt">偵測目前房間中…</span>
+    </div>
     <div class="field">
       <div class="input-wrap">
         <input id="mpCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="房號">
-        <button class="input-icon-btn" id="mpScan" title="掃描目前的房間" aria-label="掃描目前的房間">🔍</button>
+        <button class="input-icon-btn" id="mpScan" title="重新偵測房間" aria-label="重新偵測房間">🔍</button>
       </div>
     </div>
     <button class="btn outline block-btn" id="mpJoin" disabled>加入房間 ▸</button>
@@ -709,7 +723,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.10.1</span></footer>
+  <footer><span class="ver">BINGO · v1.11.0</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1406,6 +1420,7 @@ const FIREBASE_CONFIG = {
   /* ---------- Multiplayer (Firebase) ---------- */
   const MP=(function(){
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false;
+    let roomsWatchRef=null, lastRoomsSig=null;   // 大廳常駐監聽:即時反映房間開/關,免得一直按🔍
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let orderMethod="rps", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
     let sawPlayers=false;
@@ -1456,26 +1471,54 @@ const FIREBASE_CONFIG = {
       $("mpConnect").classList.remove("hidden");
       $("mpRoomList").innerHTML="";
       setMsg(available()?"":"⚠ 尚未設定 Firebase。請依說明建立免費專案並把設定貼進檔案,連線才會啟用。");
+      if(available()) startRoomWatch();               // 進來就自動偵測並持續更新,不必一直按🔍
+      else setLive("none","連線未啟用");
     }
-    // 掃描伺服器上目前開著的房間,列出來給人選(讀 rooms 一次,不掛常駐監聽)
+    // 頂部即時狀態膠囊:讓人一眼看出現在有沒有人開房(loading/open/busy/none/error)
+    function setLive(stateName,text){
+      const el=$("mpLive"); if(!el)return;
+      el.setAttribute("data-state",stateName);
+      $("mpLiveTxt").textContent=text;
+    }
+    // 把 rooms 快照整理成清單(有人在裡面的房間,依房號排序)
+    function roomItems(rooms){
+      return Object.keys(rooms).map(c=>{
+        const r=rooms[c]||{};
+        const ps=r.players||{};
+        const hostName=(r.host&&ps[r.host]&&ps[r.host].name)||"";   // 房主名稱(取房主 id 對應的玩家名)
+        return { code:c, status:r.status||"lobby", count:Object.keys(ps).length, host:hostName };
+      }).filter(r=>r.count>0).sort((a,b)=>a.code.localeCompare(b.code));
+    }
+    // 依整理後的清單更新房間列表與狀態膠囊(內容沒變就不重繪,避免遊戲中叫號一直觸發、干擾點擊)
+    function applyRooms(items){
+      const sig=items.map(r=>r.code+":"+r.status+":"+r.count+":"+r.host).join("|");
+      if(sig===lastRoomsSig)return;
+      lastRoomsSig=sig;
+      renderRoomList(items);
+      const lobby=items.filter(r=>r.status==="lobby").length;
+      if(!items.length) setLive("none","目前沒有人開房間,開一間吧！");
+      else if(lobby>0) setLive("open","現在有 "+lobby+" 間房間開放中"+(items.length>lobby?" · 另 "+(items.length-lobby)+" 間對戰中":""));
+      else setLive("busy",items.length+" 間對戰進行中(暫時無法加入)");
+    }
+    // 掛上常駐監聽:房間開/關會即時反映;離開大廳(closeConnect/enterLobby)時 stopRoomWatch 卸載
+    function startRoomWatch(){
+      if(!init()){ setLive("none","連線未啟用"); return; }
+      stopRoomWatch();
+      lastRoomsSig=null; setLive("loading","偵測目前房間中…");
+      roomsWatchRef=db.ref("rooms");
+      roomsWatchRef.on("value", s=>applyRooms(roomItems(s.val()||{})), err=>{
+        stopRoomWatch(); setLive("error","無法讀取房間清單");
+        $("mpRoomList").innerHTML='<div class="room-empty">偵測失敗:'+esc(err.message)+'(可能是資料庫規則不允許列出房間,見說明)</div>';
+      });
+    }
+    function stopRoomWatch(){ if(roomsWatchRef){ roomsWatchRef.off(); roomsWatchRef=null; } }
+    // 🔍 手動重新偵測(重掛監聽,強制刷新一次)
     function scanRooms(){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
-      const box=$("mpRoomList"); if(!box)return;
-      box.innerHTML='<div class="room-empty">掃描中…</div>';
-      db.ref("rooms").once("value").then(s=>{
-        const rooms=s.val()||{};
-        const items=Object.keys(rooms).map(c=>{
-          const r=rooms[c]||{};
-          const ps=r.players||{};
-          const hostName=(r.host&&ps[r.host]&&ps[r.host].name)||"";   // 房主名稱(取房主 id 對應的玩家名)
-          return { code:c, status:r.status||"lobby", count:Object.keys(ps).length, host:hostName };
-        }).filter(r=>r.count>0).sort((a,b)=>a.code.localeCompare(b.code));
-        renderRoomList(items);
-      }).catch(e=>{ box.innerHTML='<div class="room-empty">掃描失敗:'+esc(e.message)+'(可能是資料庫規則不允許列出房間,見說明)</div>'; });
+      startRoomWatch();
     }
     function renderRoomList(items){
       const box=$("mpRoomList"); if(!box)return; box.innerHTML="";
-      if(!items.length){ box.innerHTML='<div class="room-empty">目前沒有開著的房間,按「建立房間」開一個吧。</div>'; return; }
       items.forEach(r=>{
         const joinable=r.status==="lobby";
         const it=document.createElement("button");
@@ -1487,6 +1530,7 @@ const FIREBASE_CONFIG = {
       });
     }
     function closeConnect(){
+      stopRoomWatch();
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -1542,6 +1586,7 @@ const FIREBASE_CONFIG = {
     function bailFromRps(){ if(isHost) resetRoomToLobby(); else leave(); }
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
+      stopRoomWatch();                                  // 已進房,卸載大廳的房間偵測監聽
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
