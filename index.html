@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.12.0 -->
-<meta name="version" content="1.12.0">
+<!-- BINGO 賓果遊戲 · v1.13.0 -->
+<meta name="version" content="1.13.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -302,6 +302,16 @@
   :root[data-theme="ebook"] .switch[aria-checked="true"]{background:#000}
   :root[data-theme="ebook"] .switch .knob{background:#000}
   :root[data-theme="ebook"] .switch[aria-checked="true"] .knob{background:#fff}
+  /* 背景音樂音量條 */
+  .rng{-webkit-appearance:none;appearance:none;width:132px;height:6px;border-radius:999px;
+    background:var(--panel-line);outline:none;cursor:pointer}
+  .rng::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;
+    border-radius:50%;background:var(--accent);border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .rng::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
+  .set-row.dim{opacity:.45}   /* 背景音樂關閉時,音量列淡化 */
+  :root[data-theme="ebook"] .rng{background:#ccc}
+  :root[data-theme="ebook"] .rng::-webkit-slider-thumb{background:#000}
+  :root[data-theme="ebook"] .rng::-moz-range-thumb{background:#000}
   :root[data-theme="ebook"] .swatch.on{border-color:#000;box-shadow:0 0 0 2px #000}
 
   .hidden{display:none!important}
@@ -550,6 +560,24 @@
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
   :root[data-theme="ebook"] .voice-btn.rec{background:#000;color:#fff}
   .voice-hint{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:var(--muted)}
+  /* 快速語音留言:連線時浮在盤面右下,點一下開始錄音、再點一下直接送給全部人(免開面板、免選對象) */
+  .quick-voice{display:none;position:fixed;z-index:40;
+    right:16px;right:calc(16px + env(safe-area-inset-right));
+    bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom));
+    align-items:center;gap:8px;border:1px solid var(--panel-line);
+    background:var(--accent);color:#1c1008;border-radius:999px;
+    padding:12px 18px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;
+    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s}
+  body.mp-on .quick-voice{display:inline-flex}   /* 只在連線中出現 */
+  body.mp-on{padding-bottom:88px}                 /* 預留淨空,浮動鈕不蓋到最底排數字 */
+  .quick-voice:active{transform:scale(.93)}
+  .quick-voice .qv-ico{font-size:20px;line-height:1}
+  .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
+  .quick-voice:disabled{opacity:.65;cursor:default}
+  :root[data-theme="midnight"] .quick-voice,
+  :root[data-theme="arcade"] .quick-voice{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .quick-voice{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
+  :root[data-theme="ebook"] .quick-voice.rec{background:#000;color:#fff}
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
   .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
     align-items:center;gap:3px;animation:emoteFloat 2.2s ease-out forwards}
@@ -723,7 +751,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.12.0</span></footer>
+  <footer><span class="ver">BINGO · v1.13.0</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -787,6 +815,14 @@
         <span class="set-lbl">音效</span>
         <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="音效"><span class="knob"></span></button>
       </div>
+      <div class="set-row">
+        <span class="set-lbl">背景音樂</span>
+        <button class="switch" id="swBgm" role="switch" aria-checked="false" aria-label="背景音樂"><span class="knob"></span></button>
+      </div>
+      <div class="set-row" id="bgmVolRow">
+        <span class="set-lbl">音量</span>
+        <input class="rng" id="bgmVol" type="range" min="0" max="100" value="35" aria-label="背景音樂音量">
+      </div>
       <button class="btn primary" id="setClose">完成</button>
     </div>
   </div>
@@ -812,6 +848,11 @@
     </div>
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
+
+  <!-- 快速語音留言:連線時浮在盤面右下,點一下錄音、再點一下直接送給全部人 -->
+  <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
+    <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
+  </button>
 
   <!-- 房主移出玩家的確認 -->
   <div class="veil" id="kickVeil">
@@ -926,6 +967,72 @@ const FIREBASE_CONFIG = {
       emote(){tone(880,{type:"sine",dur:0.09,vol:0.13,slideTo:1245});},
       ctx(){ return ac(); },   // 給語音留言用同一個(已解鎖)AudioContext 播放,繞過 iOS 自動播放限制
       win(){[523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46});}
+    };
+  })();
+
+  /* ---------- 背景音樂(Web Audio 即時合成,不載任何音檔) ----------
+     溫柔的和弦墊 pad + 低音,以 I–V–vi–IV 一小節換一個和弦、循環播放;
+     與音效各自獨立(自己的開關與音量),共用 Sound 那顆已解鎖的 AudioContext,
+     沿用同一套繞過 iOS 自動播放的機制。 */
+  const BGM=(function(){
+    let master=null, timer=null, on=false, vol=0.35, idx=0;
+    const PROG=[   // 每組:[低音, 和弦三音…](C 大調 I–V–vi–IV)
+      [130.81,261.63,329.63,392.00],  // C
+      [ 98.00,196.00,246.94,293.66],  // G
+      [110.00,220.00,261.63,329.63],  // Am
+      [ 87.31,174.61,220.00,261.63]   // F
+    ];
+    const BAR=4.2;                      // 每個和弦時長(秒)
+    function ctx(){ return (Sound.ctx && Sound.ctx()) || null; }
+    function ensureMaster(c){
+      if(!master || master.context!==c){
+        master=c.createGain(); master.gain.value=on?vol:0.0001; master.connect(c.destination);
+      }
+      return master;
+    }
+    function chord(c,freqs,t){
+      const m=ensureMaster(c);
+      freqs.forEach((f,i)=>{
+        const osc=c.createOscillator(), g=c.createGain();
+        osc.type = i===0 ? "sine" : "triangle";            // 低音用 sine、和弦用 triangle
+        osc.frequency.setValueAtTime(f,t);
+        const peak = i===0 ? 0.5 : 0.26;                    // 低音略大、和弦柔一點
+        g.gain.setValueAtTime(0.0001,t);
+        g.gain.exponentialRampToValueAtTime(peak,t+0.9);            // 慢起
+        g.gain.setValueAtTime(peak,t+BAR-1.1);
+        g.gain.exponentialRampToValueAtTime(0.0001,t+BAR-0.05);     // 慢收,不留爆音
+        osc.connect(g).connect(m);
+        osc.start(t); osc.stop(t+BAR);
+      });
+    }
+    function tick(){
+      const c=ctx(); if(!c)return;
+      if(c.state==="suspended"){ c.resume().catch(()=>{}); }
+      chord(c, PROG[idx%PROG.length], c.currentTime+0.05); idx++;
+    }
+    function start(){
+      const c=ctx(); if(!c)return;
+      ensureMaster(c);
+      if(timer)return;      // 已在播
+      tick();               // 立刻先來一個和弦,不用等第一個 BAR
+      timer=setInterval(tick, BAR*1000);
+    }
+    function stop(){
+      if(timer){ clearInterval(timer); timer=null; }
+      if(master){ try{ const c=master.context; master.gain.cancelScheduledValues(c.currentTime); master.gain.setTargetAtTime(0.0001,c.currentTime,0.25); }catch(e){} }
+    }
+    return {
+      isOn(){ return on; },
+      vol(){ return vol; },
+      setOn(o){
+        on=!!o;
+        if(on){ start(); if(master){ try{ const c=master.context; master.gain.cancelScheduledValues(c.currentTime); master.gain.setTargetAtTime(vol,c.currentTime,0.2); }catch(e){} } }
+        else{ stop(); }
+      },
+      setVolume(v){
+        vol=Math.max(0,Math.min(1,+v||0));
+        if(master && on){ try{ const c=master.context; master.gain.setTargetAtTime(vol,c.currentTime,0.05); }catch(e){} }
+      }
     };
   })();
 
@@ -1189,6 +1296,7 @@ const FIREBASE_CONFIG = {
 
   /* ---------- Theme & fullscreen ---------- */
   let lastColorTheme="sunset";
+  let bgmOn=false, bgmVol=0.35;   // 背景音樂:是否開啟、音量(0~1);預設關,音量 35%
   const STORE_KEY="bingo.prefs.v1";
   function savePrefs(){
     try{
@@ -1199,6 +1307,8 @@ const FIREBASE_CONFIG = {
         muted:Sound.isMuted(),
         target:state.target,
         size:SIZE,
+        bgmOn:bgmOn,
+        bgmVol:bgmVol,
         name:nameEl?nameEl.value.trim():""
       }));
     }catch(e){/* storage unavailable -> just don't persist */}
@@ -1215,6 +1325,9 @@ const FIREBASE_CONFIG = {
       $("targetVal").textContent=state.target;
     }
     if(p.muted){ Sound.setMuted(true); }
+    if(typeof p.bgmVol==="number"){ bgmVol=Math.max(0,Math.min(1,p.bgmVol)); }
+    BGM.setVolume(bgmVol);
+    if(p.bgmOn){ bgmOn=true; }   // 記住「想開」;實際播放等首次使用者互動(繞過自動播放限制)
     if(p.ebook){ setEbook(true,true); }
     if(typeof p.name==="string" && p.name){ const nameEl=$("mpName"); if(nameEl) nameEl.value=p.name; }
   }
@@ -1250,6 +1363,10 @@ const FIREBASE_CONFIG = {
       const active=isEbook?lastColorTheme:document.documentElement.getAttribute("data-theme");
       [...sw.children].forEach(b=>b.classList.toggle("on",b.dataset.theme===active));
     }
+    const swB=$("swBgm"), volEl=$("bgmVol"), volRow=$("bgmVolRow");
+    if(swB)swB.setAttribute("aria-checked",bgmOn?"true":"false");
+    if(volEl)volEl.value=Math.round(bgmVol*100);
+    if(volRow)volRow.classList.toggle("dim",!bgmOn);   // 關閉時音量列淡化
   }
   function openSettings(){ Sound.wake(); syncSettingsUI(); $("setVeil").classList.add("show"); }
   function closeSettings(){ $("setVeil").classList.remove("show"); }
@@ -1267,6 +1384,9 @@ const FIREBASE_CONFIG = {
     syncSettingsUI();
   }
   function toggleEbook(){ setEbook(document.documentElement.getAttribute("data-theme")!=="ebook"); }
+  // 背景音樂:開關(開→解鎖音訊並播放;關→停止),音量即時套用;都記憶偏好
+  function setBgm(on){ bgmOn=!!on; if(bgmOn){ Sound.wake(); BGM.setOn(true); } else { BGM.setOn(false); } savePrefs(); syncSettingsUI(); }
+  function setBgmVol(v){ bgmVol=Math.max(0,Math.min(1,v)); BGM.setVolume(bgmVol); }
   let toastT;
   function showToast(txt,dur){
     let el=$("toast");
@@ -1338,6 +1458,39 @@ const FIREBASE_CONFIG = {
     }).catch(err=>{
       resetVoiceBtn();
       if(hint)hint.textContent=(err&&err.name==="NotAllowedError")?"麥克風權限被拒絕":"無法啟動錄音";
+    });
+  }
+  /* ---- 快速語音留言:浮動鈕直接錄音、送給全部人(沿用面板同一套 Voice) ---- */
+  let qvTick=null;
+  function resetQuickVoiceBtn(){
+    const b=$("quickVoiceBtn"); if(qvTick){ clearInterval(qvTick); qvTick=null; }
+    if(!b)return; b.classList.remove("rec"); b.disabled=false;
+    const ico=$("qvIco"), lab=$("qvLabel"); if(ico)ico.textContent="🎤"; if(lab)lab.textContent="語音";
+  }
+  function toggleQuickVoice(){
+    const b=$("quickVoiceBtn"); if(!b||!state.online)return;
+    const ico=$("qvIco"), lab=$("qvLabel");
+    if(!Voice.supported()){ showToast("此裝置/瀏覽器不支援錄音"); return; }
+    if(Voice.recording()){ b.disabled=true; if(lab)lab.textContent="處理中…"; Voice.stop(); return; }  // 停止 → 交給 onBlob 收尾
+    Sound.wake();
+    b.disabled=true; if(lab)lab.textContent="準備中…";
+    Voice.start((wav)=>{
+      resetQuickVoiceBtn();
+      if(!wav || wav.byteLength<=44){ showToast("沒有錄到聲音"); return; }
+      try{
+        const url=Voice.toDataURL(wav);
+        if(url.length>200000){ showToast("語音太長,請再短一點"); return; }   // RTDB 友善上限
+        MP.sendEmote("all","🎤","voice",url);
+        showToast("已送出語音給全部人 🎤");
+      }catch(e){ showToast("語音處理失敗"); }
+    }).then(()=>{
+      b.disabled=false; b.classList.add("rec"); if(ico)ico.textContent="⏹";
+      let left=Math.ceil(Voice.MAX_MS/1000);
+      if(lab)lab.textContent=left+"s";
+      qvTick=setInterval(()=>{ left--; if(left<=0){ if(qvTick){clearInterval(qvTick);qvTick=null;} return; } if(lab)lab.textContent=left+"s"; },1000);
+    }).catch(err=>{
+      resetQuickVoiceBtn();
+      showToast((err&&err.name==="NotAllowedError")?"麥克風權限被拒絕":"無法啟動錄音");
     });
   }
   // 播放收到的語音:優先走 Web Audio(用已解鎖的 AudioContext + decodeAudioData,
@@ -1589,6 +1742,7 @@ const FIREBASE_CONFIG = {
     function bailFromRps(){ if(isHost) resetRoomToLobby(); else leave(); }
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
+      document.body.classList.add("mp-on"); resetQuickVoiceBtn();   // 連線中:顯示快速語音浮動鈕
       stopRoomWatch();                                  // 已進房,卸載大廳的房間偵測監聽
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
@@ -2217,6 +2371,7 @@ const FIREBASE_CONFIG = {
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();
+      document.body.classList.remove("mp-on"); resetQuickVoiceBtn();   // 離線:收起快速語音浮動鈕
       closeWin();
       $("mpBar").classList.add("hidden");
       hidePhasePanels();
@@ -2314,8 +2469,12 @@ const FIREBASE_CONFIG = {
   $("emoteSend").addEventListener("click",sendCustomText);
   $("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
   $("voiceBtn").addEventListener("click",toggleVoice);
+  $("quickVoiceBtn").addEventListener("click",toggleQuickVoice);   // 快速語音:直接錄→送全部人
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
+  $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));                       // 背景音樂開關
+  $("bgmVol").addEventListener("input",e=>setBgmVol((+e.target.value||0)/100));  // 拖曳即時調音量
+  $("bgmVol").addEventListener("change",savePrefs);                             // 放開才存偏好
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
@@ -2352,6 +2511,11 @@ const FIREBASE_CONFIG = {
   $("mpAgain").addEventListener("click",()=>MP.again());
   $("mpLeaveWin").addEventListener("click",()=>MP.leave());
   addEventListener("resize",()=>{if(state.won){const cv=$("confetti");cv.width=innerWidth;cv.height=innerHeight;}});
+  // 首次使用者互動:解鎖音訊;若偏好記得「要開背景音樂」就開始播(繞過瀏覽器自動播放限制)
+  let audioUnlocked=false;
+  function unlockAudioOnce(){ if(audioUnlocked)return; audioUnlocked=true; Sound.wake(); if(bgmOn)BGM.setOn(true); }
+  addEventListener("pointerdown",unlockAudioOnce,{once:true});
+  addEventListener("keydown",unlockAudioOnce,{once:true});
 
   buildSwatches();
   loadPrefs();
