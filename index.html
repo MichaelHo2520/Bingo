@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.8.1 -->
-<meta name="version" content="1.8.1">
+<!-- BINGO 賓果遊戲 · v1.8.2 -->
+<meta name="version" content="1.8.2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -405,12 +405,20 @@
   .reveal-hand .nm{font-weight:800;font-size:14px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .reveal-hand .txt{color:var(--muted);font-size:11.5px;font-weight:700}
   .reveal-hand.win{border-color:var(--accent);background:rgba(255,255,255,.20)}
+  .reveal-hand.win .nm{color:var(--accent)}          /* 贏家的名字用強調色,一眼認出 */
+  .reveal-hand.tie{border-style:dashed;opacity:.92}  /* 平手揭曉:虛線框,表示還沒定案 */
   @keyframes revealPop{to{opacity:1;transform:none}}
   .reveal-order{text-align:center;font-weight:800;font-size:15px;margin-top:2px;line-height:1.5}
+  /* 揭曉:先出號的贏家大字強調,清楚看見是誰 */
+  .reveal-champ{font-weight:900;font-size:15px;line-height:1.35}
+  .reveal-champ .nm{color:var(--accent);font-size:24px;font-weight:900;word-break:break-word}
+  .reveal-seq{color:var(--muted);font-size:13px;font-weight:700;margin-top:6px}
   :root[data-theme="ebook"] .reveal-hand{background:#fff;border:2px solid #000}
   :root[data-theme="ebook"] .reveal-hand.win{background:#000;color:#fff}
   :root[data-theme="ebook"] .reveal-hand.win .rk,
+  :root[data-theme="ebook"] .reveal-hand.win .nm,
   :root[data-theme="ebook"] .reveal-hand.win .txt{color:#fff}
+  :root[data-theme="ebook"] .reveal-champ .nm{color:#000}
   .order-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
   .order-item{
     display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.10);
@@ -627,7 +635,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.8.1</span></footer>
+  <footer><span class="ver">BINGO · v1.8.2</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1154,6 +1162,7 @@ const FIREBASE_CONFIG = {
     let abandoned=false;                    // 開打後對手都離開、只剩自己 → 本局作廢,不再繼續
     let orderAnnounced=false;               // 本局是否已公告過出手順序(猜拳結果)
     let revealData=null, revealTimer=null;  // 猜拳過場:大家出的拳 / 房主用的「揭曉後自動開打」計時器
+    let tieTimer=null, tieSig="";           // 平手揭曉:房主用的「停留後自動重猜」計時器 / 避免重繪重播動畫
     let emotesReady=false;                   // 好友互動:是否已略過歷史 emotes(避免重播舊表情)
     const RPS_EMO={R:"✊",S:"✌️",P:"✋"}, RPS_TXT={R:"石頭",S:"剪刀",P:"布"};
 
@@ -1473,6 +1482,7 @@ const FIREBASE_CONFIG = {
       $("mpControls").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
       showMpVeil("rps");
       setLock(true);
+      tieSig="";
       renderRps();
     }
     function renderRps(){
@@ -1480,6 +1490,8 @@ const FIREBASE_CONFIG = {
       const seq=(rps&&rps.seq)||1;
       const throws=(rps&&rps.throws)||{};
       const mg=myGroup();
+      // 平手揭曉:停留一下,讓大家看清楚剛剛是平手(保留這輪的出拳),之後房主自動帶進下一輪
+      if(rps&&rps.tie){ renderRpsTie(gs,seq,throws,mg); return; }
       const mine=!!(throws[meId]&&throws[meId].s===seq);   // 需為布林:classList.toggle 收到 undefined 會「翻轉」而非設定,平手重猜時會亂亮
       const inGroup = mg && mg.length>1;               // 你在還要比大小的組裡
       const btns=$("rpsBtns");
@@ -1504,14 +1516,37 @@ const FIREBASE_CONFIG = {
         box.appendChild(chip);
       });
     }
+    // 平手揭曉:把這一輪還在比大小的人各出了什麼攤開來,標明平手,停留一下再重猜
+    function renderRpsTie(gs,seq,throws,mg){
+      const inGroup = mg && mg.length>1;
+      $("rpsBtns").style.display="none";
+      $("rpsHint").textContent = inGroup ? "🤝 平手!再猜一次…" : "還有人平手,再猜一次…";
+      const ids=gs.map(g=>String(g).split(",")).filter(m=>m.length>1)
+        .reduce((a,m)=>a.concat(m),[]).filter(id=>players[id]);
+      const sig="tie:"+seq+"|"+ids.map(id=>id+":"+((throws[id]&&throws[id].c)||"")).join(",");
+      if(sig===tieSig) return;   // 內容沒變就不重繪,避免動畫重播
+      tieSig=sig;
+      const box=$("rpsThrows"); box.innerHTML="";
+      ids.forEach((id,idx)=>{
+        const c=(throws[id]&&throws[id].s===seq)?throws[id].c:null;
+        const it=document.createElement("div");
+        it.className="reveal-hand tie";
+        it.style.animationDelay=(idx*0.08)+"s";
+        it.innerHTML='<span class="emo">'+(RPS_EMO[c]||"❔")+'</span>'+
+          '<span class="nm">'+esc(dispName(id))+(id===meId?"(你)":"")+'</span>'+
+          '<span class="txt">'+(RPS_TXT[c]||"")+'</span>';
+        box.appendChild(it);
+      });
+    }
     function throwRps(c){
-      if(!rps||curPhase!=="rps")return;
+      if(!rps||curPhase!=="rps"||rps.tie)return;
       const mg=myGroup(); if(!mg||mg.length<=1)return;
       const seq=rps.seq||1;
       roomRef.child("rps/throws/"+meId).set({ c:c, s:seq });
     }
     function rpsHostResolve(){
       if(!isHost||!rps||status!=="rps")return;
+      if(rps.tie)return;                 // 平手揭曉中,等房主的計時器帶進下一輪,先不判定
       const seq=rps.seq||1;
       const throws=rps.throws||{};
       let groups=(rps.groups||[]).map(g=>String(g).split(",").filter(id=>players[id])).filter(g=>g.length>0);
@@ -1535,8 +1570,15 @@ const FIREBASE_CONFIG = {
         if(cur.length)newGroups.push(cur);
       });
       if(newGroups.some(g=>g.length>1)){
-        // 還有平手 → 下一輪重猜,但保留已累積的出拳紀錄
-        roomRef.update({ "rps/groups":newGroups.map(g=>g.join(",")), "rps/seq":seq+1, "rps/throws":null, "rps/reveal":acc });
+        // 還有平手 → 先揭曉這一輪(讓大家看清楚是平手),停留約 2 秒再重猜(保留已累積的出拳紀錄)
+        if(tieTimer)return;                              // 已排程過就不重複
+        const nextGroups=newGroups.map(g=>g.join(","));
+        // 先把分組結果寫進去(已定案的人變單獨一組),並保留 throws/seq 讓平手的人看到彼此出了什麼
+        roomRef.update({ "rps/groups":nextGroups, "rps/tie":true });
+        tieTimer=setTimeout(()=>{
+          tieTimer=null;
+          roomRef.update({ "rps/seq":seq+1, "rps/throws":null, "rps/reveal":acc, "rps/tie":null });
+        }, 2000);
       }else{
         // 定案 → 先進入過場揭曉(帶著大家的出拳與最終順序),再由房主自動開打
         const finalOrder=newGroups.reduce((a,g)=>a.concat(g),[]);
@@ -1580,9 +1622,10 @@ const FIREBASE_CONFIG = {
       });
       const oe=$("revealOrder");
       if(oe){
-        oe.textContent = ids.length===2
-          ? dispName(ids[0])+" 贏,先出號 🎉"
-          : "出手順序:"+ids.map(id=>dispName(id)).join(" → ");
+        const champ=ids[0];   // 排第一 = 贏家,先出號 → 用大字強調,一眼看清是誰
+        let html='<div class="reveal-champ">🏆 <span class="nm">'+esc(dispName(champ))+(champ===meId?"(你)":"")+'</span> 先出號!</div>';
+        if(ids.length>2) html+='<div class="reveal-seq">出手順序:'+ids.map(id=>esc(dispName(id))).join(" → ")+'</div>';
+        oe.innerHTML=html;
       }
       // 「跳過」鈕:所有人都看得到、都能按(用來快速跳過揭曉畫面);沒按也會自動開打
       const btn=$("revealSkip"); if(btn) btn.classList.remove("hidden");
@@ -1772,6 +1815,7 @@ const FIREBASE_CONFIG = {
       ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled(); curPhase="lobby";
       order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false; abandoned=false;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
+      tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       closeWin();
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -1800,6 +1844,7 @@ const FIREBASE_CONFIG = {
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
       order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
+      tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();
       closeWin();
       $("mpBar").classList.add("hidden");
