@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.7.1 -->
-<meta name="version" content="1.7.1">
+<!-- BINGO 賓果遊戲 · v1.7.2 -->
+<meta name="version" content="1.7.2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -596,7 +596,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.7.1</span></footer>
+  <footer><span class="ver">BINGO · v1.7.2</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -620,6 +620,8 @@
         <div class="rps-hint" id="revealHint"></div>
         <div class="actions"><button class="btn primary hidden" id="revealSkip">跳過 ⏭</button></div>
       </div>
+      <!-- 逃生出口:猜拳卡住(有人一直不出拳)時,總是能離開 -->
+      <button class="peek-link" id="mpVeilLeave">離開房間</button>
     </div>
   </div>
 
@@ -1237,9 +1239,12 @@ const FIREBASE_CONFIG = {
     function showMpVeil(which){
       $("rpsContent").classList.toggle("hidden", which!=="rps");
       $("revealContent").classList.toggle("hidden", which!=="reveal");
+      const lv=$("mpVeilLeave"); if(lv) lv.textContent = isHost ? "取消猜拳,回大廳" : "離開房間";
       $("mpVeil").classList.add("show");
     }
     function hideMpVeil(){ $("mpVeil").classList.remove("show"); }
+    // 猜拳卡住時的逃生:房主→取消回大廳(保留房間,大家可重來);訪客→離開房間回單機
+    function bailFromRps(){ if(isHost) again(); else leave(); }
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       $("mpConnect").classList.add("hidden");
@@ -1814,7 +1819,7 @@ const FIREBASE_CONFIG = {
     return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap,
-             amHost, setSize:setBoardSize, roster, sendEmote, revealSkip };
+             amHost, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps };
   })();
 
   /* ---------- Wire up ---------- */
@@ -1863,6 +1868,7 @@ const FIREBASE_CONFIG = {
   $("orderSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.setOrderMethod(b.dataset.order);});
   $("rpsBtns").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.throwRps(b.dataset.rps);b.blur();});
   $("revealSkip").addEventListener("click",()=>MP.revealSkip());
+  $("mpVeilLeave").addEventListener("click",()=>MP.bailFromRps());
   $("orderConfirm").addEventListener("click",()=>MP.confirmOrder());
   $("mpLeaveBtn").addEventListener("click",()=>MP.leave());
   $("mpAgain").addEventListener("click",()=>MP.again());
