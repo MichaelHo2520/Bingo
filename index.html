@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.13.1 -->
-<meta name="version" content="1.13.1">
+<!-- BINGO 賓果遊戲 · v1.14.0 -->
+<meta name="version" content="1.14.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -322,7 +322,6 @@
   }
   .mp-input.wide{flex:1}
   .mp-input::placeholder{color:var(--muted)}
-  #mpCode,#mpCreateCode{letter-spacing:6px;font-family:'Fredoka';text-align:center}
   .or-divider{display:flex;align-items:center;gap:12px;margin:16px 2px 12px;color:var(--muted);font-size:12.5px;font-weight:800}
   .or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:var(--panel-line)}
   /* 連線面板標題列:返回箭頭 + 標題 */
@@ -349,12 +348,23 @@
     background:rgba(255,255,255,.10);border:1px solid var(--panel-line);border-radius:12px;
     padding:12px 14px;cursor:pointer;color:var(--text);font-weight:800;transition:transform .1s,border-color .12s}
   .room-item:hover{transform:translateY(-1px);border-color:var(--accent)}
-  .room-item .rc{font-family:'Fredoka';font-size:18px;letter-spacing:2px}
-  .room-item .meta{margin-left:auto;color:var(--muted);font-size:13px;font-weight:700}
+  .room-item .rn{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px}
+  .room-item .rc{flex:none;font-family:'Fredoka';font-size:12.5px;letter-spacing:1px;color:var(--muted);font-weight:700}
+  .room-item .meta{margin-left:auto;flex:none;color:var(--muted);font-size:13px;font-weight:700}
   .room-item.busy{opacity:.5;cursor:not-allowed}
   .room-item.busy:hover{transform:none;border-color:var(--panel-line)}
   .room-empty{color:var(--muted);font-size:13px;padding:6px 2px}
   :root[data-theme="ebook"] .room-item{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .room-item .rc,:root[data-theme="ebook"] .room-item .meta{color:#555}
+  /* 房間橫幅裡的小號碼標籤(房名為主、號碼為輔) */
+  .room-code-tag{font-family:'Fredoka';font-size:12px;letter-spacing:1px;color:var(--muted);font-weight:700;margin-left:7px;vertical-align:middle}
+  /* 加入區:即時偵測膠囊 + 重新偵測鈕同一列 */
+  .mp-detect-row{display:flex;align-items:center;gap:8px;margin:0 2px}
+  .mp-detect-row .mp-live{flex:1;justify-content:flex-start;margin:0}
+  .mp-rescan{flex:none;width:40px;height:38px;border:1px solid var(--panel-line);border-radius:12px;
+    background:rgba(255,255,255,.06);color:var(--muted);font-size:18px;cursor:pointer;display:grid;place-items:center;transition:.15s}
+  .mp-rescan:hover{background:rgba(255,255,255,.12);color:var(--text);border-color:var(--accent)}
+  :root[data-theme="ebook"] .mp-rescan{background:#fff;border:1px solid #000;color:#000}
   /* 大廳即時房間狀態膠囊:一眼看出現在有沒有人開房,不必一直按🔍 */
   .mp-live{display:inline-flex;align-items:center;gap:9px;max-width:100%;margin:0 2px;
     padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.06);
@@ -681,21 +691,17 @@
 
     <div class="or-divider"><span>建立新房間</span></div>
     <div class="field">
-      <input id="mpCreateCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="指定房號(留空隨機)">
+      <input id="mpRoomName" class="mp-input" maxlength="12" placeholder="房間名稱(留空用你的暱稱)">
     </div>
     <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
 
     <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
-    <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
-      <span class="dot" aria-hidden="true"></span><span id="mpLiveTxt">偵測目前房間中…</span>
-    </div>
-    <div class="field">
-      <div class="input-wrap">
-        <input id="mpCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="房號">
-        <button class="input-icon-btn" id="mpScan" title="重新偵測房間" aria-label="重新偵測房間">🔍</button>
+    <div class="mp-detect-row">
+      <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span><span id="mpLiveTxt">偵測目前房間中…</span>
       </div>
+      <button class="mp-rescan" id="mpScan" title="重新偵測房間" aria-label="重新偵測房間">🔍</button>
     </div>
-    <button class="btn outline block-btn" id="mpJoin" disabled>加入房間 ▸</button>
     <div class="room-list" id="mpRoomList"></div>
     <div class="hint" id="mpConnMsg"></div>
   </section>
@@ -703,7 +709,7 @@
   <!-- ====== ONLINE: room banner ====== -->
   <div class="panel hidden" id="mpBar">
     <div class="row" style="margin-top:0;justify-content:space-between">
-      <span class="label">房號 <b id="mpRoomCode" class="display" style="font-size:20px;letter-spacing:2px"></b></span>
+      <span class="label">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b><span class="room-code-tag" id="mpRoomTag"></span></span>
       <span style="display:flex;align-items:center;gap:10px">
         <span class="mp-status" id="mpStatusTxt">等待中…</span>
         <button class="mini" id="mpLeaveBtn" title="離開房間" style="width:auto;padding:0 12px;font-size:13px">離開</button>
@@ -751,7 +757,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.13.1</span></footer>
+  <footer><span class="ver">BINGO · v1.14.0</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -966,7 +972,9 @@ const FIREBASE_CONFIG = {
       line(){[523,659,784].forEach((f,i)=>tone(f,{type:"triangle",dur:0.17,vol:0.18,delay:i*0.06}));},
       emote(){tone(880,{type:"sine",dur:0.09,vol:0.13,slideTo:1245});},
       ctx(){ return ac(); },   // 給語音留言用同一個(已解鎖)AudioContext 播放,繞過 iOS 自動播放限制
-      win(){[523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46});}
+      win(){[523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46});},
+      // 輸的音效:與 win 的上行呼應,改成下行三音+尾端往下滑,做出「失落」感(平手不走這裡,平手用 win)
+      lose(){[415,349,277].forEach((f,i)=>tone(f,{type:"triangle",dur:0.30,vol:0.20,delay:i*0.16})); tone(220,{type:"sine",dur:0.6,vol:0.13,delay:0.5,slideTo:147});}
     };
   })();
 
@@ -1565,6 +1573,7 @@ const FIREBASE_CONFIG = {
   /* ---------- Multiplayer (Firebase) ---------- */
   const MP=(function(){
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false;
+    let roomName="";                             // 房主設定的房間名稱(對外顯示用;內部仍以 code 當資料庫鍵值)
     let roomsWatchRef=null, lastRoomsSig=null;   // 大廳常駐監聽:即時反映房間開/關,免得一直按🔍
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let orderMethod="rps", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
@@ -1619,7 +1628,7 @@ const FIREBASE_CONFIG = {
       $("setupActions").classList.add("hidden");
       $("mpConnect").classList.remove("hidden");
       $("mpRoomList").innerHTML="";
-      setMsg(available()?"":"⚠ 尚未設定 Firebase。請依說明建立免費專案並把設定貼進檔案,連線才會啟用。");
+      setMsg(available()?"點下方房間即可直接加入":"⚠ 尚未設定 Firebase。請依說明建立免費專案並把設定貼進檔案,連線才會啟用。");
       if(available()) startRoomWatch();               // 進來就自動偵測並持續更新,不必一直按🔍
       else setLive("none","連線未啟用");
     }
@@ -1635,12 +1644,12 @@ const FIREBASE_CONFIG = {
         const r=rooms[c]||{};
         const ps=r.players||{};
         const hostName=(r.host&&ps[r.host]&&ps[r.host].name)||"";   // 房主名稱(取房主 id 對應的玩家名)
-        return { code:c, status:r.status||"lobby", count:Object.keys(ps).length, host:hostName };
+        return { code:c, status:r.status||"lobby", count:Object.keys(ps).length, host:hostName, name:(r.roomName||"") };
       }).filter(r=>r.count>0).sort((a,b)=>a.code.localeCompare(b.code));
     }
     // 依整理後的清單更新房間列表與狀態膠囊(內容沒變就不重繪,避免遊戲中叫號一直觸發、干擾點擊)
     function applyRooms(items){
-      const sig=items.map(r=>r.code+":"+r.status+":"+r.count+":"+r.host).join("|");
+      const sig=items.map(r=>r.code+":"+r.status+":"+r.count+":"+r.host+":"+r.name).join("|");
       if(sig===lastRoomsSig)return;
       lastRoomsSig=sig;
       renderRoomList(items);
@@ -1673,8 +1682,9 @@ const FIREBASE_CONFIG = {
         const it=document.createElement("button");
         it.type="button"; it.className="room-item"+(joinable?"":" busy"); it.disabled=!joinable;
         const hostTag=r.host?'👑 '+esc(r.host)+' · ':'';
-        it.innerHTML='<span class="rc">'+esc(r.code)+'</span><span class="meta">'+hostTag+'👥 '+r.count+' 人 · '+(joinable?"等待中":"遊戲中")+'</span>';
-        if(joinable) it.addEventListener("click",()=>{ $("mpCode").value=r.code; join(r.code,$("mpName").value); });
+        const nm=r.name||("房間 "+r.code);   // 舊房間沒房名時,退回用號碼當名字
+        it.innerHTML='<span class="rn">🏠 '+esc(nm)+'</span><span class="rc">#'+esc(r.code)+'</span><span class="meta">'+hostTag+'👥 '+r.count+' 人 · '+(joinable?"等待中":"遊戲中")+'</span>';
+        if(joinable) it.addEventListener("click",()=>join(r.code,$("mpName").value,r.name));
         box.appendChild(it);
       });
     }
@@ -1685,29 +1695,26 @@ const FIREBASE_CONFIG = {
       $("setupActions").classList.remove("hidden");
     }
 
-    function create(name,wantCode){
+    function create(name,wantName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
       meName=(name||"玩家").slice(0,8); meId=pid(); isHost=true;
-      const desired=(wantCode||"").replace(/\D/g,"").trim();       // 指定房號(可留空)
-      if(desired && desired.length!==4){ setMsg("房號請輸入 4 位數字,或留空由系統隨機。"); return; }
-      code = desired || randomCode();
-      roomRef=db.ref("rooms/"+code);
+      roomName=(wantName||"").trim().slice(0,12) || (meName+"的房間");   // 房名可留空,預設用暱稱
+      code=randomCode(); roomRef=db.ref("rooms/"+code);                  // 內部隨機 4 位碼當資料庫鍵值(玩家看不到)
       roomRef.child("host").once("value").then(snap=>{
-        if(snap.exists()){
-          if(desired){ setMsg("房號 "+desired+" 已被使用,換一個或留空隨機。"); throw "taken"; }
-          code=randomCode(); roomRef=db.ref("rooms/"+code);        // 隨機模式才自動避開撞號
-        }
-        return roomRef.update({ host:meId, status:"lobby", target:state.target, size:SIZE, orderMethod:"rps",
+        if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }   // 撞號就重抽一次
+        return roomRef.update({ host:meId, roomName:roomName, status:"lobby", target:state.target, size:SIZE, orderMethod:"rps",
           calledList:[], winner:null, order:null, turnIndex:0, rps:null, emotes:null, createdAt:Date.now() });
-      }).then(()=>{ joinNode(); enterLobby(); }).catch(e=>{ if(e!=="taken") setMsg("建立房間失敗:"+((e&&e.message)||e)); });
+      }).then(()=>{ joinNode(); enterLobby(); }).catch(e=>setMsg("建立房間失敗:"+((e&&e.message)||e)));
     }
-    function join(inCode,name){
+    function join(inCode,name,inName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
       const c=(inCode||"").replace(/\D/g,"").trim();
-      if(c.length<4){ setMsg("請輸入完整房號(4 位數字)。"); return; }
-      meName=(name||"玩家").slice(0,8); meId=pid(); isHost=false; code=c; roomRef=db.ref("rooms/"+code);
-      roomRef.child("host").once("value").then(snap=>{
-        if(!snap.exists()){ setMsg("找不到這個房間,請確認房號。"); return; }
+      if(c.length<4){ setMsg("請從下方清單選擇房間加入。"); return; }
+      meName=(name||"玩家").slice(0,8); meId=pid(); isHost=false; code=c; roomName=inName||""; roomRef=db.ref("rooms/"+code);
+      roomRef.once("value").then(snap=>{
+        const r=snap.val();
+        if(!r||!r.host){ setMsg("這個房間已經關閉了,請重新選擇。"); return; }
+        roomName=inName||r.roomName||("房間 "+code);   // 以房主設定的房名為準
         joinNode(); enterLobby();
       }).catch(e=>setMsg("加入失敗:"+e.message));
     }
@@ -1740,7 +1747,8 @@ const FIREBASE_CONFIG = {
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
       $("mpBar").classList.remove("hidden");
-      $("mpRoomCode").textContent=code;
+      $("mpRoomTitle").textContent=roomName||("房間 "+code);
+      $("mpRoomTag").textContent="#"+code;
       $("startBtn").classList.add("hidden");
       $("onlineBtn").classList.add("hidden");
       $("mpReadyBtn").classList.remove("hidden");
@@ -2296,7 +2304,7 @@ const FIREBASE_CONFIG = {
           $("winWord").textContent="你輸了";
           $("winMsg").textContent=dispName(wid)+" 先完成了 "+lines+" 條線";
         }
-        if(!outcomeShown && mine){ Sound.win(); burst(); }
+        if(!outcomeShown){ if(mine){ Sound.win(); burst(); } else { Sound.lose(); } }
       }
       outcomeShown=true;
       render();
@@ -2482,13 +2490,10 @@ const FIREBASE_CONFIG = {
   // multiplayer
   $("onlineBtn").addEventListener("click",()=>MP.openConnect());
   $("mpBack").addEventListener("click",()=>MP.closeConnect());
-  $("mpCreate").addEventListener("click",()=>MP.create($("mpName").value,$("mpCreateCode").value));
-  $("mpJoin").addEventListener("click",()=>MP.join($("mpCode").value,$("mpName").value));
+  $("mpCreate").addEventListener("click",()=>MP.create($("mpName").value,$("mpRoomName").value));
   $("mpScan").addEventListener("click",()=>MP.scanRooms());
   $("mpName").addEventListener("change",savePrefs);   // 暱稱記住,下次自動帶入
-  // 沒填房號 → 加入鈕停用(有填任何數字才亮起)
-  const syncJoinBtn=()=>{ $("mpJoin").disabled = !$("mpCode").value.replace(/\D/g,"").length; };
-  $("mpCode").addEventListener("input",syncJoinBtn); syncJoinBtn();
+  $("mpRoomName").addEventListener("keydown",e=>{ if(e.key==="Enter")MP.create($("mpName").value,$("mpRoomName").value); });
   $("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
   $("mpStartBtn").addEventListener("click",()=>MP.startGame());
   $("orderSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.setOrderMethod(b.dataset.order);});
