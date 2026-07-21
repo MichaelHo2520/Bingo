@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.7.2 -->
-<meta name="version" content="1.7.2">
+<!-- BINGO 賓果遊戲 · v1.7.3 -->
+<meta name="version" content="1.7.3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -428,6 +428,8 @@
   :root[data-theme="midnight"] .emote-fab,
   :root[data-theme="arcade"] .emote-fab{color:var(--daub-ink)}
   :root[data-theme="ebook"] .emote-fab{background:#fff;color:#000;border:1px solid #000;box-shadow:none}
+  /* 連線中:底部預留淨空,讓右下浮動互動鈕落在最底排數字的下方,小螢幕才不會蓋到號碼 */
+  body.mp-live{padding-bottom:96px}
   .emote-card{max-width:340px}
   .emote-to{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
   .emote-to-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.10);color:var(--text);
@@ -596,7 +598,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.7.2</span></footer>
+  <footer><span class="ver">BINGO · v1.7.3</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1261,6 +1263,7 @@ const FIREBASE_CONFIG = {
       $("sizeRow").style.display=isHost?"":"none";       // 只有房主能改盤面大小
       syncOrderRow();                                     // 出手順序:大家都看得到目前選擇(訪客唯讀)
       $("emoteFab").classList.remove("hidden");           // 連線中顯示互動鈕
+      document.body.classList.add("mp-live");             // 盤面底部預留空間,浮動鈕不蓋號碼
       state.fill="auto"; state.card=shuffled(); state.mode="setup";
       render(); applyFillUI(); updateReadyBtn();
       listen();
@@ -1784,6 +1787,7 @@ const FIREBASE_CONFIG = {
       $("mpConnect").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
       $("emoteFab").classList.add("hidden");
+      document.body.classList.remove("mp-live");          // 離開連線,取消底部預留
       $("startBtn").classList.remove("hidden");
       $("onlineBtn").classList.remove("hidden");
       $("targetRow").style.display="";
