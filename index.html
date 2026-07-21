@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.7.0 -->
-<meta name="version" content="1.7.0">
+<!-- BINGO 賓果遊戲 · v1.7.1 -->
+<meta name="version" content="1.7.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -596,7 +596,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.7.0</span></footer>
+  <footer><span class="ver">BINGO · v1.7.1</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1444,7 +1444,7 @@ const FIREBASE_CONFIG = {
       const seq=(rps&&rps.seq)||1;
       const throws=(rps&&rps.throws)||{};
       const mg=myGroup();
-      const mine=throws[meId]&&throws[meId].s===seq;
+      const mine=!!(throws[meId]&&throws[meId].s===seq);   // 需為布林:classList.toggle 收到 undefined 會「翻轉」而非設定,平手重猜時會亂亮
       const inGroup = mg && mg.length>1;               // 你在還要比大小的組裡
       const btns=$("rpsBtns");
       btns.style.display = inGroup ? "" : "none";        // 出拳前後都顯示(讓你選的那個留著)
