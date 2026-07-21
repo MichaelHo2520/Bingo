@@ -1437,8 +1437,7 @@ const FIREBASE_CONFIG = {
         chip.addEventListener("click",()=>openEmote(id===meId?"all":id));   // 點對象 → 開表情面板
         const seatIdx=order.indexOf(id);
         const seatBadge=(status==="playing"&&seatIdx>=0)?'<span class="seat-badge">'+(seatIdx+1)+'</span>':'';
-        const nameHtml=esc(dispName(id))+(id===meId?'(你)':'');
-        chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+nameHtml+'</span>'+
+        chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+esc(dispName(id))+'</span>'+youTag(id)+
           (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'');
         if(isHost && status==="lobby" && id!==meId){
           const k=document.createElement("button");
@@ -1557,9 +1556,9 @@ const FIREBASE_CONFIG = {
       const box=$("rpsThrows"); box.innerHTML="";
       gs.map(g=>String(g).split(",")).filter(m=>m.length>1).reduce((a,m)=>a.concat(m),[]).filter(id=>players[id]).forEach(id=>{
         const done=throws[id]&&throws[id].s===seq;
-        const chip=document.createElement("div"); chip.className="mp-chip"+(done?" ready":"");
+        const chip=document.createElement("div"); chip.className="mp-chip"+(done?" ready":"")+(id===meId?" me":"");
         // 只顯示「是否已出拳」,絕不透露對方出的拳(避免後出的人偷看)
-        chip.innerHTML='<span class="dot"></span><span>'+esc(dispName(id))+'</span><span class="ln">'+(done?"已出拳":"等待中")+'</span>';
+        chip.innerHTML='<span class="dot"></span><span>'+esc(dispName(id))+'</span>'+youTag(id)+'<span class="ln">'+(done?"已出拳":"等待中")+'</span>';
         box.appendChild(chip);
       });
     }
@@ -1577,10 +1576,10 @@ const FIREBASE_CONFIG = {
       ids.forEach((id,idx)=>{
         const c=(throws[id]&&throws[id].s===seq)?throws[id].c:null;
         const it=document.createElement("div");
-        it.className="reveal-hand tie";
+        it.className="reveal-hand tie"+(id===meId?" me":"");
         it.style.animationDelay=(idx*0.08)+"s";
-        it.innerHTML='<span class="emo">'+(RPS_EMO[c]||"❔")+'</span>'+
-          '<span class="nm">'+esc(dispName(id))+(id===meId?"(你)":"")+'</span>'+
+        it.innerHTML=youTag(id)+'<span class="emo">'+(RPS_EMO[c]||"❔")+'</span>'+
+          '<span class="nm">'+esc(dispName(id))+'</span>'+
           '<span class="txt">'+(RPS_TXT[c]||"")+'</span>';
         box.appendChild(it);
       });
@@ -1625,7 +1624,7 @@ const FIREBASE_CONFIG = {
         tieTimer=setTimeout(()=>{
           tieTimer=null;
           roomRef.update({ "rps/seq":seq+1, "rps/throws":null, "rps/reveal":acc, "rps/tie":null });
-        }, 2000);
+        }, 1500);
       }else{
         // 定案 → 先進入過場揭曉(帶著大家的出拳與最終順序),再由房主自動開打
         const finalOrder=newGroups.reduce((a,g)=>a.concat(g),[]);
@@ -1659,18 +1658,18 @@ const FIREBASE_CONFIG = {
       ids.forEach((id,idx)=>{
         const c=throws[id];
         const it=document.createElement("div");
-        it.className="reveal-hand"+(idx===0?" win":"");
+        it.className="reveal-hand"+(idx===0?" win":"")+(id===meId?" me":"");
         it.style.animationDelay=(idx*0.12)+"s";
-        it.innerHTML='<span class="rk">'+(idx+1)+'</span>'+
+        it.innerHTML=youTag(id)+'<span class="rk">'+(idx+1)+'</span>'+
           '<span class="emo">'+(RPS_EMO[c]||"❔")+'</span>'+
-          '<span class="nm">'+esc(dispName(id))+(id===meId?"(你)":"")+'</span>'+
+          '<span class="nm">'+esc(dispName(id))+'</span>'+
           '<span class="txt">'+(RPS_TXT[c]||"")+'</span>';
         box.appendChild(it);
       });
       const oe=$("revealOrder");
       if(oe){
         const champ=ids[0];   // 排第一 = 贏家,先出號 → 用大字強調,一眼看清是誰
-        let html='<div class="reveal-champ">🏆 <span class="nm">'+esc(dispName(champ))+(champ===meId?"(你)":"")+'</span> 先出號!</div>';
+        let html='<div class="reveal-champ">🏆 <span class="nm">'+esc(dispName(champ))+'</span>'+youTag(champ)+' 先出號!</div>';
         if(ids.length>2) html+='<div class="reveal-seq">出手順序:'+ids.map(id=>esc(dispName(id))).join(" → ")+'</div>';
         oe.innerHTML=html;
       }
