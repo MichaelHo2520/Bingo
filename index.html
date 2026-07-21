@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.2 -->
-<meta name="version" content="1.9.2">
+<!-- BINGO 賓果遊戲 · v1.9.3 -->
+<meta name="version" content="1.9.3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -510,9 +510,9 @@
   :root[data-theme="ebook"] .emote-fly.is-text .ef-emo{background:#fff;color:#000;border:1px solid #000}
   @keyframes emoteFloat{
     0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
-    15%{opacity:1;transform:translate(-50%,-64%) scale(1.15)}
-    32%{transform:translate(-50%,-74%) scale(1)}
-    100%{opacity:0;transform:translate(-50%,-165%) scale(1)}
+    15%{opacity:1;transform:translate(-50%,-90%) scale(1.15)}
+    32%{transform:translate(-50%,-140%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-360%) scale(1)}
   }
   :root[data-theme="ebook"] .emote-fly .ef-cap{background:#000}
   #toast{
@@ -662,7 +662,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.2</span></footer>
+  <footer><span class="ver">BINGO · v1.9.3</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1189,11 +1189,9 @@ const FIREBASE_CONFIG = {
   // 顯示一個飛起的表情:定位到目標玩家的晶片(找不到就畫面中央),下方標註誰傳給誰
   function showEmote(emoji,caption,anchorId,kind){
     const layer=$("emoteFly"); if(!layer)return;
-    let x=innerWidth/2, y=innerHeight*0.42;
-    if(anchorId){
-      const chip=$("mpPlayers")&&$("mpPlayers").querySelector('.mp-chip[data-id="'+anchorId+'"]');
-      if(chip){ const r=chip.getBoundingClientRect(); x=r.left+r.width/2; y=r.top+r.height/2; }
-    }
+    let x=innerWidth/2, y=innerHeight*0.5;
+    const grid=$("grid");          // 起點固定在棋盤正中央,往上飄(不再錨定玩家晶片)
+    if(grid){ const g=grid.getBoundingClientRect(); if(g.width){ x=g.left+g.width/2; y=g.top+g.height/2; } }
     x += (Math.random()-0.5)*36;   // 一點點抖動,避免連發完全重疊
     const el=document.createElement("div"); el.className="emote-fly"+(kind==="text"?" is-text":"");
     el.style.left=x+"px"; el.style.top=y+"px";
