@@ -2,10 +2,15 @@
 <html lang="zh-Hant" data-theme="sunset">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- PWA:iOS Safari 不支援 Fullscreen API,靠「加入主畫面」以 standalone 全螢幕開啟 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.8.2 -->
-<meta name="version" content="1.8.2">
+<!-- BINGO 賓果遊戲 · v1.9.0 -->
+<meta name="version" content="1.9.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -333,7 +338,7 @@
   .mp-chip .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
   .mp-chip.ready .dot{background:var(--accent)}
   .mp-chip .ln{font-family:'Fredoka';color:var(--accent);font-weight:700}
-  .mp-chip.me{border-color:var(--accent)}
+  .mp-chip.me{border-color:var(--accent-2);box-shadow:0 0 0 2px var(--accent-2)}  /* 自己的晶片:accent-2 光環,和別人拉開差距 */
   /* 房主用:大廳時每個非自己的玩家晶片右側出現的移除鈕 */
   .mp-chip .mp-kick{display:inline-grid;place-items:center;width:20px;height:20px;margin-left:3px;padding:0;
     border:none;border-radius:50%;background:#ff5252;color:#fff;line-height:0;cursor:pointer;
@@ -395,6 +400,7 @@
   /* 猜拳過場:揭曉大家出了什麼 */
   .reveal-hands{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:12px 0 14px}
   .reveal-hand{
+    position:relative;                               /* 承載右上角「你」徽章 */
     display:flex;flex-direction:column;align-items:center;gap:3px;min-width:86px;
     background:rgba(255,255,255,.10);border:2px solid var(--panel-line);border-radius:16px;
     padding:12px 14px 10px;opacity:0;transform:translateY(10px) scale(.85);
@@ -407,6 +413,9 @@
   .reveal-hand.win{border-color:var(--accent);background:rgba(255,255,255,.20)}
   .reveal-hand.win .nm{color:var(--accent)}          /* 贏家的名字用強調色,一眼認出 */
   .reveal-hand.tie{border-style:dashed;opacity:.92}  /* 平手揭曉:虛線框,表示還沒定案 */
+  /* 「你」高反差:自己的卡片用 accent-2 光環 + 加粗名字,和其他人拉開差距 */
+  .reveal-hand.me{border-color:var(--accent-2);box-shadow:0 0 0 3px var(--accent-2),0 0 16px var(--accent-2);background:rgba(255,255,255,.18)}
+  .reveal-hand.me .nm{font-weight:900}
   @keyframes revealPop{to{opacity:1;transform:none}}
   .reveal-order{text-align:center;font-weight:800;font-size:15px;margin-top:2px;line-height:1.5}
   /* 揭曉:先出號的贏家大字強調,清楚看見是誰 */
@@ -419,6 +428,14 @@
   :root[data-theme="ebook"] .reveal-hand.win .nm,
   :root[data-theme="ebook"] .reveal-hand.win .txt{color:#fff}
   :root[data-theme="ebook"] .reveal-champ .nm{color:#000}
+  /* 「你」徽章:醒目膠囊,晶片/揭曉/名單一眼認出自己 */
+  .you-badge{display:inline-block;background:var(--accent-2);color:#1c1008;font-family:'Fredoka';
+    font-weight:700;font-size:11px;line-height:1;padding:3px 8px;border-radius:999px;margin-left:6px;
+    vertical-align:middle;box-shadow:0 1px 5px rgba(0,0,0,.28)}
+  .reveal-hand .you-badge{position:absolute;top:-9px;right:-6px;margin:0;font-size:10.5px;padding:3px 8px}
+  :root[data-theme="midnight"] .you-badge,
+  :root[data-theme="arcade"] .you-badge{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .you-badge{background:#000;color:#fff}
   .order-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
   .order-item{
     display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.10);
@@ -447,18 +464,7 @@
   :root[data-theme="ebook"] .rps-btn.chosen{background:#000;color:#fff}
   :root[data-theme="ebook"] .cell.callable{box-shadow:0 0 0 3px #000 inset}
   /* ---------- 好友互動表情 ---------- */
-  .emote-fab{
-    position:fixed;right:18px;bottom:20px;z-index:56;width:56px;height:56px;border-radius:50%;
-    border:1px solid var(--panel-line);background:linear-gradient(135deg,var(--accent),var(--accent-2));
-    color:#1c1008;font-size:28px;line-height:1;cursor:pointer;display:grid;place-items:center;
-    box-shadow:0 6px 18px rgba(0,0,0,.32);transition:transform .12s}
-  .emote-fab:hover{transform:translateY(-2px) scale(1.05)}
-  .emote-fab:active{transform:scale(.94)}
-  :root[data-theme="midnight"] .emote-fab,
-  :root[data-theme="arcade"] .emote-fab{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .emote-fab{background:#fff;color:#000;border:1px solid #000;box-shadow:none}
-  /* 連線中:底部預留淨空,讓右下浮動互動鈕落在最底排數字的下方,小螢幕才不會蓋到號碼 */
-  body.mp-live{padding-bottom:96px}
+  /* 互動鈕已改放右上工具列(.tools),不再用浮動鈕,盤面數字不會被蓋到 */
   .emote-card{max-width:340px}
   .emote-to{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
   .emote-to-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.10);color:var(--text);
@@ -475,12 +481,28 @@
   .emote-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .emote-btn:active{transform:scale(.9)}
   :root[data-theme="ebook"] .emote-btn{background:#fff;border:1px solid #000}
+  /* 罐頭文字訊息(一句話) */
+  .emote-sub{font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;color:var(--muted);letter-spacing:.3px;margin:16px 0 8px}
+  .emote-phrases{display:flex;flex-wrap:wrap;gap:8px}
+  .phrase-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    border-radius:999px;padding:9px 15px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
+    cursor:pointer;transition:transform .1s,background .15s}
+  .phrase-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
+  .phrase-btn:active{transform:scale(.94)}
+  :root[data-theme="ebook"] .phrase-btn{background:#fff;border:1px solid #000}
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
   .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
     align-items:center;gap:3px;animation:emoteFloat 2.2s ease-out forwards}
   .emote-fly .ef-emo{font-size:46px;line-height:1;filter:drop-shadow(0 3px 8px rgba(0,0,0,.4))}
   .emote-fly .ef-cap{font-family:'Fredoka';font-weight:600;font-size:12px;color:#fff;white-space:nowrap;
     background:rgba(0,0,0,.5);padding:2px 9px;border-radius:999px}
+  /* 文字罐頭訊息:飛出時用對話泡泡樣式,而不是超大 emoji */
+  .emote-fly.is-text .ef-emo{font-size:19px;font-family:'Nunito',sans-serif;font-weight:800;color:#1c1008;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));padding:8px 16px;border-radius:16px;
+    white-space:nowrap;line-height:1.25;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
+  :root[data-theme="midnight"] .emote-fly.is-text .ef-emo,
+  :root[data-theme="arcade"] .emote-fly.is-text .ef-emo{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .emote-fly.is-text .ef-emo{background:#fff;color:#000;border:1px solid #000}
   @keyframes emoteFloat{
     0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
     15%{opacity:1;transform:translate(-50%,-64%) scale(1.15)}
@@ -510,6 +532,7 @@
       <span class="bulb">B</span><span class="bulb">I</span><span class="bulb">N</span><span class="bulb">G</span><span class="bulb">O</span>
     </div>
     <div class="tools">
+      <button class="icon-btn hidden" id="emoteBtn" title="傳送互動表情" aria-label="傳送互動表情">😀</button>
       <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
       <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
     </div>
@@ -635,7 +658,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.8.2</span></footer>
+  <footer><span class="ver">BINGO · v1.9.0</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -704,12 +727,13 @@
   </div>
 
   <!-- emoji 好友互動(連線) -->
-  <button class="emote-fab hidden" id="emoteFab" title="傳送互動表情" aria-label="傳送互動表情">😀</button>
   <div class="veil" id="emoteVeil">
     <div class="set-card emote-card">
       <div class="set-head" id="emoteHead">傳給全部人</div>
       <div class="emote-to" id="emoteTo"></div>
       <div class="emote-grid" id="emoteGrid"></div>
+      <div class="emote-sub">💬 一句話</div>
+      <div class="emote-phrases" id="emotePhrases"></div>
       <button class="btn ghost" id="emoteClose">關閉</button>
     </div>
   </div>
@@ -1094,18 +1118,31 @@ const FIREBASE_CONFIG = {
     toastT=setTimeout(()=>el.classList.remove("show"),dur||1100);
   }
   function toggleFull(){
-    if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}
-    else{document.exitFullscreen&&document.exitFullscreen();}
+    const de=document.documentElement;
+    const req=de.requestFullscreen||de.webkitRequestFullscreen;   // webkit:舊 Safari/Android
+    const exit=document.exitFullscreen||document.webkitExitFullscreen;
+    const fsEl=document.fullscreenElement||document.webkitFullscreenElement;
+    if(req){
+      if(fsEl){ exit&&exit.call(document); }
+      else{ req.call(de); }
+    }else{
+      // iOS Safari(iPhone)不支援 Fullscreen API → 引導改用「加入主畫面」以全螢幕開啟
+      const standalone = ("standalone" in navigator && navigator.standalone) ||
+                         (matchMedia&&matchMedia("(display-mode: standalone)").matches);
+      showToast(standalone ? "已是全螢幕模式 👍"
+                           : "iOS 請按 Safari 分享鈕 → 加入主畫面,即可全螢幕", 3000);
+    }
   }
 
   /* ---------- 好友互動表情(連線用) ---------- */
-  const EMOTES=["👍","❤️","😂","🎉","🔥","👏","😮","😢","😭","😎","🤯","😱","🥳","🤝","🙏","💪","😡","💩"];
+  const EMOTES=["👍","👎","❤️","😂","🎉","🔥","👏","😮","😢","😭","😎","🤯","🥳","🤝","🙏","💪","😡","💩"];
+  const PHRASES=["快一點!","你好慢~","加油~~","太扯了😂","穩住穩住","別緊張","嚇死我了","運氣真好"];
   let emoteTarget="all";                       // 目前要傳給誰:"all" 或某玩家 id
   function openEmote(target){
     if(!state.online)return;
     const roster=MP.roster();
     emoteTarget = (target && target!=="all" && roster.some(p=>p.id===target)) ? target : "all";
-    buildEmoteRecipients(); buildEmoteGrid();
+    buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases();
     Sound.wake();
     $("emoteVeil").classList.add("show");
   }
@@ -1133,8 +1170,17 @@ const FIREBASE_CONFIG = {
       g.appendChild(b);
     });
   }
+  function buildEmotePhrases(){
+    const g=$("emotePhrases"); if(!g)return; g.innerHTML="";
+    PHRASES.forEach(tx=>{
+      const b=document.createElement("button");
+      b.type="button"; b.className="phrase-btn"; b.textContent=tx;
+      b.addEventListener("click",()=>{ MP.sendEmote(emoteTarget,tx,"text"); closeEmote(); });
+      g.appendChild(b);
+    });
+  }
   // 顯示一個飛起的表情:定位到目標玩家的晶片(找不到就畫面中央),下方標註誰傳給誰
-  function showEmote(emoji,caption,anchorId){
+  function showEmote(emoji,caption,anchorId,kind){
     const layer=$("emoteFly"); if(!layer)return;
     let x=innerWidth/2, y=innerHeight*0.42;
     if(anchorId){
@@ -1142,7 +1188,7 @@ const FIREBASE_CONFIG = {
       if(chip){ const r=chip.getBoundingClientRect(); x=r.left+r.width/2; y=r.top+r.height/2; }
     }
     x += (Math.random()-0.5)*36;   // 一點點抖動,避免連發完全重疊
-    const el=document.createElement("div"); el.className="emote-fly";
+    const el=document.createElement("div"); el.className="emote-fly"+(kind==="text"?" is-text":"");
     el.style.left=x+"px"; el.style.top=y+"px";
     el.innerHTML='<span class="ef-emo">'+esc(emoji)+'</span><span class="ef-cap">'+esc(caption)+'</span>';   // esc:防止對方送入惡意內容
     layer.appendChild(el);
@@ -1194,6 +1240,8 @@ const FIREBASE_CONFIG = {
       const same=Object.keys(players).filter(x=>((players[x]&&players[x].name)||"玩家")===raw);
       return same.length<=1 ? raw : raw+(same.indexOf(id)+1);
     }
+    // 高反差「你」徽章:讓自己在名單/猜拳/揭曉裡一眼認出來(取代不明顯的「(你)」小字)
+    function youTag(id){ return id===meId ? '<span class="you-badge">你</span>' : ''; }
 
     function openConnect(){
       $("setup").classList.add("hidden");
@@ -1300,8 +1348,7 @@ const FIREBASE_CONFIG = {
       $("targetRow").style.display=isHost?"":"none";
       $("sizeRow").style.display=isHost?"":"none";       // 只有房主能改盤面大小
       syncOrderRow();                                     // 出手順序:大家都看得到目前選擇(訪客唯讀)
-      $("emoteFab").classList.remove("hidden");           // 連線中顯示互動鈕
-      document.body.classList.add("mp-live");             // 盤面底部預留空間,浮動鈕不蓋號碼
+      $("emoteBtn").classList.remove("hidden");           // 連線中:右上工具列顯示互動鈕
       state.fill="auto"; state.card=shuffled(); state.mode="setup";
       render(); applyFillUI(); updateReadyBtn();
       listen();
@@ -1853,8 +1900,7 @@ const FIREBASE_CONFIG = {
       $("mpStartBtn").classList.add("hidden");
       $("mpConnect").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
-      $("emoteFab").classList.add("hidden");
-      document.body.classList.remove("mp-live");          // 離開連線,取消底部預留
+      $("emoteBtn").classList.add("hidden");              // 離開連線,收起互動鈕
       $("startBtn").classList.remove("hidden");
       $("onlineBtn").classList.remove("hidden");
       $("targetRow").style.display="";
@@ -1869,10 +1915,11 @@ const FIREBASE_CONFIG = {
     function setBoardSize(n){ if(isHost&&roomRef&&n>=5&&n<=7) roomRef.child("size").set(n); }
     // 目前房間的玩家清單(給表情面板挑對象用),含顯示名與是否為自己
     function roster(){ return Object.keys(players).map(id=>({ id:id, name:dispName(id), me:id===meId })); }
-    function sendEmote(to,emoji){
+    function sendEmote(to,emoji,kind){
       if(!roomRef||!meId)return;
+      const isText=kind==="text";
       const ref=roomRef.child("emotes").push();
-      ref.set({ from:meId, to:to||"all", emoji:String(emoji).slice(0,8), at:firebase.database.ServerValue.TIMESTAMP });
+      ref.set({ from:meId, to:to||"all", emoji:String(emoji).slice(0,isText?24:8), kind:isText?"text":"emoji", at:firebase.database.ServerValue.TIMESTAMP });
       ref.onDisconnect().remove();
       setTimeout(()=>{ try{ ref.remove(); }catch(e){} }, 6000);   // 秀完自動清掉,避免資料無限累積
     }
@@ -1883,7 +1930,7 @@ const FIREBASE_CONFIG = {
       if(to!=="all" && to!==meId && e.from!==meId)return;
       const fromNm=dispName(e.from)+(e.from===meId?"(你)":"");
       const toNm=(to==="all")?"全部人":dispName(to)+(to===meId?"(你)":"");
-      showEmote(e.emoji, fromNm+" → "+toNm, (to!=="all")?to:e.from);
+      showEmote(e.emoji, fromNm+" → "+toNm, (to!=="all")?to:e.from, e.kind);
       if(e.from!==meId && (to==="all"||to===meId)) Sound.emote();
     }
 
@@ -1918,7 +1965,7 @@ const FIREBASE_CONFIG = {
   $("settingsBtn").addEventListener("click",openSettings);
   $("setClose").addEventListener("click",closeSettings);
   $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
-  $("emoteFab").addEventListener("click",()=>openEmote("all"));
+  $("emoteBtn").addEventListener("click",()=>openEmote("all"));
   $("emoteClose").addEventListener("click",closeEmote);
   $("emoteVeil").addEventListener("click",e=>{ if(e.target===$("emoteVeil"))closeEmote(); });
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
