@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v0.12.0 -->
-<meta name="version" content="0.12.0">
+<!-- BINGO 賓果遊戲 · v0.12.1 -->
+<meta name="version" content="0.12.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -259,7 +259,7 @@
   .mp-input::placeholder{color:var(--muted)}
   #mpCode{letter-spacing:6px;font-family:'Fredoka';text-align:center}
   .mp-status{font-weight:800;font-size:13px;color:var(--accent)}
-  .mp-players{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .mp-players{display:flex;flex-wrap:wrap;gap:14px 12px;margin-top:12px}
   .mp-chip{
     display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.10);
     border:1px solid var(--panel-line);border-radius:999px;padding:6px 13px;font-weight:800;font-size:14px;
@@ -274,8 +274,8 @@
   :root[data-theme="arcade"] .mp-chip .seat-badge{color:var(--daub-ink)}
   :root[data-theme="ebook"] .mp-chip .seat-badge{background:#000;color:#fff}
   /* 目前輪到的玩家:高對比 + 放大 + 脈動,一眼看出換誰 */
-  .mp-chip.turn{background:var(--accent);color:#1c1008;border-color:var(--accent);transform:scale(1.08);
-    font-size:15.5px;animation:turnpulse 1.2s ease-in-out infinite}
+  .mp-chip.turn{background:var(--accent);color:#1c1008;border-color:var(--accent);transform:scale(1.04);
+    font-size:15px;animation:turnpulse 1.2s ease-in-out infinite}
   .mp-chip.turn .dot{background:#1c1008}
   .mp-chip.turn .ln{color:#1c1008}
   .mp-chip.turn .seat-badge{background:#1c1008;color:var(--accent)}
@@ -285,14 +285,20 @@
   :root[data-theme="ebook"] .mp-chip.turn .ln{color:#fff}
   :root[data-theme="ebook"] .mp-chip.turn .seat-badge{background:#fff;color:#000}
   .mp-play{
-    width:min(92vw,520px);display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    background:var(--panel);border:1px solid var(--panel-line);border-radius:15px;padding:12px 16px;
+    width:min(92vw,520px);display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;padding:14px 20px;
   }
-  .mp-last{display:flex;flex-direction:column;gap:2px}
-  .mp-last-num{font-size:34px;font-weight:700;line-height:1}
-  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:20px;line-height:1}
-  .mp-turn{flex:1;min-width:120px;margin-left:auto;text-align:right;font-weight:800;font-size:16px;color:var(--accent)}
+  .mp-hud-item{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  .mp-hud-item + .mp-hud-item{padding-left:20px;border-left:1px solid var(--panel-line)}
+  .mp-ball{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-size:24px;font-weight:700;line-height:1;
+    box-shadow:0 3px 10px rgba(0,0,0,.25)}
+  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:24px;line-height:1;color:var(--text)}
+  .mp-turn{margin-left:auto;text-align:center;font-weight:800;font-size:15px;color:var(--accent);
+    background:rgba(0,0,0,.16);padding:10px 16px;border-radius:999px}
   .mp-turn.wait{color:var(--muted)}
+  :root[data-theme="ebook"] .mp-ball{box-shadow:none;border:1px solid #000}
+  :root[data-theme="ebook"] .mp-turn{background:#fff;border:1px solid #000}
   .cell.callable{box-shadow:0 0 0 3px var(--accent) inset;cursor:pointer}
   .mp-panel{
     width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
@@ -421,8 +427,8 @@
 
     <!-- online play HUD (顯示在棋盤上方) -->
     <div class="mp-play hidden" id="mpControls">
-      <div class="mp-last"><span class="lbl">最新號碼</span><span class="mp-last-num display" id="mpLastNum">–</span></div>
-      <div class="mp-last"><span class="lbl">目標</span><span class="mp-goal-num display" id="mpGoalNum">5 線</span></div>
+      <div class="mp-hud-item"><span class="lbl">最新號碼</span><span class="mp-ball display" id="mpLastNum">–</span></div>
+      <div class="mp-hud-item"><span class="lbl">目標</span><span class="mp-goal-num display" id="mpGoalNum">5 線</span></div>
       <div class="mp-turn wait" id="mpTurn">等待開始…</div>
     </div>
 
@@ -467,7 +473,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v0.12.0</span></footer>
+  <footer><span class="ver">BINGO · v0.12.1</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
