@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.13.0 -->
-<meta name="version" content="1.13.0">
+<!-- BINGO 賓果遊戲 · v1.13.1 -->
+<meta name="version" content="1.13.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -751,7 +751,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.13.0</span></footer>
+  <footer><span class="ver">BINGO · v1.13.1</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -970,68 +970,60 @@ const FIREBASE_CONFIG = {
     };
   })();
 
-  /* ---------- 背景音樂(Web Audio 即時合成,不載任何音檔) ----------
-     溫柔的和弦墊 pad + 低音,以 I–V–vi–IV 一小節換一個和弦、循環播放;
-     與音效各自獨立(自己的開關與音量),共用 Sound 那顆已解鎖的 AudioContext,
-     沿用同一套繞過 iOS 自動播放的機制。 */
+  /* ---------- 背景音樂(獨立音檔 bgm.mp3,不內嵌) ----------
+     為了不讓 index.html 每次改動都連音樂一起變大,音樂拆成同目錄的獨立檔 `bgm.mp3`
+     (30 秒、可無縫循環),以相對路徑載入。主路徑走 Web Audio:fetch → decodeAudioData →
+     AudioBufferSource(loop) → GainNode(音量,iOS 也有效)→ destination;共用 Sound 已解鎖的
+     AudioContext(繞過 iOS 自動播放)。fetch/decode 失敗(離線、file:// 取不到)→ 退回
+     HTMLAudio;仍失敗就靜默關掉,App 不受影響、只是沒音樂。 */
   const BGM=(function(){
-    let master=null, timer=null, on=false, vol=0.35, idx=0;
-    const PROG=[   // 每組:[低音, 和弦三音…](C 大調 I–V–vi–IV)
-      [130.81,261.63,329.63,392.00],  // C
-      [ 98.00,196.00,246.94,293.66],  // G
-      [110.00,220.00,261.63,329.63],  // Am
-      [ 87.31,174.61,220.00,261.63]   // F
-    ];
-    const BAR=4.2;                      // 每個和弦時長(秒)
+    const SRC="bgm.mp3";
+    let master=null, buffer=null, node=null, el=null;
+    let on=false, vol=0.35, ready=false, loading=false, failed=false;
     function ctx(){ return (Sound.ctx && Sound.ctx()) || null; }
     function ensureMaster(c){
-      if(!master || master.context!==c){
-        master=c.createGain(); master.gain.value=on?vol:0.0001; master.connect(c.destination);
-      }
+      if(!master || master.context!==c){ master=c.createGain(); master.gain.value=vol; master.connect(c.destination); }
       return master;
     }
-    function chord(c,freqs,t){
+    function load(){
+      if(ready || failed)return Promise.resolve();
+      const c=ctx(); if(!c)return Promise.resolve();
+      if(loading)return Promise.resolve();
+      loading=true;
+      return fetch(SRC).then(r=>{ if(!r.ok)throw 0; return r.arrayBuffer(); })
+        .then(ab=>new Promise((res,rej)=>{ c.decodeAudioData(ab, b=>res(b), e=>rej(e)); }))
+        .then(b=>{ buffer=b; ready=true; loading=false; })
+        .catch(()=>{ loading=false; failed=true; });   // 取不到就標記失敗,交給 HTMLAudio 後備
+    }
+    function stopNode(){ if(node){ try{ node.stop(); node.disconnect(); }catch(e){} node=null; } }
+    function playBuffer(){
+      const c=ctx(); if(!c||!buffer)return;
+      stopNode();
       const m=ensureMaster(c);
-      freqs.forEach((f,i)=>{
-        const osc=c.createOscillator(), g=c.createGain();
-        osc.type = i===0 ? "sine" : "triangle";            // 低音用 sine、和弦用 triangle
-        osc.frequency.setValueAtTime(f,t);
-        const peak = i===0 ? 0.5 : 0.26;                    // 低音略大、和弦柔一點
-        g.gain.setValueAtTime(0.0001,t);
-        g.gain.exponentialRampToValueAtTime(peak,t+0.9);            // 慢起
-        g.gain.setValueAtTime(peak,t+BAR-1.1);
-        g.gain.exponentialRampToValueAtTime(0.0001,t+BAR-0.05);     // 慢收,不留爆音
-        osc.connect(g).connect(m);
-        osc.start(t); osc.stop(t+BAR);
-      });
-    }
-    function tick(){
-      const c=ctx(); if(!c)return;
       if(c.state==="suspended"){ c.resume().catch(()=>{}); }
-      chord(c, PROG[idx%PROG.length], c.currentTime+0.05); idx++;
+      node=c.createBufferSource(); node.buffer=buffer; node.loop=true;   // Web Audio 無縫循環
+      node.connect(m); node.start();
     }
-    function start(){
-      const c=ctx(); if(!c)return;
-      ensureMaster(c);
-      if(timer)return;      // 已在播
-      tick();               // 立刻先來一個和弦,不用等第一個 BAR
-      timer=setInterval(tick, BAR*1000);
-    }
-    function stop(){
-      if(timer){ clearInterval(timer); timer=null; }
-      if(master){ try{ const c=master.context; master.gain.cancelScheduledValues(c.currentTime); master.gain.setTargetAtTime(0.0001,c.currentTime,0.25); }catch(e){} }
+    function playFallback(){   // 後備:桌機/Android 仍能播(iOS 對 HTMLAudio 的音量可能無效)
+      try{ if(!el){ el=new Audio(SRC); el.loop=true; } el.volume=vol; el.play().catch(()=>{}); }catch(e){}
     }
     return {
       isOn(){ return on; },
       vol(){ return vol; },
       setOn(o){
         on=!!o;
-        if(on){ start(); if(master){ try{ const c=master.context; master.gain.cancelScheduledValues(c.currentTime); master.gain.setTargetAtTime(vol,c.currentTime,0.2); }catch(e){} } }
-        else{ stop(); }
+        if(on){
+          if(ready){ playBuffer(); }
+          else if(failed){ playFallback(); }
+          else { load().then(()=>{ if(!on)return; if(ready)playBuffer(); else playFallback(); }); }
+        }else{
+          stopNode(); if(el){ try{ el.pause(); }catch(e){} }
+        }
       },
       setVolume(v){
         vol=Math.max(0,Math.min(1,+v||0));
-        if(master && on){ try{ const c=master.context; master.gain.setTargetAtTime(vol,c.currentTime,0.05); }catch(e){} }
+        if(master){ try{ master.gain.setTargetAtTime(vol, master.context.currentTime, 0.05); }catch(e){ try{ master.gain.value=vol; }catch(_){} } }
+        if(el){ try{ el.volume=vol; }catch(e){} }
       }
     };
   })();
