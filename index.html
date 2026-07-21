@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.11.1 -->
-<meta name="version" content="1.11.1">
+<!-- BINGO 賓果遊戲 · v1.12.0 -->
+<meta name="version" content="1.12.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -723,7 +723,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.11.1</span></footer>
+  <footer><span class="ver">BINGO · v1.12.0</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1432,6 +1432,10 @@ const FIREBASE_CONFIG = {
     let revealData=null, revealTimer=null;  // 猜拳過場:大家出的拳 / 房主用的「揭曉後自動開打」計時器
     let tieTimer=null, tieSig="";           // 平手揭曉:房主用的「停留後自動重猜」計時器 / 避免重繪重播動畫
     let emotesReady=false;                   // 好友互動:是否已略過歷史 emotes(避免重播舊表情)
+    let connRef=null, connected=null;        // .info/connected 監聽 / 目前連線狀態(null=未知,尚未回報)
+    let resyncing=false, resyncTimer=null;   // 剛從背景/斷線恢復的寬限旗標與計時器(期間不把舊名單快照當成被踢)
+    let graceTimer=null;                     // 「暫時有人不見」的寬限計時器:逾時仍不見才真的離開/回大廳
+    const GRACE_MS=20000;                    // 斷線寬限期(手機切 App 常見情境):20 秒內回來就當沒事
     const RPS_EMO={R:"✊",S:"✌️",P:"✋"}, RPS_TXT={R:"石頭",S:"剪刀",P:"布"};
 
     function available(){
@@ -1563,10 +1567,9 @@ const FIREBASE_CONFIG = {
       }).catch(e=>setMsg("加入失敗:"+e.message));
     }
     function joinNode(){
-      const r=roomRef.child("players/"+meId);
-      r.set({ name:meName, lines:0, ready:false });
-      r.onDisconnect().remove();
-      if(isHost) roomRef.onDisconnect().remove();   // 房主斷線/關頁 → 自動關閉整個房間
+      armPresence({ name:meName, lines:0, ready:false });
+      // 註:不再於房主斷線時「整房刪除」——短暫切背景改由寬限期+重連歸位處理(見 watchConn/resume);
+      //     房主真的離開時 leave() 會 roomRef.remove() 關房,orphan 房間無玩家也會被大廳清單過濾掉。
     }
 
     function hidePhasePanels(){
@@ -1603,22 +1606,60 @@ const FIREBASE_CONFIG = {
       state.fill="auto"; state.card=shuffled(); state.mode="setup";
       render(); applyFillUI(); updateReadyBtn();
       listen();
+      watchConn();   // 開始監看連線狀態,支援斷線後自動歸位
     }
     // 訪客:確認過房主與玩家名單後,若房主(或整個房間)消失 → 自動退出連線
     function hostGone(){
       return !isHost && state.online && sawHost && sawPlayers && (!hostId || !players[hostId]);
     }
-    function kickIfHostGone(){
-      if(hostGone()){ showToast("房主已離開,房間已關閉"); leave(); return true; }
-      return false;
-    }
     // 訪客:曾在名單看過自己、如今自己被移除 → 被房主踢出,退回單機
     function iWasKicked(){
       return !isHost && state.online && sawMe && !players[meId];
     }
-    function kickIfKicked(){
-      if(iWasKicked()){ showToast("你已被房主移出房間"); leave(); return true; }
-      return false;
+    // 目前是否「穩定在線」:真的連著、不在剛恢復的寬限期、且分頁在前景。
+    // 用來分辨「被房主踢出」(穩定在線卻被移除 → 立即離開)與「自己切背景斷線」(交給寬限期+重連歸位)。
+    function stableOnline(){ return connected===true && !resyncing && !document.hidden; }
+
+    // ── 斷線復原(手機切到 LINE 等 App、分頁被凍結時 WebSocket 會斷,Firebase 依 onDisconnect 移除玩家節點)──
+    // 方法一(重連自動歸位):監聽 .info/connected,一重新連上就把自己重新寫回並重掛 onDisconnect;
+    //   回到前景(visibilitychange)也主動歸位一次(離線時寫入會排隊,連線恢復後送出)。
+    // 方法二(寬限期):名單顯示「我/房主暫時不見」時不立刻離開,寬限 GRACE_MS;回來就取消,逾時仍不見才真的離開。
+    function watchConn(){
+      if(connRef||!db)return;
+      connRef=db.ref(".info/connected");
+      connRef.on("value",s=>{
+        const now=!!s.val(), wasDown=(connected===false);
+        connected=now;
+        if(now && wasDown) resume("已重新連線");   // 斷線後重新連上 → 自動歸位並提示
+      });
+    }
+    function stopConn(){ if(connRef){ connRef.off(); connRef=null; } connected=null; }
+    // 重新寫回自己的玩家節點並重掛「斷線自動移除」;首次 join 與重連歸位共用(update 保留 winAt 等其它欄位)
+    function armPresence(data){
+      if(!roomRef||!meId)return;
+      const r=roomRef.child("players/"+meId);
+      r.update(data);
+      r.onDisconnect().remove();
+    }
+    // 從背景/斷線恢復:進入寬限期並主動把自己寫回(msg 有值才提示,避免只是短暫切前景也跳訊息)
+    function resume(msg){
+      if(!state.online||!roomRef||!meId)return;
+      resyncing=true;
+      if(resyncTimer)clearTimeout(resyncTimer);
+      resyncTimer=setTimeout(()=>{ resyncing=false; resyncTimer=null; recheckPresence(); }, GRACE_MS);
+      const me=players[meId]||{};
+      armPresence({ name:meName, lines:me.lines||0, ready:!!ready });   // 保留目前線數/準備狀態
+      if(msg)showToast(msg,1500);
+    }
+    // 有人「暫時不見」時,排一個寬限期後的複查(已在排就不重排)
+    function scheduleRecheck(){ if(!graceTimer)graceTimer=setTimeout(()=>{ graceTimer=null; recheckPresence(); }, GRACE_MS); }
+    function clearRecheck(){ if(graceTimer){ clearTimeout(graceTimer); graceTimer=null; } }
+    // 寬限期到期後再確認一次:該離開/回大廳的情況若仍成立,才真的動作
+    function recheckPresence(){
+      if(!state.online||!roomRef)return;
+      if(iWasKicked() && connected){ showToast("你已被房主移出房間"); leave(); return; }
+      if(hostGone()){ showToast("房主已離開,房間已關閉"); leave(); return; }
+      if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1) hostAloneToLobby();
     }
     // 房主:點移除鈕先跳確認小卡(避免誤觸把人踢掉)
     let pendingKickId=null;
@@ -1642,21 +1683,23 @@ const FIREBASE_CONFIG = {
     function listen(){
       roomRef.child("host").on("value",s=>{
         hostId=s.val()||null; if(hostId)sawHost=true;
-        kickIfHostGone();
+        if(hostGone()) scheduleRecheck();   // 房主暫時不見 → 進寬限期,期間房主重連歸位就恢復
       });
       roomRef.child("players").on("value",s=>{
         players=s.val()||{};
         if(Object.keys(players).length) sawPlayers=true;
         if(players[meId]) sawMe=true;
-        if(kickIfHostGone()) return;
-        if(kickIfKicked()) return;
+        // 我一直穩定連著卻從名單消失 → 房主真的把我踢了,立即離開;其餘情況一律交給寬限期
+        if(iWasKicked() && stableOnline()){ showToast("你已被房主移出房間"); leave(); return; }
+        // 「暫時不見」(我/房主消失,或遊戲中房主只剩自己):寬限期內先不動作,等重連歸位;全部正常則解除寬限
+        const alone=isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1;
+        if(iWasKicked() || hostGone() || alone) scheduleRecheck(); else clearRecheck();
         renderPlayers(); updateStartBtn();
-        // 遊戲中(非大廳)其他人都離開、房主只剩自己 → 自動回大廳等待,保留房間開著(不卡在單人局,也不顯示結束卡)
-        if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1){ hostAloneToLobby(); return; }
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
         else if(curPhase==="ordering") renderOrderPanel();
         else if(curPhase==="playing"){
-          if(isHost && order.length && !players[order[turnIndex]]) roomRef.child("turnIndex").set(nextTurn(turnIndex));
+          // 輪到的人暫時不見:不在寬限期內才跳過他(避免卡住);寬限中先等他回來,不亂動出手順序
+          if(isHost && order.length && !players[order[turnIndex]] && !graceTimer) roomRef.child("turnIndex").set(nextTurn(turnIndex));
           updateTurnUI();
           if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
         }
@@ -2156,6 +2199,7 @@ const FIREBASE_CONFIG = {
         if(roomRef){
           ["host","players","status","target","size","orderMethod","order","turnIndex","rps","reveal","calledList","winner","emotes"].forEach(k=>roomRef.child(k).off());
           if(isHost){
+            if(meId) roomRef.child("players/"+meId).onDisconnect().cancel();
             roomRef.onDisconnect().cancel();
             roomRef.remove();                       // 房主離開 → 關閉整個房間
           }else if(meId){
@@ -2165,6 +2209,8 @@ const FIREBASE_CONFIG = {
           }
         }
       }catch(e){}
+      stopConn(); clearRecheck();                   // 卸載連線監聽、清掉寬限計時器
+      resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
       order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false;
@@ -2220,6 +2266,9 @@ const FIREBASE_CONFIG = {
       showEmote(e.emoji, fromNm+" → "+toNm, (to!=="all")?to:e.from, e.kind);
       if(!mine && forMe) Sound.emote();
     }
+
+    // 手機從 LINE 等 App 切回前景:主動歸位一次(是否真的斷過交給 .info/connected 決定要不要提示)
+    document.addEventListener("visibilitychange",()=>{ if(!document.hidden) resume(null); });
 
     return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
