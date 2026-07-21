@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.10 -->
-<meta name="version" content="1.9.10">
+<!-- BINGO 賓果遊戲 · v1.9.11 -->
+<meta name="version" content="1.9.11">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -689,7 +689,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.10</span></footer>
+  <footer><span class="ver">BINGO · v1.9.11</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1389,7 +1389,7 @@ const FIREBASE_CONFIG = {
     }
     function hideMpVeil(){ $("mpVeil").classList.remove("show"); }
     // 猜拳卡住時的逃生:房主→取消回大廳(保留房間,大家可重來);訪客→離開房間回單機
-    function bailFromRps(){ if(isHost) again(); else leave(); }
+    function bailFromRps(){ if(isHost) resetRoomToLobby(); else leave(); }
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       $("mpConnect").classList.add("hidden");
@@ -1561,7 +1561,7 @@ const FIREBASE_CONFIG = {
       const ids=Object.keys(players);
       if(ids.length<2 || !ids.every(id=>players[id].ready)){ showToast("需要 2 人以上且全部準備好"); return; }
       const base={ target:state.target, calledList:[], winner:null, turnIndex:0, reveal:null };
-      Object.keys(players).forEach(id=>{ base["players/"+id+"/winAt"]=null; });   // 清掉上一局的達標紀錄
+      Object.keys(players).forEach(id=>{ base["players/"+id+"/winAt"]=null; base["players/"+id+"/lines"]=0; });   // 清掉上一局的達標紀錄與線數
       if(orderMethod==="rps"){
         roomRef.update({ ...base, status:"rps", order:null, rps:{ seq:1, groups:[ids.join(",")], throws:null } });
       }else if(orderMethod==="random"){
@@ -1580,7 +1580,7 @@ const FIREBASE_CONFIG = {
       else if(status==="rps"){ if(curPhase!=="rps") enterRps(); else renderRps(); }
       else if(status==="reveal"){ if(curPhase!=="reveal") enterReveal(); else renderReveal(); }
       else if(status==="ordering"){ if(curPhase!=="ordering") enterOrdering(); else renderOrderPanel(); }
-      else { if(curPhase!=="lobby") backToLobby(); }
+      else { if(curPhase!=="lobby" && !winner) backToLobby(); }   // 本局剛結束(winner 尚未清)時不強拉回大廳,留著結果卡讓玩家自己按「再一局/離開」
       curPhase=status;
     }
 
@@ -1878,6 +1878,7 @@ const FIREBASE_CONFIG = {
     // 揭曉結果:比較各玩家達標時的叫號數(winAt),最早者贏;若最早者不只一人 = 平手
     function showOutcome(){
       if(!winner)return;
+      if(!outcomeShown && state.mode!=="play") return;   // 我不是這局的參賽者(例如趁「再一局」大廳期間才加入的人)→ 不彈出上一局的舊結果卡
       const withAt=Object.keys(players).filter(id=>players[id]&&typeof players[id].winAt==="number");
       let finalists, at;
       if(withAt.length){
@@ -1891,8 +1892,10 @@ const FIREBASE_CONFIG = {
 
       $("spWinBtns").classList.add("hidden");
       $("mpWinBtns").classList.remove("hidden");
-      $("mpAgain").style.display="";   // 結束後,房主與訪客都能發起「再一局」(任一人按都會把整房帶回大廳重來)
+      $("mpAgain").style.display="";   // 結束後,房主與訪客都看得到「再一局」,各自決定要不要續玩
       showResult();
+      // 本局一結束就把自己設為「未準備」:再一局需各玩家重新按準備確認,房主才在大家都 ready 後才能開始(只寫自己節點,不動別人)
+      if(!outcomeShown && meId && roomRef){ ready=false; roomRef.child("players/"+meId).update({ ready:false }); }
 
       if(isDraw){
         const names=finalists.map(id=>dispName(id));
@@ -1918,13 +1921,24 @@ const FIREBASE_CONFIG = {
     function hostAloneToLobby(){
       if(curPhase==="lobby")return;
       showToast("其他玩家都離開了,回到等待…", 2600);
-      again();   // 清掉本局狀態、回大廳、重置準備;房主仍在房內,房號不變,可繼續等人加入
+      resetRoomToLobby();   // 對手都走了、本局作廢(此時無 winner):房主把整房清回大廳,房號不變,可繼續等人加入
     }
-    function again(){
-      if(!roomRef)return;   // 任一玩家(房主或訪客)皆可發起再一局:重置整房狀態、大家一起回大廳(房間層寫入為開放,訪客亦可寫)
+    // 房主用:把整房「完整」清回大廳(清掉本局所有資料、所有人取消準備)。用於「猜拳中途取消」與「對手都離開作廢」;
+    // 這兩種情況都沒有 winner 要保留,故可直接清 winner。所有寫入皆由房主發出,權限一定夠。
+    function resetRoomToLobby(){
+      if(!roomRef)return;
       const ups={ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null, reveal:null, emotes:null };
       Object.keys(players).forEach(id=>{ ups["players/"+id+"/lines"]=0; ups["players/"+id+"/ready"]=false; ups["players/"+id+"/winAt"]=null; });
       roomRef.update(ups);
+      backToLobby();
+    }
+    // 「再一局」= 每位玩家各自決定要不要續玩(房主或訪客皆可按):只把自己帶回大廳重新準備,不強拉別人。
+    // 第一個按的人負責把房間 status 翻回 "lobby";其餘本局資料(calledList/winner/order/winAt)留到下一局 startGame 才清,
+    // 才不會把還在看結果的人的結果卡弄壞(winner 一旦被清,他們的結果卡就會被 onWinner 收掉)。
+    // 各玩家的 ready 已在 showOutcome(本局結束當下)各自設為 false,故回大廳後都要重新按準備,房主才能開始。
+    function again(){
+      if(!roomRef)return;
+      if(status!=="lobby") roomRef.child("status").set("lobby");
       backToLobby();
     }
     function backToLobby(){
