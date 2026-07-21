@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.6.0 -->
-<meta name="version" content="1.6.0">
+<!-- BINGO 賓果遊戲 · v1.6.1 -->
+<meta name="version" content="1.6.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -280,9 +280,14 @@
   #mpCode,#mpCreateCode{letter-spacing:6px;font-family:'Fredoka';text-align:center}
   .or-divider{display:flex;align-items:center;gap:12px;margin:16px 2px 4px;color:var(--muted);font-size:12.5px;font-weight:800}
   .or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:var(--panel-line)}
+  /* 連線面板標題列:返回箭頭 + 標題 */
+  .mp-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .mp-head .subtitle{margin:0}
   .join-row{display:flex;align-items:center;gap:8px;margin-top:10px}
   .join-row .mp-input{flex:1;min-width:0;height:48px}
   .join-row .btn.primary{flex:0 0 auto;min-width:92px;height:48px;padding:0 20px;font-size:16px;border-radius:12px;display:grid;place-items:center}
+  /* 掃描:縮成房號左邊的方形圖示鈕 */
+  .join-row .mp-scan-btn{flex:0 0 auto;width:48px;min-width:0;height:48px;padding:0;font-size:20px;border-radius:12px;display:grid;place-items:center}
   .room-list{display:flex;flex-direction:column;gap:8px}
   .room-list:not(:empty){margin-top:10px}
   .room-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
@@ -513,7 +518,12 @@
 
   <!-- ====== ONLINE: connect ====== -->
   <section class="panel hidden" id="mpConnect">
-    <div class="subtitle">連線對戰</div>
+    <div class="mp-head">
+      <button class="icon-btn" id="mpBack" title="回單機" aria-label="返回單機">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="subtitle">連線對戰</div>
+    </div>
     <div class="hint">建立房間把房號給朋友,或輸入朋友的房號加入。兩台裝置各自有自己的卡片,輪流出號、比誰先湊滿線數。</div>
     <div class="row"><span class="label">你的暱稱</span>
       <input id="mpName" class="mp-input" maxlength="8" placeholder="玩家">
@@ -524,13 +534,12 @@
     </div>
     <div class="or-divider"><span>加入朋友的房間</span></div>
     <div class="join-row">
+      <button class="btn ghost mp-scan-btn" id="mpScan" title="掃描目前的房間" aria-label="掃描目前的房間">🔍</button>
       <input id="mpCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="房號">
       <button class="btn primary" id="mpJoin">加入 ▸</button>
     </div>
-    <div class="actions" style="margin-top:10px"><button class="btn ghost" id="mpScan">🔍 掃描目前的房間</button></div>
     <div class="room-list" id="mpRoomList"></div>
     <div class="hint" id="mpConnMsg"></div>
-    <div class="actions" style="margin-top:10px"><button class="btn ghost" id="mpBack">← 回單機</button></div>
   </section>
 
   <!-- ====== ONLINE: room banner ====== -->
@@ -584,7 +593,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.6.0</span></footer>
+  <footer><span class="ver">BINGO · v1.6.1</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
