@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.2.0 -->
-<meta name="version" content="1.2.0">
+<!-- BINGO 賓果遊戲 · v1.3.0 -->
+<meta name="version" content="1.3.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -285,6 +285,13 @@
   .mp-chip.ready .dot{background:var(--accent)}
   .mp-chip .ln{font-family:'Fredoka';color:var(--accent);font-weight:700}
   .mp-chip.me{border-color:var(--accent)}
+  /* 房主用:大廳時每個非自己的玩家晶片右側出現的移除鈕 */
+  .mp-chip .mp-kick{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:2px;padding:0;
+    border:none;border-radius:50%;background:rgba(255,80,80,.22);color:#ff6b6b;
+    font-family:'Fredoka';font-weight:700;font-size:14px;line-height:1;cursor:pointer;transition:background .15s,color .15s}
+  .mp-chip .mp-kick:hover{background:#ff5252;color:#fff}
+  :root[data-theme="ebook"] .mp-chip .mp-kick{background:#fff;color:#000;border:1px solid #000}
+  :root[data-theme="ebook"] .mp-chip .mp-kick:hover{background:#000;color:#fff}
   .mp-chip .seat-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;
     border-radius:10px;background:var(--accent);color:#1c1008;font-family:'Fredoka';font-weight:700;font-size:12.5px}
   :root[data-theme="midnight"] .mp-chip .seat-badge,
@@ -496,7 +503,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.2.0</span></footer>
+  <footer><span class="ver">BINGO · v1.3.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -886,6 +893,7 @@ const FIREBASE_CONFIG = {
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let orderMethod="host", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
     let sawPlayers=false;
+    let sawMe=false;                        // 是否曾在名單看過自己(避免剛加入的空讀誤判成被踢)
     let hostId=null, sawHost=false;         // 房主 id / 是否曾看過有效房主(避免剛加入時誤判)
     let myWinAt=null, outcomeShown=false;   // 平手判定用:自己達標時的叫號數 / 結果是否已揭曉
     let orderAnnounced=false;               // 本局是否已公告過出手順序(猜拳結果)
@@ -991,7 +999,7 @@ const FIREBASE_CONFIG = {
       $("mpControls").classList.add("hidden");
     }
     function enterLobby(){
-      state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawHost=false; hostId=null;
+      state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -1016,6 +1024,22 @@ const FIREBASE_CONFIG = {
       if(hostGone()){ showToast("房主已離開,房間已關閉"); leave(); return true; }
       return false;
     }
+    // 訪客:曾在名單看過自己、如今自己被移除 → 被房主踢出,退回單機
+    function iWasKicked(){
+      return !isHost && state.online && sawMe && !players[meId];
+    }
+    function kickIfKicked(){
+      if(iWasKicked()){ showToast("你已被房主移出房間"); leave(); return true; }
+      return false;
+    }
+    // 房主:把某位玩家移出房間(僅大廳階段,遊戲進行中不動出手順序)
+    function kick(id){
+      if(!isHost||!roomRef||id===meId)return;
+      if(status!=="lobby"){ showToast("遊戲進行中無法移除玩家"); return; }
+      const nm=dispName(id);
+      roomRef.child("players/"+id).remove();
+      showToast("已移出 "+nm);
+    }
     function listen(){
       roomRef.child("host").on("value",s=>{
         hostId=s.val()||null; if(hostId)sawHost=true;
@@ -1024,7 +1048,9 @@ const FIREBASE_CONFIG = {
       roomRef.child("players").on("value",s=>{
         players=s.val()||{};
         if(Object.keys(players).length) sawPlayers=true;
+        if(players[meId]) sawMe=true;
         if(kickIfHostGone()) return;
+        if(kickIfKicked()) return;
         renderPlayers(); updateStartBtn();
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
         else if(curPhase==="ordering") renderOrderPanel();
@@ -1057,6 +1083,13 @@ const FIREBASE_CONFIG = {
         const nameHtml=esc(dispName(id))+(id===meId?'(你)':'');
         chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+nameHtml+'</span>'+
           (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'');
+        if(isHost && status==="lobby" && id!==meId){
+          const k=document.createElement("button");
+          k.type="button"; k.className="mp-kick"; k.title="移出房間";
+          k.setAttribute("aria-label","移出 "+dispName(id)); k.textContent="×";
+          k.addEventListener("click",ev=>{ ev.stopPropagation(); kick(id); });
+          chip.appendChild(k);
+        }
         box.appendChild(chip);
       });
       $("mpStatusTxt").textContent = status==="playing" ? "遊戲進行中" : (status==="rps"?"猜拳決定順序…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…")));
@@ -1380,7 +1413,7 @@ const FIREBASE_CONFIG = {
           }
         }
       }catch(e){}
-      sawPlayers=false; sawHost=false; hostId=null;
+      sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
       order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false;
       closeWin();
