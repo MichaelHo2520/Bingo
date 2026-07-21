@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v0.12.1 -->
-<meta name="version" content="0.12.1">
+<!-- BINGO 賓果遊戲 · v1.0.0 -->
+<meta name="version" content="1.0.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -473,7 +473,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v0.12.1</span></footer>
+  <footer><span class="ver">BINGO · v1.0.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -863,6 +863,7 @@ const FIREBASE_CONFIG = {
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let orderMethod="host", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
     let sawPlayers=false;
+    let hostId=null, sawHost=false;         // 房主 id / 是否曾看過有效房主(避免剛加入時誤判)
     let myWinAt=null, outcomeShown=false;   // 平手判定用:自己達標時的叫號數 / 結果是否已揭曉
     let orderAnnounced=false;               // 本局是否已公告過出手順序(猜拳結果)
 
@@ -940,7 +941,7 @@ const FIREBASE_CONFIG = {
       $("mpControls").classList.add("hidden");
     }
     function enterLobby(){
-      state.online=true; ready=false; curPhase="lobby"; sawPlayers=false;
+      state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawHost=false; hostId=null;
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -957,13 +958,23 @@ const FIREBASE_CONFIG = {
       render(); applyFillUI(); updateReadyBtn(); syncOrderSeg();
       listen();
     }
+    // 訪客:確認過房主與玩家名單後,若房主(或整個房間)消失 → 自動退出連線
+    function hostGone(){
+      return !isHost && state.online && sawHost && sawPlayers && (!hostId || !players[hostId]);
+    }
+    function kickIfHostGone(){
+      if(hostGone()){ showToast("房主已離開,房間已關閉"); leave(); return true; }
+      return false;
+    }
     function listen(){
+      roomRef.child("host").on("value",s=>{
+        hostId=s.val()||null; if(hostId)sawHost=true;
+        kickIfHostGone();
+      });
       roomRef.child("players").on("value",s=>{
         players=s.val()||{};
         if(Object.keys(players).length) sawPlayers=true;
-        else if(sawPlayers && state.online && !isHost){   // 房主已關閉整個房間
-          showToast("房主已離開,房間已關閉"); leave(); return;
-        }
+        if(kickIfHostGone()) return;
         renderPlayers(); updateStartBtn();
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
         else if(curPhase==="ordering") renderOrderPanel();
@@ -1301,7 +1312,7 @@ const FIREBASE_CONFIG = {
     function leave(){
       try{
         if(roomRef){
-          ["players","status","target","orderMethod","order","turnIndex","rps","calledList","winner"].forEach(k=>roomRef.child(k).off());
+          ["host","players","status","target","orderMethod","order","turnIndex","rps","calledList","winner"].forEach(k=>roomRef.child(k).off());
           if(isHost){
             roomRef.onDisconnect().cancel();
             roomRef.remove();                       // 房主離開 → 關閉整個房間
@@ -1312,7 +1323,7 @@ const FIREBASE_CONFIG = {
           }
         }
       }catch(e){}
-      sawPlayers=false;
+      sawPlayers=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
       order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false;
       closeWin();
