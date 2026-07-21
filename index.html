@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v0.10.0 -->
-<meta name="version" content="0.10.0">
+<!-- BINGO 賓果遊戲 · v0.11.0 -->
+<meta name="version" content="0.11.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -268,13 +268,19 @@
   .mp-chip.ready .dot{background:var(--accent)}
   .mp-chip .ln{font-family:'Fredoka';color:var(--accent);font-weight:700}
   .mp-chip.me{border-color:var(--accent)}
+  .mp-chip .seat-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;
+    border-radius:10px;background:var(--accent);color:#1c1008;font-family:'Fredoka';font-weight:700;font-size:12.5px}
+  :root[data-theme="midnight"] .mp-chip .seat-badge,
+  :root[data-theme="arcade"] .mp-chip .seat-badge{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .mp-chip .seat-badge{background:#000;color:#fff}
   .mp-play{
-    width:min(92vw,520px);display:flex;align-items:center;gap:14px;
+    width:min(92vw,520px);display:flex;align-items:center;gap:14px;flex-wrap:wrap;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:15px;padding:12px 16px;
   }
   .mp-last{display:flex;flex-direction:column;gap:2px}
   .mp-last-num{font-size:34px;font-weight:700;line-height:1}
-  .mp-turn{flex:1;margin-left:auto;text-align:right;font-weight:800;font-size:16px;color:var(--accent)}
+  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:20px;line-height:1}
+  .mp-turn{flex:1;min-width:120px;margin-left:auto;text-align:right;font-weight:800;font-size:16px;color:var(--accent)}
   .mp-turn.wait{color:var(--muted)}
   .cell.callable{box-shadow:0 0 0 3px var(--accent) inset;cursor:pointer}
   .mp-panel{
@@ -401,6 +407,23 @@
 
   <!-- ====== BOARD ====== -->
   <div class="board-wrap">
+
+    <!-- online play HUD (顯示在棋盤上方) -->
+    <div class="mp-play hidden" id="mpControls">
+      <div class="mp-last"><span class="lbl">最新號碼</span><span class="mp-last-num display" id="mpLastNum">–</span></div>
+      <div class="mp-last"><span class="lbl">目標</span><span class="mp-goal-num display" id="mpGoalNum">5 線</span></div>
+      <div class="mp-turn wait" id="mpTurn">等待開始…</div>
+    </div>
+
+    <!-- play status (單機,顯示在棋盤上方) -->
+    <div class="status hidden" id="playStatus">
+      <div><div class="lbl">已完成</div><div class="big"><span id="lineCount">0</span> 條線</div></div>
+      <button class="icon-btn" id="exitBtn" title="退出這局" aria-label="退出這局，回到開始畫面">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      </button>
+      <div style="text-align:right"><div class="lbl">還差</div><div class="big"><span id="remain">5</span> 條贏</div></div>
+    </div>
+
     <div class="grid" id="grid"></div>
 
     <!-- setup actions -->
@@ -410,12 +433,6 @@
       <button class="btn ghost" id="onlineBtn">🌐 連線對戰</button>
       <button class="btn primary hidden" id="mpReadyBtn">準備好了 ✓</button>
       <button class="btn primary hidden" id="mpStartBtn">開始對戰 ▸</button>
-    </div>
-
-    <!-- online play controls -->
-    <div class="mp-play hidden" id="mpControls">
-      <div class="mp-last"><span class="lbl">最新號碼</span><span class="mp-last-num display" id="mpLastNum">–</span></div>
-      <div class="mp-turn wait" id="mpTurn">等待開始…</div>
     </div>
 
     <!-- online: rock-paper-scissors to decide order -->
@@ -437,16 +454,9 @@
       <div class="order-list" id="orderList"></div>
       <div class="actions"><button class="btn primary hidden" id="orderConfirm">確定順序,開始 ▸</button></div>
     </div>
-
-    <!-- play status (single player) -->
-    <div class="status hidden" id="playStatus">
-      <div><div class="lbl">已完成</div><div class="big"><span id="lineCount">0</span> 條線</div></div>
-      <button class="icon-btn" id="exitBtn" title="退出這局" aria-label="退出這局，回到開始畫面">🚪</button>
-      <div style="text-align:right"><div class="lbl">還差</div><div class="big"><span id="remain">5</span> 條贏</div></div>
-    </div>
   </div>
 
-  <footer><span class="ver">BINGO · v0.10.0</span></footer>
+  <footer><span class="ver">BINGO · v0.11.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -817,13 +827,13 @@ const FIREBASE_CONFIG = {
   }
   function toggleEbook(){ setEbook(document.documentElement.getAttribute("data-theme")!=="ebook"); }
   let toastT;
-  function showToast(txt){
+  function showToast(txt,dur){
     let el=$("toast");
     if(!el){el=document.createElement("div");el.id="toast";document.body.appendChild(el);}
     el.textContent=txt;
     el.classList.add("show");
     clearTimeout(toastT);
-    toastT=setTimeout(()=>el.classList.remove("show"),1100);
+    toastT=setTimeout(()=>el.classList.remove("show"),dur||1100);
   }
   function toggleFull(){
     if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();}
@@ -836,6 +846,8 @@ const FIREBASE_CONFIG = {
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let orderMethod="host", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
     let sawPlayers=false;
+    let myWinAt=null, outcomeShown=false;   // 平手判定用:自己達標時的叫號數 / 結果是否已揭曉
+    let orderAnnounced=false;               // 本局是否已公告過出手順序(猜拳結果)
 
     function available(){
       return !!(window.firebase && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0);
@@ -935,12 +947,13 @@ const FIREBASE_CONFIG = {
         else if(curPhase==="playing"){
           if(isHost && order.length && !players[order[turnIndex]]) roomRef.child("turnIndex").set(nextTurn(turnIndex));
           updateTurnUI();
+          if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
         }
       });
       roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); });
-      roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"&&!isHost){ state.target=t; $("targetVal").textContent=t; } });
+      roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"&&!isHost){ state.target=t; $("targetVal").textContent=t; const g=$("mpGoalNum"); if(g)g.textContent=t+" 線"; } });
       roomRef.child("orderMethod").on("value",s=>{ orderMethod=s.val()||"host"; syncOrderSeg(); });
-      roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); } });
+      roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); } maybeAnnounceOrder(); });
       roomRef.child("turnIndex").on("value",s=>{ turnIndex=s.val()||0; if(curPhase==="playing"){ render(); updateTurnUI(); } });
       roomRef.child("rps").on("value",s=>{ rps=s.val(); if(curPhase==="rps")renderRps(); if(isHost)rpsHostResolve(); });
       roomRef.child("calledList").on("value",s=>{ calledList=s.val()||[]; onCalled(); });
@@ -954,7 +967,9 @@ const FIREBASE_CONFIG = {
         const p=players[id]||{};
         const chip=document.createElement("div");
         chip.className="mp-chip"+(p.ready?" ready":"")+(id===meId?" me":"");
-        chip.innerHTML='<span class="dot"></span><span>'+esc(p.name||"玩家")+'</span>'+
+        const seatIdx=order.indexOf(id);
+        const seatBadge=(status==="playing"&&seatIdx>=0)?'<span class="seat-badge">'+(seatIdx+1)+'</span>':'';
+        chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+esc(p.name||"玩家")+'</span>'+
           (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'');
         box.appendChild(chip);
       });
@@ -1126,13 +1141,29 @@ const FIREBASE_CONFIG = {
     /* ----- playing (turn-based manual call) ----- */
     function enterPlaying(){
       state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(25).fill(false);
+      myWinAt=null; outcomeShown=false; orderAnnounced=false;
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       $("playStatus").classList.add("hidden");
       $("mpRpsPanel").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
       $("mpControls").classList.remove("hidden");
+      const g=$("mpGoalNum"); if(g)g.textContent=state.target+" 線";
       setLock(false);
       resetMarquee(); render(); applyCalledMarks(); updateTurnUI(); refreshLines();
+      maybeAnnounceOrder();
+    }
+    // 猜拳/排序定案後,公告一次出手順序(讓大家知道猜拳誰贏誰輸);order 可能比 status 晚到,故用旗標確保只公告一次
+    function maybeAnnounceOrder(){
+      if(orderAnnounced || !order.length || status!=="playing") return;
+      orderAnnounced=true;
+      const nm=id=>(players[id]||{}).name||"玩家";
+      let msg;
+      if(orderMethod==="rps"){
+        msg = order.length===2 ? ("✊ 猜拳結果:"+nm(order[0])+" 贏,先出號") : ("✊ 猜拳結果 · 出手順序:"+order.map(nm).join(" → "));
+      }else{
+        msg = "出手順序:"+order.map(nm).join(" → ");
+      }
+      showToast(msg, 3200);
     }
     function isMyTurn(){ return status==="playing" && !winner && order.length>0 && order[turnIndex]===meId; }
     function isCalled(v){ return calledList.indexOf(v)>=0; }
@@ -1175,31 +1206,58 @@ const FIREBASE_CONFIG = {
       }
     }
     function reportLines(done){ if(roomRef&&meId)roomRef.child("players/"+meId+"/lines").set(done); }
-    function tryWin(done){ if(roomRef)roomRef.child("winner").transaction(w=> w || { id:meId, name:meName, lines:done }); }
+    function tryWin(done){
+      if(!roomRef)return;
+      // 記錄「自己在第幾次叫號時達標」;同一次叫號同時達標 = 平手(見 showOutcome)
+      if(myWinAt===null){ myWinAt=calledList.length; if(meId)roomRef.child("players/"+meId+"/winAt").set(myWinAt); }
+      roomRef.child("winner").transaction(w=> w || { id:meId, name:meName, lines:done, at:myWinAt });
+    }
 
-    function onWinner(){
+    function onWinner(){ if(winner) showOutcome(); }
+    // 揭曉結果:比較各玩家達標時的叫號數(winAt),最早者贏;若最早者不只一人 = 平手
+    function showOutcome(){
       if(!winner)return;
-      const mine=winner.id===meId;
-      Sound.win();
-      $("winWord").textContent=mine?"你贏了!":"BINGO!";
-      $("winMsg").textContent=mine?("你最先完成 "+winner.lines+" 條線 🎉"):(esc(winner.name)+" 完成了 "+winner.lines+" 條線");
+      const withAt=Object.keys(players).filter(id=>players[id]&&typeof players[id].winAt==="number");
+      let finalists, at;
+      if(withAt.length){
+        at=Math.min.apply(null, withAt.map(id=>players[id].winAt));
+        finalists=withAt.filter(id=>players[id].winAt===at);
+      }else{
+        finalists=[winner.id];
+      }
+      const isDraw=finalists.length>1;
+      const lines=(winner&&winner.lines)||state.target;
+
       $("spWinBtns").classList.add("hidden");
       $("mpWinBtns").classList.remove("hidden");
       $("mpAgain").style.display=isHost?"":"none";
       $("veil").classList.add("show");
+
+      if(isDraw){
+        const names=finalists.map(id=>(players[id]||{}).name||"玩家");
+        const mineTie=finalists.indexOf(meId)>=0;
+        $("winWord").textContent="平手!";
+        $("winMsg").textContent=names.join("、")+" 同時完成 "+lines+" 條線,平手!";
+        if(!outcomeShown){ Sound.win(); if(mineTie)burst(); }
+      }else{
+        const wid=finalists[0], mine=wid===meId;
+        $("winWord").textContent=mine?"你贏了!":"BINGO!";
+        $("winMsg").textContent=mine?("你最先完成 "+lines+" 條線 🎉"):(((players[wid]||{}).name||winner.name||"對手")+" 完成了 "+lines+" 條線");
+        if(!outcomeShown){ Sound.win(); if(mine)burst(); }
+      }
+      outcomeShown=true;
       render();
-      if(mine)burst();
     }
     function again(){
       if(!isHost)return;
       const ups={ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null };
-      Object.keys(players).forEach(id=>{ ups["players/"+id+"/lines"]=0; ups["players/"+id+"/ready"]=false; });
+      Object.keys(players).forEach(id=>{ ups["players/"+id+"/lines"]=0; ups["players/"+id+"/ready"]=false; ups["players/"+id+"/winAt"]=null; });
       roomRef.update(ups);
       backToLobby();
     }
     function backToLobby(){
       ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled(); curPhase="lobby";
-      order=[]; turnIndex=0; rps=null;
+      order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false;
       closeWin();
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -1226,7 +1284,7 @@ const FIREBASE_CONFIG = {
       }catch(e){}
       sawPlayers=false;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
-      order=[]; turnIndex=0; rps=null; curPhase="lobby";
+      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false;
       closeWin();
       $("mpBar").classList.add("hidden");
       hidePhasePanels();
