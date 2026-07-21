@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.6 -->
-<meta name="version" content="1.9.6">
+<!-- BINGO 賓果遊戲 · v1.9.7 -->
+<meta name="version" content="1.9.7">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -268,6 +268,7 @@
   /* ---------- Settings sheet ---------- */
   .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
     padding:22px 22px 24px;max-width:360px;width:100%;backdrop-filter:blur(14px);
+    max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;   /* 螢幕不夠高時卡片內部可捲動,不再被切掉 */
     animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
   .set-head{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:10px;text-align:center}
   .set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -678,7 +679,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.6</span></footer>
+  <footer><span class="ver">BINGO · v1.9.7</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
