@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.6.1 -->
-<meta name="version" content="1.6.1">
+<!-- BINGO 賓果遊戲 · v1.7.0 -->
+<meta name="version" content="1.7.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -143,6 +143,7 @@
 
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
   .row .label{font-weight:800;font-size:14px}
+  .row .seg{margin-left:auto}          /* 盤面大小/出手順序選項靠右,與達成線數的 +/− 對齊 */
   .steppers{display:flex;gap:6px;align-items:center;margin-left:auto}
   .mini{
     width:34px;height:34px;border-radius:10px;border:1px solid var(--panel-line);
@@ -366,7 +367,9 @@
   .rps-btn:hover{transform:translateY(-2px)}
   .rps-btn:focus{outline:none}                                   /* 消除滑鼠點擊後殘留的外框 */
   .rps-btn:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}  /* 僅鍵盤操作時顯示 */
-  .rps-btn.chosen{border-color:var(--accent);background:rgba(255,255,255,.20)}
+  .rps-btn.chosen{border-color:var(--accent);background:rgba(255,255,255,.20);transform:scale(1.06)}
+  .rps-btns.locked{pointer-events:none}            /* 已出拳 → 不能再改 */
+  .rps-btn.dim{opacity:.28;transform:none}          /* 出拳後把沒選的淡化,只留你選的 */
   .rps-throws{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center}
   /* 猜拳過場:揭曉大家出了什麼 */
   .reveal-hands{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:12px 0 14px}
@@ -509,8 +512,8 @@
     <div class="row hidden" id="mpOrderRow">
       <span class="label" id="orderLabel">出手順序由誰定</span>
       <div class="seg" id="orderSeg" style="flex:0 0 auto">
-        <button class="on" data-order="host">👑 房主排</button>
-        <button data-order="rps">✊ 猜拳</button>
+        <button data-order="host">👑 房主排</button>
+        <button class="on" data-order="rps">✊ 猜拳</button>
         <button data-order="random">🎲 隨機</button>
       </div>
     </div>
@@ -593,7 +596,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.6.1</span></footer>
+  <footer><span class="ver">BINGO · v1.7.0</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -615,7 +618,7 @@
         <div class="reveal-hands" id="revealList"></div>
         <div class="reveal-order" id="revealOrder"></div>
         <div class="rps-hint" id="revealHint"></div>
-        <div class="actions"><button class="btn primary hidden" id="revealContinue">繼續 ▸</button></div>
+        <div class="actions"><button class="btn primary hidden" id="revealSkip">跳過 ⏭</button></div>
       </div>
     </div>
   </div>
@@ -1110,7 +1113,7 @@ const FIREBASE_CONFIG = {
   const MP=(function(){
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false;
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
-    let orderMethod="host", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
+    let orderMethod="rps", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
     let sawPlayers=false;
     let sawMe=false;                        // 是否曾在名單看過自己(避免剛加入的空讀誤判成被踢)
     let hostId=null, sawHost=false;         // 房主 id / 是否曾看過有效房主(避免剛加入時誤判)
@@ -1204,7 +1207,7 @@ const FIREBASE_CONFIG = {
           if(desired){ setMsg("房號 "+desired+" 已被使用,換一個或留空隨機。"); throw "taken"; }
           code=randomCode(); roomRef=db.ref("rooms/"+code);        // 隨機模式才自動避開撞號
         }
-        return roomRef.update({ host:meId, status:"lobby", target:state.target, size:SIZE, orderMethod:"host",
+        return roomRef.update({ host:meId, status:"lobby", target:state.target, size:SIZE, orderMethod:"rps",
           calledList:[], winner:null, order:null, turnIndex:0, rps:null, emotes:null, createdAt:Date.now() });
       }).then(()=>{ joinNode(); enterLobby(); }).catch(e=>{ if(e!=="taken") setMsg("建立房間失敗:"+((e&&e.message)||e)); });
     }
@@ -1442,14 +1445,20 @@ const FIREBASE_CONFIG = {
       const throws=(rps&&rps.throws)||{};
       const mg=myGroup();
       const mine=throws[meId]&&throws[meId].s===seq;
-      const iNeed = mg && mg.length>1 && !mine;
-      $("rpsBtns").style.display = iNeed ? "" : "none";
+      const inGroup = mg && mg.length>1;               // 你在還要比大小的組裡
+      const btns=$("rpsBtns");
+      btns.style.display = inGroup ? "" : "none";        // 出拳前後都顯示(讓你選的那個留著)
+      btns.classList.toggle("locked", !!mine);           // 已出拳 → 鎖住不能再改
       let hint;
-      if(!mg || mg.length<=1) hint="你的順序已定,等其他人猜完…";
-      else if(iNeed) hint="出拳!(和你平手的人一起比大小)";
-      else hint="已出拳,等待其他人…";
+      if(!inGroup) hint="你的順序已定,等其他人猜完…";
+      else if(mine) hint="你出了 "+RPS_EMO[throws[meId].c]+" "+RPS_TXT[throws[meId].c]+",等待其他人…";
+      else hint="出拳!(和你平手的人一起比大小)";
       $("rpsHint").textContent=hint;
-      [...$("rpsBtns").children].forEach(b=>b.classList.toggle("chosen", mine && throws[meId].c===b.dataset.rps));
+      [...btns.children].forEach(b=>{
+        const isChosen = mine && throws[meId].c===b.dataset.rps;
+        b.classList.toggle("chosen", isChosen);
+        b.classList.toggle("dim", !!mine && !isChosen);  // 出拳後淡化沒選的,只留你選的
+      });
       const box=$("rpsThrows"); box.innerHTML="";
       gs.map(g=>String(g).split(",")).filter(m=>m.length>1).reduce((a,m)=>a.concat(m),[]).filter(id=>players[id]).forEach(id=>{
         const done=throws[id]&&throws[id].s===seq;
@@ -1539,17 +1548,17 @@ const FIREBASE_CONFIG = {
           ? dispName(ids[0])+" 贏,先出號 🎉"
           : "出手順序:"+ids.map(id=>dispName(id)).join(" → ");
       }
-      // 房主看得到「繼續」鈕可提早開打;其他人顯示等待提示
-      const btn=$("revealContinue"); if(btn) btn.classList.toggle("hidden", !isHost);
-      const rh=$("revealHint"); if(rh) rh.textContent = isHost ? "3 秒後自動開始,或按「繼續」" : "準備開始…";
+      // 「跳過」鈕:所有人都看得到、都能按(用來快速跳過揭曉畫面);沒按也會自動開打
+      const btn=$("revealSkip"); if(btn) btn.classList.remove("hidden");
+      const rh=$("revealHint"); if(rh) rh.textContent = "3 秒後自動開始,或按下方跳過";
     }
     function scheduleRevealAdvance(){
-      if(!isHost || revealTimer) return;
-      revealTimer=setTimeout(()=>{ revealTimer=null; revealAdvance(); }, 3000);
+      if(!isHost || revealTimer) return;               // 自動計時只由房主掛一個,避免多人重複寫
+      revealTimer=setTimeout(()=>{ revealTimer=null; revealSkip(); }, 3000);
     }
-    // 揭曉 → 開打(房主專用):自動計時或按「繼續」都走這裡
-    function revealAdvance(){
-      if(!isHost || status!=="reveal" || !roomRef) return;
+    // 揭曉 → 開打:自動計時(房主)或任一人按「跳過」都走這裡,把整局推進到開打
+    function revealSkip(){
+      if(status!=="reveal" || !roomRef) return;
       if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       roomRef.update({ status:"playing", reveal:null });
     }
@@ -1805,7 +1814,7 @@ const FIREBASE_CONFIG = {
     return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap,
-             amHost, setSize:setBoardSize, roster, sendEmote, revealContinue:revealAdvance };
+             amHost, setSize:setBoardSize, roster, sendEmote, revealSkip };
   })();
 
   /* ---------- Wire up ---------- */
@@ -1853,7 +1862,7 @@ const FIREBASE_CONFIG = {
   $("mpStartBtn").addEventListener("click",()=>MP.startGame());
   $("orderSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.setOrderMethod(b.dataset.order);});
   $("rpsBtns").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.throwRps(b.dataset.rps);b.blur();});
-  $("revealContinue").addEventListener("click",()=>MP.revealContinue());
+  $("revealSkip").addEventListener("click",()=>MP.revealSkip());
   $("orderConfirm").addEventListener("click",()=>MP.confirmOrder());
   $("mpLeaveBtn").addEventListener("click",()=>MP.leave());
   $("mpAgain").addEventListener("click",()=>MP.again());
