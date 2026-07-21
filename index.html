@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.4.0 -->
-<meta name="version" content="1.4.0">
+<!-- BINGO 賓果遊戲 · v1.5.0 -->
+<meta name="version" content="1.5.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -355,6 +355,25 @@
   .rps-btn:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}  /* 僅鍵盤操作時顯示 */
   .rps-btn.chosen{border-color:var(--accent);background:rgba(255,255,255,.20)}
   .rps-throws{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center}
+  /* 猜拳過場:揭曉大家出了什麼 */
+  .reveal-hands{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:12px 0 14px}
+  .reveal-hand{
+    display:flex;flex-direction:column;align-items:center;gap:3px;min-width:86px;
+    background:rgba(255,255,255,.10);border:2px solid var(--panel-line);border-radius:16px;
+    padding:12px 14px 10px;opacity:0;transform:translateY(10px) scale(.85);
+    animation:revealPop .38s cubic-bezier(.2,.9,.3,1.35) forwards;
+  }
+  .reveal-hand .emo{font-size:42px;line-height:1;margin-bottom:2px}
+  .reveal-hand .rk{font-family:'Fredoka';font-weight:600;color:var(--accent);font-size:12.5px}
+  .reveal-hand .nm{font-weight:800;font-size:14px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reveal-hand .txt{color:var(--muted);font-size:11.5px;font-weight:700}
+  .reveal-hand.win{border-color:var(--accent);background:rgba(255,255,255,.20)}
+  @keyframes revealPop{to{opacity:1;transform:none}}
+  .reveal-order{text-align:center;font-weight:800;font-size:15px;margin-top:2px;line-height:1.5}
+  :root[data-theme="ebook"] .reveal-hand{background:#fff;border:2px solid #000}
+  :root[data-theme="ebook"] .reveal-hand.win{background:#000;color:#fff}
+  :root[data-theme="ebook"] .reveal-hand.win .rk,
+  :root[data-theme="ebook"] .reveal-hand.win .txt{color:#fff}
   .order-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
   .order-item{
     display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.10);
@@ -509,6 +528,14 @@
       <div class="rps-throws" id="rpsThrows"></div>
     </div>
 
+    <!-- online: reveal what everyone threw, before the game starts -->
+    <div class="mp-panel hidden" id="mpRevealPanel">
+      <div class="subtitle">✊ 猜拳結果</div>
+      <div class="rps-hint" id="revealHint">大家出的拳揭曉!</div>
+      <div class="reveal-hands" id="revealList"></div>
+      <div class="reveal-order" id="revealOrder"></div>
+    </div>
+
     <!-- online: host arranges turn order -->
     <div class="mp-panel hidden" id="mpOrderPanel">
       <div class="subtitle">安排出手順序</div>
@@ -518,7 +545,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.4.0</span></footer>
+  <footer><span class="ver">BINGO · v1.5.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -921,6 +948,8 @@ const FIREBASE_CONFIG = {
     let myWinAt=null, outcomeShown=false;   // 平手判定用:自己達標時的叫號數 / 結果是否已揭曉
     let abandoned=false;                    // 開打後對手都離開、只剩自己 → 本局作廢,不再繼續
     let orderAnnounced=false;               // 本局是否已公告過出手順序(猜拳結果)
+    let revealData=null, revealTimer=null;  // 猜拳過場:大家出的拳 / 房主用的「揭曉後自動開打」計時器
+    const RPS_EMO={R:"✊",S:"✌️",P:"✋"}, RPS_TXT={R:"石頭",S:"剪刀",P:"布"};
 
     function available(){
       return !!(window.firebase && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0);
@@ -967,7 +996,9 @@ const FIREBASE_CONFIG = {
         const rooms=s.val()||{};
         const items=Object.keys(rooms).map(c=>{
           const r=rooms[c]||{};
-          return { code:c, status:r.status||"lobby", count:Object.keys(r.players||{}).length };
+          const ps=r.players||{};
+          const hostName=(r.host&&ps[r.host]&&ps[r.host].name)||"";   // 房主名稱(取房主 id 對應的玩家名)
+          return { code:c, status:r.status||"lobby", count:Object.keys(ps).length, host:hostName };
         }).filter(r=>r.count>0).sort((a,b)=>a.code.localeCompare(b.code));
         renderRoomList(items);
       }).catch(e=>{ box.innerHTML='<div class="room-empty">掃描失敗:'+esc(e.message)+'(可能是資料庫規則不允許列出房間,見說明)</div>'; });
@@ -979,7 +1010,8 @@ const FIREBASE_CONFIG = {
         const joinable=r.status==="lobby";
         const it=document.createElement("button");
         it.type="button"; it.className="room-item"+(joinable?"":" busy"); it.disabled=!joinable;
-        it.innerHTML='<span class="rc">'+esc(r.code)+'</span><span class="meta">👥 '+r.count+' 人 · '+(joinable?"等待中":"遊戲中")+'</span>';
+        const hostTag=r.host?'👑 '+esc(r.host)+' · ':'';
+        it.innerHTML='<span class="rc">'+esc(r.code)+'</span><span class="meta">'+hostTag+'👥 '+r.count+' 人 · '+(joinable?"等待中":"遊戲中")+'</span>';
         if(joinable) it.addEventListener("click",()=>{ $("mpCode").value=r.code; join(r.code,$("mpName").value); });
         box.appendChild(it);
       });
@@ -1019,6 +1051,7 @@ const FIREBASE_CONFIG = {
 
     function hidePhasePanels(){
       $("mpRpsPanel").classList.add("hidden");
+      $("mpRevealPanel").classList.add("hidden");
       $("mpOrderPanel").classList.add("hidden");
       $("mpControls").classList.add("hidden");
     }
@@ -1093,6 +1126,7 @@ const FIREBASE_CONFIG = {
       roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } maybeAnnounceOrder(); });
       roomRef.child("turnIndex").on("value",s=>{ turnIndex=s.val()||0; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } });
       roomRef.child("rps").on("value",s=>{ rps=s.val(); if(curPhase==="rps")renderRps(); if(isHost)rpsHostResolve(); });
+      roomRef.child("reveal").on("value",s=>{ revealData=s.val(); if(curPhase==="reveal")renderReveal(); });
       roomRef.child("calledList").on("value",s=>{ calledList=s.val()||[]; onCalled(); });
       roomRef.child("winner").on("value",s=>{ winner=s.val(); if(winner)onWinner(); else closeWin(); });
     }
@@ -1120,7 +1154,7 @@ const FIREBASE_CONFIG = {
         }
         box.appendChild(chip);
       });
-      $("mpStatusTxt").textContent = status==="playing" ? "遊戲進行中" : (status==="rps"?"猜拳決定順序…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…")));
+      $("mpStatusTxt").textContent = status==="playing" ? "遊戲進行中" : (status==="rps"?"猜拳決定順序…":(status==="reveal"?"猜拳結果揭曉…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…"))));
     }
     function updateReadyBtn(){
       const b=$("mpReadyBtn");
@@ -1154,7 +1188,7 @@ const FIREBASE_CONFIG = {
       if(!isHost)return;
       const ids=Object.keys(players);
       if(ids.length<2 || !ids.every(id=>players[id].ready)){ showToast("需要 2 人以上且全部準備好"); return; }
-      const base={ target:state.target, calledList:[], winner:null, turnIndex:0 };
+      const base={ target:state.target, calledList:[], winner:null, turnIndex:0, reveal:null };
       Object.keys(players).forEach(id=>{ base["players/"+id+"/winAt"]=null; });   // 清掉上一局的達標紀錄
       if(orderMethod==="rps"){
         roomRef.update({ ...base, status:"rps", order:null, rps:{ seq:1, groups:[ids.join(",")], throws:null } });
@@ -1172,6 +1206,7 @@ const FIREBASE_CONFIG = {
       renderPlayers();
       if(status==="playing"){ if(curPhase!=="playing") enterPlaying(); else updateTurnUI(); }
       else if(status==="rps"){ if(curPhase!=="rps") enterRps(); else renderRps(); }
+      else if(status==="reveal"){ if(curPhase!=="reveal") enterReveal(); else renderReveal(); }
       else if(status==="ordering"){ if(curPhase!=="ordering") enterOrdering(); else renderOrderPanel(); }
       else { if(curPhase!=="lobby") backToLobby(); }
       curPhase=status;
@@ -1233,6 +1268,9 @@ const FIREBASE_CONFIG = {
         return;
       }
       if(!pending.every(id=>throws[id]&&throws[id].s===seq))return;
+      // 累積每位玩家「最後出的拳」,供最後過場揭曉(第一輪為全體同組,故人人都有紀錄)
+      const acc=Object.assign({}, (rps.reveal||{}));
+      pending.forEach(id=>{ acc[id]=throws[id].c; });
       const newGroups=[];
       groups.forEach(g=>{
         if(g.length<=1){ newGroups.push(g); return; }
@@ -1244,10 +1282,63 @@ const FIREBASE_CONFIG = {
         if(cur.length)newGroups.push(cur);
       });
       if(newGroups.some(g=>g.length>1)){
-        roomRef.update({ "rps/groups":newGroups.map(g=>g.join(",")), "rps/seq":seq+1, "rps/throws":null });
+        // 還有平手 → 下一輪重猜,但保留已累積的出拳紀錄
+        roomRef.update({ "rps/groups":newGroups.map(g=>g.join(",")), "rps/seq":seq+1, "rps/throws":null, "rps/reveal":acc });
       }else{
-        roomRef.update({ order:newGroups.reduce((a,g)=>a.concat(g),[]), turnIndex:0, status:"playing", rps:null });
+        // 定案 → 先進入過場揭曉(帶著大家的出拳與最終順序),再由房主自動開打
+        const finalOrder=newGroups.reduce((a,g)=>a.concat(g),[]);
+        roomRef.update({ status:"reveal", order:finalOrder, turnIndex:0, rps:null, reveal:{ throws:acc, order:finalOrder } });
       }
+    }
+
+    /* ----- reveal: 猜拳過場,揭曉大家出了什麼 ----- */
+    function enterReveal(){
+      state.mode="setup";
+      $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
+      $("mpOrderRow").classList.add("hidden");
+      $("mpControls").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
+      $("mpRpsPanel").classList.add("hidden");
+      $("mpRevealPanel").classList.remove("hidden");
+      setLock(true);
+      revealSig="";   // 每局重繪,確保揭曉動畫重播
+      renderReveal();
+      if(isHost) scheduleRevealAdvance();   // 房主:過場秀完自動開打
+    }
+    let revealSig="";
+    function renderReveal(){
+      const rv=revealData||{};
+      const throws=rv.throws||{};
+      const ord=(rv.order&&rv.order.length?rv.order:order)||[];
+      const ids=ord.filter(id=>players[id]||throws[id]);
+      if(ids.length && !ids.some(id=>throws[id])) return;   // 出拳資料還沒同步到,先不畫(避免閃現❔)
+      const sig=ids.map(id=>id+":"+(throws[id]||"")).join("|");
+      if(sig===revealSig) return;   // 內容沒變就不重繪(避免動畫重播)
+      revealSig=sig;
+      const box=$("revealList"); if(!box)return; box.innerHTML="";
+      ids.forEach((id,idx)=>{
+        const c=throws[id];
+        const it=document.createElement("div");
+        it.className="reveal-hand"+(idx===0?" win":"");
+        it.style.animationDelay=(idx*0.12)+"s";
+        it.innerHTML='<span class="rk">'+(idx+1)+'</span>'+
+          '<span class="emo">'+(RPS_EMO[c]||"❔")+'</span>'+
+          '<span class="nm">'+esc(dispName(id))+(id===meId?"(你)":"")+'</span>'+
+          '<span class="txt">'+(RPS_TXT[c]||"")+'</span>';
+        box.appendChild(it);
+      });
+      const oe=$("revealOrder");
+      if(oe){
+        oe.textContent = ids.length===2
+          ? dispName(ids[0])+" 贏,先出號 🎉"
+          : "出手順序:"+ids.map(id=>dispName(id)).join(" → ");
+      }
+    }
+    function scheduleRevealAdvance(){
+      if(!isHost || revealTimer) return;
+      revealTimer=setTimeout(()=>{
+        revealTimer=null;
+        if(isHost && status==="reveal" && roomRef) roomRef.update({ status:"playing", reveal:null });
+      }, 3800);
     }
 
     /* ----- host manual ordering ----- */
@@ -1255,6 +1346,7 @@ const FIREBASE_CONFIG = {
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
       $("mpControls").classList.add("hidden"); $("mpRpsPanel").classList.add("hidden");
+      $("mpRevealPanel").classList.add("hidden");
       $("mpOrderPanel").classList.remove("hidden");
       setLock(true);
       orderDraft=Object.keys(players);
@@ -1297,6 +1389,7 @@ const FIREBASE_CONFIG = {
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       $("playStatus").classList.add("hidden");
       $("mpRpsPanel").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
+      $("mpRevealPanel").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
       $("mpControls").classList.remove("hidden");
       const g=$("mpGoalNum"); if(g)g.textContent=state.target+" 線";
@@ -1308,11 +1401,10 @@ const FIREBASE_CONFIG = {
     function maybeAnnounceOrder(){
       if(orderAnnounced || !order.length || status!=="playing") return;
       orderAnnounced=true;
+      if(orderMethod==="rps") return;   // 猜拳已用過場揭曉,不再跳 toast 重複公告
       const nm=id=>dispName(id);
       let msg;
-      if(orderMethod==="rps"){
-        msg = order.length===2 ? ("✊ 猜拳結果:"+nm(order[0])+" 贏,先出號") : ("✊ 猜拳結果 · 出手順序:"+order.map(nm).join(" → "));
-      }else if(orderMethod==="random"){
+      if(orderMethod==="random"){
         msg = "🎲 隨機順序:"+order.map(nm).join(" → ");
       }else{
         msg = "出手順序:"+order.map(nm).join(" → ");
@@ -1421,7 +1513,7 @@ const FIREBASE_CONFIG = {
     }
     function again(){
       if(!isHost)return;
-      const ups={ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null };
+      const ups={ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null, reveal:null };
       Object.keys(players).forEach(id=>{ ups["players/"+id+"/lines"]=0; ups["players/"+id+"/ready"]=false; ups["players/"+id+"/winAt"]=null; });
       roomRef.update(ups);
       backToLobby();
@@ -1429,6 +1521,7 @@ const FIREBASE_CONFIG = {
     function backToLobby(){
       ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled(); curPhase="lobby";
       order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false; abandoned=false;
+      revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       closeWin();
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -1442,7 +1535,7 @@ const FIREBASE_CONFIG = {
     function leave(){
       try{
         if(roomRef){
-          ["host","players","status","target","orderMethod","order","turnIndex","rps","calledList","winner"].forEach(k=>roomRef.child(k).off());
+          ["host","players","status","target","orderMethod","order","turnIndex","rps","reveal","calledList","winner"].forEach(k=>roomRef.child(k).off());
           if(isHost){
             roomRef.onDisconnect().cancel();
             roomRef.remove();                       // 房主離開 → 關閉整個房間
@@ -1456,6 +1549,7 @@ const FIREBASE_CONFIG = {
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
       order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false;
+      revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       closeWin();
       $("mpBar").classList.add("hidden");
       hidePhasePanels();
