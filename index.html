@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.8.0 -->
-<meta name="version" content="1.8.0">
+<!-- BINGO 賓果遊戲 · v1.8.1 -->
+<meta name="version" content="1.8.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -125,16 +125,16 @@
   /* ---------- Panel ---------- */
   .panel{
     width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
-    border-radius:22px;padding:18px;backdrop-filter:blur(10px);
+    border-radius:20px;padding:16px;backdrop-filter:blur(10px);
   }
   .subtitle{font-weight:800;font-size:15px;letter-spacing:.4px}
   .hint{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.5}
 
   /* ---------- Segmented / options ---------- */
-  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:14px;padding:4px;gap:4px}
+  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:12px;padding:3px;gap:4px}
   .seg button{
     flex:1;border:0;background:transparent;color:var(--muted);font-family:'Nunito';font-weight:800;
-    font-size:14.5px;padding:11px 8px;border-radius:11px;cursor:pointer;transition:.2s;white-space:nowrap;
+    font-size:14px;padding:8px 8px;border-radius:9px;cursor:pointer;transition:.2s;white-space:nowrap;
   }
   .seg button.on{background:var(--accent);color:#1c1008;box-shadow:0 4px 14px rgba(0,0,0,.2)}
   .seg.readonly{pointer-events:none}   /* 訪客:出手順序只讀,不能改但看得到房主的選擇 */
@@ -142,15 +142,15 @@
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
 
   /* ---------- Field block:標籤在上、控制項滿版、共用同一條左右基準線 ---------- */
-  .field{margin-top:16px}
-  .field-label{display:block;font-weight:800;font-size:13px;color:var(--muted);letter-spacing:.3px;margin-bottom:8px}
-  .field .mp-input{width:100%;height:48px}
+  .field{margin-top:12px}
+  .field-label{display:block;font-weight:800;font-size:12px;color:var(--muted);letter-spacing:.3px;margin-bottom:5px}
+  .field .mp-input{width:100%;height:44px}
 
   /* 全寬 stepper:− 靠左、＋ 靠右、數字置中,與 seg 同寬同高 */
-  .stepper-bar{display:flex;align-items:center;background:rgba(0,0,0,.14);border-radius:14px;padding:4px;gap:4px}
-  .stepper-bar .mini{flex:0 0 auto;width:60px;height:auto;min-height:41px;border:0;background:transparent;border-radius:11px;font-size:22px}
+  .stepper-bar{display:flex;align-items:center;background:rgba(0,0,0,.14);border-radius:12px;padding:3px;gap:4px}
+  .stepper-bar .mini{flex:0 0 auto;width:56px;height:auto;min-height:34px;border:0;background:transparent;border-radius:9px;font-size:20px}
   .stepper-bar .mini:hover{background:rgba(255,255,255,.08)}
-  .stepper-bar .target-val{flex:1}
+  .stepper-bar .target-val{flex:1;font-size:20px}
   :root[data-theme="ebook"] .stepper-bar{background:#fff;border:1px solid #000}
 
   /* .row 保留給房間橫幅(mpBar)使用 */
@@ -290,7 +290,7 @@
   .mp-input.wide{flex:1}
   .mp-input::placeholder{color:var(--muted)}
   #mpCode,#mpCreateCode{letter-spacing:6px;font-family:'Fredoka';text-align:center}
-  .or-divider{display:flex;align-items:center;gap:12px;margin:20px 2px 14px;color:var(--muted);font-size:12.5px;font-weight:800}
+  .or-divider{display:flex;align-items:center;gap:12px;margin:16px 2px 12px;color:var(--muted);font-size:12.5px;font-weight:800}
   .or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:var(--panel-line)}
   /* 連線面板標題列:返回箭頭 + 標題 */
   .mp-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
@@ -303,7 +303,13 @@
     font-size:19px;cursor:pointer;display:grid;place-items:center;transition:.15s}
   .input-icon-btn:hover{background:rgba(255,255,255,.10);color:var(--text)}
   /* 滿版主鈕:每個區塊唯一的主要動作,左右緣與輸入框對齊 */
-  .block-btn{display:block;width:100%;flex:none;min-width:0;margin-top:10px}
+  .block-btn{display:block;width:100%;flex:none;min-width:0;margin-top:10px;padding:13px 16px;font-size:16px}
+  /* 加入房間:外框式次要主鈕,與實心橘色的「建立房間」明顯區分 */
+  .btn.outline{background:transparent;border:2px solid var(--accent);color:var(--accent)}
+  .btn.outline:not(:disabled):hover{background:rgba(255,255,255,.06)}
+  :root[data-theme="ebook"] .btn.outline{border-color:#000;color:#000}
+  .btn:disabled,.btn[disabled]{opacity:.42;cursor:not-allowed;transform:none;box-shadow:none}
+  .btn:disabled:hover,.btn[disabled]:hover{transform:none;background:transparent}
   .room-list{display:flex;flex-direction:column;gap:8px}
   .room-list:not(:empty){margin-top:10px}
   .room-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
@@ -556,7 +562,7 @@
     <div class="field">
       <input id="mpCreateCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="指定房號(留空隨機)">
     </div>
-    <button class="btn primary block-btn" id="mpCreate">建立房間</button>
+    <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
 
     <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
     <div class="field">
@@ -565,7 +571,7 @@
         <button class="input-icon-btn" id="mpScan" title="掃描目前的房間" aria-label="掃描目前的房間">🔍</button>
       </div>
     </div>
-    <button class="btn primary block-btn" id="mpJoin">加入房間 ▸</button>
+    <button class="btn outline block-btn" id="mpJoin" disabled>加入房間 ▸</button>
     <div class="room-list" id="mpRoomList"></div>
     <div class="hint" id="mpConnMsg"></div>
   </section>
@@ -621,7 +627,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.8.0</span></footer>
+  <footer><span class="ver">BINGO · v1.8.1</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1883,6 +1889,9 @@ const FIREBASE_CONFIG = {
   $("mpCreate").addEventListener("click",()=>MP.create($("mpName").value,$("mpCreateCode").value));
   $("mpJoin").addEventListener("click",()=>MP.join($("mpCode").value,$("mpName").value));
   $("mpScan").addEventListener("click",()=>MP.scanRooms());
+  // 沒填房號 → 加入鈕停用(有填任何數字才亮起)
+  const syncJoinBtn=()=>{ $("mpJoin").disabled = !$("mpCode").value.replace(/\D/g,"").length; };
+  $("mpCode").addEventListener("input",syncJoinBtn); syncJoinBtn();
   $("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
   $("mpStartBtn").addEventListener("click",()=>MP.startGame());
   $("orderSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.setOrderMethod(b.dataset.order);});
