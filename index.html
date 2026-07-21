@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v0.11.0 -->
-<meta name="version" content="0.11.0">
+<!-- BINGO 賓果遊戲 · v0.12.0 -->
+<meta name="version" content="0.12.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -273,6 +273,17 @@
   :root[data-theme="midnight"] .mp-chip .seat-badge,
   :root[data-theme="arcade"] .mp-chip .seat-badge{color:var(--daub-ink)}
   :root[data-theme="ebook"] .mp-chip .seat-badge{background:#000;color:#fff}
+  /* 目前輪到的玩家:高對比 + 放大 + 脈動,一眼看出換誰 */
+  .mp-chip.turn{background:var(--accent);color:#1c1008;border-color:var(--accent);transform:scale(1.08);
+    font-size:15.5px;animation:turnpulse 1.2s ease-in-out infinite}
+  .mp-chip.turn .dot{background:#1c1008}
+  .mp-chip.turn .ln{color:#1c1008}
+  .mp-chip.turn .seat-badge{background:#1c1008;color:var(--accent)}
+  @keyframes turnpulse{0%,100%{box-shadow:0 0 0 2px var(--accent)}50%{box-shadow:0 0 0 2px var(--accent),0 0 16px var(--accent)}}
+  :root[data-theme="ebook"] .mp-chip.turn{background:#000;color:#fff}
+  :root[data-theme="ebook"] .mp-chip.turn .dot{background:#fff}
+  :root[data-theme="ebook"] .mp-chip.turn .ln{color:#fff}
+  :root[data-theme="ebook"] .mp-chip.turn .seat-badge{background:#fff;color:#000}
   .mp-play{
     width:min(92vw,520px);display:flex;align-items:center;gap:14px;flex-wrap:wrap;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:15px;padding:12px 16px;
@@ -456,7 +467,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v0.11.0</span></footer>
+  <footer><span class="ver">BINGO · v0.12.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -871,6 +882,12 @@ const FIREBASE_CONFIG = {
     }
     function setMsg(t){ $("mpConnMsg").textContent=t||""; }
     function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+    // 顯示用名稱:沒填或重複的名字會加編號區分(玩家1、玩家2、KK1、KK2…);各端 players 的 key 序一致故結果一致
+    function dispName(id){
+      const raw=(players[id]&&players[id].name)||"玩家";
+      const same=Object.keys(players).filter(x=>((players[x]&&players[x].name)||"玩家")===raw);
+      return same.length<=1 ? raw : raw+(same.indexOf(id)+1);
+    }
 
     function openConnect(){
       $("setup").classList.add("hidden");
@@ -953,8 +970,8 @@ const FIREBASE_CONFIG = {
       roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); });
       roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"&&!isHost){ state.target=t; $("targetVal").textContent=t; const g=$("mpGoalNum"); if(g)g.textContent=t+" 線"; } });
       roomRef.child("orderMethod").on("value",s=>{ orderMethod=s.val()||"host"; syncOrderSeg(); });
-      roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); } maybeAnnounceOrder(); });
-      roomRef.child("turnIndex").on("value",s=>{ turnIndex=s.val()||0; if(curPhase==="playing"){ render(); updateTurnUI(); } });
+      roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } maybeAnnounceOrder(); });
+      roomRef.child("turnIndex").on("value",s=>{ turnIndex=s.val()||0; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } });
       roomRef.child("rps").on("value",s=>{ rps=s.val(); if(curPhase==="rps")renderRps(); if(isHost)rpsHostResolve(); });
       roomRef.child("calledList").on("value",s=>{ calledList=s.val()||[]; onCalled(); });
       roomRef.child("winner").on("value",s=>{ winner=s.val(); if(winner)onWinner(); else closeWin(); });
@@ -965,11 +982,13 @@ const FIREBASE_CONFIG = {
       const ids=Object.keys(players);
       ids.forEach(id=>{
         const p=players[id]||{};
+        const isTurn=status==="playing"&&order.length>0&&order[turnIndex]===id;
         const chip=document.createElement("div");
-        chip.className="mp-chip"+(p.ready?" ready":"")+(id===meId?" me":"");
+        chip.className="mp-chip"+(p.ready?" ready":"")+(id===meId?" me":"")+(isTurn?" turn":"");
         const seatIdx=order.indexOf(id);
         const seatBadge=(status==="playing"&&seatIdx>=0)?'<span class="seat-badge">'+(seatIdx+1)+'</span>':'';
-        chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+esc(p.name||"玩家")+'</span>'+
+        const nameHtml=esc(dispName(id))+(id===meId?'(你)':'');
+        chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+nameHtml+'</span>'+
           (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'');
         box.appendChild(chip);
       });
@@ -1060,7 +1079,7 @@ const FIREBASE_CONFIG = {
         const done=throws[id]&&throws[id].s===seq;
         const chip=document.createElement("div"); chip.className="mp-chip"+(done?" ready":"");
         // 只顯示「是否已出拳」,絕不透露對方出的拳(避免後出的人偷看)
-        chip.innerHTML='<span class="dot"></span><span>'+esc((players[id]||{}).name||"玩家")+'</span><span class="ln">'+(done?"已出拳":"等待中")+'</span>';
+        chip.innerHTML='<span class="dot"></span><span>'+esc(dispName(id))+'</span><span class="ln">'+(done?"已出拳":"等待中")+'</span>';
         box.appendChild(chip);
       });
     }
@@ -1116,7 +1135,7 @@ const FIREBASE_CONFIG = {
       if(isHost) orderDraft=arr;
       arr.forEach((id,idx)=>{
         const it=document.createElement("div"); it.className="order-item";
-        it.innerHTML='<span class="seat">'+(idx+1)+'</span><span class="nm">'+esc((players[id]||{}).name||"玩家")+(id===meId?"(你)":"")+'</span>';
+        it.innerHTML='<span class="seat">'+(idx+1)+'</span><span class="nm">'+esc(dispName(id))+(id===meId?"(你)":"")+'</span>';
         if(isHost){
           const mv=document.createElement("span"); mv.className="mv";
           const up=document.createElement("button"); up.textContent="▲"; up.disabled=idx===0; up.addEventListener("click",()=>moveOrder(idx,-1));
@@ -1156,7 +1175,7 @@ const FIREBASE_CONFIG = {
     function maybeAnnounceOrder(){
       if(orderAnnounced || !order.length || status!=="playing") return;
       orderAnnounced=true;
-      const nm=id=>(players[id]||{}).name||"玩家";
+      const nm=id=>dispName(id);
       let msg;
       if(orderMethod==="rps"){
         msg = order.length===2 ? ("✊ 猜拳結果:"+nm(order[0])+" 贏,先出號") : ("✊ 猜拳結果 · 出手順序:"+order.map(nm).join(" → "));
@@ -1179,7 +1198,7 @@ const FIREBASE_CONFIG = {
       const p=order[turnIndex];
       if(!p){ el.textContent="—"; el.classList.add("wait"); return; }
       if(p===meId){ el.textContent="👉 換你出號!"; el.classList.remove("wait"); }
-      else { el.textContent="輪到 "+esc((players[p]||{}).name||"玩家"); el.classList.add("wait"); }
+      else { el.textContent="輪到 "+dispName(p); el.classList.add("wait"); }
     }
     function tap(i){
       if(!isMyTurn()){ showToast("還沒輪到你"); return; }
@@ -1234,16 +1253,21 @@ const FIREBASE_CONFIG = {
       $("veil").classList.add("show");
 
       if(isDraw){
-        const names=finalists.map(id=>(players[id]||{}).name||"玩家");
+        const names=finalists.map(id=>dispName(id));
         const mineTie=finalists.indexOf(meId)>=0;
         $("winWord").textContent="平手!";
         $("winMsg").textContent=names.join("、")+" 同時完成 "+lines+" 條線,平手!";
         if(!outcomeShown){ Sound.win(); if(mineTie)burst(); }
       }else{
         const wid=finalists[0], mine=wid===meId;
-        $("winWord").textContent=mine?"你贏了!":"BINGO!";
-        $("winMsg").textContent=mine?("你最先完成 "+lines+" 條線 🎉"):(((players[wid]||{}).name||winner.name||"對手")+" 完成了 "+lines+" 條線");
-        if(!outcomeShown){ Sound.win(); if(mine)burst(); }
+        if(mine){
+          $("winWord").textContent="你贏了!";
+          $("winMsg").textContent="你最先完成 "+lines+" 條線 🎉";
+        }else{
+          $("winWord").textContent="你輸了";
+          $("winMsg").textContent=dispName(wid)+" 先完成了 "+lines+" 條線";
+        }
+        if(!outcomeShown && mine){ Sound.win(); burst(); }
       }
       outcomeShown=true;
       render();
