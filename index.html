@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.3 -->
-<meta name="version" content="1.9.3">
+<!-- BINGO 賓果遊戲 · v1.9.4 -->
+<meta name="version" content="1.9.4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -257,6 +257,13 @@
   :root[data-theme="ebook"] .peek-link{color:#555}
   :root[data-theme="ebook"] .peek-reopen{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
   canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
+  /* 房主移出玩家:確認小卡 */
+  .confirm-card{max-width:340px}
+  .confirm-ico{font-size:42px;line-height:1;margin-bottom:2px}
+  .confirm-title{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:8px}
+  .btn.danger{background:#e03131;color:#fff}
+  .btn.danger:hover{filter:brightness(1.08)}
+  :root[data-theme="ebook"] .btn.danger{background:#000;color:#fff;border:1px solid #000}
 
   /* ---------- Settings sheet ---------- */
   .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
@@ -662,7 +669,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.3</span></footer>
+  <footer><span class="ver">BINGO · v1.9.4</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -742,6 +749,19 @@
     </div>
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
+
+  <!-- 房主移出玩家的確認 -->
+  <div class="veil" id="kickVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">⚠️</div>
+      <div class="confirm-title">移出玩家?</div>
+      <p id="kickMsg">確定要把這位玩家移出房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="kickCancel">取消</button>
+        <button class="btn danger" id="kickConfirm">移出房間</button>
+      </div>
+    </div>
+  </div>
 
   <canvas class="confetti" id="confetti"></canvas>
 
@@ -1373,6 +1393,17 @@ const FIREBASE_CONFIG = {
       if(iWasKicked()){ showToast("你已被房主移出房間"); leave(); return true; }
       return false;
     }
+    // 房主:點移除鈕先跳確認小卡(避免誤觸把人踢掉)
+    let pendingKickId=null;
+    function askKick(id){
+      if(!isHost||!roomRef||id===meId)return;
+      if(status!=="lobby"){ showToast("遊戲進行中無法移除玩家"); return; }
+      pendingKickId=id;
+      $("kickMsg").innerHTML="確定要把「"+esc(dispName(id))+"」移出房間嗎?";
+      $("kickVeil").classList.add("show");
+    }
+    function closeKick(){ pendingKickId=null; $("kickVeil").classList.remove("show"); }
+    function confirmKick(){ const id=pendingKickId; closeKick(); if(id)kick(id); }
     // 房主:把某位玩家移出房間(僅大廳階段,遊戲進行中不動出手順序)
     function kick(id){
       if(!isHost||!roomRef||id===meId)return;
@@ -1431,6 +1462,8 @@ const FIREBASE_CONFIG = {
     function renderPlayers(){
       const box=$("mpPlayers"); if(!box)return; box.innerHTML="";
       const ids=Object.keys(players);
+      // 確認框開著時,若對象已離開或已不在大廳,直接收掉避免踢到空氣
+      if(pendingKickId && (status!=="lobby" || !players[pendingKickId])) closeKick();
       ids.forEach(id=>{
         const p=players[id]||{};
         const isTurn=status==="playing"&&order.length>0&&order[turnIndex]===id;
@@ -1449,7 +1482,7 @@ const FIREBASE_CONFIG = {
           k.type="button"; k.className="mp-kick"; k.title="移出房間";
           k.setAttribute("aria-label","移出 "+dispName(id));
           k.innerHTML='<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-          k.addEventListener("click",ev=>{ ev.stopPropagation(); kick(id); });
+          k.addEventListener("click",ev=>{ ev.stopPropagation(); askKick(id); });
           chip.appendChild(k);
         }
         box.appendChild(chip);
@@ -1940,7 +1973,8 @@ const FIREBASE_CONFIG = {
     return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap,
-             amHost, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps };
+             amHost, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,
+             confirmKick, cancelKick:closeKick };
   })();
 
   /* ---------- Wire up ---------- */
@@ -1995,6 +2029,9 @@ const FIREBASE_CONFIG = {
   $("mpVeilLeave").addEventListener("click",()=>MP.bailFromRps());
   $("orderConfirm").addEventListener("click",()=>MP.confirmOrder());
   $("mpLeaveBtn").addEventListener("click",()=>MP.leave());
+  $("kickConfirm").addEventListener("click",()=>MP.confirmKick());
+  $("kickCancel").addEventListener("click",()=>MP.cancelKick());
+  $("kickVeil").addEventListener("click",e=>{ if(e.target===$("kickVeil"))MP.cancelKick(); });
   $("mpAgain").addEventListener("click",()=>MP.again());
   $("mpLeaveWin").addEventListener("click",()=>MP.leave());
   addEventListener("resize",()=>{if(state.won){const cv=$("confetti");cv.width=innerWidth;cv.height=innerHeight;}});
