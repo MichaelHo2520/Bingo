@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.13 -->
-<meta name="version" content="1.9.13">
+<!-- BINGO 賓果遊戲 · v1.10.0 -->
+<meta name="version" content="1.10.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -532,6 +532,13 @@
   /* 覆蓋 .set-card .btn 的 width:100%/margin-top,讓送出鈕縮成內容寬、與輸入框同排對齊 */
   .emote-card #emoteSend{flex:0 0 auto;width:auto;margin-top:0;padding:11px 20px;font-size:14px}
   :root[data-theme="ebook"] #emoteText{background:#fff;border:1px solid #000}
+  /* 語音留言:錄音鈕(錄音中變紅並脈動) */
+  .emote-voice{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .emote-card .voice-btn{flex:0 0 auto;width:auto;margin-top:0;padding:11px 18px;font-size:14px}
+  .voice-btn.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
+  @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
+  :root[data-theme="ebook"] .voice-btn.rec{background:#000;color:#fff}
+  .voice-hint{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:var(--muted)}
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
   .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
     align-items:center;gap:3px;animation:emoteFloat 2.2s ease-out forwards}
@@ -545,6 +552,9 @@
   :root[data-theme="midnight"] .emote-fly.is-text .ef-emo,
   :root[data-theme="arcade"] .emote-fly.is-text .ef-emo{color:var(--daub-ink)}
   :root[data-theme="ebook"] .emote-fly.is-text .ef-emo{background:#fff;color:#000;border:1px solid #000}
+  /* 語音訊息飛出時:麥克風圖示輕微脈動,暗示正在播放 */
+  .emote-fly.is-voice .ef-emo{animation:voicePulse .55s ease-in-out infinite alternate}
+  @keyframes voicePulse{from{transform:scale(1)}to{transform:scale(1.14)}}
   @keyframes emoteFloat{
     0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
     15%{opacity:1;transform:translate(-50%,-90%) scale(1.15)}
@@ -699,7 +709,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.13</span></footer>
+  <footer><span class="ver">BINGO · v1.10.0</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -779,6 +789,11 @@
       <div class="emote-input">
         <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
         <button class="btn" id="emoteSend" type="button">送出</button>
+      </div>
+      <div class="emote-sub">🎤 語音留言(最長 6 秒)</div>
+      <div class="emote-voice">
+        <button class="btn voice-btn" id="voiceBtn" type="button">🎤 錄音留言</button>
+        <span class="voice-hint" id="voiceHint"></span>
       </div>
     </div>
   </div>
@@ -897,6 +912,37 @@ const FIREBASE_CONFIG = {
       emote(){tone(880,{type:"sine",dur:0.09,vol:0.13,slideTo:1245});},
       win(){[523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46});}
     };
+  })();
+
+  /* ---------- 語音留言(連線用:MediaRecorder,低取樣率壓小檔案) ---------- */
+  const Voice=(function(){
+    const MAX_MS=6000;                         // 上限 6 秒(超過自動停)
+    let rec=null, chunks=[], stream=null, mime="", tmr=null, onDone=null;
+    function supported(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder); }
+    function pickMime(){                        // 優先 Opus(小);iOS 只有 mp4/aac
+      const cands=["audio/webm;codecs=opus","audio/ogg;codecs=opus","audio/webm","audio/mp4","audio/aac"];
+      for(const m of cands){ try{ if(MediaRecorder.isTypeSupported(m))return m; }catch(e){} }
+      return "";
+    }
+    function recording(){ return !!(rec && rec.state==="recording"); }
+    function teardown(){ if(stream){ stream.getTracks().forEach(t=>{try{t.stop();}catch(e){}}); stream=null; } rec=null; }
+    async function start(onBlob){
+      if(!supported())throw new Error("unsupported");
+      // 單聲道 + 低取樣率:盡量壓小;部分瀏覽器會忽略 sampleRate,再靠 audioBitsPerSecond 兜底
+      stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,sampleRate:16000,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      mime=pickMime();
+      const opt={audioBitsPerSecond:16000}; if(mime)opt.mimeType=mime;
+      rec=new MediaRecorder(stream,opt);
+      chunks=[]; onDone=onBlob;
+      rec.ondataavailable=e=>{ if(e.data&&e.data.size)chunks.push(e.data); };
+      rec.onstop=()=>{ const blob=new Blob(chunks,{type:mime||"audio/webm"}); teardown(); const cb=onDone; onDone=null; if(cb)cb(blob); };
+      rec.start();
+      tmr=setTimeout(stop, MAX_MS);
+    }
+    function stop(){ if(tmr){clearTimeout(tmr);tmr=null;} if(recording()){ try{rec.stop();}catch(e){} } }
+    function cancel(){ onDone=null; if(tmr){clearTimeout(tmr);tmr=null;} if(rec&&rec.state!=="inactive"){ try{rec.stop();}catch(e){} } teardown(); }
+    function toDataURL(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error||new Error("read")); r.readAsDataURL(blob); }); }
+    return { supported, recording, start, stop, cancel, toDataURL, MAX_MS };
   })();
 
   let state={
@@ -1205,10 +1251,49 @@ const FIREBASE_CONFIG = {
     emoteTarget = (target && target!=="all" && roster.some(p=>p.id===target)) ? target : "all";
     buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases();
     const inp=$("emoteText"); if(inp)inp.value="";
+    resetVoiceBtn(); const vh=$("voiceHint"); if(vh)vh.textContent="";
     Sound.wake();
     $("emoteVeil").classList.add("show");
   }
-  function closeEmote(){ const v=$("emoteVeil"); if(v)v.classList.remove("show"); }
+  function closeEmote(){ const v=$("emoteVeil"); if(v)v.classList.remove("show"); Voice.cancel(); resetVoiceBtn(); }
+  /* ---- 語音留言:錄音鈕狀態機(閒置 → 錄音倒數 → 送出) ---- */
+  let voiceTick=null;
+  function resetVoiceBtn(){
+    const b=$("voiceBtn"); if(voiceTick){ clearInterval(voiceTick); voiceTick=null; }
+    if(!b)return; b.classList.remove("rec"); b.disabled=false; b.textContent="🎤 錄音留言";
+  }
+  function toggleVoice(){
+    const b=$("voiceBtn"), hint=$("voiceHint"); if(!b)return;
+    if(hint)hint.textContent="";
+    if(!Voice.supported()){ if(hint)hint.textContent="此裝置/瀏覽器不支援錄音"; return; }
+    if(Voice.recording()){ b.disabled=true; b.textContent="處理中…"; Voice.stop(); return; }   // 停止 → 交給 onBlob 收尾
+    const to=emoteTarget;
+    b.disabled=true; b.textContent="準備中…";
+    Voice.start(async(blob)=>{
+      resetVoiceBtn();
+      if(!blob||!blob.size){ if(hint)hint.textContent="沒有錄到聲音"; return; }
+      try{
+        const url=await Voice.toDataURL(blob);
+        if(url.length>220000){ if(hint)hint.textContent="語音太大,請再短一點"; return; }   // RTDB 友善上限
+        MP.sendEmote(to,"🎤","voice",url);
+        closeEmote();
+      }catch(e){ if(hint)hint.textContent="語音處理失敗"; }
+    }).then(()=>{
+      b.disabled=false; b.classList.add("rec");
+      let left=Math.ceil(Voice.MAX_MS/1000);
+      b.textContent="⏹ 停止 · "+left+"s";
+      voiceTick=setInterval(()=>{ left--; if(left<=0){ if(voiceTick){clearInterval(voiceTick);voiceTick=null;} return; } b.textContent="⏹ 停止 · "+left+"s"; },1000);
+    }).catch(err=>{
+      resetVoiceBtn();
+      if(hint)hint.textContent=(err&&err.name==="NotAllowedError")?"麥克風權限被拒絕":"無法啟動錄音";
+    });
+  }
+  // 播放收到的語音(靜音時不播,避免打擾)
+  function playVoice(dataURL){
+    if(!dataURL)return;
+    if(Sound.isMuted&&Sound.isMuted())return;
+    try{ const a=new Audio(dataURL); a.play().catch(()=>{}); }catch(e){}
+  }
   function buildEmoteRecipients(){
     const box=$("emoteTo"); if(!box)return; box.innerHTML="";
     const list=[{id:"all",name:"🌐 全部人"}].concat(MP.roster().filter(p=>!p.me).map(p=>({id:p.id,name:p.name})));
@@ -1255,7 +1340,7 @@ const FIREBASE_CONFIG = {
     const grid=$("grid");          // 起點固定在棋盤正中央,往上飄(不再錨定玩家晶片)
     if(grid){ const g=grid.getBoundingClientRect(); if(g.width){ x=g.left+g.width/2; y=g.top+g.height/2; } }
     x += (Math.random()-0.5)*36;   // 一點點抖動,避免連發完全重疊
-    const el=document.createElement("div"); el.className="emote-fly"+(kind==="text"?" is-text":"");
+    const el=document.createElement("div"); el.className="emote-fly"+(kind==="text"?" is-text":"")+(kind==="voice"?" is-voice":"");
     el.style.left=x+"px"; el.style.top=y+"px";
     el.innerHTML='<span class="ef-emo">'+esc(emoji)+'</span><span class="ef-cap">'+esc(caption)+'</span>';   // esc:防止對方送入惡意內容
     layer.appendChild(el);
@@ -2007,23 +2092,33 @@ const FIREBASE_CONFIG = {
     function setBoardSize(n){ if(isHost&&roomRef&&n>=5&&n<=7) roomRef.child("size").set(n); }
     // 目前房間的玩家清單(給表情面板挑對象用),含顯示名與是否為自己
     function roster(){ return Object.keys(players).map(id=>({ id:id, name:dispName(id), me:id===meId })); }
-    function sendEmote(to,emoji,kind){
+    function sendEmote(to,emoji,kind,audio){
       if(!roomRef||!meId)return;
-      const isText=kind==="text";
+      const isText=kind==="text", isVoice=kind==="voice";
       const ref=roomRef.child("emotes").push();
-      ref.set({ from:meId, to:to||"all", emoji:String(emoji).slice(0,isText?24:8), kind:isText?"text":"emoji", at:firebase.database.ServerValue.TIMESTAMP });
+      const rec={ from:meId, to:to||"all", kind:isVoice?"voice":(isText?"text":"emoji"), at:firebase.database.ServerValue.TIMESTAMP };
+      if(isVoice){ rec.emoji="🎤"; rec.audio=String(audio||""); }        // 語音:emoji 當顯示圖示,音訊放 audio(base64)
+      else { rec.emoji=String(emoji).slice(0,isText?24:8); }
+      ref.set(rec);
       ref.onDisconnect().remove();
-      setTimeout(()=>{ try{ ref.remove(); }catch(e){} }, 6000);   // 秀完自動清掉,避免資料無限累積
+      setTimeout(()=>{ try{ ref.remove(); }catch(e){} }, isVoice?15000:6000);   // 秀完自動清掉;語音較大,多給時間讓大家收到再清
     }
     // 收到互動:只顯示「給全部」「給我」「我自己送出」的;針對某人 → 動畫落在那個人的晶片
     function handleEmote(e){
-      if(!e||!e.emoji)return;
+      if(!e)return;
       const to=e.to||"all";
       if(to!=="all" && to!==meId && e.from!==meId)return;
       const fromNm=dispName(e.from)+(e.from===meId?"(你)":"");
       const toNm=(to==="all")?"全部人":dispName(to)+(to===meId?"(你)":"");
+      const mine=e.from===meId, forMe=(to==="all"||to===meId);
+      if(e.kind==="voice"){
+        showEmote("🎤", fromNm+" → "+toNm, (to!=="all")?to:e.from, "voice");
+        if(!mine && forMe) playVoice(e.audio);   // 別人傳給我/全部人才播;自己送的不回放
+        return;
+      }
+      if(!e.emoji)return;
       showEmote(e.emoji, fromNm+" → "+toNm, (to!=="all")?to:e.from, e.kind);
-      if(e.from!==meId && (to==="all"||to===meId)) Sound.emote();
+      if(!mine && forMe) Sound.emote();
     }
 
     return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
@@ -2069,6 +2164,7 @@ const FIREBASE_CONFIG = {
   },{passive:false});
   $("emoteSend").addEventListener("click",sendCustomText);
   $("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
+  $("voiceBtn").addEventListener("click",toggleVoice);
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("fsBtn").addEventListener("click",toggleFull);
