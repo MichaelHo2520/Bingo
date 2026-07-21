@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.7.4 -->
-<meta name="version" content="1.7.4">
+<!-- BINGO 賓果遊戲 · v1.8.0 -->
+<meta name="version" content="1.8.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -131,7 +131,7 @@
   .hint{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.5}
 
   /* ---------- Segmented / options ---------- */
-  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:14px;padding:4px;margin-top:12px;gap:4px}
+  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:14px;padding:4px;gap:4px}
   .seg button{
     flex:1;border:0;background:transparent;color:var(--muted);font-family:'Nunito';font-weight:800;
     font-size:14.5px;padding:11px 8px;border-radius:11px;cursor:pointer;transition:.2s;white-space:nowrap;
@@ -141,10 +141,21 @@
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
 
+  /* ---------- Field block:標籤在上、控制項滿版、共用同一條左右基準線 ---------- */
+  .field{margin-top:16px}
+  .field-label{display:block;font-weight:800;font-size:13px;color:var(--muted);letter-spacing:.3px;margin-bottom:8px}
+  .field .mp-input{width:100%;height:48px}
+
+  /* 全寬 stepper:− 靠左、＋ 靠右、數字置中,與 seg 同寬同高 */
+  .stepper-bar{display:flex;align-items:center;background:rgba(0,0,0,.14);border-radius:14px;padding:4px;gap:4px}
+  .stepper-bar .mini{flex:0 0 auto;width:60px;height:auto;min-height:41px;border:0;background:transparent;border-radius:11px;font-size:22px}
+  .stepper-bar .mini:hover{background:rgba(255,255,255,.08)}
+  .stepper-bar .target-val{flex:1}
+  :root[data-theme="ebook"] .stepper-bar{background:#fff;border:1px solid #000}
+
+  /* .row 保留給房間橫幅(mpBar)使用 */
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
   .row .label{font-weight:800;font-size:14px}
-  .row .seg{margin-left:auto}          /* 盤面大小/出手順序選項靠右,與達成線數的 +/− 對齊 */
-  .steppers{display:flex;gap:6px;align-items:center;margin-left:auto}
   .mini{
     width:34px;height:34px;border-radius:10px;border:1px solid var(--panel-line);
     background:rgba(255,255,255,.08);color:var(--text);font-size:18px;font-weight:800;cursor:pointer;
@@ -279,16 +290,20 @@
   .mp-input.wide{flex:1}
   .mp-input::placeholder{color:var(--muted)}
   #mpCode,#mpCreateCode{letter-spacing:6px;font-family:'Fredoka';text-align:center}
-  .or-divider{display:flex;align-items:center;gap:12px;margin:16px 2px 4px;color:var(--muted);font-size:12.5px;font-weight:800}
+  .or-divider{display:flex;align-items:center;gap:12px;margin:20px 2px 14px;color:var(--muted);font-size:12.5px;font-weight:800}
   .or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:var(--panel-line)}
   /* 連線面板標題列:返回箭頭 + 標題 */
   .mp-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
   .mp-head .subtitle{margin:0}
-  .join-row{display:flex;align-items:center;gap:8px;margin-top:10px}
-  .join-row .mp-input{flex:1;min-width:0;height:48px}
-  .join-row .btn.primary{flex:0 0 auto;min-width:92px;height:48px;padding:0 20px;font-size:16px;border-radius:12px;display:grid;place-items:center}
-  /* 掃描:縮成房號左邊的方形圖示鈕 */
-  .join-row .mp-scan-btn{flex:0 0 auto;width:48px;min-width:0;height:48px;padding:0;font-size:20px;border-radius:12px;display:grid;place-items:center}
+  /* 房號輸入框 + 內嵌掃描圖示鈕(收進框內右側,讓輸入框左緣與其他欄位對齊) */
+  .input-wrap{position:relative;width:100%}
+  .input-wrap .mp-input{width:100%;padding-left:46px;padding-right:46px}
+  .input-icon-btn{position:absolute;top:50%;right:6px;transform:translateY(-50%);
+    width:38px;height:38px;border:0;border-radius:10px;background:transparent;color:var(--muted);
+    font-size:19px;cursor:pointer;display:grid;place-items:center;transition:.15s}
+  .input-icon-btn:hover{background:rgba(255,255,255,.10);color:var(--text)}
+  /* 滿版主鈕:每個區塊唯一的主要動作,左右緣與輸入框對齊 */
+  .block-btn{display:block;width:100%;flex:none;min-width:0;margin-top:10px}
   .room-list{display:flex;flex-direction:column;gap:8px}
   .room-list:not(:empty){margin-top:10px}
   .room-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
@@ -490,30 +505,33 @@
   <section class="panel" id="setup">
     <div class="subtitle">開始新的一局</div>
 
-    <div class="seg" id="fillSeg" role="tablist" aria-label="填號方式">
-      <button class="on" data-fill="auto">🎲 自動填號</button>
-      <button data-fill="manual">✏️ 手動填號</button>
+    <div class="field">
+      <span class="field-label">填號方式</span>
+      <div class="seg" id="fillSeg" role="tablist" aria-label="填號方式">
+        <button class="on" data-fill="auto">🎲 自動填號</button>
+        <button data-fill="manual">✏️ 手動填號</button>
+      </div>
     </div>
 
-    <div class="row" id="sizeRow">
-      <span class="label">盤面大小</span>
-      <div class="seg" id="sizeSeg" style="flex:0 0 auto" aria-label="盤面大小">
+    <div class="field" id="sizeRow">
+      <span class="field-label">盤面大小</span>
+      <div class="seg" id="sizeSeg" aria-label="盤面大小">
         <button class="on" data-size="5">5×5</button>
         <button data-size="6">6×6</button>
         <button data-size="7">7×7</button>
       </div>
     </div>
-    <div class="row" id="targetRow">
-      <span class="label">達成幾條線算贏</span>
-      <div class="steppers">
+    <div class="field" id="targetRow">
+      <span class="field-label">達成幾條線算贏</span>
+      <div class="stepper-bar">
         <button class="mini" id="tMinus" aria-label="減少">−</button>
         <span class="target-val display" id="targetVal">5</span>
         <button class="mini" id="tPlus" aria-label="增加">＋</button>
       </div>
     </div>
-    <div class="row hidden" id="mpOrderRow">
-      <span class="label" id="orderLabel">出手順序由誰定</span>
-      <div class="seg" id="orderSeg" style="flex:0 0 auto">
+    <div class="field hidden" id="mpOrderRow">
+      <span class="field-label" id="orderLabel">出手順序由誰定</span>
+      <div class="seg" id="orderSeg">
         <button data-order="host">👑 房主排</button>
         <button class="on" data-order="rps">✊ 猜拳</button>
         <button data-order="random">🎲 隨機</button>
@@ -529,19 +547,25 @@
       </button>
       <div class="subtitle">連線對戰</div>
     </div>
-    <div class="row"><span class="label">你的暱稱</span>
+    <div class="field">
+      <span class="field-label">你的暱稱</span>
       <input id="mpName" class="mp-input" maxlength="8" placeholder="玩家">
     </div>
-    <div class="join-row" style="margin-top:12px">
+
+    <div class="or-divider"><span>建立新房間</span></div>
+    <div class="field">
       <input id="mpCreateCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="指定房號(留空隨機)">
-      <button class="btn primary" id="mpCreate">建立房間</button>
     </div>
-    <div class="or-divider"><span>加入朋友的房間</span></div>
-    <div class="join-row">
-      <button class="btn ghost mp-scan-btn" id="mpScan" title="掃描目前的房間" aria-label="掃描目前的房間">🔍</button>
-      <input id="mpCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="房號">
-      <button class="btn primary" id="mpJoin">加入 ▸</button>
+    <button class="btn primary block-btn" id="mpCreate">建立房間</button>
+
+    <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
+    <div class="field">
+      <div class="input-wrap">
+        <input id="mpCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="房號">
+        <button class="input-icon-btn" id="mpScan" title="掃描目前的房間" aria-label="掃描目前的房間">🔍</button>
+      </div>
     </div>
+    <button class="btn primary block-btn" id="mpJoin">加入房間 ▸</button>
     <div class="room-list" id="mpRoomList"></div>
     <div class="hint" id="mpConnMsg"></div>
   </section>
@@ -597,7 +621,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.7.4</span></footer>
+  <footer><span class="ver">BINGO · v1.8.0</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
