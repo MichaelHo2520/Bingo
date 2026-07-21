@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
+<!-- BINGO 賓果遊戲 · v0.9.0 -->
+<meta name="version" content="0.9.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -220,6 +222,38 @@
   canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
 
   .hidden{display:none!important}
+  /* multiplayer */
+  .mp-input{
+    flex:1;min-width:0;background:rgba(255,255,255,.12);border:1px solid var(--panel-line);
+    border-radius:12px;padding:11px 14px;color:var(--text);font-family:'Nunito';font-weight:800;font-size:15px;outline:none;
+  }
+  .mp-input.wide{flex:1}
+  .mp-input::placeholder{color:var(--muted)}
+  #mpCode{text-transform:uppercase;letter-spacing:2px;font-family:'Fredoka'}
+  .mp-status{font-weight:800;font-size:13px;color:var(--accent)}
+  .mp-players{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .mp-chip{
+    display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.10);
+    border:1px solid var(--panel-line);border-radius:999px;padding:6px 13px;font-weight:800;font-size:14px;
+  }
+  .mp-chip .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  .mp-chip.ready .dot{background:var(--accent)}
+  .mp-chip .ln{font-family:'Fredoka';color:var(--accent);font-weight:700}
+  .mp-chip.me{border-color:var(--accent)}
+  .mp-play{
+    width:min(92vw,520px);display:flex;align-items:center;gap:14px;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:15px;padding:12px 16px;
+  }
+  .mp-last{display:flex;flex-direction:column;gap:2px}
+  .mp-last-num{font-size:34px;font-weight:700;line-height:1}
+  #mpDraw{flex:1;margin-left:auto;max-width:200px}
+  #mpDraw:disabled{opacity:.45;cursor:not-allowed}
+  :root[data-theme="ebook"] .mp-input,
+  :root[data-theme="ebook"] .mp-chip,
+  :root[data-theme="ebook"] .mp-play{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .mp-status,
+  :root[data-theme="ebook"] .mp-chip .ln{color:#000}
+  :root[data-theme="ebook"] .mp-chip.ready .dot{background:#000}
   #toast{
     position:fixed;top:68px;left:50%;transform:translateX(-50%) translateY(-14px);
     background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-weight:600;
@@ -230,6 +264,7 @@
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   :root[data-theme="ebook"] #toast{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
   footer{color:var(--muted);font-size:12px;margin-top:auto;padding-top:8px;opacity:.7}
+  .ver{opacity:.6;letter-spacing:.03em}
 
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}}
 </style>
@@ -258,7 +293,7 @@
       <button data-fill="manual">✏️ 手動填號</button>
     </div>
 
-    <div class="row">
+    <div class="row" id="targetRow">
       <span class="label">達成幾條線算贏</span>
       <div class="steppers">
         <button class="mini" id="tMinus" aria-label="減少">−</button>
@@ -269,6 +304,34 @@
     <div class="hint" id="fillHint">已隨機排好，按「重洗」可換一組數字。</div>
   </section>
 
+  <!-- ====== ONLINE: connect ====== -->
+  <section class="panel hidden" id="mpConnect">
+    <div class="subtitle">連線對戰</div>
+    <div class="hint">建立房間把房號給朋友,或輸入朋友的房號加入。兩台裝置各自有自己的卡片,一起抽號、比誰先湊滿線數。</div>
+    <div class="row"><span class="label">你的暱稱</span>
+      <input id="mpName" class="mp-input" maxlength="8" placeholder="玩家">
+    </div>
+    <div class="actions" style="margin-top:12px"><button class="btn primary" id="mpCreate">建立房間</button></div>
+    <div class="row">
+      <input id="mpCode" class="mp-input wide" maxlength="5" placeholder="輸入房號加入">
+      <button class="btn ghost" id="mpJoin" style="flex:0 0 auto;min-width:90px">加入</button>
+    </div>
+    <div class="hint" id="mpConnMsg"></div>
+    <div class="actions"><button class="btn ghost" id="mpBack">← 回單機</button></div>
+  </section>
+
+  <!-- ====== ONLINE: room banner ====== -->
+  <div class="panel hidden" id="mpBar">
+    <div class="row" style="margin-top:0;justify-content:space-between">
+      <span class="label">房號 <b id="mpRoomCode" class="display" style="font-size:20px;letter-spacing:2px"></b></span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span class="mp-status" id="mpStatusTxt">等待中…</span>
+        <button class="mini" id="mpLeaveBtn" title="離開房間" style="width:auto;padding:0 12px;font-size:13px">離開</button>
+      </span>
+    </div>
+    <div id="mpPlayers" class="mp-players"></div>
+  </div>
+
   <!-- ====== BOARD ====== -->
   <div class="board-wrap">
     <div class="grid" id="grid"></div>
@@ -277,9 +340,18 @@
     <div class="actions" id="setupActions">
       <button class="btn ghost" id="reshuffleBtn">🎲 重洗</button>
       <button class="btn primary" id="startBtn">開始遊戲 ▸</button>
+      <button class="btn ghost" id="onlineBtn">🌐 連線對戰</button>
+      <button class="btn primary hidden" id="mpReadyBtn">準備好了 ✓</button>
+      <button class="btn primary hidden" id="mpStartBtn">開始對戰 ▸</button>
     </div>
 
-    <!-- play status + actions -->
+    <!-- online play controls -->
+    <div class="mp-play hidden" id="mpControls">
+      <div class="mp-last"><span class="lbl">最新號碼</span><span class="mp-last-num display" id="mpLastNum">–</span></div>
+      <button class="btn primary" id="mpDraw">抽號 🎲</button>
+    </div>
+
+    <!-- play status + actions (single player) -->
     <div class="status hidden" id="playStatus">
       <div><div class="lbl">已完成</div><div class="big"><span id="lineCount">0</span> 條線</div></div>
       <div style="text-align:right"><div class="lbl">還差</div><div class="big"><span id="remain">5</span> 條贏</div></div>
@@ -290,20 +362,45 @@
     </div>
   </div>
 
-  <footer>點格子代表被叫到的號碼 · 湊滿線數即 BINGO</footer>
+  <footer>點格子代表被叫到的號碼 · 湊滿線數即 BINGO <span class="ver">v0.9.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
     <div class="win-card">
-      <div class="word display">BINGO!</div>
+      <div class="word display" id="winWord">BINGO!</div>
       <p id="winMsg">你完成了 5 條線 🎉</p>
-      <div class="actions">
+      <div class="actions" id="spWinBtns">
         <button class="btn ghost" id="winRestart">再玩一次</button>
         <button class="btn primary" id="winNew">換新號碼</button>
+      </div>
+      <div class="actions hidden" id="mpWinBtns">
+        <button class="btn primary" id="mpAgain">再一局</button>
+        <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
     </div>
   </div>
   <canvas class="confetti" id="confetti"></canvas>
+
+<!-- Firebase SDK (compat) - loaded from Google CDN -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<script>
+/* ============================================================
+   連線對戰設定 — 把你的 Firebase 專案設定貼在這裡
+   (Firebase Console → 專案設定 → 你的網頁應用程式 → firebaseConfig)
+   一定要包含 databaseURL(需先建立 Realtime Database)
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBVBN3hRMSFq7KwWmyf3IR01Y82XmfhLQ0",
+  authDomain: "bingo-82e51.firebaseapp.com",
+  databaseURL: "https://bingo-82e51-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bingo-82e51",
+  storageBucket: "bingo-82e51.firebasestorage.app",
+  messagingSenderId: "954833280596",
+  appId: "1:954833280596:web:29c1d2aa434f62db91d7c1"
+};
+</script>
 
 <script>
 (function(){
@@ -361,6 +458,7 @@
     card:shuffled(),     // 25 numbers (0 = empty in manual)
     marked:Array(25).fill(false),
     lastLines:0,
+    online:false,
     won:false
   };
 
@@ -383,7 +481,8 @@
 
       if(state.mode==="play"){
         if(state.marked[i])cell.classList.add("marked");
-        cell.addEventListener("click",()=>toggle(i));
+        if(state.online){ cell.disabled=true; cell.style.cursor="default"; }
+        else cell.addEventListener("click",()=>toggle(i));
         cell.setAttribute("aria-pressed",state.marked[i]?"true":"false");
       }else if(manual){
         if(!val)cell.classList.add("empty-cell");
@@ -427,6 +526,7 @@
     $("fillHint").textContent = ok
       ? "25 格都填好了,可以開始! ▸"
       : `點空格會填入目前最小的可用號碼,下一個是 ${next}。點已填的格子可收回該號碼(其他號碼不變)。`;
+    if(state.online)MP.readyEnabled(ok);
   }
 
   /* ---------- Play ---------- */
@@ -456,13 +556,22 @@
 
     if(done>state.lastLines && done<state.target)Sound.line();
     state.lastLines=done;
+
+    if(state.online){
+      MP.reportLines(done);
+      if(done>=state.target) MP.tryWin(done);
+      return;
+    }
     if(done>=state.target && !state.won){ state.won=true; win(done); }
   }
 
   /* ---------- Win ---------- */
   function win(done){
     Sound.win();
+    $("winWord").textContent="BINGO!";
     $("winMsg").textContent=`你完成了 ${done} 條線 🎉`;
+    $("spWinBtns").classList.remove("hidden");
+    $("mpWinBtns").classList.add("hidden");
     $("veil").classList.add("show");
     burst();
   }
@@ -502,6 +611,7 @@
     else {
       $("fillHint").textContent="已隨機排好,按「重洗」可換一組數字。";
       $("startBtn").disabled=false;$("startBtn").style.opacity="1";
+      if(state.online)MP.readyEnabled(true);
     }
   }
 
@@ -593,6 +703,244 @@
     else{document.exitFullscreen&&document.exitFullscreen();}
   }
 
+  /* ---------- Multiplayer (Firebase) ---------- */
+  const MP=(function(){
+    let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false;
+    let players={}, calledList=[], status="lobby", winner=null, ready=false;
+
+    function available(){
+      return !!(window.firebase && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0);
+    }
+    function init(){
+      if(db)return true;
+      if(!available())return false;
+      try{
+        if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);
+        db=firebase.database(); return true;
+      }catch(e){ console.error(e); return false; }
+    }
+    function randomCode(){
+      const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s="";
+      for(let i=0;i<4;i++)s+=A[Math.floor(Math.random()*A.length)];
+      return s;
+    }
+    function pid(){
+      let id; try{id=localStorage.getItem("bingo.pid");}catch(e){}
+      if(!id){ id="p"+Math.random().toString(36).slice(2,9); try{localStorage.setItem("bingo.pid",id);}catch(e){} }
+      return id;
+    }
+    function setMsg(t){ $("mpConnMsg").textContent=t||""; }
+    function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+    function openConnect(){
+      $("setup").classList.add("hidden");
+      $("setupActions").classList.add("hidden");
+      $("mpConnect").classList.remove("hidden");
+      setMsg(available()?"":"⚠ 尚未設定 Firebase。請依說明建立免費專案並把設定貼進檔案,連線才會啟用。");
+    }
+    function closeConnect(){
+      $("mpConnect").classList.add("hidden");
+      $("setup").classList.remove("hidden");
+      $("setupActions").classList.remove("hidden");
+    }
+
+    function create(name){
+      if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
+      meName=(name||"玩家").slice(0,8); meId=pid(); isHost=true; code=randomCode();
+      roomRef=db.ref("rooms/"+code);
+      roomRef.child("host").once("value").then(snap=>{
+        if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }
+        return roomRef.update({ host:meId, status:"lobby", target:state.target, calledList:[], winner:null, createdAt:Date.now() });
+      }).then(()=>{ joinNode(); enterLobby(); }).catch(e=>setMsg("建立房間失敗:"+e.message));
+    }
+    function join(inCode,name){
+      if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
+      const c=(inCode||"").toUpperCase().trim();
+      if(c.length<4){ setMsg("請輸入完整房號。"); return; }
+      meName=(name||"玩家").slice(0,8); meId=pid(); isHost=false; code=c; roomRef=db.ref("rooms/"+code);
+      roomRef.child("host").once("value").then(snap=>{
+        if(!snap.exists()){ setMsg("找不到這個房間,請確認房號。"); return; }
+        joinNode(); enterLobby();
+      }).catch(e=>setMsg("加入失敗:"+e.message));
+    }
+    function joinNode(){
+      const r=roomRef.child("players/"+meId);
+      r.set({ name:meName, lines:0, ready:false });
+      r.onDisconnect().remove();
+    }
+
+    function enterLobby(){
+      state.online=true; ready=false;
+      $("mpConnect").classList.add("hidden");
+      $("setup").classList.remove("hidden");
+      $("setupActions").classList.remove("hidden");
+      $("mpBar").classList.remove("hidden");
+      $("mpRoomCode").textContent=code;
+      $("startBtn").classList.add("hidden");
+      $("onlineBtn").classList.add("hidden");
+      $("mpReadyBtn").classList.remove("hidden");
+      $("mpStartBtn").classList.add("hidden");
+      $("mpControls").classList.add("hidden");
+      $("targetRow").style.display=isHost?"":"none";
+      state.fill="auto"; state.card=shuffled(); state.mode="setup";
+      render(); applyFillUI(); updateReadyBtn();
+      listen();
+    }
+    function listen(){
+      roomRef.child("players").on("value",s=>{ players=s.val()||{}; renderPlayers(); updateStartBtn(); });
+      roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); });
+      roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"&&!isHost){ state.target=t; $("targetVal").textContent=t; } });
+      roomRef.child("calledList").on("value",s=>{ calledList=s.val()||[]; onCalled(); });
+      roomRef.child("winner").on("value",s=>{ winner=s.val(); if(winner)onWinner(); else closeWin(); });
+    }
+
+    function renderPlayers(){
+      const box=$("mpPlayers"); if(!box)return; box.innerHTML="";
+      const ids=Object.keys(players);
+      ids.forEach(id=>{
+        const p=players[id]||{};
+        const chip=document.createElement("div");
+        chip.className="mp-chip"+(p.ready?" ready":"")+(id===meId?" me":"");
+        chip.innerHTML='<span class="dot"></span><span>'+esc(p.name||"玩家")+'</span>'+
+          (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'');
+        box.appendChild(chip);
+      });
+      $("mpStatusTxt").textContent = status==="playing" ? "遊戲進行中" : (ids.length<2?"等待對手加入…":"等待大家準備…");
+    }
+    function updateReadyBtn(){
+      const b=$("mpReadyBtn");
+      b.textContent=ready?"取消準備":"準備好了 ✓";
+      b.classList.toggle("ghost",ready); b.classList.toggle("primary",!ready);
+    }
+    function setLock(lock){
+      $("reshuffleBtn").disabled=lock;
+      $("fillSeg").style.pointerEvents=lock?"none":"";
+      grid.style.pointerEvents=lock?"none":"";
+    }
+    function toggleReady(){
+      if(!ready){
+        if(state.card.some(n=>!n)){ showToast("卡片還沒填滿"); return; }
+        ready=true; roomRef.child("players/"+meId).update({ ready:true, name:meName }); setLock(true);
+      }else{
+        ready=false; roomRef.child("players/"+meId).update({ ready:false }); setLock(false);
+      }
+      updateReadyBtn();
+    }
+    function updateStartBtn(){
+      if(!isHost){ $("mpStartBtn").classList.add("hidden"); return; }
+      const ids=Object.keys(players);
+      const allReady=ids.length>=2 && ids.every(id=>players[id].ready);
+      $("mpStartBtn").classList.toggle("hidden", status!=="lobby" || !allReady);
+    }
+    function setTarget(t){ if(isHost&&roomRef)roomRef.child("target").set(t); }
+    function startGame(){
+      if(!isHost)return;
+      roomRef.update({ status:"playing", target:state.target, calledList:[], winner:null });
+    }
+
+    function onStatus(){
+      renderPlayers();
+      if(status==="playing" && state.mode!=="play"){
+        state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(25).fill(false);
+        $("setup").classList.add("hidden");
+        $("setupActions").classList.add("hidden");
+        $("playStatus").classList.add("hidden");
+        $("playActions").classList.add("hidden");
+        $("mpControls").classList.remove("hidden");
+        $("mpDraw").disabled=false;
+        setLock(false);
+        resetMarquee(); render(); applyCalledMarks(); refreshLines();
+      } else if(status==="lobby" && state.mode==="play"){
+        backToLobby();
+      }
+    }
+    function draw(){
+      if(status!=="playing"||winner)return;
+      roomRef.child("calledList").transaction(list=>{
+        list=list||[]; if(list.length>=25)return list;
+        const used=new Set(list), avail=[];
+        for(let n=1;n<=25;n++) if(!used.has(n))avail.push(n);
+        list.push(avail[Math.floor(Math.random()*avail.length)]); return list;
+      });
+    }
+    function onCalled(){
+      const last=calledList[calledList.length-1];
+      $("mpLastNum").textContent=last?last:"–";
+      if(state.mode==="play"){
+        const prev=state.marked.slice();
+        applyCalledMarks();
+        if(state.marked.some((m,i)=>m&&!prev[i]))Sound.mark();
+        refreshLines();
+      }
+      $("mpDraw").disabled=(calledList.length>=25)||!!winner;
+    }
+    function applyCalledMarks(){
+      const set=new Set(calledList);
+      for(let i=0;i<25;i++){
+        state.marked[i]=set.has(state.card[i]);
+        if(grid.children[i])grid.children[i].classList.toggle("marked",state.marked[i]);
+      }
+    }
+    function reportLines(done){ if(roomRef&&meId)roomRef.child("players/"+meId+"/lines").set(done); }
+    function tryWin(done){ if(roomRef)roomRef.child("winner").transaction(w=> w || { id:meId, name:meName, lines:done }); }
+
+    function onWinner(){
+      if(!winner)return;
+      const mine=winner.id===meId;
+      Sound.win();
+      $("winWord").textContent=mine?"你贏了!":"BINGO!";
+      $("winMsg").textContent=mine?("你最先完成 "+winner.lines+" 條線 🎉"):(esc(winner.name)+" 完成了 "+winner.lines+" 條線");
+      $("spWinBtns").classList.add("hidden");
+      $("mpWinBtns").classList.remove("hidden");
+      $("mpAgain").style.display=isHost?"":"none";
+      $("mpDraw").disabled=true;
+      $("veil").classList.add("show");
+      if(mine)burst();
+    }
+    function again(){
+      if(!isHost)return;
+      const ups={ status:"lobby", calledList:[], winner:null };
+      Object.keys(players).forEach(id=>{ ups["players/"+id+"/lines"]=0; ups["players/"+id+"/ready"]=false; });
+      roomRef.update(ups);
+      backToLobby();
+    }
+    function backToLobby(){
+      ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled();
+      closeWin();
+      $("setup").classList.remove("hidden");
+      $("setupActions").classList.remove("hidden");
+      $("mpControls").classList.add("hidden");
+      $("startBtn").classList.add("hidden");
+      $("onlineBtn").classList.add("hidden");
+      $("mpReadyBtn").classList.remove("hidden");
+      setLock(false); updateReadyBtn(); render(); applyFillUI();
+    }
+    function leave(){
+      try{
+        if(roomRef){
+          ["players","status","target","calledList","winner"].forEach(k=>roomRef.child(k).off());
+          if(meId)roomRef.child("players/"+meId).remove();
+        }
+      }catch(e){}
+      roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
+      closeWin();
+      $("mpBar").classList.add("hidden");
+      $("mpControls").classList.add("hidden");
+      $("mpReadyBtn").classList.add("hidden");
+      $("mpStartBtn").classList.add("hidden");
+      $("mpConnect").classList.add("hidden");
+      $("startBtn").classList.remove("hidden");
+      $("onlineBtn").classList.remove("hidden");
+      $("targetRow").style.display="";
+      setLock(false);
+      toSetup();
+    }
+    function readyEnabled(ok){ if(state.online && !ready)$("mpReadyBtn").disabled=!ok; }
+
+    return { available, openConnect, closeConnect, create, join, toggleReady, startGame,
+             setTarget, draw, again, leave, reportLines, tryWin, readyEnabled };
+  })();
+
   /* ---------- Wire up ---------- */
   $("fillSeg").addEventListener("click",e=>{
     const b=e.target.closest("button");if(!b)return;
@@ -603,9 +951,9 @@
     else { state.card=Array(25).fill(0); }
     render();applyFillUI();
   });
-  $("tMinus").addEventListener("click",()=>{state.target=Math.max(1,state.target-1);$("targetVal").textContent=state.target;savePrefs();});
-  $("tPlus").addEventListener("click",()=>{state.target=Math.min(12,state.target+1);$("targetVal").textContent=state.target;savePrefs();});
-  $("reshuffleBtn").addEventListener("click",()=>{state.card=shuffled();render();});
+  $("tMinus").addEventListener("click",()=>{state.target=Math.max(1,state.target-1);$("targetVal").textContent=state.target;savePrefs();if(state.online)MP.setTarget(state.target);});
+  $("tPlus").addEventListener("click",()=>{state.target=Math.min(12,state.target+1);$("targetVal").textContent=state.target;savePrefs();if(state.online)MP.setTarget(state.target);});
+  $("reshuffleBtn").addEventListener("click",()=>{state.card=shuffled();render();if(state.online)MP.readyEnabled(true);});
   $("startBtn").addEventListener("click",startGame);
   $("restartBtn").addEventListener("click",restart);
   $("editBtn").addEventListener("click",toSetup);
@@ -615,6 +963,17 @@
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
+  // multiplayer
+  $("onlineBtn").addEventListener("click",()=>MP.openConnect());
+  $("mpBack").addEventListener("click",()=>MP.closeConnect());
+  $("mpCreate").addEventListener("click",()=>MP.create($("mpName").value));
+  $("mpJoin").addEventListener("click",()=>MP.join($("mpCode").value,$("mpName").value));
+  $("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
+  $("mpStartBtn").addEventListener("click",()=>MP.startGame());
+  $("mpDraw").addEventListener("click",()=>MP.draw());
+  $("mpLeaveBtn").addEventListener("click",()=>MP.leave());
+  $("mpAgain").addEventListener("click",()=>MP.again());
+  $("mpLeaveWin").addEventListener("click",()=>MP.leave());
   addEventListener("resize",()=>{if(state.won){const cv=$("confetti");cv.width=innerWidth;cv.height=innerHeight;}});
 
   loadPrefs();
