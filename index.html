@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.0 -->
-<meta name="version" content="1.9.0">
+<!-- BINGO 賓果遊戲 · v1.9.1 -->
+<meta name="version" content="1.9.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -339,6 +339,11 @@
   .mp-chip.ready .dot{background:var(--accent)}
   .mp-chip .ln{font-family:'Fredoka';color:var(--accent);font-weight:700}
   .mp-chip.me{border-color:var(--accent-2);box-shadow:0 0 0 2px var(--accent-2)}  /* 自己的晶片:accent-2 光環,和別人拉開差距 */
+  /* 互動提示:每個晶片尾端一顆淡淡的 😀,暗示「點我可以送表情」(取代原本右上角的互動鈕) */
+  .mp-chip .mp-poke{margin-left:1px;font-size:13px;line-height:1;opacity:.5;
+    transition:opacity .12s,transform .12s;pointer-events:none}
+  .mp-chip.clickable:hover .mp-poke{opacity:1;transform:scale(1.15)}
+  .mp-chip.turn .mp-poke{opacity:.8}
   /* 房主用:大廳時每個非自己的玩家晶片右側出現的移除鈕 */
   .mp-chip .mp-kick{display:inline-grid;place-items:center;width:20px;height:20px;margin-left:3px;padding:0;
     border:none;border-radius:50%;background:#ff5252;color:#fff;line-height:0;cursor:pointer;
@@ -532,7 +537,6 @@
       <span class="bulb">B</span><span class="bulb">I</span><span class="bulb">N</span><span class="bulb">G</span><span class="bulb">O</span>
     </div>
     <div class="tools">
-      <button class="icon-btn hidden" id="emoteBtn" title="傳送互動表情" aria-label="傳送互動表情">😀</button>
       <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
       <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
     </div>
@@ -658,7 +662,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.0</span></footer>
+  <footer><span class="ver">BINGO · v1.9.1</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1348,7 +1352,6 @@ const FIREBASE_CONFIG = {
       $("targetRow").style.display=isHost?"":"none";
       $("sizeRow").style.display=isHost?"":"none";       // 只有房主能改盤面大小
       syncOrderRow();                                     // 出手順序:大家都看得到目前選擇(訪客唯讀)
-      $("emoteBtn").classList.remove("hidden");           // 連線中:右上工具列顯示互動鈕
       state.fill="auto"; state.card=shuffled(); state.mode="setup";
       render(); applyFillUI(); updateReadyBtn();
       listen();
@@ -1433,12 +1436,13 @@ const FIREBASE_CONFIG = {
         const chip=document.createElement("div");
         chip.className="mp-chip clickable"+(p.ready?" ready":"")+(id===meId?" me":"")+(isTurn?" turn":"");
         chip.dataset.id=id;                                  // 供表情動畫定位到該玩家晶片
-        chip.title="點一下傳送互動表情";
+        chip.title=id===meId?"點一下傳送互動表情給全部人":"點一下傳送互動表情";
         chip.addEventListener("click",()=>openEmote(id===meId?"all":id));   // 點對象 → 開表情面板
         const seatIdx=order.indexOf(id);
         const seatBadge=(status==="playing"&&seatIdx>=0)?'<span class="seat-badge">'+(seatIdx+1)+'</span>':'';
         chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+esc(dispName(id))+'</span>'+youTag(id)+
-          (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'');
+          (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'')+
+          '<span class="mp-poke" aria-hidden="true">😀</span>';   // 互動提示:暗示晶片可點送表情
         if(isHost && status==="lobby" && id!==meId){
           const k=document.createElement("button");
           k.type="button"; k.className="mp-kick"; k.title="移出房間";
@@ -1899,7 +1903,6 @@ const FIREBASE_CONFIG = {
       $("mpStartBtn").classList.add("hidden");
       $("mpConnect").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
-      $("emoteBtn").classList.add("hidden");              // 離開連線,收起互動鈕
       $("startBtn").classList.remove("hidden");
       $("onlineBtn").classList.remove("hidden");
       $("targetRow").style.display="";
@@ -1964,7 +1967,6 @@ const FIREBASE_CONFIG = {
   $("settingsBtn").addEventListener("click",openSettings);
   $("setClose").addEventListener("click",closeSettings);
   $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
-  $("emoteBtn").addEventListener("click",()=>openEmote("all"));
   $("emoteClose").addEventListener("click",closeEmote);
   $("emoteVeil").addEventListener("click",e=>{ if(e.target===$("emoteVeil"))closeEmote(); });
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
