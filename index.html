@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.14.0 -->
-<meta name="version" content="1.14.0">
+<!-- BINGO 賓果遊戲 · v1.15.0 -->
+<meta name="version" content="1.15.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -344,20 +344,20 @@
   .btn:disabled:hover,.btn[disabled]:hover{transform:none;background:transparent}
   .room-list{display:flex;flex-direction:column;gap:8px}
   .room-list:not(:empty){margin-top:10px}
-  .room-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  /* 房間卡改成兩行:第一行房名(整行、可放大),第二行房主+人數;不再顯示內部號碼,避免手機上房名被擠到只剩幾字 */
+  .room-item{display:flex;flex-direction:column;align-items:stretch;gap:4px;width:100%;text-align:left;
     background:rgba(255,255,255,.10);border:1px solid var(--panel-line);border-radius:12px;
     padding:12px 14px;cursor:pointer;color:var(--text);font-weight:800;transition:transform .1s,border-color .12s}
   .room-item:hover{transform:translateY(-1px);border-color:var(--accent)}
-  .room-item .rn{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:16px}
-  .room-item .rc{flex:none;font-family:'Fredoka';font-size:12.5px;letter-spacing:1px;color:var(--muted);font-weight:700}
-  .room-item .meta{margin-left:auto;flex:none;color:var(--muted);font-size:13px;font-weight:700}
+  .room-item .rn{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;line-height:1.25}
+  .room-item .meta{width:100%;color:var(--muted);font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .room-item .host{color:var(--accent)}
   .room-item.busy{opacity:.5;cursor:not-allowed}
   .room-item.busy:hover{transform:none;border-color:var(--panel-line)}
   .room-empty{color:var(--muted);font-size:13px;padding:6px 2px}
   :root[data-theme="ebook"] .room-item{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .room-item .rc,:root[data-theme="ebook"] .room-item .meta{color:#555}
-  /* 房間橫幅裡的小號碼標籤(房名為主、號碼為輔) */
-  .room-code-tag{font-family:'Fredoka';font-size:12px;letter-spacing:1px;color:var(--muted);font-weight:700;margin-left:7px;vertical-align:middle}
+  :root[data-theme="ebook"] .room-item .meta{color:#555}
+  :root[data-theme="ebook"] .room-item .host{color:#000}
   /* 加入區:即時偵測膠囊 + 重新偵測鈕同一列 */
   .mp-detect-row{display:flex;align-items:center;gap:8px;margin:0 2px}
   .mp-detect-row .mp-live{flex:1;justify-content:flex-start;margin:0}
@@ -620,8 +620,10 @@
   }
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   :root[data-theme="ebook"] #toast{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
-  footer{color:var(--muted);font-size:12px;margin-top:auto;padding-top:8px;opacity:.7}
+  footer{color:var(--muted);font-size:12px;margin-top:auto;padding-top:8px;opacity:.7;
+    display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
   .ver{opacity:.6;letter-spacing:.03em}
+  .dev{opacity:.75;font-weight:700}
 
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}}
 </style>
@@ -708,9 +710,9 @@
 
   <!-- ====== ONLINE: room banner ====== -->
   <div class="panel hidden" id="mpBar">
-    <div class="row" style="margin-top:0;justify-content:space-between">
-      <span class="label">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b><span class="room-code-tag" id="mpRoomTag"></span></span>
-      <span style="display:flex;align-items:center;gap:10px">
+    <div class="row" style="margin-top:0;justify-content:space-between;flex-wrap:nowrap">
+      <span class="label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b></span>
+      <span style="flex:none;display:flex;align-items:center;gap:10px">
         <span class="mp-status" id="mpStatusTxt">等待中…</span>
         <button class="mini" id="mpLeaveBtn" title="離開房間" style="width:auto;padding:0 12px;font-size:13px">離開</button>
       </span>
@@ -757,7 +759,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.14.0</span></footer>
+  <footer><span class="ver">BINGO · v1.15.0</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -987,7 +989,7 @@ const FIREBASE_CONFIG = {
   const BGM=(function(){
     const SRC="bgm.mp3";
     let master=null, buffer=null, node=null, el=null;
-    let on=false, vol=0.35, ready=false, loading=false, failed=false;
+    let on=false, vol=0.35, ready=false, loading=false, failed=false, ducked=false;
     function ctx(){ return (Sound.ctx && Sound.ctx()) || null; }
     function ensureMaster(c){
       if(!master || master.context!==c){ master=c.createGain(); master.gain.value=vol; master.connect(c.destination); }
@@ -1015,15 +1017,25 @@ const FIREBASE_CONFIG = {
     function playFallback(){   // 後備:桌機/Android 仍能播(iOS 對 HTMLAudio 的音量可能無效)
       try{ if(!el){ el=new Audio(SRC); el.loop=true; } el.volume=vol; el.play().catch(()=>{}); }catch(e){}
     }
+    // 語音期間先停背景音樂,讓語音聽得清楚;語音全部播完再恢復(僅在使用者原本就開著時)
+    function duck(d){
+      d=!!d;
+      if(d===ducked)return;
+      ducked=d;
+      if(d){ stopNode(); if(el){ try{ el.pause(); }catch(e){} } }
+      else if(on){ if(ready)playBuffer(); else if(failed)playFallback(); else load().then(()=>{ if(on&&!ducked){ if(ready)playBuffer(); else playFallback(); } }); }
+    }
     return {
       isOn(){ return on; },
       vol(){ return vol; },
+      duck,
       setOn(o){
         on=!!o;
         if(on){
+          if(ducked)return;   // 語音播放中:先記住偏好(on=true),等語音播完由 duck(false) 接手開播
           if(ready){ playBuffer(); }
           else if(failed){ playFallback(); }
-          else { load().then(()=>{ if(!on)return; if(ready)playBuffer(); else playFallback(); }); }
+          else { load().then(()=>{ if(!on||ducked)return; if(ready)playBuffer(); else playFallback(); }); }
         }else{
           stopNode(); if(el){ try{ el.pause(); }catch(e){} }
         }
@@ -1495,26 +1507,46 @@ const FIREBASE_CONFIG = {
   }
   // 播放收到的語音:優先走 Web Audio(用已解鎖的 AudioContext + decodeAudioData,
   // 繞過 iOS 對 new Audio().play() 的自動播放封鎖、也能解 WAV);失敗再退回 HTMLAudio。靜音時不播。
-  function fallbackAudio(u){ try{ const a=new Audio(u); a.play().catch(()=>{}); }catch(e){} }
-  function playVoice(dataURL){
-    if(!dataURL)return;
-    if(Sound.isMuted&&Sound.isMuted())return;
+  function fallbackAudio(u,onEnd){
+    try{ const a=new Audio(u); if(onEnd){ a.onended=onEnd; a.onerror=onEnd; } const p=a.play(); if(p&&p.catch)p.catch(()=>{ if(onEnd)onEnd(); }); }
+    catch(e){ if(onEnd)onEnd(); }
+  }
+  // 播放單則語音,播完(或失敗)呼叫 onEnd;Web Audio 優先(繞過 iOS 自動播放封鎖、可解 WAV),失敗退回 HTMLAudio
+  function playVoiceOnce(dataURL,onEnd){
+    let called=false; const done=()=>{ if(called)return; called=true; if(onEnd)onEnd(); };
     let bytes;
     try{
       const i=dataURL.indexOf(","); if(i<0)throw 0;
       const bin=atob(dataURL.slice(i+1)); bytes=new Uint8Array(bin.length);
       for(let k=0;k<bin.length;k++)bytes[k]=bin.charCodeAt(k);
-    }catch(e){ fallbackAudio(dataURL); return; }
+    }catch(e){ fallbackAudio(dataURL,done); return; }
     const c=Sound.ctx&&Sound.ctx();
-    if(!c){ fallbackAudio(dataURL); return; }
+    if(!c){ fallbackAudio(dataURL,done); return; }
     const play=()=>{
       try{
         c.decodeAudioData(bytes.buffer.slice(0),
-          b=>{ try{ const s=c.createBufferSource(); s.buffer=b; s.connect(c.destination); s.start(); }catch(e){ fallbackAudio(dataURL); } },
-          ()=>fallbackAudio(dataURL));
-      }catch(e){ fallbackAudio(dataURL); }
+          b=>{ try{ const s=c.createBufferSource(); s.buffer=b; s.connect(c.destination); s.onended=done; s.start(); }catch(e){ fallbackAudio(dataURL,done); } },
+          ()=>fallbackAudio(dataURL,done));
+      }catch(e){ fallbackAudio(dataURL,done); }
     };
     if(c.state==="suspended") c.resume().then(play).catch(play); else play();
+  }
+  // 語音播放佇列:多則語音「依收到先後」排隊逐一播、不重疊;整個佇列播放期間停背景音樂,全部播完再恢復
+  const voiceQueue=[]; let voiceBusy=false, voiceSafety=null;
+  function enqueueVoice(dataURL){
+    if(!dataURL)return;
+    if(Sound.isMuted&&Sound.isMuted())return;   // 靜音:不播也不排隊
+    voiceQueue.push(dataURL);
+    if(!voiceBusy) pumpVoice();
+  }
+  function pumpVoice(){
+    if(voiceBusy)return;
+    const next=voiceQueue.shift();
+    if(next===undefined){ BGM.duck(false); return; }   // 佇列清空 → 恢復背景音樂
+    voiceBusy=true; BGM.duck(true);                     // 開播 → 停背景音樂
+    const advance=()=>{ if(!voiceBusy)return; if(voiceSafety){ clearTimeout(voiceSafety); voiceSafety=null; } voiceBusy=false; pumpVoice(); };
+    voiceSafety=setTimeout(advance,9000);               // 保險:單則語音上限 6 秒,9 秒沒收到結束事件就強制接續,避免佇列卡住
+    playVoiceOnce(next,advance);
   }
   function buildEmoteRecipients(){
     const box=$("emoteTo"); if(!box)return; box.innerHTML="";
@@ -1681,9 +1713,10 @@ const FIREBASE_CONFIG = {
         const joinable=r.status==="lobby";
         const it=document.createElement("button");
         it.type="button"; it.className="room-item"+(joinable?"":" busy"); it.disabled=!joinable;
-        const hostTag=r.host?'👑 '+esc(r.host)+' · ':'';
+        const hostTag=r.host?'<span class="host">👑 '+esc(r.host)+'</span> · ':'';
         const nm=r.name||("房間 "+r.code);   // 舊房間沒房名時,退回用號碼當名字
-        it.innerHTML='<span class="rn">🏠 '+esc(nm)+'</span><span class="rc">#'+esc(r.code)+'</span><span class="meta">'+hostTag+'👥 '+r.count+' 人 · '+(joinable?"等待中":"遊戲中")+'</span>';
+        // 兩行卡片:房名獨占第一行(整行寬、放大好認),房主與人數放第二行;不再對外顯示內部號碼
+        it.innerHTML='<span class="rn">🏠 '+esc(nm)+'</span><span class="meta">'+hostTag+'👥 '+r.count+' 人 · '+(joinable?"等待中":"遊戲中")+'</span>';
         if(joinable) it.addEventListener("click",()=>join(r.code,$("mpName").value,r.name));
         box.appendChild(it);
       });
@@ -1747,8 +1780,7 @@ const FIREBASE_CONFIG = {
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
       $("mpBar").classList.remove("hidden");
-      $("mpRoomTitle").textContent=roomName||("房間 "+code);
-      $("mpRoomTag").textContent="#"+code;
+      $("mpRoomTitle").textContent=roomName||("房間 "+code);   // 橫幅只顯示房名(不再帶內部號碼,避免手機上被截斷)
       $("startBtn").classList.add("hidden");
       $("onlineBtn").classList.add("hidden");
       $("mpReadyBtn").classList.remove("hidden");
@@ -1959,7 +1991,12 @@ const FIREBASE_CONFIG = {
       }else if(orderMethod==="random"){
         const ord=ids.slice();
         for(let i=ord.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=ord[i]; ord[i]=ord[j]; ord[j]=t; }
-        roomRef.update({ ...base, status:"playing", order:ord, rps:null });   // 隨機洗好順序,直接開打
+        // 隨機順序沒有猜拳/排序過場當「屏障」。若把清空(calledList/winner)與 status="playing" 塞進同一次寫入,
+        // 各端兩個監聽的到達順序不保證:一旦 status 先到,enterPlaying() 會用「上一局殘留的 calledList」重算而秒判勝利,
+        // 於是再一局一開打就立刻跳結果卡、無限迴圈卡死(此 bug 只發生在隨機;rps/host 的清空在更早的獨立寫入已先傳到)。
+        // 解法:拆成兩次寫入(Firebase 保證同一客戶端的寫入依序送達各端)——先清殘局並排好順序,確定 calledList 已清空,再翻 status 開打。
+        roomRef.update({ ...base, order:ord, rps:null });
+        roomRef.child("status").set("playing");
       }else{
         roomRef.update({ ...base, status:"ordering", order:null, rps:null });
       }
@@ -2414,7 +2451,7 @@ const FIREBASE_CONFIG = {
       const mine=e.from===meId, forMe=(to==="all"||to===meId);
       if(e.kind==="voice"){
         showEmote("🎤", fromNm+" → "+toNm, (to!=="all")?to:e.from, "voice");
-        if(!mine && forMe) playVoice(e.audio);   // 別人傳給我/全部人才播;自己送的不回放
+        if(!mine && forMe) enqueueVoice(e.audio);   // 別人傳給我/全部人才播(進佇列排隊逐一播);自己送的不回放
         return;
       }
       if(!e.emoji)return;
