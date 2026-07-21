@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.9 -->
-<meta name="version" content="1.9.9">
+<!-- BINGO 賓果遊戲 · v1.9.10 -->
+<meta name="version" content="1.9.10">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -689,7 +689,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.9</span></footer>
+  <footer><span class="ver">BINGO · v1.9.10</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1891,7 +1891,7 @@ const FIREBASE_CONFIG = {
 
       $("spWinBtns").classList.add("hidden");
       $("mpWinBtns").classList.remove("hidden");
-      $("mpAgain").style.display=isHost?"":"none";
+      $("mpAgain").style.display="";   // 結束後,房主與訪客都能發起「再一局」(任一人按都會把整房帶回大廳重來)
       showResult();
 
       if(isDraw){
@@ -1921,7 +1921,7 @@ const FIREBASE_CONFIG = {
       again();   // 清掉本局狀態、回大廳、重置準備;房主仍在房內,房號不變,可繼續等人加入
     }
     function again(){
-      if(!isHost)return;
+      if(!roomRef)return;   // 任一玩家(房主或訪客)皆可發起再一局:重置整房狀態、大家一起回大廳(房間層寫入為開放,訪客亦可寫)
       const ups={ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null, reveal:null, emotes:null };
       Object.keys(players).forEach(id=>{ ups["players/"+id+"/lines"]=0; ups["players/"+id+"/ready"]=false; ups["players/"+id+"/winAt"]=null; });
       roomRef.update(ups);
