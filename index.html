@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.4 -->
-<meta name="version" content="1.9.4">
+<!-- BINGO 賓果遊戲 · v1.9.5 -->
+<meta name="version" content="1.9.5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -502,6 +502,14 @@
   .phrase-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .phrase-btn:active{transform:scale(.94)}
   :root[data-theme="ebook"] .phrase-btn{background:#fff;border:1px solid #000}
+  /* 自訂文字輸入 */
+  .emote-input{display:flex;gap:8px;margin-top:10px}
+  #emoteText{flex:1;min-width:0;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    border-radius:999px;padding:9px 15px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;outline:none;transition:border-color .15s}
+  #emoteText::placeholder{color:var(--muted);font-weight:700}
+  #emoteText:focus{border-color:var(--accent)}
+  #emoteSend{flex:0 0 auto;padding:9px 18px;font-size:14px}
+  :root[data-theme="ebook"] #emoteText{background:#fff;border:1px solid #000}
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
   .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
     align-items:center;gap:3px;animation:emoteFloat 2.2s ease-out forwards}
@@ -669,7 +677,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.4</span></footer>
+  <footer><span class="ver">BINGO · v1.9.5</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -745,6 +753,10 @@
       <div class="emote-grid" id="emoteGrid"></div>
       <div class="emote-sub">💬 一句話</div>
       <div class="emote-phrases" id="emotePhrases"></div>
+      <div class="emote-input">
+        <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
+        <button class="btn" id="emoteSend" type="button">送出</button>
+      </div>
       <button class="btn ghost" id="emoteClose">關閉</button>
     </div>
   </div>
@@ -1170,6 +1182,7 @@ const FIREBASE_CONFIG = {
     const roster=MP.roster();
     emoteTarget = (target && target!=="all" && roster.some(p=>p.id===target)) ? target : "all";
     buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases();
+    const inp=$("emoteText"); if(inp)inp.value="";
     Sound.wake();
     $("emoteVeil").classList.add("show");
   }
@@ -1205,6 +1218,13 @@ const FIREBASE_CONFIG = {
       b.addEventListener("click",()=>{ MP.sendEmote(emoteTarget,tx,"text"); closeEmote(); });
       g.appendChild(b);
     });
+  }
+  // 送出自己打的字(空白只送空格會被忽略;長度上限與 sendEmote 一致)
+  function sendCustomText(){
+    const inp=$("emoteText"); if(!inp)return;
+    const tx=inp.value.trim();
+    if(!tx)return;
+    MP.sendEmote(emoteTarget,tx,"text"); inp.value=""; closeEmote();
   }
   // 顯示一個飛起的表情:定位到目標玩家的晶片(找不到就畫面中央),下方標註誰傳給誰
   function showEmote(emoji,caption,anchorId,kind){
@@ -2004,6 +2024,8 @@ const FIREBASE_CONFIG = {
   $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
   $("emoteClose").addEventListener("click",closeEmote);
   $("emoteVeil").addEventListener("click",e=>{ if(e.target===$("emoteVeil"))closeEmote(); });
+  $("emoteSend").addEventListener("click",sendCustomText);
+  $("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("fsBtn").addEventListener("click",toggleFull);
