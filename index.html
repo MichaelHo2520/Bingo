@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v0.9.0 -->
-<meta name="version" content="0.9.0">
+<!-- BINGO 賓果遊戲 · v0.10.0 -->
+<meta name="version" content="0.10.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -340,6 +340,7 @@
       <span class="bulb">B</span><span class="bulb">I</span><span class="bulb">N</span><span class="bulb">G</span><span class="bulb">O</span>
     </div>
     <div class="tools">
+      <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
       <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
     </div>
   </div>
@@ -368,7 +369,6 @@
         <button data-order="rps">✊ 猜拳</button>
       </div>
     </div>
-    <div class="hint" id="fillHint">已隨機排好，按「重洗」可換一組數字。</div>
   </section>
 
   <!-- ====== ONLINE: connect ====== -->
@@ -438,18 +438,15 @@
       <div class="actions"><button class="btn primary hidden" id="orderConfirm">確定順序,開始 ▸</button></div>
     </div>
 
-    <!-- play status + actions (single player) -->
+    <!-- play status (single player) -->
     <div class="status hidden" id="playStatus">
       <div><div class="lbl">已完成</div><div class="big"><span id="lineCount">0</span> 條線</div></div>
+      <button class="icon-btn" id="exitBtn" title="退出這局" aria-label="退出這局，回到開始畫面">🚪</button>
       <div style="text-align:right"><div class="lbl">還差</div><div class="big"><span id="remain">5</span> 條贏</div></div>
-    </div>
-    <div class="actions hidden" id="playActions">
-      <button class="btn ghost" id="restartBtn">↺ 清空重玩</button>
-      <button class="btn ghost" id="editBtn">✎ 重新編號</button>
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v0.9.0</span></footer>
+  <footer><span class="ver">BINGO · v0.10.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -482,10 +479,6 @@
       <div class="set-row">
         <span class="set-lbl">音效</span>
         <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="音效"><span class="knob"></span></button>
-      </div>
-      <div class="set-row">
-        <span class="set-lbl">全螢幕</span>
-        <button class="switch" id="swFull" role="switch" aria-checked="false" aria-label="全螢幕"><span class="knob"></span></button>
       </div>
       <button class="btn primary" id="setClose">完成</button>
     </div>
@@ -638,10 +631,6 @@ const FIREBASE_CONFIG = {
     const filled=state.card.filter(n=>n>0).length, ok=filled===25;
     $("startBtn").disabled=!ok;
     $("startBtn").style.opacity=ok?"1":".5";
-    const next=smallestMissing();
-    $("fillHint").textContent = ok
-      ? "都填好了,可以開始 ▸"
-      : `點空格依序填入號碼,下一個是 ${next};點已填的可收回。`;
     if(state.online)MP.readyEnabled(ok);
   }
 
@@ -699,7 +688,6 @@ const FIREBASE_CONFIG = {
     $("setup").classList.remove("hidden");
     $("setupActions").classList.remove("hidden");
     $("playStatus").classList.add("hidden");
-    $("playActions").classList.add("hidden");
     resetMarquee();
     render();
     applyFillUI();
@@ -711,7 +699,6 @@ const FIREBASE_CONFIG = {
     $("setup").classList.add("hidden");
     $("setupActions").classList.add("hidden");
     $("playStatus").classList.remove("hidden");
-    $("playActions").classList.remove("hidden");
     render();
   }
   function restart(){
@@ -723,7 +710,6 @@ const FIREBASE_CONFIG = {
   function applyFillUI(){
     const manual=state.fill==="manual";
     $("reshuffleBtn").classList.toggle("hidden",manual);
-    $("fillHint").classList.toggle("hidden",!manual);   // 自動模式不需要說明,保持乾淨
     if(manual){ updateManualUI(); }
     else {
       $("startBtn").disabled=false;$("startBtn").style.opacity="1";
@@ -805,10 +791,9 @@ const FIREBASE_CONFIG = {
   }
   function syncSettingsUI(){
     const isEbook=document.documentElement.getAttribute("data-theme")==="ebook";
-    const swE=$("swEbook"), swM=$("swMute"), swF=$("swFull"), sw=$("swatches");
+    const swE=$("swEbook"), swM=$("swMute"), sw=$("swatches");
     if(swE)swE.setAttribute("aria-checked",isEbook?"true":"false");
     if(swM)swM.setAttribute("aria-checked",Sound.isMuted()?"false":"true");   // on = 有聲音
-    if(swF)swF.setAttribute("aria-checked",document.fullscreenElement?"true":"false");
     if(sw){
       sw.classList.toggle("locked",isEbook);
       const active=isEbook?lastColorTheme:document.documentElement.getAttribute("data-theme");
@@ -1142,7 +1127,7 @@ const FIREBASE_CONFIG = {
     function enterPlaying(){
       state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(25).fill(false);
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
-      $("playStatus").classList.add("hidden"); $("playActions").classList.add("hidden");
+      $("playStatus").classList.add("hidden");
       $("mpRpsPanel").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
       $("mpControls").classList.remove("hidden");
@@ -1276,15 +1261,13 @@ const FIREBASE_CONFIG = {
   $("tPlus").addEventListener("click",()=>{state.target=Math.min(12,state.target+1);$("targetVal").textContent=state.target;savePrefs();if(state.online)MP.setTarget(state.target);});
   $("reshuffleBtn").addEventListener("click",()=>{state.card=shuffled();render();if(state.online)MP.readyEnabled(true);});
   $("startBtn").addEventListener("click",startGame);
-  $("restartBtn").addEventListener("click",restart);
-  $("editBtn").addEventListener("click",toSetup);
+  $("exitBtn").addEventListener("click",toSetup);
   $("settingsBtn").addEventListener("click",openSettings);
   $("setClose").addEventListener("click",closeSettings);
   $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
-  $("swFull").addEventListener("click",toggleFull);
-  document.addEventListener("fullscreenchange",syncSettingsUI);
+  $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
   // multiplayer
