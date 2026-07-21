@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.3.2 -->
-<meta name="version" content="1.3.2">
+<!-- BINGO 賓果遊戲 · v1.4.0 -->
+<meta name="version" content="1.4.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -219,6 +219,20 @@
   .win-card p{color:var(--muted);margin:10px 0 22px;font-weight:700}
   .win-card .actions{width:100%}
   .win-card .btn{min-width:0;font-size:16px;padding:14px 10px}
+  /* 先關掉結果卡看看牌面(不重來、不離開) */
+  .peek-link{margin-top:14px;background:none;border:0;cursor:pointer;
+    color:var(--muted);font-family:'Nunito';font-weight:800;font-size:14px;
+    text-decoration:underline;text-underline-offset:3px}
+  .peek-link:hover{color:var(--text)}
+  /* 偷看牌面時,浮在底部、可再叫回結果卡 */
+  .peek-reopen{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:55;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008;border:0;
+    border-radius:999px;padding:12px 22px;cursor:pointer;
+    font-family:'Fredoka';font-weight:700;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+  :root[data-theme="midnight"] .peek-reopen,
+  :root[data-theme="arcade"] .peek-reopen{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .peek-link{color:#555}
+  :root[data-theme="ebook"] .peek-reopen{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
   canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
 
   /* ---------- Settings sheet ---------- */
@@ -504,7 +518,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.3.2</span></footer>
+  <footer><span class="ver">BINGO · v1.4.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -519,8 +533,11 @@
         <button class="btn primary" id="mpAgain">再一局</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
+      <button class="peek-link" id="winPeek">先看看牌面 👀</button>
     </div>
   </div>
+  <!-- 偷看牌面時,用這顆浮動鈕叫回結果卡 -->
+  <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
 
   <!-- settings -->
   <div class="veil" id="setVeil">
@@ -735,14 +752,19 @@ const FIREBASE_CONFIG = {
     $("winMsg").textContent=`你完成了 ${done} 條線 🎉`;
     $("spWinBtns").classList.remove("hidden");
     $("mpWinBtns").classList.add("hidden");
-    $("veil").classList.add("show");
+    showResult();
     burst();
   }
-  function closeWin(){ $("veil").classList.remove("show"); }
+  // 叫出結果卡(順便收起「看結果」浮動鈕)
+  function showResult(){ $("reopenWin").classList.add("hidden"); $("veil").classList.add("show"); }
+  // 徹底收掉結果(重來/離開時用):卡片與浮動鈕都關
+  function closeWin(){ $("veil").classList.remove("show"); $("reopenWin").classList.add("hidden"); }
+  // 只把結果卡收起來看牌面,留一顆浮動鈕可再叫回結果
+  function peekBoard(){ $("veil").classList.remove("show"); $("reopenWin").classList.remove("hidden"); }
 
   /* ---------- Mode switches ---------- */
   function toSetup(){
-    state.mode="setup";state.won=false;
+    state.mode="setup";state.won=false;closeWin();
     $("setup").classList.remove("hidden");
     $("setupActions").classList.remove("hidden");
     $("playStatus").classList.add("hidden");
@@ -897,6 +919,7 @@ const FIREBASE_CONFIG = {
     let sawMe=false;                        // 是否曾在名單看過自己(避免剛加入的空讀誤判成被踢)
     let hostId=null, sawHost=false;         // 房主 id / 是否曾看過有效房主(避免剛加入時誤判)
     let myWinAt=null, outcomeShown=false;   // 平手判定用:自己達標時的叫號數 / 結果是否已揭曉
+    let abandoned=false;                    // 開打後對手都離開、只剩自己 → 本局作廢,不再繼續
     let orderAnnounced=false;               // 本局是否已公告過出手順序(猜拳結果)
 
     function available(){
@@ -1056,9 +1079,12 @@ const FIREBASE_CONFIG = {
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
         else if(curPhase==="ordering") renderOrderPanel();
         else if(curPhase==="playing"){
-          if(isHost && order.length && !players[order[turnIndex]]) roomRef.child("turnIndex").set(nextTurn(turnIndex));
-          updateTurnUI();
-          if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
+          if(!winner && Object.keys(players).length<=1){ showAbandoned(); }   // 對手都跑光,剩自己一人 → 結束
+          else{
+            if(isHost && order.length && !players[order[turnIndex]]) roomRef.child("turnIndex").set(nextTurn(turnIndex));
+            updateTurnUI();
+            if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
+          }
         }
       });
       roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); });
@@ -1267,7 +1293,7 @@ const FIREBASE_CONFIG = {
     /* ----- playing (turn-based manual call) ----- */
     function enterPlaying(){
       state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(25).fill(false);
-      myWinAt=null; outcomeShown=false; orderAnnounced=false;
+      myWinAt=null; outcomeShown=false; orderAnnounced=false; abandoned=false;
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       $("playStatus").classList.add("hidden");
       $("mpRpsPanel").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
@@ -1293,7 +1319,7 @@ const FIREBASE_CONFIG = {
       }
       showToast(msg, 3200);
     }
-    function isMyTurn(){ return status==="playing" && !winner && order.length>0 && order[turnIndex]===meId; }
+    function isMyTurn(){ return status==="playing" && !winner && !abandoned && order.length>0 && order[turnIndex]===meId; }
     function isCalled(v){ return calledList.indexOf(v)>=0; }
     function nextTurn(from){
       if(!order.length)return from;
@@ -1359,7 +1385,7 @@ const FIREBASE_CONFIG = {
       $("spWinBtns").classList.add("hidden");
       $("mpWinBtns").classList.remove("hidden");
       $("mpAgain").style.display=isHost?"":"none";
-      $("veil").classList.add("show");
+      showResult();
 
       if(isDraw){
         const names=finalists.map(id=>dispName(id));
@@ -1381,6 +1407,18 @@ const FIREBASE_CONFIG = {
       outcomeShown=true;
       render();
     }
+    // 開打後對手全部離開、只剩自己:這局作廢,顯示結束卡(房主可再一局、或離開房間)
+    function showAbandoned(){
+      if(abandoned)return;
+      abandoned=true;
+      $("winWord").textContent="遊戲結束";
+      $("winMsg").textContent="其他玩家都離開了,這局結束。";
+      $("spWinBtns").classList.add("hidden");
+      $("mpWinBtns").classList.remove("hidden");
+      $("mpAgain").style.display=isHost?"":"none";
+      showResult();
+      render();   // 讓格子改回不可點,避免一個人繼續叫號
+    }
     function again(){
       if(!isHost)return;
       const ups={ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null };
@@ -1390,7 +1428,7 @@ const FIREBASE_CONFIG = {
     }
     function backToLobby(){
       ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled(); curPhase="lobby";
-      order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false;
+      order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false; abandoned=false;
       closeWin();
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -1417,7 +1455,7 @@ const FIREBASE_CONFIG = {
       }catch(e){}
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
-      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false;
+      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false;
       closeWin();
       $("mpBar").classList.add("hidden");
       hidePhasePanels();
@@ -1461,6 +1499,8 @@ const FIREBASE_CONFIG = {
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
+  $("winPeek").addEventListener("click",peekBoard);       // 先收起結果卡看牌面
+  $("reopenWin").addEventListener("click",showResult);    // 浮動鈕:再叫回結果卡
   // multiplayer
   $("onlineBtn").addEventListener("click",()=>MP.openConnect());
   $("mpBack").addEventListener("click",()=>MP.closeConnect());
