@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.7 -->
-<meta name="version" content="1.9.7">
+<!-- BINGO 賓果遊戲 · v1.9.8 -->
+<meta name="version" content="1.9.8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -478,7 +478,17 @@
   :root[data-theme="ebook"] .cell.callable{box-shadow:0 0 0 3px #000 inset}
   /* ---------- 好友互動表情 ---------- */
   /* 互動鈕已改放右上工具列(.tools),不再用浮動鈕,盤面數字不會被蓋到 */
-  .emote-card{max-width:340px}
+  .emote-card{max-width:340px;position:relative;overscroll-behavior:contain;touch-action:pan-y}  /* 只有卡片內部可上下捲,不外溢到背景 */
+  #emoteVeil{touch-action:none}   /* 手指在卡片外(背景)滑動時,不捲動背景頁 */
+  /* 右上角關閉 ✕:sticky 固定在卡片可視區右上,卡片內部捲動時也不會捲走 */
+  .card-x{position:sticky;top:0;margin:-6px -4px -32px auto;z-index:4;
+    width:34px;height:34px;border-radius:50%;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.12);color:var(--text);font-size:15px;font-weight:800;line-height:1;
+    cursor:pointer;display:grid;place-items:center;transition:background .15s,transform .1s}
+  .card-x:hover{background:rgba(255,255,255,.22);transform:scale(1.06)}
+  .card-x:active{transform:scale(.9)}
+  :root[data-theme="ebook"] .card-x{background:#fff;border:1px solid #000}
+  .emote-card .set-head{padding:0 34px}   /* 標題兩側留空,長名字不會被 ✕ 蓋到 */
   .emote-to{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
   .emote-to-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.10);color:var(--text);
     border-radius:999px;padding:7px 13px;font-family:'Nunito';font-weight:800;font-size:13.5px;cursor:pointer;
@@ -679,7 +689,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.7</span></footer>
+  <footer><span class="ver">BINGO · v1.9.8</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -750,6 +760,7 @@
   <!-- emoji 好友互動(連線) -->
   <div class="veil" id="emoteVeil">
     <div class="set-card emote-card">
+      <button class="card-x" id="emoteClose" type="button" aria-label="關閉">✕</button>
       <div class="set-head" id="emoteHead">傳給全部人</div>
       <div class="emote-to" id="emoteTo"></div>
       <div class="emote-grid" id="emoteGrid"></div>
@@ -759,7 +770,6 @@
         <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
         <button class="btn" id="emoteSend" type="button">送出</button>
       </div>
-      <button class="btn ghost" id="emoteClose">關閉</button>
     </div>
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
@@ -2025,7 +2035,8 @@ const FIREBASE_CONFIG = {
   $("setClose").addEventListener("click",closeSettings);
   $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
   $("emoteClose").addEventListener("click",closeEmote);
-  $("emoteVeil").addEventListener("click",e=>{ if(e.target===$("emoteVeil"))closeEmote(); });
+  // 碰到卡片外(背景)就直接關閉:用 pointerdown 讓觸控一按下就關,不必等點擊放開
+  $("emoteVeil").addEventListener("pointerdown",e=>{ if(e.target===$("emoteVeil"))closeEmote(); });
   $("emoteSend").addEventListener("click",sendCustomText);
   $("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
