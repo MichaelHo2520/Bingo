@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.12 -->
-<meta name="version" content="1.9.12">
+<!-- BINGO 賓果遊戲 · v1.9.13 -->
+<meta name="version" content="1.9.13">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -90,14 +90,21 @@
   body{
     font-family:'Nunito',system-ui,sans-serif;
     color:var(--text);
+    background:var(--bg1);
+    min-height:100%;
+    display:flex;flex-direction:column;align-items:center;
+    padding:16px;gap:14px;overflow-x:hidden;
+    transition:background .5s ease;
+  }
+  /* 固定背景層:取代 background-attachment:fixed(手機滑動時背景會被帶著跑、放開才重畫、跳一下)。
+     改用 position:fixed 的合成層,滑動時由合成器釘住、不重繪,就不會跳動 */
+  body::before{
+    content:"";
+    position:fixed;inset:0;z-index:-1;pointer-events:none;
     background:
       radial-gradient(120% 120% at 15% 0%, var(--bg2) 0%, transparent 55%),
       radial-gradient(120% 120% at 100% 100%, var(--bg3) 0%, transparent 50%),
       var(--bg1);
-    background-attachment:fixed;
-    min-height:100%;
-    display:flex;flex-direction:column;align-items:center;
-    padding:16px;gap:14px;overflow-x:hidden;
     transition:background .5s ease;
   }
   .display{font-family:'Fredoka',sans-serif}
@@ -692,7 +699,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.12</span></footer>
+  <footer><span class="ver">BINGO · v1.9.13</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
