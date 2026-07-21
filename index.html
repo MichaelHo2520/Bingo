@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.1.0 -->
-<meta name="version" content="1.1.0">
+<!-- BINGO 賓果遊戲 · v1.2.0 -->
+<meta name="version" content="1.2.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -263,6 +263,18 @@
   .join-row{display:flex;align-items:center;gap:8px;margin-top:10px}
   .join-row .mp-input{flex:1;min-width:0;height:48px}
   .join-row .btn.primary{flex:0 0 auto;min-width:92px;height:48px;padding:0 20px;font-size:16px;border-radius:12px;display:grid;place-items:center}
+  .room-list{display:flex;flex-direction:column;gap:8px}
+  .room-list:not(:empty){margin-top:10px}
+  .room-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    background:rgba(255,255,255,.10);border:1px solid var(--panel-line);border-radius:12px;
+    padding:12px 14px;cursor:pointer;color:var(--text);font-weight:800;transition:transform .1s,border-color .12s}
+  .room-item:hover{transform:translateY(-1px);border-color:var(--accent)}
+  .room-item .rc{font-family:'Fredoka';font-size:18px;letter-spacing:2px}
+  .room-item .meta{margin-left:auto;color:var(--muted);font-size:13px;font-weight:700}
+  .room-item.busy{opacity:.5;cursor:not-allowed}
+  .room-item.busy:hover{transform:none;border-color:var(--panel-line)}
+  .room-empty{color:var(--muted);font-size:13px;padding:6px 2px}
+  :root[data-theme="ebook"] .room-item{background:#fff;border:1px solid #000}
   .mp-status{font-weight:800;font-size:13px;color:var(--accent)}
   .mp-players{display:flex;flex-wrap:wrap;gap:14px 12px;margin-top:12px}
   .mp-chip{
@@ -410,11 +422,13 @@
       <input id="mpName" class="mp-input" maxlength="8" placeholder="玩家">
     </div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" id="mpCreate">建立房間</button></div>
-    <div class="or-divider"><span>或加入朋友的房間</span></div>
+    <div class="or-divider"><span>加入朋友的房間</span></div>
     <div class="join-row">
       <input id="mpCode" class="mp-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="房號">
       <button class="btn primary" id="mpJoin">加入 ▸</button>
     </div>
+    <div class="actions" style="margin-top:8px"><button class="btn ghost" id="mpScan">🔍 掃描目前的房間</button></div>
+    <div class="room-list" id="mpRoomList"></div>
     <div class="hint" id="mpConnMsg"></div>
     <div class="actions"><button class="btn ghost" id="mpBack">← 回單機</button></div>
   </section>
@@ -482,7 +496,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.1.0</span></footer>
+  <footer><span class="ver">BINGO · v1.2.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -909,7 +923,34 @@ const FIREBASE_CONFIG = {
       $("setup").classList.add("hidden");
       $("setupActions").classList.add("hidden");
       $("mpConnect").classList.remove("hidden");
+      $("mpRoomList").innerHTML="";
       setMsg(available()?"":"⚠ 尚未設定 Firebase。請依說明建立免費專案並把設定貼進檔案,連線才會啟用。");
+    }
+    // 掃描伺服器上目前開著的房間,列出來給人選(讀 rooms 一次,不掛常駐監聽)
+    function scanRooms(){
+      if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
+      const box=$("mpRoomList"); if(!box)return;
+      box.innerHTML='<div class="room-empty">掃描中…</div>';
+      db.ref("rooms").once("value").then(s=>{
+        const rooms=s.val()||{};
+        const items=Object.keys(rooms).map(c=>{
+          const r=rooms[c]||{};
+          return { code:c, status:r.status||"lobby", count:Object.keys(r.players||{}).length };
+        }).filter(r=>r.count>0).sort((a,b)=>a.code.localeCompare(b.code));
+        renderRoomList(items);
+      }).catch(e=>{ box.innerHTML='<div class="room-empty">掃描失敗:'+esc(e.message)+'(可能是資料庫規則不允許列出房間,見說明)</div>'; });
+    }
+    function renderRoomList(items){
+      const box=$("mpRoomList"); if(!box)return; box.innerHTML="";
+      if(!items.length){ box.innerHTML='<div class="room-empty">目前沒有開著的房間,按「建立房間」開一個吧。</div>'; return; }
+      items.forEach(r=>{
+        const joinable=r.status==="lobby";
+        const it=document.createElement("button");
+        it.type="button"; it.className="room-item"+(joinable?"":" busy"); it.disabled=!joinable;
+        it.innerHTML='<span class="rc">'+esc(r.code)+'</span><span class="meta">👥 '+r.count+' 人 · '+(joinable?"等待中":"遊戲中")+'</span>';
+        if(joinable) it.addEventListener("click",()=>{ $("mpCode").value=r.code; join(r.code,$("mpName").value); });
+        box.appendChild(it);
+      });
     }
     function closeConnect(){
       $("mpConnect").classList.add("hidden");
@@ -1357,7 +1398,7 @@ const FIREBASE_CONFIG = {
     }
     function readyEnabled(ok){ if(state.online && !ready)$("mpReadyBtn").disabled=!ok; }
 
-    return { available, openConnect, closeConnect, create, join, toggleReady, startGame,
+    return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap };
   })();
@@ -1390,6 +1431,7 @@ const FIREBASE_CONFIG = {
   $("mpBack").addEventListener("click",()=>MP.closeConnect());
   $("mpCreate").addEventListener("click",()=>MP.create($("mpName").value));
   $("mpJoin").addEventListener("click",()=>MP.join($("mpCode").value,$("mpName").value));
+  $("mpScan").addEventListener("click",()=>MP.scanRooms());
   $("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
   $("mpStartBtn").addEventListener("click",()=>MP.startGame());
   $("orderSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.setOrderMethod(b.dataset.order);});
