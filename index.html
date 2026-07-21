@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.1 -->
-<meta name="version" content="1.9.1">
+<!-- BINGO 賓果遊戲 · v1.9.2 -->
+<meta name="version" content="1.9.2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -662,7 +662,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.1</span></footer>
+  <footer><span class="ver">BINGO · v1.9.2</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1040,12 +1040,14 @@ const FIREBASE_CONFIG = {
   const STORE_KEY="bingo.prefs.v1";
   function savePrefs(){
     try{
+      const nameEl=$("mpName");
       localStorage.setItem(STORE_KEY, JSON.stringify({
         theme:lastColorTheme,
         ebook:document.documentElement.getAttribute("data-theme")==="ebook",
         muted:Sound.isMuted(),
         target:state.target,
-        size:SIZE
+        size:SIZE,
+        name:nameEl?nameEl.value.trim():""
       }));
     }catch(e){/* storage unavailable -> just don't persist */}
   }
@@ -1062,6 +1064,7 @@ const FIREBASE_CONFIG = {
     }
     if(p.muted){ Sound.setMuted(true); }
     if(p.ebook){ setEbook(true,true); }
+    if(typeof p.name==="string" && p.name){ const nameEl=$("mpName"); if(nameEl) nameEl.value=p.name; }
   }
 
   /* ---------- Settings sheet ---------- */
@@ -1982,6 +1985,7 @@ const FIREBASE_CONFIG = {
   $("mpCreate").addEventListener("click",()=>MP.create($("mpName").value,$("mpCreateCode").value));
   $("mpJoin").addEventListener("click",()=>MP.join($("mpCode").value,$("mpName").value));
   $("mpScan").addEventListener("click",()=>MP.scanRooms());
+  $("mpName").addEventListener("change",savePrefs);   // 暱稱記住,下次自動帶入
   // 沒填房號 → 加入鈕停用(有填任何數字才亮起)
   const syncJoinBtn=()=>{ $("mpJoin").disabled = !$("mpCode").value.replace(/\D/g,"").length; };
   $("mpCode").addEventListener("input",syncJoinBtn); syncJoinBtn();
