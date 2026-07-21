@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.7.3 -->
-<meta name="version" content="1.7.3">
+<!-- BINGO 賓果遊戲 · v1.7.4 -->
+<meta name="version" content="1.7.4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -95,7 +95,7 @@
   .display{font-family:'Fredoka',sans-serif}
 
   /* ---------- Top bar ---------- */
-  .topbar{width:100%;max-width:560px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .topbar{width:min(92vw,520px);display:flex;align-items:center;justify-content:space-between;gap:10px}
   .marquee{display:flex;gap:6px;align-items:flex-end}
   .marquee .bulb{
     font-family:'Fredoka',sans-serif;font-weight:700;
@@ -124,7 +124,7 @@
 
   /* ---------- Panel ---------- */
   .panel{
-    width:100%;max-width:560px;background:var(--panel);border:1px solid var(--panel-line);
+    width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
     border-radius:22px;padding:18px;backdrop-filter:blur(10px);
   }
   .subtitle{font-weight:800;font-size:15px;letter-spacing:.4px}
@@ -154,7 +154,7 @@
   .target-val{font-family:'Fredoka';font-weight:700;font-size:22px;min-width:26px;text-align:center}
 
   /* ---------- Grid ---------- */
-  .board-wrap{width:100%;max-width:560px;display:flex;flex-direction:column;align-items:center;gap:12px}
+  .board-wrap{width:min(92vw,520px);display:flex;flex-direction:column;align-items:center;gap:12px}
   .grid{
     --gap:clamp(6px,1.6vw,10px);
     width:min(92vw,520px);aspect-ratio:1;
@@ -529,7 +529,6 @@
       </button>
       <div class="subtitle">連線對戰</div>
     </div>
-    <div class="hint">建立房間把房號給朋友,或輸入朋友的房號加入。兩台裝置各自有自己的卡片,輪流出號、比誰先湊滿線數。</div>
     <div class="row"><span class="label">你的暱稱</span>
       <input id="mpName" class="mp-input" maxlength="8" placeholder="玩家">
     </div>
@@ -598,7 +597,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.7.3</span></footer>
+  <footer><span class="ver">BINGO · v1.7.4</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1304,15 +1303,14 @@ const FIREBASE_CONFIG = {
         if(kickIfHostGone()) return;
         if(kickIfKicked()) return;
         renderPlayers(); updateStartBtn();
+        // 遊戲中(非大廳)其他人都離開、房主只剩自己 → 自動回大廳等待,保留房間開著(不卡在單人局,也不顯示結束卡)
+        if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1){ hostAloneToLobby(); return; }
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
         else if(curPhase==="ordering") renderOrderPanel();
         else if(curPhase==="playing"){
-          if(!winner && Object.keys(players).length<=1){ showAbandoned(); }   // 對手都跑光,剩自己一人 → 結束
-          else{
-            if(isHost && order.length && !players[order[turnIndex]]) roomRef.child("turnIndex").set(nextTurn(turnIndex));
-            updateTurnUI();
-            if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
-          }
+          if(isHost && order.length && !players[order[turnIndex]]) roomRef.child("turnIndex").set(nextTurn(turnIndex));
+          updateTurnUI();
+          if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
         }
       });
       roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); });
@@ -1727,17 +1725,11 @@ const FIREBASE_CONFIG = {
       outcomeShown=true;
       render();
     }
-    // 開打後對手全部離開、只剩自己:這局作廢,顯示結束卡(房主可再一局、或離開房間)
-    function showAbandoned(){
-      if(abandoned)return;
-      abandoned=true;
-      $("winWord").textContent="遊戲結束";
-      $("winMsg").textContent="其他玩家都離開了,這局結束。";
-      $("spWinBtns").classList.add("hidden");
-      $("mpWinBtns").classList.remove("hidden");
-      $("mpAgain").style.display=isHost?"":"none";
-      showResult();
-      render();   // 讓格子改回不可點,避免一個人繼續叫號
+    // 遊戲中其他人都離開、房主只剩自己:自動回大廳等待(保留房間開著讓人重新加入),不卡在單人局
+    function hostAloneToLobby(){
+      if(curPhase==="lobby")return;
+      showToast("其他玩家都離開了,回到等待…", 2600);
+      again();   // 清掉本局狀態、回大廳、重置準備;房主仍在房內,房號不變,可繼續等人加入
     }
     function again(){
       if(!isHost)return;
