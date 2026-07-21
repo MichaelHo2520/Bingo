@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.5 -->
-<meta name="version" content="1.9.5">
+<!-- BINGO 賓果遊戲 · v1.9.6 -->
+<meta name="version" content="1.9.6">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -503,12 +503,13 @@
   .phrase-btn:active{transform:scale(.94)}
   :root[data-theme="ebook"] .phrase-btn{background:#fff;border:1px solid #000}
   /* 自訂文字輸入 */
-  .emote-input{display:flex;gap:8px;margin-top:10px}
-  #emoteText{flex:1;min-width:0;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
-    border-radius:999px;padding:9px 15px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;outline:none;transition:border-color .15s}
+  .emote-input{display:flex;align-items:stretch;gap:8px;margin-top:16px}
+  #emoteText{flex:1 1 auto;min-width:0;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    border-radius:999px;padding:11px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;outline:none;transition:border-color .15s}
   #emoteText::placeholder{color:var(--muted);font-weight:700}
   #emoteText:focus{border-color:var(--accent)}
-  #emoteSend{flex:0 0 auto;padding:9px 18px;font-size:14px}
+  /* 覆蓋 .set-card .btn 的 width:100%/margin-top,讓送出鈕縮成內容寬、與輸入框同排對齊 */
+  .emote-card #emoteSend{flex:0 0 auto;width:auto;margin-top:0;padding:11px 20px;font-size:14px}
   :root[data-theme="ebook"] #emoteText{background:#fff;border:1px solid #000}
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
   .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
@@ -677,7 +678,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.5</span></footer>
+  <footer><span class="ver">BINGO · v1.9.6</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
