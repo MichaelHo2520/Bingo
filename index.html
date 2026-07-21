@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.8 -->
-<meta name="version" content="1.9.8">
+<!-- BINGO 賓果遊戲 · v1.9.9 -->
+<meta name="version" content="1.9.9">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -689,7 +689,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.8</span></footer>
+  <footer><span class="ver">BINGO · v1.9.9</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -2037,6 +2037,12 @@ const FIREBASE_CONFIG = {
   $("emoteClose").addEventListener("click",closeEmote);
   // 碰到卡片外(背景)就直接關閉:用 pointerdown 讓觸控一按下就關,不必等點擊放開
   $("emoteVeil").addEventListener("pointerdown",e=>{ if(e.target===$("emoteVeil"))closeEmote(); });
+  // 面板內滑動:卡片「有得捲」才交給它內部捲動,否則(沒得捲或在背景)一律吃掉手勢,避免捲到背景頁
+  $("emoteVeil").addEventListener("touchmove",e=>{
+    const card=e.target.closest?e.target.closest(".emote-card"):null;
+    if(card && card.scrollHeight>card.clientHeight) return;   // 內容超出才讓卡片捲(overscroll-behavior:contain 擋邊界外溢)
+    e.preventDefault();
+  },{passive:false});
   $("emoteSend").addEventListener("click",sendCustomText);
   $("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
