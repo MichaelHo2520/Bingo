@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.10.0 -->
-<meta name="version" content="1.10.0">
+<!-- BINGO 賓果遊戲 · v1.10.1 -->
+<meta name="version" content="1.10.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -709,7 +709,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.10.0</span></footer>
+  <footer><span class="ver">BINGO · v1.10.1</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -910,38 +910,76 @@ const FIREBASE_CONFIG = {
       start(){[392,523,659].forEach((f,i)=>tone(f,{type:"triangle",dur:0.12,vol:0.16,delay:i*0.05}));},
       line(){[523,659,784].forEach((f,i)=>tone(f,{type:"triangle",dur:0.17,vol:0.18,delay:i*0.06}));},
       emote(){tone(880,{type:"sine",dur:0.09,vol:0.13,slideTo:1245});},
+      ctx(){ return ac(); },   // 給語音留言用同一個(已解鎖)AudioContext 播放,繞過 iOS 自動播放限制
       win(){[523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46});}
     };
   })();
 
-  /* ---------- 語音留言(連線用:MediaRecorder,低取樣率壓小檔案) ---------- */
+  /* ---------- 語音留言(連線用:錄 PCM 編 WAV,跨平台可播) ----------
+     不用 MediaRecorder 的壓縮輸出:Android 產生的 Opus/WebM iOS 無法解碼(「安卓錄→
+     iPhone 沒聲音」的主因)。改自己抓原始 PCM、降到低取樣率、編成 WAV;iOS/Android
+     都能用 AudioContext.decodeAudioData 解,一次解決相容問題。 */
   const Voice=(function(){
-    const MAX_MS=6000;                         // 上限 6 秒(超過自動停)
-    let rec=null, chunks=[], stream=null, mime="", tmr=null, onDone=null;
-    function supported(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder); }
-    function pickMime(){                        // 優先 Opus(小);iOS 只有 mp4/aac
-      const cands=["audio/webm;codecs=opus","audio/ogg;codecs=opus","audio/webm","audio/mp4","audio/aac"];
-      for(const m of cands){ try{ if(MediaRecorder.isTypeSupported(m))return m; }catch(e){} }
-      return "";
-    }
-    function recording(){ return !!(rec && rec.state==="recording"); }
-    function teardown(){ if(stream){ stream.getTracks().forEach(t=>{try{t.stop();}catch(e){}}); stream=null; } rec=null; }
-    async function start(onBlob){
+    const MAX_MS=6000, OUT_RATE=8000;   // 上限 6 秒;輸出 8kHz 單聲道(電話音質,跨平台又小;要更清晰可調高)
+    let ctx=null, stream=null, src=null, proc=null, zero=null, buf=[], recLen=0, inRate=44100, tmr=null, onDone=null, active=false;
+    function supported(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && (window.AudioContext||window.webkitAudioContext)); }
+    function recording(){ return active; }
+    async function start(onWav){
       if(!supported())throw new Error("unsupported");
-      // 單聲道 + 低取樣率:盡量壓小;部分瀏覽器會忽略 sampleRate,再靠 audioBitsPerSecond 兜底
-      stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,sampleRate:16000,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-      mime=pickMime();
-      const opt={audioBitsPerSecond:16000}; if(mime)opt.mimeType=mime;
-      rec=new MediaRecorder(stream,opt);
-      chunks=[]; onDone=onBlob;
-      rec.ondataavailable=e=>{ if(e.data&&e.data.size)chunks.push(e.data); };
-      rec.onstop=()=>{ const blob=new Blob(chunks,{type:mime||"audio/webm"}); teardown(); const cb=onDone; onDone=null; if(cb)cb(blob); };
-      rec.start();
+      onDone=onWav; buf=[]; recLen=0;
+      const AC=window.AudioContext||window.webkitAudioContext; ctx=new AC();
+      if(ctx.state==="suspended"){ try{ await ctx.resume(); }catch(e){} }
+      inRate=ctx.sampleRate;
+      stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      src=ctx.createMediaStreamSource(stream);
+      proc=ctx.createScriptProcessor(4096,1,1);
+      zero=ctx.createGain(); zero.gain.value=0;      // 靜音接 destination:讓 onaudioprocess 在 iOS 也觸發,又不會把麥克風回授到喇叭
+      proc.onaudioprocess=e=>{ if(!active)return; const ch=e.inputBuffer.getChannelData(0); buf.push(new Float32Array(ch)); recLen+=ch.length; };
+      src.connect(proc); proc.connect(zero); zero.connect(ctx.destination);
+      active=true;
       tmr=setTimeout(stop, MAX_MS);
     }
-    function stop(){ if(tmr){clearTimeout(tmr);tmr=null;} if(recording()){ try{rec.stop();}catch(e){} } }
-    function cancel(){ onDone=null; if(tmr){clearTimeout(tmr);tmr=null;} if(rec&&rec.state!=="inactive"){ try{rec.stop();}catch(e){} } teardown(); }
-    function toDataURL(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(r.error||new Error("read")); r.readAsDataURL(blob); }); }
+    function detach(){
+      if(tmr){clearTimeout(tmr);tmr=null;}
+      try{ if(proc){ proc.onaudioprocess=null; proc.disconnect(); } }catch(e){}
+      try{ if(src)src.disconnect(); }catch(e){}
+      try{ if(zero)zero.disconnect(); }catch(e){}
+      if(stream){ stream.getTracks().forEach(t=>{try{t.stop();}catch(e){}}); stream=null; }
+    }
+    function stop(){
+      if(!active)return; active=false; detach();
+      const wav = recLen>0 ? encodeWav(mergeDown(buf,recLen,inRate,OUT_RATE),OUT_RATE) : null;
+      buf=[]; recLen=0;
+      try{ if(ctx)ctx.close(); }catch(e){} ctx=null;
+      const cb=onDone; onDone=null; if(cb)cb(wav);
+    }
+    function cancel(){ onDone=null; if(active){ active=false; detach(); } buf=[]; recLen=0; try{ if(ctx)ctx.close(); }catch(e){} ctx=null; }
+    // 合併所有 PCM 區塊並線性降取樣到 outRate
+    function mergeDown(chunks,len,inR,outR){
+      const all=new Float32Array(len); let off=0;
+      for(const c of chunks){ all.set(c,off); off+=c.length; }
+      if(outR>=inR)return all;
+      const ratio=inR/outR, outLen=Math.floor(len/ratio), out=new Float32Array(outLen);
+      for(let i=0;i<outLen;i++){ const s=Math.floor(i*ratio), e=Math.min(len,Math.floor((i+1)*ratio)); let sum=0,n=0; for(let j=s;j<e;j++){ sum+=all[j]; n++; } out[i]=n?sum/n:(all[s]||0); }
+      return out;
+    }
+    // Float32 → 16-bit PCM 單聲道 WAV(ArrayBuffer)
+    function encodeWav(samples,rate){
+      const n=samples.length, ab=new ArrayBuffer(44+n*2), v=new DataView(ab);
+      const ws=(o,s)=>{ for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i)); };
+      ws(0,"RIFF"); v.setUint32(4,36+n*2,true); ws(8,"WAVE"); ws(12,"fmt ");
+      v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+      v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+      ws(36,"data"); v.setUint32(40,n*2,true);
+      let o=44; for(let i=0;i<n;i++){ let x=Math.max(-1,Math.min(1,samples[i])); v.setInt16(o,x<0?x*0x8000:x*0x7FFF,true); o+=2; }
+      return ab;
+    }
+    // ArrayBuffer → base64 dataURL(分塊避免爆堆疊)
+    function toDataURL(ab){
+      const bytes=new Uint8Array(ab); let bin=""; const CH=0x8000;
+      for(let i=0;i<bytes.length;i+=CH){ bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH)); }
+      return "data:audio/wav;base64,"+btoa(bin);
+    }
     return { supported, recording, start, stop, cancel, toDataURL, MAX_MS };
   })();
 
@@ -1269,12 +1307,12 @@ const FIREBASE_CONFIG = {
     if(Voice.recording()){ b.disabled=true; b.textContent="處理中…"; Voice.stop(); return; }   // 停止 → 交給 onBlob 收尾
     const to=emoteTarget;
     b.disabled=true; b.textContent="準備中…";
-    Voice.start(async(blob)=>{
+    Voice.start((wav)=>{
       resetVoiceBtn();
-      if(!blob||!blob.size){ if(hint)hint.textContent="沒有錄到聲音"; return; }
+      if(!wav || wav.byteLength<=44){ if(hint)hint.textContent="沒有錄到聲音"; return; }
       try{
-        const url=await Voice.toDataURL(blob);
-        if(url.length>220000){ if(hint)hint.textContent="語音太大,請再短一點"; return; }   // RTDB 友善上限
+        const url=Voice.toDataURL(wav);
+        if(url.length>200000){ if(hint)hint.textContent="語音太長,請再短一點"; return; }   // RTDB 友善上限(WAV 較大)
         MP.sendEmote(to,"🎤","voice",url);
         closeEmote();
       }catch(e){ if(hint)hint.textContent="語音處理失敗"; }
@@ -1288,11 +1326,28 @@ const FIREBASE_CONFIG = {
       if(hint)hint.textContent=(err&&err.name==="NotAllowedError")?"麥克風權限被拒絕":"無法啟動錄音";
     });
   }
-  // 播放收到的語音(靜音時不播,避免打擾)
+  // 播放收到的語音:優先走 Web Audio(用已解鎖的 AudioContext + decodeAudioData,
+  // 繞過 iOS 對 new Audio().play() 的自動播放封鎖、也能解 WAV);失敗再退回 HTMLAudio。靜音時不播。
+  function fallbackAudio(u){ try{ const a=new Audio(u); a.play().catch(()=>{}); }catch(e){} }
   function playVoice(dataURL){
     if(!dataURL)return;
     if(Sound.isMuted&&Sound.isMuted())return;
-    try{ const a=new Audio(dataURL); a.play().catch(()=>{}); }catch(e){}
+    let bytes;
+    try{
+      const i=dataURL.indexOf(","); if(i<0)throw 0;
+      const bin=atob(dataURL.slice(i+1)); bytes=new Uint8Array(bin.length);
+      for(let k=0;k<bin.length;k++)bytes[k]=bin.charCodeAt(k);
+    }catch(e){ fallbackAudio(dataURL); return; }
+    const c=Sound.ctx&&Sound.ctx();
+    if(!c){ fallbackAudio(dataURL); return; }
+    const play=()=>{
+      try{
+        c.decodeAudioData(bytes.buffer.slice(0),
+          b=>{ try{ const s=c.createBufferSource(); s.buffer=b; s.connect(c.destination); s.start(); }catch(e){ fallbackAudio(dataURL); } },
+          ()=>fallbackAudio(dataURL));
+      }catch(e){ fallbackAudio(dataURL); }
+    };
+    if(c.state==="suspended") c.resume().then(play).catch(play); else play();
   }
   function buildEmoteRecipients(){
     const box=$("emoteTo"); if(!box)return; box.innerHTML="";
