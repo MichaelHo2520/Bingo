@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.9.11 -->
-<meta name="version" content="1.9.11">
+<!-- BINGO 賓果遊戲 · v1.9.12 -->
+<meta name="version" content="1.9.12">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -83,6 +83,9 @@
 
 
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  /* 隱藏捲軸(手機往下滑不再出現白色位置索引條),仍可正常捲動 */
+  html{scrollbar-width:none;-ms-overflow-style:none}
+  ::-webkit-scrollbar{width:0;height:0;display:none}
   html,body{height:100%}
   body{
     font-family:'Nunito',system-ui,sans-serif;
@@ -689,7 +692,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.9.11</span></footer>
+  <footer><span class="ver">BINGO · v1.9.12</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
