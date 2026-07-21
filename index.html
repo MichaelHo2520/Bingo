@@ -850,6 +850,7 @@ const FIREBASE_CONFIG = {
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false;
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let orderMethod="host", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
+    let sawPlayers=false;
 
     function available(){
       return !!(window.firebase && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0);
@@ -910,6 +911,7 @@ const FIREBASE_CONFIG = {
       const r=roomRef.child("players/"+meId);
       r.set({ name:meName, lines:0, ready:false });
       r.onDisconnect().remove();
+      if(isHost) roomRef.onDisconnect().remove();   // 房主斷線/關頁 → 自動關閉整個房間
     }
 
     function hidePhasePanels(){
@@ -918,7 +920,7 @@ const FIREBASE_CONFIG = {
       $("mpControls").classList.add("hidden");
     }
     function enterLobby(){
-      state.online=true; ready=false; curPhase="lobby";
+      state.online=true; ready=false; curPhase="lobby"; sawPlayers=false;
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -937,7 +939,12 @@ const FIREBASE_CONFIG = {
     }
     function listen(){
       roomRef.child("players").on("value",s=>{
-        players=s.val()||{}; renderPlayers(); updateStartBtn();
+        players=s.val()||{};
+        if(Object.keys(players).length) sawPlayers=true;
+        else if(sawPlayers && state.online && !isHost){   // 房主已關閉整個房間
+          showToast("房主已離開,房間已關閉"); leave(); return;
+        }
+        renderPlayers(); updateStartBtn();
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
         else if(curPhase==="ordering") renderOrderPanel();
         else if(curPhase==="playing"){
@@ -1222,9 +1229,17 @@ const FIREBASE_CONFIG = {
       try{
         if(roomRef){
           ["players","status","target","orderMethod","order","turnIndex","rps","calledList","winner"].forEach(k=>roomRef.child(k).off());
-          if(meId)roomRef.child("players/"+meId).remove();
+          if(isHost){
+            roomRef.onDisconnect().cancel();
+            roomRef.remove();                       // 房主離開 → 關閉整個房間
+          }else if(meId){
+            const pr=roomRef.child("players/"+meId);
+            pr.onDisconnect().cancel();
+            pr.remove();
+          }
         }
       }catch(e){}
+      sawPlayers=false;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
       order=[]; turnIndex=0; rps=null; curPhase="lobby";
       closeWin();
