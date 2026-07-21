@@ -221,6 +221,34 @@
   .win-card .btn{min-width:0;font-size:16px;padding:14px 10px}
   canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
 
+  /* ---------- Settings sheet ---------- */
+  .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
+    padding:22px 22px 24px;max-width:360px;width:100%;backdrop-filter:blur(14px);
+    animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
+  .set-head{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:10px;text-align:center}
+  .set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:15px 2px;border-top:1px solid var(--panel-line)}
+  .set-lbl{font-weight:800;font-size:15px}
+  .swatches{display:flex;gap:9px}
+  .swatch{width:30px;height:30px;border-radius:50%;border:2px solid var(--panel-line);cursor:pointer;
+    padding:0;transition:transform .12s}
+  .swatch:hover{transform:scale(1.12)}
+  .swatch.on{border-color:var(--text);box-shadow:0 0 0 2px var(--accent)}
+  .swatches.locked{opacity:.3;pointer-events:none}
+  .switch{width:52px;height:30px;border-radius:999px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.12);cursor:pointer;padding:0;position:relative;transition:background .2s}
+  .switch .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+    background:var(--text);transition:transform .2s}
+  .switch[aria-checked="true"]{background:var(--accent)}
+  .switch[aria-checked="true"] .knob{transform:translateX(22px);background:#fff}
+  .set-card .btn{width:100%;margin-top:18px}
+  :root[data-theme="ebook"] .set-card{background:#fff;border:2px solid #000}
+  :root[data-theme="ebook"] .switch{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .switch[aria-checked="true"]{background:#000}
+  :root[data-theme="ebook"] .switch .knob{background:#000}
+  :root[data-theme="ebook"] .switch[aria-checked="true"] .knob{background:#fff}
+  :root[data-theme="ebook"] .swatch.on{border-color:#000;box-shadow:0 0 0 2px #000}
+
   .hidden{display:none!important}
   /* multiplayer */
   .mp-input{
@@ -312,17 +340,13 @@
       <span class="bulb">B</span><span class="bulb">I</span><span class="bulb">N</span><span class="bulb">G</span><span class="bulb">O</span>
     </div>
     <div class="tools">
-      <button class="icon-btn" id="muteBtn" title="音效開關" aria-label="音效開關">🔊</button>
-      <button class="icon-btn" id="ebookBtn" title="電子書模式" aria-label="電子書模式">📖</button>
-      <button class="icon-btn" id="themeBtn" title="切換主題" aria-label="切換主題">🎨</button>
-      <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
+      <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
     </div>
   </div>
 
   <!-- ====== SETUP ====== -->
   <section class="panel" id="setup">
     <div class="subtitle">開始新的一局</div>
-    <div class="hint">在 5×5 的格子填入 1–25，每個數字只能出現一次。選好填號方式後就能開始劃記。</div>
 
     <div class="seg" id="fillSeg" role="tablist" aria-label="填號方式">
       <button class="on" data-fill="auto">🎲 自動填號</button>
@@ -425,7 +449,7 @@
     </div>
   </div>
 
-  <footer>點格子代表被叫到的號碼 · 湊滿線數即 BINGO <span class="ver">v0.9.0</span></footer>
+  <footer><span class="ver">BINGO · v0.9.0</span></footer>
 
   <!-- win -->
   <div class="veil" id="veil">
@@ -440,6 +464,30 @@
         <button class="btn primary" id="mpAgain">再一局</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
+    </div>
+  </div>
+
+  <!-- settings -->
+  <div class="veil" id="setVeil">
+    <div class="set-card">
+      <div class="set-head">設定</div>
+      <div class="set-row">
+        <span class="set-lbl">主題</span>
+        <div class="swatches" id="swatches"></div>
+      </div>
+      <div class="set-row">
+        <span class="set-lbl">電子書模式</span>
+        <button class="switch" id="swEbook" role="switch" aria-checked="false" aria-label="電子書模式"><span class="knob"></span></button>
+      </div>
+      <div class="set-row">
+        <span class="set-lbl">音效</span>
+        <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="音效"><span class="knob"></span></button>
+      </div>
+      <div class="set-row">
+        <span class="set-lbl">全螢幕</span>
+        <button class="switch" id="swFull" role="switch" aria-checked="false" aria-label="全螢幕"><span class="knob"></span></button>
+      </div>
+      <button class="btn primary" id="setClose">完成</button>
     </div>
   </div>
   <canvas class="confetti" id="confetti"></canvas>
@@ -470,6 +518,7 @@ const FIREBASE_CONFIG = {
   "use strict";
   const THEMES=["sunset","midnight","bubblegum","meadow","arcade"];
   const THEME_NAMES={sunset:"落日",midnight:"午夜霓虹",bubblegum:"泡泡糖",meadow:"草原",arcade:"街機",ebook:"電子書"};
+  const THEME_COLORS={sunset:["#ff8a3d","#ffd24a"],midnight:["#22e0ff","#ff4bd8"],bubblegum:["#ff4fa3","#9b6bff"],meadow:["#6cc04a","#ffcf47"],arcade:["#ffe600","#ff2d55"]};
   const LINES=[
     [0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
     [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
@@ -591,8 +640,8 @@ const FIREBASE_CONFIG = {
     $("startBtn").style.opacity=ok?"1":".5";
     const next=smallestMissing();
     $("fillHint").textContent = ok
-      ? "25 格都填好了,可以開始! ▸"
-      : `點空格會填入目前最小的可用號碼,下一個是 ${next}。點已填的格子可收回該號碼(其他號碼不變)。`;
+      ? "都填好了,可以開始 ▸"
+      : `點空格依序填入號碼,下一個是 ${next};點已填的可收回。`;
     if(state.online)MP.readyEnabled(ok);
   }
 
@@ -674,9 +723,9 @@ const FIREBASE_CONFIG = {
   function applyFillUI(){
     const manual=state.fill==="manual";
     $("reshuffleBtn").classList.toggle("hidden",manual);
+    $("fillHint").classList.toggle("hidden",!manual);   // 自動模式不需要說明,保持乾淨
     if(manual){ updateManualUI(); }
     else {
-      $("fillHint").textContent="已隨機排好,按「重洗」可換一組數字。";
       $("startBtn").disabled=false;$("startBtn").style.opacity="1";
       if(state.online)MP.readyEnabled(true);
     }
@@ -729,19 +778,46 @@ const FIREBASE_CONFIG = {
       state.target=Math.min(12,Math.max(1,p.target));
       $("targetVal").textContent=state.target;
     }
-    if(p.muted){ Sound.setMuted(true); $("muteBtn").textContent="🔇"; }
+    if(p.muted){ Sound.setMuted(true); }
     if(p.ebook){ setEbook(true,true); }
   }
 
-  function cycleTheme(){
-    const cur=document.documentElement.getAttribute("data-theme");
-    if(cur==="ebook")return;                 // locked while in e-book mode
-    const next=THEMES[(THEMES.indexOf(cur)+1)%THEMES.length];
-    document.documentElement.setAttribute("data-theme",next);
-    lastColorTheme=next;
-    showToast(THEME_NAMES[next]);
-    savePrefs();
+  /* ---------- Settings sheet ---------- */
+  function buildSwatches(){
+    const box=$("swatches"); if(!box)return; box.innerHTML="";
+    THEMES.forEach(name=>{
+      const b=document.createElement("button");
+      b.type="button"; b.className="swatch"; b.dataset.theme=name;
+      b.title=THEME_NAMES[name]; b.setAttribute("aria-label",THEME_NAMES[name]);
+      const c=THEME_COLORS[name]||["#888","#555"];
+      b.style.background="linear-gradient(135deg,"+c[0]+","+c[1]+")";
+      b.addEventListener("click",()=>setTheme(name));
+      box.appendChild(b);
+    });
   }
+  function setTheme(name){
+    if(THEMES.indexOf(name)<0)return;
+    if(document.documentElement.getAttribute("data-theme")==="ebook")return;   // locked in e-book mode
+    document.documentElement.setAttribute("data-theme",name);
+    lastColorTheme=name;
+    savePrefs();
+    syncSettingsUI();
+  }
+  function syncSettingsUI(){
+    const isEbook=document.documentElement.getAttribute("data-theme")==="ebook";
+    const swE=$("swEbook"), swM=$("swMute"), swF=$("swFull"), sw=$("swatches");
+    if(swE)swE.setAttribute("aria-checked",isEbook?"true":"false");
+    if(swM)swM.setAttribute("aria-checked",Sound.isMuted()?"false":"true");   // on = 有聲音
+    if(swF)swF.setAttribute("aria-checked",document.fullscreenElement?"true":"false");
+    if(sw){
+      sw.classList.toggle("locked",isEbook);
+      const active=isEbook?lastColorTheme:document.documentElement.getAttribute("data-theme");
+      [...sw.children].forEach(b=>b.classList.toggle("on",b.dataset.theme===active));
+    }
+  }
+  function openSettings(){ Sound.wake(); syncSettingsUI(); $("setVeil").classList.add("show"); }
+  function closeSettings(){ $("setVeil").classList.remove("show"); }
+
   function setEbook(on,silent){
     const root=document.documentElement;
     if(on){
@@ -750,10 +826,9 @@ const FIREBASE_CONFIG = {
     }else{
       root.setAttribute("data-theme",lastColorTheme);
     }
-    $("ebookBtn").classList.toggle("active",on);
-    $("themeBtn").disabled=on;                // can't switch themes in e-book mode
     if(!silent)showToast(on?"電子書模式":THEME_NAMES[lastColorTheme]);
     savePrefs();
+    syncSettingsUI();
   }
   function toggleEbook(){ setEbook(document.documentElement.getAttribute("data-theme")!=="ebook"); }
   let toastT;
@@ -977,7 +1052,8 @@ const FIREBASE_CONFIG = {
       gs.map(g=>String(g).split(",")).filter(m=>m.length>1).reduce((a,m)=>a.concat(m),[]).filter(id=>players[id]).forEach(id=>{
         const done=throws[id]&&throws[id].s===seq;
         const chip=document.createElement("div"); chip.className="mp-chip"+(done?" ready":"");
-        chip.innerHTML='<span class="dot"></span><span>'+esc((players[id]||{}).name||"玩家")+(done?" ✊":" …")+'</span>';
+        // 只顯示「是否已出拳」,絕不透露對方出的拳(避免後出的人偷看)
+        chip.innerHTML='<span class="dot"></span><span>'+esc((players[id]||{}).name||"玩家")+'</span><span class="ln">'+(done?"已出拳":"等待中")+'</span>';
         box.appendChild(chip);
       });
     }
@@ -1187,10 +1263,13 @@ const FIREBASE_CONFIG = {
   $("startBtn").addEventListener("click",startGame);
   $("restartBtn").addEventListener("click",restart);
   $("editBtn").addEventListener("click",toSetup);
-  $("themeBtn").addEventListener("click",cycleTheme);
-  $("ebookBtn").addEventListener("click",toggleEbook);
-  $("muteBtn").addEventListener("click",()=>{ const m=Sound.toggle(); $("muteBtn").textContent=m?"🔇":"🔊"; savePrefs(); });
-  $("fsBtn").addEventListener("click",toggleFull);
+  $("settingsBtn").addEventListener("click",openSettings);
+  $("setClose").addEventListener("click",closeSettings);
+  $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
+  $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
+  $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
+  $("swFull").addEventListener("click",toggleFull);
+  document.addEventListener("fullscreenchange",syncSettingsUI);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
   // multiplayer
@@ -1208,8 +1287,10 @@ const FIREBASE_CONFIG = {
   $("mpLeaveWin").addEventListener("click",()=>MP.leave());
   addEventListener("resize",()=>{if(state.won){const cv=$("confetti");cv.width=innerWidth;cv.height=innerHeight;}});
 
+  buildSwatches();
   loadPrefs();
   render();applyFillUI();
+  syncSettingsUI();
 })();
 </script>
 </body>
