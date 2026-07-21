@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.11.0 -->
-<meta name="version" content="1.11.0">
+<!-- BINGO 賓果遊戲 · v1.11.1 -->
+<meta name="version" content="1.11.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -723,7 +723,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.11.0</span></footer>
+  <footer><span class="ver">BINGO · v1.11.1</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -2272,6 +2272,13 @@ const FIREBASE_CONFIG = {
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
   $("winPeek").addEventListener("click",peekBoard);       // 先收起結果卡看牌面
   $("reopenWin").addEventListener("click",showResult);    // 浮動鈕:再叫回結果卡
+  // 勝負結果卡是「強制回應」視窗:要離開只能按卡片上的按鈕。點/滑到卡片外的空白背景一律吃掉手勢——
+  // 既不會關掉結果,也不會讓背景頁跟著捲動(手滑不再把結果畫面弄跑掉)
+  $("veil").addEventListener("touchmove",e=>{
+    const card=e.target.closest?e.target.closest(".win-card"):null;
+    if(card && card.scrollHeight>card.clientHeight) return;   // 卡片內容超出畫面時,才讓卡片自己捲
+    e.preventDefault();
+  },{passive:false});
   // multiplayer
   $("onlineBtn").addEventListener("click",()=>MP.openConnect());
   $("mpBack").addEventListener("click",()=>MP.closeConnect());
