@@ -229,7 +229,7 @@
   }
   .mp-input.wide{flex:1}
   .mp-input::placeholder{color:var(--muted)}
-  #mpCode{text-transform:uppercase;letter-spacing:2px;font-family:'Fredoka'}
+  #mpCode{letter-spacing:6px;font-family:'Fredoka';text-align:center}
   .mp-status{font-weight:800;font-size:13px;color:var(--accent)}
   .mp-players{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
   .mp-chip{
@@ -246,14 +246,50 @@
   }
   .mp-last{display:flex;flex-direction:column;gap:2px}
   .mp-last-num{font-size:34px;font-weight:700;line-height:1}
-  #mpDraw{flex:1;margin-left:auto;max-width:200px}
-  #mpDraw:disabled{opacity:.45;cursor:not-allowed}
+  .mp-turn{flex:1;margin-left:auto;text-align:right;font-weight:800;font-size:16px;color:var(--accent)}
+  .mp-turn.wait{color:var(--muted)}
+  .cell.callable{box-shadow:0 0 0 3px var(--accent) inset;cursor:pointer}
+  .mp-panel{
+    width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:15px;padding:16px;
+  }
+  .mp-panel .subtitle{font-size:15px;margin-bottom:4px}
+  .rps-hint{color:var(--muted);font-size:13px;margin:6px 0 12px}
+  .rps-btns{display:flex;gap:10px;justify-content:center}
+  .rps-btn{
+    flex:1;max-width:110px;font-size:34px;padding:14px 0;background:rgba(255,255,255,.10);
+    border:2px solid var(--panel-line);border-radius:16px;cursor:pointer;transition:transform .08s,border-color .12s;
+  }
+  .rps-btn:hover{transform:translateY(-2px)}
+  .rps-btn.chosen{border-color:var(--accent);background:rgba(255,255,255,.20)}
+  .rps-throws{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center}
+  .order-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
+  .order-item{
+    display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.10);
+    border:1px solid var(--panel-line);border-radius:12px;padding:8px 12px;font-weight:800;
+  }
+  .order-item .seat{font-family:'Fredoka';color:var(--accent);min-width:22px;text-align:center}
+  .order-item .nm{flex:1}
+  .order-item .mv{display:flex;gap:6px}
+  .order-item .mv button{
+    width:32px;height:32px;border-radius:9px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.12);color:var(--text);cursor:pointer;font-size:14px;
+  }
+  .order-item .mv button:disabled{opacity:.3;cursor:default}
   :root[data-theme="ebook"] .mp-input,
   :root[data-theme="ebook"] .mp-chip,
   :root[data-theme="ebook"] .mp-play{background:#fff;border:1px solid #000}
   :root[data-theme="ebook"] .mp-status,
   :root[data-theme="ebook"] .mp-chip .ln{color:#000}
   :root[data-theme="ebook"] .mp-chip.ready .dot{background:#000}
+  :root[data-theme="ebook"] .mp-panel,
+  :root[data-theme="ebook"] .rps-btn,
+  :root[data-theme="ebook"] .order-item,
+  :root[data-theme="ebook"] .order-item .mv button{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .mp-turn,
+  :root[data-theme="ebook"] .order-item .seat{color:#000}
+  :root[data-theme="ebook"] .rps-btn.chosen{background:#000;color:#fff}
+  :root[data-theme="ebook"] .cell.callable{box-shadow:0 0 0 3px #000 inset}
   #toast{
     position:fixed;top:68px;left:50%;transform:translateX(-50%) translateY(-14px);
     background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-weight:600;
@@ -301,19 +337,26 @@
         <button class="mini" id="tPlus" aria-label="增加">＋</button>
       </div>
     </div>
+    <div class="row hidden" id="mpOrderRow">
+      <span class="label">出手順序由誰定</span>
+      <div class="seg" id="orderSeg" style="flex:0 0 auto">
+        <button class="on" data-order="host">👑 房主排</button>
+        <button data-order="rps">✊ 猜拳</button>
+      </div>
+    </div>
     <div class="hint" id="fillHint">已隨機排好，按「重洗」可換一組數字。</div>
   </section>
 
   <!-- ====== ONLINE: connect ====== -->
   <section class="panel hidden" id="mpConnect">
     <div class="subtitle">連線對戰</div>
-    <div class="hint">建立房間把房號給朋友,或輸入朋友的房號加入。兩台裝置各自有自己的卡片,一起抽號、比誰先湊滿線數。</div>
+    <div class="hint">建立房間把房號給朋友,或輸入朋友的房號加入。兩台裝置各自有自己的卡片,輪流出號、比誰先湊滿線數。</div>
     <div class="row"><span class="label">你的暱稱</span>
       <input id="mpName" class="mp-input" maxlength="8" placeholder="玩家">
     </div>
     <div class="actions" style="margin-top:12px"><button class="btn primary" id="mpCreate">建立房間</button></div>
     <div class="row">
-      <input id="mpCode" class="mp-input wide" maxlength="5" placeholder="輸入房號加入">
+      <input id="mpCode" class="mp-input wide" maxlength="4" inputmode="numeric" pattern="[0-9]*" placeholder="輸入房號(數字)">
       <button class="btn ghost" id="mpJoin" style="flex:0 0 auto;min-width:90px">加入</button>
     </div>
     <div class="hint" id="mpConnMsg"></div>
@@ -348,7 +391,27 @@
     <!-- online play controls -->
     <div class="mp-play hidden" id="mpControls">
       <div class="mp-last"><span class="lbl">最新號碼</span><span class="mp-last-num display" id="mpLastNum">–</span></div>
-      <button class="btn primary" id="mpDraw">抽號 🎲</button>
+      <div class="mp-turn wait" id="mpTurn">等待開始…</div>
+    </div>
+
+    <!-- online: rock-paper-scissors to decide order -->
+    <div class="mp-panel hidden" id="mpRpsPanel">
+      <div class="subtitle">猜拳決定出手順序</div>
+      <div class="rps-hint" id="rpsHint">出拳!贏的人先出號。</div>
+      <div class="rps-btns" id="rpsBtns">
+        <button class="rps-btn" data-rps="R" title="石頭">✊</button>
+        <button class="rps-btn" data-rps="S" title="剪刀">✌️</button>
+        <button class="rps-btn" data-rps="P" title="布">✋</button>
+      </div>
+      <div class="rps-throws" id="rpsThrows"></div>
+    </div>
+
+    <!-- online: host arranges turn order -->
+    <div class="mp-panel hidden" id="mpOrderPanel">
+      <div class="subtitle">安排出手順序</div>
+      <div class="rps-hint" id="orderHint">用上下箭頭排好先後,然後開始。</div>
+      <div class="order-list" id="orderList"></div>
+      <div class="actions"><button class="btn primary hidden" id="orderConfirm">確定順序,開始 ▸</button></div>
     </div>
 
     <!-- play status + actions (single player) -->
@@ -481,7 +544,11 @@ const FIREBASE_CONFIG = {
 
       if(state.mode==="play"){
         if(state.marked[i])cell.classList.add("marked");
-        if(state.online){ cell.disabled=true; cell.style.cursor="default"; }
+        if(state.online){
+          const called=MP.isCalled(val);
+          if(MP.isMyTurn() && !called){ cell.classList.add("callable"); cell.style.cursor="pointer"; cell.addEventListener("click",()=>MP.tap(i)); }
+          else { cell.disabled=true; cell.style.cursor="default"; }
+        }
         else cell.addEventListener("click",()=>toggle(i));
         cell.setAttribute("aria-pressed",state.marked[i]?"true":"false");
       }else if(manual){
@@ -707,6 +774,7 @@ const FIREBASE_CONFIG = {
   const MP=(function(){
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false;
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
+    let orderMethod="host", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
 
     function available(){
       return !!(window.firebase && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0);
@@ -720,8 +788,7 @@ const FIREBASE_CONFIG = {
       }catch(e){ console.error(e); return false; }
     }
     function randomCode(){
-      const A="ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let s="";
-      for(let i=0;i<4;i++)s+=A[Math.floor(Math.random()*A.length)];
+      let s=""; for(let i=0;i<4;i++)s+=Math.floor(Math.random()*10);
       return s;
     }
     function pid(){
@@ -750,13 +817,14 @@ const FIREBASE_CONFIG = {
       roomRef=db.ref("rooms/"+code);
       roomRef.child("host").once("value").then(snap=>{
         if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }
-        return roomRef.update({ host:meId, status:"lobby", target:state.target, calledList:[], winner:null, createdAt:Date.now() });
+        return roomRef.update({ host:meId, status:"lobby", target:state.target, orderMethod:"host",
+          calledList:[], winner:null, order:null, turnIndex:0, rps:null, createdAt:Date.now() });
       }).then(()=>{ joinNode(); enterLobby(); }).catch(e=>setMsg("建立房間失敗:"+e.message));
     }
     function join(inCode,name){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
-      const c=(inCode||"").toUpperCase().trim();
-      if(c.length<4){ setMsg("請輸入完整房號。"); return; }
+      const c=(inCode||"").replace(/\D/g,"").trim();
+      if(c.length<4){ setMsg("請輸入完整房號(4 位數字)。"); return; }
       meName=(name||"玩家").slice(0,8); meId=pid(); isHost=false; code=c; roomRef=db.ref("rooms/"+code);
       roomRef.child("host").once("value").then(snap=>{
         if(!snap.exists()){ setMsg("找不到這個房間,請確認房號。"); return; }
@@ -769,8 +837,13 @@ const FIREBASE_CONFIG = {
       r.onDisconnect().remove();
     }
 
+    function hidePhasePanels(){
+      $("mpRpsPanel").classList.add("hidden");
+      $("mpOrderPanel").classList.add("hidden");
+      $("mpControls").classList.add("hidden");
+    }
     function enterLobby(){
-      state.online=true; ready=false;
+      state.online=true; ready=false; curPhase="lobby";
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -780,16 +853,29 @@ const FIREBASE_CONFIG = {
       $("onlineBtn").classList.add("hidden");
       $("mpReadyBtn").classList.remove("hidden");
       $("mpStartBtn").classList.add("hidden");
-      $("mpControls").classList.add("hidden");
+      hidePhasePanels();
       $("targetRow").style.display=isHost?"":"none";
+      $("mpOrderRow").classList.toggle("hidden", !isHost);
       state.fill="auto"; state.card=shuffled(); state.mode="setup";
-      render(); applyFillUI(); updateReadyBtn();
+      render(); applyFillUI(); updateReadyBtn(); syncOrderSeg();
       listen();
     }
     function listen(){
-      roomRef.child("players").on("value",s=>{ players=s.val()||{}; renderPlayers(); updateStartBtn(); });
+      roomRef.child("players").on("value",s=>{
+        players=s.val()||{}; renderPlayers(); updateStartBtn();
+        if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
+        else if(curPhase==="ordering") renderOrderPanel();
+        else if(curPhase==="playing"){
+          if(isHost && order.length && !players[order[turnIndex]]) roomRef.child("turnIndex").set(nextTurn(turnIndex));
+          updateTurnUI();
+        }
+      });
       roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); });
       roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"&&!isHost){ state.target=t; $("targetVal").textContent=t; } });
+      roomRef.child("orderMethod").on("value",s=>{ orderMethod=s.val()||"host"; syncOrderSeg(); });
+      roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); } });
+      roomRef.child("turnIndex").on("value",s=>{ turnIndex=s.val()||0; if(curPhase==="playing"){ render(); updateTurnUI(); } });
+      roomRef.child("rps").on("value",s=>{ rps=s.val(); if(curPhase==="rps")renderRps(); if(isHost)rpsHostResolve(); });
       roomRef.child("calledList").on("value",s=>{ calledList=s.val()||[]; onCalled(); });
       roomRef.child("winner").on("value",s=>{ winner=s.val(); if(winner)onWinner(); else closeWin(); });
     }
@@ -805,7 +891,7 @@ const FIREBASE_CONFIG = {
           (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'');
         box.appendChild(chip);
       });
-      $("mpStatusTxt").textContent = status==="playing" ? "遊戲進行中" : (ids.length<2?"等待對手加入…":"等待大家準備…");
+      $("mpStatusTxt").textContent = status==="playing" ? "遊戲進行中" : (status==="rps"?"猜拳決定順序…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…")));
     }
     function updateReadyBtn(){
       const b=$("mpReadyBtn");
@@ -833,35 +919,175 @@ const FIREBASE_CONFIG = {
       $("mpStartBtn").classList.toggle("hidden", status!=="lobby" || !allReady);
     }
     function setTarget(t){ if(isHost&&roomRef)roomRef.child("target").set(t); }
+    function setOrderMethod(m){ if(isHost&&roomRef){ orderMethod=m; roomRef.child("orderMethod").set(m); syncOrderSeg(); } }
+    function syncOrderSeg(){ const seg=$("orderSeg"); if(!seg)return; [...seg.children].forEach(b=>b.classList.toggle("on", b.dataset.order===orderMethod)); }
     function startGame(){
       if(!isHost)return;
-      roomRef.update({ status:"playing", target:state.target, calledList:[], winner:null });
-    }
-
-    function onStatus(){
-      renderPlayers();
-      if(status==="playing" && state.mode!=="play"){
-        state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(25).fill(false);
-        $("setup").classList.add("hidden");
-        $("setupActions").classList.add("hidden");
-        $("playStatus").classList.add("hidden");
-        $("playActions").classList.add("hidden");
-        $("mpControls").classList.remove("hidden");
-        $("mpDraw").disabled=false;
-        setLock(false);
-        resetMarquee(); render(); applyCalledMarks(); refreshLines();
-      } else if(status==="lobby" && state.mode==="play"){
-        backToLobby();
+      const ids=Object.keys(players);
+      if(ids.length<2 || !ids.every(id=>players[id].ready)){ showToast("需要 2 人以上且全部準備好"); return; }
+      if(orderMethod==="rps"){
+        roomRef.update({ status:"rps", target:state.target, calledList:[], winner:null, order:null, turnIndex:0,
+          rps:{ seq:1, groups:[ids.join(",")], throws:null } });
+      }else{
+        roomRef.update({ status:"ordering", target:state.target, calledList:[], winner:null, order:null, turnIndex:0, rps:null });
       }
     }
-    function draw(){
-      if(status!=="playing"||winner)return;
-      roomRef.child("calledList").transaction(list=>{
-        list=list||[]; if(list.length>=25)return list;
-        const used=new Set(list), avail=[];
-        for(let n=1;n<=25;n++) if(!used.has(n))avail.push(n);
-        list.push(avail[Math.floor(Math.random()*avail.length)]); return list;
+
+    /* ----- phase dispatch ----- */
+    function onStatus(){
+      renderPlayers();
+      if(status==="playing"){ if(curPhase!=="playing") enterPlaying(); else updateTurnUI(); }
+      else if(status==="rps"){ if(curPhase!=="rps") enterRps(); else renderRps(); }
+      else if(status==="ordering"){ if(curPhase!=="ordering") enterOrdering(); else renderOrderPanel(); }
+      else { if(curPhase!=="lobby") backToLobby(); }
+      curPhase=status;
+    }
+
+    /* ----- rock-paper-scissors: decide turn order ----- */
+    function beats(a,b){ return (a==="R"&&b==="S")||(a==="S"&&b==="P")||(a==="P"&&b==="R"); }
+    function myGroup(){
+      const gs=(rps&&rps.groups)||[];
+      for(const g of gs){ const m=String(g).split(","); if(m.indexOf(meId)>=0) return m; }
+      return null;
+    }
+    function enterRps(){
+      state.mode="setup";
+      $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
+      $("mpOrderRow").classList.add("hidden");
+      $("mpControls").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
+      $("mpRpsPanel").classList.remove("hidden");
+      setLock(true);
+      renderRps();
+    }
+    function renderRps(){
+      const gs=(rps&&rps.groups)||[];
+      const seq=(rps&&rps.seq)||1;
+      const throws=(rps&&rps.throws)||{};
+      const mg=myGroup();
+      const mine=throws[meId]&&throws[meId].s===seq;
+      const iNeed = mg && mg.length>1 && !mine;
+      $("rpsBtns").style.display = iNeed ? "" : "none";
+      let hint;
+      if(!mg || mg.length<=1) hint="你的順序已定,等其他人猜完…";
+      else if(iNeed) hint="出拳!(和你平手的人一起比大小)";
+      else hint="已出拳,等待其他人…";
+      $("rpsHint").textContent=hint;
+      [...$("rpsBtns").children].forEach(b=>b.classList.toggle("chosen", mine && throws[meId].c===b.dataset.rps));
+      const box=$("rpsThrows"); box.innerHTML="";
+      gs.map(g=>String(g).split(",")).filter(m=>m.length>1).reduce((a,m)=>a.concat(m),[]).filter(id=>players[id]).forEach(id=>{
+        const done=throws[id]&&throws[id].s===seq;
+        const chip=document.createElement("div"); chip.className="mp-chip"+(done?" ready":"");
+        chip.innerHTML='<span class="dot"></span><span>'+esc((players[id]||{}).name||"玩家")+(done?" ✊":" …")+'</span>';
+        box.appendChild(chip);
       });
+    }
+    function throwRps(c){
+      if(!rps||curPhase!=="rps")return;
+      const mg=myGroup(); if(!mg||mg.length<=1)return;
+      const seq=rps.seq||1;
+      roomRef.child("rps/throws/"+meId).set({ c:c, s:seq });
+    }
+    function rpsHostResolve(){
+      if(!isHost||!rps||status!=="rps")return;
+      const seq=rps.seq||1;
+      const throws=rps.throws||{};
+      let groups=(rps.groups||[]).map(g=>String(g).split(",").filter(id=>players[id])).filter(g=>g.length>0);
+      const pending=groups.filter(g=>g.length>1).reduce((a,g)=>a.concat(g),[]);
+      if(pending.length===0){
+        roomRef.update({ order:groups.reduce((a,g)=>a.concat(g),[]), turnIndex:0, status:"playing", rps:null });
+        return;
+      }
+      if(!pending.every(id=>throws[id]&&throws[id].s===seq))return;
+      const newGroups=[];
+      groups.forEach(g=>{
+        if(g.length<=1){ newGroups.push(g); return; }
+        const wins={};
+        g.forEach(x=>{ wins[x]=g.filter(y=>y!==x && beats(throws[x].c, throws[y].c)).length; });
+        const sorted=[...g].sort((a,b)=>wins[b]-wins[a]);
+        let cur=[], curWin=null;
+        sorted.forEach(x=>{ if(curWin===null||wins[x]===curWin){ cur.push(x); curWin=wins[x]; } else { newGroups.push(cur); cur=[x]; curWin=wins[x]; } });
+        if(cur.length)newGroups.push(cur);
+      });
+      if(newGroups.some(g=>g.length>1)){
+        roomRef.update({ "rps/groups":newGroups.map(g=>g.join(",")), "rps/seq":seq+1, "rps/throws":null });
+      }else{
+        roomRef.update({ order:newGroups.reduce((a,g)=>a.concat(g),[]), turnIndex:0, status:"playing", rps:null });
+      }
+    }
+
+    /* ----- host manual ordering ----- */
+    function enterOrdering(){
+      $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
+      $("mpOrderRow").classList.add("hidden");
+      $("mpControls").classList.add("hidden"); $("mpRpsPanel").classList.add("hidden");
+      $("mpOrderPanel").classList.remove("hidden");
+      setLock(true);
+      orderDraft=Object.keys(players);
+      renderOrderPanel();
+    }
+    function renderOrderPanel(){
+      $("orderConfirm").classList.toggle("hidden", !isHost);
+      $("orderHint").textContent=isHost ? "用上下箭頭排好先後,然後開始。" : "房主正在安排出手順序…";
+      const list=$("orderList"); if(!list)return; list.innerHTML="";
+      let arr = isHost ? orderDraft.filter(id=>players[id]) : Object.keys(players);
+      if(isHost) orderDraft=arr;
+      arr.forEach((id,idx)=>{
+        const it=document.createElement("div"); it.className="order-item";
+        it.innerHTML='<span class="seat">'+(idx+1)+'</span><span class="nm">'+esc((players[id]||{}).name||"玩家")+(id===meId?"(你)":"")+'</span>';
+        if(isHost){
+          const mv=document.createElement("span"); mv.className="mv";
+          const up=document.createElement("button"); up.textContent="▲"; up.disabled=idx===0; up.addEventListener("click",()=>moveOrder(idx,-1));
+          const dn=document.createElement("button"); dn.textContent="▼"; dn.disabled=idx===arr.length-1; dn.addEventListener("click",()=>moveOrder(idx,1));
+          mv.appendChild(up); mv.appendChild(dn); it.appendChild(mv);
+        }
+        list.appendChild(it);
+      });
+    }
+    function moveOrder(idx,d){
+      const a=orderDraft.filter(id=>players[id]); const j=idx+d;
+      if(j<0||j>=a.length)return;
+      const t=a[idx]; a[idx]=a[j]; a[j]=t; orderDraft=a; renderOrderPanel();
+    }
+    function confirmOrder(){
+      if(!isHost)return;
+      const ord=orderDraft.filter(id=>players[id]);
+      if(ord.length<2){ showToast("人數不足"); return; }
+      roomRef.update({ order:ord, turnIndex:0, status:"playing" });
+    }
+
+    /* ----- playing (turn-based manual call) ----- */
+    function enterPlaying(){
+      state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(25).fill(false);
+      $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
+      $("playStatus").classList.add("hidden"); $("playActions").classList.add("hidden");
+      $("mpRpsPanel").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
+      $("mpOrderRow").classList.add("hidden");
+      $("mpControls").classList.remove("hidden");
+      setLock(false);
+      resetMarquee(); render(); applyCalledMarks(); updateTurnUI(); refreshLines();
+    }
+    function isMyTurn(){ return status==="playing" && !winner && order.length>0 && order[turnIndex]===meId; }
+    function isCalled(v){ return calledList.indexOf(v)>=0; }
+    function nextTurn(from){
+      if(!order.length)return from;
+      let i=from;
+      for(let k=0;k<order.length;k++){ i=(i+1)%order.length; if(players[order[i]])return i; }
+      return from;
+    }
+    function updateTurnUI(){
+      const el=$("mpTurn"); if(!el)return;
+      if(status!=="playing"){ el.textContent="等待開始…"; el.classList.add("wait"); return; }
+      const p=order[turnIndex];
+      if(!p){ el.textContent="—"; el.classList.add("wait"); return; }
+      if(p===meId){ el.textContent="👉 換你出號!"; el.classList.remove("wait"); }
+      else { el.textContent="輪到 "+esc((players[p]||{}).name||"玩家"); el.classList.add("wait"); }
+    }
+    function tap(i){
+      if(!isMyTurn()){ showToast("還沒輪到你"); return; }
+      const n=state.card[i]; if(!n)return;
+      if(isCalled(n))return;
+      Sound.place();
+      roomRef.update({ calledList:calledList.concat(n), turnIndex:nextTurn(turnIndex) });
     }
     function onCalled(){
       const last=calledList[calledList.length-1];
@@ -870,9 +1096,8 @@ const FIREBASE_CONFIG = {
         const prev=state.marked.slice();
         applyCalledMarks();
         if(state.marked.some((m,i)=>m&&!prev[i]))Sound.mark();
-        refreshLines();
+        render(); updateTurnUI();
       }
-      $("mpDraw").disabled=(calledList.length>=25)||!!winner;
     }
     function applyCalledMarks(){
       const set=new Set(calledList);
@@ -893,42 +1118,46 @@ const FIREBASE_CONFIG = {
       $("spWinBtns").classList.add("hidden");
       $("mpWinBtns").classList.remove("hidden");
       $("mpAgain").style.display=isHost?"":"none";
-      $("mpDraw").disabled=true;
       $("veil").classList.add("show");
+      render();
       if(mine)burst();
     }
     function again(){
       if(!isHost)return;
-      const ups={ status:"lobby", calledList:[], winner:null };
+      const ups={ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null };
       Object.keys(players).forEach(id=>{ ups["players/"+id+"/lines"]=0; ups["players/"+id+"/ready"]=false; });
       roomRef.update(ups);
       backToLobby();
     }
     function backToLobby(){
-      ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled();
+      ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled(); curPhase="lobby";
+      order=[]; turnIndex=0; rps=null;
       closeWin();
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
-      $("mpControls").classList.add("hidden");
+      hidePhasePanels();
       $("startBtn").classList.add("hidden");
       $("onlineBtn").classList.add("hidden");
       $("mpReadyBtn").classList.remove("hidden");
-      setLock(false); updateReadyBtn(); render(); applyFillUI();
+      $("mpOrderRow").classList.toggle("hidden", !isHost);
+      setLock(false); updateReadyBtn(); render(); applyFillUI(); syncOrderSeg();
     }
     function leave(){
       try{
         if(roomRef){
-          ["players","status","target","calledList","winner"].forEach(k=>roomRef.child(k).off());
+          ["players","status","target","orderMethod","order","turnIndex","rps","calledList","winner"].forEach(k=>roomRef.child(k).off());
           if(meId)roomRef.child("players/"+meId).remove();
         }
       }catch(e){}
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
+      order=[]; turnIndex=0; rps=null; curPhase="lobby";
       closeWin();
       $("mpBar").classList.add("hidden");
-      $("mpControls").classList.add("hidden");
+      hidePhasePanels();
       $("mpReadyBtn").classList.add("hidden");
       $("mpStartBtn").classList.add("hidden");
       $("mpConnect").classList.add("hidden");
+      $("mpOrderRow").classList.add("hidden");
       $("startBtn").classList.remove("hidden");
       $("onlineBtn").classList.remove("hidden");
       $("targetRow").style.display="";
@@ -938,7 +1167,8 @@ const FIREBASE_CONFIG = {
     function readyEnabled(ok){ if(state.online && !ready)$("mpReadyBtn").disabled=!ok; }
 
     return { available, openConnect, closeConnect, create, join, toggleReady, startGame,
-             setTarget, draw, again, leave, reportLines, tryWin, readyEnabled };
+             setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
+             reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap };
   })();
 
   /* ---------- Wire up ---------- */
@@ -970,7 +1200,9 @@ const FIREBASE_CONFIG = {
   $("mpJoin").addEventListener("click",()=>MP.join($("mpCode").value,$("mpName").value));
   $("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
   $("mpStartBtn").addEventListener("click",()=>MP.startGame());
-  $("mpDraw").addEventListener("click",()=>MP.draw());
+  $("orderSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.setOrderMethod(b.dataset.order);});
+  $("rpsBtns").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.throwRps(b.dataset.rps);});
+  $("orderConfirm").addEventListener("click",()=>MP.confirmOrder());
   $("mpLeaveBtn").addEventListener("click",()=>MP.leave());
   $("mpAgain").addEventListener("click",()=>MP.again());
   $("mpLeaveWin").addEventListener("click",()=>MP.leave());
