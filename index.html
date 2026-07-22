@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.20.1 -->
-<meta name="version" content="1.20.1">
+<!-- BINGO 賓果遊戲 · v1.21.0 -->
+<meta name="version" content="1.21.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -154,7 +154,12 @@
     font-size:14px;padding:8px 8px;border-radius:9px;cursor:pointer;transition:.2s;white-space:nowrap;
   }
   .seg button.on{background:var(--accent);color:#1c1008;box-shadow:0 4px 14px rgba(0,0,0,.2)}
-  .seg.readonly{pointer-events:none}   /* 訪客:出手順序只讀,不能改但看得到房主的選擇 */
+  /* 訪客唯讀選項(房主決定的設定):做成明顯「不能按」——整體淡化、選中項改中性灰底(拿掉亮橘按鈕感)、未選項再淡一階、游標不變手指 */
+  .seg.readonly{pointer-events:none;opacity:.9}
+  .seg.readonly button{cursor:default}
+  .seg.readonly button:not(.on){opacity:.32}
+  .seg.readonly button.on{background:rgba(0,0,0,.16);color:var(--text);box-shadow:none}
+  :root[data-theme="ebook"] .seg.readonly button.on{background:#eee;color:#000}
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
 
@@ -336,10 +341,20 @@
   .hidden{display:none!important}
   /* 房間分頁切換專用:與 .hidden 分開,離開 setup/大廳時各流程仍用 .hidden 做完整隱藏,兩者互不干擾 */
   .tab-hidden{display:none!important}
-  /* 房間分頁列(⚙️設定 / ✏️填號):當頁面主導覽,寬度對齊面板,兩顆分頁平分 */
-  .room-tabs{width:min(92vw,520px);padding:4px;gap:6px}
-  .room-tabs button{padding:11px 8px;font-size:15px}
-  .room-tabs button.on{box-shadow:0 5px 16px rgba(0,0,0,.22)}
+  /* 房間分頁列(✏️填號 / ⚙️設定):做成「底線頁籤」,和下方選項膠囊 .seg 明顯不同——一看就知道是換頁、不是選項按鈕 */
+  .room-tabs{width:min(92vw,520px);display:flex;gap:2px;border-bottom:2px solid var(--panel-line)}
+  .room-tabs button{flex:1;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;
+    padding:11px 8px 12px;font-family:'Nunito';font-weight:800;font-size:15.5px;color:var(--muted);cursor:pointer;transition:.15s}
+  .room-tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  :root[data-theme="ebook"] .room-tabs{border-bottom-color:#000}
+  :root[data-theme="ebook"] .room-tabs button.on{color:#000;border-bottom-color:#000}
+  /* 填號方式列:當作填號分頁的一部分,寬度對齊 */
+  #fillRow{width:min(92vw,520px);margin-top:0}
+  /* 主要動作列(準備/開始固定顯示 + 現在該做什麼提示) */
+  .primary-bar{width:min(92vw,520px);display:flex;flex-direction:column;gap:10px}
+  .action-hint{text-align:center;font-weight:800;font-size:14px;line-height:1.45;color:var(--text);
+    background:rgba(0,0,0,.10);border-radius:12px;padding:9px 12px}
+  :root[data-theme="ebook"] .action-hint{background:#fff;border:1px solid #000;color:#000}
   /* multiplayer */
   .mp-input{
     flex:1;min-width:0;background:rgba(255,255,255,.12);border:1px solid var(--panel-line);
@@ -717,7 +732,8 @@
   .home-hint{color:var(--muted);font-size:12.5px;margin-top:16px;opacity:.8}
   :root[data-theme="ebook"] .home-title{background:none;color:#000;-webkit-text-fill-color:#000}
   /* 單機設定頁的「回主選單」小鈕 */
-  .home-back{width:auto;padding:6px 14px;font-size:13px;margin-bottom:10px}
+  /* flex:none + align-self:成為 body(column flex)直屬子元素時,不要被 .btn 的 flex:1 撐成一大塊 */
+  .home-back{flex:none;align-self:flex-start;width:auto;min-width:0;padding:6px 14px;font-size:13px;margin-bottom:2px}
   /* 沒填暱稱時的醒目提示(紅框 + 抖動) */
   .mp-input.needs-name{border-color:#ff5252!important;box-shadow:0 0 0 3px rgba(255,82,82,.28);animation:shakeX .45s}
   @keyframes shakeX{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
@@ -776,24 +792,18 @@
     <div id="mpPlayers" class="mp-players"></div>
   </div>
 
-  <!-- 房間分頁列:把「設定」與「號碼格」拆成兩個分頁,避免畫面一次太長(單機/連線通用) -->
-  <div class="seg room-tabs hidden" id="roomTabs" role="tablist" aria-label="房間分頁">
-    <button type="button" class="on" data-tab="settings" role="tab">⚙️ 設定</button>
-    <button type="button" data-tab="fill" role="tab">✏️ 填號</button>
+  <!-- 單機:回主選單(固定在分頁上方,不會被分頁切換藏起來) -->
+  <button class="btn ghost home-back hidden" id="soloBack" type="button">‹ 主選單</button>
+
+  <!-- 房間分頁列:✏️填號 / ⚙️設定(做成底線頁籤,和下方的選項膠囊 .seg 明顯不同;填號在前=多數人的主要動作) -->
+  <div class="room-tabs hidden" id="roomTabs" role="tablist" aria-label="房間分頁">
+    <button type="button" class="on" data-tab="fill" role="tab">✏️ 填號</button>
+    <button type="button" data-tab="settings" role="tab">⚙️ 設定</button>
   </div>
 
   <!-- ====== SETUP ====== -->
   <section class="panel hidden" id="setup">
-    <button class="btn ghost home-back hidden" id="soloBack" type="button">‹ 主選單</button>
-    <div class="subtitle">開始新的一局</div>
-
-    <div class="field">
-      <span class="field-label">填號方式</span>
-      <div class="seg" id="fillSeg" role="tablist" aria-label="填號方式">
-        <button class="on" data-fill="auto">🎲 自動填號</button>
-        <button data-fill="manual">✏️ 手動填號</button>
-      </div>
-    </div>
+    <div class="subtitle">遊戲設定</div>
 
     <div class="field" id="sizeRow">
       <span class="field-label">盤面大小</span>
@@ -869,6 +879,15 @@
     <div class="hint" id="mpConnMsg"></div>
   </section>
 
+  <!-- 填號方式(屬於「填號」分頁,和號碼格擺在一起,不用切來切去) -->
+  <div class="field tab-hidden" id="fillRow">
+    <span class="field-label">填號方式</span>
+    <div class="seg" id="fillSeg" role="tablist" aria-label="填號方式">
+      <button class="on" data-fill="auto">🎲 自動填號</button>
+      <button data-fill="manual">✏️ 手動填號</button>
+    </div>
+  </div>
+
   <!-- ====== BOARD ====== -->
   <div class="board-wrap hidden" id="boardWrap">
 
@@ -890,13 +909,10 @@
 
     <div class="grid" id="grid"></div>
 
-    <!-- setup actions -->
+    <!-- 填號分頁的動作:換一組號碼(連線鈕保留但已改由主選單進入,平時由 JS 隱藏) -->
     <div class="actions" id="setupActions">
       <button class="btn ghost" id="reshuffleBtn">🎲 換一組號碼</button>
-      <button class="btn primary" id="startBtn">開始遊戲 ▸</button>
       <button class="btn ghost" id="onlineBtn">🌐 連線對戰</button>
-      <button class="btn primary hidden" id="mpReadyBtn">準備好了 ✓</button>
-      <button class="btn primary hidden" id="mpStartBtn">開始對戰 ▸</button>
     </div>
 
     <!-- online: host arranges turn order -->
@@ -908,7 +924,17 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.20.1</span><span class="dev">開發者 Michael Ho</span></footer>
+  <!-- 主要動作列:準備/開始固定顯示,不藏在分頁裡;上方一行提示「現在該做什麼」,降低新手進房呆掉 -->
+  <div class="primary-bar hidden" id="primaryBar">
+    <div class="action-hint hidden" id="actionHint"></div>
+    <div class="actions" id="primaryActions">
+      <button class="btn primary" id="startBtn">開始遊戲 ▸</button>
+      <button class="btn primary hidden" id="mpReadyBtn">準備好了 ✓</button>
+      <button class="btn primary hidden" id="mpStartBtn">開始對戰 ▸</button>
+    </div>
+  </div>
+
+  <footer><span class="ver">BINGO · v1.21.0</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1350,6 +1376,7 @@ const FIREBASE_CONFIG = {
     $("startBtn").disabled=!ok;
     $("startBtn").style.opacity=ok?"1":".5";
     if(state.online)MP.readyEnabled(ok);
+    refreshActionHint();   // 手動填號進度改變 → 更新「填好卡片 / 可以準備」提示
   }
 
   /* ---------- Play ---------- */
@@ -1478,24 +1505,42 @@ const FIREBASE_CONFIG = {
   let roomTab="fill";   // 目前分頁:'settings'=設定列 / 'fill'=號碼格
   function applyRoomTab(){
     const settingsOn = roomTab==="settings";
-    // 設定列只在「設定」分頁;號碼格連同下方按鈕(換一組/準備/開始)整個 boardWrap 只在「填號」分頁
+    // 設定列只在「設定」分頁;填號方式列 + 號碼格 + 換一組 只在「填號」分頁
     $("setup").classList.toggle("tab-hidden", !settingsOn);
+    $("fillRow").classList.toggle("tab-hidden", settingsOn);
     $("boardWrap").classList.toggle("tab-hidden", settingsOn);
     const bar=$("roomTabs"); if(bar)[...bar.children].forEach(b=>b.classList.toggle("on", b.dataset.tab===roomTab));
   }
-  // show=true:進入 setup/大廳 → 顯示分頁列並套用目前分頁(defaultTab 指定預設頁)
-  // show=false:離開(進遊戲/猜拳/主選單) → 收起分頁列並清掉分頁隱藏,顯示交還給各流程的 .hidden 控制
+  // show=true:進入 setup/大廳 → 顯示分頁列 + 主要動作列並套用目前分頁(defaultTab 指定預設頁)
+  // show=false:離開(進遊戲/猜拳/主選單) → 收起分頁列/主要動作列/填號列,setup 與 boardWrap 的顯示交還給各流程的 .hidden
   function updateRoomTabs(show, defaultTab){
     const bar=$("roomTabs"); if(!bar)return;
     if(!show){
       bar.classList.add("hidden");
+      $("primaryBar").classList.add("hidden");
       $("setup").classList.remove("tab-hidden");
       $("boardWrap").classList.remove("tab-hidden");
+      $("fillRow").classList.add("tab-hidden");   // 填號方式列只屬於大廳/設定的「填號」分頁,離開一律收起
       return;
     }
     if(defaultTab)roomTab=defaultTab;
     bar.classList.remove("hidden");
+    $("primaryBar").classList.remove("hidden");
     applyRoomTab();
+    refreshActionHint();
+  }
+
+  /* ---------- 主要動作列的「現在該做什麼」提示 ---------- */
+  function setActionHint(text){
+    const el=$("actionHint"); if(!el)return;
+    el.textContent=text||"";
+    el.classList.toggle("hidden", !text);
+  }
+  // 單機交給這裡、連線轉給 MP.refreshHint()(它握有 players/ready/isHost 等狀態)
+  function refreshActionHint(){
+    if(state.online){ if(MP&&MP.refreshHint)MP.refreshHint(); return; }
+    if(state.mode==="setup" && state.fill==="manual" && state.card.some(n=>!n)) setActionHint("把空格都填上號碼,就能開始 ▸");
+    else setActionHint("");
   }
 
   function applyFillUI(){
@@ -1505,6 +1550,7 @@ const FIREBASE_CONFIG = {
     else {
       $("startBtn").disabled=false;$("startBtn").style.opacity="1";
       if(state.online)MP.readyEnabled(true);
+      refreshActionHint();
     }
   }
 
@@ -2249,11 +2295,26 @@ const FIREBASE_CONFIG = {
         box.appendChild(chip);
       });
       $("mpStatusTxt").textContent = status==="playing" ? "遊戲進行中" : (status==="rps"?"猜拳決定順序…":(status==="reveal"?"猜拳結果揭曉…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…"))));
+      mpHint();
+    }
+    // 主要動作列的引導提示:只在大廳,依「我準備了沒 / 大家好了沒 / 我是不是房主」給出下一步該做什麼
+    function mpHint(){
+      if(!state.online || status!=="lobby"){ setActionHint(""); return; }
+      const ids=Object.keys(players);
+      if(ids.length<2){ setActionHint("👋 等其他人加入房間就能開始"); return; }
+      const readyCount=ids.filter(id=>players[id]&&players[id].ready).length;
+      if(!ready){
+        setActionHint(state.card.some(n=>!n) ? "① 先填好你的賓果卡片" : "② 按下面的「準備好了 ✓」");
+        return;
+      }
+      if(readyCount>=ids.length) setActionHint(isHost ? "🎉 大家都準備好了 → 按「開始對戰 ▸」" : "大家都準備好了,等房主開始…");
+      else setActionHint("已準備 ✓ 等其他人… ("+readyCount+"/"+ids.length+")");
     }
     function updateReadyBtn(){
       const b=$("mpReadyBtn");
       b.textContent=ready?"取消準備":"準備好了 ✓";
       b.classList.toggle("ghost",ready); b.classList.toggle("primary",!ready);
+      mpHint();
     }
     function setLock(lock){
       $("reshuffleBtn").disabled=lock;
@@ -2864,7 +2925,7 @@ const FIREBASE_CONFIG = {
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap,
              amHost, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,
-             confirmKick, cancelKick:closeKick,
+             confirmKick, cancelKick:closeKick, refreshHint:mpHint,
              setScoreMode, setWinGoal, resetScores, winGoal:()=>winGoal, scoreMode:()=>scoreMode, usePrefs };
   })();
 
