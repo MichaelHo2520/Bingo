@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.17.1 -->
-<meta name="version" content="1.17.1">
+<!-- BINGO 賓果遊戲 · v1.18.0 -->
+<meta name="version" content="1.18.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -654,6 +654,22 @@
     display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
   .ver{opacity:.6;letter-spacing:.03em}
   .dev{opacity:.75;font-weight:700}
+  /* 主選單(進場先選單機 / 連線) */
+  #home{text-align:center;padding-top:8px}
+  .home-hero{margin:16px 0 24px}
+  .home-emoji{font-size:52px;line-height:1;margin-bottom:4px}
+  .home-title{font-family:'Fredoka';font-weight:700;font-size:clamp(40px,13vw,64px);line-height:1;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;
+    background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.04em}
+  .home-tagline{color:var(--muted);font-weight:700;margin-top:10px;font-size:15px}
+  .home-btn{margin-top:12px;font-size:18px;padding:16px 10px}
+  .home-hint{color:var(--muted);font-size:12.5px;margin-top:16px;opacity:.8}
+  :root[data-theme="ebook"] .home-title{background:none;color:#000;-webkit-text-fill-color:#000}
+  /* 單機設定頁的「回主選單」小鈕 */
+  .home-back{width:auto;padding:6px 14px;font-size:13px;margin-bottom:10px}
+  /* 沒填暱稱時的醒目提示(紅框 + 抖動) */
+  .mp-input.needs-name{border-color:#ff5252!important;box-shadow:0 0 0 3px rgba(255,82,82,.28);animation:shakeX .45s}
+  @keyframes shakeX{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}}
 </style>
@@ -670,8 +686,21 @@
     </div>
   </div>
 
+  <!-- ====== HOME:進場先選「單機 / 連線」 ====== -->
+  <section class="panel" id="home">
+    <div class="home-hero">
+      <div class="home-emoji" aria-hidden="true">🎱</div>
+      <div class="home-title display">BINGO</div>
+      <div class="home-tagline">和朋友連線比賽,或自己單機練習</div>
+    </div>
+    <button class="btn primary block-btn home-btn" id="homeOnline">🌐 連線對戰</button>
+    <button class="btn ghost block-btn home-btn" id="homeSolo">🎯 單機練習</button>
+    <div class="home-hint">連線可同房比賽、計分;單機自己玩一張卡</div>
+  </section>
+
   <!-- ====== SETUP ====== -->
-  <section class="panel" id="setup">
+  <section class="panel hidden" id="setup">
+    <button class="btn ghost home-back hidden" id="soloBack" type="button">‹ 主選單</button>
     <div class="subtitle">開始新的一局</div>
 
     <div class="field">
@@ -728,14 +757,14 @@
   <!-- ====== ONLINE: connect ====== -->
   <section class="panel hidden" id="mpConnect">
     <div class="mp-head">
-      <button class="icon-btn" id="mpBack" title="回單機" aria-label="返回單機">
+      <button class="icon-btn" id="mpBack" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <div class="subtitle">連線對戰</div>
     </div>
     <div class="field">
-      <span class="field-label">你的暱稱</span>
-      <input id="mpName" class="mp-input" maxlength="8" placeholder="玩家">
+      <span class="field-label">你的暱稱(必填)</span>
+      <input id="mpName" class="mp-input" maxlength="8" placeholder="輸入你的名字">
     </div>
 
     <div class="or-divider"><span>建立新房間</span></div>
@@ -768,7 +797,7 @@
   </div>
 
   <!-- ====== BOARD ====== -->
-  <div class="board-wrap">
+  <div class="board-wrap hidden" id="boardWrap">
 
     <!-- online play HUD (顯示在棋盤上方) -->
     <div class="mp-play hidden" id="mpControls">
@@ -806,7 +835,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.17.1</span><span class="dev">開發者 Michael Ho</span></footer>
+  <footer><span class="ver">BINGO · v1.18.0</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -848,7 +877,7 @@
       </div>
       <div class="actions hidden" id="mpWinBtns">
         <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
-        <button class="btn primary" id="mpAgain">再一局</button>
+        <button class="btn primary" id="mpAgain">繼續 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
       <button class="peek-link" id="winPeek">先看看牌面 👀</button>
@@ -1312,6 +1341,43 @@ const FIREBASE_CONFIG = {
     render();
     applyFillUI();
   }
+  // 主選單:進場先選「單機 / 連線」;離開房間、單機返回都回到這裡
+  function enterHome(){
+    state.mode="home"; state.won=false; state.online=false; closeWin();
+    $("home").classList.remove("hidden");
+    $("setup").classList.add("hidden");
+    $("setupActions").classList.add("hidden");
+    $("mpConnect").classList.add("hidden");
+    $("mpBar").classList.add("hidden");
+    $("boardWrap").classList.add("hidden");
+    $("playStatus").classList.add("hidden");
+    $("mpControls").classList.add("hidden");
+    document.body.classList.remove("mp-on");
+    resetMarquee();
+  }
+  // 從主選單進「單機」:顯示棋盤與單機設定,開全新一局(連線相關列/鈕都收起)
+  function enterSolo(){
+    state.online=false;
+    $("home").classList.add("hidden");
+    $("mpConnect").classList.add("hidden");
+    $("mpBar").classList.add("hidden");
+    $("boardWrap").classList.remove("hidden");
+    $("setup").classList.remove("hidden");
+    $("setupActions").classList.remove("hidden");
+    $("soloBack").classList.remove("hidden");       // 單機才顯示「回主選單」
+    $("startBtn").classList.remove("hidden");
+    $("onlineBtn").classList.add("hidden");          // 連線改由主選單進入
+    $("mpReadyBtn").classList.add("hidden");
+    $("mpStartBtn").classList.add("hidden");
+    $("mpOrderRow").classList.add("hidden");
+    $("scoreRow").classList.add("hidden");           // 計分列是連線專用
+    $("sizeRow").style.display="";
+    $("targetRow").style.display="";
+    $("playStatus").classList.add("hidden");
+    $("mpControls").classList.add("hidden");
+    state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled();
+    closeWin(); resetMarquee(); render(); applyFillUI();
+  }
   function startGame(){
     if(state.fill==="manual" && state.card.some(n=>!n))return;
     state.mode="play";state.marked=Array(nCells()).fill(false);state.won=false;state.lastLines=0;
@@ -1378,6 +1444,8 @@ const FIREBASE_CONFIG = {
         bgmOn:bgmOn,
         bgmVol:bgmVol,
         voiceVol:voiceVol,
+        scoreMode:(MP&&MP.scoreMode)?MP.scoreMode():"rank",   // 記住連線計分偏好(建房預設用)
+        winGoal:(MP&&MP.winGoal)?MP.winGoal():3,
         name:nameEl?nameEl.value.trim():""
       }));
     }catch(e){/* storage unavailable -> just don't persist */}
@@ -1397,6 +1465,7 @@ const FIREBASE_CONFIG = {
     if(typeof p.bgmVol==="number"){ bgmVol=Math.max(0,Math.min(1,p.bgmVol)); }
     BGM.setVolume(bgmVol);
     if(typeof p.voiceVol==="number"){ voiceVol=Math.max(0,Math.min(3,p.voiceVol)); }
+    if(MP&&MP.usePrefs){ MP.usePrefs(p.scoreMode, p.winGoal); }   // 帶回記住的連線計分偏好(建房預設)
     if(p.bgmOn){ bgmOn=true; }   // 記住「想開」;實際播放等首次使用者互動(繞過自動播放限制)
     if(p.ebook){ setEbook(true,true); }
     if(typeof p.name==="string" && p.name){ const nameEl=$("mpName"); if(nameEl) nameEl.value=p.name; }
@@ -1732,6 +1801,8 @@ const FIREBASE_CONFIG = {
     function youTag(id){ return id===meId ? '<span class="you-badge">你</span>' : ''; }
 
     function openConnect(){
+      $("home").classList.add("hidden");
+      $("boardWrap").classList.add("hidden");
       $("setup").classList.add("hidden");
       $("setupActions").classList.add("hidden");
       $("mpConnect").classList.remove("hidden");
@@ -1800,27 +1871,36 @@ const FIREBASE_CONFIG = {
     function closeConnect(){
       stopRoomWatch();
       $("mpConnect").classList.add("hidden");
-      $("setup").classList.remove("hidden");
-      $("setupActions").classList.remove("hidden");
+      enterHome();   // 連線畫面返回 → 回主選單(不再直接掉到單機設定)
     }
 
+    // 沒填暱稱:紅框抖動 + 聚焦 + 提示,擋住建房/加入,讓人一定注意到
+    function flagNameNeeded(){
+      const el=$("mpName");
+      if(el){ el.classList.remove("needs-name"); void el.offsetWidth; el.classList.add("needs-name"); try{ el.focus(); }catch(e){} el.scrollIntoView&&el.scrollIntoView({block:"center"}); }
+      showToast("請先輸入你的暱稱 🙂", 2200);
+    }
     function create(name,wantName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
-      meName=(name||"玩家").slice(0,8); meId=pid(); isHost=true;
+      const nm=(name||"").trim();
+      if(!nm){ flagNameNeeded(); return; }   // 必填暱稱
+      meName=nm.slice(0,8); meId=pid(); isHost=true;
       roomName=(wantName||"").trim().slice(0,12) || (meName+"的房間");   // 房名可留空,預設用暱稱
       code=randomCode(); roomRef=db.ref("rooms/"+code);                  // 內部隨機 4 位碼當資料庫鍵值(玩家看不到)
       roomRef.child("host").once("value").then(snap=>{
         if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }   // 撞號就重抽一次
         return roomRef.update({ host:meId, roomName:roomName, status:"lobby", target:state.target, size:SIZE, orderMethod:"rps",
-          scoreMode:"rank", winGoal:3, roundId:null,
+          scoreMode:scoreMode, winGoal:winGoal, roundId:null,   // 用記住的計分偏好當建房預設
           calledList:[], winner:null, order:null, turnIndex:0, rps:null, emotes:null, createdAt:Date.now() });
       }).then(()=>{ joinNode(); enterLobby(); }).catch(e=>setMsg("建立房間失敗:"+((e&&e.message)||e)));
     }
     function join(inCode,name,inName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
+      const nm=(name||"").trim();
+      if(!nm){ flagNameNeeded(); return; }   // 必填暱稱(才知道你是誰)
       const c=(inCode||"").replace(/\D/g,"").trim();
       if(c.length<4){ setMsg("請從下方清單選擇房間加入。"); return; }
-      meName=(name||"玩家").slice(0,8); meId=pid(); isHost=false; code=c; roomName=inName||""; roomRef=db.ref("rooms/"+code);
+      meName=nm.slice(0,8); meId=pid(); isHost=false; code=c; roomName=inName||""; roomRef=db.ref("rooms/"+code);
       roomRef.once("value").then(snap=>{
         const r=snap.val();
         if(!r||!r.host){ setMsg("這個房間已經關閉了,請重新選擇。"); return; }
@@ -1853,6 +1933,9 @@ const FIREBASE_CONFIG = {
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();   // 連線中:顯示快速語音浮動鈕
       stopRoomWatch();                                  // 已進房,卸載大廳的房間偵測監聽
+      $("home").classList.add("hidden");
+      $("boardWrap").classList.remove("hidden");        // 進大廳要看得到棋盤(填卡)
+      $("soloBack").classList.add("hidden");            // 大廳不顯示單機的「回主選單」(用房間橫幅的離開)
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -2065,8 +2148,10 @@ const FIREBASE_CONFIG = {
       syncOrderSeg();
     }
     /* ----- 連線計分:模式(累積排行 / 搶 N 勝)、目標勝場、重設戰績 ----- */
-    function setScoreMode(m){ if(isHost&&roomRef){ scoreMode=(m==="match")?"match":"rank"; roomRef.child("scoreMode").set(scoreMode); syncScoreRow(); } }
-    function setWinGoal(n){ if(isHost&&roomRef){ winGoal=Math.max(2,Math.min(20,n|0)); roomRef.child("winGoal").set(winGoal); syncScoreRow(); } }
+    function setScoreMode(m){ if(isHost&&roomRef){ scoreMode=(m==="match")?"match":"rank"; roomRef.child("scoreMode").set(scoreMode); syncScoreRow(); savePrefs(); } }
+    function setWinGoal(n){ if(isHost&&roomRef){ winGoal=Math.max(2,Math.min(20,n|0)); roomRef.child("winGoal").set(winGoal); syncScoreRow(); savePrefs(); } }
+    // 開機時把記住的計分偏好帶進來當「建房預設」(訪客加入別人的房仍以房主設定為準,由監聽覆蓋)
+    function usePrefs(mode,goal){ if(mode==="match"||mode==="rank")scoreMode=mode; if(typeof goal==="number"&&goal>=2)winGoal=Math.min(20,goal); }
     // 房主重設所有人戰績歸零(大廳的「重設戰績」與奪冠後的「開新賽季」共用);只清 score/scoredRound,不動本局其它狀態
     function resetScores(){
       if(!isHost||!roomRef)return;
@@ -2574,7 +2659,7 @@ const FIREBASE_CONFIG = {
       $("targetRow").style.display="";
       $("sizeRow").style.display="";
       setLock(false);
-      toSetup();
+      enterHome();   // 離開房間 → 回主選單(不再掉到單機設定)
     }
     function readyEnabled(ok){ if(state.online && !ready)$("mpReadyBtn").disabled=!ok; }
 
@@ -2620,7 +2705,7 @@ const FIREBASE_CONFIG = {
              reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap,
              amHost, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,
              confirmKick, cancelKick:closeKick,
-             setScoreMode, setWinGoal, resetScores, winGoal:()=>winGoal };
+             setScoreMode, setWinGoal, resetScores, winGoal:()=>winGoal, scoreMode:()=>scoreMode, usePrefs };
   })();
 
   /* ---------- Wire up ---------- */
@@ -2680,12 +2765,17 @@ const FIREBASE_CONFIG = {
     if(card && card.scrollHeight>card.clientHeight) return;   // 卡片內容超出畫面時,才讓卡片自己捲
     e.preventDefault();
   },{passive:false});
+  // 主選單:進場先選單機 / 連線
+  $("homeSolo").addEventListener("click",enterSolo);
+  $("homeOnline").addEventListener("click",()=>MP.openConnect());
+  $("soloBack").addEventListener("click",enterHome);   // 單機頁「回主選單」
   // multiplayer
   $("onlineBtn").addEventListener("click",()=>MP.openConnect());
   $("mpBack").addEventListener("click",()=>MP.closeConnect());
   $("mpCreate").addEventListener("click",()=>MP.create($("mpName").value,$("mpRoomName").value));
   $("mpScan").addEventListener("click",()=>MP.scanRooms());
   $("mpName").addEventListener("change",savePrefs);   // 暱稱記住,下次自動帶入
+  $("mpName").addEventListener("input",()=>$("mpName").classList.remove("needs-name"));   // 一開始打字就解除紅框提示
   $("mpRoomName").addEventListener("keydown",e=>{ if(e.key==="Enter")MP.create($("mpName").value,$("mpRoomName").value); });
   $("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
   $("mpStartBtn").addEventListener("click",()=>MP.startGame());
@@ -2717,6 +2807,7 @@ const FIREBASE_CONFIG = {
   applyGridCols();syncSizeSeg();
   render();applyFillUI();
   syncSettingsUI();
+  enterHome();   // 進場先顯示主選單(選單機 / 連線)
 })();
 </script>
 </body>
