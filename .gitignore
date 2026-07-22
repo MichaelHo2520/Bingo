@@ -1,0 +1,16 @@
+# === Bingo 公開 repo：只放程式(index.html / styles.css / js/ / bgm.mp3)===
+# 其餘一律不上傳；文檔改用 notes/ 底下的獨立 git 做本機版本控管。
+
+# 本機文檔與計畫(notes/ 內另有獨立 git,永不 push 到此公開 repo)
+notes/
+
+# 所有 Markdown 文檔都不上傳(要公開某份時用 git add -f 強制加入)
+*.md
+
+# 舊/實驗殘留、未被 index.html 引用的資產
+back.jpg
+alexguz-funk-amp-breakbeat-541097.mp3
+
+# 系統/編輯器雜項
+.DS_Store
+Thumbs.db

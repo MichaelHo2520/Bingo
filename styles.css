@@ -1,0 +1,724 @@
+  /* ---------- Themes ---------- */
+  :root[data-theme="sunset"]{
+    --bg1:#2a1136; --bg2:#7a2d54; --bg3:#c85a3c;
+    --panel:rgba(255,244,236,.10); --panel-line:rgba(255,255,255,.16);
+    --cell:#fff6ec; --cell-edge:#e9d3bd; --cell-text:#4a2b1f;
+    --accent:#ff8a3d; --accent-2:#ffd24a; --daub:#ff5a5f; --daub-ink:#fff;
+    --text:#fff3ea; --muted:#e7c9bd; --marquee:#ffd24a;
+  }
+  :root[data-theme="midnight"]{
+    --bg1:#05060f; --bg2:#0d1b3a; --bg3:#101026;
+    --panel:rgba(120,160,255,.07); --panel-line:rgba(140,190,255,.18);
+    --cell:#141a33; --cell-edge:#26305a; --cell-text:#dbe6ff;
+    --accent:#22e0ff; --accent-2:#ff4bd8; --daub:#ff2fb0; --daub-ink:#0a0016;
+    --text:#eaf2ff; --muted:#8fa2cc; --marquee:#22e0ff;
+  }
+  :root[data-theme="bubblegum"]{
+    --bg1:#ffd9ec; --bg2:#ffc1e3; --bg3:#d5c2ff;
+    --panel:rgba(255,255,255,.35); --panel-line:rgba(180,90,170,.22);
+    --cell:#ffffff; --cell-edge:#f4c9e4; --cell-text:#7a2b63;
+    --accent:#ff4fa3; --accent-2:#9b6bff; --daub:#ff2f86; --daub-ink:#fff;
+    --text:#6a1f57; --muted:#a76b96; --marquee:#ff4fa3;
+  }
+  :root[data-theme="meadow"]{
+    --bg1:#16351f; --bg2:#2f6b3c; --bg3:#7fae4a;
+    --panel:rgba(245,255,235,.10); --panel-line:rgba(255,255,255,.16);
+    --cell:#f7fbec; --cell-edge:#d5e4bd; --cell-text:#274224;
+    --accent:#6cc04a; --accent-2:#ffcf47; --daub:#e0563b; --daub-ink:#fff;
+    --text:#f2f8e8; --muted:#c3d6b3; --marquee:#ffcf47;
+  }
+  :root[data-theme="arcade"]{
+    --bg1:#000000; --bg2:#140018; --bg3:#001018;
+    --panel:rgba(255,255,255,.05); --panel-line:rgba(255,255,255,.14);
+    --cell:#0e0e12; --cell-edge:#2a2a33; --cell-text:#f5f5f5;
+    --accent:#ffe600; --accent-2:#ff2d55; --daub:#ff2d55; --daub-ink:#000;
+    --text:#ffffff; --muted:#8a8a92; --marquee:#ffe600;
+  }
+  /* E-book / e-ink: pure monochrome, flat, no motion */
+  :root[data-theme="ebook"]{
+    --bg1:#ffffff; --bg2:#ffffff; --bg3:#ffffff;
+    --panel:#ffffff; --panel-line:#000000;
+    --cell:#ffffff; --cell-edge:#000000; --cell-text:#000000;
+    --accent:#000000; --accent-2:#000000; --daub:#000000; --daub-ink:#ffffff;
+    --text:#000000; --muted:#555555; --marquee:#000000;
+  }
+  :root[data-theme="ebook"] *{animation:none!important;transition:none!important;text-shadow:none!important;backdrop-filter:none!important}
+  :root[data-theme="ebook"] body{background:#fff!important}
+  :root[data-theme="ebook"] .panel,
+  :root[data-theme="ebook"] .status,
+  :root[data-theme="ebook"] .icon-btn{background:#fff;box-shadow:none}
+  :root[data-theme="ebook"] .cell{box-shadow:none;border-width:2px}
+  :root[data-theme="ebook"] .cell .daub{display:none}
+  :root[data-theme="ebook"] .cell.marked{background:#000;border-color:#000}
+  :root[data-theme="ebook"] .cell.marked .num{color:#fff;transform:none}
+  :root[data-theme="ebook"] .cell.inline{box-shadow:inset 0 0 0 3px #fff;border-color:#000}
+  :root[data-theme="ebook"] .seg{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .seg button.on{background:#000;color:#fff}
+  :root[data-theme="ebook"] .btn.primary{background:#000;color:#fff}
+  :root[data-theme="ebook"] .btn.ghost,
+  :root[data-theme="ebook"] .mini{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .marquee .bulb{color:#bbb;opacity:1}
+  :root[data-theme="ebook"] .marquee .bulb.lit{color:#000;transform:none}
+  :root[data-theme="ebook"] .veil{background:rgba(255,255,255,.9)}
+  :root[data-theme="ebook"] .win-card{background:#fff;border:2px solid #000}
+  :root[data-theme="ebook"] .win-card .word{background:none;color:#000;-webkit-text-fill-color:#000}
+  :root[data-theme="ebook"] .cell.empty-cell{background:#fff;border:2px dashed #999;color:#999}
+
+
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  /* 隱藏捲軸(手機往下滑不再出現白色位置索引條),仍可正常捲動 */
+  html{scrollbar-width:none;-ms-overflow-style:none}
+  ::-webkit-scrollbar{width:0;height:0;display:none}
+  html,body{height:100%}
+  body{
+    font-family:'Nunito',system-ui,sans-serif;
+    color:var(--text);
+    background:var(--bg1);
+    min-height:100%;
+    display:flex;flex-direction:column;align-items:center;
+    padding:16px;gap:14px;overflow-x:hidden;
+    transition:background .5s ease;
+  }
+  /* 固定背景層:取代 background-attachment:fixed(手機滑動時背景會被帶著跑、放開才重畫、跳一下)。
+     改用 position:fixed 的合成層,滑動時由合成器釘住、不重繪,就不會跳動 */
+  body::before{
+    content:"";
+    position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:
+      radial-gradient(120% 120% at 15% 0%, var(--bg2) 0%, transparent 55%),
+      radial-gradient(120% 120% at 100% 100%, var(--bg3) 0%, transparent 50%),
+      var(--bg1);
+    transition:background .5s ease;
+  }
+  .display{font-family:'Fredoka',sans-serif}
+
+  /* ---------- Top bar ---------- */
+  .topbar{width:min(92vw,520px);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .marquee{display:flex;gap:6px;align-items:flex-end}
+  .marquee .bulb{
+    font-family:'Fredoka',sans-serif;font-weight:700;
+    font-size:clamp(28px,9vw,44px);line-height:1;
+    color:var(--muted);letter-spacing:1px;
+    transition:color .3s, text-shadow .3s, transform .3s;
+    position:relative;opacity:.55;
+  }
+  .marquee .bulb.lit{
+    color:var(--marquee);opacity:1;
+    text-shadow:0 0 8px var(--marquee), 0 0 22px var(--marquee);
+    transform:translateY(-2px);
+  }
+  /* 主選單:大標題已有一個大大的 BINGO,頂列跑馬燈就先藏起來(保留位置讓 ⛶/⚙️ 停在右上),免得整頁 BINGO 字太多 */
+  body.at-home .marquee{visibility:hidden}
+  .tools{display:flex;gap:8px}
+  .icon-btn{
+    width:42px;height:42px;border-radius:13px;border:1px solid var(--panel-line);
+    background:var(--panel);color:var(--text);font-size:19px;cursor:pointer;
+    display:grid;place-items:center;backdrop-filter:blur(6px);transition:transform .15s, background .2s;
+  }
+  .icon-btn:hover{transform:translateY(-2px)}
+  .icon-btn:active{transform:scale(.94)}
+  .icon-btn.active{background:var(--accent);border-color:var(--accent)}
+  .icon-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+  :root[data-theme="ebook"] .icon-btn.active{background:#000;border-color:#000}
+  .icon-btn:focus-visible,.btn:focus-visible,.cell:focus-visible,.mini:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
+
+  /* ---------- Panel ---------- */
+  .panel{
+    width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:20px;padding:16px;backdrop-filter:blur(10px);
+  }
+  .subtitle{font-weight:800;font-size:15px;letter-spacing:.4px}
+  .hint{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.5}
+
+  /* ---------- Segmented / options ---------- */
+  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:12px;padding:3px;gap:4px}
+  .seg button{
+    flex:1;border:0;background:transparent;color:var(--muted);font-family:'Nunito';font-weight:800;
+    font-size:14px;padding:8px 8px;border-radius:9px;cursor:pointer;transition:.2s;white-space:nowrap;
+  }
+  .seg button.on{background:var(--accent);color:#1c1008;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  /* 訪客唯讀選項(房主決定的設定):做成明顯「不能按」——整體淡化、選中項改中性灰底(拿掉亮橘按鈕感)、未選項再淡一階、游標不變手指 */
+  .seg.readonly{pointer-events:none;opacity:.9}
+  .seg.readonly button{cursor:default}
+  .seg.readonly button:not(.on){opacity:.32}
+  .seg.readonly button.on{background:rgba(0,0,0,.16);color:var(--text);box-shadow:none}
+  :root[data-theme="ebook"] .seg.readonly button.on{background:#eee;color:#000}
+  :root[data-theme="midnight"] .seg button.on,
+  :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
+
+  /* ---------- Field block:標籤在上、控制項滿版、共用同一條左右基準線 ---------- */
+  .field{margin-top:12px}
+  .field-label{display:block;font-weight:800;font-size:12px;color:var(--muted);letter-spacing:.3px;margin-bottom:5px}
+  .field .mp-input{width:100%;height:44px}
+
+  /* 全寬 stepper:− 靠左、＋ 靠右、數字置中,與 seg 同寬同高 */
+  .stepper-bar{display:flex;align-items:center;background:rgba(0,0,0,.14);border-radius:12px;padding:3px;gap:4px}
+  .stepper-bar .mini{flex:0 0 auto;width:56px;height:auto;min-height:34px;border:0;background:transparent;border-radius:9px;font-size:20px}
+  .stepper-bar .mini:hover{background:rgba(255,255,255,.08)}
+  .stepper-bar .target-val{flex:1;font-size:20px}
+  :root[data-theme="ebook"] .stepper-bar{background:#fff;border:1px solid #000}
+
+  /* .row 保留給房間橫幅(mpBar)使用 */
+  .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .row .label{font-weight:800;font-size:14px}
+  .mini{
+    width:34px;height:34px;border-radius:10px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.08);color:var(--text);font-size:18px;font-weight:800;cursor:pointer;
+    display:grid;place-items:center;
+  }
+  .mini:active{transform:scale(.9)}
+  .target-val{font-family:'Fredoka';font-weight:700;font-size:22px;min-width:26px;text-align:center}
+
+  /* ---------- Grid ---------- */
+  .board-wrap{width:min(92vw,520px);display:flex;flex-direction:column;align-items:center;gap:12px}
+  .grid{
+    --gap:clamp(6px,1.6vw,10px);
+    width:min(92vw,520px);aspect-ratio:1;
+    display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,1fr);
+    gap:var(--gap);
+  }
+  .cell{
+    position:relative;border:0;cursor:pointer;border-radius:16px;
+    background:var(--cell);border:2px solid var(--cell-edge);
+    color:var(--cell-text);font-family:'Fredoka',sans-serif;font-weight:600;
+    font-size:var(--cellfont,clamp(20px,6.5vw,40px));
+    display:grid;place-items:center;overflow:hidden;
+    transition:transform .12s ease, box-shadow .25s, border-color .25s;
+    box-shadow:0 3px 0 var(--cell-edge);
+  }
+  .cell:hover{transform:translateY(-2px)}
+  .cell:active{transform:translateY(1px)}
+  .cell .num{position:relative;z-index:2;transition:color .2s, transform .2s}
+  /* daub stamp */
+  .cell .daub{
+    position:absolute;z-index:1;inset:0;margin:auto;width:78%;height:78%;
+    border-radius:50%;background:var(--daub);
+    transform:scale(0) rotate(-12deg);opacity:0;
+    transition:transform .28s cubic-bezier(.34,1.56,.64,1), opacity .2s;
+    box-shadow:0 4px 12px rgba(0,0,0,.28) inset, 0 3px 10px rgba(0,0,0,.25);
+  }
+  .cell.marked .daub{transform:scale(1) rotate(0);opacity:1}
+  .cell.marked .num{color:var(--daub-ink);transform:scale(1.05)}
+  .cell.inline{border-color:var(--accent-2);box-shadow:0 0 0 3px var(--accent-2), 0 0 18px var(--accent-2)}
+
+  /* manual tap-to-place */
+  .cell.empty-cell{background:var(--panel);border:2px dashed var(--panel-line);box-shadow:none;color:var(--muted)}
+  .cell.empty-cell:hover{border-color:var(--accent);border-style:solid;transform:translateY(-2px)}
+  .cell.just-placed{animation:place .25s ease}
+  @keyframes place{from{transform:scale(.78)}to{transform:scale(1)}}
+
+  /* ---------- Buttons ---------- */
+  .actions{display:flex;gap:10px;width:min(92vw,520px);flex-wrap:wrap}
+  .btn{
+    flex:1;min-width:120px;border:0;border-radius:15px;padding:15px 16px;cursor:pointer;
+    font-family:'Fredoka';font-weight:600;font-size:17px;transition:transform .15s, filter .2s;
+  }
+  .btn:hover{transform:translateY(-2px)}
+  .btn:active{transform:translateY(0) scale(.98)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008}
+  :root[data-theme="midnight"] .btn.primary,:root[data-theme="arcade"] .btn.primary{color:var(--daub-ink)}
+  .btn.ghost{background:var(--panel);border:1px solid var(--panel-line);color:var(--text)}
+
+  .status{width:min(92vw,520px);display:flex;justify-content:space-between;align-items:center;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:15px;padding:12px 16px}
+  .status .big{font-family:'Fredoka';font-weight:700;font-size:20px}
+  .status .lbl{color:var(--muted);font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
+
+  /* ---------- Win overlay ---------- */
+  .veil{position:fixed;inset:0;display:none;place-items:center;z-index:50;
+    background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:20px}
+  .veil.show{display:grid}
+  .win-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
+    padding:34px 30px;text-align:center;max-width:380px;backdrop-filter:blur(14px);
+    animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  .win-card .word{font-family:'Fredoka';font-weight:700;font-size:clamp(46px,15vw,76px);line-height:1;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .win-card p{color:var(--muted);margin:10px 0 22px;font-weight:700}
+  .win-card .actions{width:100%}
+  .win-card .btn{min-width:0;font-size:16px;padding:14px 10px}
+  /* 連線計分:結果卡上的排行榜與「總冠軍」橫幅 */
+  .win-champ{font-family:'Fredoka';font-weight:700;font-size:clamp(19px,6vw,26px);
+    color:var(--accent);margin:2px 0 14px;line-height:1.25}
+  .win-scores{width:100%;display:flex;flex-direction:column;gap:6px;margin:0 0 20px}
+  .win-scores .ws-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;
+    background:rgba(255,255,255,.08);border:1px solid var(--panel-line);font-weight:800;font-size:15px}
+  .win-scores .ws-row.lead{background:var(--accent);color:#1c1008;border-color:var(--accent)}
+  .win-scores .ws-row.me{box-shadow:0 0 0 2px var(--accent-2)}
+  .win-scores .ws-rank{flex:none;font-family:'Fredoka';opacity:.85;min-width:22px}
+  .win-scores .ws-name{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .win-scores .ws-pts{flex:none;font-family:'Fredoka'}
+  /* 搶勝模式:排行頂端的「🎯 搶 N 勝」小標,點出這局在拼幾勝 */
+  .win-scores .ws-goal{font-family:'Fredoka';font-weight:700;font-size:14px;color:var(--accent-2);
+    text-align:center;margin:-2px 0 2px}
+  :root[data-theme="ebook"] .win-scores .ws-goal{color:#000}
+  :root[data-theme="ebook"] .win-scores .ws-row{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .win-scores .ws-row.lead{background:#000;color:#fff}
+  /* 猜拳/揭曉蓋板:比勝利卡稍寬,容得下橫排手勢卡 */
+  .mp-veil-card{max-width:min(92vw,440px)}
+  .mp-veil-title{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:8px}
+  .mp-veil-card .rps-btns{margin-top:4px}
+  .mp-veil-card .actions{margin-top:16px}
+  /* 先關掉結果卡看看牌面(不重來、不離開) */
+  .peek-link{margin-top:14px;background:none;border:0;cursor:pointer;
+    color:var(--muted);font-family:'Nunito';font-weight:800;font-size:14px;
+    text-decoration:underline;text-underline-offset:3px}
+  .peek-link:hover{color:var(--text)}
+  /* 偷看牌面時,浮在底部、可再叫回結果卡 */
+  .peek-reopen{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:55;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008;border:0;
+    border-radius:999px;padding:12px 22px;cursor:pointer;
+    font-family:'Fredoka';font-weight:700;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+  :root[data-theme="midnight"] .peek-reopen,
+  :root[data-theme="arcade"] .peek-reopen{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .peek-link{color:#555}
+  :root[data-theme="ebook"] .peek-reopen{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
+  canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
+  /* 房主移出玩家:確認小卡 */
+  .confirm-card{max-width:340px}
+  .confirm-ico{font-size:42px;line-height:1;margin-bottom:2px}
+  .confirm-title{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:8px}
+  .btn.danger{background:#e03131;color:#fff}
+  .btn.danger:hover{filter:brightness(1.08)}
+  :root[data-theme="ebook"] .btn.danger{background:#000;color:#fff;border:1px solid #000}
+
+  /* ---------- Settings sheet ---------- */
+  .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
+    padding:22px 22px 24px;max-width:360px;width:100%;backdrop-filter:blur(14px);
+    max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;   /* 螢幕不夠高時卡片內部可捲動,不再被切掉 */
+    animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
+  .set-head{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:10px;text-align:center}
+  .set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:15px 2px;border-top:1px solid var(--panel-line)}
+  .set-lbl{font-weight:800;font-size:15px}
+  .swatches{display:flex;gap:9px}
+  .swatch{width:30px;height:30px;border-radius:50%;border:2px solid var(--panel-line);cursor:pointer;
+    padding:0;transition:transform .12s}
+  .swatch:hover{transform:scale(1.12)}
+  .swatch.on{border-color:var(--text);box-shadow:0 0 0 2px var(--accent)}
+  .swatches.locked{opacity:.3;pointer-events:none}
+  .switch{width:52px;height:30px;border-radius:999px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.12);cursor:pointer;padding:0;position:relative;transition:background .2s}
+  .switch .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+    background:var(--text);transition:transform .2s}
+  .switch[aria-checked="true"]{background:var(--accent)}
+  .switch[aria-checked="true"] .knob{transform:translateX(22px);background:#fff}
+  .set-card .btn{width:100%;margin-top:18px}
+  :root[data-theme="ebook"] .set-card{background:#fff;border:2px solid #000}
+  :root[data-theme="ebook"] .switch{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .switch[aria-checked="true"]{background:#000}
+  :root[data-theme="ebook"] .switch .knob{background:#000}
+  :root[data-theme="ebook"] .switch[aria-checked="true"] .knob{background:#fff}
+  /* 背景音樂音量條 */
+  .rng{-webkit-appearance:none;appearance:none;width:132px;height:6px;border-radius:999px;
+    background:var(--panel-line);outline:none;cursor:pointer}
+  .rng::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:18px;height:18px;
+    border-radius:50%;background:var(--accent);border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .rng::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
+  .set-row.dim{opacity:.45}   /* 背景音樂關閉時,音量列淡化 */
+  :root[data-theme="ebook"] .rng{background:#ccc}
+  :root[data-theme="ebook"] .rng::-webkit-slider-thumb{background:#000}
+  :root[data-theme="ebook"] .rng::-moz-range-thumb{background:#000}
+  :root[data-theme="ebook"] .swatch.on{border-color:#000;box-shadow:0 0 0 2px #000}
+
+  .hidden{display:none!important}
+  /* 房間分頁切換專用:與 .hidden 分開,離開 setup/大廳時各流程仍用 .hidden 做完整隱藏,兩者互不干擾 */
+  .tab-hidden{display:none!important}
+  /* 房間分頁列(✏️填號 / ⚙️設定):做成「底線頁籤」,和下方選項膠囊 .seg 明顯不同——一看就知道是換頁、不是選項按鈕 */
+  .room-tabs{width:min(92vw,520px);display:flex;gap:2px;border-bottom:2px solid var(--panel-line)}
+  .room-tabs button{flex:1;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;
+    padding:11px 8px 12px;font-family:'Nunito';font-weight:800;font-size:15.5px;color:var(--muted);cursor:pointer;transition:.15s}
+  .room-tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+  :root[data-theme="ebook"] .room-tabs{border-bottom-color:#000}
+  :root[data-theme="ebook"] .room-tabs button.on{color:#000;border-bottom-color:#000}
+  /* 填號方式列:當作填號分頁的一部分,寬度對齊 */
+  #fillRow{width:min(92vw,520px);margin-top:0}
+  /* 主要動作列(準備/開始固定顯示 + 現在該做什麼提示) */
+  .primary-bar{width:min(92vw,520px);display:flex;flex-direction:column;gap:10px}
+  .action-hint{text-align:center;font-weight:800;font-size:14px;line-height:1.45;color:var(--text);
+    background:rgba(0,0,0,.10);border-radius:12px;padding:9px 12px}
+  :root[data-theme="ebook"] .action-hint{background:#fff;border:1px solid #000;color:#000}
+  /* multiplayer */
+  .mp-input{
+    flex:1;min-width:0;background:rgba(255,255,255,.12);border:1px solid var(--panel-line);
+    border-radius:12px;padding:11px 14px;color:var(--text);font-family:'Nunito';font-weight:800;font-size:15px;outline:none;
+  }
+  .mp-input.wide{flex:1}
+  .mp-input::placeholder{color:var(--muted)}
+  .or-divider{display:flex;align-items:center;gap:12px;margin:16px 2px 12px;color:var(--muted);font-size:12.5px;font-weight:800}
+  .or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:var(--panel-line)}
+  /* 連線面板標題列:返回箭頭 + 標題 */
+  .mp-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .mp-head .subtitle{margin:0}
+  /* 房號輸入框 + 內嵌掃描圖示鈕(收進框內右側,讓輸入框左緣與其他欄位對齊) */
+  .input-wrap{position:relative;width:100%}
+  .input-wrap .mp-input{width:100%;padding-left:46px;padding-right:46px}
+  .input-icon-btn{position:absolute;top:50%;right:6px;transform:translateY(-50%);
+    width:38px;height:38px;border:0;border-radius:10px;background:transparent;color:var(--muted);
+    font-size:19px;cursor:pointer;display:grid;place-items:center;transition:.15s}
+  .input-icon-btn:hover{background:rgba(255,255,255,.10);color:var(--text)}
+  /* 滿版主鈕:每個區塊唯一的主要動作,左右緣與輸入框對齊 */
+  .block-btn{display:block;width:100%;flex:none;min-width:0;margin-top:10px;padding:13px 16px;font-size:16px}
+  /* 加入房間:外框式次要主鈕,與實心橘色的「建立房間」明顯區分 */
+  .btn.outline{background:transparent;border:2px solid var(--accent);color:var(--accent)}
+  .btn.outline:not(:disabled):hover{background:rgba(255,255,255,.06)}
+  :root[data-theme="ebook"] .btn.outline{border-color:#000;color:#000}
+  .btn:disabled,.btn[disabled]{opacity:.42;cursor:not-allowed;transform:none;box-shadow:none}
+  .btn:disabled:hover,.btn[disabled]:hover{transform:none;background:transparent}
+  .room-list{display:flex;flex-direction:column;gap:8px}
+  .room-list:not(:empty){margin-top:10px}
+  /* 房間清單分區:把「可加入」與「對戰中」拆成兩塊,各自帶小標題,一眼看出哪些能點 */
+  .room-group{display:flex;flex-direction:column;gap:8px}
+  .room-group + .room-group{margin-top:14px}
+  .room-group-title{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:800;
+    color:var(--muted);letter-spacing:.03em;padding:0 2px 2px}
+  .room-group-title .gt-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+  .room-group.joinable .room-group-title{color:#22c55e}
+  .room-group.joinable .room-group-title .gt-dot{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+  /* 房間卡:左邊房名+房主人數(兩行),右邊一顆「加入 ▸」或「遊戲中」標,清楚指出可點的動作 */
+  .room-item{display:flex;flex-direction:row;align-items:center;gap:10px;width:100%;text-align:left;
+    background:rgba(255,255,255,.10);border:1px solid var(--panel-line);border-radius:12px;
+    padding:12px 14px;cursor:pointer;color:var(--text);font-weight:800;transition:transform .1s,border-color .12s,background .12s}
+  .room-item .room-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+  .room-item .rn{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:17px;line-height:1.25}
+  .room-item .meta{width:100%;color:var(--muted);font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .room-item .host{color:var(--accent)}
+  /* 可加入:綠色系高亮 + 綠色「加入 ▸」膠囊鈕,和灰階的對戰中拉開差距 */
+  .room-item.joinable{border-color:rgba(34,197,94,.55);background:rgba(34,197,94,.10)}
+  .room-item.joinable:hover{transform:translateY(-1px);border-color:#22c55e;background:rgba(34,197,94,.16)}
+  .room-item .join-cta{flex:none;display:inline-flex;align-items:center;gap:3px;padding:9px 15px;border-radius:999px;
+    background:#22c55e;color:#06301a;font-family:'Fredoka',sans-serif;font-weight:700;font-size:14.5px;white-space:nowrap}
+  .room-item.joinable:hover .join-cta{background:#16a34a;color:#fff}
+  .room-item.busy{opacity:.55;cursor:not-allowed}
+  .room-item.busy:hover{transform:none;border-color:var(--panel-line);background:rgba(255,255,255,.10)}
+  .room-item .busy-tag{flex:none;display:inline-flex;align-items:center;gap:4px;padding:8px 13px;border-radius:999px;
+    background:rgba(255,255,255,.08);border:1px solid var(--panel-line);color:var(--muted);font-size:13px;font-weight:800;white-space:nowrap}
+  .room-empty{color:var(--muted);font-size:13px;padding:6px 2px}
+  :root[data-theme="ebook"] .room-item{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .room-item .meta{color:#555}
+  :root[data-theme="ebook"] .room-item .host{color:#000}
+  :root[data-theme="ebook"] .room-group.joinable .room-group-title{color:#000}
+  :root[data-theme="ebook"] .room-group.joinable .room-group-title .gt-dot{background:#000;box-shadow:none}
+  :root[data-theme="ebook"] .room-item.joinable{background:#fff;border:2px solid #000}
+  :root[data-theme="ebook"] .room-item .join-cta{background:#000;color:#fff}
+  :root[data-theme="ebook"] .room-item .busy-tag{background:#eee;border:1px solid #999;color:#555}
+  /* 加入區:即時偵測膠囊 + 重新偵測鈕同一列 */
+  .mp-detect-row{display:flex;align-items:center;gap:8px;margin:0 2px}
+  .mp-detect-row .mp-live{flex:1;justify-content:flex-start;margin:0}
+  .mp-rescan{flex:none;width:40px;height:38px;border:1px solid var(--panel-line);border-radius:12px;
+    background:rgba(255,255,255,.06);color:var(--muted);font-size:18px;cursor:pointer;display:grid;place-items:center;transition:.15s}
+  .mp-rescan:hover{background:rgba(255,255,255,.12);color:var(--text);border-color:var(--accent)}
+  :root[data-theme="ebook"] .mp-rescan{background:#fff;border:1px solid #000;color:#000}
+  /* 大廳即時房間狀態膠囊:一眼看出現在有沒有人開房,不必一直按🔍 */
+  .mp-live{display:inline-flex;align-items:center;gap:9px;max-width:100%;margin:0 2px;
+    padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.06);
+    border:1px solid var(--panel-line);color:var(--muted);font-weight:800;font-size:13px;line-height:1.3}
+  .mp-live .dot{width:9px;height:9px;border-radius:50%;background:currentColor;flex:none}
+  .mp-live[data-state="open"]{color:var(--accent);border-color:var(--accent);background:rgba(255,255,255,.10)}
+  .mp-live[data-state="open"] .dot{animation:mpPulse 1.6s ease-out infinite}
+  .mp-live[data-state="busy"]{color:var(--accent-2)}
+  .mp-live[data-state="error"]{color:var(--daub)}
+  @keyframes mpPulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  :root[data-theme="ebook"] .mp-live{background:#fff;border:1px solid #000}
+  .mp-status{font-weight:800;font-size:13px;color:var(--accent)}
+  .mp-players{display:flex;flex-wrap:wrap;gap:14px 12px;margin-top:12px}
+  .mp-chip{
+    display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.10);
+    border:1px solid var(--panel-line);border-radius:999px;padding:6px 13px;font-weight:800;font-size:14px;
+  }
+  .mp-chip.clickable{cursor:pointer;transition:transform .1s,border-color .12s}
+  .mp-chip.clickable:hover{transform:translateY(-1px);border-color:var(--accent)}
+  .mp-chip .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  .mp-chip.ready .dot{background:var(--accent)}
+  .mp-chip .ln{font-family:'Fredoka';color:var(--accent);font-weight:700}
+  .mp-chip.me{border-color:var(--accent-2);box-shadow:0 0 0 2px var(--accent-2)}  /* 自己的晶片:accent-2 光環,和別人拉開差距 */
+  /* 互動提示:每個晶片尾端一顆淡淡的 😀,暗示「點我可以送表情」(取代原本右上角的互動鈕) */
+  .mp-chip .mp-poke{margin-left:1px;font-size:13px;line-height:1;opacity:.5;
+    transition:opacity .12s,transform .12s;pointer-events:none}
+  .mp-chip.clickable:hover .mp-poke{opacity:1;transform:scale(1.15)}
+  .mp-chip.turn .mp-poke{opacity:.8}
+  /* 房主用:大廳時每個非自己的玩家晶片右側出現的移除鈕 */
+  .mp-chip .mp-kick{display:inline-grid;place-items:center;width:20px;height:20px;margin-left:3px;padding:0;
+    border:none;border-radius:50%;background:#ff5252;color:#fff;line-height:0;cursor:pointer;
+    box-shadow:0 1px 3px rgba(0,0,0,.28);transition:background .15s,transform .1s}
+  .mp-chip .mp-kick svg{display:block}
+  .mp-chip .mp-kick:hover{background:#e03131;transform:scale(1.1)}
+  :root[data-theme="ebook"] .mp-chip .mp-kick{background:#000;color:#fff;border:1px solid #000;box-shadow:none}
+  :root[data-theme="ebook"] .mp-chip .mp-kick:hover{background:#333}
+  .mp-chip .seat-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;
+    border-radius:10px;background:var(--accent);color:#1c1008;font-family:'Fredoka';font-weight:700;font-size:12.5px}
+  :root[data-theme="midnight"] .mp-chip .seat-badge,
+  :root[data-theme="arcade"] .mp-chip .seat-badge{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .mp-chip .seat-badge{background:#000;color:#fff}
+  /* 目前輪到的玩家:高對比 + 放大 + 脈動,一眼看出換誰 */
+  .mp-chip.turn{background:var(--accent);color:#1c1008;border-color:var(--accent);transform:scale(1.04);
+    font-size:15px;animation:turnpulse 1.2s ease-in-out infinite}
+  .mp-chip.turn .dot{background:#1c1008}
+  .mp-chip.turn .ln{color:#1c1008}
+  .mp-chip.turn .seat-badge{background:#1c1008;color:var(--accent)}
+  @keyframes turnpulse{0%,100%{box-shadow:0 0 0 2px var(--accent)}50%{box-shadow:0 0 0 2px var(--accent),0 0 16px var(--accent)}}
+  :root[data-theme="ebook"] .mp-chip.turn{background:#000;color:#fff}
+  :root[data-theme="ebook"] .mp-chip.turn .dot{background:#fff}
+  :root[data-theme="ebook"] .mp-chip.turn .ln{color:#fff}
+  :root[data-theme="ebook"] .mp-chip.turn .seat-badge{background:#fff;color:#000}
+  /* 連線計分:玩家晶片上的累積勝場徽章 🏆N(只在有分數時顯示) */
+  .mp-chip .score-badge{display:inline-flex;align-items:center;gap:1px;margin-left:2px;
+    font-family:'Fredoka';font-weight:700;font-size:12.5px;color:var(--accent-2)}
+  .mp-chip.turn .score-badge{color:#1c1008}
+  :root[data-theme="ebook"] .mp-chip .score-badge{color:#000}
+  :root[data-theme="ebook"] .mp-chip.turn .score-badge{color:#fff}
+  /* 連線計分:大廳設定列「搶勝」的目標勝場 stepper 與重設鈕 */
+  .score-extra{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .score-extra .wg-group{display:inline-flex;align-items:center;gap:6px}
+  .score-extra .wg-lbl{font-size:13px;color:var(--muted);font-weight:800}
+  .score-extra .mini{width:auto;min-width:40px;height:auto;min-height:32px;border:0;border-radius:9px;
+    background:rgba(0,0,0,.14);font-size:18px;padding:0 12px;cursor:pointer}
+  .score-extra .mini:hover{background:rgba(255,255,255,.08)}
+  .score-extra .target-val{min-width:26px;text-align:center;font-size:19px}
+  .score-extra .score-reset{margin-left:auto;min-width:0;font-size:13px;font-weight:800;
+    background:transparent;border:1px solid var(--panel-line);color:var(--muted)}
+  /* 目標勝場鎖定(賽季進行中):+/− 變淡不可按,數字仍看得到 */
+  .score-extra .mini:disabled{opacity:.35;cursor:not-allowed}
+  .score-extra .mini:disabled:hover{background:rgba(0,0,0,.14)}
+  .score-extra .wg-group.locked .target-val{opacity:.7}
+  .score-extra .wg-lock-hint{flex-basis:100%;font-size:12px;font-weight:700;color:var(--muted);opacity:.9}
+  :root[data-theme="ebook"] .score-extra .mini{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .score-extra .mini:disabled:hover{background:#fff}
+  .mp-play{
+    width:min(92vw,520px);display:flex;align-items:center;gap:20px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;padding:14px 20px;
+  }
+  .mp-hud-item{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+  .mp-hud-item + .mp-hud-item{padding-left:20px;border-left:1px solid var(--panel-line)}
+  .mp-ball{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-size:24px;font-weight:700;line-height:1;
+    box-shadow:0 3px 10px rgba(0,0,0,.25)}
+  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:24px;line-height:1;color:var(--text)}
+  .mp-turn{margin-left:auto;text-align:center;font-weight:800;font-size:15px;color:var(--accent);
+    background:rgba(0,0,0,.16);padding:10px 16px;border-radius:999px}
+  .mp-turn.wait{color:var(--muted)}
+  :root[data-theme="ebook"] .mp-ball{box-shadow:none;border:1px solid #000}
+  :root[data-theme="ebook"] .mp-turn{background:#fff;border:1px solid #000}
+  .cell.callable{box-shadow:0 0 0 3px var(--accent) inset;cursor:pointer}
+  .mp-panel{
+    width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
+    border-radius:15px;padding:16px;
+  }
+  .mp-panel .subtitle{font-size:15px;margin-bottom:4px}
+  .rps-hint{color:var(--muted);font-size:13px;margin:6px 0 12px}
+  .rps-btns{display:flex;gap:10px;justify-content:center}
+  .rps-btn{
+    flex:1;max-width:110px;font-size:34px;padding:14px 0;background:rgba(255,255,255,.10);
+    border:2px solid var(--panel-line);border-radius:16px;cursor:pointer;transition:transform .08s,border-color .12s;
+  }
+  .rps-btn:hover{transform:translateY(-2px)}
+  .rps-btn:focus{outline:none}                                   /* 消除滑鼠點擊後殘留的外框 */
+  .rps-btn:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}  /* 僅鍵盤操作時顯示 */
+  .rps-btn.chosen{border-color:var(--accent);background:rgba(255,255,255,.20);transform:scale(1.06)}
+  .rps-btns.locked{pointer-events:none}            /* 已出拳 → 不能再改 */
+  .rps-btn.dim{opacity:.28;transform:none}          /* 出拳後把沒選的淡化,只留你選的 */
+  .rps-throws{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;justify-content:center}
+  /* 猜拳過場:揭曉大家出了什麼 */
+  .reveal-hands{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin:12px 0 14px}
+  .reveal-hand{
+    position:relative;                               /* 承載右上角「你」徽章 */
+    display:flex;flex-direction:column;align-items:center;gap:3px;min-width:86px;
+    background:rgba(255,255,255,.10);border:2px solid var(--panel-line);border-radius:16px;
+    padding:12px 14px 10px;opacity:0;transform:translateY(10px) scale(.85);
+    animation:revealPop .38s cubic-bezier(.2,.9,.3,1.35) forwards;
+  }
+  .reveal-hand .emo{font-size:42px;line-height:1;margin-bottom:2px}
+  .reveal-hand .rk{font-family:'Fredoka';font-weight:600;color:var(--accent);font-size:12.5px}
+  .reveal-hand .nm{font-weight:800;font-size:14px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reveal-hand .txt{color:var(--muted);font-size:11.5px;font-weight:700}
+  .reveal-hand.win{border-color:var(--accent);background:rgba(255,255,255,.20)}
+  .reveal-hand.win .nm{color:var(--accent)}          /* 贏家的名字用強調色,一眼認出 */
+  .reveal-hand.tie{border-style:dashed;opacity:.92}  /* 平手揭曉:虛線框,表示還沒定案 */
+  /* 「你」高反差:自己的卡片用 accent-2 光環 + 加粗名字,和其他人拉開差距 */
+  .reveal-hand.me{border-color:var(--accent-2);box-shadow:0 0 0 3px var(--accent-2),0 0 16px var(--accent-2);background:rgba(255,255,255,.18)}
+  .reveal-hand.me .nm{font-weight:900}
+  @keyframes revealPop{to{opacity:1;transform:none}}
+  .reveal-order{text-align:center;font-weight:800;font-size:15px;margin-top:2px;line-height:1.5}
+  /* 揭曉:先出號的贏家大字強調,清楚看見是誰 */
+  .reveal-champ{font-weight:900;font-size:15px;line-height:1.35}
+  .reveal-champ .nm{color:var(--accent);font-size:24px;font-weight:900;word-break:break-word}
+  .reveal-seq{color:var(--muted);font-size:13px;font-weight:700;margin-top:6px}
+  :root[data-theme="ebook"] .reveal-hand{background:#fff;border:2px solid #000}
+  :root[data-theme="ebook"] .reveal-hand.win{background:#000;color:#fff}
+  :root[data-theme="ebook"] .reveal-hand.win .rk,
+  :root[data-theme="ebook"] .reveal-hand.win .nm,
+  :root[data-theme="ebook"] .reveal-hand.win .txt{color:#fff}
+  :root[data-theme="ebook"] .reveal-champ .nm{color:#000}
+  /* 「你」徽章:醒目膠囊,晶片/揭曉/名單一眼認出自己 */
+  .you-badge{display:inline-block;background:var(--accent-2);color:#1c1008;font-family:'Fredoka';
+    font-weight:700;font-size:11px;line-height:1;padding:3px 8px;border-radius:999px;margin-left:6px;
+    vertical-align:middle;box-shadow:0 1px 5px rgba(0,0,0,.28)}
+  .reveal-hand .you-badge{position:absolute;top:-9px;right:-6px;margin:0;font-size:10.5px;padding:3px 8px}
+  :root[data-theme="midnight"] .you-badge,
+  :root[data-theme="arcade"] .you-badge{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .you-badge{background:#000;color:#fff}
+  .order-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
+  .order-item{
+    display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.10);
+    border:1px solid var(--panel-line);border-radius:12px;padding:8px 12px;font-weight:800;
+  }
+  .order-item .seat{font-family:'Fredoka';color:var(--accent);min-width:22px;text-align:center}
+  .order-item .nm{flex:1}
+  .order-item .mv{display:flex;gap:6px}
+  .order-item .mv button{
+    width:32px;height:32px;border-radius:9px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.12);color:var(--text);cursor:pointer;font-size:14px;
+  }
+  .order-item .mv button:disabled{opacity:.3;cursor:default}
+  :root[data-theme="ebook"] .mp-input,
+  :root[data-theme="ebook"] .mp-chip,
+  :root[data-theme="ebook"] .mp-play{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .mp-status,
+  :root[data-theme="ebook"] .mp-chip .ln{color:#000}
+  :root[data-theme="ebook"] .mp-chip.ready .dot{background:#000}
+  :root[data-theme="ebook"] .mp-panel,
+  :root[data-theme="ebook"] .rps-btn,
+  :root[data-theme="ebook"] .order-item,
+  :root[data-theme="ebook"] .order-item .mv button{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .mp-turn,
+  :root[data-theme="ebook"] .order-item .seat{color:#000}
+  :root[data-theme="ebook"] .rps-btn.chosen{background:#000;color:#fff}
+  :root[data-theme="ebook"] .cell.callable{box-shadow:0 0 0 3px #000 inset}
+  /* ---------- 好友互動表情 ---------- */
+  /* 互動鈕已改放右上工具列(.tools),不再用浮動鈕,盤面數字不會被蓋到 */
+  .emote-card{max-width:340px;position:relative;overscroll-behavior:contain;touch-action:pan-y}  /* 只有卡片內部可上下捲,不外溢到背景 */
+  #emoteVeil{touch-action:none}   /* 手指在卡片外(背景)滑動時,不捲動背景頁 */
+  /* 右上角關閉 ✕:sticky 固定在卡片可視區右上,卡片內部捲動時也不會捲走 */
+  .card-x{position:sticky;top:0;margin:-6px -4px -32px auto;z-index:4;
+    width:34px;height:34px;border-radius:50%;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.12);color:var(--text);font-size:15px;font-weight:800;line-height:1;
+    cursor:pointer;display:grid;place-items:center;transition:background .15s,transform .1s}
+  .card-x:hover{background:rgba(255,255,255,.22);transform:scale(1.06)}
+  .card-x:active{transform:scale(.9)}
+  :root[data-theme="ebook"] .card-x{background:#fff;border:1px solid #000}
+  .emote-card .set-head{padding:0 34px}   /* 標題兩側留空,長名字不會被 ✕ 蓋到 */
+  .emote-to{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
+  .emote-to-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.10);color:var(--text);
+    border-radius:999px;padding:7px 13px;font-family:'Nunito';font-weight:800;font-size:13.5px;cursor:pointer;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:.12s}
+  .emote-to-btn.on{background:var(--accent);color:#1c1008;border-color:var(--accent)}
+  :root[data-theme="midnight"] .emote-to-btn.on,
+  :root[data-theme="arcade"] .emote-to-btn.on{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .emote-to-btn{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .emote-to-btn.on{background:#000;color:#fff}
+  .emote-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+  .emote-btn{aspect-ratio:1;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);
+    border-radius:12px;font-size:26px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .1s,background .15s}
+  .emote-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
+  .emote-btn:active{transform:scale(.9)}
+  :root[data-theme="ebook"] .emote-btn{background:#fff;border:1px solid #000}
+  /* 罐頭文字訊息(一句話) */
+  .emote-sub{font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;color:var(--muted);letter-spacing:.3px;margin:16px 0 8px}
+  .emote-phrases{display:flex;flex-wrap:wrap;gap:8px}
+  .phrase-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    border-radius:999px;padding:9px 15px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
+    cursor:pointer;transition:transform .1s,background .15s}
+  .phrase-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
+  .phrase-btn:active{transform:scale(.94)}
+  :root[data-theme="ebook"] .phrase-btn{background:#fff;border:1px solid #000}
+  /* 自訂文字輸入 */
+  .emote-input{display:flex;align-items:stretch;gap:8px;margin-top:16px}
+  #emoteText{flex:1 1 auto;min-width:0;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    border-radius:999px;padding:11px 16px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;outline:none;transition:border-color .15s}
+  #emoteText::placeholder{color:var(--muted);font-weight:700}
+  #emoteText:focus{border-color:var(--accent)}
+  /* 覆蓋 .set-card .btn 的 width:100%/margin-top,讓送出鈕縮成內容寬、與輸入框同排對齊 */
+  .emote-card #emoteSend{flex:0 0 auto;width:auto;margin-top:0;padding:11px 20px;font-size:14px}
+  :root[data-theme="ebook"] #emoteText{background:#fff;border:1px solid #000}
+  /* 語音留言:錄音鈕(錄音中變紅並脈動) */
+  .emote-voice{display:flex;align-items:center;gap:10px;margin-top:10px}
+  .emote-card .voice-btn{flex:0 0 auto;width:auto;margin-top:0;padding:11px 18px;font-size:14px}
+  .voice-btn.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
+  @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
+  :root[data-theme="ebook"] .voice-btn.rec{background:#000;color:#fff}
+  .voice-hint{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:var(--muted)}
+  /* 快速語音留言:連線時浮在盤面右下,點一下開始錄音、再點一下直接送給全部人(免開面板、免選對象) */
+  .quick-voice{display:none;position:fixed;z-index:40;
+    right:16px;right:calc(16px + env(safe-area-inset-right));
+    bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom));
+    align-items:center;gap:8px;border:1px solid var(--panel-line);
+    background:var(--accent);color:#1c1008;border-radius:999px;
+    padding:12px 18px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;
+    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s}
+  body.mp-on .quick-voice{display:inline-flex}   /* 只在連線中出現 */
+  body.mp-on{padding-bottom:88px}                 /* 預留淨空,浮動鈕不蓋到最底排數字 */
+  .quick-voice:active{transform:scale(.93)}
+  .quick-voice .qv-ico{font-size:20px;line-height:1}
+  .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
+  .quick-voice:disabled{opacity:.65;cursor:default}
+  :root[data-theme="midnight"] .quick-voice,
+  :root[data-theme="arcade"] .quick-voice{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .quick-voice{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
+  :root[data-theme="ebook"] .quick-voice.rec{background:#000;color:#fff}
+  .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
+  .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
+    align-items:center;gap:3px;animation:emoteFloat 2.2s ease-out forwards}
+  .emote-fly .ef-emo{font-size:46px;line-height:1;filter:drop-shadow(0 3px 8px rgba(0,0,0,.4))}
+  .emote-fly .ef-cap{font-family:'Fredoka';font-weight:600;font-size:12px;color:#fff;white-space:nowrap;
+    background:rgba(0,0,0,.5);padding:2px 9px;border-radius:999px}
+  /* 文字罐頭訊息:飛出時用對話泡泡樣式,而不是超大 emoji */
+  .emote-fly.is-text .ef-emo{font-size:19px;font-family:'Nunito',sans-serif;font-weight:800;color:#1c1008;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));padding:8px 16px;border-radius:16px;
+    white-space:nowrap;line-height:1.25;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
+  :root[data-theme="midnight"] .emote-fly.is-text .ef-emo,
+  :root[data-theme="arcade"] .emote-fly.is-text .ef-emo{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .emote-fly.is-text .ef-emo{background:#fff;color:#000;border:1px solid #000}
+  /* 語音訊息飛出時:麥克風圖示輕微脈動,暗示正在播放 */
+  .emote-fly.is-voice .ef-emo{animation:voicePulse .55s ease-in-out infinite alternate}
+  @keyframes voicePulse{from{transform:scale(1)}to{transform:scale(1.14)}}
+  @keyframes emoteFloat{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
+    15%{opacity:1;transform:translate(-50%,-90%) scale(1.15)}
+    32%{transform:translate(-50%,-140%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-360%) scale(1)}
+  }
+  :root[data-theme="ebook"] .emote-fly .ef-cap{background:#000}
+  #toast{
+    position:fixed;top:68px;left:50%;transform:translateX(-50%) translateY(-14px);
+    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-weight:600;
+    padding:8px 18px;border-radius:999px;font-size:15px;z-index:70;
+    opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;
+    box-shadow:0 6px 18px rgba(0,0,0,.25);
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  :root[data-theme="ebook"] #toast{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
+  footer{color:var(--muted);font-size:12px;margin-top:auto;padding-top:8px;opacity:.7;
+    display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
+  .ver{opacity:.6;letter-spacing:.03em}
+  .dev{opacity:.75;font-weight:700}
+  /* 主選單(進場先選單機 / 連線) */
+  #home{text-align:center;padding-top:8px}
+  .home-hero{margin:16px 0 24px}
+  /* 主選單插圖:內嵌 SVG 賓果卡(取代原本會被誤認成撞球的 🎱);顏色全用主題變數,隨主題自動變色 */
+  .home-art{width:clamp(96px,30vw,132px);height:auto;margin:0 auto 6px;display:block;
+    filter:drop-shadow(0 6px 16px rgba(0,0,0,.28))}
+  .home-art .bc-card{fill:var(--panel);stroke:var(--panel-line);stroke-width:2}
+  .home-art .bc-hd{fill:var(--accent);font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px}
+  .home-art .bc-cell{fill:rgba(255,255,255,.06);stroke:var(--panel-line);stroke-width:1}
+  .home-art .bc-daub{fill:var(--accent-2)}
+  .home-art .bc-star{fill:var(--accent)}
+  :root[data-theme="ebook"] .home-art .bc-card{fill:#fff;stroke:#000}
+  :root[data-theme="ebook"] .home-art .bc-hd{fill:#000}
+  :root[data-theme="ebook"] .home-art .bc-cell{fill:#fff;stroke:#000}
+  :root[data-theme="ebook"] .home-art .bc-daub{fill:#000}
+  :root[data-theme="ebook"] .home-art .bc-star{fill:#000}
+  .home-title{font-family:'Fredoka';font-weight:700;font-size:clamp(40px,13vw,64px);line-height:1;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;
+    background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.04em}
+  .home-tagline{color:var(--muted);font-weight:700;margin-top:10px;font-size:15px}
+  .home-btn{margin-top:12px;font-size:18px;padding:16px 10px}
+  .home-hint{color:var(--muted);font-size:12.5px;margin-top:16px;opacity:.8}
+  :root[data-theme="ebook"] .home-title{background:none;color:#000;-webkit-text-fill-color:#000}
+  /* 單機設定頁的「回主選單」小鈕 */
+  /* flex:none + align-self:成為 body(column flex)直屬子元素時,不要被 .btn 的 flex:1 撐成一大塊 */
+  .home-back{flex:none;align-self:flex-start;width:auto;min-width:0;padding:6px 14px;font-size:13px;margin-bottom:2px}
+  /* 沒填暱稱時的醒目提示(紅框 + 抖動) */
+  .mp-input.needs-name{border-color:#ff5252!important;box-shadow:0 0 0 3px rgba(255,82,82,.28);animation:shakeX .45s}
+  @keyframes shakeX{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}}
