@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.23.3 -->
-<meta name="version" content="1.23.3">
+<!-- BINGO 賓果遊戲 · v1.23.4 -->
+<meta name="version" content="1.23.4">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -83,6 +83,9 @@
     <button type="button" class="on" data-tab="fill" role="tab">✏️ 填號</button>
     <button type="button" data-tab="settings" role="tab">⚙️ 設定</button>
   </div>
+
+  <!-- 中間可捲動內容區:填號/設定分頁的內容都在這裡上下捲,固定的準備/開始列在它「下方」,不再互相遮擋 -->
+  <div class="scroll-area" id="scrollArea">
 
   <!-- ====== SETUP ====== -->
   <section class="panel hidden" id="setup">
@@ -208,8 +211,9 @@
       <div class="actions"><button class="btn primary hidden" id="orderConfirm">確定順序,開始 ▸</button></div>
     </div>
   </div>
+  </div><!-- /scroll-area -->
 
-  <!-- 主要動作列:準備/開始固定顯示,不藏在分頁裡;上方一行提示「現在該做什麼」,降低新手進房呆掉 -->
+  <!-- 主要動作列:準備/開始固定在可捲動內容區的「下方」(不再蓋到號碼格 / 換一組);上方一行提示可放「現在該做什麼」 -->
   <div class="primary-bar hidden" id="primaryBar">
     <div class="action-hint hidden" id="actionHint"></div>
     <div class="actions" id="primaryActions">

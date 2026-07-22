@@ -74,11 +74,17 @@
     font-family:'Nunito',system-ui,sans-serif;
     color:var(--text);
     background:var(--bg1);
-    min-height:100%;
+    height:100vh;height:100dvh;   /* 固定視窗高:改由中間 .scroll-area 捲動,準備列固定在其下方(不再浮蓋內容) */
     display:flex;flex-direction:column;align-items:center;
-    padding:16px;gap:14px;overflow-x:hidden;
+    padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));
+    gap:14px;overflow:hidden;
     transition:background .5s ease;
   }
+  /* app-shell:頂列 / 房間橫幅 / 分頁列固定在上;中間內容區可上下捲;準備列固定在其下方 */
+  .scroll-area{flex:1 1 0;min-height:0;width:min(92vw,520px);
+    display:flex;flex-direction:column;align-items:center;gap:14px;
+    overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  .topbar,#mpBar,#soloHead,#roomTabs,#home,.primary-bar{flex:none}
   /* 固定背景層:取代 background-attachment:fixed(手機滑動時背景會被帶著跑、放開才重畫、跳一下)。
      改用 position:fixed 的合成層,滑動時由合成器釘住、不重繪,就不會跳動 */
   body::before{
@@ -342,17 +348,8 @@
   :root[data-theme="ebook"] .room-tabs button.on{color:#000;border-bottom-color:#000}
   /* 填號方式列:當作填號分頁的一部分,寬度對齊 */
   #fillRow{width:min(92vw,520px);margin-top:0}
-  /* 主要動作列(準備/開始 + 現在該做什麼提示):固定在畫面最下方,分頁內容照常在它上方捲動,不隨分頁位移。
-     底改透明——原本的 var(--bg1) 漸層和頁面放射狀背景對不上,底部會浮出一條色差帶(看起來像奇怪的陰影) */
-  .primary-bar{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:40;
-    width:min(92vw,520px);display:flex;flex-direction:column;gap:8px;
-    padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px));
-    background:transparent;
-    pointer-events:none;   /* 透明區不擋點擊(讓下方方塊可點),只有按鈕本身接收點擊 */
-  }
-  .primary-bar button,.primary-bar .action-hint{pointer-events:auto}
-  /* 顯示固定底部動作列時,body 預留底部空間,最後一段內容才不會被鈕蓋住 */
-  body.has-primary-bar{padding-bottom:calc(122px + env(safe-area-inset-bottom,0px))}
+  /* 主要動作列(準備/開始 + 現在該做什麼提示):在 app-shell 裡是 .scroll-area「下方」的固定列,不再 position:fixed 浮蓋內容 */
+  .primary-bar{width:min(92vw,520px);display:flex;flex-direction:column;gap:8px;padding-top:4px}
   .action-hint{text-align:center;font-weight:800;font-size:14px;line-height:1.45;color:var(--text);
     background:rgba(0,0,0,.10);border-radius:12px;padding:9px 12px}
   :root[data-theme="ebook"] .action-hint{background:#fff;border:1px solid #000;color:#000}
@@ -668,12 +665,12 @@
     background:var(--accent);color:#1c1008;border-radius:50%;
     width:54px;height:54px;padding:0;
     cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,bottom .2s}
-  /* 只在「連線遊戲進行中」出現(大廳有固定動作列時不顯示,避免右下浮動鈕蓋到換一組/方塊;大廳仍可用表情面板錄音) */
-  body.mp-on:not(.has-primary-bar) .quick-voice{display:inline-flex}
+  body.mp-on .quick-voice{display:inline-flex}    /* 連線中(大廳 + 遊戲)都顯示 */
   .quick-voice .qv-label{display:none}            /* 只留麥克風圖示,不顯示文字 */
-  body.mp-on{padding-bottom:calc(88px + env(safe-area-inset-bottom))}   /* 播放中:淨空給右下語音鈕 */
-  /* 大廳(有固定底部動作列):底部留白清開準備列即可(此時無浮動語音鈕);兩類同時存在時本規則勝出,避免被 mp-on 的 88px 蓋過而不足 */
-  body.mp-on.has-primary-bar{padding-bottom:calc(122px + env(safe-area-inset-bottom))}
+  /* 連線中:中間可捲區底部留白,讓最後內容(換一組/末排號碼)能捲到浮動語音鈕上方 */
+  body.mp-on .scroll-area{padding-bottom:72px}
+  /* 大廳(有固定準備列)時:浮動語音鈕抬到準備列上方,不與它重疊 */
+  body.has-primary-bar .quick-voice{bottom:calc(84px + env(safe-area-inset-bottom))}
   .quick-voice:active{transform:scale(.93)}
   .quick-voice .qv-ico{font-size:24px;line-height:1}
   .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
