@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.15.0 -->
-<meta name="version" content="1.15.0">
+<!-- BINGO 賓果遊戲 · v1.15.1 -->
+<meta name="version" content="1.15.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -759,7 +759,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.15.0</span><span class="dev">開發者 Michael Ho</span></footer>
+  <footer><span class="ver">BINGO · v1.15.1</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1439,7 +1439,12 @@ const FIREBASE_CONFIG = {
     Sound.wake();
     $("emoteVeil").classList.add("show");
   }
-  function closeEmote(){ const v=$("emoteVeil"); if(v)v.classList.remove("show"); Voice.cancel(); resetVoiceBtn(); }
+  // 錄音期間也要停背景音樂:Android 一開麥克風(getUserMedia)整個音訊會被 OS 切到「通話路徑」
+  // (VOICE_COMMUNICATION),此時還在播的背景音樂就被硬走聽筒/通話音質,變得很難聽。錄音與「收語音
+  // 播放」共用同一個 BGM.duck,任一在進行就停,兩者都結束才恢復(避免其一提早 duck(false) 蓋掉另一個)。
+  let voiceRecording=false;
+  function refreshBgmDuck(){ try{ BGM.duck(voiceRecording || voiceBusy); }catch(e){} }
+  function closeEmote(){ const v=$("emoteVeil"); if(v)v.classList.remove("show"); Voice.cancel(); voiceRecording=false; refreshBgmDuck(); resetVoiceBtn(); }
   /* ---- 語音留言:錄音鈕狀態機(閒置 → 錄音倒數 → 送出) ---- */
   let voiceTick=null;
   function resetVoiceBtn(){
@@ -1453,7 +1458,9 @@ const FIREBASE_CONFIG = {
     if(Voice.recording()){ b.disabled=true; b.textContent="處理中…"; Voice.stop(); return; }   // 停止 → 交給 onBlob 收尾
     const to=emoteTarget;
     b.disabled=true; b.textContent="準備中…";
+    voiceRecording=true; refreshBgmDuck();   // 先停背景音樂,再開麥克風(避免 Android 通話路徑把音樂弄難聽)
     Voice.start((wav)=>{
+      voiceRecording=false; refreshBgmDuck();  // 錄音結束:恢復背景音樂(若還有收到的語音在播,duck 會維持到播完)
       resetVoiceBtn();
       if(!wav || wav.byteLength<=44){ if(hint)hint.textContent="沒有錄到聲音"; return; }
       try{
@@ -1468,6 +1475,7 @@ const FIREBASE_CONFIG = {
       b.textContent="⏹ 停止 · "+left+"s";
       voiceTick=setInterval(()=>{ left--; if(left<=0){ if(voiceTick){clearInterval(voiceTick);voiceTick=null;} return; } b.textContent="⏹ 停止 · "+left+"s"; },1000);
     }).catch(err=>{
+      voiceRecording=false; refreshBgmDuck();   // 開麥失敗:恢復背景音樂
       resetVoiceBtn();
       if(hint)hint.textContent=(err&&err.name==="NotAllowedError")?"麥克風權限被拒絕":"無法啟動錄音";
     });
@@ -1486,7 +1494,9 @@ const FIREBASE_CONFIG = {
     if(Voice.recording()){ b.disabled=true; if(lab)lab.textContent="處理中…"; Voice.stop(); return; }  // 停止 → 交給 onBlob 收尾
     Sound.wake();
     b.disabled=true; if(lab)lab.textContent="準備中…";
+    voiceRecording=true; refreshBgmDuck();   // 先停背景音樂,再開麥克風(避免 Android 通話路徑把音樂弄難聽)
     Voice.start((wav)=>{
+      voiceRecording=false; refreshBgmDuck();  // 錄音結束:恢復背景音樂(若還有收到的語音在播,duck 會維持到播完)
       resetQuickVoiceBtn();
       if(!wav || wav.byteLength<=44){ showToast("沒有錄到聲音"); return; }
       try{
@@ -1501,6 +1511,7 @@ const FIREBASE_CONFIG = {
       if(lab)lab.textContent=left+"s";
       qvTick=setInterval(()=>{ left--; if(left<=0){ if(qvTick){clearInterval(qvTick);qvTick=null;} return; } if(lab)lab.textContent=left+"s"; },1000);
     }).catch(err=>{
+      voiceRecording=false; refreshBgmDuck();   // 開麥失敗:恢復背景音樂
       resetQuickVoiceBtn();
       showToast((err&&err.name==="NotAllowedError")?"麥克風權限被拒絕":"無法啟動錄音");
     });
@@ -1542,8 +1553,8 @@ const FIREBASE_CONFIG = {
   function pumpVoice(){
     if(voiceBusy)return;
     const next=voiceQueue.shift();
-    if(next===undefined){ BGM.duck(false); return; }   // 佇列清空 → 恢復背景音樂
-    voiceBusy=true; BGM.duck(true);                     // 開播 → 停背景音樂
+    if(next===undefined){ refreshBgmDuck(); return; }   // 佇列清空 → 恢復背景音樂(若同時在錄音,duck 會維持到錄完)
+    voiceBusy=true; refreshBgmDuck();                    // 開播 → 停背景音樂
     const advance=()=>{ if(!voiceBusy)return; if(voiceSafety){ clearTimeout(voiceSafety); voiceSafety=null; } voiceBusy=false; pumpVoice(); };
     voiceSafety=setTimeout(advance,9000);               // 保險:單則語音上限 6 秒,9 秒沒收到結束事件就強制接續,避免佇列卡住
     playVoiceOnce(next,advance);
