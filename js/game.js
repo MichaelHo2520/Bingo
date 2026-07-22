@@ -64,9 +64,7 @@
   /* ---------- Rendering ---------- */
   function render(){
     grid.innerHTML="";
-    // 連線遊戲中:盤面整體一律解除鎖定(某格能不能點,由該格自己的 disabled 決定)。
-    // 不再依賴「進遊戲時 setLock(false) 有沒有把上一局的鎖定清乾淨」——否則第 N 局殘留的鎖定會造成
-    // 「輪到你、格子也亮成可按,但整塊盤面吃不到點擊、點了完全沒反應(連『還沒輪到你』都不跳)」。
+    // 連線遊戲中:盤面整體一律解除鎖定,不再依賴「進遊戲時 setLock(false) 有沒有把上一局的殘留鎖定清乾淨」。
     if(state.online && state.mode==="play") grid.style.pointerEvents="";
     const manual = state.mode==="setup" && state.fill==="manual";
     for(let i=0;i<nCells();i++){
@@ -80,8 +78,11 @@
         if(state.marked[i])cell.classList.add("marked");
         if(state.online){
           const called=MP.isCalled(val);
-          if(MP.isMyTurn() && !called){ cell.classList.add("callable"); cell.style.cursor="pointer"; cell.addEventListener("click",()=>MP.tap(i)); }
-          else { cell.disabled=true; cell.style.cursor="default"; }
+          if(MP.isMyTurn() && !called){ cell.classList.add("callable"); cell.style.cursor="pointer"; }
+          else cell.style.cursor="default";
+          // 一律綁定點擊 → 由 tap() 自行判定可否叫號並給回饋:輪到你就叫號、沒輪到你會跳「還沒輪到你」。
+          // 不再用 disabled 讓非本回合的格子「靜默吃掉點擊」——那會造成「明明輪到你、格子也在,卻怎麼點都完全沒反應」的假死。
+          cell.addEventListener("click",()=>MP.tap(i));
         }
         else cell.addEventListener("click",()=>toggle(i));
         cell.setAttribute("aria-pressed",state.marked[i]?"true":"false");
