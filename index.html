@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.26.1 -->
-<meta name="version" content="1.26.1">
+<!-- BINGO 賓果遊戲 · v1.27.0 -->
+<meta name="version" content="1.27.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -68,6 +68,8 @@
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <span class="label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b></span>
+      <!-- 目標線數移進標題列:遊戲中副標列會整列收起,替下方號碼格讓出高度 -->
+      <span class="mp-goal" id="mpBarGoal" aria-label="目標線數"></span>
       <!-- 麥克風 + 表情:大廳/遊戲中都固定在房間框右上,不再浮在盤面(不會壓到號碼格),兩顆並排互不重疊 -->
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
@@ -76,9 +78,9 @@
         <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
       </div>
     </div>
-    <div class="mp-subrow">
+    <!-- 副標列:大廳/猜拳顯示狀態文字;遊戲中整列收起(換誰改看高亮的玩家晶片,不再用文字重複寫) -->
+    <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
-      <span class="mp-goal" id="mpBarGoal" aria-label="目標線數"></span>
     </div>
     <div id="mpPlayers" class="mp-players"></div>
   </div>
@@ -330,10 +332,6 @@
       <div class="emote-input">
         <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
         <button class="btn" id="emoteSend" type="button">送出</button>
-      </div>
-      <div class="emote-voice">
-        <button class="btn voice-btn" id="voiceBtn" type="button">🎤 錄音留言</button>
-        <span class="voice-hint" id="voiceHint"></span>
       </div>
     </div>
   </div>

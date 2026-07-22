@@ -438,9 +438,11 @@
         }
         box.appendChild(chip);
       });
-      if(aloneTick){ /* 房主落單倒數中:狀態列交給倒數顯示,不覆蓋 */ }
-      else if(status==="playing"){ updateTurnUI(); }   // 遊戲中:狀態列顯示「換你出號 / 輪到 X」
+      const subrow=$("mpSubrow");
+      if(aloneTick){ if(subrow)subrow.classList.remove("hidden"); /* 房主落單倒數中:副標列交給倒數顯示,不覆蓋 */ }
+      else if(status==="playing"){ updateTurnUI(); }   // 遊戲中:副標列整列收起(換誰改看高亮的玩家晶片)
       else {
+        if(subrow)subrow.classList.remove("hidden");
         const st=$("mpStatusTxt"); st.classList.remove("wait");
         st.textContent = status==="rps"?"猜拳決定順序…":(status==="reveal"?"猜拳結果揭曉…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…")));
       }
@@ -820,13 +822,11 @@
     }
     // 目標線數顯示在房間框(大廳/遊戲中都顯示)
     function updateMpGoal(){ const g=$("mpBarGoal"); if(g)g.textContent = state.target ? ("🎯 "+state.target+" 線") : ""; }
-    // 輪到誰:遊戲中改用房間框的狀態列顯示(叫號框已移除);非遊戲中的狀態文字由 renderPlayers 設定
+    // 輪到誰:遊戲中不再用文字寫「輪到 X / 換你出號」——換誰改看高亮脈動的玩家晶片(.turn)+ 自己盤面亮起的可點格;
+    // 副標列整列收起,替下方號碼格讓出縱向高度(落單倒數中則由倒數接管,不動)
     function updateTurnUI(){
-      const el=$("mpStatusTxt"); if(!el || status!=="playing" || aloneTick)return;   // 落單倒數中不覆蓋狀態列
-      const p=order[turnIndex];
-      if(!p){ el.textContent="遊戲進行中"; el.classList.add("wait"); return; }
-      if(p===meId){ el.textContent="👉 換你出號!"; el.classList.remove("wait"); }
-      else { el.textContent="輪到 "+dispName(p); el.classList.add("wait"); }
+      if(status!=="playing" || aloneTick)return;
+      const subrow=$("mpSubrow"); if(subrow)subrow.classList.add("hidden");
     }
     function tap(i){
       if(!isMyTurn()){ showToast("還沒輪到你"); return; }

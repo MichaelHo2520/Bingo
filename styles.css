@@ -93,7 +93,7 @@
   body{ --board-cap: calc(100dvh - 170px); }                    /* 遊戲中 / 主選單:僅上方 HUD + 邊距 */
   body.has-primary-bar{ --board-cap: calc(100dvh - 240px); }    /* 設定 / 大廳:另含填號列 + 底部準備列 */
   body.mp-on.has-primary-bar{ --board-cap: calc(100dvh - 300px); }        /* 連線大廳:再含房間橫幅 */
-  body.mp-on:not(.has-primary-bar){ --board-cap: calc(100dvh - 185px); }  /* 連線遊戲中:僅含房間橫幅(叫號框已移除,盤面可更大;寬螢幕時號碼格不再被夾太小) */
+  body.mp-on:not(.has-primary-bar){ --board-cap: calc(100dvh - 160px); }  /* 連線遊戲中:僅含房間橫幅(叫號框已移除、副標列也在遊戲中收起,盤面可更大;寬螢幕時號碼格不再被夾太小) */
   /* 固定背景層:取代 background-attachment:fixed(手機滑動時背景會被帶著跑、放開才重畫、跳一下)。
      改用 position:fixed 的合成層,滑動時由合成器釘住、不重繪,就不會跳動 */
   body::before{
@@ -464,7 +464,9 @@
   .mp-chip.clickable:hover{transform:translateY(-1px);border-color:var(--accent)}
   .mp-chip .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
   .mp-chip.ready .dot{background:var(--accent)}
-  .mp-chip .ln{font-family:'Fredoka';color:var(--accent);font-weight:700}
+  /* 本局完成線數:用底色膠囊包起來,和它前面純文字的 🏆 累積勝場明確區隔開 */
+  .mp-chip .ln{font-family:'Fredoka';font-weight:700;font-size:12px;line-height:1;
+    background:var(--accent);color:#1c1008;border-radius:999px;padding:3px 8px;margin-left:1px}
   .mp-chip.me{border-color:var(--accent-2);box-shadow:0 0 0 2px var(--accent-2)}  /* 自己的晶片:accent-2 光環,和別人拉開差距 */
   /* (晶片尾端的 😀 互動提示已移除;改用房間框的專用表情鈕進入) */
   /* 房主用:大廳時每個非自己的玩家晶片右側出現的移除鈕 */
@@ -478,18 +480,21 @@
   .mp-chip .seat-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;
     border-radius:10px;background:var(--accent);color:#1c1008;font-family:'Fredoka';font-weight:700;font-size:12.5px}
   :root[data-theme="midnight"] .mp-chip .seat-badge,
-  :root[data-theme="arcade"] .mp-chip .seat-badge{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .mp-chip .seat-badge{background:#000;color:#fff}
+  :root[data-theme="midnight"] .mp-chip .ln,
+  :root[data-theme="arcade"] .mp-chip .seat-badge,
+  :root[data-theme="arcade"] .mp-chip .ln{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .mp-chip .seat-badge,
+  :root[data-theme="ebook"] .mp-chip .ln{background:#000;color:#fff}
   /* 目前輪到的玩家:高對比 + 放大 + 脈動,一眼看出換誰 */
   .mp-chip.turn{background:var(--accent);color:#1c1008;border-color:var(--accent);transform:scale(1.04);
     font-size:15px;animation:turnpulse 1.2s ease-in-out infinite}
   .mp-chip.turn .dot{background:#1c1008}
-  .mp-chip.turn .ln{color:#1c1008}
+  .mp-chip.turn .ln{background:#1c1008;color:var(--accent)}   /* 輪到時晶片底色是 accent,線數膠囊反白成深底亮字才看得清 */
   .mp-chip.turn .seat-badge{background:#1c1008;color:var(--accent)}
   @keyframes turnpulse{0%,100%{box-shadow:0 0 0 2px var(--accent)}50%{box-shadow:0 0 0 2px var(--accent),0 0 16px var(--accent)}}
   :root[data-theme="ebook"] .mp-chip.turn{background:#000;color:#fff}
   :root[data-theme="ebook"] .mp-chip.turn .dot{background:#fff}
-  :root[data-theme="ebook"] .mp-chip.turn .ln{color:#fff}
+  :root[data-theme="ebook"] .mp-chip.turn .ln{background:#fff;color:#000}
   :root[data-theme="ebook"] .mp-chip.turn .seat-badge{background:#fff;color:#000}
   /* 連線計分:玩家晶片上的累積勝場徽章 🏆N(只在有分數時顯示) */
   .mp-chip .score-badge{display:inline-flex;align-items:center;gap:1px;margin-left:2px;
@@ -610,8 +615,7 @@
   :root[data-theme="ebook"] .mp-input,
   :root[data-theme="ebook"] .mp-chip,
   :root[data-theme="ebook"] .mp-play{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .mp-status,
-  :root[data-theme="ebook"] .mp-chip .ln{color:#000}
+  :root[data-theme="ebook"] .mp-status{color:#000}
   :root[data-theme="ebook"] .mp-chip.ready .dot{background:#000}
   :root[data-theme="ebook"] .mp-panel,
   :root[data-theme="ebook"] .rps-btn,
@@ -667,13 +671,8 @@
   /* 覆蓋 .set-card .btn 的 width:100%/margin-top,讓送出鈕縮成內容寬、與輸入框同排對齊 */
   .emote-card #emoteSend{flex:0 0 auto;width:auto;margin-top:0;padding:11px 20px;font-size:14px}
   :root[data-theme="ebook"] #emoteText{background:#fff;border:1px solid #000}
-  /* 語音留言:錄音鈕(錄音中變紅並脈動) */
-  .emote-voice{display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-top:10px}
-  .emote-card .voice-btn{flex:none;width:100%;margin-top:0;padding:12px 18px;font-size:15px}   /* 錄音鈕滿版 */
-  .voice-btn.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
+  /* 錄音中脈動動畫:表情面板內的錄音鈕已移除,此 keyframe 仍供房間框的快速語音鈕 .quick-voice.rec 使用 */
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
-  :root[data-theme="ebook"] .voice-btn.rec{background:#000;color:#fff}
-  .voice-hint{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:var(--muted);text-align:center}
   /* 換一組號碼 🎲:自動填號時的右下浮動 FAB(由 JS 切 .hidden 顯隱)。麥克風已改常駐房間框,這裡改浮在最右下角 */
   .quick-reshuffle{position:fixed;z-index:40;display:inline-flex;align-items:center;justify-content:center;
     right:16px;right:calc(16px + env(safe-area-inset-right));
@@ -692,11 +691,11 @@
   .mp-actions{display:flex;align-items:center;gap:8px;flex:none}
   .quick-voice,.mp-act-btn{
     flex:none;display:inline-flex;align-items:center;justify-content:center;
-    width:38px;height:38px;padding:0;border-radius:50%;cursor:pointer;
+    width:42px;height:42px;padding:0;border-radius:50%;cursor:pointer;
     border:1px solid var(--panel-line);background:var(--accent);color:#1c1008;
-    font-size:20px;line-height:1;transition:transform .1s,background .2s}
+    font-size:22px;line-height:1;transition:transform .1s,background .2s}
   .quick-voice .qv-label{display:none}            /* 只留麥克風圖示 */
-  .quick-voice .qv-ico{font-size:20px;line-height:1}
+  .quick-voice .qv-ico{font-size:22px;line-height:1}
   .quick-voice:active,.mp-act-btn:active{transform:scale(.9)}
   @media (hover:hover){ .quick-voice:hover,.mp-act-btn:hover{transform:translateY(-1px)} }
   .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
