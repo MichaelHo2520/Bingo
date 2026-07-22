@@ -348,7 +348,9 @@
     width:min(92vw,520px);display:flex;flex-direction:column;gap:8px;
     padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px));
     background:transparent;
+    pointer-events:none;   /* 透明區不擋點擊(讓下方方塊可點),只有按鈕本身接收點擊 */
   }
+  .primary-bar button,.primary-bar .action-hint{pointer-events:auto}
   /* 顯示固定底部動作列時,body 預留底部空間,最後一段內容才不會被鈕蓋住 */
   body.has-primary-bar{padding-bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   .action-hint{text-align:center;font-weight:800;font-size:14px;line-height:1.45;color:var(--text);
@@ -652,12 +654,12 @@
   .emote-card #emoteSend{flex:0 0 auto;width:auto;margin-top:0;padding:11px 20px;font-size:14px}
   :root[data-theme="ebook"] #emoteText{background:#fff;border:1px solid #000}
   /* 語音留言:錄音鈕(錄音中變紅並脈動) */
-  .emote-voice{display:flex;align-items:center;gap:10px;margin-top:10px}
-  .emote-card .voice-btn{flex:0 0 auto;width:auto;margin-top:0;padding:11px 18px;font-size:14px}
+  .emote-voice{display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-top:10px}
+  .emote-card .voice-btn{flex:none;width:100%;margin-top:0;padding:12px 18px;font-size:15px}   /* 錄音鈕滿版 */
   .voice-btn.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
   :root[data-theme="ebook"] .voice-btn.rec{background:#000;color:#fff}
-  .voice-hint{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:var(--muted)}
+  .voice-hint{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:var(--muted);text-align:center}
   /* 快速語音留言:連線時浮在盤面右下,點一下開始錄音、再點一下直接送給全部人(免開面板、免選對象) */
   .quick-voice{display:none;position:fixed;z-index:40;
     right:16px;right:calc(16px + env(safe-area-inset-right));
@@ -666,12 +668,12 @@
     background:var(--accent);color:#1c1008;border-radius:50%;
     width:54px;height:54px;padding:0;
     cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,bottom .2s}
-  body.mp-on .quick-voice{display:inline-flex}   /* 只在連線中出現 */
+  /* 只在「連線遊戲進行中」出現(大廳有固定動作列時不顯示,避免右下浮動鈕蓋到換一組/方塊;大廳仍可用表情面板錄音) */
+  body.mp-on:not(.has-primary-bar) .quick-voice{display:inline-flex}
   .quick-voice .qv-label{display:none}            /* 只留麥克風圖示,不顯示文字 */
   body.mp-on{padding-bottom:calc(88px + env(safe-area-inset-bottom))}   /* 播放中:淨空給右下語音鈕 */
-  /* 大廳同時有固定底部動作列時:語音鈕抬到動作列上方避免重疊,底部再多留淨空 */
-  body.mp-on.has-primary-bar{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
-  body.has-primary-bar .quick-voice{bottom:calc(92px + env(safe-area-inset-bottom))}
+  /* 大廳(有固定底部動作列):底部留白清開準備列即可(此時無浮動語音鈕);兩類同時存在時本規則勝出,避免被 mp-on 的 88px 蓋過而不足 */
+  body.mp-on.has-primary-bar{padding-bottom:calc(122px + env(safe-area-inset-bottom))}
   .quick-voice:active{transform:scale(.93)}
   .quick-voice .qv-ico{font-size:24px;line-height:1}
   .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
