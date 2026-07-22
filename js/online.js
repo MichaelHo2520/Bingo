@@ -440,8 +440,9 @@
       $("reshuffleBtn").disabled=lock;
       $("fillSeg").style.pointerEvents=lock?"none":"";
       grid.style.pointerEvents=lock?"none":"";
-      // 準備好了:收起「換一組」骰子與「填號方式」列(取消準備會再顯示);切分頁時 applyRoomTab 也會依 amReady 重算
-      $("fillRow").classList.toggle("tab-hidden", lock || (typeof roomTab!=="undefined" && roomTab==="settings"));
+      // 準備好了 / 遊戲進行中:收起「換一組」骰子與「填號方式」列(取消準備會再顯示);切分頁時 applyRoomTab 也會依 amReady 重算
+      // 進遊戲時 enterPlaying 會呼叫 setLock(false) 解鎖盤面,但填號方式列在遊戲中一律不該再出現,故用 state.mode==="play" 一併收起
+      $("fillRow").classList.toggle("tab-hidden", state.mode==="play" || lock || (typeof roomTab!=="undefined" && roomTab==="settings"));
       if(typeof updateReshuffleBtn==="function") updateReshuffleBtn();
     }
     function toggleReady(){
@@ -530,8 +531,16 @@
     }
 
     /* ----- phase dispatch ----- */
+    // 遊戲進行中:把快速語音麥克風鈕移進「房間框」(mpBar)右下角;離開遊戲(大廳/猜拳/揭曉)再放回畫面右下的浮動位置
+    function dockQuickVoice(on){
+      document.body.classList.toggle("mp-playing", on);
+      const qv=$("quickVoiceBtn"); if(!qv)return;
+      const dest = on ? $("mpBar") : document.body;
+      if(qv.parentNode!==dest) dest.appendChild(qv);
+    }
     function onStatus(){
       renderPlayers();
+      dockQuickVoice(status==="playing");
       if(status==="playing"){ if(curPhase!=="playing") enterPlaying(); else updateTurnUI(); }
       else if(status==="rps"){ if(curPhase!=="rps") enterRps(); else renderRps(); }
       else if(status==="reveal"){ if(curPhase!=="reveal") enterReveal(); else renderReveal(); }
@@ -999,6 +1008,7 @@
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();
+      dockQuickVoice(false);   // 離開房間:把麥克風鈕放回畫面右下(並移除 mp-playing)
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();   // 離線:收起快速語音浮動鈕
       closeWin();
       $("mpBar").classList.add("hidden");

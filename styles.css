@@ -523,18 +523,20 @@
   :root[data-theme="ebook"] .score-extra .wg-group{background:#f0f0f0}
   :root[data-theme="ebook"] .score-extra .wg-stepper{background:#fff;border:1px solid #000}
   :root[data-theme="ebook"] .score-extra .score-reset{border:1px solid #000;color:#000}
+  /* 叫號框(連線遊戲 HUD):整體調小一點,替號碼格多擠出縱向空間,避免盤面被擠到要上下捲 */
   .mp-play{
-    width:min(92vw,520px);display:flex;align-items:center;gap:20px;flex-wrap:wrap;
-    background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;padding:14px 20px;
+    width:min(92vw,520px);display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;padding:9px 16px;
   }
-  .mp-hud-item{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
-  .mp-hud-item + .mp-hud-item{padding-left:20px;border-left:1px solid var(--panel-line)}
-  .mp-ball{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
-    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-size:24px;font-weight:700;line-height:1;
+  .mp-hud-item{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+  .mp-hud-item + .mp-hud-item{padding-left:14px;border-left:1px solid var(--panel-line)}
+  .mp-play .lbl{color:var(--muted);font-size:11.5px;font-weight:800;letter-spacing:.3px}
+  .mp-ball{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
+    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-size:20px;font-weight:700;line-height:1;
     box-shadow:0 3px 10px rgba(0,0,0,.25)}
-  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:24px;line-height:1;color:var(--text)}
-  .mp-turn{margin-left:auto;text-align:center;font-weight:800;font-size:15px;color:var(--accent);
-    background:rgba(0,0,0,.16);padding:10px 16px;border-radius:999px}
+  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:20px;line-height:1;color:var(--text)}
+  .mp-turn{margin-left:auto;text-align:center;font-weight:800;font-size:14px;color:var(--accent);
+    background:rgba(0,0,0,.16);padding:8px 14px;border-radius:999px}
   .mp-turn.wait{color:var(--muted)}
   :root[data-theme="ebook"] .mp-ball{box-shadow:none;border:1px solid #000}
   :root[data-theme="ebook"] .mp-turn{background:#fff;border:1px solid #000}
@@ -702,6 +704,12 @@
   :root[data-theme="arcade"] .quick-voice{color:var(--daub-ink)}
   :root[data-theme="ebook"] .quick-voice{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
   :root[data-theme="ebook"] .quick-voice.rec{background:#000;color:#fff}
+  /* 遊戲進行中:麥克風鈕由 JS 移進「房間框」(mpBar),停在它的右下角(離玩家名單近);
+     其餘時候(大廳)仍浮在畫面右下。position:relative 讓 ebook 主題(關掉 backdrop-filter)也能正確定位 */
+  #mpBar{position:relative}
+  body.mp-playing #quickVoiceBtn{position:absolute;right:12px;bottom:12px;width:46px;height:46px;opacity:.9}
+  body.mp-playing .mp-players{padding-right:56px}   /* 右下角讓出麥克風位置,玩家晶片不被蓋到 */
+  body.mp-playing .board-wrap{gap:8px}              /* 叫號框與號碼格更緊湊,替號碼格多擠出空間 */
   /* 快速換一組號碼:自動填號時才顯示(由 JS 切 .hidden);浮在麥克風正上方(約在「手動填號」那一列的位置) */
   .quick-reshuffle{display:inline-flex;font-size:24px;line-height:1;
     bottom:calc(82px + env(safe-area-inset-bottom))}
