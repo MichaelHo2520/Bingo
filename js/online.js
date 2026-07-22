@@ -408,7 +408,7 @@
     function mpHint(){ setActionHint(""); }
     function updateReadyBtn(){
       const b=$("mpReadyBtn");
-      b.textContent=ready?"取消準備":"準備好了 ✓";
+      b.textContent=ready?"取消準備":"準備好了";
       b.classList.toggle("ghost",ready); b.classList.toggle("primary",!ready);
       mpHint();
     }

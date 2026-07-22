@@ -342,17 +342,17 @@
   :root[data-theme="ebook"] .room-tabs button.on{color:#000;border-bottom-color:#000}
   /* 填號方式列:當作填號分頁的一部分,寬度對齊 */
   #fillRow{width:min(92vw,520px);margin-top:0}
-  /* 主要動作列(準備/開始 + 現在該做什麼提示):固定在畫面最下方,分頁內容照常在它上方捲動,不隨分頁位移 */
+  /* 主要動作列(準備/開始 + 現在該做什麼提示):固定在畫面最下方,分頁內容照常在它上方捲動,不隨分頁位移。
+     底改透明——原本的 var(--bg1) 漸層和頁面放射狀背景對不上,底部會浮出一條色差帶(看起來像奇怪的陰影) */
   .primary-bar{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:40;
     width:min(92vw,520px);display:flex;flex-direction:column;gap:8px;
     padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px));
-    background:linear-gradient(to top, var(--bg1) 58%, transparent);   /* 由底色淡出,捲動內容不會硬切在鈕邊 */
+    background:transparent;
   }
   /* 顯示固定底部動作列時,body 預留底部空間,最後一段內容才不會被鈕蓋住 */
   body.has-primary-bar{padding-bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   .action-hint{text-align:center;font-weight:800;font-size:14px;line-height:1.45;color:var(--text);
     background:rgba(0,0,0,.10);border-radius:12px;padding:9px 12px}
-  :root[data-theme="ebook"] .primary-bar{background:linear-gradient(to top, #fff 60%, transparent)}
   :root[data-theme="ebook"] .action-hint{background:#fff;border:1px solid #000;color:#000}
   /* multiplayer */
   .mp-input{
