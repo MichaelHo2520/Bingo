@@ -26,7 +26,7 @@
     let resyncing=false, resyncTimer=null;   // 剛從背景/斷線恢復的寬限旗標與計時器(期間不把舊名單快照當成被踢)
     let graceTimer=null;                     // 「暫時有人不見」的寬限計時器:逾時仍不見才真的離開/回大廳
     const GRACE_MS=20000;                    // 斷線寬限期(手機切 App 常見情境):20 秒內回來就當沒事
-    let aloneTimer=null;                     // 遊戲中只剩房主自己的專用計時器(比一般斷線寬限短,較快退回等待)
+    let aloneTimer=null, aloneTick=null;     // 遊戲中只剩房主自己的專用計時器 + 秒數倒數 interval(比一般斷線寬限短,較快退回等待)
     const ALONE_MS=8000;                     // 對手都離開後 8 秒仍只剩自己 → 退回大廳(短暫斷線重連者來得及回來就取消)
     const RPS_EMO={R:"✊",S:"✌️",P:"✋"}, RPS_TXT={R:"石頭",S:"剪刀",P:"布"};
 
@@ -304,9 +304,19 @@
     // 有人「暫時不見」時,排一個寬限期後的複查(已在排就不重排)
     function scheduleRecheck(){ if(!graceTimer)graceTimer=setTimeout(()=>{ graceTimer=null; recheckPresence(); }, GRACE_MS); }
     function clearRecheck(){ if(graceTimer){ clearTimeout(graceTimer); graceTimer=null; } }
-    // 遊戲中只剩房主自己:用較短的專用寬限,逾時仍只剩自己就退回大廳(對手若只是短暫斷線,重連歸位會取消)
-    function scheduleAloneCheck(){ if(!aloneTimer)aloneTimer=setTimeout(()=>{ aloneTimer=null; if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1) hostAloneToLobby(); }, ALONE_MS); }
-    function clearAloneCheck(){ if(aloneTimer){ clearTimeout(aloneTimer); aloneTimer=null; } }
+    // 遊戲中只剩房主自己:狀態列即時倒數,逾時仍只剩自己就退回大廳(對手若只是短暫斷線,重連歸位會取消)
+    function paintAloneCountdown(sec){ const el=$("mpStatusTxt"); if(!el)return; el.classList.add("wait"); el.textContent="其他玩家都離開了,"+sec+" 秒後回到等待…"; }
+    function scheduleAloneCheck(){
+      if(aloneTimer)return;
+      let left=Math.ceil(ALONE_MS/1000);
+      paintAloneCountdown(left);
+      aloneTick=setInterval(()=>{ left--; if(left>0) paintAloneCountdown(left); }, 1000);
+      aloneTimer=setTimeout(()=>{
+        aloneTimer=null; if(aloneTick){ clearInterval(aloneTick); aloneTick=null; }
+        if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1) hostAloneToLobby();
+      }, ALONE_MS);
+    }
+    function clearAloneCheck(){ if(aloneTimer){ clearTimeout(aloneTimer); aloneTimer=null; } if(aloneTick){ clearInterval(aloneTick); aloneTick=null; } }
     // 寬限期到期後再確認一次:該離開/回大廳的情況若仍成立,才真的動作
     function recheckPresence(){
       if(!state.online||!roomRef)return;
@@ -428,7 +438,8 @@
         }
         box.appendChild(chip);
       });
-      if(status==="playing"){ updateTurnUI(); }   // 遊戲中:狀態列顯示「換你出號 / 輪到 X」
+      if(aloneTick){ /* 房主落單倒數中:狀態列交給倒數顯示,不覆蓋 */ }
+      else if(status==="playing"){ updateTurnUI(); }   // 遊戲中:狀態列顯示「換你出號 / 輪到 X」
       else {
         const st=$("mpStatusTxt"); st.classList.remove("wait");
         st.textContent = status==="rps"?"猜拳決定順序…":(status==="reveal"?"猜拳結果揭曉…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…")));
@@ -811,7 +822,7 @@
     function updateMpGoal(){ const g=$("mpBarGoal"); if(g)g.textContent = state.target ? ("🎯 "+state.target+" 線") : ""; }
     // 輪到誰:遊戲中改用房間框的狀態列顯示(叫號框已移除);非遊戲中的狀態文字由 renderPlayers 設定
     function updateTurnUI(){
-      const el=$("mpStatusTxt"); if(!el || status!=="playing")return;
+      const el=$("mpStatusTxt"); if(!el || status!=="playing" || aloneTick)return;   // 落單倒數中不覆蓋狀態列
       const p=order[turnIndex];
       if(!p){ el.textContent="遊戲進行中"; el.classList.add("wait"); return; }
       if(p===meId){ el.textContent="👉 換你出號!"; el.classList.remove("wait"); }

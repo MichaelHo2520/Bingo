@@ -1,13 +1,20 @@
 "use strict";
 
+  // iOS 16.4+ navigator.audioSession:控制音訊是否受側邊靜音鍵影響。
+  //  "playback"        = 純播放,繞過靜音鍵(收語音/音效/BGM 用)
+  //  "play-and-record" = 可同時錄音+播放,也繞過靜音鍵(錄語音時用;錄完切回 playback)
+  // 若不切成 play-and-record,錄音的 getUserMedia 會被 playback session 擋下 → 「無法啟動錄音」。feature-detect,不支援就略過。
+  function setAudioSession(type){
+    try{ const as=navigator.audioSession; if(as && as.type!==type) as.type=type; }catch(e){}
+  }
+
   /* ---------- Sound (Web Audio, no files) ---------- */
   const Sound=(function(){
     let ctx=null, muted=false;
-    // iOS 16.4+:把音訊 session 設成 "playback",讓 Web Audio 不受靜音鍵(側邊靜音開關/鈴聲模式)影響而發不出聲。
-    // 這正是「按著麥克風時收到的語音就聽得到、放開就沒聲音」的根因——getUserMedia 會把 session 切到 play-and-record;
-    // 平時(沒在錄音)先設成 playback,收到的語音才能在靜音模式下也播出。feature-detect,不支援(舊 iOS/其它瀏覽器)就略過。
+    // 平時(沒在錄音)把 session 設成 playback,收到的語音才能在靜音模式下也播出;但若正在錄音(play-and-record)則不覆蓋,避免打斷錄音。
     function setPlaybackSession(){
-      try{ const as=navigator.audioSession; if(as && as.type!=="playback" && as.type!=="play-and-record") as.type="playback"; }catch(e){}
+      try{ const as=navigator.audioSession; if(as && as.type==="play-and-record") return; }catch(e){}
+      setAudioSession("playback");
     }
     function ac(){
       if(!ctx){const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return null; ctx=new AC(); setPlaybackSession();}
@@ -145,6 +152,7 @@
     async function start(onWav){
       if(!supported())throw new Error("unsupported");
       onDone=onWav; buf=[]; recLen=0;
+      setAudioSession("play-and-record");   // iOS:錄音前把 session 切成可錄音(否則被 playback session 擋下 → 無法啟動)
       const AC=window.AudioContext||window.webkitAudioContext; ctx=new AC();
       if(ctx.state==="suspended"){ try{ await ctx.resume(); }catch(e){} }
       inRate=ctx.sampleRate;
@@ -163,6 +171,7 @@
       try{ if(src)src.disconnect(); }catch(e){}
       try{ if(zero)zero.disconnect(); }catch(e){}
       if(stream){ stream.getTracks().forEach(t=>{try{t.stop();}catch(e){}}); stream=null; }
+      setAudioSession("playback");   // 錄音結束 → 切回純播放 session(收到的語音仍能繞過靜音鍵播放)
     }
     function stop(){
       if(!active)return; active=false; detach();
