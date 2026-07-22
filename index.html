@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.20.0 -->
-<meta name="version" content="1.20.0">
+<!-- BINGO 賓果遊戲 · v1.20.1 -->
+<meta name="version" content="1.20.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -908,7 +908,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.20.0</span><span class="dev">開發者 Michael Ho</span></footer>
+  <footer><span class="ver">BINGO · v1.20.1</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -1859,7 +1859,7 @@ const FIREBASE_CONFIG = {
     let orderMethod="rps", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
     // 連線計分:scoreMode="rank"(累積勝場排行,無止盡)|"match"(搶 N 勝,達標跳總冠軍);winGoal=目標勝場(match 用)
     // roundId=每局開打時房主寫的識別碼(給「一局只計一次分」用);scoredThisRound=本端這局是否已幫自己加過分(本地去重)
-    let scoreMode="rank", winGoal=3, roundId=null, scoredThisRound=false;
+    let scoreMode="rank", winGoal=3, roundId=null, scoredThisRound=false, scores={};   // scores 獨立於在線節點,斷線不刪
     let myRoundWin=false;                   // 我這局是不是贏家(含平手):結果卡排行先樂觀 +1,免得加分交易回寫前顯示還是 0 勝
     let sawPlayers=false;
     let sawMe=false;                        // 是否曾在名單看過自己(避免剛加入的空讀誤判成被踢)
@@ -2151,6 +2151,7 @@ const FIREBASE_CONFIG = {
       if(status!=="lobby"){ showToast("遊戲進行中無法移除玩家"); return; }
       const nm=dispName(id);
       roomRef.child("players/"+id).remove();
+      roomRef.child("scores/"+id).remove();   // 連同分數一起清,避免殘留(踢人才清;斷線絕不清)
       showToast("已移出 "+nm);
     }
     function listen(){
@@ -2203,6 +2204,12 @@ const FIREBASE_CONFIG = {
       roomRef.child("scoreMode").on("value",s=>{ scoreMode=(s.val()==="match")?"match":"rank"; syncScoreRow(); renderPlayers(); });
       roomRef.child("winGoal").on("value",s=>{ const n=s.val(); winGoal=(typeof n==="number"&&n>=2)?Math.min(20,n):3; syncScoreRow(); });
       roomRef.child("roundId").on("value",s=>{ roundId=s.val()||null; });
+      // 連線計分:分數存獨立路徑 scores/<id>={n,round},不掛 onDisconnect,斷線/切背景都刪不到
+      roomRef.child("scores").on("value",s=>{ scores=s.val()||{};
+        if(curPhase==="lobby") syncScoreRow();   // 分數變動 → 重評「搶勝目標」鎖定
+        renderPlayers();                          // 晶片上的 🏆N 徽章
+        if(winner) renderScoreboard();            // 結果卡開著時同步排行
+      });
       roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } maybeAnnounceOrder(); });
       roomRef.child("turnIndex").on("value",s=>{ turnIndex=s.val()||0; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } });
       roomRef.child("rps").on("value",s=>{ rps=s.val(); if(curPhase==="rps")renderRps(); if(isHost)rpsHostResolve(); });
@@ -2226,7 +2233,7 @@ const FIREBASE_CONFIG = {
         chip.addEventListener("click",()=>openEmote(id===meId?"all":id));   // 點對象 → 開表情面板
         const seatIdx=order.indexOf(id);
         const seatBadge=(status==="playing"&&seatIdx>=0)?'<span class="seat-badge">'+(seatIdx+1)+'</span>':'';
-        const sc=(p.score||0);
+        const sc=scoreOf(id);
         const scoreBadge=sc>0?'<span class="score-badge" title="累積勝場">🏆'+sc+'</span>':'';   // 有累積勝場才顯示,大廳/遊戲中都看得到
         chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+esc(dispName(id))+'</span>'+youTag(id)+scoreBadge+
           (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'')+
@@ -2280,15 +2287,15 @@ const FIREBASE_CONFIG = {
     }
     /* ----- 連線計分:模式(累積排行 / 搶 N 勝)、目標勝場、重設戰績 ----- */
     // 搶勝賽季是否已開打:只要有人拿過分,目標勝場就鎖住(不然打到一半改「搶幾勝」會讓進度變得莫名其妙);要重設戰績/開新賽季才能再改
-    function seasonInProgress(){ return scoreMode==="match" && Object.keys(players).some(id=>((players[id]&&players[id].score)||0)>0); }
+    function seasonInProgress(){ return scoreMode==="match" && Object.keys(players).some(id=>scoreOf(id)>0); }
     function setScoreMode(m){ if(isHost&&roomRef){ scoreMode=(m==="match")?"match":"rank"; roomRef.child("scoreMode").set(scoreMode); syncScoreRow(); savePrefs(); } }
     function setWinGoal(n){ if(isHost&&roomRef&&!seasonInProgress()){ winGoal=Math.max(2,Math.min(20,n|0)); roomRef.child("winGoal").set(winGoal); syncScoreRow(); savePrefs(); } }
     // 開機時把記住的計分偏好帶進來當「建房預設」(訪客加入別人的房仍以房主設定為準,由監聽覆蓋)
     function usePrefs(mode,goal){ if(mode==="match"||mode==="rank")scoreMode=mode; if(typeof goal==="number"&&goal>=2)winGoal=Math.min(20,goal); }
-    // 房主重設所有人戰績歸零(大廳的「重設戰績」與奪冠後的「開新賽季」共用);只清 score/scoredRound,不動本局其它狀態
+    // 房主重設所有人戰績歸零(大廳的「重設戰績」與奪冠後的「開新賽季」共用);只清 scores 節點,不動本局其它狀態
     function resetScores(){
       if(!isHost||!roomRef)return;
-      const ups={}; Object.keys(players).forEach(id=>{ ups["players/"+id+"/score"]=0; ups["players/"+id+"/scoredRound"]=null; });
+      const ups={}; Object.keys(players).forEach(id=>{ ups["scores/"+id]=null; });   // 整個清掉分數節點
       scoredThisRound=false;
       if(Object.keys(ups).length) roomRef.update(ups);
       showToast("已重設所有人的戰績 🏆");
@@ -2317,7 +2324,7 @@ const FIREBASE_CONFIG = {
       const ids=Object.keys(players);
       if(ids.length<2 || !ids.every(id=>players[id].ready)){ showToast("需要 2 人以上且全部準備好"); return; }
       const base={ target:state.target, calledList:[], winner:null, turnIndex:0, reveal:null, roundId:Date.now() };   // roundId 每局換,供「一局只計一次分」判定
-      Object.keys(players).forEach(id=>{ base["players/"+id+"/winAt"]=null; base["players/"+id+"/lines"]=0; });   // 清掉上一局的達標紀錄與線數(score/scoredRound 不清,跨局累積)
+      Object.keys(players).forEach(id=>{ base["players/"+id+"/winAt"]=null; base["players/"+id+"/lines"]=0; });   // 清掉上一局的達標紀錄與線數(分數存於 scores/,不隨開新局清除)
       if(orderMethod==="rps"){
         roomRef.update({ ...base, status:"rps", order:null, rps:{ seq:1, groups:[ids.join(",")], throws:null } });
       }else if(orderMethod==="random"){
@@ -2662,13 +2669,13 @@ const FIREBASE_CONFIG = {
       myRoundWin=iWon;   // 記住我這局贏了 → renderScoreboard 先樂觀 +1,不必等加分交易回寫
 
       // 計分:贏家(含平手雙方)幫「自己」+1 勝,一局只計一次。
-      // 用 roundId(每局換)+ 節點上的 scoredRound 做冪等:交易內再驗一次,重複呼叫也不會重複加;只寫自己節點,契合全案「不跨寫別人」的做法。
-      if(iWon && meId && roomRef && roundId && !scoredThisRound && !(players[meId]&&players[meId].scoredRound===roundId)){
+      // 分數寫在獨立的 scores/<id>(不掛 onDisconnect,斷線刪不到);用 roundId + scores 上的 round 做冪等:
+      // 交易內再驗一次,重複呼叫也不會重複加;只寫自己節點,契合全案「不跨寫別人」的做法。
+      if(iWon && meId && roomRef && roundId && !scoredThisRound && scoredRoundOf(meId)!==roundId){
         scoredThisRound=true;
-        roomRef.child("players/"+meId).transaction(p=>{
-          if(!p)return p;                         // 節點已不在 → 不動
-          if(p.scoredRound===roundId)return;      // 這局已計過 → 中止交易,不重複加
-          p.score=(p.score||0)+1; p.scoredRound=roundId; return p;
+        roomRef.child("scores/"+meId).transaction(s=>{
+          if(s && s.round===roundId) return;          // 這局已計過 → 中止交易,不重複加
+          return { n:((s&&s.n)||0)+1, round:roundId }; // s=null 時自然建立 {n:1,...}
         }, ()=>{ if(winner) renderScoreboard(); });   // 加分寫入完成後,用回寫後的真實分數再畫一次排行(補上樂觀值/確認達標)
       }
 
@@ -2700,14 +2707,17 @@ const FIREBASE_CONFIG = {
       outcomeShown=true;
       render();
     }
+    // 連線計分:從獨立的 scores 節點取值(不受在線節點刪除影響)
+    function scoreOf(id){ return (scores[id]&&scores[id].n)||0; }
+    function scoredRoundOf(id){ return scores[id]&&scores[id].round; }
     // 結果卡下方的累積勝場排行榜;搶 N 勝模式下有人達標時多顯示「總冠軍」橫幅,房主再多一顆「開新賽季」
     function renderScoreboard(){
       const sb=$("winScores"), champEl=$("winChamp"), nsBtn=$("mpNewSeason");
       if(!sb)return;
       const rows=Object.keys(players).map(id=>{
-        let score=(players[id]&&players[id].score)||0;
+        let score=scoreOf(id);
         // 我這局贏了、但加分交易還沒回寫到本地快照 → 先樂觀 +1,避免結果卡上自己還顯示舊分(0 勝)
-        if(id===meId && myRoundWin && roundId && !(players[id]&&players[id].scoredRound===roundId)) score+=1;
+        if(id===meId && myRoundWin && roundId && scoredRoundOf(id)!==roundId) score+=1;
         return { id, score, name:dispName(id) };
       }).sort((a,b)=> b.score-a.score || (a.id<b.id?-1:1));   // 分數高→低,同分依 id(各端一致)
       const top=rows.length?rows[0].score:0;
@@ -2774,7 +2784,7 @@ const FIREBASE_CONFIG = {
     function leave(){
       try{
         if(roomRef){
-          ["host","players","status","target","size","orderMethod","order","turnIndex","rps","reveal","calledList","winner","emotes"].forEach(k=>roomRef.child(k).off());
+          ["host","players","status","target","size","orderMethod","order","turnIndex","rps","reveal","calledList","winner","emotes","scores"].forEach(k=>roomRef.child(k).off());
           if(isHost){
             if(meId) roomRef.child("players/"+meId).onDisconnect().cancel();
             roomRef.onDisconnect().cancel();
@@ -2783,13 +2793,14 @@ const FIREBASE_CONFIG = {
             const pr=roomRef.child("players/"+meId);
             pr.onDisconnect().cancel();
             pr.remove();
+            roomRef.child("scores/"+meId).remove();   // 訪客主動離開才清自己分數(斷線不清)
           }
         }
       }catch(e){}
       stopConn(); clearRecheck();                   // 卸載連線監聽、清掉寬限計時器
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
-      roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; calledList=[];
+      roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; scores={}; calledList=[];
       order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
