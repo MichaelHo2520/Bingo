@@ -253,6 +253,7 @@
     document.body.classList.toggle("room-tab-fill", !settingsOn);
     document.body.classList.toggle("room-tab-settings", settingsOn);
     const bar=$("roomTabs"); if(bar)[...bar.children].forEach(b=>b.classList.toggle("on", b.dataset.tab===roomTab));
+    const sa=$("scrollArea"); if(sa)sa.scrollTop=0;   // 切換分頁時捲回頂端,兩個分頁各自從頭看(不再共用捲動位置)
     updateReshuffleBtn();
   }
   // show=true:進入 setup/大廳 → 顯示分頁列 + 主要動作列並套用目前分頁(defaultTab 指定預設頁)

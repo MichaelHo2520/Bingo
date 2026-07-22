@@ -90,10 +90,10 @@
   body.room-tab-fill .scroll-area{flex:1 1 0}
   /* 盤面尺寸上限:除了 92vw / 520px,再用「可視高度」夾一次,螢幕太寬時格子才不會變太大、下緣被切掉。
      依目前版面(是否有房間橫幅 / 準備列 / HUD)預留不同的縱向空間 */
-  body{ --board-cap: calc(100dvh - 210px); }                    /* 遊戲中 / 主選單:僅上方 HUD + 邊距 */
-  body.has-primary-bar{ --board-cap: calc(100dvh - 330px); }    /* 設定 / 大廳:另含填號列 + 底部準備列 */
-  body.mp-on.has-primary-bar{ --board-cap: calc(100dvh - 430px); }        /* 連線大廳:再含房間橫幅(矮螢幕時盤面縮小,讓填號列不被浮動鈕蓋住) */
-  body.mp-on:not(.has-primary-bar){ --board-cap: calc(100dvh - 250px); }  /* 連線遊戲中:含房間橫幅 + HUD */
+  body{ --board-cap: calc(100dvh - 170px); }                    /* 遊戲中 / 主選單:僅上方 HUD + 邊距 */
+  body.has-primary-bar{ --board-cap: calc(100dvh - 240px); }    /* 設定 / 大廳:另含填號列 + 底部準備列 */
+  body.mp-on.has-primary-bar{ --board-cap: calc(100dvh - 300px); }        /* 連線大廳:再含房間橫幅 */
+  body.mp-on:not(.has-primary-bar){ --board-cap: calc(100dvh - 210px); }  /* 連線遊戲中:含房間橫幅 + HUD */
   /* 固定背景層:取代 background-attachment:fixed(手機滑動時背景會被帶著跑、放開才重畫、跳一下)。
      改用 position:fixed 的合成層,滑動時由合成器釘住、不重繪,就不會跳動 */
   body::before{
@@ -672,18 +672,14 @@
     right:16px;right:calc(16px + env(safe-area-inset-right));
     align-items:center;justify-content:center;border:1px solid var(--panel-line);
     background:var(--accent);color:#1c1008;border-radius:50%;
-    width:54px;height:54px;padding:0;opacity:.8;   /* 半透明:不擋住底下的號碼/按鈕 */
+    width:54px;height:54px;padding:0;opacity:.6;   /* 半透明:讓底下的準備鈕/填號方式看得到 */
     cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,bottom .2s,opacity .2s}
   .quick-voice:hover,.quick-voice:active,.quick-voice.rec,
   .quick-reshuffle:hover,.quick-reshuffle:active{opacity:1}   /* 互動 / 錄音中回到不透明,狀態清楚 */
-  /* 快速語音留言:連線時浮在盤面右下,點一下開始錄音、再點一下直接送給全部人(免開面板、免選對象) */
+  /* 快速語音留言:浮在最右下角(大廳時就浮在「準備好了」上),點一下錄音、再點一下直接送給全部人 */
   .quick-voice{display:none;bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom))}
   body.mp-on .quick-voice{display:inline-flex}    /* 連線中(大廳 + 遊戲)都顯示 */
   .quick-voice .qv-label{display:none}            /* 只留麥克風圖示,不顯示文字 */
-  /* 填號分頁:內容區底部留白,讓最後一列(填號方式)能清出右下浮動鈕的空間 */
-  body.room-tab-fill .scroll-area{padding-bottom:60px}
-  /* 大廳(有固定準備列)時:浮動語音鈕抬到準備列上方,不與它重疊 */
-  body.has-primary-bar .quick-voice{bottom:calc(84px + env(safe-area-inset-bottom))}
   .quick-voice:active{transform:scale(.93)}
   .quick-voice .qv-ico{font-size:24px;line-height:1}
   .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
@@ -692,11 +688,10 @@
   :root[data-theme="arcade"] .quick-voice{color:var(--daub-ink)}
   :root[data-theme="ebook"] .quick-voice{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
   :root[data-theme="ebook"] .quick-voice.rec{background:#000;color:#fff}
-  /* 快速換一組號碼:自動填號時才顯示(由 JS 切 .hidden);單機蹲在準備列上方,連線時再疊到麥克風上方 */
+  /* 快速換一組號碼:自動填號時才顯示(由 JS 切 .hidden);浮在麥克風正上方(約在「手動填號」那一列的位置) */
   .quick-reshuffle{display:inline-flex;font-size:24px;line-height:1;
-    bottom:calc(84px + env(safe-area-inset-bottom))}
+    bottom:calc(82px + env(safe-area-inset-bottom))}
   .quick-reshuffle.hidden{display:none!important}
-  body.mp-on .quick-reshuffle{bottom:calc(150px + env(safe-area-inset-bottom))}  /* 連線:疊在麥克風上方 */
   .quick-reshuffle:hover{transform:translateY(-2px)}
   .quick-reshuffle:active{transform:scale(.93)}
   :root[data-theme="midnight"] .quick-reshuffle,
