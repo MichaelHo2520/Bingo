@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.15.1 -->
-<meta name="version" content="1.15.1">
+<!-- BINGO 賓果遊戲 · v1.16.0 -->
+<meta name="version" content="1.16.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -759,7 +759,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.15.1</span><span class="dev">開發者 Michael Ho</span></footer>
+  <footer><span class="ver">BINGO · v1.16.0</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -830,6 +830,10 @@
       <div class="set-row" id="bgmVolRow">
         <span class="set-lbl">音量</span>
         <input class="rng" id="bgmVol" type="range" min="0" max="100" value="35" aria-label="背景音樂音量">
+      </div>
+      <div class="set-row">
+        <span class="set-lbl">語音音量</span>
+        <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
       </div>
       <button class="btn primary" id="setClose">完成</button>
     </div>
@@ -1309,6 +1313,7 @@ const FIREBASE_CONFIG = {
   /* ---------- Theme & fullscreen ---------- */
   let lastColorTheme="sunset";
   let bgmOn=false, bgmVol=0.35;   // 背景音樂:是否開啟、音量(0~1);預設關,音量 35%
+  let voiceVol=1.5;               // 收到語音的播放音量倍率(1=原音,可 >1 放大);預設 150%,範圍 0~3
   const STORE_KEY="bingo.prefs.v1";
   function savePrefs(){
     try{
@@ -1321,6 +1326,7 @@ const FIREBASE_CONFIG = {
         size:SIZE,
         bgmOn:bgmOn,
         bgmVol:bgmVol,
+        voiceVol:voiceVol,
         name:nameEl?nameEl.value.trim():""
       }));
     }catch(e){/* storage unavailable -> just don't persist */}
@@ -1339,6 +1345,7 @@ const FIREBASE_CONFIG = {
     if(p.muted){ Sound.setMuted(true); }
     if(typeof p.bgmVol==="number"){ bgmVol=Math.max(0,Math.min(1,p.bgmVol)); }
     BGM.setVolume(bgmVol);
+    if(typeof p.voiceVol==="number"){ voiceVol=Math.max(0,Math.min(3,p.voiceVol)); }
     if(p.bgmOn){ bgmOn=true; }   // 記住「想開」;實際播放等首次使用者互動(繞過自動播放限制)
     if(p.ebook){ setEbook(true,true); }
     if(typeof p.name==="string" && p.name){ const nameEl=$("mpName"); if(nameEl) nameEl.value=p.name; }
@@ -1379,6 +1386,7 @@ const FIREBASE_CONFIG = {
     if(swB)swB.setAttribute("aria-checked",bgmOn?"true":"false");
     if(volEl)volEl.value=Math.round(bgmVol*100);
     if(volRow)volRow.classList.toggle("dim",!bgmOn);   // 關閉時音量列淡化
+    const vvEl=$("voiceVol"); if(vvEl)vvEl.value=Math.round(voiceVol*100);
   }
   function openSettings(){ Sound.wake(); syncSettingsUI(); $("setVeil").classList.add("show"); }
   function closeSettings(){ $("setVeil").classList.remove("show"); }
@@ -1399,6 +1407,8 @@ const FIREBASE_CONFIG = {
   // 背景音樂:開關(開→解鎖音訊並播放;關→停止),音量即時套用;都記憶偏好
   function setBgm(on){ bgmOn=!!on; if(bgmOn){ Sound.wake(); BGM.setOn(true); } else { BGM.setOn(false); } savePrefs(); syncSettingsUI(); }
   function setBgmVol(v){ bgmVol=Math.max(0,Math.min(1,v)); BGM.setVolume(bgmVol); }
+  // 收到語音的音量:倍率 0~3(1=原音,>1 放大);每則語音播放時即時讀 voiceVol 套用,故不需即時改動已播節點
+  function setVoiceVol(v){ voiceVol=Math.max(0,Math.min(3,v)); }
   let toastT;
   function showToast(txt,dur){
     let el=$("toast");
@@ -1519,7 +1529,8 @@ const FIREBASE_CONFIG = {
   // 播放收到的語音:優先走 Web Audio(用已解鎖的 AudioContext + decodeAudioData,
   // 繞過 iOS 對 new Audio().play() 的自動播放封鎖、也能解 WAV);失敗再退回 HTMLAudio。靜音時不播。
   function fallbackAudio(u,onEnd){
-    try{ const a=new Audio(u); if(onEnd){ a.onended=onEnd; a.onerror=onEnd; } const p=a.play(); if(p&&p.catch)p.catch(()=>{ if(onEnd)onEnd(); }); }
+    // HTMLAudio 的 .volume 上限為 1(無法放大),故只套用 0~1 那段;放大要靠 Web Audio 主路徑的 GainNode
+    try{ const a=new Audio(u); try{ a.volume=Math.max(0,Math.min(1,voiceVol)); }catch(e){} if(onEnd){ a.onended=onEnd; a.onerror=onEnd; } const p=a.play(); if(p&&p.catch)p.catch(()=>{ if(onEnd)onEnd(); }); }
     catch(e){ if(onEnd)onEnd(); }
   }
   // 播放單則語音,播完(或失敗)呼叫 onEnd;Web Audio 優先(繞過 iOS 自動播放封鎖、可解 WAV),失敗退回 HTMLAudio
@@ -1536,7 +1547,7 @@ const FIREBASE_CONFIG = {
     const play=()=>{
       try{
         c.decodeAudioData(bytes.buffer.slice(0),
-          b=>{ try{ const s=c.createBufferSource(); s.buffer=b; s.connect(c.destination); s.onended=done; s.start(); }catch(e){ fallbackAudio(dataURL,done); } },
+          b=>{ try{ const s=c.createBufferSource(); s.buffer=b; const g=c.createGain(); g.gain.value=voiceVol; s.connect(g); g.connect(c.destination); s.onended=done; s.start(); }catch(e){ fallbackAudio(dataURL,done); } },
           ()=>fallbackAudio(dataURL,done));
       }catch(e){ fallbackAudio(dataURL,done); }
     };
@@ -2523,6 +2534,8 @@ const FIREBASE_CONFIG = {
   $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));                       // 背景音樂開關
   $("bgmVol").addEventListener("input",e=>setBgmVol((+e.target.value||0)/100));  // 拖曳即時調音量
   $("bgmVol").addEventListener("change",savePrefs);                             // 放開才存偏好
+  $("voiceVol").addEventListener("input",e=>setVoiceVol((+e.target.value||0)/100)); // 收到語音音量:拖曳即時套用(下一則生效)
+  $("voiceVol").addEventListener("change",savePrefs);                              // 放開才存偏好
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});
