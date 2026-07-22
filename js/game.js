@@ -200,7 +200,6 @@
     $("soloHead").classList.add("hidden");   // 回主選單:收起單機返回列(修正返回後主頁殘留返回鈕)
     $("boardWrap").classList.add("hidden");
     $("playStatus").classList.add("hidden");
-    $("mpControls").classList.add("hidden");
     updateRoomTabs(false);   // 主選單不顯示房間分頁列
     document.body.classList.remove("mp-on");
     resetMarquee();
@@ -225,7 +224,6 @@
     $("sizeRow").style.display="";
     $("targetRow").style.display="";
     $("playStatus").classList.add("hidden");
-    $("mpControls").classList.add("hidden");
     state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled();
     updateRoomTabs(true,"fill");   // 單機:分頁預設「填號」,常見流程(自動填號→開始)一進來就看到卡片
     closeWin(); resetMarquee(); render(); applyFillUI();

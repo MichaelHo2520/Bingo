@@ -26,6 +26,8 @@
     let resyncing=false, resyncTimer=null;   // 剛從背景/斷線恢復的寬限旗標與計時器(期間不把舊名單快照當成被踢)
     let graceTimer=null;                     // 「暫時有人不見」的寬限計時器:逾時仍不見才真的離開/回大廳
     const GRACE_MS=20000;                    // 斷線寬限期(手機切 App 常見情境):20 秒內回來就當沒事
+    let aloneTimer=null;                     // 遊戲中只剩房主自己的專用計時器(比一般斷線寬限短,較快退回等待)
+    const ALONE_MS=8000;                     // 對手都離開後 8 秒仍只剩自己 → 退回大廳(短暫斷線重連者來得及回來就取消)
     const RPS_EMO={R:"✊",S:"✌️",P:"✋"}, RPS_TXT={R:"石頭",S:"剪刀",P:"布"};
 
     // 是否已備妥連線(SDK 已載入 + config 有填);config 未填時視為關閉連線功能
@@ -218,7 +220,6 @@
     function hidePhasePanels(){
       hideMpVeil();
       $("mpOrderPanel").classList.add("hidden");
-      $("mpControls").classList.add("hidden");
     }
     // 猜拳/揭曉蓋板(像結束畫面那樣彈出);which = "rps" | "reveal"
     function showMpVeil(which){
@@ -303,6 +304,9 @@
     // 有人「暫時不見」時,排一個寬限期後的複查(已在排就不重排)
     function scheduleRecheck(){ if(!graceTimer)graceTimer=setTimeout(()=>{ graceTimer=null; recheckPresence(); }, GRACE_MS); }
     function clearRecheck(){ if(graceTimer){ clearTimeout(graceTimer); graceTimer=null; } }
+    // 遊戲中只剩房主自己:用較短的專用寬限,逾時仍只剩自己就退回大廳(對手若只是短暫斷線,重連歸位會取消)
+    function scheduleAloneCheck(){ if(!aloneTimer)aloneTimer=setTimeout(()=>{ aloneTimer=null; if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1) hostAloneToLobby(); }, ALONE_MS); }
+    function clearAloneCheck(){ if(aloneTimer){ clearTimeout(aloneTimer); aloneTimer=null; } }
     // 寬限期到期後再確認一次:該離開/回大廳的情況若仍成立,才真的動作
     function recheckPresence(){
       if(!state.online||!roomRef)return;
@@ -347,7 +351,8 @@
         if(iWasKicked() && stableOnline()){ showToast("你已被房主移出房間"); leave(); return; }
         // 「暫時不見」(我/房主消失,或遊戲中房主只剩自己):寬限期內先不動作,等重連歸位;全部正常則解除寬限
         const alone=isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1;
-        if(iWasKicked() || hostGone() || alone) scheduleRecheck(); else clearRecheck();
+        if(alone) scheduleAloneCheck(); else clearAloneCheck();   // 只剩房主 → 走較短的專用寬限,較快退回等待
+        if(iWasKicked() || hostGone()) scheduleRecheck(); else clearRecheck();
         renderPlayers(); updateStartBtn();
         if(curPhase==="lobby") syncScoreRow();   // 分數變動(重設戰績/開新賽季)→ 重新評估目標勝場鎖定狀態
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
@@ -360,7 +365,7 @@
         }
       });
       roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); });
-      roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"&&!isHost){ state.target=t; $("targetVal").textContent=t; const g=$("mpGoalNum"); if(g)g.textContent=t+" 線"; } });
+      roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"){ if(!isHost){ state.target=t; $("targetVal").textContent=t; } updateMpGoal(); } });
       // 盤面大小:房主寫入,訪客跟著套用(重發卡片;若已準備先取消準備讓其重填)
       roomRef.child("size").on("value",s=>{
         const n=s.val();
@@ -412,8 +417,7 @@
         const sc=scoreOf(id);
         const scoreBadge=sc>0?'<span class="score-badge" title="累積勝場">🏆'+sc+'</span>':'';   // 有累積勝場才顯示,大廳/遊戲中都看得到
         chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+esc(dispName(id))+'</span>'+youTag(id)+scoreBadge+
-          (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'')+
-          '<span class="mp-poke" aria-hidden="true">😀</span>';   // 互動提示:暗示晶片可點送表情
+          (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'');   // 互動 😀 提示已移除;改由房間框的專用表情鈕進入
         if(isHost && status==="lobby" && id!==meId){
           const k=document.createElement("button");
           k.type="button"; k.className="mp-kick"; k.title="移出房間";
@@ -424,7 +428,12 @@
         }
         box.appendChild(chip);
       });
-      $("mpStatusTxt").textContent = status==="playing" ? "遊戲進行中" : (status==="rps"?"猜拳決定順序…":(status==="reveal"?"猜拳結果揭曉…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…"))));
+      if(status==="playing"){ updateTurnUI(); }   // 遊戲中:狀態列顯示「換你出號 / 輪到 X」
+      else {
+        const st=$("mpStatusTxt"); st.classList.remove("wait");
+        st.textContent = status==="rps"?"猜拳決定順序…":(status==="reveal"?"猜拳結果揭曉…":(status==="ordering"?"排定順序中…":(ids.length<2?"等待對手加入…":"等待大家準備…")));
+      }
+      updateMpGoal();
       mpHint();
     }
     // 主要動作列的引導提示:只在大廳,依「我準備了沒 / 大家好了沒 / 我是不是房主」給出下一步該做什麼
@@ -531,16 +540,8 @@
     }
 
     /* ----- phase dispatch ----- */
-    // 遊戲進行中:把快速語音麥克風鈕移進「房間框」(mpBar)右下角;離開遊戲(大廳/猜拳/揭曉)再放回畫面右下的浮動位置
-    function dockQuickVoice(on){
-      document.body.classList.toggle("mp-playing", on);
-      const qv=$("quickVoiceBtn"); if(!qv)return;
-      const dest = on ? $("mpBar") : document.body;
-      if(qv.parentNode!==dest) dest.appendChild(qv);
-    }
     function onStatus(){
       renderPlayers();
-      dockQuickVoice(status==="playing");
       if(status==="playing"){ if(curPhase!=="playing") enterPlaying(); else updateTurnUI(); }
       else if(status==="rps"){ if(curPhase!=="rps") enterRps(); else renderRps(); }
       else if(status==="reveal"){ if(curPhase!=="reveal") enterReveal(); else renderReveal(); }
@@ -562,7 +563,7 @@
       updateRoomTabs(false);   // 猜拳:收起房間分頁列
       $("mpOrderRow").classList.add("hidden");
       $("scoreRow").classList.add("hidden");
-      $("mpControls").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
+      $("mpOrderPanel").classList.add("hidden");
       showMpVeil("rps");
       setLock(true);
       tieSig="";
@@ -676,7 +677,7 @@
       updateRoomTabs(false);   // 猜拳揭曉:收起房間分頁列
       $("mpOrderRow").classList.add("hidden");
       $("scoreRow").classList.add("hidden");
-      $("mpControls").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
+      $("mpOrderPanel").classList.add("hidden");
       showMpVeil("reveal");
       setLock(true);
       revealSig="";   // 每局重繪,確保揭曉動畫重播
@@ -733,7 +734,7 @@
       updateRoomTabs(false);   // 房主排順序:收起房間分頁列
       $("mpOrderRow").classList.add("hidden");
       $("scoreRow").classList.add("hidden");
-      $("mpControls").classList.add("hidden"); hideMpVeil();
+      hideMpVeil();
       $("mpOrderPanel").classList.remove("hidden");
       setLock(true);
       orderDraft=Object.keys(players);
@@ -779,8 +780,7 @@
       hideMpVeil(); $("mpOrderPanel").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
       $("scoreRow").classList.add("hidden");
-      $("mpControls").classList.remove("hidden");
-      const g=$("mpGoalNum"); if(g)g.textContent=state.target+" 線";
+      updateMpGoal();   // 目標線數顯示在房間框
       setLock(false);
       resetMarquee(); render(); applyCalledMarks(); updateTurnUI(); refreshLines();
       maybeAnnounceOrder();
@@ -807,11 +807,13 @@
       for(let k=0;k<order.length;k++){ i=(i+1)%order.length; if(players[order[i]])return i; }
       return from;
     }
+    // 目標線數顯示在房間框(大廳/遊戲中都顯示)
+    function updateMpGoal(){ const g=$("mpBarGoal"); if(g)g.textContent = state.target ? ("🎯 "+state.target+" 線") : ""; }
+    // 輪到誰:遊戲中改用房間框的狀態列顯示(叫號框已移除);非遊戲中的狀態文字由 renderPlayers 設定
     function updateTurnUI(){
-      const el=$("mpTurn"); if(!el)return;
-      if(status!=="playing"){ el.textContent="等待開始…"; el.classList.add("wait"); return; }
+      const el=$("mpStatusTxt"); if(!el || status!=="playing")return;
       const p=order[turnIndex];
-      if(!p){ el.textContent="—"; el.classList.add("wait"); return; }
+      if(!p){ el.textContent="遊戲進行中"; el.classList.add("wait"); return; }
       if(p===meId){ el.textContent="👉 換你出號!"; el.classList.remove("wait"); }
       else { el.textContent="輪到 "+dispName(p); el.classList.add("wait"); }
     }
@@ -823,8 +825,6 @@
       roomRef.update({ calledList:calledList.concat(n), turnIndex:nextTurn(turnIndex) });
     }
     function onCalled(){
-      const last=calledList[calledList.length-1];
-      $("mpLastNum").textContent=last?last:"–";
       if(state.mode==="play"){
         const prev=state.marked.slice();
         applyCalledMarks();
@@ -970,6 +970,7 @@
     }
     function backToLobby(){
       ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled(); curPhase="lobby";
+      clearAloneCheck();
       order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
@@ -1000,7 +1001,7 @@
           }
         }
       }catch(e){}
-      stopConn(); clearRecheck();                   // 卸載連線監聽、清掉寬限計時器
+      stopConn(); clearRecheck(); clearAloneCheck();   // 卸載連線監聽、清掉寬限計時器
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; scores={}; calledList=[];
@@ -1008,8 +1009,7 @@
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();
-      dockQuickVoice(false);   // 離開房間:把麥克風鈕放回畫面右下(並移除 mp-playing)
-      document.body.classList.remove("mp-on"); resetQuickVoiceBtn();   // 離線:收起快速語音浮動鈕
+      document.body.classList.remove("mp-on"); resetQuickVoiceBtn();   // 離線:重置快速語音鈕狀態
       closeWin();
       $("mpBar").classList.add("hidden");
       hidePhasePanels();

@@ -93,7 +93,7 @@
   body{ --board-cap: calc(100dvh - 170px); }                    /* 遊戲中 / 主選單:僅上方 HUD + 邊距 */
   body.has-primary-bar{ --board-cap: calc(100dvh - 240px); }    /* 設定 / 大廳:另含填號列 + 底部準備列 */
   body.mp-on.has-primary-bar{ --board-cap: calc(100dvh - 300px); }        /* 連線大廳:再含房間橫幅 */
-  body.mp-on:not(.has-primary-bar){ --board-cap: calc(100dvh - 210px); }  /* 連線遊戲中:含房間橫幅 + HUD */
+  body.mp-on:not(.has-primary-bar){ --board-cap: calc(100dvh - 185px); }  /* 連線遊戲中:僅含房間橫幅(叫號框已移除,盤面可更大;寬螢幕時號碼格不再被夾太小) */
   /* 固定背景層:取代 background-attachment:fixed(手機滑動時背景會被帶著跑、放開才重畫、跳一下)。
      改用 position:fixed 的合成層,滑動時由合成器釘住、不重繪,就不會跳動 */
   body::before{
@@ -466,11 +466,7 @@
   .mp-chip.ready .dot{background:var(--accent)}
   .mp-chip .ln{font-family:'Fredoka';color:var(--accent);font-weight:700}
   .mp-chip.me{border-color:var(--accent-2);box-shadow:0 0 0 2px var(--accent-2)}  /* 自己的晶片:accent-2 光環,和別人拉開差距 */
-  /* 互動提示:每個晶片尾端一顆淡淡的 😀,暗示「點我可以送表情」(取代原本右上角的互動鈕) */
-  .mp-chip .mp-poke{margin-left:1px;font-size:13px;line-height:1;opacity:.5;
-    transition:opacity .12s,transform .12s;pointer-events:none}
-  .mp-chip.clickable:hover .mp-poke{opacity:1;transform:scale(1.15)}
-  .mp-chip.turn .mp-poke{opacity:.8}
+  /* (晶片尾端的 😀 互動提示已移除;改用房間框的專用表情鈕進入) */
   /* 房主用:大廳時每個非自己的玩家晶片右側出現的移除鈕 */
   .mp-chip .mp-kick{display:inline-grid;place-items:center;width:20px;height:20px;margin-left:3px;padding:0;
     border:none;border-radius:50%;background:#ff5252;color:#fff;line-height:0;cursor:pointer;
@@ -678,42 +674,44 @@
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
   :root[data-theme="ebook"] .voice-btn.rec{background:#000;color:#fff}
   .voice-hint{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:var(--muted);text-align:center}
-  /* 右下浮動圓鈕的共用外觀:麥克風(語音)與骰子(換一組)共用 */
-  .quick-voice,.quick-reshuffle{position:fixed;z-index:40;
+  /* 換一組號碼 🎲:自動填號時的右下浮動 FAB(由 JS 切 .hidden 顯隱)。麥克風已改常駐房間框,這裡改浮在最右下角 */
+  .quick-reshuffle{position:fixed;z-index:40;display:inline-flex;align-items:center;justify-content:center;
     right:16px;right:calc(16px + env(safe-area-inset-right));
-    align-items:center;justify-content:center;border:1px solid var(--panel-line);
-    background:var(--accent);color:#1c1008;border-radius:50%;
-    width:54px;height:54px;padding:0;opacity:.6;   /* 半透明:讓底下的準備鈕/填號方式看得到 */
-    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,bottom .2s,opacity .2s}
-  /* 按下當下 / 錄音中回到不透明,狀態清楚。:hover 只給真的能 hover 的裝置(滑鼠),
-     否則觸控點完 hover 會「卡住」不退,鈕一直全不透明、回不到半透明 */
-  .quick-voice:active,.quick-voice.rec,.quick-reshuffle:active{opacity:1}
-  @media (hover:hover){
-    .quick-voice:hover,.quick-reshuffle:hover{opacity:1}
-    .quick-reshuffle:hover{transform:translateY(-2px)}
-  }
-  /* 快速語音留言:浮在最右下角(大廳時就浮在「準備好了」上),點一下錄音、再點一下直接送給全部人 */
-  .quick-voice{display:none;bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom))}
-  body.mp-on .quick-voice{display:inline-flex}    /* 連線中(大廳 + 遊戲)都顯示 */
-  .quick-voice .qv-label{display:none}            /* 只留麥克風圖示,不顯示文字 */
-  .quick-voice:active{transform:scale(.93)}
-  .quick-voice .qv-ico{font-size:24px;line-height:1}
-  .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
-  .quick-voice:disabled{opacity:.65;cursor:default}
-  :root[data-theme="midnight"] .quick-voice,
-  :root[data-theme="arcade"] .quick-voice{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .quick-voice{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
-  :root[data-theme="ebook"] .quick-voice.rec{background:#000;color:#fff}
-  /* 遊戲進行中:麥克風鈕由 JS 移進「房間框」(mpBar),停在它的右下角(離玩家名單近);
-     其餘時候(大廳)仍浮在畫面右下。position:relative 讓 ebook 主題(關掉 backdrop-filter)也能正確定位 */
-  #mpBar{position:relative}
-  body.mp-playing #quickVoiceBtn{position:absolute;right:12px;bottom:12px;width:46px;height:46px;opacity:.9}
-  body.mp-playing .mp-players{padding-right:56px}   /* 右下角讓出麥克風位置,玩家晶片不被蓋到 */
-  body.mp-playing .board-wrap{gap:8px}              /* 叫號框與號碼格更緊湊,替號碼格多擠出空間 */
-  /* 快速換一組號碼:自動填號時才顯示(由 JS 切 .hidden);浮在麥克風正上方(約在「手動填號」那一列的位置) */
-  .quick-reshuffle{display:inline-flex;font-size:24px;line-height:1;
-    bottom:calc(82px + env(safe-area-inset-bottom))}
+    bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom));
+    width:54px;height:54px;padding:0;font-size:24px;line-height:1;opacity:.6;
+    border:1px solid var(--panel-line);background:var(--accent);color:#1c1008;border-radius:50%;
+    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,opacity .2s}
+  .quick-reshuffle:active{opacity:1;transform:scale(.93)}
   .quick-reshuffle.hidden{display:none!important}
+  @media (hover:hover){ .quick-reshuffle:hover{opacity:1;transform:translateY(-2px)} }
+  :root[data-theme="midnight"] .quick-reshuffle,
+  :root[data-theme="arcade"] .quick-reshuffle{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .quick-reshuffle{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
+
+  /* 房間框右上動作鈕:麥克風(快速語音)+ 表情。大廳/遊戲中都常駐在房間框(不再浮在盤面、不會壓到號碼格),兩顆並排 */
+  .mp-actions{display:flex;align-items:center;gap:8px;flex:none}
+  .quick-voice,.mp-act-btn{
+    flex:none;display:inline-flex;align-items:center;justify-content:center;
+    width:38px;height:38px;padding:0;border-radius:50%;cursor:pointer;
+    border:1px solid var(--panel-line);background:var(--accent);color:#1c1008;
+    font-size:20px;line-height:1;transition:transform .1s,background .2s}
+  .quick-voice .qv-label{display:none}            /* 只留麥克風圖示 */
+  .quick-voice .qv-ico{font-size:20px;line-height:1}
+  .quick-voice:active,.mp-act-btn:active{transform:scale(.9)}
+  @media (hover:hover){ .quick-voice:hover,.mp-act-btn:hover{transform:translateY(-1px)} }
+  .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
+  .quick-voice:disabled{opacity:.6;cursor:default}
+  :root[data-theme="midnight"] .quick-voice,:root[data-theme="midnight"] .mp-act-btn,
+  :root[data-theme="arcade"] .quick-voice,:root[data-theme="arcade"] .mp-act-btn{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .quick-voice,:root[data-theme="ebook"] .mp-act-btn{background:#fff;border:1px solid #000;color:#000}
+  :root[data-theme="ebook"] .quick-voice.rec{background:#000;color:#fff}
+
+  /* 房間框副標列:狀態文字(輪到誰 / 等待中)+ 目標線數 🎯N線 */
+  .mp-subrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
+  .mp-subrow .mp-status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mp-goal{flex:none;font-weight:800;font-size:13px;color:var(--accent-2)}
+  .mp-status.wait{color:var(--muted)}
+  :root[data-theme="ebook"] .mp-goal{color:#000}
   /* 「🔊 點我播放語音」膠囊:收到語音但音訊未解鎖(iOS 切背景回來)時浮在頂端中央,點一下(手勢)喚醒並補播 */
   .voice-gate{position:fixed;z-index:66;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);
     display:inline-flex;align-items:center;gap:6px;max-width:92vw;

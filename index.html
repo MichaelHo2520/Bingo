@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.25.2 -->
-<meta name="version" content="1.25.2">
+<!-- BINGO 賓果遊戲 · v1.26.0 -->
+<meta name="version" content="1.26.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -68,7 +68,17 @@
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <span class="label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b></span>
-      <span class="mp-status" id="mpStatusTxt" style="flex:none">等待中…</span>
+      <!-- 麥克風 + 表情:大廳/遊戲中都固定在房間框右上,不再浮在盤面(不會壓到號碼格),兩顆並排互不重疊 -->
+      <div class="mp-actions">
+        <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
+          <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
+        </button>
+        <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
+      </div>
+    </div>
+    <div class="mp-subrow">
+      <span class="mp-status" id="mpStatusTxt">等待中…</span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="目標線數"></span>
     </div>
     <div id="mpPlayers" class="mp-players"></div>
   </div>
@@ -173,12 +183,7 @@
   <!-- ====== BOARD ====== -->
   <div class="board-wrap hidden" id="boardWrap">
 
-    <!-- online play HUD (顯示在棋盤上方) -->
-    <div class="mp-play hidden" id="mpControls">
-      <div class="mp-hud-item"><span class="lbl">最新號碼</span><span class="mp-ball display" id="mpLastNum">–</span></div>
-      <div class="mp-hud-item"><span class="lbl">目標</span><span class="mp-goal-num display" id="mpGoalNum">5 線</span></div>
-      <div class="mp-turn wait" id="mpTurn">等待開始…</div>
-    </div>
+    <!-- 連線叫號 HUD 已移除(v1.26.0):目標線數移到房間框、輪到誰改看房間框狀態列與高亮的玩家晶片 -->
 
     <!-- play status (單機,顯示在棋盤上方) -->
     <div class="status hidden" id="playStatus">
@@ -339,11 +344,6 @@
 
   <!-- 快速換一組號碼:自動填號時浮在右下(連線時疊在麥克風上方),只留骰子圖示;點一下重抽整張卡 -->
   <button class="quick-reshuffle hidden" id="reshuffleBtn" type="button" title="換一組號碼" aria-label="換一組號碼">🎲</button>
-
-  <!-- 快速語音留言:連線時浮在盤面右下,點一下錄音、再點一下直接送給全部人 -->
-  <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
-    <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
-  </button>
 
   <!-- 房主移出玩家的確認 -->
   <div class="veil" id="kickVeil">

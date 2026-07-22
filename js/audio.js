@@ -3,8 +3,14 @@
   /* ---------- Sound (Web Audio, no files) ---------- */
   const Sound=(function(){
     let ctx=null, muted=false;
+    // iOS 16.4+:把音訊 session 設成 "playback",讓 Web Audio 不受靜音鍵(側邊靜音開關/鈴聲模式)影響而發不出聲。
+    // 這正是「按著麥克風時收到的語音就聽得到、放開就沒聲音」的根因——getUserMedia 會把 session 切到 play-and-record;
+    // 平時(沒在錄音)先設成 playback,收到的語音才能在靜音模式下也播出。feature-detect,不支援(舊 iOS/其它瀏覽器)就略過。
+    function setPlaybackSession(){
+      try{ const as=navigator.audioSession; if(as && as.type!=="playback" && as.type!=="play-and-record") as.type="playback"; }catch(e){}
+    }
     function ac(){
-      if(!ctx){const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return null; ctx=new AC();}
+      if(!ctx){const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return null; ctx=new AC(); setPlaybackSession();}
       if(ctx.state==="suspended")ctx.resume();
       return ctx;
     }
@@ -27,7 +33,7 @@
       toggle(){muted=!muted; if(!muted)tone(660,{type:"triangle",dur:0.08,vol:0.15}); return muted;},
       setMuted(m){muted=!!m;},
       isMuted(){return muted;},
-      wake(){ const c=ac(); if(c)silentKick(c); },   // 手勢中喚醒:建立/resume AudioContext + Silent Buffer Kick 強制解鎖
+      wake(){ setPlaybackSession(); const c=ac(); if(c)silentKick(c); },   // 手勢中喚醒:設 playback session(繞過靜音鍵)+ 建立/resume AudioContext + Silent Buffer Kick 強制解鎖
       running(){ return !!(ctx && ctx.state==="running"); },   // 是否已在 running(給「收到語音但 context 未解鎖」的 Fallback 判斷)
       state(){ return ctx ? ctx.state : "none"; },              // 目前 AudioContext 狀態(選配:開發者模式現場回報用)
       resume(){ const c=ac(); return (c&&c.resume)?c.resume().catch(()=>{}):Promise.resolve(); },   // 顯式喚醒並回傳 promise(手勢中呼叫,resume 後再開播)
