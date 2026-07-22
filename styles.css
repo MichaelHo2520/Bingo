@@ -199,7 +199,7 @@
     gap:var(--gap);
   }
   .cell{
-    position:relative;border:0;cursor:pointer;border-radius:16px;
+    position:relative;border:0;cursor:pointer;border-radius:var(--cellradius,16px);
     background:var(--cell);border:2px solid var(--cell-edge);
     color:var(--cell-text);font-family:'Fredoka',sans-serif;font-weight:600;
     font-size:var(--cellfont,clamp(20px,6.5vw,40px));
@@ -692,6 +692,18 @@
   .quick-reshuffle{display:inline-flex;font-size:24px;line-height:1;
     bottom:calc(82px + env(safe-area-inset-bottom))}
   .quick-reshuffle.hidden{display:none!important}
+  /* 「🔊 點我播放語音」膠囊:收到語音但音訊未解鎖(iOS 切背景回來)時浮在頂端中央,點一下(手勢)喚醒並補播 */
+  .voice-gate{position:fixed;z-index:66;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);
+    display:inline-flex;align-items:center;gap:6px;max-width:92vw;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008;border:0;border-radius:999px;
+    padding:11px 20px;cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;white-space:nowrap;
+    box-shadow:0 6px 22px rgba(0,0,0,.35);animation:voiceGateIn .3s cubic-bezier(.34,1.56,.64,1)}
+  .voice-gate.hidden{display:none!important}
+  .voice-gate:active{transform:translateX(-50%) scale(.95)}
+  @keyframes voiceGateIn{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+  :root[data-theme="midnight"] .voice-gate,
+  :root[data-theme="arcade"] .voice-gate{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .voice-gate{background:#000;color:#fff;box-shadow:none}
   .quick-reshuffle:hover{transform:translateY(-2px)}
   .quick-reshuffle:active{transform:scale(.93)}
   :root[data-theme="midnight"] .quick-reshuffle,

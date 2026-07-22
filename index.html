@@ -8,9 +8,12 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
+<meta name="theme-color" content="#2a1136">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.24.1 -->
-<meta name="version" content="1.24.1">
+<!-- BINGO 賓果遊戲 · v1.24.2 -->
+<meta name="version" content="1.24.2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -324,6 +327,9 @@
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
 
+  <!-- 收到語音但 AudioContext 未解鎖(iOS 切背景回來/尚未手勢)時,顯示這顆「點我播放」膠囊;點一下(手勢)喚醒音訊並補播佇列 -->
+  <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
+
   <!-- 快速換一組號碼:自動填號時浮在右下(連線時疊在麥克風上方),只留骰子圖示;點一下重抽整張卡 -->
   <button class="quick-reshuffle hidden" id="reshuffleBtn" type="button" title="換一組號碼" aria-label="換一組號碼">🎲</button>
 
@@ -347,9 +353,7 @@
 
   <canvas class="confetti" id="confetti"></canvas>
 
-<!-- Firebase SDK (compat) - loaded from Google CDN -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<!-- Firebase SDK (compat):改成「點連線對戰才動態載入」(見 js/online.js 的 ensureFirebase),首頁不再等它下載/解析 → 秒開 -->
 
 <script>
 /* ============================================================

@@ -1,0 +1,15 @@
+{
+  "name": "BINGO 賓果",
+  "short_name": "BINGO",
+  "description": "現場多人賓果遊戲:單機練習 + Firebase 連線對戰",
+  "lang": "zh-Hant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2a1136",
+  "theme_color": "#2a1136",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

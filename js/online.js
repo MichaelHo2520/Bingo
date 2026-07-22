@@ -28,8 +28,27 @@
     const GRACE_MS=20000;                    // 斷線寬限期(手機切 App 常見情境):20 秒內回來就當沒事
     const RPS_EMO={R:"✊",S:"✌️",P:"✋"}, RPS_TXT={R:"石頭",S:"剪刀",P:"布"};
 
+    // 是否已備妥連線(SDK 已載入 + config 有填);config 未填時視為關閉連線功能
     function available(){
-      return !!(window.firebase && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0);
+      return !!(window.firebase && configReady());
+    }
+    function configReady(){ return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0); }
+    // 動態載入 Firebase SDK(只在使用者點「連線對戰」時才載,首頁不必等它)。載入過就直接沿用。
+    let fbLoading=null;
+    function ensureFirebase(){
+      if(window.firebase) return Promise.resolve(true);
+      if(fbLoading) return fbLoading;
+      const base="https://www.gstatic.com/firebasejs/10.12.2/";
+      const load=src=>new Promise((res,rej)=>{
+        const s=document.createElement("script"); s.src=src; s.async=false;   // async=false:保證 app 先於 database 執行
+        s.onload=()=>res(); s.onerror=()=>rej(new Error("load "+src));
+        document.head.appendChild(s);
+      });
+      fbLoading = load(base+"firebase-app-compat.js")
+        .then(()=>load(base+"firebase-database-compat.js"))
+        .then(()=>!!window.firebase)
+        .catch(e=>{ fbLoading=null; throw e; });   // 失敗清掉,允許之後重試
+      return fbLoading;
     }
     function init(){
       if(db)return true;
@@ -68,9 +87,14 @@
       updateRoomTabs(false);   // 選房間畫面不顯示房間分頁列
       $("mpConnect").classList.remove("hidden");
       $("mpRoomList").innerHTML="";
-      setMsg(available()?"點下方房間即可直接加入":"⚠ 尚未設定 Firebase。請依說明建立免費專案並把設定貼進檔案,連線才會啟用。");
-      if(available()) startRoomWatch();               // 進來就自動偵測並持續更新,不必一直按🔍
-      else setLive("none","連線未啟用");
+      if(!configReady()){ setMsg("⚠ 尚未設定 Firebase。請依說明建立免費專案並把設定貼進檔案,連線才會啟用。"); setLive("none","連線未啟用"); return; }
+      setMsg("連線載入中…"); setLive("loading","連線載入中…");
+      ensureFirebase().then(()=>{
+        setMsg("點下方房間即可直接加入");
+        startRoomWatch();                             // init() 由此觸發;此時 Firebase SDK 已就緒。持續偵測房間,不必一直按🔍
+      }).catch(()=>{
+        setMsg("⚠ 連線元件載入失敗,請檢查網路後再試。"); setLive("error","載入失敗");
+      });
     }
     // 頂部即時狀態膠囊:讓人一眼看出現在有沒有人開房(loading/open/busy/none/error)
     function setLive(stateName,text){
@@ -1024,8 +1048,14 @@
       if(!mine && forMe) Sound.emote();
     }
 
-    // 手機從 LINE 等 App 切回前景:主動歸位一次(是否真的斷過交給 .info/connected 決定要不要提示)
-    document.addEventListener("visibilitychange",()=>{ if(!document.hidden) resume(null); });
+    // 手機從 LINE 等 App 切回前景:主動歸位一次(是否真的斷過交給 .info/connected 決定要不要提示);
+    // 同時嘗試喚醒音訊 + 補播等待中的語音(iOS 切背景會把 AudioContext 打回 suspended)
+    document.addEventListener("visibilitychange",()=>{
+      if(document.hidden)return;
+      resume(null);
+      try{ Sound.wake(); }catch(e){}
+      if(typeof kickVoiceQueue==="function") kickVoiceQueue();
+    });
 
     return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,

@@ -43,6 +43,7 @@
   $("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
   $("voiceBtn").addEventListener("click",toggleVoice);
   $("quickVoiceBtn").addEventListener("click",toggleQuickVoice);   // 快速語音:直接錄→送全部人
+  $("voiceGate").addEventListener("click",playVoiceGate);          // 「點我播放語音」膠囊:手勢喚醒音訊後補播佇列
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));                       // 背景音樂開關
@@ -93,11 +94,28 @@
   $("mpAgain").addEventListener("click",()=>MP.again());
   $("mpLeaveWin").addEventListener("click",()=>MP.leave());
   addEventListener("resize",()=>{if(state.won){const cv=$("confetti");cv.width=innerWidth;cv.height=innerHeight;}});
-  // 首次使用者互動:解鎖音訊;若偏好記得「要開背景音樂」就開始播(繞過瀏覽器自動播放限制)
+  // 首次使用者互動:解鎖音訊;若偏好記得「要開背景音樂」就開始播(繞過瀏覽器自動播放限制)。
+  // iOS 切背景/鎖屏會把 AudioContext 打回 suspended,故解鎖監聽做成「可重新武裝」:回前景後下一次手勢再喚醒一次。
   let audioUnlocked=false;
-  function unlockAudioOnce(){ if(audioUnlocked)return; audioUnlocked=true; Sound.wake(); if(bgmOn)BGM.setOn(true); }
-  addEventListener("pointerdown",unlockAudioOnce,{once:true});
-  addEventListener("keydown",unlockAudioOnce,{once:true});
+  function unlockAudioOnce(){
+    Sound.wake();                                        // 每次(含回前景後)都喚醒一次 AudioContext
+    if(!audioUnlocked){ audioUnlocked=true; if(bgmOn)BGM.setOn(true); }
+    if(typeof kickVoiceQueue==="function") kickVoiceQueue();   // 若有語音在等手勢,喚醒後補播
+  }
+  function armAudioUnlock(){                              // 重新掛上「下一個手勢就喚醒」(同函式參考,重複掛會自動去重)
+    addEventListener("pointerdown",unlockAudioOnce,{once:true});
+    addEventListener("keydown",unlockAudioOnce,{once:true});
+  }
+  armAudioUnlock();
+  document.addEventListener("visibilitychange",()=>{     // 回前景且 context 已被系統 suspend → 重新武裝
+    if(!document.hidden && Sound.running && !Sound.running()) armAudioUnlock();
+  });
+
+  // Service Worker:離線可玩 + 「加到主畫面」。只在 https / localhost 註冊(file:// 不支援);
+  // 採 network-first(見 sw.js),線上永遠拿最新版,不會有「更新出不來」的問題。
+  if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost" || location.hostname==="127.0.0.1")){
+    addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+  }
 
   // 版本號:從 <meta name="version"> 取一次,填到頂列(BINGO 旁)與設定頁最下面(單一來源,免多處硬編)
   (function(){

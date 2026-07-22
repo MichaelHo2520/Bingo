@@ -8,6 +8,8 @@
       if(ctx.state==="suspended")ctx.resume();
       return ctx;
     }
+    // Silent Buffer Kick:在使用者手勢當下播一段 0.01s 無聲 buffer,強制解鎖 AudioContext(舊 iOS resume() 不夠力時的便宜保險)
+    function silentKick(c){ try{ const b=c.createBuffer(1,1,22050); const s=c.createBufferSource(); s.buffer=b; s.connect(c.destination); s.start(0); }catch(e){} }
     function tone(freq,o){
       if(muted)return; const c=ac(); if(!c)return;
       o=o||{}; const type=o.type||"sine",dur=o.dur||0.12,vol=o.vol||0.2,delay=o.delay||0,slide=o.slideTo||null;
@@ -25,7 +27,10 @@
       toggle(){muted=!muted; if(!muted)tone(660,{type:"triangle",dur:0.08,vol:0.15}); return muted;},
       setMuted(m){muted=!!m;},
       isMuted(){return muted;},
-      wake(){ac();},
+      wake(){ const c=ac(); if(c)silentKick(c); },   // 手勢中喚醒:建立/resume AudioContext + Silent Buffer Kick 強制解鎖
+      running(){ return !!(ctx && ctx.state==="running"); },   // 是否已在 running(給「收到語音但 context 未解鎖」的 Fallback 判斷)
+      state(){ return ctx ? ctx.state : "none"; },              // 目前 AudioContext 狀態(選配:開發者模式現場回報用)
+      resume(){ const c=ac(); return (c&&c.resume)?c.resume().catch(()=>{}):Promise.resolve(); },   // 顯式喚醒並回傳 promise(手勢中呼叫,resume 後再開播)
       place(){tone(520,{type:"triangle",dur:0.10,vol:0.18,slideTo:820});},
       takeback(){tone(500,{type:"triangle",dur:0.13,vol:0.15,slideTo:240});},
       mark(){tone(300,{type:"sine",dur:0.09,vol:0.28,slideTo:560}); tone(760,{type:"sine",dur:0.05,vol:0.10,delay:0.02});},

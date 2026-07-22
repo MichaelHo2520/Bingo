@@ -25,7 +25,12 @@
     grid.style.gridTemplateColumns="repeat("+SIZE+",1fr)";
     grid.style.gridTemplateRows="repeat("+SIZE+",1fr)";
     const fonts={5:"clamp(20px,6.5vw,40px)",6:"clamp(17px,5.4vw,33px)",7:"clamp(15px,4.6vw,28px)"};
+    // 格子越多 → 間距/圓角縮小,把空間讓給格子本身,增加手機觸控面積、減少 6×6 / 7×7 的誤觸
+    const gaps={5:"clamp(6px,1.6vw,10px)",6:"clamp(5px,1.3vw,8px)",7:"clamp(4px,1.1vw,6px)"};
+    const radii={5:"16px",6:"13px",7:"10px"};
     grid.style.setProperty("--cellfont", fonts[SIZE]||fonts[5]);
+    grid.style.setProperty("--gap", gaps[SIZE]||gaps[5]);
+    grid.style.setProperty("--cellradius", radii[SIZE]||radii[5]);
   }
   function clampTarget(){ state.target=Math.min(maxLines(),Math.max(1,state.target)); const t=$("targetVal"); if(t)t.textContent=state.target; }
   function syncSizeSeg(){ const seg=$("sizeSeg"); if(!seg)return; [...seg.children].forEach(b=>b.classList.toggle("on", (+b.dataset.size)===SIZE)); }
@@ -590,13 +595,34 @@
   }
   function pumpVoice(){
     if(voiceBusy)return;
+    if(!voiceQueue.length){ hideVoiceGate(); refreshBgmDuck(); return; }   // 佇列清空 → 收起膠囊 + 恢復背景音樂
+    // iOS 切背景/鎖屏會把 AudioContext 打回 suspended,非手勢情境下 resume() 會被忽略。
+    // 此時「不硬播、也不丟棄」——語音留在佇列裡,改顯示可點的「🔊 點擊播放」膠囊,等使用者手勢再播
+    // (順手根治舊版「9 秒 timeout 把播不出來的語音丟出佇列、永久遺失」的 bug)。
+    if(!(Sound.running && Sound.running())){ showVoiceGate(); return; }
+    hideVoiceGate();
     const next=voiceQueue.shift();
-    if(next===undefined){ refreshBgmDuck(); return; }   // 佇列清空 → 恢復背景音樂(若同時在錄音,duck 會維持到錄完)
     voiceBusy=true; refreshBgmDuck();                    // 開播 → 停背景音樂
     const advance=()=>{ if(!voiceBusy)return; if(voiceSafety){ clearTimeout(voiceSafety); voiceSafety=null; } voiceBusy=false; pumpVoice(); };
     voiceSafety=setTimeout(advance,9000);               // 保險:單則語音上限 6 秒,9 秒沒收到結束事件就強制接續,避免佇列卡住
     playVoiceOnce(next,advance);
   }
+  // 「🔊 點擊播放」膠囊:收到語音但 AudioContext 未解鎖(iOS 切背景回來/尚未手勢)時顯示,數字為待播則數
+  function showVoiceGate(){
+    const g=$("voiceGate"); if(!g)return;
+    const t=$("voiceGateTxt"), n=voiceQueue.length;
+    if(t)t.textContent = n>1 ? ("🔊 "+n+" 則語音 · 點我播放") : "🔊 點我播放語音";
+    g.classList.remove("hidden");
+  }
+  function hideVoiceGate(){ const g=$("voiceGate"); if(g)g.classList.add("hidden"); }
+  // 點膠囊(在使用者手勢中):喚醒 AudioContext 後才開播,確保 iOS 放行
+  function playVoiceGate(){
+    Sound.wake();
+    const go=()=>{ hideVoiceGate(); pumpVoice(); };
+    if(Sound.resume) Sound.resume().then(go); else go();
+  }
+  // 回前景/任一手勢喚醒音訊後,若還有語音在等就補播(由 main.js / online.js 呼叫)
+  function kickVoiceQueue(){ if(voiceQueue.length && !voiceBusy) pumpVoice(); }
   function buildEmoteRecipients(){
     const box=$("emoteTo"); if(!box)return; box.innerHTML="";
     const list=[{id:"all",name:"🌐 全部人"}].concat(MP.roster().filter(p=>!p.me).map(p=>({id:p.id,name:p.name})));
