@@ -541,12 +541,16 @@
       }else if(orderMethod==="random"){
         const ord=ids.slice();
         for(let i=ord.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=ord[i]; ord[i]=ord[j]; ord[j]=t; }
-        // 隨機順序沒有猜拳/排序過場當「屏障」。若把清空(calledList/winner)與 status="playing" 塞進同一次寫入,
-        // 各端兩個監聽的到達順序不保證:一旦 status 先到,enterPlaying() 會用「上一局殘留的 calledList」重算而秒判勝利,
-        // 於是再一局一開打就立刻跳結果卡、無限迴圈卡死(此 bug 只發生在隨機;rps/host 的清空在更早的獨立寫入已先傳到)。
-        // 解法:拆成兩次寫入(Firebase 保證同一客戶端的寫入依序送達各端)——先清殘局並排好順序,確定 calledList 已清空,再翻 status 開打。
-        roomRef.update({ ...base, order:ord, rps:null });
-        roomRef.child("status").set("playing");
+        // 隨機順序沒有猜拳/排序過場當「屏障」,故拆成多次寫入(Firebase 保證同一客戶端的寫入依序送達各端):
+        // 陷阱一(秒判勝利):若把清空(calledList/winner)與 status="playing" 塞進同一次寫入,各端兩個監聽到達順序不保證,
+        //   一旦 status 先到,enterPlaying() 會用上一局殘留的 calledList 重算而秒判勝利、無限迴圈卡死。→ 先清殘局、確定 calledList 空了再翻 status。
+        // 陷阱二(第二局起卡死、誰都點不了):backToLobby() 已把「本地」order 清成 [],但 DB 的 order 還留著上一局的值。
+        //   若這局洗出的順序「剛好和上一局相同」(2 人有 50% 機率),對 order 寫入同一個值 Firebase「不觸發 value 事件」,
+        //   本地 order 就永遠停在 [] → 沒人輪得到、也沒有晶片高亮、點號碼一律「還沒輪到你」。
+        //   → 解法:先把 order 寫成 null(舊值→null 一定是變化、必觸發事件把本地清空),再單獨寫入新順序(null→ord 也必觸發),本地一定同步到新順序。
+        roomRef.update({ ...base, order:null, rps:null });   // ① 清殘局(含把 order 歸零,確保下一步一定觸發事件)
+        roomRef.child("order").set(ord);                     // ② 寫入本局順序(null→ord 保證各端本地 order 同步更新)
+        roomRef.child("status").set("playing");              // ③ 確定盤面與順序都就位後才開打
       }else{
         roomRef.update({ ...base, status:"ordering", order:null, rps:null });
       }
