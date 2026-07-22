@@ -94,6 +94,11 @@
 
   /* ---------- Top bar ---------- */
   .topbar{width:min(92vw,520px);display:flex;align-items:center;justify-content:space-between;gap:10px}
+  /* 品牌區:BINGO 跑馬燈 + 旁邊的小字版本號 */
+  .brand{display:flex;align-items:flex-end;gap:8px;min-width:0}
+  .topver{font-family:'Fredoka',sans-serif;font-weight:600;font-size:11px;color:var(--muted);
+    opacity:.75;letter-spacing:.02em;padding-bottom:5px;white-space:nowrap}
+  body.at-home .topver{visibility:hidden}   /* 主選單藏跑馬燈,版本也一起藏(保留位置) */
   .marquee{display:flex;gap:6px;align-items:flex-end}
   .marquee .bulb{
     font-family:'Fredoka',sans-serif;font-weight:700;
@@ -657,14 +662,18 @@
   .quick-voice{display:none;position:fixed;z-index:40;
     right:16px;right:calc(16px + env(safe-area-inset-right));
     bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom));
-    align-items:center;gap:8px;border:1px solid var(--panel-line);
-    background:var(--accent);color:#1c1008;border-radius:999px;
-    padding:12px 18px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;
-    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s}
+    align-items:center;justify-content:center;border:1px solid var(--panel-line);
+    background:var(--accent);color:#1c1008;border-radius:50%;
+    width:54px;height:54px;padding:0;
+    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,bottom .2s}
   body.mp-on .quick-voice{display:inline-flex}   /* 只在連線中出現 */
-  body.mp-on{padding-bottom:88px}                 /* 預留淨空,浮動鈕不蓋到最底排數字 */
+  .quick-voice .qv-label{display:none}            /* 只留麥克風圖示,不顯示文字 */
+  body.mp-on{padding-bottom:calc(88px + env(safe-area-inset-bottom))}   /* 播放中:淨空給右下語音鈕 */
+  /* 大廳同時有固定底部動作列時:語音鈕抬到動作列上方避免重疊,底部再多留淨空 */
+  body.mp-on.has-primary-bar{padding-bottom:calc(150px + env(safe-area-inset-bottom))}
+  body.has-primary-bar .quick-voice{bottom:calc(92px + env(safe-area-inset-bottom))}
   .quick-voice:active{transform:scale(.93)}
-  .quick-voice .qv-ico{font-size:20px;line-height:1}
+  .quick-voice .qv-ico{font-size:24px;line-height:1}
   .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
   .quick-voice:disabled{opacity:.65;cursor:default}
   :root[data-theme="midnight"] .quick-voice,
@@ -703,10 +712,10 @@
   }
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   :root[data-theme="ebook"] #toast{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
-  footer{color:var(--muted);font-size:12px;margin-top:auto;padding-top:8px;opacity:.7;
-    display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center}
-  .ver{opacity:.6;letter-spacing:.03em}
-  .dev{opacity:.75;font-weight:700}
+  /* 設定頁最下面的版本 + 開發者(取代原本主畫面的 footer) */
+  .set-foot{margin-top:14px;text-align:center;color:var(--muted);opacity:.7;
+    font-size:12px;font-weight:700;letter-spacing:.02em}
+  :root[data-theme="ebook"] .set-foot{color:#000;opacity:.6}
   /* 主選單(進場先選單機 / 連線) */
   #home{text-align:center;padding-top:8px}
   .home-hero{margin:16px 0 24px}

@@ -404,18 +404,8 @@
       mpHint();
     }
     // 主要動作列的引導提示:只在大廳,依「我準備了沒 / 大家好了沒 / 我是不是房主」給出下一步該做什麼
-    function mpHint(){
-      if(!state.online || status!=="lobby"){ setActionHint(""); return; }
-      const ids=Object.keys(players);
-      if(ids.length<2){ setActionHint("👋 等其他人加入房間就能開始"); return; }
-      const readyCount=ids.filter(id=>players[id]&&players[id].ready).length;
-      if(!ready){
-        setActionHint(state.card.some(n=>!n) ? "① 先填好你的賓果卡片" : "② 按下面的「準備好了 ✓」");
-        return;
-      }
-      if(readyCount>=ids.length) setActionHint("🎉 大家都準備好了,開始對戰!");   // 全部準備好即自動開打
-      else setActionHint("已準備 ✓ 等其他人… ("+readyCount+"/"+ids.length+")");
-    }
+    // 連線大廳不再顯示「現在該做什麼」引導(填卡 → 按準備 → 全準備自動開打,流程已夠直覺)——一律清空
+    function mpHint(){ setActionHint(""); }
     function updateReadyBtn(){
       const b=$("mpReadyBtn");
       b.textContent=ready?"取消準備":"準備好了 ✓";

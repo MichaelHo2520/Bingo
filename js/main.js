@@ -99,6 +99,13 @@
   addEventListener("pointerdown",unlockAudioOnce,{once:true});
   addEventListener("keydown",unlockAudioOnce,{once:true});
 
+  // 版本號:從 <meta name="version"> 取一次,填到頂列(BINGO 旁)與設定頁最下面(單一來源,免多處硬編)
+  (function(){
+    const m=document.querySelector('meta[name="version"]'), v=m?m.content:"";
+    const tv=$("topVer"); if(tv)tv.textContent=v?("v"+v):"";
+    const sv=$("setVer"); if(sv)sv.textContent=v?("v"+v):"";
+  })();
+
   buildSwatches();
   loadPrefs();
   applyGridCols();syncSizeSeg();

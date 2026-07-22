@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.23.0 -->
-<meta name="version" content="1.23.0">
+<!-- BINGO 賓果遊戲 · v1.23.1 -->
+<meta name="version" content="1.23.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -19,8 +19,11 @@
 <body>
 
   <div class="topbar">
-    <div class="marquee display" id="marquee" aria-label="BINGO 進度">
-      <span class="bulb">B</span><span class="bulb">I</span><span class="bulb">N</span><span class="bulb">G</span><span class="bulb">O</span>
+    <div class="brand">
+      <div class="marquee display" id="marquee" aria-label="BINGO 進度">
+        <span class="bulb">B</span><span class="bulb">I</span><span class="bulb">N</span><span class="bulb">G</span><span class="bulb">O</span>
+      </div>
+      <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
       <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
@@ -216,8 +219,6 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.23.0</span><span class="dev">開發者 Michael Ho</span></footer>
-
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
     <div class="win-card mp-veil-card">
@@ -296,6 +297,7 @@
         <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
       </div>
       <button class="btn primary" id="setClose">完成</button>
+      <div class="set-foot">BINGO · <span id="setVer"></span> · 開發者 Michael Ho</div>
     </div>
   </div>
 
