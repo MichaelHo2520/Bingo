@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.23.4 -->
-<meta name="version" content="1.23.4">
+<!-- BINGO 賓果遊戲 · v1.24.0 -->
+<meta name="version" content="1.24.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -167,15 +167,6 @@
     <div class="hint" id="mpConnMsg"></div>
   </section>
 
-  <!-- 填號方式(屬於「填號」分頁,和號碼格擺在一起,不用切來切去) -->
-  <div class="field tab-hidden" id="fillRow">
-    <span class="field-label">填號方式</span>
-    <div class="seg" id="fillSeg" role="tablist" aria-label="填號方式">
-      <button class="on" data-fill="auto">🎲 自動填號</button>
-      <button data-fill="manual">✏️ 手動填號</button>
-    </div>
-  </div>
-
   <!-- ====== BOARD ====== -->
   <div class="board-wrap hidden" id="boardWrap">
 
@@ -197,9 +188,16 @@
 
     <div class="grid" id="grid"></div>
 
-    <!-- 填號分頁的動作:換一組號碼(連線鈕保留但已改由主選單進入,平時由 JS 隱藏) -->
+    <!-- 填號方式:移到號碼格「下方」(選項本身已有圖示+文字,不再另標「填號方式」標題) -->
+    <div class="tab-hidden" id="fillRow">
+      <div class="seg" id="fillSeg" role="tablist" aria-label="填號方式">
+        <button class="on" data-fill="auto">🎲 自動填號</button>
+        <button data-fill="manual">✏️ 手動填號</button>
+      </div>
+    </div>
+
+    <!-- 填號分頁的動作:連線鈕保留但已改由主選單進入,平時由 JS 隱藏(換一組已改為右下浮動鈕) -->
     <div class="actions" id="setupActions">
-      <button class="btn ghost" id="reshuffleBtn">🎲 換一組號碼</button>
       <button class="btn ghost" id="onlineBtn">🌐 連線對戰</button>
     </div>
 
@@ -325,6 +323,9 @@
     </div>
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
+
+  <!-- 快速換一組號碼:自動填號時浮在右下(連線時疊在麥克風上方),只留骰子圖示;點一下重抽整張卡 -->
+  <button class="quick-reshuffle hidden" id="reshuffleBtn" type="button" title="換一組號碼" aria-label="換一組號碼">🎲</button>
 
   <!-- 快速語音留言:連線時浮在盤面右下,點一下錄音、再點一下直接送給全部人 -->
   <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">

@@ -80,11 +80,20 @@
     gap:14px;overflow:hidden;
     transition:background .5s ease;
   }
-  /* app-shell:頂列 / 房間橫幅 / 分頁列固定在上;中間內容區可上下捲;準備列固定在其下方 */
-  .scroll-area{flex:1 1 0;min-height:0;width:min(92vw,520px);
+  /* app-shell:頂列 / 房間橫幅 / 分頁列固定在上;中間內容區可上下捲;準備列固定在其下方。
+     預設 flex:0 1 auto — 內容短時縮到內容高度(準備列緊貼其下,不再撐出一大片空白;修正「設定分頁滑動範圍太大、底下一堆空白」) */
+  .scroll-area{flex:0 1 auto;min-height:0;width:min(92vw,520px);
     display:flex;flex-direction:column;align-items:center;gap:14px;
     overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   .topbar,#mpBar,#soloHead,#roomTabs,#home,.primary-bar{flex:none}
+  /* 填號分頁:改回 flex:1 撐滿(內容本來就有整片號碼格,不會空太多),讓準備列固定在最底,右下浮動鈕才有穩定的落點、不會壓到準備鈕 */
+  body.room-tab-fill .scroll-area{flex:1 1 0}
+  /* 盤面尺寸上限:除了 92vw / 520px,再用「可視高度」夾一次,螢幕太寬時格子才不會變太大、下緣被切掉。
+     依目前版面(是否有房間橫幅 / 準備列 / HUD)預留不同的縱向空間 */
+  body{ --board-cap: calc(100dvh - 210px); }                    /* 遊戲中 / 主選單:僅上方 HUD + 邊距 */
+  body.has-primary-bar{ --board-cap: calc(100dvh - 330px); }    /* 設定 / 大廳:另含填號列 + 底部準備列 */
+  body.mp-on.has-primary-bar{ --board-cap: calc(100dvh - 430px); }        /* 連線大廳:再含房間橫幅(矮螢幕時盤面縮小,讓填號列不被浮動鈕蓋住) */
+  body.mp-on:not(.has-primary-bar){ --board-cap: calc(100dvh - 250px); }  /* 連線遊戲中:含房間橫幅 + HUD */
   /* 固定背景層:取代 background-attachment:fixed(手機滑動時背景會被帶著跑、放開才重畫、跳一下)。
      改用 position:fixed 的合成層,滑動時由合成器釘住、不重繪,就不會跳動 */
   body::before{
@@ -184,7 +193,8 @@
   .board-wrap{width:min(92vw,520px);display:flex;flex-direction:column;align-items:center;gap:12px}
   .grid{
     --gap:clamp(6px,1.6vw,10px);
-    width:min(92vw,520px);aspect-ratio:1;
+    /* 寬度取 92vw / 520px / 可視高度上限 三者最小;max(160px,…) 防止極矮螢幕算出過小或負值 */
+    width:min(92vw,520px,max(160px,var(--board-cap,520px)));aspect-ratio:1;
     display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,1fr);
     gap:var(--gap);
   }
@@ -346,7 +356,7 @@
   .room-tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
   :root[data-theme="ebook"] .room-tabs{border-bottom-color:#000}
   :root[data-theme="ebook"] .room-tabs button.on{color:#000;border-bottom-color:#000}
-  /* 填號方式列:當作填號分頁的一部分,寬度對齊 */
+  /* 填號方式列:移到號碼格下方,寬度對齊;內部就是選項膠囊 .seg */
   #fillRow{width:min(92vw,520px);margin-top:0}
   /* 主要動作列(準備/開始 + 現在該做什麼提示):在 app-shell 裡是 .scroll-area「下方」的固定列,不再 position:fixed 浮蓋內容 */
   .primary-bar{width:min(92vw,520px);display:flex;flex-direction:column;gap:8px;padding-top:4px}
@@ -657,18 +667,21 @@
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
   :root[data-theme="ebook"] .voice-btn.rec{background:#000;color:#fff}
   .voice-hint{font-family:'Nunito',sans-serif;font-weight:700;font-size:12px;color:var(--muted);text-align:center}
-  /* 快速語音留言:連線時浮在盤面右下,點一下開始錄音、再點一下直接送給全部人(免開面板、免選對象) */
-  .quick-voice{display:none;position:fixed;z-index:40;
+  /* 右下浮動圓鈕的共用外觀:麥克風(語音)與骰子(換一組)共用 */
+  .quick-voice,.quick-reshuffle{position:fixed;z-index:40;
     right:16px;right:calc(16px + env(safe-area-inset-right));
-    bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom));
     align-items:center;justify-content:center;border:1px solid var(--panel-line);
     background:var(--accent);color:#1c1008;border-radius:50%;
-    width:54px;height:54px;padding:0;
-    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,bottom .2s}
+    width:54px;height:54px;padding:0;opacity:.8;   /* 半透明:不擋住底下的號碼/按鈕 */
+    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,bottom .2s,opacity .2s}
+  .quick-voice:hover,.quick-voice:active,.quick-voice.rec,
+  .quick-reshuffle:hover,.quick-reshuffle:active{opacity:1}   /* 互動 / 錄音中回到不透明,狀態清楚 */
+  /* 快速語音留言:連線時浮在盤面右下,點一下開始錄音、再點一下直接送給全部人(免開面板、免選對象) */
+  .quick-voice{display:none;bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom))}
   body.mp-on .quick-voice{display:inline-flex}    /* 連線中(大廳 + 遊戲)都顯示 */
   .quick-voice .qv-label{display:none}            /* 只留麥克風圖示,不顯示文字 */
-  /* 連線中:中間可捲區底部留白,讓最後內容(換一組/末排號碼)能捲到浮動語音鈕上方 */
-  body.mp-on .scroll-area{padding-bottom:72px}
+  /* 填號分頁:內容區底部留白,讓最後一列(填號方式)能清出右下浮動鈕的空間 */
+  body.room-tab-fill .scroll-area{padding-bottom:60px}
   /* 大廳(有固定準備列)時:浮動語音鈕抬到準備列上方,不與它重疊 */
   body.has-primary-bar .quick-voice{bottom:calc(84px + env(safe-area-inset-bottom))}
   .quick-voice:active{transform:scale(.93)}
@@ -679,6 +692,16 @@
   :root[data-theme="arcade"] .quick-voice{color:var(--daub-ink)}
   :root[data-theme="ebook"] .quick-voice{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
   :root[data-theme="ebook"] .quick-voice.rec{background:#000;color:#fff}
+  /* 快速換一組號碼:自動填號時才顯示(由 JS 切 .hidden);單機蹲在準備列上方,連線時再疊到麥克風上方 */
+  .quick-reshuffle{display:inline-flex;font-size:24px;line-height:1;
+    bottom:calc(84px + env(safe-area-inset-bottom))}
+  .quick-reshuffle.hidden{display:none!important}
+  body.mp-on .quick-reshuffle{bottom:calc(150px + env(safe-area-inset-bottom))}  /* 連線:疊在麥克風上方 */
+  .quick-reshuffle:hover{transform:translateY(-2px)}
+  .quick-reshuffle:active{transform:scale(.93)}
+  :root[data-theme="midnight"] .quick-reshuffle,
+  :root[data-theme="arcade"] .quick-reshuffle{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .quick-reshuffle{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
   .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
     align-items:center;gap:3px;animation:emoteFloat 2.2s ease-out forwards}

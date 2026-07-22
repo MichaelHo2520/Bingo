@@ -245,11 +245,15 @@
   let roomTab="fill";   // 目前分頁:'settings'=設定列 / 'fill'=號碼格
   function applyRoomTab(){
     const settingsOn = roomTab==="settings";
-    // 設定列只在「設定」分頁;填號方式列 + 號碼格 + 換一組 只在「填號」分頁
+    // 設定列只在「設定」分頁;填號方式列 + 號碼格 只在「填號」分頁
     $("setup").classList.toggle("tab-hidden", !settingsOn);
     $("fillRow").classList.toggle("tab-hidden", settingsOn);
     $("boardWrap").classList.toggle("tab-hidden", settingsOn);
+    // body 記住目前分頁:填號分頁才給內容區底部留白(清出右下浮動鈕的空間)
+    document.body.classList.toggle("room-tab-fill", !settingsOn);
+    document.body.classList.toggle("room-tab-settings", settingsOn);
     const bar=$("roomTabs"); if(bar)[...bar.children].forEach(b=>b.classList.toggle("on", b.dataset.tab===roomTab));
+    updateReshuffleBtn();
   }
   // show=true:進入 setup/大廳 → 顯示分頁列 + 主要動作列並套用目前分頁(defaultTab 指定預設頁)
   // show=false:離開(進遊戲/猜拳/主選單) → 收起分頁列/主要動作列/填號列,setup 與 boardWrap 的顯示交還給各流程的 .hidden
@@ -259,9 +263,11 @@
       bar.classList.add("hidden");
       $("primaryBar").classList.add("hidden");
       document.body.classList.remove("has-primary-bar");   // 收起固定底部動作列 → 移除為它預留的底部空間
+      document.body.classList.remove("room-tab-fill","room-tab-settings");   // 離開設定/大廳 → 清掉分頁留白
       $("setup").classList.remove("tab-hidden");
       $("boardWrap").classList.remove("tab-hidden");
       $("fillRow").classList.add("tab-hidden");   // 填號方式列只屬於大廳/設定的「填號」分頁,離開一律收起
+      updateReshuffleBtn();   // 進遊戲/離開 → 收起右下換一組浮動鈕
       return;
     }
     if(defaultTab)roomTab=defaultTab;
@@ -287,13 +293,20 @@
 
   function applyFillUI(){
     const manual=state.fill==="manual";
-    $("reshuffleBtn").classList.toggle("hidden",manual);
+    updateReshuffleBtn();
     if(manual){ updateManualUI(); }
     else {
       $("startBtn").disabled=false;$("startBtn").style.opacity="1";
       if(state.online)MP.readyEnabled(true);
       refreshActionHint();
     }
+  }
+  // 右下浮動「換一組」鈕:只在「設定中 + 填號分頁 + 自動填號」時出現(手動填號 / 設定分頁 / 遊戲中都收起)
+  function updateReshuffleBtn(){
+    const btn=$("reshuffleBtn"); if(!btn)return;
+    const inRoom = !$("roomTabs").classList.contains("hidden");   // 分頁列有顯示=正在設定/大廳
+    const show = inRoom && roomTab==="fill" && state.mode==="setup" && state.fill==="auto";
+    btn.classList.toggle("hidden", !show);
   }
 
   /* ---------- Confetti ---------- */
