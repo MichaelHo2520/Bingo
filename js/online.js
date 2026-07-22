@@ -440,6 +440,9 @@
       $("reshuffleBtn").disabled=lock;
       $("fillSeg").style.pointerEvents=lock?"none":"";
       grid.style.pointerEvents=lock?"none":"";
+      // 準備好了:收起「換一組」骰子與「填號方式」列(取消準備會再顯示);切分頁時 applyRoomTab 也會依 amReady 重算
+      $("fillRow").classList.toggle("tab-hidden", lock || (typeof roomTab!=="undefined" && roomTab==="settings"));
+      if(typeof updateReshuffleBtn==="function") updateReshuffleBtn();
     }
     function toggleReady(){
       if(!ready){
@@ -1060,7 +1063,7 @@
     return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap,
-             amHost, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,
+             amHost, amReady:()=>ready, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,
              confirmKick, cancelKick:closeKick, refreshHint:mpHint,
              setScoreMode, setWinGoal, resetScores, winGoal:()=>winGoal, scoreMode:()=>scoreMode, usePrefs };
   })();

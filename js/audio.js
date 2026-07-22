@@ -47,14 +47,14 @@
     };
   })();
 
-  /* ---------- 背景音樂(獨立音檔 bgm.mp3,不內嵌) ----------
-     為了不讓 index.html 每次改動都連音樂一起變大,音樂拆成同目錄的獨立檔 `bgm.mp3`
-     (30 秒、可無縫循環),以相對路徑載入。主路徑走 Web Audio:fetch → decodeAudioData →
+  /* ---------- 背景音樂(獨立音檔,放在 mp3/ 資料夾,不內嵌) ----------
+     為了不讓 index.html 每次改動都連音樂一起變大,音樂拆成獨立檔(放 `mp3/`),
+     以相對路徑載入。可在設定裡切換曲目(setSrc);主路徑走 Web Audio:fetch → decodeAudioData →
      AudioBufferSource(loop) → GainNode(音量,iOS 也有效)→ destination;共用 Sound 已解鎖的
      AudioContext(繞過 iOS 自動播放)。fetch/decode 失敗(離線、file:// 取不到)→ 退回
      HTMLAudio;仍失敗就靜默關掉,App 不受影響、只是沒音樂。 */
   const BGM=(function(){
-    const SRC="bgm.mp3";
+    let src="mp3/bgm.mp3";   // 目前曲目路徑(可由 setSrc 切換)
     let master=null, buffer=null, node=null, el=null;
     let on=false, vol=0.35, ready=false, loading=false, failed=false, ducked=false;
     function ctx(){ return (Sound.ctx && Sound.ctx()) || null; }
@@ -67,7 +67,7 @@
       const c=ctx(); if(!c)return Promise.resolve();
       if(loading)return Promise.resolve();
       loading=true;
-      return fetch(SRC).then(r=>{ if(!r.ok)throw 0; return r.arrayBuffer(); })
+      return fetch(src).then(r=>{ if(!r.ok)throw 0; return r.arrayBuffer(); })
         .then(ab=>new Promise((res,rej)=>{ c.decodeAudioData(ab, b=>res(b), e=>rej(e)); }))
         .then(b=>{ buffer=b; ready=true; loading=false; })
         .catch(()=>{ loading=false; failed=true; });   // 取不到就標記失敗,交給 HTMLAudio 後備
@@ -82,7 +82,7 @@
       node.connect(m); node.start();
     }
     function playFallback(){   // 後備:桌機/Android 仍能播(iOS 對 HTMLAudio 的音量可能無效)
-      try{ if(!el){ el=new Audio(SRC); el.loop=true; } el.volume=vol; el.play().catch(()=>{}); }catch(e){}
+      try{ if(!el){ el=new Audio(src); el.loop=true; } el.volume=vol; el.play().catch(()=>{}); }catch(e){}
     }
     // 語音期間先停背景音樂,讓語音聽得清楚;語音全部播完再恢復(僅在使用者原本就開著時)
     function duck(d){
@@ -92,9 +92,21 @@
       if(d){ stopNode(); if(el){ try{ el.pause(); }catch(e){} } }
       else if(on){ if(ready)playBuffer(); else if(failed)playFallback(); else load().then(()=>{ if(on&&!ducked){ if(ready)playBuffer(); else playFallback(); } }); }
     }
+    // 切換曲目:丟掉舊的已解碼 buffer / HTMLAudio,重設載入狀態;若正在播放就立刻換成新曲接著播
+    function setSrc(s){
+      s=s||src; if(s===src)return;
+      src=s;
+      const wasPlaying = on && !ducked;
+      stopNode();
+      if(el){ try{ el.pause(); }catch(e){} el=null; }
+      buffer=null; ready=false; failed=false; loading=false;
+      if(wasPlaying){ load().then(()=>{ if(!on||ducked)return; if(ready)playBuffer(); else if(failed)playFallback(); }); }
+    }
     return {
       isOn(){ return on; },
       vol(){ return vol; },
+      src(){ return src; },
+      setSrc,
       duck,
       setOn(o){
         on=!!o;

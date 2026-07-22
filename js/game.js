@@ -248,11 +248,13 @@
 
   /* ---------- 房間分頁:把「設定」與「號碼格」拆成兩個分頁,避免畫面一次太長 ---------- */
   let roomTab="fill";   // 目前分頁:'settings'=設定列 / 'fill'=號碼格
+  // 連線中「已按準備好了」= 鎖定:此時把填號方式列與換一組骰子都收起(取消準備再顯示)
+  function amReadyLock(){ return !!(state.online && typeof MP!=="undefined" && MP.amReady && MP.amReady()); }
   function applyRoomTab(){
     const settingsOn = roomTab==="settings";
-    // 設定列只在「設定」分頁;填號方式列 + 號碼格 只在「填號」分頁
+    // 設定列只在「設定」分頁;填號方式列 + 號碼格 只在「填號」分頁(已準備好也收起填號方式列)
     $("setup").classList.toggle("tab-hidden", !settingsOn);
-    $("fillRow").classList.toggle("tab-hidden", settingsOn);
+    $("fillRow").classList.toggle("tab-hidden", settingsOn || amReadyLock());
     $("boardWrap").classList.toggle("tab-hidden", settingsOn);
     // body 記住目前分頁:填號分頁才給內容區底部留白(清出右下浮動鈕的空間)
     document.body.classList.toggle("room-tab-fill", !settingsOn);
@@ -311,7 +313,8 @@
   function updateReshuffleBtn(){
     const btn=$("reshuffleBtn"); if(!btn)return;
     const inRoom = !$("roomTabs").classList.contains("hidden");   // 分頁列有顯示=正在設定/大廳
-    const show = inRoom && roomTab==="fill" && state.mode==="setup" && state.fill==="auto";
+    // 已按準備好了(連線)就收起,避免準備後還能換卡
+    const show = inRoom && roomTab==="fill" && state.mode==="setup" && state.fill==="auto" && !amReadyLock();
     btn.classList.toggle("hidden", !show);
   }
 
@@ -343,6 +346,13 @@
   let lastColorTheme="sunset";
   let bgmOn=false, bgmVol=0.35;   // 背景音樂:是否開啟、音量(0~1);預設關,音量 35%
   let voiceVol=1.5;               // 收到語音的播放音量倍率(1=原音,可 >1 放大);預設 150%,範圍 0~3
+  // 背景音樂可選曲目(檔案放 mp3/;第一個為預設)。新增曲目只要放檔 + 在這裡加一列
+  const BGM_TRACKS=[
+    { id:"default", name:"歡樂(預設)",     src:"mp3/bgm.mp3" },
+    { id:"sunday",  name:"Sunday Morning", src:"mp3/Sunday_Morning_Win.mp3" }
+  ];
+  let bgmTrack="default";         // 目前選的曲目 id
+  function bgmSrcOf(id){ const t=BGM_TRACKS.find(t=>t.id===id); return (t||BGM_TRACKS[0]).src; }
   const STORE_KEY="bingo.prefs.v1";
   function savePrefs(){
     try{
@@ -355,6 +365,7 @@
         size:SIZE,
         bgmOn:bgmOn,
         bgmVol:bgmVol,
+        bgmTrack:bgmTrack,
         voiceVol:voiceVol,
         scoreMode:(MP&&MP.scoreMode)?MP.scoreMode():"rank",   // 記住連線計分偏好(建房預設用)
         winGoal:(MP&&MP.winGoal)?MP.winGoal():3,
@@ -376,6 +387,8 @@
     if(p.muted){ Sound.setMuted(true); }
     if(typeof p.bgmVol==="number"){ bgmVol=Math.max(0,Math.min(1,p.bgmVol)); }
     BGM.setVolume(bgmVol);
+    if(typeof p.bgmTrack==="string" && BGM_TRACKS.some(t=>t.id===p.bgmTrack)){ bgmTrack=p.bgmTrack; }
+    BGM.setSrc(bgmSrcOf(bgmTrack));   // 套用記住的曲目(尚未播放時只是記下路徑,首次手勢才真正載入)
     if(typeof p.voiceVol==="number"){ voiceVol=Math.max(0,Math.min(3,p.voiceVol)); }
     if(MP&&MP.usePrefs){ MP.usePrefs(p.scoreMode, p.winGoal); }   // 帶回記住的連線計分偏好(建房預設)
     if(p.bgmOn){ bgmOn=true; }   // 記住「想開」;實際播放等首次使用者互動(繞過自動播放限制)
@@ -418,6 +431,14 @@
     if(swB)swB.setAttribute("aria-checked",bgmOn?"true":"false");
     if(volEl)volEl.value=Math.round(bgmVol*100);
     if(volRow)volRow.classList.toggle("dim",!bgmOn);   // 關閉時音量列淡化
+    const trkSel=$("bgmTrackSel");
+    if(trkSel){
+      if(!trkSel.options.length){   // 首次:用曲目清單建 <option>
+        BGM_TRACKS.forEach(t=>{ const o=document.createElement("option"); o.value=t.id; o.textContent=t.name; trkSel.appendChild(o); });
+      }
+      trkSel.value=bgmTrack;
+    }
+    const trkRow=$("bgmTrackRow"); if(trkRow)trkRow.classList.toggle("dim",!bgmOn);
     const vvEl=$("voiceVol"); if(vvEl)vvEl.value=Math.round(voiceVol*100);
   }
   function openSettings(){ Sound.wake(); syncSettingsUI(); $("setVeil").classList.add("show"); }
@@ -439,6 +460,11 @@
   // 背景音樂:開關(開→解鎖音訊並播放;關→停止),音量即時套用;都記憶偏好
   function setBgm(on){ bgmOn=!!on; if(bgmOn){ Sound.wake(); BGM.setOn(true); } else { BGM.setOn(false); } savePrefs(); syncSettingsUI(); }
   function setBgmVol(v){ bgmVol=Math.max(0,Math.min(1,v)); BGM.setVolume(bgmVol); }
+  // 切換背景音樂曲目:即時套到 BGM(播放中會直接換曲),記憶偏好
+  function setBgmTrack(id){
+    if(!BGM_TRACKS.some(t=>t.id===id))return;
+    bgmTrack=id; BGM.setSrc(bgmSrcOf(id)); savePrefs(); syncSettingsUI();
+  }
   // 收到語音的音量:倍率 0~3(1=原音,>1 放大);每則語音播放時即時讀 voiceVol 套用,故不需即時改動已播節點
   function setVoiceVol(v){ voiceVol=Math.max(0,Math.min(3,v)); }
   let toastT;

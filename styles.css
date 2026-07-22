@@ -113,7 +113,7 @@
   .brand{display:flex;align-items:flex-end;gap:8px;min-width:0}
   .topver{font-family:'Fredoka',sans-serif;font-weight:600;font-size:11px;color:var(--muted);
     opacity:.75;letter-spacing:.02em;padding-bottom:5px;white-space:nowrap}
-  body.at-home .topver{visibility:hidden}   /* 主選單藏跑馬燈,版本也一起藏(保留位置) */
+  /* 主選單也顯示版本:跑馬燈雖藏起來但仍佔位,版本號因此停在與其它頁完全相同的位置與大小 */
   .marquee{display:flex;gap:6px;align-items:flex-end}
   .marquee .bulb{
     font-family:'Fredoka',sans-serif;font-weight:700;
@@ -329,6 +329,15 @@
   .switch[aria-checked="true"]{background:var(--accent)}
   .switch[aria-checked="true"] .knob{transform:translateX(22px);background:#fff}
   .set-card .btn{width:100%;margin-top:18px}
+  /* 設定卡:標題 / 完成鈕 / 版本固定,只有中間的選項清單可捲動(選項變多也不會把整張卡撐到超出畫面)。
+     只作用在設定卡(#setVeil),不動到共用 .set-card 樣式的表情卡 */
+  #setVeil .set-card{display:flex;flex-direction:column;overflow:hidden}
+  #setVeil .set-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  /* 背景音樂曲目下拉 */
+  .set-select{font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;color:var(--text);
+    background:rgba(255,255,255,.12);border:1px solid var(--panel-line);border-radius:12px;
+    padding:8px 12px;cursor:pointer;max-width:62%}
+  :root[data-theme="ebook"] .set-select{background:#fff;color:#000;border:1px solid #000}
   :root[data-theme="ebook"] .set-card{background:#fff;border:2px solid #000}
   :root[data-theme="ebook"] .switch{background:#fff;border:1px solid #000}
   :root[data-theme="ebook"] .switch[aria-checked="true"]{background:#000}
@@ -674,8 +683,13 @@
     background:var(--accent);color:#1c1008;border-radius:50%;
     width:54px;height:54px;padding:0;opacity:.6;   /* 半透明:讓底下的準備鈕/填號方式看得到 */
     cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,bottom .2s,opacity .2s}
-  .quick-voice:hover,.quick-voice:active,.quick-voice.rec,
-  .quick-reshuffle:hover,.quick-reshuffle:active{opacity:1}   /* 互動 / 錄音中回到不透明,狀態清楚 */
+  /* 按下當下 / 錄音中回到不透明,狀態清楚。:hover 只給真的能 hover 的裝置(滑鼠),
+     否則觸控點完 hover 會「卡住」不退,鈕一直全不透明、回不到半透明 */
+  .quick-voice:active,.quick-voice.rec,.quick-reshuffle:active{opacity:1}
+  @media (hover:hover){
+    .quick-voice:hover,.quick-reshuffle:hover{opacity:1}
+    .quick-reshuffle:hover{transform:translateY(-2px)}
+  }
   /* 快速語音留言:浮在最右下角(大廳時就浮在「準備好了」上),點一下錄音、再點一下直接送給全部人 */
   .quick-voice{display:none;bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom))}
   body.mp-on .quick-voice{display:inline-flex}    /* 連線中(大廳 + 遊戲)都顯示 */
@@ -704,7 +718,6 @@
   :root[data-theme="midnight"] .voice-gate,
   :root[data-theme="arcade"] .voice-gate{color:var(--daub-ink)}
   :root[data-theme="ebook"] .voice-gate{background:#000;color:#fff;box-shadow:none}
-  .quick-reshuffle:hover{transform:translateY(-2px)}
   .quick-reshuffle:active{transform:scale(.93)}
   :root[data-theme="midnight"] .quick-reshuffle,
   :root[data-theme="arcade"] .quick-reshuffle{color:var(--daub-ink)}

@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.24.2 -->
-<meta name="version" content="1.24.2">
+<!-- BINGO 賓果遊戲 · v1.25.0 -->
+<meta name="version" content="1.25.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -277,29 +277,36 @@
   <div class="veil" id="setVeil">
     <div class="set-card">
       <div class="set-head">設定</div>
-      <div class="set-row">
-        <span class="set-lbl">主題</span>
-        <div class="swatches" id="swatches"></div>
-      </div>
-      <div class="set-row">
-        <span class="set-lbl">電子書模式</span>
-        <button class="switch" id="swEbook" role="switch" aria-checked="false" aria-label="電子書模式"><span class="knob"></span></button>
-      </div>
-      <div class="set-row">
-        <span class="set-lbl">音效</span>
-        <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="音效"><span class="knob"></span></button>
-      </div>
-      <div class="set-row">
-        <span class="set-lbl">背景音樂</span>
-        <button class="switch" id="swBgm" role="switch" aria-checked="false" aria-label="背景音樂"><span class="knob"></span></button>
-      </div>
-      <div class="set-row" id="bgmVolRow">
-        <span class="set-lbl">音量</span>
-        <input class="rng" id="bgmVol" type="range" min="0" max="100" value="35" aria-label="背景音樂音量">
-      </div>
-      <div class="set-row">
-        <span class="set-lbl">語音音量</span>
-        <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
+      <!-- 只有這塊選項清單會捲動,標題/完成鈕/版本固定不動 -->
+      <div class="set-body" id="setBody">
+        <div class="set-row">
+          <span class="set-lbl">主題</span>
+          <div class="swatches" id="swatches"></div>
+        </div>
+        <div class="set-row">
+          <span class="set-lbl">電子書模式</span>
+          <button class="switch" id="swEbook" role="switch" aria-checked="false" aria-label="電子書模式"><span class="knob"></span></button>
+        </div>
+        <div class="set-row">
+          <span class="set-lbl">音效</span>
+          <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="音效"><span class="knob"></span></button>
+        </div>
+        <div class="set-row">
+          <span class="set-lbl">背景音樂</span>
+          <button class="switch" id="swBgm" role="switch" aria-checked="false" aria-label="背景音樂"><span class="knob"></span></button>
+        </div>
+        <div class="set-row" id="bgmTrackRow">
+          <span class="set-lbl">音樂曲目</span>
+          <select class="set-select" id="bgmTrackSel" aria-label="背景音樂曲目"></select>
+        </div>
+        <div class="set-row" id="bgmVolRow">
+          <span class="set-lbl">音量</span>
+          <input class="rng" id="bgmVol" type="range" min="0" max="100" value="35" aria-label="背景音樂音量">
+        </div>
+        <div class="set-row">
+          <span class="set-lbl">語音音量</span>
+          <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
+        </div>
       </div>
       <button class="btn primary" id="setClose">完成</button>
       <div class="set-foot">BINGO · <span id="setVer"></span> · 開發者 Michael Ho</div>

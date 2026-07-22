@@ -47,6 +47,7 @@
   $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));                       // 背景音樂開關
+  $("bgmTrackSel").addEventListener("change",e=>setBgmTrack(e.target.value));    // 切換背景音樂曲目
   $("bgmVol").addEventListener("input",e=>setBgmVol((+e.target.value||0)/100));  // 拖曳即時調音量
   $("bgmVol").addEventListener("change",savePrefs);                             // 放開才存偏好
   $("voiceVol").addEventListener("input",e=>setVoiceVol((+e.target.value||0)/100)); // 收到語音音量:拖曳即時套用(下一則生效)
