@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.17.0 -->
-<meta name="version" content="1.17.0">
+<!-- BINGO 賓果遊戲 · v1.17.1 -->
+<meta name="version" content="1.17.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -438,6 +438,7 @@
   :root[data-theme="ebook"] .mp-chip.turn .score-badge{color:#fff}
   /* 連線計分:大廳設定列「搶勝」的目標勝場 stepper 與重設鈕 */
   .score-extra{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .score-extra .wg-group{display:inline-flex;align-items:center;gap:6px}
   .score-extra .wg-lbl{font-size:13px;color:var(--muted);font-weight:800}
   .score-extra .mini{width:auto;min-width:40px;height:auto;min-height:32px;border:0;border-radius:9px;
     background:rgba(0,0,0,.14);font-size:18px;padding:0 12px;cursor:pointer}
@@ -712,11 +713,13 @@
         <button data-score="match">🎯 搶勝</button>
       </div>
       <div class="score-extra hidden" id="scoreExtra">
-        <span class="wg-lbl">先到</span>
-        <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
-        <span class="target-val display" id="winGoalVal">3</span>
-        <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
-        <span class="wg-lbl">勝奪冠</span>
+        <span class="wg-group hidden" id="wgGroup">
+          <span class="wg-lbl">先到</span>
+          <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+          <span class="target-val display" id="winGoalVal">3</span>
+          <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+          <span class="wg-lbl">勝奪冠</span>
+        </span>
         <button class="mini score-reset" id="resetScoreBtn" type="button">重設戰績</button>
       </div>
     </div>
@@ -803,7 +806,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.17.0</span><span class="dev">開發者 Michael Ho</span></footer>
+  <footer><span class="ver">BINGO · v1.17.1</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -2080,9 +2083,11 @@ const FIREBASE_CONFIG = {
       $("scoreSeg").classList.toggle("readonly", !isHost);
       const lb=$("scoreLabel"); if(lb)lb.textContent = isHost ? "連線計分" : "連線計分(房主決定)";
       syncScoreSeg();
-      const extra=$("scoreExtra"); if(extra)extra.classList.toggle("hidden", scoreMode!=="match");
+      // 附加列:房主任何模式都看得到(內含重設戰績);訪客只在搶勝模式看得到(顯示目標勝場)
+      const extra=$("scoreExtra"); if(extra)extra.classList.toggle("hidden", !(isHost || scoreMode==="match"));
+      const wg=$("wgGroup"); if(wg)wg.classList.toggle("hidden", scoreMode!=="match");   // 目標勝場只在搶勝模式顯示
       const wv=$("winGoalVal"); if(wv)wv.textContent=winGoal;
-      ["wgMinus","wgPlus"].forEach(id=>{ const b=$(id); if(b)b.style.display=isHost?"":"none"; });   // 目標勝場只有房主能調
+      ["wgMinus","wgPlus"].forEach(id=>{ const b=$(id); if(b)b.style.display=isHost?"":"none"; });   // 目標勝場只有房主能調(訪客只看數字)
       const rb=$("resetScoreBtn"); if(rb)rb.style.display=isHost?"":"none";                            // 重設戰績只有房主能按
     }
     function startGame(){
