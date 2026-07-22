@@ -64,6 +64,10 @@
   /* ---------- Rendering ---------- */
   function render(){
     grid.innerHTML="";
+    // 連線遊戲中:盤面整體一律解除鎖定(某格能不能點,由該格自己的 disabled 決定)。
+    // 不再依賴「進遊戲時 setLock(false) 有沒有把上一局的鎖定清乾淨」——否則第 N 局殘留的鎖定會造成
+    // 「輪到你、格子也亮成可按,但整塊盤面吃不到點擊、點了完全沒反應(連『還沒輪到你』都不跳)」。
+    if(state.online && state.mode==="play") grid.style.pointerEvents="";
     const manual = state.mode==="setup" && state.fill==="manual";
     for(let i=0;i<nCells();i++){
       const cell=document.createElement("button");

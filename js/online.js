@@ -559,7 +559,9 @@
     /* ----- phase dispatch ----- */
     function onStatus(){
       renderPlayers();
-      if(status==="playing"){ if(curPhase!=="playing") enterPlaying(); else updateTurnUI(); }
+      // status 是 playing 但盤面還沒真的進遊戲(state.mode 不是 play)也要 enterPlaying:
+      // 保險涵蓋 curPhase 因殘留/漏事件停在 "playing" 而略過 enterPlaying、導致盤面沒解鎖/沒重繪的情況。
+      if(status==="playing"){ if(curPhase!=="playing"||state.mode!=="play") enterPlaying(); else updateTurnUI(); }
       else if(status==="rps"){ if(curPhase!=="rps") enterRps(); else renderRps(); }
       else if(status==="reveal"){ if(curPhase!=="reveal") enterReveal(); else renderReveal(); }
       else if(status==="ordering"){ if(curPhase!=="ordering") enterOrdering(); else renderOrderPanel(); }
