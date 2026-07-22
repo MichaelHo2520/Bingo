@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.16.0 -->
-<meta name="version" content="1.16.0">
+<!-- BINGO 賓果遊戲 · v1.17.0 -->
+<meta name="version" content="1.17.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -247,6 +247,19 @@
   .win-card p{color:var(--muted);margin:10px 0 22px;font-weight:700}
   .win-card .actions{width:100%}
   .win-card .btn{min-width:0;font-size:16px;padding:14px 10px}
+  /* 連線計分:結果卡上的排行榜與「總冠軍」橫幅 */
+  .win-champ{font-family:'Fredoka';font-weight:700;font-size:clamp(19px,6vw,26px);
+    color:var(--accent);margin:2px 0 14px;line-height:1.25}
+  .win-scores{width:100%;display:flex;flex-direction:column;gap:6px;margin:0 0 20px}
+  .win-scores .ws-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;
+    background:rgba(255,255,255,.08);border:1px solid var(--panel-line);font-weight:800;font-size:15px}
+  .win-scores .ws-row.lead{background:var(--accent);color:#1c1008;border-color:var(--accent)}
+  .win-scores .ws-row.me{box-shadow:0 0 0 2px var(--accent-2)}
+  .win-scores .ws-rank{flex:none;font-family:'Fredoka';opacity:.85;min-width:22px}
+  .win-scores .ws-name{flex:1;min-width:0;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .win-scores .ws-pts{flex:none;font-family:'Fredoka'}
+  :root[data-theme="ebook"] .win-scores .ws-row{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .win-scores .ws-row.lead{background:#000;color:#fff}
   /* 猜拳/揭曉蓋板:比勝利卡稍寬,容得下橫排手勢卡 */
   .mp-veil-card{max-width:min(92vw,440px)}
   .mp-veil-title{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:8px}
@@ -417,6 +430,22 @@
   :root[data-theme="ebook"] .mp-chip.turn .dot{background:#fff}
   :root[data-theme="ebook"] .mp-chip.turn .ln{color:#fff}
   :root[data-theme="ebook"] .mp-chip.turn .seat-badge{background:#fff;color:#000}
+  /* 連線計分:玩家晶片上的累積勝場徽章 🏆N(只在有分數時顯示) */
+  .mp-chip .score-badge{display:inline-flex;align-items:center;gap:1px;margin-left:2px;
+    font-family:'Fredoka';font-weight:700;font-size:12.5px;color:var(--accent-2)}
+  .mp-chip.turn .score-badge{color:#1c1008}
+  :root[data-theme="ebook"] .mp-chip .score-badge{color:#000}
+  :root[data-theme="ebook"] .mp-chip.turn .score-badge{color:#fff}
+  /* 連線計分:大廳設定列「搶勝」的目標勝場 stepper 與重設鈕 */
+  .score-extra{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .score-extra .wg-lbl{font-size:13px;color:var(--muted);font-weight:800}
+  .score-extra .mini{width:auto;min-width:40px;height:auto;min-height:32px;border:0;border-radius:9px;
+    background:rgba(0,0,0,.14);font-size:18px;padding:0 12px;cursor:pointer}
+  .score-extra .mini:hover{background:rgba(255,255,255,.08)}
+  .score-extra .target-val{min-width:26px;text-align:center;font-size:19px}
+  .score-extra .score-reset{margin-left:auto;min-width:0;font-size:13px;font-weight:800;
+    background:transparent;border:1px solid var(--panel-line);color:var(--muted)}
+  :root[data-theme="ebook"] .score-extra .mini{background:#fff;border:1px solid #000}
   .mp-play{
     width:min(92vw,520px);display:flex;align-items:center;gap:20px;flex-wrap:wrap;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;padding:14px 20px;
@@ -676,6 +705,21 @@
         <button data-order="random">🎲 隨機</button>
       </div>
     </div>
+    <div class="field hidden" id="scoreRow">
+      <span class="field-label" id="scoreLabel">連線計分</span>
+      <div class="seg" id="scoreSeg">
+        <button class="on" data-score="rank">🏆 累積排行</button>
+        <button data-score="match">🎯 搶勝</button>
+      </div>
+      <div class="score-extra hidden" id="scoreExtra">
+        <span class="wg-lbl">先到</span>
+        <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+        <span class="target-val display" id="winGoalVal">3</span>
+        <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+        <span class="wg-lbl">勝奪冠</span>
+        <button class="mini score-reset" id="resetScoreBtn" type="button">重設戰績</button>
+      </div>
+    </div>
   </section>
 
   <!-- ====== ONLINE: connect ====== -->
@@ -759,7 +803,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.16.0</span><span class="dev">開發者 Michael Ho</span></footer>
+  <footer><span class="ver">BINGO · v1.17.0</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">
@@ -793,11 +837,14 @@
     <div class="win-card">
       <div class="word display" id="winWord">BINGO!</div>
       <p id="winMsg">你完成了 5 條線 🎉</p>
+      <div class="win-champ hidden" id="winChamp"></div>
+      <div class="win-scores hidden" id="winScores"></div>
       <div class="actions" id="spWinBtns">
         <button class="btn ghost" id="winRestart">再玩一次</button>
         <button class="btn primary" id="winNew">換新號碼</button>
       </div>
       <div class="actions hidden" id="mpWinBtns">
+        <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
         <button class="btn primary" id="mpAgain">再一局</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
@@ -1241,6 +1288,7 @@ const FIREBASE_CONFIG = {
     $("winMsg").textContent=`你完成了 ${done} 條線 🎉`;
     $("spWinBtns").classList.remove("hidden");
     $("mpWinBtns").classList.add("hidden");
+    $("winScores").classList.add("hidden"); $("winChamp").classList.add("hidden"); $("mpNewSeason").classList.add("hidden");   // 單機:不顯示連線排行/冠軍
     showResult();
     burst();
   }
@@ -1631,6 +1679,9 @@ const FIREBASE_CONFIG = {
     let roomsWatchRef=null, lastRoomsSig=null;   // 大廳常駐監聽:即時反映房間開/關,免得一直按🔍
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let orderMethod="rps", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
+    // 連線計分:scoreMode="rank"(累積勝場排行,無止盡)|"match"(搶 N 勝,達標跳總冠軍);winGoal=目標勝場(match 用)
+    // roundId=每局開打時房主寫的識別碼(給「一局只計一次分」用);scoredThisRound=本端這局是否已幫自己加過分(本地去重)
+    let scoreMode="rank", winGoal=3, roundId=null, scoredThisRound=false;
     let sawPlayers=false;
     let sawMe=false;                        // 是否曾在名單看過自己(避免剛加入的空讀誤判成被踢)
     let hostId=null, sawHost=false;         // 房主 id / 是否曾看過有效房主(避免剛加入時誤判)
@@ -1758,6 +1809,7 @@ const FIREBASE_CONFIG = {
       roomRef.child("host").once("value").then(snap=>{
         if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }   // 撞號就重抽一次
         return roomRef.update({ host:meId, roomName:roomName, status:"lobby", target:state.target, size:SIZE, orderMethod:"rps",
+          scoreMode:"rank", winGoal:3, roundId:null,
           calledList:[], winner:null, order:null, turnIndex:0, rps:null, emotes:null, createdAt:Date.now() });
       }).then(()=>{ joinNode(); enterLobby(); }).catch(e=>setMsg("建立房間失敗:"+((e&&e.message)||e)));
     }
@@ -1811,6 +1863,7 @@ const FIREBASE_CONFIG = {
       $("targetRow").style.display=isHost?"":"none";
       $("sizeRow").style.display=isHost?"":"none";       // 只有房主能改盤面大小
       syncOrderRow();                                     // 出手順序:大家都看得到目前選擇(訪客唯讀)
+      syncScoreRow();                                     // 連線計分:同上,大家都看得到(訪客唯讀)
       state.fill="auto"; state.card=shuffled(); state.mode="setup";
       render(); applyFillUI(); updateReadyBtn();
       listen();
@@ -1929,6 +1982,10 @@ const FIREBASE_CONFIG = {
       roomRef.child("emotes").on("child_added",s=>{ if(emotesReady)handleEmote(s.val()); });
       roomRef.child("emotes").once("value",()=>{ emotesReady=true; });
       roomRef.child("orderMethod").on("value",s=>{ orderMethod=s.val()||"host"; syncOrderSeg(); });
+      // 連線計分:模式 / 搶勝目標 / 每局識別碼
+      roomRef.child("scoreMode").on("value",s=>{ scoreMode=(s.val()==="match")?"match":"rank"; syncScoreRow(); renderPlayers(); });
+      roomRef.child("winGoal").on("value",s=>{ const n=s.val(); winGoal=(typeof n==="number"&&n>=2)?Math.min(20,n):3; syncScoreRow(); });
+      roomRef.child("roundId").on("value",s=>{ roundId=s.val()||null; });
       roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } maybeAnnounceOrder(); });
       roomRef.child("turnIndex").on("value",s=>{ turnIndex=s.val()||0; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } });
       roomRef.child("rps").on("value",s=>{ rps=s.val(); if(curPhase==="rps")renderRps(); if(isHost)rpsHostResolve(); });
@@ -1952,7 +2009,9 @@ const FIREBASE_CONFIG = {
         chip.addEventListener("click",()=>openEmote(id===meId?"all":id));   // 點對象 → 開表情面板
         const seatIdx=order.indexOf(id);
         const seatBadge=(status==="playing"&&seatIdx>=0)?'<span class="seat-badge">'+(seatIdx+1)+'</span>':'';
-        chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+esc(dispName(id))+'</span>'+youTag(id)+
+        const sc=(p.score||0);
+        const scoreBadge=sc>0?'<span class="score-badge" title="累積勝場">🏆'+sc+'</span>':'';   // 有累積勝場才顯示,大廳/遊戲中都看得到
+        chip.innerHTML='<span class="dot"></span>'+seatBadge+'<span>'+esc(dispName(id))+'</span>'+youTag(id)+scoreBadge+
           (status==="playing"?'<span class="ln">'+(p.lines||0)+'線</span>':'')+
           '<span class="mp-poke" aria-hidden="true">😀</span>';   // 互動提示:暗示晶片可點送表情
         if(isHost && status==="lobby" && id!==meId){
@@ -2002,12 +2061,36 @@ const FIREBASE_CONFIG = {
       const lb=$("orderLabel"); if(lb)lb.textContent = isHost ? "出手順序由誰定" : "出手順序(房主決定)";
       syncOrderSeg();
     }
+    /* ----- 連線計分:模式(累積排行 / 搶 N 勝)、目標勝場、重設戰績 ----- */
+    function setScoreMode(m){ if(isHost&&roomRef){ scoreMode=(m==="match")?"match":"rank"; roomRef.child("scoreMode").set(scoreMode); syncScoreRow(); } }
+    function setWinGoal(n){ if(isHost&&roomRef){ winGoal=Math.max(2,Math.min(20,n|0)); roomRef.child("winGoal").set(winGoal); syncScoreRow(); } }
+    // 房主重設所有人戰績歸零(大廳的「重設戰績」與奪冠後的「開新賽季」共用);只清 score/scoredRound,不動本局其它狀態
+    function resetScores(){
+      if(!isHost||!roomRef)return;
+      const ups={}; Object.keys(players).forEach(id=>{ ups["players/"+id+"/score"]=0; ups["players/"+id+"/scoredRound"]=null; });
+      scoredThisRound=false;
+      if(Object.keys(ups).length) roomRef.update(ups);
+      showToast("已重設所有人的戰績 🏆");
+    }
+    function syncScoreSeg(){ const seg=$("scoreSeg"); if(!seg)return; [...seg.children].forEach(b=>b.classList.toggle("on", b.dataset.score===scoreMode)); }
+    // 大廳:計分列大家都看得到(房主可改、訪客唯讀);搶勝模式才顯示目標勝場,調整/重設只有房主能操作
+    function syncScoreRow(){
+      const row=$("scoreRow"); if(!row || !state.online)return;
+      if(curPhase==="lobby") row.classList.remove("hidden");
+      $("scoreSeg").classList.toggle("readonly", !isHost);
+      const lb=$("scoreLabel"); if(lb)lb.textContent = isHost ? "連線計分" : "連線計分(房主決定)";
+      syncScoreSeg();
+      const extra=$("scoreExtra"); if(extra)extra.classList.toggle("hidden", scoreMode!=="match");
+      const wv=$("winGoalVal"); if(wv)wv.textContent=winGoal;
+      ["wgMinus","wgPlus"].forEach(id=>{ const b=$(id); if(b)b.style.display=isHost?"":"none"; });   // 目標勝場只有房主能調
+      const rb=$("resetScoreBtn"); if(rb)rb.style.display=isHost?"":"none";                            // 重設戰績只有房主能按
+    }
     function startGame(){
       if(!isHost)return;
       const ids=Object.keys(players);
       if(ids.length<2 || !ids.every(id=>players[id].ready)){ showToast("需要 2 人以上且全部準備好"); return; }
-      const base={ target:state.target, calledList:[], winner:null, turnIndex:0, reveal:null };
-      Object.keys(players).forEach(id=>{ base["players/"+id+"/winAt"]=null; base["players/"+id+"/lines"]=0; });   // 清掉上一局的達標紀錄與線數
+      const base={ target:state.target, calledList:[], winner:null, turnIndex:0, reveal:null, roundId:Date.now() };   // roundId 每局換,供「一局只計一次分」判定
+      Object.keys(players).forEach(id=>{ base["players/"+id+"/winAt"]=null; base["players/"+id+"/lines"]=0; });   // 清掉上一局的達標紀錄與線數(score/scoredRound 不清,跨局累積)
       if(orderMethod==="rps"){
         roomRef.update({ ...base, status:"rps", order:null, rps:{ seq:1, groups:[ids.join(",")], throws:null } });
       }else if(orderMethod==="random"){
@@ -2046,6 +2129,7 @@ const FIREBASE_CONFIG = {
       state.mode="setup";
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
+      $("scoreRow").classList.add("hidden");
       $("mpControls").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
       showMpVeil("rps");
       setLock(true);
@@ -2158,6 +2242,7 @@ const FIREBASE_CONFIG = {
       state.mode="setup";
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
+      $("scoreRow").classList.add("hidden");
       $("mpControls").classList.add("hidden"); $("mpOrderPanel").classList.add("hidden");
       showMpVeil("reveal");
       setLock(true);
@@ -2213,6 +2298,7 @@ const FIREBASE_CONFIG = {
     function enterOrdering(){
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
+      $("scoreRow").classList.add("hidden");
       $("mpControls").classList.add("hidden"); hideMpVeil();
       $("mpOrderPanel").classList.remove("hidden");
       setLock(true);
@@ -2252,11 +2338,12 @@ const FIREBASE_CONFIG = {
     /* ----- playing (turn-based manual call) ----- */
     function enterPlaying(){
       state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(nCells()).fill(false);
-      myWinAt=null; outcomeShown=false; orderAnnounced=false; abandoned=false;
+      myWinAt=null; outcomeShown=false; orderAnnounced=false; abandoned=false; scoredThisRound=false;
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       $("playStatus").classList.add("hidden");
       hideMpVeil(); $("mpOrderPanel").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
+      $("scoreRow").classList.add("hidden");
       $("mpControls").classList.remove("hidden");
       const g=$("mpGoalNum"); if(g)g.textContent=state.target+" 線";
       setLock(false);
@@ -2339,7 +2426,19 @@ const FIREBASE_CONFIG = {
         finalists=[winner.id];
       }
       const isDraw=finalists.length>1;
+      const iWon=finalists.indexOf(meId)>=0;
       const lines=(winner&&winner.lines)||state.target;
+
+      // 計分:贏家(含平手雙方)幫「自己」+1 勝,一局只計一次。
+      // 用 roundId(每局換)+ 節點上的 scoredRound 做冪等:交易內再驗一次,重複呼叫也不會重複加;只寫自己節點,契合全案「不跨寫別人」的做法。
+      if(iWon && meId && roomRef && roundId && !scoredThisRound && !(players[meId]&&players[meId].scoredRound===roundId)){
+        scoredThisRound=true;
+        roomRef.child("players/"+meId).transaction(p=>{
+          if(!p)return p;                         // 節點已不在 → 不動
+          if(p.scoredRound===roundId)return;      // 這局已計過 → 中止交易,不重複加
+          p.score=(p.score||0)+1; p.scoredRound=roundId; return p;
+        });
+      }
 
       $("spWinBtns").classList.add("hidden");
       $("mpWinBtns").classList.remove("hidden");
@@ -2365,8 +2464,34 @@ const FIREBASE_CONFIG = {
         }
         if(!outcomeShown){ if(mine){ Sound.win(); burst(); } else { Sound.lose(); } }
       }
+      renderScoreboard();   // 結果卡下方畫累積勝場排行(+ 搶勝模式的總冠軍橫幅)
       outcomeShown=true;
       render();
+    }
+    // 結果卡下方的累積勝場排行榜;搶 N 勝模式下有人達標時多顯示「總冠軍」橫幅,房主再多一顆「開新賽季」
+    function renderScoreboard(){
+      const sb=$("winScores"), champEl=$("winChamp"), nsBtn=$("mpNewSeason");
+      if(!sb)return;
+      const rows=Object.keys(players).map(id=>({ id, score:(players[id]&&players[id].score)||0, name:dispName(id) }))
+                       .sort((a,b)=> b.score-a.score || (a.id<b.id?-1:1));   // 分數高→低,同分依 id(各端一致)
+      const top=rows.length?rows[0].score:0;
+      const anyScore=top>0;
+      const champs=(scoreMode==="match" && top>=winGoal) ? rows.filter(r=>r.score===top) : [];
+      if(champEl){
+        if(champs.length){ champEl.textContent="🏆 總冠軍:"+champs.map(c=>c.name).join("、")+"(先達 "+winGoal+" 勝)"; champEl.classList.remove("hidden"); }
+        else champEl.classList.add("hidden");
+      }
+      // 第一局還沒分數(累積模式)就不顯示空排行;搶勝模式則一律顯示,讓大家知道進度
+      if(anyScore || scoreMode==="match"){
+        sb.innerHTML=rows.map((r,i)=>{
+          const lead=r.score===top && top>0;
+          const cls="ws-row"+(lead?" lead":"")+(r.id===meId?" me":"");
+          const rank=lead?"🏆":(i+1)+".";
+          return '<div class="'+cls+'"><span class="ws-rank">'+rank+'</span><span class="ws-name">'+esc(r.name)+'</span><span class="ws-pts">'+r.score+' 勝</span></div>';
+        }).join("");
+        sb.classList.remove("hidden");
+      }else{ sb.innerHTML=""; sb.classList.add("hidden"); }
+      if(nsBtn) nsBtn.classList.toggle("hidden", !(champs.length && isHost));   // 奪冠後房主才有「開新賽季」
     }
     // 遊戲中其他人都離開、房主只剩自己:自動回大廳等待(保留房間開著讓人重新加入),不卡在單人局
     function hostAloneToLobby(){
@@ -2394,7 +2519,7 @@ const FIREBASE_CONFIG = {
     }
     function backToLobby(){
       ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled(); curPhase="lobby";
-      order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false; abandoned=false;
+      order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       closeWin();
@@ -2404,7 +2529,7 @@ const FIREBASE_CONFIG = {
       $("startBtn").classList.add("hidden");
       $("onlineBtn").classList.add("hidden");
       $("mpReadyBtn").classList.remove("hidden");
-      syncOrderRow();
+      syncOrderRow(); syncScoreRow();
       setLock(false); updateReadyBtn(); render(); applyFillUI();
     }
     function leave(){
@@ -2438,6 +2563,7 @@ const FIREBASE_CONFIG = {
       $("mpStartBtn").classList.add("hidden");
       $("mpConnect").classList.add("hidden");
       $("mpOrderRow").classList.add("hidden");
+      $("scoreRow").classList.add("hidden");
       $("startBtn").classList.remove("hidden");
       $("onlineBtn").classList.remove("hidden");
       $("targetRow").style.display="";
@@ -2488,7 +2614,8 @@ const FIREBASE_CONFIG = {
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap,
              amHost, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,
-             confirmKick, cancelKick:closeKick };
+             confirmKick, cancelKick:closeKick,
+             setScoreMode, setWinGoal, resetScores, winGoal:()=>winGoal };
   })();
 
   /* ---------- Wire up ---------- */
@@ -2558,6 +2685,11 @@ const FIREBASE_CONFIG = {
   $("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
   $("mpStartBtn").addEventListener("click",()=>MP.startGame());
   $("orderSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.setOrderMethod(b.dataset.order);});
+  $("scoreSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.setScoreMode(b.dataset.score);});   // 計分模式:累積排行 / 搶勝
+  $("wgMinus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()-1));   // 搶勝目標 −1
+  $("wgPlus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()+1));    // 搶勝目標 +1
+  $("resetScoreBtn").addEventListener("click",()=>MP.resetScores());          // 房主:重設所有人戰績
+  $("mpNewSeason").addEventListener("click",()=>{ MP.resetScores(); MP.again(); });   // 奪冠後:重設戰績並回大廳開新賽季
   $("rpsBtns").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.throwRps(b.dataset.rps);b.blur();});
   $("revealSkip").addEventListener("click",()=>MP.revealSkip());
   $("mpVeilLeave").addEventListener("click",()=>MP.bailFromRps());
