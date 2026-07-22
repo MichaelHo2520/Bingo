@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="BINGO">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.22.0 -->
-<meta name="version" content="1.22.0">
+<!-- BINGO 賓果遊戲 · v1.23.0 -->
+<meta name="version" content="1.23.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -57,18 +57,23 @@
 
   <!-- ====== ONLINE: room banner(移到設定/棋盤上方,讓房內名單固定在頂端) ====== -->
   <div class="panel hidden" id="mpBar">
-    <div class="row" style="margin-top:0;justify-content:space-between;flex-wrap:nowrap">
+    <div class="row" style="margin-top:0;flex-wrap:nowrap">
+      <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
       <span class="label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b></span>
-      <span style="flex:none;display:flex;align-items:center;gap:10px">
-        <span class="mp-status" id="mpStatusTxt">等待中…</span>
-        <button class="mini" id="mpLeaveBtn" title="離開房間" style="width:auto;padding:0 12px;font-size:13px">離開</button>
-      </span>
+      <span class="mp-status" id="mpStatusTxt" style="flex:none">等待中…</span>
     </div>
     <div id="mpPlayers" class="mp-players"></div>
   </div>
 
-  <!-- 單機:回主選單(固定在分頁上方,不會被分頁切換藏起來) -->
-  <button class="btn ghost home-back hidden" id="soloBack" type="button">‹ 主選單</button>
+  <!-- 單機:回主選單(返回箭頭,和連線對戰的返回一致;固定在分頁上方,不會被分頁切換藏起來) -->
+  <div class="solo-head hidden" id="soloHead">
+    <button class="icon-btn" id="soloBack" type="button" title="回主選單" aria-label="回主選單">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <span class="subtitle">單機練習</span>
+  </div>
 
   <!-- 房間分頁列:✏️填號 / ⚙️設定(做成底線頁籤,和下方的選項膠囊 .seg 明顯不同;填號在前=多數人的主要動作) -->
   <div class="room-tabs hidden" id="roomTabs" role="tablist" aria-label="房間分頁">
@@ -111,15 +116,17 @@
         <button data-score="match">🎯 搶勝</button>
       </div>
       <div class="score-extra hidden" id="scoreExtra">
-        <span class="wg-group hidden" id="wgGroup">
+        <div class="wg-group hidden" id="wgGroup">
           <span class="wg-lbl">先到</span>
-          <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
-          <span class="target-val display" id="winGoalVal">3</span>
-          <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+          <div class="wg-stepper">
+            <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+            <span class="target-val display" id="winGoalVal">3</span>
+            <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+          </div>
           <span class="wg-lbl">勝奪冠</span>
-        </span>
-        <button class="mini score-reset" id="resetScoreBtn" type="button">重設戰績</button>
+        </div>
         <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
+        <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
       </div>
     </div>
   </section>
@@ -209,7 +216,7 @@
     </div>
   </div>
 
-  <footer><span class="ver">BINGO · v1.22.0</span><span class="dev">開發者 Michael Ho</span></footer>
+  <footer><span class="ver">BINGO · v1.23.0</span><span class="dev">開發者 Michael Ho</span></footer>
 
   <!-- online: 猜拳 / 揭曉 蓋板(像結束畫面那樣彈出,在這裡出拳、揭曉) -->
   <div class="veil" id="mpVeil">

@@ -6,6 +6,7 @@
     let roomName="";                             // 房主設定的房間名稱(對外顯示用;內部仍以 code 當資料庫鍵值)
     let roomsWatchRef=null, lastRoomsSig=null;   // 大廳常駐監聽:即時反映房間開/關,免得一直按🔍
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
+    let autoStarting=false;   // 全部人準備好 → 房主端自動開打的一次性守衛(避免 status 尚未同步前重複觸發)
     let prevIds=null;   // 上一次的玩家 id 清單,用來偵測「有新玩家加入」放音效(null=進房後尚未收到第一次快照)
     let orderMethod="rps", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
     // 連線計分:scoreMode="rank"(累積勝場排行,無止盡)|"match"(搶 N 勝,達標跳總冠軍);winGoal=目標勝場(match 用)
@@ -211,7 +212,7 @@
       stopRoomWatch();                                  // 已進房,卸載大廳的房間偵測監聽
       $("home").classList.add("hidden");
       $("boardWrap").classList.remove("hidden");        // 進大廳要看得到棋盤(填卡)
-      $("soloBack").classList.add("hidden");            // 大廳不顯示單機的「回主選單」(用房間橫幅的離開)
+      $("soloHead").classList.add("hidden");            // 大廳不顯示單機的返回列(用房間橫幅的離開)
       $("mpConnect").classList.add("hidden");
       $("setup").classList.remove("hidden");
       $("setupActions").classList.remove("hidden");
@@ -412,7 +413,7 @@
         setActionHint(state.card.some(n=>!n) ? "① 先填好你的賓果卡片" : "② 按下面的「準備好了 ✓」");
         return;
       }
-      if(readyCount>=ids.length) setActionHint(isHost ? "🎉 大家都準備好了 → 按「開始對戰 ▸」" : "大家都準備好了,等房主開始…");
+      if(readyCount>=ids.length) setActionHint("🎉 大家都準備好了,開始對戰!");   // 全部準備好即自動開打
       else setActionHint("已準備 ✓ 等其他人… ("+readyCount+"/"+ids.length+")");
     }
     function updateReadyBtn(){
@@ -436,10 +437,14 @@
       updateReadyBtn();
     }
     function updateStartBtn(){
-      if(!isHost){ $("mpStartBtn").classList.add("hidden"); return; }
+      $("mpStartBtn").classList.add("hidden");   // 不再用手動開始鈕:全部準備好即自動開打
+      if(!isHost)return;
       const ids=Object.keys(players);
       const allReady=ids.length>=2 && ids.every(id=>players[id].ready);
-      $("mpStartBtn").classList.toggle("hidden", status!=="lobby" || !allReady);
+      // 尚未全準備(或已離開大廳)→ 解除守衛,之後再次全部準備好時可再自動開打
+      if(status!=="lobby" || !allReady){ autoStarting=false; return; }
+      // 全部人都準備好 → 房主端直接開打,不必再按「開始」;只觸發一次(等 status 同步後守衛自然解除)
+      if(!autoStarting){ autoStarting=true; startGame(); }
     }
     function setTarget(t){ if(isHost&&roomRef)roomRef.child("target").set(t); }
     function setOrderMethod(m){ if(isHost&&roomRef){ orderMethod=m; roomRef.child("orderMethod").set(m); syncOrderSeg(); } }
@@ -890,7 +895,13 @@
       const anyScore=top>0;
       const champs=(scoreMode==="match" && top>=winGoal) ? rows.filter(r=>r.score===top) : [];
       if(champEl){
-        if(champs.length){ champEl.textContent="🏆 總冠軍:"+champs.map(c=>c.name).join("、")+"(先達 "+winGoal+" 勝)"; champEl.classList.remove("hidden"); }
+        if(champs.length){
+          // 總冠軍:第一行標題,換行後大字顯示是誰,再一行小字標達標勝場(名字為玩家輸入 → esc 防注入)
+          champEl.innerHTML='<span class="champ-label">🏆 總冠軍</span>'+
+            '<span class="champ-name">'+champs.map(c=>esc(c.name)).join("、")+'</span>'+
+            '<span class="champ-goal">先達 '+winGoal+' 勝</span>';
+          champEl.classList.remove("hidden");
+        }
         else champEl.classList.add("hidden");
       }
       // 第一局還沒分數(累積模式)就不顯示空排行;搶勝模式則一律顯示,讓大家知道進度

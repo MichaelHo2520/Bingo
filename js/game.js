@@ -192,6 +192,7 @@
     $("setupActions").classList.add("hidden");
     $("mpConnect").classList.add("hidden");
     $("mpBar").classList.add("hidden");
+    $("soloHead").classList.add("hidden");   // 回主選單:收起單機返回列(修正返回後主頁殘留返回鈕)
     $("boardWrap").classList.add("hidden");
     $("playStatus").classList.add("hidden");
     $("mpControls").classList.add("hidden");
@@ -209,7 +210,7 @@
     $("boardWrap").classList.remove("hidden");
     $("setup").classList.remove("hidden");
     $("setupActions").classList.remove("hidden");
-    $("soloBack").classList.remove("hidden");       // 單機才顯示「回主選單」
+    $("soloHead").classList.remove("hidden");       // 單機才顯示「回主選單」返回列
     $("startBtn").classList.remove("hidden");
     $("onlineBtn").classList.add("hidden");          // 連線改由主選單進入
     $("mpReadyBtn").classList.add("hidden");
@@ -257,6 +258,7 @@
     if(!show){
       bar.classList.add("hidden");
       $("primaryBar").classList.add("hidden");
+      document.body.classList.remove("has-primary-bar");   // 收起固定底部動作列 → 移除為它預留的底部空間
       $("setup").classList.remove("tab-hidden");
       $("boardWrap").classList.remove("tab-hidden");
       $("fillRow").classList.add("tab-hidden");   // 填號方式列只屬於大廳/設定的「填號」分頁,離開一律收起
@@ -265,6 +267,7 @@
     if(defaultTab)roomTab=defaultTab;
     bar.classList.remove("hidden");
     $("primaryBar").classList.remove("hidden");
+    document.body.classList.add("has-primary-bar");   // 準備/開始固定在畫面最下方 → body 預留底部空間,分頁內容照常捲動
     applyRoomTab();
     refreshActionHint();
   }

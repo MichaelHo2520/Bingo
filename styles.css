@@ -237,9 +237,13 @@
   .win-card p{color:var(--muted);margin:10px 0 22px;font-weight:700}
   .win-card .actions{width:100%}
   .win-card .btn{min-width:0;font-size:16px;padding:14px 10px}
-  /* 連線計分:結果卡上的排行榜與「總冠軍」橫幅 */
-  .win-champ{font-family:'Fredoka';font-weight:700;font-size:clamp(19px,6vw,26px);
-    color:var(--accent);margin:2px 0 14px;line-height:1.25}
+  /* 連線計分:結果卡上的排行榜與「總冠軍」橫幅(標題→換行→大字顯示是誰→小字達標勝場) */
+  .win-champ{display:flex;flex-direction:column;align-items:center;gap:3px;margin:2px 0 14px;line-height:1.2}
+  .win-champ .champ-label{font-family:'Fredoka';font-weight:700;font-size:15px;color:var(--muted);letter-spacing:.5px}
+  .win-champ .champ-name{font-family:'Fredoka';font-weight:700;font-size:clamp(24px,8vw,34px);color:var(--accent);
+    max-width:100%;overflow-wrap:anywhere}
+  .win-champ .champ-goal{font-size:12.5px;font-weight:800;color:var(--muted);opacity:.85}
+  :root[data-theme="ebook"] .win-champ .champ-name{color:#000}
   .win-scores{width:100%;display:flex;flex-direction:column;gap:6px;margin:0 0 20px}
   .win-scores .ws-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;
     background:rgba(255,255,255,.08);border:1px solid var(--panel-line);font-weight:800;font-size:15px}
@@ -333,10 +337,17 @@
   :root[data-theme="ebook"] .room-tabs button.on{color:#000;border-bottom-color:#000}
   /* 填號方式列:當作填號分頁的一部分,寬度對齊 */
   #fillRow{width:min(92vw,520px);margin-top:0}
-  /* 主要動作列(準備/開始固定顯示 + 現在該做什麼提示) */
-  .primary-bar{width:min(92vw,520px);display:flex;flex-direction:column;gap:10px}
+  /* 主要動作列(準備/開始 + 現在該做什麼提示):固定在畫面最下方,分頁內容照常在它上方捲動,不隨分頁位移 */
+  .primary-bar{position:fixed;left:50%;bottom:0;transform:translateX(-50%);z-index:40;
+    width:min(92vw,520px);display:flex;flex-direction:column;gap:8px;
+    padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px));
+    background:linear-gradient(to top, var(--bg1) 58%, transparent);   /* 由底色淡出,捲動內容不會硬切在鈕邊 */
+  }
+  /* 顯示固定底部動作列時,body 預留底部空間,最後一段內容才不會被鈕蓋住 */
+  body.has-primary-bar{padding-bottom:calc(122px + env(safe-area-inset-bottom,0px))}
   .action-hint{text-align:center;font-weight:800;font-size:14px;line-height:1.45;color:var(--text);
     background:rgba(0,0,0,.10);border-radius:12px;padding:9px 12px}
+  :root[data-theme="ebook"] .primary-bar{background:linear-gradient(to top, #fff 60%, transparent)}
   :root[data-theme="ebook"] .action-hint{background:#fff;border:1px solid #000;color:#000}
   /* multiplayer */
   .mp-input{
@@ -467,23 +478,28 @@
   .mp-chip.turn .score-badge{color:#1c1008}
   :root[data-theme="ebook"] .mp-chip .score-badge{color:#000}
   :root[data-theme="ebook"] .mp-chip.turn .score-badge{color:#fff}
-  /* 連線計分:大廳設定列「搶勝」的目標勝場 stepper 與重設鈕 */
-  .score-extra{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
-  .score-extra .wg-group{display:inline-flex;align-items:center;gap:6px}
-  .score-extra .wg-lbl{font-size:13px;color:var(--muted);font-weight:800}
-  .score-extra .mini{width:auto;min-width:40px;height:auto;min-height:32px;border:0;border-radius:9px;
-    background:rgba(0,0,0,.14);font-size:18px;padding:0 12px;cursor:pointer}
-  .score-extra .mini:hover{background:rgba(255,255,255,.08)}
-  .score-extra .target-val{min-width:26px;text-align:center;font-size:19px}
-  .score-extra .score-reset{margin-left:auto;min-width:0;font-size:13px;font-weight:800;
-    background:transparent;border:1px solid var(--panel-line);color:var(--muted)}
+  /* 連線計分附加設定(搶勝目標 stepper + 重設戰績):改成上下留白的直式排列,不再擠成一行 */
+  .score-extra{display:flex;flex-direction:column;gap:12px;margin-top:12px}
+  .score-extra .wg-group{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+    background:rgba(0,0,0,.12);border-radius:14px;padding:12px 14px}
+  .score-extra .wg-lbl{font-size:14px;color:var(--muted);font-weight:800}
+  .score-extra .wg-stepper{display:flex;align-items:center;background:rgba(0,0,0,.18);border-radius:12px;padding:3px;gap:4px}
+  .score-extra .wg-stepper .mini{width:50px;height:auto;min-height:36px;border:0;border-radius:9px;
+    background:transparent;font-size:20px;cursor:pointer}
+  .score-extra .wg-stepper .mini:hover{background:rgba(255,255,255,.10)}
+  .score-extra .target-val{min-width:28px;text-align:center;font-size:20px}
   /* 目標勝場鎖定(賽季進行中):+/− 變淡不可按,數字仍看得到 */
-  .score-extra .mini:disabled{opacity:.35;cursor:not-allowed}
-  .score-extra .mini:disabled:hover{background:rgba(0,0,0,.14)}
+  .score-extra .wg-stepper .mini:disabled{opacity:.35;cursor:not-allowed}
+  .score-extra .wg-stepper .mini:disabled:hover{background:transparent}
   .score-extra .wg-group.locked .target-val{opacity:.7}
-  .score-extra .wg-lock-hint{flex-basis:100%;font-size:12px;font-weight:700;color:var(--muted);opacity:.9}
-  :root[data-theme="ebook"] .score-extra .mini{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .score-extra .mini:disabled:hover{background:#fff}
+  .score-extra .wg-lock-hint{text-align:center;font-size:12px;font-weight:700;color:var(--muted);opacity:.9;line-height:1.4}
+  .score-extra .score-reset{align-self:center;width:auto;height:auto;min-width:0;min-height:0;
+    padding:10px 22px;font-size:13.5px;font-weight:800;border-radius:11px;cursor:pointer;
+    background:transparent;border:1px solid var(--panel-line);color:var(--muted)}
+  .score-extra .score-reset:hover{border-color:var(--accent);color:var(--text)}
+  :root[data-theme="ebook"] .score-extra .wg-group{background:#f0f0f0}
+  :root[data-theme="ebook"] .score-extra .wg-stepper{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .score-extra .score-reset{border:1px solid #000;color:#000}
   .mp-play{
     width:min(92vw,520px);display:flex;align-items:center;gap:20px;flex-wrap:wrap;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;padding:14px 20px;
@@ -714,9 +730,9 @@
   .home-btn{margin-top:12px;font-size:18px;padding:16px 10px}
   .home-hint{color:var(--muted);font-size:12.5px;margin-top:16px;opacity:.8}
   :root[data-theme="ebook"] .home-title{background:none;color:#000;-webkit-text-fill-color:#000}
-  /* 單機設定頁的「回主選單」小鈕 */
-  /* flex:none + align-self:成為 body(column flex)直屬子元素時,不要被 .btn 的 flex:1 撐成一大塊 */
-  .home-back{flex:none;align-self:flex-start;width:auto;min-width:0;padding:6px 14px;font-size:13px;margin-bottom:2px}
+  /* 單機返回列:返回箭頭 + 標題,和連線對戰的 .mp-head 一致(取代舊的「‹ 主選單」文字鈕) */
+  .solo-head{width:min(92vw,520px);display:flex;align-items:center;gap:10px}
+  .solo-head .subtitle{margin:0}
   /* 沒填暱稱時的醒目提示(紅框 + 抖動) */
   .mp-input.needs-name{border-color:#ff5252!important;box-shadow:0 0 0 3px rgba(255,82,82,.28);animation:shakeX .45s}
   @keyframes shakeX{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
