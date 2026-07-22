@@ -99,17 +99,21 @@
   // iOS 切背景/鎖屏會把 AudioContext 打回 suspended,故解鎖監聽做成「可重新武裝」:回前景後下一次手勢再喚醒一次。
   let audioUnlocked=false;
   function unlockAudioOnce(){
-    Sound.wake();                                        // 每次(含回前景後)都喚醒一次 AudioContext
+    if(typeof markAudioArmed==="function") markAudioArmed();   // 真實手勢 → 標記音訊已解鎖(觸控裝置收到的語音才可自動播)
+    Sound.wake();                                        // 每次(含回前景後)都喚醒一次 AudioContext + Silent Buffer Kick
     if(!audioUnlocked){ audioUnlocked=true; if(bgmOn)BGM.setOn(true); }
-    if(typeof kickVoiceQueue==="function") kickVoiceQueue();   // 若有語音在等手勢,喚醒後補播
+    // 等 resume 真的完成(context running)再補播,避免太早 pump 時 Sound.running() 仍為 false 又退回膠囊
+    const kick=()=>{ if(typeof kickVoiceQueue==="function") kickVoiceQueue(); };
+    if(Sound.resume) Sound.resume().then(kick); else kick();
   }
   function armAudioUnlock(){                              // 重新掛上「下一個手勢就喚醒」(同函式參考,重複掛會自動去重)
     addEventListener("pointerdown",unlockAudioOnce,{once:true});
     addEventListener("keydown",unlockAudioOnce,{once:true});
   }
   armAudioUnlock();
-  document.addEventListener("visibilitychange",()=>{     // 回前景且 context 已被系統 suspend → 重新武裝
-    if(!document.hidden && Sound.running && !Sound.running()) armAudioUnlock();
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden){ if(typeof markAudioStale==="function") markAudioStale(); return; }   // 切到背景 → 音訊視為未解鎖(iOS 回來常是 state=running 卻不出聲)
+    armAudioUnlock();   // 回前景一律重新武裝:下一個手勢(點任何地方 / 點播放膠囊)都會重新解鎖並補播等待中的語音
   });
 
   // Service Worker:離線可玩 + 「加到主畫面」。只在 https / localhost 註冊(file:// 不支援);

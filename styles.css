@@ -523,20 +523,20 @@
   :root[data-theme="ebook"] .score-extra .wg-group{background:#f0f0f0}
   :root[data-theme="ebook"] .score-extra .wg-stepper{background:#fff;border:1px solid #000}
   :root[data-theme="ebook"] .score-extra .score-reset{border:1px solid #000;color:#000}
-  /* 叫號框(連線遊戲 HUD):整體調小一點,替號碼格多擠出縱向空間,避免盤面被擠到要上下捲 */
+  /* 叫號框(連線遊戲 HUD):整體再調小一點,替號碼格多擠出縱向空間,避免盤面被擠到要上下捲 */
   .mp-play{
-    width:min(92vw,520px);display:flex;align-items:center;gap:14px;flex-wrap:wrap;
-    background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;padding:9px 16px;
+    width:min(92vw,520px);display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:14px;padding:6px 13px;
   }
-  .mp-hud-item{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
-  .mp-hud-item + .mp-hud-item{padding-left:14px;border-left:1px solid var(--panel-line)}
-  .mp-play .lbl{color:var(--muted);font-size:11.5px;font-weight:800;letter-spacing:.3px}
-  .mp-ball{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;
-    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-size:20px;font-weight:700;line-height:1;
-    box-shadow:0 3px 10px rgba(0,0,0,.25)}
-  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:20px;line-height:1;color:var(--text)}
-  .mp-turn{margin-left:auto;text-align:center;font-weight:800;font-size:14px;color:var(--accent);
-    background:rgba(0,0,0,.16);padding:8px 14px;border-radius:999px}
+  .mp-hud-item{display:flex;flex-direction:column;gap:2px;align-items:flex-start}
+  .mp-hud-item + .mp-hud-item{padding-left:12px;border-left:1px solid var(--panel-line)}
+  .mp-play .lbl{color:var(--muted);font-size:10.5px;font-weight:800;letter-spacing:.2px}
+  .mp-ball{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-size:17px;font-weight:700;line-height:1;
+    box-shadow:0 2px 8px rgba(0,0,0,.25)}
+  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:18px;line-height:1;color:var(--text)}
+  .mp-turn{margin-left:auto;text-align:center;font-weight:800;font-size:13px;color:var(--accent);
+    background:rgba(0,0,0,.16);padding:6px 12px;border-radius:999px}
   .mp-turn.wait{color:var(--muted)}
   :root[data-theme="ebook"] .mp-ball{box-shadow:none;border:1px solid #000}
   :root[data-theme="ebook"] .mp-turn{background:#fff;border:1px solid #000}

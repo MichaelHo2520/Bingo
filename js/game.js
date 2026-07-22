@@ -524,6 +524,7 @@
     if(hint)hint.textContent="";
     if(!Voice.supported()){ if(hint)hint.textContent="此裝置/瀏覽器不支援錄音"; return; }
     if(Voice.recording()){ b.disabled=true; b.textContent="處理中…"; Voice.stop(); return; }   // 停止 → 交給 onBlob 收尾
+    markAudioArmed(); Sound.wake(); kickVoiceQueue();   // 按麥克風=手勢,順手解鎖播放音訊並補播等待中的語音
     const to=emoteTarget;
     b.disabled=true; b.textContent="準備中…";
     voiceRecording=true; refreshBgmDuck();   // 先停背景音樂,再開麥克風(避免 Android 通話路徑把音樂弄難聽)
@@ -560,7 +561,8 @@
     const ico=$("qvIco"), lab=$("qvLabel");
     if(!Voice.supported()){ showToast("此裝置/瀏覽器不支援錄音"); return; }
     if(Voice.recording()){ b.disabled=true; if(lab)lab.textContent="處理中…"; Voice.stop(); return; }  // 停止 → 交給 onBlob 收尾
-    Sound.wake();
+    markAudioArmed(); Sound.wake();   // 按麥克風=手勢,順手解鎖播放音訊(這也是「按著麥克風時收到的語音就會自動播」的原因)
+    kickVoiceQueue();                 // 若正好有語音在膠囊裡等,趁這個手勢一起補播
     b.disabled=true; if(lab)lab.textContent="準備中…";
     voiceRecording=true; refreshBgmDuck();   // 先停背景音樂,再開麥克風(避免 Android 通話路徑把音樂弄難聽)
     Voice.start((wav)=>{
@@ -613,6 +615,13 @@
   }
   // 語音播放佇列:多則語音「依收到先後」排隊逐一播、不重疊;整個佇列播放期間停背景音樂,全部播完再恢復
   const voiceQueue=[]; let voiceBusy=false, voiceSafety=null;
+  // audioArmed =「使用者手勢已解鎖音訊、且之後沒切到背景」。iOS 有個惡名昭彰的狀況:切到別的 App 再回來,
+  // AudioContext 的 state 仍是 "running" 卻其實不出聲——只看 Sound.running() 會被騙,把語音「靜音播掉」(使用者只看到 🎤 飛一下就沒了、沒聲音)。
+  // 因此在觸控裝置(iOS/Android)上,收到語音要不要自動播,除了 context 在跑,還要求「這回合有真的手勢解鎖過」;否則一律改顯示可點的播放膠囊。
+  const IS_TOUCH = ("ontouchstart" in window) || (navigator.maxTouchPoints>0);
+  let audioArmed=false;
+  function markAudioArmed(){ audioArmed=true; }      // 由真實手勢(點播放膠囊 / 按麥克風 / 首次互動解鎖)呼叫
+  function markAudioStale(){ audioArmed=false; }     // 切到背景 → 下次回前景要重新用手勢解鎖才自動播
   function enqueueVoice(dataURL){
     if(!dataURL)return;
     if(Sound.isMuted&&Sound.isMuted())return;   // 靜音:不播也不排隊
@@ -622,10 +631,11 @@
   function pumpVoice(){
     if(voiceBusy)return;
     if(!voiceQueue.length){ hideVoiceGate(); refreshBgmDuck(); return; }   // 佇列清空 → 收起膠囊 + 恢復背景音樂
-    // iOS 切背景/鎖屏會把 AudioContext 打回 suspended,非手勢情境下 resume() 會被忽略。
-    // 此時「不硬播、也不丟棄」——語音留在佇列裡,改顯示可點的「🔊 點擊播放」膠囊,等使用者手勢再播
-    // (順手根治舊版「9 秒 timeout 把播不出來的語音丟出佇列、永久遺失」的 bug)。
-    if(!(Sound.running && Sound.running())){ showVoiceGate(); return; }
+    // iOS 切背景/鎖屏會把 AudioContext 打回 suspended,非手勢情境下 resume() 會被忽略;更麻煩的是回前景後
+    // state 常仍顯示 "running" 卻不出聲。此時「不硬播、也不丟棄」——語音留在佇列裡,改顯示可點的「🔊 點擊播放」膠囊,
+    // 等使用者手勢再播(順手根治舊版「9 秒 timeout 把播不出來的語音丟出佇列、永久遺失」的 bug)。
+    // 觸控裝置額外要求 audioArmed(這回合手勢解鎖過);桌機維持原本只看 context 是否在跑,不因切分頁就退回膠囊。
+    if((IS_TOUCH && !audioArmed) || !(Sound.running && Sound.running())){ showVoiceGate(); return; }
     hideVoiceGate();
     const next=voiceQueue.shift();
     voiceBusy=true; refreshBgmDuck();                    // 開播 → 停背景音樂
@@ -643,7 +653,7 @@
   function hideVoiceGate(){ const g=$("voiceGate"); if(g)g.classList.add("hidden"); }
   // 點膠囊(在使用者手勢中):喚醒 AudioContext 後才開播,確保 iOS 放行
   function playVoiceGate(){
-    Sound.wake();
+    markAudioArmed(); Sound.wake();   // 點膠囊本身就是手勢 → 標記音訊已解鎖,這回合之後收到的語音可自動播
     const go=()=>{ hideVoiceGate(); pumpVoice(); };
     if(Sound.resume) Sound.resume().then(go); else go();
   }
