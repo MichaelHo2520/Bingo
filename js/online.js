@@ -1147,14 +1147,15 @@
     function roster(){ return Object.keys(players).map(id=>({ id:id, name:dispName(id), me:id===meId })); }
     function sendEmote(to,emoji,kind,audio){
       if(!roomRef||!meId)return;
-      const isText=kind==="text", isVoice=kind==="voice";
+      const isText=kind==="text", isVoice=kind==="voice", isClip=kind==="clip";
       const ref=roomRef.child("emotes").push();
-      const rec={ from:meId, to:to||"all", kind:isVoice?"voice":(isText?"text":"emoji"), at:firebase.database.ServerValue.TIMESTAMP };
-      if(isVoice){ rec.emoji="🎤"; rec.audio=String(audio||""); }        // 語音:emoji 當顯示圖示,音訊放 audio(base64)
+      const rec={ from:meId, to:to||"all", kind:isVoice?"voice":(isClip?"clip":(isText?"text":"emoji")), at:firebase.database.ServerValue.TIMESTAMP };
+      if(isVoice){ rec.emoji="🎤"; rec.audio=String(audio||""); }              // 即時語音:emoji 當顯示圖示,音訊放 audio(base64)
+      else if(isClip){ rec.emoji="🔊"; rec.clip=String(audio||"").slice(0,40); } // 語音短訊:只傳代號(clip),對方播本地 m4a;emoji 供舊版客戶端降級顯示
       else { rec.emoji=String(emoji).slice(0,isText?24:8); }
       ref.set(rec);
       ref.onDisconnect().remove();
-      setTimeout(()=>{ try{ ref.remove(); }catch(e){} }, isVoice?15000:6000);   // 秀完自動清掉;語音較大,多給時間讓大家收到再清
+      setTimeout(()=>{ try{ ref.remove(); }catch(e){} }, isVoice?15000:6000);   // 秀完自動清掉;語音較大多給時間,clip 只是代號比照一般表情 6 秒
     }
     // 收到互動:只顯示「給全部」「給我」「我自己送出」的;針對某人 → 動畫落在那個人的晶片
     function handleEmote(e){
@@ -1167,6 +1168,11 @@
       if(e.kind==="voice"){
         showEmote("🎤", fromNm+" → "+toNm, (to!=="all")?to:e.from, "voice");
         if(!mine && forMe) enqueueVoice(e.audio);   // 別人傳給我/全部人才播(進佇列排隊逐一播);自己送的不回放
+        return;
+      }
+      if(e.kind==="clip"){
+        showEmote("🔊", fromNm+" → "+toNm, (to!=="all")?to:e.from, "voice");
+        if(!mine && forMe) enqueueClip(e.clip);     // 語音短訊:依代號播本地 m4a(沿用語音佇列);自己送的不回放
         return;
       }
       if(!e.emoji)return;

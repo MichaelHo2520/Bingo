@@ -672,6 +672,9 @@
   .phrase-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .phrase-btn:active{transform:scale(.94)}
   :root[data-theme="ebook"] .phrase-btn{background:#fff;border:1px solid #000}
+  .clip-btn{background:rgba(120,190,255,.14)}                                   /* 語音短訊:藍調底色,與「一句話」稍作區隔 */
+  .clip-btn:hover{background:rgba(120,190,255,.26)}
+  :root[data-theme="ebook"] .clip-btn{background:#fff;border:1px solid #000}
   /* 自訂文字輸入 */
   .emote-input{display:flex;align-items:stretch;gap:8px;margin-top:16px}
   #emoteText{flex:1 1 auto;min-width:0;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);

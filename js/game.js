@@ -514,12 +514,16 @@
   /* ---------- 好友互動表情(連線用) ---------- */
   const EMOTES=["👍","👎","❤️","😂","🎉","🔥","👏","😮","😢","😭","😎","🤯","🥳","🤝","🙏","💪","😡","💩"];
   const PHRASES=["快一點!","你好慢~","加油~~","太扯了😂","穩住穩住","別緊張","嚇死我了","運氣真好"];
+  // 語音短訊(連線用):選文字項目 → 只傳代號,對方播本地預錄 m4a;與上方即時錄音語音是兩條獨立管道,兩者並存
+  const CLIPS=[
+    { id:"howlong", label:"是要多久?", src:"mp3/是要多久.m4a" },
+  ];
   let emoteTarget="all";                       // 目前要傳給誰:"all" 或某玩家 id
   function openEmote(target){
     if(!state.online)return;
     const roster=MP.roster();
     emoteTarget = (target && target!=="all" && roster.some(p=>p.id===target)) ? target : "all";
-    buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases();
+    buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases(); buildVoiceClips();
     const inp=$("emoteText"); if(inp)inp.value="";
     resetVoiceBtn(); const vh=$("voiceHint"); if(vh)vh.textContent="";
     Sound.wake();
@@ -611,25 +615,39 @@
     try{ const a=new Audio(u); try{ a.volume=Math.max(0,Math.min(1,voiceVol)); }catch(e){} if(onEnd){ a.onended=onEnd; a.onerror=onEnd; } const p=a.play(); if(p&&p.catch)p.catch(()=>{ if(onEnd)onEnd(); }); }
     catch(e){ if(onEnd)onEnd(); }
   }
-  // 播放單則語音,播完(或失敗)呼叫 onEnd;Web Audio 優先(繞過 iOS 自動播放封鎖、可解 WAV),失敗退回 HTMLAudio
-  function playVoiceOnce(dataURL,onEnd){
+  // 語音短訊的已解碼快取:同一個預錄檔重複播不必重抓重解(key = 檔案路徑)
+  const clipBufCache={};
+  // 用 Web Audio 播一段已解碼的 AudioBuffer(套用收語音音量);成功回傳 true
+  function playDecoded(c,buf,onEnd){
+    try{ const s=c.createBufferSource(); s.buffer=buf; const g=c.createGain(); g.gain.value=voiceVol; s.connect(g); g.connect(c.destination); s.onended=onEnd; s.start(); return true; }
+    catch(e){ return false; }
+  }
+  // 播放單則音源,播完(或失敗)呼叫 onEnd。來源可為 base64 data URL(即時錄音語音)或本地檔路徑(語音短訊 m4a)。
+  // Web Audio 優先(繞過 iOS 自動播放封鎖、可解 WAV/AAC),失敗退回 HTMLAudio。
+  function playVoiceOnce(src,onEnd){
     let called=false; const done=()=>{ if(called)return; called=true; if(onEnd)onEnd(); };
-    let bytes;
-    try{
-      const i=dataURL.indexOf(","); if(i<0)throw 0;
-      const bin=atob(dataURL.slice(i+1)); bytes=new Uint8Array(bin.length);
-      for(let k=0;k<bin.length;k++)bytes[k]=bin.charCodeAt(k);
-    }catch(e){ fallbackAudio(dataURL,done); return; }
     const c=Sound.ctx&&Sound.ctx();
-    if(!c){ fallbackAudio(dataURL,done); return; }
-    const play=()=>{
-      try{
-        c.decodeAudioData(bytes.buffer.slice(0),
-          b=>{ try{ const s=c.createBufferSource(); s.buffer=b; const g=c.createGain(); g.gain.value=voiceVol; s.connect(g); g.connect(c.destination); s.onended=done; s.start(); }catch(e){ fallbackAudio(dataURL,done); } },
-          ()=>fallbackAudio(dataURL,done));
-      }catch(e){ fallbackAudio(dataURL,done); }
+    if(!c){ fallbackAudio(src,done); return; }
+    const isData = src.slice(0,5)==="data:";
+    const start=()=>{
+      if(!isData && clipBufCache[src]){ if(!playDecoded(c,clipBufCache[src],done)) fallbackAudio(src,done); return; }   // 快取命中:直接播
+      const decode=(arrbuf,cacheKey)=>{
+        try{
+          c.decodeAudioData(arrbuf.slice(0),
+            b=>{ if(cacheKey)clipBufCache[cacheKey]=b; if(!playDecoded(c,b,done)) fallbackAudio(src,done); },
+            ()=>fallbackAudio(src,done));
+        }catch(e){ fallbackAudio(src,done); }
+      };
+      if(isData){
+        let bytes;
+        try{ const i=src.indexOf(","); if(i<0)throw 0; const bin=atob(src.slice(i+1)); bytes=new Uint8Array(bin.length); for(let k=0;k<bin.length;k++)bytes[k]=bin.charCodeAt(k); }
+        catch(e){ fallbackAudio(src,done); return; }
+        decode(bytes.buffer,null);
+      } else {
+        fetch(src).then(r=>{ if(!r.ok)throw 0; return r.arrayBuffer(); }).then(ab=>decode(ab,src)).catch(()=>fallbackAudio(src,done));   // 本地 m4a:抓檔 → 解碼(結果快取)
+      }
     };
-    if(c.state==="suspended") c.resume().then(play).catch(play); else play();
+    if(c.state==="suspended") c.resume().then(start).catch(start); else start();
   }
   // 語音播放佇列:多則語音「依收到先後」排隊逐一播、不重疊;整個佇列播放期間停背景音樂,全部播完再恢復
   const voiceQueue=[]; let voiceBusy=false, voiceSafety=null;
@@ -640,11 +658,16 @@
   let audioArmed=false;
   function markAudioArmed(){ audioArmed=true; }      // 由真實手勢(點播放膠囊 / 按麥克風 / 首次互動解鎖)呼叫
   function markAudioStale(){ audioArmed=false; }     // 切到背景 → 下次回前景要重新用手勢解鎖才自動播
-  function enqueueVoice(dataURL){
-    if(!dataURL)return;
+  function enqueueVoice(src){
+    if(!src)return;
     if(Sound.isMuted&&Sound.isMuted())return;   // 靜音:不播也不排隊
-    voiceQueue.push(dataURL);
+    voiceQueue.push(src);
     if(!voiceBusy) pumpVoice();
+  }
+  // 語音短訊:依代號找本地預錄檔,丟進同一條語音佇列播放(未知代號=跨版本沒有此檔 → 安全略過,不出聲)
+  function enqueueClip(id){
+    const clip=CLIPS.find(c=>c.id===id); if(!clip)return;
+    enqueueVoice(clip.src);
   }
   function pumpVoice(){
     if(voiceBusy)return;
@@ -658,7 +681,7 @@
     const next=voiceQueue.shift();
     voiceBusy=true; refreshBgmDuck();                    // 開播 → 停背景音樂
     const advance=()=>{ if(!voiceBusy)return; if(voiceSafety){ clearTimeout(voiceSafety); voiceSafety=null; } voiceBusy=false; pumpVoice(); };
-    voiceSafety=setTimeout(advance,9000);               // 保險:單則語音上限 6 秒,9 秒沒收到結束事件就強制接續,避免佇列卡住
+    voiceSafety=setTimeout(advance,15000);              // 保險:即時語音上限 6 秒、語音短訊通常也短,15 秒沒收到結束事件就強制接續,避免佇列卡住
     playVoiceOnce(next,advance);
   }
   // 「🔊 點擊播放」膠囊:收到語音但 AudioContext 未解鎖(iOS 切背景回來/尚未手勢)時顯示,數字為待播則數
@@ -706,6 +729,20 @@
       const b=document.createElement("button");
       b.type="button"; b.className="phrase-btn"; b.textContent=tx;
       b.addEventListener("click",()=>{ MP.sendEmote(emoteTarget,tx,"text"); closeEmote(); });
+      g.appendChild(b);
+    });
+  }
+  // 語音短訊按鈕:文字選單,點擊只送代號(kind="clip");送出者本機不回放(比照語音),對方播本地 m4a
+  function buildVoiceClips(){
+    const g=$("emoteClips"); if(!g)return; g.innerHTML="";
+    CLIPS.forEach(clip=>{
+      const b=document.createElement("button");
+      b.type="button"; b.className="phrase-btn clip-btn"; b.textContent="🔊 "+clip.label;
+      b.addEventListener("click",()=>{
+        markAudioArmed(); Sound.wake();   // 點按鈕=手勢,順手解鎖音訊(利於同回合收到別人的語音能自動播)
+        MP.sendEmote(emoteTarget, "🔊", "clip", clip.id);
+        closeEmote();
+      });
       g.appendChild(b);
     });
   }
