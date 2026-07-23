@@ -11,6 +11,9 @@
     let autoStarting=false;   // 全部人準備好 → 房主端自動開打的一次性守衛(避免 status 尚未同步前重複觸發)
     let prevIds=null;   // 上一次的玩家 id 清單,用來偵測「有新玩家加入」放音效(null=進房後尚未收到第一次快照)
     let orderMethod="rps", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
+    // 一局揮發狀態全收在單一 game 節點(status/order/turnIndex/calledList/rps/reveal/winner/roundId),每次推進帶單調遞增 rev。
+    // 單一節點 → 沒有「跨欄位事件到達順序」問題;rev 每次遞增 → 值即使相同也算變化、事件必觸發(取代舊的「先寫 null」與 enterPlaying 重讀等 workaround)。
+    let gameRev=0;   // 本地已套用的最新 game 版本;收到 rev 更舊的快照直接丟(過期快照)
     // 連線計分:scoreMode="rank"(累積勝場排行,無止盡)|"match"(搶 N 勝,達標跳總冠軍);winGoal=目標勝場(match 用)
     // roundId=每局開打時房主寫的識別碼(給「一局只計一次分」用);scoredThisRound=本端這局是否已幫自己加過分(本地去重)
     let scoreMode="rank", winGoal=3, roundId=null, scoredThisRound=false, scores={};   // scores 獨立於在線節點,斷線不刪
@@ -219,9 +222,11 @@
       code=randomCode(); roomRef=db.ref("rooms/"+code);                  // 內部隨機 4 位碼當資料庫鍵值(玩家看不到)
       roomRef.child("host").once("value").then(snap=>{
         if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }   // 撞號就重抽一次
-        return roomRef.update({ host:meId, roomName:roomName, status:"lobby", target:state.target, size:SIZE, orderMethod:"rps",
-          scoreMode:scoreMode, winGoal:winGoal, roundId:null,   // 用記住的計分偏好當建房預設
-          calledList:[], winner:null, order:null, turnIndex:0, rps:null, emotes:null, createdAt:Date.now() });
+        return roomRef.update({ host:meId, roomName:roomName, target:state.target, size:SIZE, orderMethod:"rps",
+          scoreMode:scoreMode, winGoal:winGoal,   // 用記住的計分偏好當建房預設
+          emotes:null, createdAt:Date.now(),
+          // 一局揮發狀態全收在 game(取代舊的散落頂層欄位);rev 由此起算,單調遞增
+          game:{ rev:1, status:"lobby", order:null, turnIndex:0, calledList:[], winner:null, rps:null, reveal:null, roundId:null } });
       }).then(()=>{ joinNode(); enterLobby(); armRoomIndex(); }).catch(e=>setMsg("建立房間失敗:"+((e&&e.message)||e)));
     }
     function join(inCode,name,inName){
@@ -260,6 +265,7 @@
     function bailFromRps(){ if(isHost) resetRoomToLobby(); else leave(); }
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
+      gameRev=0;   // ★ 進新房必歸零:MP 為常駐 IIFE,不重設會把上一間房累積的高 rev 帶進來,害新房快照被 onGame 的「rev<gameRev」全部誤丟 → 加入者卡在大廳、整房卡死
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();   // 連線中:顯示快速語音浮動鈕
       stopRoomWatch();                                  // 已進房,卸載大廳的房間偵測監聽
       $("home").classList.add("hidden");
@@ -398,12 +404,14 @@
         else if(curPhase==="ordering") renderOrderPanel();
         else if(curPhase==="playing"){
           // 輪到的人暫時不見:不在寬限期內才跳過他(避免卡住);寬限中先等他回來,不亂動出手順序
-          if(isHost && order.length && !players[order[turnIndex]] && !graceTimer) roomRef.child("turnIndex").set(nextTurn(turnIndex));
+          if(isHost && order.length && !players[order[turnIndex]] && !graceTimer) txGame(g=>{ if(g.status!=="playing"||g.winner)return false; g.turnIndex=nextTurn(g.turnIndex||0, g.order||[]); });
           updateTurnUI();
           if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
         }
       });
-      roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); if(isHost) updateRoomIndex(); });   // 狀態(大廳/對戰中)變動 → 同步大廳索引
+      // 一局揮發狀態:單一 game 節點、單一監聽。取代舊的 status/order/turnIndex/calledList/rps/reveal/winner/roundId 八個 child 監聽,
+      // 消除「跨欄位事件到達順序不保證」的隱式時序假設;過期快照(rev 更舊)於 onGame 內丟棄。
+      roomRef.child("game").on("value",s=>onGame(s.val()));
       roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"){ if(!isHost){ state.target=t; $("targetVal").textContent=t; } updateMpGoal(); } });
       // 盤面大小:房主寫入,訪客跟著套用(重發卡片;若已準備先取消準備讓其重填)
       roomRef.child("size").on("value",s=>{
@@ -420,22 +428,15 @@
       roomRef.child("emotes").on("child_added",s=>{ if(emotesReady)handleEmote(s.val()); });
       roomRef.child("emotes").once("value",()=>{ emotesReady=true; });
       roomRef.child("orderMethod").on("value",s=>{ orderMethod=s.val()||"host"; syncOrderSeg(); });
-      // 連線計分:模式 / 搶勝目標 / 每局識別碼
+      // 連線計分:模式 / 搶勝目標(roundId 已併入 game 節點,不再獨立監聽)
       roomRef.child("scoreMode").on("value",s=>{ scoreMode=(s.val()==="match")?"match":"rank"; syncScoreRow(); renderPlayers(); });
       roomRef.child("winGoal").on("value",s=>{ const n=s.val(); winGoal=(typeof n==="number"&&n>=2)?Math.min(20,n):3; syncScoreRow(); });
-      roomRef.child("roundId").on("value",s=>{ roundId=s.val()||null; });
       // 連線計分:分數存獨立路徑 scores/<id>={n,round},不掛 onDisconnect,斷線/切背景都刪不到
       roomRef.child("scores").on("value",s=>{ scores=s.val()||{};
         if(curPhase==="lobby") syncScoreRow();   // 分數變動 → 重評「搶勝目標」鎖定
         renderPlayers();                          // 晶片上的 🏆N 徽章
         if(winner) renderScoreboard();            // 結果卡開著時同步排行
       });
-      roomRef.child("order").on("value",s=>{ order=s.val()||[]; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } maybeAnnounceOrder(); });
-      roomRef.child("turnIndex").on("value",s=>{ turnIndex=s.val()||0; if(curPhase==="playing"){ render(); updateTurnUI(); renderPlayers(); } });
-      roomRef.child("rps").on("value",s=>{ rps=s.val(); if(curPhase==="rps")renderRps(); if(isHost)rpsHostResolve(); });
-      roomRef.child("reveal").on("value",s=>{ revealData=s.val(); if(curPhase==="reveal")renderReveal(); });
-      roomRef.child("calledList").on("value",s=>{ calledList=s.val()||[]; onCalled(); });
-      roomRef.child("winner").on("value",s=>{ winner=s.val(); if(winner)onWinner(); else closeWin(); });
     }
 
     function renderPlayers(){
@@ -563,26 +564,62 @@
       if(!isHost)return;
       const ids=Object.keys(players);
       if(ids.length<2 || !ids.every(id=>players[id].ready)){ showToast("需要 2 人以上且全部準備好"); return; }
-      const base={ target:state.target, calledList:[], winner:null, turnIndex:0, reveal:null, roundId:Date.now() };   // roundId 每局換,供「一局只計一次分」判定
-      Object.keys(players).forEach(id=>{ base["players/"+id+"/winAt"]=null; base["players/"+id+"/lines"]=0; });   // 清掉上一局的達標紀錄與線數(分數存於 scores/,不隨開新局清除)
+      // 清掉上一局每位玩家的達標紀錄與線數(per-player,獨立節點;分數存 scores/,不隨開新局清除)
+      const pups={}; Object.keys(players).forEach(id=>{ pups["players/"+id+"/winAt"]=null; pups["players/"+id+"/lines"]=0; });
+      if(Object.keys(pups).length) roomRef.update(pups);
+      // 本局揮發狀態一次原子寫入 game 節點(帶新 rev)。舊版「拆三次寫 / 先寫 null / enterPlaying 重讀」的 workaround 全數不再需要:
+      //   • 單一節點 → 清殘局(calledList/winner)與 status 一次到齊,不會「status 先到、用殘局重算而秒判勝利」(舊陷阱一);
+      //   • rev 每局遞增 → 即使洗出的順序與上一局相同,節點值仍變化、value 事件必觸發,不會卡在舊 order(舊陷阱二)。
+      const base={ status:"lobby", order:null, turnIndex:0, calledList:[], winner:null, rps:null, reveal:null, roundId:Date.now() };   // roundId 每局換,供「一局只計一次分」判定
       if(orderMethod==="rps"){
-        roomRef.update({ ...base, status:"rps", order:null, rps:{ seq:1, groups:[ids.join(",")], throws:null } });
+        setGame({ ...base, status:"rps", rps:{ seq:1, groups:[ids.join(",")], throws:null } });
       }else if(orderMethod==="random"){
         const ord=ids.slice();
         for(let i=ord.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=ord[i]; ord[i]=ord[j]; ord[j]=t; }
-        // 隨機順序沒有猜拳/排序過場當「屏障」,故拆成多次寫入(Firebase 保證同一客戶端的寫入依序送達各端):
-        // 陷阱一(秒判勝利):若把清空(calledList/winner)與 status="playing" 塞進同一次寫入,各端兩個監聽到達順序不保證,
-        //   一旦 status 先到,enterPlaying() 會用上一局殘留的 calledList 重算而秒判勝利、無限迴圈卡死。→ 先清殘局、確定 calledList 空了再翻 status。
-        // 陷阱二(第二局起卡死、誰都點不了):backToLobby() 已把「本地」order 清成 [],但 DB 的 order 還留著上一局的值。
-        //   若這局洗出的順序「剛好和上一局相同」(2 人有 50% 機率),對 order 寫入同一個值 Firebase「不觸發 value 事件」,
-        //   本地 order 就永遠停在 [] → 沒人輪得到、也沒有晶片高亮、點號碼一律「還沒輪到你」。
-        //   → 解法:先把 order 寫成 null(舊值→null 一定是變化、必觸發事件把本地清空),再單獨寫入新順序(null→ord 也必觸發),本地一定同步到新順序。
-        roomRef.update({ ...base, order:null, rps:null });   // ① 清殘局(含把 order 歸零,確保下一步一定觸發事件)
-        roomRef.child("order").set(ord);                     // ② 寫入本局順序(null→ord 保證各端本地 order 同步更新)
-        roomRef.child("status").set("playing");              // ③ 確定盤面與順序都就位後才開打
+        setGame({ ...base, status:"playing", order:ord });
       }else{
-        roomRef.update({ ...base, status:"ordering", order:null, rps:null });
+        setGame({ ...base, status:"ordering" });
       }
+    }
+
+    /* ----- game 節點:單一版本化狀態的寫入輔助 + 派發 ----- */
+    // 房主推進相位:覆寫整個 game 節點(開新局 / 全清回大廳),單一原子寫入 + 新 rev。
+    function setGame(g){ if(!roomRef)return; g.rev=gameRev+1; roomRef.child("game").set(g); }
+    // 房主推進相位:只改部分欄位(其餘保留;update 為合併,不會清掉未列出的欄位),同時遞增 rev。
+    function patchGame(p){ if(!roomRef)return; p.rev=gameRev+1; roomRef.child("game").update(p); }
+    // 需原子遞增 rev 的多寫者操作(叫號 tap、達標 tryWin、跳過斷線者):用 transaction 避免併發覆蓋。
+    // mut(g) 直接改 g;回傳 false 代表中止交易(不寫,例如號碼已被叫過、已有贏家)。
+    function txGame(mut){
+      if(!roomRef)return;
+      roomRef.child("game").transaction(g=>{
+        if(!g)return;                   // 節點不存在/尚未快取 → 回傳 undefined 中止交易(勿回傳 null,那會寫入 null 刪掉節點)
+        if(mut(g)===false)return;       // mut 要求中止(號碼已被叫過、已有贏家等)→ 中止,不寫
+        g.rev=(g.rev||0)+1;
+        return g;
+      });
+    }
+    // 收到 game 快照:rev 更舊 → 過期,丟棄;否則套用整包狀態並派發到對應相位。
+    // 取代舊的 8 個 child 監聽,所有欄位一次到齊,不再有「跨欄位事件到達順序」問題;
+    // 同 rev 的中途更新(如猜拳逐一出拳、平手重猜)rev 不變,仍會套用(判斷用 < 而非 <=)。
+    function onGame(g){
+      g=g||{};
+      const rev=(typeof g.rev==="number")?g.rev:0;
+      if(rev<gameRev)return;            // 過期快照,丟棄
+      gameRev=rev;
+      order=g.order||[]; turnIndex=g.turnIndex||0; calledList=g.calledList||[];
+      rps=g.rps||null; revealData=g.reveal||null; roundId=g.roundId||null;
+      const nextWinner=g.winner||null, nextStatus=g.status||"lobby";
+      const statusChanged=(nextStatus!==status), hadWinner=!!winner;
+      winner=nextWinner; status=nextStatus;   // 先更新模組值,讓 onStatus/showOutcome 讀到正確 winner/status
+      onStatus();                        // 相位派發(可能觸發 enter*/backToLobby);完成後 curPhase===status
+      // 目前相位的即時內容更新(對應舊 child 監聽的即時渲染)
+      if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
+      else if(curPhase==="reveal"){ renderReveal(); }
+      else if(curPhase==="playing"){ onCalled(); maybeAnnounceOrder(); }
+      // winner 邊緣:剛出現/仍在 → 揭曉結果(showOutcome 內含 outcomeShown 去重,補算平手安全);剛清掉 → 收結果卡
+      if(winner) onWinner();
+      else if(hadWinner) closeWin();
+      if(statusChanged && isHost) updateRoomIndex();   // 大廳/對戰中 狀態變動 → 同步大廳輕量索引
     }
 
     /* ----- phase dispatch ----- */
@@ -674,7 +711,7 @@
       if(!rps||curPhase!=="rps"||rps.tie)return;
       const mg=myGroup(); if(!mg||mg.length<=1)return;
       const seq=rps.seq||1;
-      roomRef.child("rps/throws/"+meId).set({ c:c, s:seq });
+      roomRef.child("game/rps/throws/"+meId).set({ c:c, s:seq });   // 猜拳出拳:同 rev 的中途更新,onGame 照常套用(不遞增 rev)
     }
     function rpsHostResolve(){
       if(!isHost||!rps||status!=="rps")return;
@@ -684,7 +721,7 @@
       let groups=(rps.groups||[]).map(g=>String(g).split(",").filter(id=>players[id])).filter(g=>g.length>0);
       const pending=groups.filter(g=>g.length>1).reduce((a,g)=>a.concat(g),[]);
       if(pending.length===0){
-        roomRef.update({ order:groups.reduce((a,g)=>a.concat(g),[]), turnIndex:0, status:"playing", rps:null });
+        patchGame({ order:groups.reduce((a,g)=>a.concat(g),[]), turnIndex:0, status:"playing", rps:null });
         return;
       }
       if(!pending.every(id=>throws[id]&&throws[id].s===seq))return;
@@ -705,16 +742,17 @@
         // 還有平手 → 先揭曉這一輪(讓大家看清楚是平手),停留約 2 秒再重猜(保留已累積的出拳紀錄)
         if(tieTimer)return;                              // 已排程過就不重複
         const nextGroups=newGroups.map(g=>g.join(","));
-        // 先把分組結果寫進去(已定案的人變單獨一組),並保留 throws/seq 讓平手的人看到彼此出了什麼
-        roomRef.update({ "rps/groups":nextGroups, "rps/tie":true });
+        // 先把分組結果寫進去(已定案的人變單獨一組),並保留 throws/seq 讓平手的人看到彼此出了什麼。
+        // 這些都是 rps 相位內的中途更新(同 rev),onGame 照常套用;不遞增 rev。
+        roomRef.child("game/rps").update({ groups:nextGroups, tie:true });
         tieTimer=setTimeout(()=>{
           tieTimer=null;
-          roomRef.update({ "rps/seq":seq+1, "rps/throws":null, "rps/reveal":acc, "rps/tie":null });
+          roomRef.child("game/rps").update({ seq:seq+1, throws:null, reveal:acc, tie:null });
         }, 1500);
       }else{
         // 定案 → 先進入過場揭曉(帶著大家的出拳與最終順序),再由房主自動開打
         const finalOrder=newGroups.reduce((a,g)=>a.concat(g),[]);
-        roomRef.update({ status:"reveal", order:finalOrder, turnIndex:0, rps:null, reveal:{ throws:acc, order:finalOrder } });
+        patchGame({ status:"reveal", order:finalOrder, turnIndex:0, rps:null, reveal:{ throws:acc, order:finalOrder } });
       }
     }
 
@@ -773,7 +811,8 @@
     function revealSkip(){
       if(status!=="reveal" || !roomRef) return;
       if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
-      roomRef.update({ status:"playing", reveal:null });
+      // 揭曉畫面所有人都能按「跳過」+ 房主計時器 = 多寫者;用 txGame 交易確保只從 reveal→playing 推進一次(非房主單寫者)
+      txGame(g=>{ if(g.status!=="reveal")return false; g.status="playing"; g.reveal=null; });
     }
 
     /* ----- host manual ordering ----- */
@@ -815,7 +854,7 @@
       if(!isHost)return;
       const ord=orderDraft.filter(id=>players[id]);
       if(ord.length<2){ showToast("人數不足"); return; }
-      roomRef.update({ order:ord, turnIndex:0, status:"playing" });
+      patchGame({ order:ord, turnIndex:0, status:"playing" });
     }
 
     /* ----- playing (turn-based manual call) ----- */
@@ -832,17 +871,8 @@
       setLock(false);
       resetMarquee(); render(); applyCalledMarks(); updateTurnUI(); refreshLines();
       maybeAnnounceOrder();
-      // 保險:status 已是 playing 卻讀不到 order(本地 order 停在 [])→ 主動重讀一次 DB 的 order 補救。
-      // 成因:startGame 隨機順序用「先寫 null 再寫 ord」兩筆去逼 value 事件觸發;但 Firebase 同步給遠端時
-      //   會把短時間內的多筆寫入「合併(coalesce)」成一次,對 order 節點的淨變化就變成「舊值→新值」——
-      //   若這局洗出的順序剛好和上一局相同(2 人有 50%),淨變化=0,order 監聽根本不觸發,本地就永遠停在 []。
-      //   → 此時 DB 的 order 其實是對的,直接重讀補上,否則沒人輪得到、點誰都跳「還沒輪到你」而卡死。
-      if(!order.length && roomRef){
-        roomRef.child("order").once("value",s=>{
-          const ord=s.val()||[];
-          if(ord.length && status==="playing"){ order=ord; render(); updateTurnUI(); renderPlayers(); maybeAnnounceOrder(); }
-        });
-      }
+      // (舊版此處有「order 停在 [] 就主動重讀 DB」的補救,因應舊拆分寫入被 coalesce 吃掉 order 事件。
+      //  改用單一 game 節點 + rev 後,order 與 status 一定在同一快照原子到齊,補救不再需要,已移除。)
     }
     // 猜拳/排序定案後,公告一次出手順序(讓大家知道猜拳誰贏誰輸);order 可能比 status 晚到,故用旗標確保只公告一次
     function maybeAnnounceOrder(){
@@ -860,10 +890,12 @@
     }
     function isMyTurn(){ return status==="playing" && !winner && !abandoned && order.length>0 && order[turnIndex]===meId; }
     function isCalled(v){ return calledList.indexOf(v)>=0; }
-    function nextTurn(from){
-      if(!order.length)return from;
+    // 下一位仍在線的玩家索引。ord 可傳入(txGame 交易內用交易當下的 g.order,避免與模組值不一致);省略則用模組 order。
+    function nextTurn(from, ord){
+      ord = ord || order;
+      if(!ord.length)return from;
       let i=from;
-      for(let k=0;k<order.length;k++){ i=(i+1)%order.length; if(players[order[i]])return i; }
+      for(let k=0;k<ord.length;k++){ i=(i+1)%ord.length; if(players[ord[i]])return i; }
       return from;
     }
     // 目標線數顯示在房間框(大廳/遊戲中都顯示)
@@ -890,7 +922,14 @@
       const n=state.card[i]; if(!n)return;
       if(isCalled(n))return;
       Sound.place();
-      roomRef.update({ calledList:calledList.concat(n), turnIndex:nextTurn(turnIndex) });
+      // 叫號:交易內原子地加號碼、推進 turnIndex、遞增 rev(多寫者安全:即使兩端同時點也不會覆蓋彼此)
+      txGame(g=>{
+        if(g.status!=="playing")return false;
+        const cl=g.calledList||[];
+        if(cl.indexOf(n)>=0)return false;   // 已被叫過(重複點/競態)→ 中止
+        g.calledList=cl.concat(n);
+        g.turnIndex=nextTurn(g.turnIndex||0, g.order||[]);
+      });
     }
     function onCalled(){
       if(state.mode==="play"){
@@ -910,9 +949,10 @@
     function reportLines(done){ if(roomRef&&meId)roomRef.child("players/"+meId+"/lines").set(done); }
     function tryWin(done){
       if(!roomRef)return;
-      // 記錄「自己在第幾次叫號時達標」;同一次叫號同時達標 = 平手(見 showOutcome)
+      // 記錄「自己在第幾次叫號時達標」;同一次叫號同時達標 = 平手(見 showOutcome)。winAt 是 per-player 節點,獨立寫。
       if(myWinAt===null){ myWinAt=calledList.length; if(meId)roomRef.child("players/"+meId+"/winAt").set(myWinAt); }
-      roomRef.child("winner").transaction(w=> w || { id:meId, name:meName, lines:done, at:myWinAt });
+      // winner 收進 game 節點:交易確保只有第一位達標者寫得進(已有 winner 則中止),並原子遞增 rev
+      txGame(g=>{ if(g.winner)return false; g.winner={ id:meId, name:meName, lines:done, at:myWinAt }; });
     }
 
     function onWinner(){ if(winner) showOutcome(); }
@@ -1022,9 +1062,11 @@
     // 這兩種情況都沒有 winner 要保留,故可直接清 winner。所有寫入皆由房主發出,權限一定夠。
     function resetRoomToLobby(){
       if(!roomRef)return;
-      const ups={ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null, reveal:null, emotes:null };
+      // per-player 與 emotes 是獨立節點,一起清;本局揮發狀態用 setGame 整包覆寫回大廳(帶新 rev)
+      const ups={ emotes:null };
       Object.keys(players).forEach(id=>{ ups["players/"+id+"/lines"]=0; ups["players/"+id+"/ready"]=false; ups["players/"+id+"/winAt"]=null; });
       roomRef.update(ups);
+      setGame({ status:"lobby", calledList:[], winner:null, order:null, turnIndex:0, rps:null, reveal:null, roundId:null });
       backToLobby();
     }
     // 「再一局」= 每位玩家各自決定要不要續玩(房主或訪客皆可按):只把自己帶回大廳重新準備,不強拉別人。
@@ -1033,7 +1075,9 @@
     // 各玩家的 ready 已在 showOutcome(本局結束當下)各自設為 false,故回大廳後都要重新按準備,房主才能開始。
     function again(){
       if(!roomRef)return;
-      if(status!=="lobby") roomRef.child("status").set("lobby");
+      // 只翻 status 回 lobby(保留 winner 等本局資料,才不會弄壞還在看結果的人的結果卡);其餘欄位留到下一局 startGame 才清。
+      // again 房主/訪客皆可按 = 多寫者;用 txGame 而非 patchGame,多人同按時交易確保 rev 原子遞增、收斂一致
+      if(status!=="lobby") txGame(g=>{ if(g.status==="lobby")return false; g.status="lobby"; });
       backToLobby();
     }
     function backToLobby(){
@@ -1056,7 +1100,7 @@
     function leave(){
       try{
         if(roomRef){
-          ["host","players","status","target","size","orderMethod","order","turnIndex","rps","reveal","calledList","winner","emotes","scores"].forEach(k=>roomRef.child(k).off());
+          ["host","players","game","target","size","orderMethod","scoreMode","winGoal","scores","emotes"].forEach(k=>roomRef.child(k).off());
           if(isHost){
             if(meId) roomRef.child("players/"+meId).onDisconnect().cancel();
             roomRef.onDisconnect().cancel();
@@ -1074,7 +1118,7 @@
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; scores={}; calledList=[];
-      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false; wasMyTurn=false; lastIndexSig=null;
+      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false; wasMyTurn=false; lastIndexSig=null; gameRev=0;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();
