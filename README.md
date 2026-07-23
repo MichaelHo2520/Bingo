@@ -8,6 +8,25 @@
 
 ---
 
+## 📸 遊戲畫面
+
+<table>
+  <tr>
+    <td align="center"><b>🏠 主選單</b></td>
+    <td align="center"><b>🎯 單機對局</b></td>
+    <td align="center"><b>⚙️ 設定・主題</b></td>
+    <td align="center"><b>📖 電子書模式</b></td>
+  </tr>
+  <tr>
+    <td><img src="screenshots/home.png" width="200" alt="BINGO 主選單:單機練習 / 連線對戰"></td>
+    <td><img src="screenshots/board.png" width="200" alt="賓果盤面,號碼劃記與完成連線高亮"></td>
+    <td><img src="screenshots/settings.png" width="200" alt="設定面板:主題、音效、背景音樂、語音"></td>
+    <td><img src="screenshots/ebook.png" width="200" alt="電子書 / 電子紙黑白護眼模式"></td>
+  </tr>
+</table>
+
+---
+
 ## ✨ 功能介紹
 
 ### 🎮 兩種玩法
