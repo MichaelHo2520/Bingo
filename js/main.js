@@ -89,6 +89,8 @@
   $("mpNewSeason").addEventListener("click",()=>{ MP.resetScores(); MP.again(); });   // 奪冠後:重設戰績並回大廳開新賽季
   $("rpsBtns").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.throwRps(b.dataset.rps);b.blur();});
   $("revealSkip").addEventListener("click",()=>MP.revealSkip());
+  $("rpsVoiceBtn").addEventListener("click",toggleQuickVoice);        // 猜拳蓋板的快速語音:與房間框那顆共用同一套狀態機
+  $("rpsEmoteBtn").addEventListener("click",()=>openEmote("all"));    // 猜拳蓋板的表情鈕:開互動面板(疊在猜拳蓋板之上,含語音短訊)
   $("mpVeilLeave").addEventListener("click",()=>MP.bailFromRps());
   $("orderConfirm").addEventListener("click",()=>MP.confirmOrder());
   $("mpLeaveBtn").addEventListener("click",()=>MP.leave());

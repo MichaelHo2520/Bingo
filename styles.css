@@ -702,6 +702,7 @@
 
   /* 房間框右上動作鈕:麥克風(快速語音)+ 表情。大廳/遊戲中都常駐在房間框(不再浮在盤面、不會壓到號碼格),兩顆並排 */
   .mp-actions{display:flex;align-items:center;gap:8px;flex:none}
+  .rps-actions{justify-content:center;margin-top:16px}   /* 猜拳蓋板內的語音/表情鈕:置中、與上方出拳結果留點間距 */
   .quick-voice,.mp-act-btn{
     flex:none;display:inline-flex;align-items:center;justify-content:center;
     width:42px;height:42px;padding:0;border-radius:50%;cursor:pointer;

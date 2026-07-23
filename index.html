@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.33.0 -->
-<meta name="version" content="1.33.0">
+<!-- BINGO 賓果遊戲 · v1.34.0 -->
+<meta name="version" content="1.34.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -244,6 +244,13 @@
           <button class="rps-btn" data-rps="P" title="布">✋</button>
         </div>
         <div class="rps-throws" id="rpsThrows"></div>
+        <!-- 猜拳等待時也能傳語音/表情:沿用房間框那組(🎤 快速語音 + 😀 互動面板,面板內含語音短訊) -->
+        <div class="mp-actions rps-actions" id="rpsActions">
+          <button class="quick-voice" id="rpsVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
+            <span class="qv-ico">🎤</span><span class="qv-label">語音</span>
+          </button>
+          <button class="mp-act-btn" id="rpsEmoteBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
+        </div>
       </div>
       <!-- 揭曉大家出了什麼 -->
       <div id="revealContent" class="hidden">

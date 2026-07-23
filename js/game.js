@@ -592,20 +592,30 @@
     });
   }
   /* ---- 快速語音留言:浮動鈕直接錄音、送給全部人(沿用面板同一套 Voice) ---- */
+  // 快速語音鈕可能同時存在兩顆(房間框固定那顆 + 猜拳蓋板那顆),用 class 一起掃描,
+  // 讓「準備中/錄音倒數/⏹」等狀態兩邊同步顯示,不會因為只更新其中一顆而顯示不一致。
   let qvTick=null;
+  function eachQuickVoice(fn){ const list=document.querySelectorAll(".quick-voice"); for(let i=0;i<list.length;i++)fn(list[i]); }
+  function setQuickVoiceUI(o){
+    eachQuickVoice(b=>{
+      if(o.disabled!=null) b.disabled=o.disabled;
+      if(o.rec!=null) b.classList.toggle("rec",o.rec);
+      const ico=b.querySelector(".qv-ico"), lab=b.querySelector(".qv-label");
+      if(ico&&o.ico!=null) ico.textContent=o.ico;
+      if(lab&&o.lab!=null) lab.textContent=o.lab;
+    });
+  }
   function resetQuickVoiceBtn(){
-    const b=$("quickVoiceBtn"); if(qvTick){ clearInterval(qvTick); qvTick=null; }
-    if(!b)return; b.classList.remove("rec"); b.disabled=false;
-    const ico=$("qvIco"), lab=$("qvLabel"); if(ico)ico.textContent="🎤"; if(lab)lab.textContent="語音";
+    if(qvTick){ clearInterval(qvTick); qvTick=null; }
+    setQuickVoiceUI({ rec:false, disabled:false, ico:"🎤", lab:"語音" });
   }
   function toggleQuickVoice(){
-    const b=$("quickVoiceBtn"); if(!b||!state.online)return;
-    const ico=$("qvIco"), lab=$("qvLabel");
+    if(!state.online)return;
     if(!Voice.supported()){ showToast("此裝置/瀏覽器不支援錄音"); return; }
-    if(Voice.recording()){ b.disabled=true; if(lab)lab.textContent="處理中…"; Voice.stop(); return; }  // 停止 → 交給 onBlob 收尾
+    if(Voice.recording()){ setQuickVoiceUI({ disabled:true, lab:"處理中…" }); Voice.stop(); return; }  // 停止 → 交給 onBlob 收尾
     markAudioArmed(); Sound.wake();   // 按麥克風=手勢,順手解鎖播放音訊(這也是「按著麥克風時收到的語音就會自動播」的原因)
     kickVoiceQueue();                 // 若正好有語音在膠囊裡等,趁這個手勢一起補播
-    b.disabled=true; if(lab)lab.textContent="準備中…";
+    setQuickVoiceUI({ disabled:true, lab:"準備中…" });
     voiceRecording=true; refreshBgmDuck();   // 先停背景音樂,再開麥克風(避免 Android 通話路徑把音樂弄難聽)
     Voice.start((wav)=>{
       voiceRecording=false; refreshBgmDuck();  // 錄音結束:恢復背景音樂(若還有收到的語音在播,duck 會維持到播完)
@@ -618,10 +628,10 @@
         showToast("已送出語音給全部人 🎤");
       }catch(e){ showToast("語音處理失敗"); }
     }).then(()=>{
-      b.disabled=false; b.classList.add("rec"); if(ico)ico.textContent="⏹";
+      setQuickVoiceUI({ disabled:false, rec:true, ico:"⏹" });
       let left=Math.ceil(Voice.MAX_MS/1000);
-      if(lab)lab.textContent=left+"s";
-      qvTick=setInterval(()=>{ left--; if(left<=0){ if(qvTick){clearInterval(qvTick);qvTick=null;} return; } if(lab)lab.textContent=left+"s"; },1000);
+      setQuickVoiceUI({ lab:left+"s" });
+      qvTick=setInterval(()=>{ left--; if(left<=0){ if(qvTick){clearInterval(qvTick);qvTick=null;} return; } setQuickVoiceUI({ lab:left+"s" }); },1000);
     }).catch(err=>{
       voiceRecording=false; refreshBgmDuck();   // 開麥失敗:恢復背景音樂
       resetQuickVoiceBtn();
