@@ -6,6 +6,8 @@ notes/
 
 # 所有 Markdown 文檔都不上傳(要公開某份時用 git add -f 強制加入)
 *.md
+# 例外:README.md 要公開在 GitHub 首頁(給人搜尋/瀏覽),放行上傳
+!README.md
 
 # 舊/實驗殘留、未被 index.html 引用的資產
 back.jpg
