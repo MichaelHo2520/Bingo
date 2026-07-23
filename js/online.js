@@ -24,6 +24,7 @@
     let myWinAt=null, outcomeShown=false;   // 平手判定用:自己達標時的叫號數 / 結果是否已揭曉
     let abandoned=false;                    // 開打後對手都離開、只剩自己 → 本局作廢,不再繼續
     let orderAnnounced=false;               // 本局是否已公告過出手順序(猜拳結果)
+    let reachAnnounced=false;               // 本局是否已廣播過「聽牌」(一局只播一次,避免每次叫號重播)
     let revealData=null, revealTimer=null;  // 猜拳過場:大家出的拳 / 房主用的「揭曉後自動開打」計時器
     let tieTimer=null, tieSig="";           // 平手揭曉:房主用的「停留後自動重猜」計時器 / 避免重繪重播動畫
     let emotesReady=false;                   // 好友互動:是否已略過歷史 emotes(避免重播舊表情)
@@ -860,7 +861,7 @@
     /* ----- playing (turn-based manual call) ----- */
     function enterPlaying(){
       state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(nCells()).fill(false);
-      myWinAt=null; outcomeShown=false; orderAnnounced=false; abandoned=false; scoredThisRound=false; wasMyTurn=false;
+      myWinAt=null; outcomeShown=false; orderAnnounced=false; reachAnnounced=false; abandoned=false; scoredThisRound=false; wasMyTurn=false;
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       updateRoomTabs(false);   // 進遊戲:收起房間分頁列,棋盤佔滿
       $("playStatus").classList.add("hidden");
@@ -953,6 +954,13 @@
       if(myWinAt===null){ myWinAt=calledList.length; if(meId)roomRef.child("players/"+meId+"/winAt").set(myWinAt); }
       // winner 收進 game 節點:交易確保只有第一位達標者寫得進(已有 winner 則中止),並原子遞增 rev
       txGame(g=>{ if(g.winner)return false; g.winner={ id:meId, name:meName, lines:done, at:myWinAt }; });
+    }
+    // 聽牌廣播:本端(game.js refreshLines)偵測到自己只差一號就達標時呼叫。一局只播一次(reachAnnounced 去重)。
+    // 廣播對象為全部人,且 handleEmote 對 kind==="reach" 會「連自己也播」→ 聽牌者本人也聽得到「聽牌」語音。
+    function reportReach(){
+      if(reachAnnounced || status!=="playing" || winner)return;
+      reachAnnounced=true;
+      sendEmote("all", "🀄", "reach");
     }
 
     function onWinner(){ if(winner) showOutcome(); }
@@ -1147,9 +1155,9 @@
     function roster(){ return Object.keys(players).map(id=>({ id:id, name:dispName(id), me:id===meId })); }
     function sendEmote(to,emoji,kind,audio){
       if(!roomRef||!meId)return;
-      const isText=kind==="text", isVoice=kind==="voice", isClip=kind==="clip";
+      const isText=kind==="text", isVoice=kind==="voice", isClip=kind==="clip", isReach=kind==="reach";
       const ref=roomRef.child("emotes").push();
-      const rec={ from:meId, to:to||"all", kind:isVoice?"voice":(isClip?"clip":(isText?"text":"emoji")), at:firebase.database.ServerValue.TIMESTAMP };
+      const rec={ from:meId, to:to||"all", kind:isVoice?"voice":(isClip?"clip":(isReach?"reach":(isText?"text":"emoji"))), at:firebase.database.ServerValue.TIMESTAMP };
       if(isVoice){ rec.emoji="🎤"; rec.audio=String(audio||""); }              // 即時語音:emoji 當顯示圖示,音訊放 audio(base64)
       else if(isClip){ rec.emoji="🔊"; rec.clip=String(audio||"").slice(0,40); } // 語音短訊:只傳代號(clip),對方播本地 m4a;emoji 供舊版客戶端降級顯示
       else { rec.emoji=String(emoji).slice(0,isText?24:8); }
@@ -1175,6 +1183,12 @@
         if(!mine && forMe) enqueueClip(e.clip);     // 語音短訊:依代號播本地 m4a(沿用語音佇列);自己送的不回放
         return;
       }
+      if(e.kind==="reach"){                          // 有人聽牌:全部人(含聽牌者本人)都播「聽牌」語音
+        const who=mine?"你":dispName(e.from);
+        showEmote("🀄", who+" 聽牌了!", e.from, "voice");
+        enqueueClip("reach");                        // 刻意不排除 mine → 聽牌者自己也聽得到
+        return;
+      }
       if(!e.emoji)return;
       showEmote(e.emoji, fromNm+" → "+toNm, (to!=="all")?to:e.from, e.kind);
       if(!mine && forMe) Sound.emote();
@@ -1191,7 +1205,7 @@
 
     return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
-             reportLines, tryWin, readyEnabled, isMyTurn, isCalled, tap,
+             reportLines, tryWin, reportReach, readyEnabled, isMyTurn, isCalled, tap,
              amHost, amReady:()=>ready, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,
              confirmKick, cancelKick:closeKick, refreshHint:mpHint,
              setScoreMode, setWinGoal, resetScores, winGoal:()=>winGoal, scoreMode:()=>scoreMode, usePrefs };

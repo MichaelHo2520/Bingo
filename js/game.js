@@ -159,9 +159,25 @@
     if(state.online){
       MP.reportLines(done);
       if(done>=state.target) MP.tryWin(done);
+      else if(isTenpai()) MP.reportReach();   // 聽牌(只差一號就達標)→ 廣播「聽牌」語音給全部人(含自己);MP 內一局只播一次
       return;
     }
     if(done>=state.target && !state.won){ state.won=true; win(done); }
+  }
+  // 連線用:是否「聽牌」——目前尚未達標,但只要再劃記某一格(某個號碼被叫到)就能達到目標線數。
+  // 因號碼一次叫一個、劃記只增不減,達標前必會先經過聽牌狀態;各端只判斷自己的盤面。
+  function isTenpai(){
+    let done=0;
+    LINES.forEach(line=>{ if(line.every(idx=>state.marked[idx])) done++; });
+    if(done>=state.target) return false;   // 已達標(贏了)不算聽牌
+    for(let i=0;i<nCells();i++){
+      if(state.marked[i]) continue;        // 已劃記的格跳過,只試「還沒被叫到」的格
+      state.marked[i]=true;                // 假設這格被叫到
+      let d=0; LINES.forEach(line=>{ if(line.every(idx=>state.marked[idx])) d++; });
+      state.marked[i]=false;               // 還原(不改動真實盤面)
+      if(d>=state.target) return true;      // 只差這一格就達標 → 聽牌
+    }
+    return false;
   }
 
   /* ---------- Win ---------- */
@@ -519,6 +535,8 @@
     { id:"howlong", label:"是要多久?",   src:"mp3/是要多久.m4a" },
     { id:"ready",   label:"啊西好了沒?", src:"mp3/啊西好了沒.m4a" },
     { id:"hurry",   label:"快點來不及啦!", src:"mp3/快點，來不急啦.m4a" },
+    // 「聽牌」為連線遊戲自動觸發(有人只差一號就達標),不放進手動表情選單 → auto:true 讓 buildVoiceClips 略過
+    { id:"reach",   label:"聽牌",          src:"mp3/聽牌.m4a", auto:true },
   ];
   let emoteTarget="all";                       // 目前要傳給誰:"all" 或某玩家 id
   function openEmote(target){
@@ -738,6 +756,7 @@
   function buildVoiceClips(){
     const g=$("emoteClips"); if(!g)return; g.innerHTML="";
     CLIPS.forEach(clip=>{
+      if(clip.auto) return;   // 自動觸發的語音(如聽牌)不放進手動選單
       const b=document.createElement("button");
       b.type="button"; b.className="phrase-btn clip-btn"; b.textContent="🔊 "+clip.label;
       b.addEventListener("click",()=>{
