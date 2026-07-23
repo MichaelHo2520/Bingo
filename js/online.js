@@ -803,6 +803,17 @@
       setLock(false);
       resetMarquee(); render(); applyCalledMarks(); updateTurnUI(); refreshLines();
       maybeAnnounceOrder();
+      // 保險:status 已是 playing 卻讀不到 order(本地 order 停在 [])→ 主動重讀一次 DB 的 order 補救。
+      // 成因:startGame 隨機順序用「先寫 null 再寫 ord」兩筆去逼 value 事件觸發;但 Firebase 同步給遠端時
+      //   會把短時間內的多筆寫入「合併(coalesce)」成一次,對 order 節點的淨變化就變成「舊值→新值」——
+      //   若這局洗出的順序剛好和上一局相同(2 人有 50%),淨變化=0,order 監聽根本不觸發,本地就永遠停在 []。
+      //   → 此時 DB 的 order 其實是對的,直接重讀補上,否則沒人輪得到、點誰都跳「還沒輪到你」而卡死。
+      if(!order.length && roomRef){
+        roomRef.child("order").once("value",s=>{
+          const ord=s.val()||[];
+          if(ord.length && status==="playing"){ order=ord; render(); updateTurnUI(); renderPlayers(); maybeAnnounceOrder(); }
+        });
+      }
     }
     // 猜拳/排序定案後,公告一次出手順序(讓大家知道猜拳誰贏誰輸);order 可能比 status 晚到,故用旗標確保只公告一次
     function maybeAnnounceOrder(){
