@@ -52,6 +52,8 @@
   $("bgmVol").addEventListener("change",savePrefs);                             // 放開才存偏好
   $("voiceVol").addEventListener("input",e=>setVoiceVol((+e.target.value||0)/100)); // 收到語音音量:拖曳即時套用(下一則生效)
   $("voiceVol").addEventListener("change",savePrefs);                              // 放開才存偏好
+  $("sfxVol").addEventListener("input",e=>setSfxVol((+e.target.value||0)/100));    // 音效音量:拖曳即時套用
+  $("sfxVol").addEventListener("change",savePrefs);                                // 放開才存偏好
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});

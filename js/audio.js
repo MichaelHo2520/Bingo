@@ -8,16 +8,21 @@
     try{ const as=navigator.audioSession; if(as && as.type!==type) as.type=type; }catch(e){}
   }
 
-  /* ---------- Sound (Web Audio, no files) ---------- */
+  /* ---------- Sound(Web Audio 合成音效 + 勝敗音檔 win.wav/lose.wav;含總音量調整) ---------- */
   const Sound=(function(){
-    let ctx=null, muted=false;
+    let ctx=null, muted=false, vol=1;   // vol:音效總音量 0~1(預設 100%,勝敗音檔與所有合成音都經過總音量節點)
+    let master=null;                     // 音效總音量 GainNode(建在當前 AudioContext 上)
+    let winBuf=null, loseBuf=null;       // 勝/敗音檔(mp3/win.wav、mp3/lose.wav)解碼後的 AudioBuffer
+    let winEl=null, loseEl=null;         // Web Audio 解不了時的 HTMLAudio 後備節點
+    const SFX={ win:"mp3/win.wav", lose:"mp3/lose.wav" };
+    const sfxReady={win:false,lose:false}, sfxFailed={win:false,lose:false}, sfxLoading={win:false,lose:false};
     // 平時(沒在錄音)把 session 設成 playback,收到的語音才能在靜音模式下也播出;但若正在錄音(play-and-record)則不覆蓋,避免打斷錄音。
     function setPlaybackSession(){
       try{ const as=navigator.audioSession; if(as && as.type==="play-and-record") return; }catch(e){}
       setAudioSession("playback");
     }
     function ac(){
-      if(!ctx){const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return null; ctx=new AC(); setPlaybackSession();}
+      if(!ctx){const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return null; ctx=new AC(); setPlaybackSession(); preload();}
       if(ctx.state==="suspended")ctx.resume();
       return ctx;
     }
@@ -33,9 +38,39 @@
       g.gain.setValueAtTime(0.0001,t);
       g.gain.exponentialRampToValueAtTime(vol,t+0.012);
       g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
-      osc.connect(g).connect(c.destination);
+      osc.connect(g).connect(masterNode(c));
       osc.start(t); osc.stop(t+dur+0.03);
     }
+    // 音效總音量節點:所有合成音與勝敗音檔都接到它,再進 destination(音量鍵/iOS 也有效)
+    function masterNode(c){
+      if(!master || master.context!==c){ master=c.createGain(); master.gain.value=vol; master.connect(c.destination); }
+      return master;
+    }
+    // 預載勝/敗音檔:fetch → decodeAudioData → AudioBuffer(和 BGM 同套路)。首次建立 AudioContext 時就開始載,遊戲結束前通常已就緒。
+    function loadSfx(key){
+      if(sfxReady[key]||sfxFailed[key]||sfxLoading[key])return;
+      const c=ac(); if(!c)return;
+      sfxLoading[key]=true;
+      fetch(SFX[key]).then(r=>{ if(!r.ok)throw 0; return r.arrayBuffer(); })
+        .then(ab=>new Promise((res,rej)=>c.decodeAudioData(ab,b=>res(b),e=>rej(e))))
+        .then(b=>{ if(key==="win")winBuf=b; else loseBuf=b; sfxReady[key]=true; sfxLoading[key]=false; })
+        .catch(()=>{ sfxLoading[key]=false; sfxFailed[key]=true; });   // 取不到/解不了(離線、file://)→ 交給 HTMLAudio 或合成音後備
+    }
+    function preload(){ loadSfx("win"); loadSfx("lose"); }
+    // 播已解碼的音檔(走總音量節點);成功回 true,失敗(muted / 無 ctx / 尚未載好)回 false
+    function playBuf(buf){
+      if(muted)return false;
+      const c=ac(); if(!c||!buf)return false;
+      try{ if(c.state==="suspended")c.resume(); const s=c.createBufferSource(); s.buffer=buf; s.connect(masterNode(c)); s.start(); return true; }catch(e){ return false; }
+    }
+    // HTMLAudio 後備(Web Audio 解不了時用);桌機/Android 可套音量,iOS 音量可能無效
+    function playEl(key){
+      if(muted)return false;
+      try{ let el=key==="win"?winEl:loseEl; if(!el){ el=new Audio(SFX[key]); if(key==="win")winEl=el; else loseEl=el; } el.volume=Math.max(0,Math.min(1,vol)); el.currentTime=0; const p=el.play(); if(p&&p.catch)p.catch(()=>{}); return true; }catch(e){ return false; }
+    }
+    // 合成音後備:音檔還沒載好 / 全都取不到時,至少有聲(即原本的勝敗提示音)
+    function synthWin(){ [523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46}); }
+    function synthLose(){ [415,349,277].forEach((f,i)=>tone(f,{type:"triangle",dur:0.30,vol:0.20,delay:i*0.16})); tone(220,{type:"sine",dur:0.6,vol:0.13,delay:0.5,slideTo:147}); }
     return {
       toggle(){muted=!muted; if(!muted)tone(660,{type:"triangle",dur:0.08,vol:0.15}); return muted;},
       setMuted(m){muted=!!m;},
@@ -54,9 +89,13 @@
       // 有新玩家加入房間:溫暖的上行三音(C-F-A),明顯有別於開始/完成線的音效,讓房內眾人都知道有人來了
       join(){[523,698,880].forEach((f,i)=>tone(f,{type:"sine",dur:0.16,vol:0.2,delay:i*0.09}));},
       ctx(){ return ac(); },   // 給語音留言用同一個(已解鎖)AudioContext 播放,繞過 iOS 自動播放限制
-      win(){[523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46});},
-      // 輸的音效:與 win 的上行呼應,改成下行三音+尾端往下滑,做出「失落」感(平手不走這裡,平手用 win)
-      lose(){[415,349,277].forEach((f,i)=>tone(f,{type:"triangle",dur:0.30,vol:0.20,delay:i*0.16})); tone(220,{type:"sine",dur:0.6,vol:0.13,delay:0.5,slideTo:147});}
+      // 勝/敗音效:優先播使用者放的 mp3/win.wav、mp3/lose.wav;還沒載好或取不到就用合成音墊著,確保永遠有聲
+      win(){ if(muted)return; if(playBuf(winBuf))return; if(!sfxReady.win&&!sfxFailed.win)loadSfx("win"); if(sfxFailed.win&&playEl("win"))return; synthWin(); },
+      // 平手不走這裡(平手用 win);lose 只在自己輸時播
+      lose(){ if(muted)return; if(playBuf(loseBuf))return; if(!sfxReady.lose&&!sfxFailed.lose)loadSfx("lose"); if(sfxFailed.lose&&playEl("lose"))return; synthLose(); },
+      // 音效總音量(0~1):即時套到總音量節點與 HTMLAudio 後備(偏好記憶在 game.js)
+      setVolume(v){ vol=Math.max(0,Math.min(1,+v||0)); if(master){ try{ master.gain.setTargetAtTime(vol,master.context.currentTime,0.03); }catch(e){ try{ master.gain.value=vol; }catch(_){} } } if(winEl){try{winEl.volume=vol;}catch(e){}} if(loseEl){try{loseEl.volume=vol;}catch(e){}} },
+      vol(){ return vol; }
     };
   })();
 

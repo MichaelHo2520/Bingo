@@ -349,6 +349,7 @@
   let lastColorTheme="sunset";
   let bgmOn=false, bgmVol=0.35;   // 背景音樂:是否開啟、音量(0~1);預設關,音量 35%
   let voiceVol=1.5;               // 收到語音的播放音量倍率(1=原音,可 >1 放大);預設 150%,範圍 0~3
+  let sfxVol=1;                   // 音效總音量(0~1);預設 100%,含點格/連線/勝敗等所有音效
   // 背景音樂可選曲目(檔案放 mp3/;第一個為預設)。新增曲目只要放檔 + 在這裡加一列
   const BGM_TRACKS=[
     { id:"default", name:"歡樂(預設)",     src:"mp3/bgm.mp3" },
@@ -370,6 +371,7 @@
         bgmVol:bgmVol,
         bgmTrack:bgmTrack,
         voiceVol:voiceVol,
+        sfxVol:sfxVol,
         scoreMode:(MP&&MP.scoreMode)?MP.scoreMode():"rank",   // 記住連線計分偏好(建房預設用)
         winGoal:(MP&&MP.winGoal)?MP.winGoal():3,
         name:nameEl?nameEl.value.trim():""
@@ -393,6 +395,8 @@
     if(typeof p.bgmTrack==="string" && BGM_TRACKS.some(t=>t.id===p.bgmTrack)){ bgmTrack=p.bgmTrack; }
     BGM.setSrc(bgmSrcOf(bgmTrack));   // 套用記住的曲目(尚未播放時只是記下路徑,首次手勢才真正載入)
     if(typeof p.voiceVol==="number"){ voiceVol=Math.max(0,Math.min(3,p.voiceVol)); }
+    if(typeof p.sfxVol==="number"){ sfxVol=Math.max(0,Math.min(1,p.sfxVol)); }
+    Sound.setVolume(sfxVol);
     if(MP&&MP.usePrefs){ MP.usePrefs(p.scoreMode, p.winGoal); }   // 帶回記住的連線計分偏好(建房預設)
     if(p.bgmOn){ bgmOn=true; }   // 記住「想開」;實際播放等首次使用者互動(繞過自動播放限制)
     if(p.ebook){ setEbook(true,true); }
@@ -425,6 +429,9 @@
     const swE=$("swEbook"), swM=$("swMute"), sw=$("swatches");
     if(swE)swE.setAttribute("aria-checked",isEbook?"true":"false");
     if(swM)swM.setAttribute("aria-checked",Sound.isMuted()?"false":"true");   // on = 有聲音
+    const sfxEl=$("sfxVol"), sfxRow=$("sfxVolRow");
+    if(sfxEl)sfxEl.value=Math.round(sfxVol*100);
+    if(sfxRow)sfxRow.classList.toggle("dim",Sound.isMuted());   // 音效關閉時,音量列淡化
     if(sw){
       sw.classList.toggle("locked",isEbook);
       const active=isEbook?lastColorTheme:document.documentElement.getAttribute("data-theme");
@@ -470,6 +477,8 @@
   }
   // 收到語音的音量:倍率 0~3(1=原音,>1 放大);每則語音播放時即時讀 voiceVol 套用,故不需即時改動已播節點
   function setVoiceVol(v){ voiceVol=Math.max(0,Math.min(3,v)); }
+  // 音效總音量:0~1,即時套到 Sound 的總音量節點(含點格/連線/勝敗等所有音效)
+  function setSfxVol(v){ sfxVol=Math.max(0,Math.min(1,v)); Sound.setVolume(sfxVol); }
   let toastT;
   function showToast(txt,dur){
     let el=$("toast");
