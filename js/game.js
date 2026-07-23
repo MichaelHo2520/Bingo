@@ -159,17 +159,21 @@
     if(state.online){
       MP.reportLines(done);
       if(done>=state.target) MP.tryWin(done);
-      else if(isTenpai()) MP.reportReach();   // 聽牌(只差一號就達標)→ 廣播「聽牌」語音給全部人(含自己);MP 內一局只播一次
+      else if(isTenpai()) MP.reportReach();   // 聽牌(完成「目標−1」條線)→ 廣播「聽牌」語音給全部人(含自己);MP 內一局只播一次
       return;
     }
     if(done>=state.target && !state.won){ state.won=true; win(done); }
   }
-  // 連線用:是否「聽牌」——目前尚未達標,但只要再劃記某一格(某個號碼被叫到)就能達到目標線數。
-  // 因號碼一次叫一個、劃記只增不減,達標前必會先經過聽牌狀態;各端只判斷自己的盤面。
+  // 連線用:是否「聽牌」——完成「目標線數 − 1」條線即視為聽牌(例:目標 3 線,完成 2 線就算聽牌)。
+  // 這樣比「只差一格就達標」更早觸發,聽牌者本人也不會等到最後一刻才知道自己就快贏/已落後。
+  // 各端只判斷自己的盤面;達標(贏了)不算聽牌。
   function isTenpai(){
     let done=0;
     LINES.forEach(line=>{ if(line.every(idx=>state.marked[idx])) done++; });
     if(done>=state.target) return false;   // 已達標(贏了)不算聽牌
+    // 主規則:完成「目標 − 1」條線即聽牌(目標需 ≥2 才適用,否則目標 1 線時 0 線就誤判)
+    if(state.target>=2 && done>=state.target-1) return true;
+    // 備援(涵蓋目標僅 1 線、或一格同時完成多線直接達標前的最後一步):只差一格就達標也算聽牌
     for(let i=0;i<nCells();i++){
       if(state.marked[i]) continue;        // 已劃記的格跳過,只試「還沒被叫到」的格
       state.marked[i]=true;                // 假設這格被叫到

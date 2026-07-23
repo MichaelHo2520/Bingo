@@ -25,6 +25,7 @@
     let abandoned=false;                    // 開打後對手都離開、只剩自己 → 本局作廢,不再繼續
     let orderAnnounced=false;               // 本局是否已公告過出手順序(猜拳結果)
     let reachAnnounced=false;               // 本局是否已廣播過「聽牌」(一局只播一次,避免每次叫號重播)
+    let reachClipTimer=null;                // 接收端合併:同一波多人聽牌只播一次「聽牌」語音(見 handleEmote reach)
     let revealData=null, revealTimer=null;  // 猜拳過場:大家出的拳 / 房主用的「揭曉後自動開打」計時器
     let tieTimer=null, tieSig="";           // 平手揭曉:房主用的「停留後自動重猜」計時器 / 避免重繪重播動畫
     let emotesReady=false;                   // 好友互動:是否已略過歷史 emotes(避免重播舊表情)
@@ -862,6 +863,8 @@
     function enterPlaying(){
       state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(nCells()).fill(false);
       myWinAt=null; outcomeShown=false; orderAnnounced=false; reachAnnounced=false; abandoned=false; scoredThisRound=false; wasMyTurn=false;
+      if(reachClipTimer){ clearTimeout(reachClipTimer); reachClipTimer=null; }   // 清掉上一局殘留的聽牌合併計時器
+
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       updateRoomTabs(false);   // 進遊戲:收起房間分頁列,棋盤佔滿
       $("playStatus").classList.add("hidden");
@@ -1185,9 +1188,13 @@
       }
       if(e.kind==="reach"){                          // 有人聽牌:全部人(含聽牌者本人)都播「聽牌」語音
         const who=mine?"你":dispName(e.from);
-        showEmote("🀄", who+" 聽牌了!", e.from, "voice");
-        enqueueClip("reach");                        // 刻意不排除 mine → 聽牌者自己也聽得到
-        return;
+        showEmote("🀄", who+" 聽牌了!", e.from, "voice");   // 視覺氣泡各自落在對應晶片(顯示誰聽牌)
+        // 語音合併:同一次叫號可能多人「一起」達成聽牌,各端會連收好幾則 reach。
+        // 用一個短延遲把這一波合併成單次播報 —— 第一則排程計時器,期間內後續的都併掉,不重播。
+        if(!reachClipTimer){
+          reachClipTimer=setTimeout(()=>{ reachClipTimer=null; enqueueClip("reach"); }, 600);
+        }
+        return;                                      // 刻意不排除 mine → 聽牌者自己也聽得到(合併後仍會播到)
       }
       if(!e.emoji)return;
       showEmote(e.emoji, fromNm+" → "+toNm, (to!=="all")?to:e.from, e.kind);
