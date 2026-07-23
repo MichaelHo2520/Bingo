@@ -516,7 +516,9 @@
   const PHRASES=["快一點!","你好慢~","加油~~","太扯了😂","穩住穩住","別緊張","嚇死我了","運氣真好"];
   // 語音短訊(連線用):選文字項目 → 只傳代號,對方播本地預錄 m4a;與上方即時錄音語音是兩條獨立管道,兩者並存
   const CLIPS=[
-    { id:"howlong", label:"是要多久?", src:"mp3/是要多久.m4a" },
+    { id:"howlong", label:"是要多久?",   src:"mp3/是要多久.m4a" },
+    { id:"ready",   label:"啊西好了沒?", src:"mp3/啊西好了沒.m4a" },
+    { id:"hurry",   label:"快點來不及啦!", src:"mp3/快點，來不急啦.m4a" },
   ];
   let emoteTarget="all";                       // 目前要傳給誰:"all" 或某玩家 id
   function openEmote(target){
