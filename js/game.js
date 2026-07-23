@@ -352,10 +352,10 @@
   let sfxVol=1;                   // 音效總音量(0~1);預設 100%,含點格/連線/勝敗等所有音效
   // 背景音樂可選曲目(檔案放 mp3/;第一個為預設)。新增曲目只要放檔 + 在這裡加一列
   const BGM_TRACKS=[
-    { id:"default", name:"歡樂(預設)",     src:"mp3/bgm.mp3" },
-    { id:"sunday",  name:"Sunday Morning", src:"mp3/Sunday_Morning_Win.mp3" }
+    { id:"sunday", name:"Sunday Morning(預設)", src:"mp3/Sunday_Morning.mp3" },
+    { id:"happy",  name:"歡樂",                 src:"mp3/bgm.mp3" }
   ];
-  let bgmTrack="default";         // 目前選的曲目 id
+  let bgmTrack="sunday";          // 目前選的曲目 id(預設 Sunday Morning;舊版存的 "default" 已不存在,會自動回退到這裡)
   function bgmSrcOf(id){ const t=BGM_TRACKS.find(t=>t.id===id); return (t||BGM_TRACKS[0]).src; }
   const STORE_KEY="bingo.prefs.v1";
   function savePrefs(){

@@ -106,7 +106,7 @@
      AudioContext(繞過 iOS 自動播放)。fetch/decode 失敗(離線、file:// 取不到)→ 退回
      HTMLAudio;仍失敗就靜默關掉,App 不受影響、只是沒音樂。 */
   const BGM=(function(){
-    let src="mp3/bgm.mp3";   // 目前曲目路徑(可由 setSrc 切換)
+    let src="mp3/Sunday_Morning.mp3";   // 目前曲目路徑(預設 Sunday Morning;可由 setSrc 切換,載入偏好時也會覆寫)
     let master=null, buffer=null, node=null, el=null;
     let on=false, vol=0.35, ready=false, loading=false, failed=false, ducked=false;
     function ctx(){ return (Sound.ctx && Sound.ctx()) || null; }

@@ -313,8 +313,15 @@
     max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;   /* 螢幕不夠高時卡片內部可捲動,不再被切掉 */
     animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
   .set-head{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:10px;text-align:center}
+  /* 設定分類:每組一個小標題(外觀 / 音效 / 背景音樂 / 語音),組與組之間留白,一眼好找 */
+  .set-group{border:1px solid var(--panel-line);border-radius:16px;padding:2px 12px;margin-top:12px;
+    background:rgba(255,255,255,.04)}
+  .set-group:first-child{margin-top:2px}
+  .set-group-title{font-family:'Fredoka';font-weight:700;font-size:12px;letter-spacing:.08em;
+    color:var(--accent);text-transform:uppercase;padding:11px 2px 3px}
   .set-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
-    padding:15px 2px;border-top:1px solid var(--panel-line)}
+    padding:14px 2px;border-top:1px solid var(--panel-line)}
+  .set-group-title + .set-row{border-top:none}   /* 分類標題已當分隔,組內首列不再畫線 */
   .set-lbl{font-weight:800;font-size:15px}
   .swatches{display:flex;gap:9px}
   .swatch{width:30px;height:30px;border-radius:50%;border:2px solid var(--panel-line);cursor:pointer;
@@ -338,6 +345,8 @@
     background:rgba(255,255,255,.12);border:1px solid var(--panel-line);border-radius:12px;
     padding:8px 12px;cursor:pointer;max-width:62%}
   :root[data-theme="ebook"] .set-select{background:#fff;color:#000;border:1px solid #000}
+  :root[data-theme="ebook"] .set-group{border-color:#000;background:none}
+  :root[data-theme="ebook"] .set-group-title{color:#000}
   :root[data-theme="ebook"] .set-card{background:#fff;border:2px solid #000}
   :root[data-theme="ebook"] .switch{background:#fff;border:1px solid #000}
   :root[data-theme="ebook"] .switch[aria-checked="true"]{background:#000}
