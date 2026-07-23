@@ -54,6 +54,7 @@
   $("voiceVol").addEventListener("change",savePrefs);                              // 放開才存偏好
   $("sfxVol").addEventListener("input",e=>setSfxVol((+e.target.value||0)/100));    // 音效音量:拖曳即時套用
   $("sfxVol").addEventListener("change",savePrefs);                                // 放開才存偏好
+  $("swVibrate").addEventListener("click",()=>setVibrate(!vibrateOn));              // 「輪到你時震動」開關
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});

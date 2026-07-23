@@ -88,6 +88,8 @@
       emote(){tone(880,{type:"sine",dur:0.09,vol:0.13,slideTo:1245});},
       // 有新玩家加入房間:溫暖的上行三音(C-F-A),明顯有別於開始/完成線的音效,讓房內眾人都知道有人來了
       join(){[523,698,880].forEach((f,i)=>tone(f,{type:"sine",dur:0.16,vol:0.2,delay:i*0.09}));},
+      // 輪到你出號:清亮的兩音「叮–咚」(D6→G6),音色/音高刻意有別於其它音效,讓沒盯著螢幕的人也知道換自己了
+      turn(){ tone(1175,{type:"sine",dur:0.13,vol:0.26}); tone(1568,{type:"sine",dur:0.26,vol:0.24,delay:0.14}); },
       ctx(){ return ac(); },   // 給語音留言用同一個(已解鎖)AudioContext 播放,繞過 iOS 自動播放限制
       // 勝/敗音效:優先播使用者放的 mp3/win.wav、mp3/lose.wav;還沒載好或取不到就用合成音墊著,確保永遠有聲
       win(){ if(muted)return; if(playBuf(winBuf))return; if(!sfxReady.win&&!sfxFailed.win)loadSfx("win"); if(sfxFailed.win&&playEl("win"))return; synthWin(); },

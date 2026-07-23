@@ -5,6 +5,8 @@
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false;
     let roomName="";                             // 房主設定的房間名稱(對外顯示用;內部仍以 code 當資料庫鍵值)
     let roomsWatchRef=null, lastRoomsSig=null;   // 大廳常駐監聽:即時反映房間開/關,免得一直按🔍
+    let lastIndexSig=null;                        // 房主寫大廳輕量索引 rooms_index 的去重簽章(房名/狀態/人數/房主名沒變就不重寫)
+    let wasMyTurn=false;                          // 連線遊戲中「輪到我」的邊緣偵測(不是我→是我 只提示一次)
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let autoStarting=false;   // 全部人準備好 → 房主端自動開打的一次性守衛(避免 status 尚未同步前重複觸發)
     let prevIds=null;   // 上一次的玩家 id 清單,用來偵測「有新玩家加入」放音效(null=進房後尚未收到第一次快照)
@@ -104,13 +106,12 @@
       el.setAttribute("data-state",stateName);
       $("mpLiveTxt").textContent=text;
     }
-    // 把 rooms 快照整理成清單(有人在裡面的房間,依房號排序)
-    function roomItems(rooms){
-      return Object.keys(rooms).map(c=>{
-        const r=rooms[c]||{};
-        const ps=r.players||{};
-        const hostName=(r.host&&ps[r.host]&&ps[r.host].name)||"";   // 房主名稱(取房主 id 對應的玩家名)
-        return { code:c, status:r.status||"lobby", count:Object.keys(ps).length, host:hostName, name:(r.roomName||"") };
+    // 把輕量索引節點 rooms_index 整理成清單(依房號排序)。索引只存大廳需要的欄位(房名/狀態/人數/房主名),
+    // 不含 calledList / emotes(語音 base64)等 gameplay 資料 → 大廳流量大幅降低。
+    function roomItems(idx){
+      return Object.keys(idx).map(c=>{
+        const r=idx[c]||{};
+        return { code:c, status:r.status||"lobby", count:r.count||0, host:r.host||"", name:r.name||"" };
       }).filter(r=>r.count>0).sort((a,b)=>a.code.localeCompare(b.code));
     }
     // 依整理後的清單更新房間列表與狀態膠囊(內容沒變就不重繪,避免遊戲中叫號一直觸發、干擾點擊)
@@ -124,18 +125,44 @@
       else if(lobby>0) setLive("open","現在有 "+lobby+" 間房間開放中"+(items.length>lobby?" · 另 "+(items.length-lobby)+" 間對戰中":""));
       else setLive("busy",items.length+" 間對戰進行中(暫時無法加入)");
     }
-    // 掛上常駐監聽:房間開/關會即時反映;離開大廳(closeConnect/enterLobby)時 stopRoomWatch 卸載
+    // 掛上常駐監聽:房間開/關會即時反映;離開大廳(closeConnect/enterLobby)時 stopRoomWatch 卸載。
+    // 只監聽輕量索引 rooms_index(每房約 4 個小欄位),不再整包下載所有房間的 gameplay 資料。
     function startRoomWatch(){
       if(!init()){ setLive("none","連線未啟用"); return; }
       stopRoomWatch();
       lastRoomsSig=null; setLive("loading","偵測目前房間中…");
-      roomsWatchRef=db.ref("rooms");
+      roomsWatchRef=db.ref("rooms_index");
       roomsWatchRef.on("value", s=>applyRooms(roomItems(s.val()||{})), err=>{
         stopRoomWatch(); setLive("error","無法讀取房間清單");
-        $("mpRoomList").innerHTML='<div class="room-empty">偵測失敗:'+esc(err.message)+'(可能是資料庫規則不允許列出房間,見說明)</div>';
+        $("mpRoomList").innerHTML='<div class="room-empty">偵測失敗:'+esc(err.message)+'(可能是資料庫規則未開放 rooms_index 讀取,見說明)</div>';
       });
     }
     function stopRoomWatch(){ if(roomsWatchRef){ roomsWatchRef.off(); roomsWatchRef=null; } }
+    // ── 大廳輕量索引 rooms_index/{code}(降低資料庫用量的核心)──
+    // 只存大廳清單要的欄位(name 房名 / status 狀態 / count 人數 / host 房主名),由「房主」單方維護:
+    //   • 房主的 players / status 一有變動,用 sig 去重後才寫回(避免每次劃記線數都寫)。
+    //   • 索引掛房主的 onDisconnect().remove():房主斷線/離開 → 索引消失,大廳即時不再顯示這間;
+    //     房內玩家看的是 rooms/{code} 本體,不受影響。房主重連(resume)會 armRoomIndex() 重掛+重寫。
+    //   • 房主真的離線不回 → 索引已被 onDisconnect 清掉,大廳不會殘留(rooms/{code} 本體的孤兒清理另議)。
+    // ⚠ 需在 Firebase 規則開放 rooms_index 的讀(大廳)與寫(房主),否則大廳會顯示「偵測失敗」。
+    function updateRoomIndex(){
+      if(!isHost || !roomRef || !db || !code)return;
+      const ids=Object.keys(players);
+      let count=ids.length;
+      if(!players[meId]) count+=1;   // 房主自己的節點還沒同步回本地時(建房瞬間),也把自己算進去,避免 count=0
+      const hostName=(players[meId]&&players[meId].name)||meName||"";
+      const sig=roomName+"|"+status+"|"+count+"|"+hostName;
+      if(sig===lastIndexSig)return;   // 房名/狀態/人數/房主名都沒變(例如只是線數更新)→ 不寫,省流量
+      lastIndexSig=sig;
+      db.ref("rooms_index/"+code).update({ name:roomName, status:status, count:count, host:hostName });
+    }
+    // 房主:掛索引的斷線自動移除,並立即寫一次(建房 / 重連歸位共用)
+    function armRoomIndex(){
+      if(!isHost || !roomRef || !db || !code)return;
+      db.ref("rooms_index/"+code).onDisconnect().remove();
+      lastIndexSig=null;   // 強制重寫一次
+      updateRoomIndex();
+    }
     // 🔍 手動重新偵測(重掛監聽,強制刷新一次)
     function scanRooms(){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
@@ -195,7 +222,7 @@
         return roomRef.update({ host:meId, roomName:roomName, status:"lobby", target:state.target, size:SIZE, orderMethod:"rps",
           scoreMode:scoreMode, winGoal:winGoal, roundId:null,   // 用記住的計分偏好當建房預設
           calledList:[], winner:null, order:null, turnIndex:0, rps:null, emotes:null, createdAt:Date.now() });
-      }).then(()=>{ joinNode(); enterLobby(); }).catch(e=>setMsg("建立房間失敗:"+((e&&e.message)||e)));
+      }).then(()=>{ joinNode(); enterLobby(); armRoomIndex(); }).catch(e=>setMsg("建立房間失敗:"+((e&&e.message)||e)));
     }
     function join(inCode,name,inName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
@@ -299,6 +326,7 @@
       resyncTimer=setTimeout(()=>{ resyncing=false; resyncTimer=null; recheckPresence(); }, GRACE_MS);
       const me=players[meId]||{};
       armPresence({ name:meName, lines:me.lines||0, ready:!!ready });   // 保留目前線數/準備狀態
+      if(isHost) armRoomIndex();   // 房主重連 → 重掛索引 onDisconnect 並重寫,房間重新出現在大廳
       if(msg)showToast(msg,1500);
     }
     // 有人「暫時不見」時,排一個寬限期後的複查(已在排就不重排)
@@ -364,6 +392,7 @@
         if(alone) scheduleAloneCheck(); else clearAloneCheck();   // 只剩房主 → 走較短的專用寬限,較快退回等待
         if(iWasKicked() || hostGone()) scheduleRecheck(); else clearRecheck();
         renderPlayers(); updateStartBtn();
+        if(isHost) updateRoomIndex();   // 人數/房主名變動 → 同步大廳輕量索引(sig 去重,線數變動不會觸發寫入)
         if(curPhase==="lobby") syncScoreRow();   // 分數變動(重設戰績/開新賽季)→ 重新評估目標勝場鎖定狀態
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
         else if(curPhase==="ordering") renderOrderPanel();
@@ -374,7 +403,7 @@
           if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
         }
       });
-      roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); });
+      roomRef.child("status").on("value",s=>{ status=s.val()||"lobby"; onStatus(); if(isHost) updateRoomIndex(); });   // 狀態(大廳/對戰中)變動 → 同步大廳索引
       roomRef.child("target").on("value",s=>{ const t=s.val(); if(typeof t==="number"){ if(!isHost){ state.target=t; $("targetVal").textContent=t; } updateMpGoal(); } });
       // 盤面大小:房主寫入,訪客跟著套用(重發卡片;若已準備先取消準備讓其重填)
       roomRef.child("size").on("value",s=>{
@@ -792,7 +821,7 @@
     /* ----- playing (turn-based manual call) ----- */
     function enterPlaying(){
       state.mode="play"; state.won=false; state.lastLines=0; state.marked=Array(nCells()).fill(false);
-      myWinAt=null; outcomeShown=false; orderAnnounced=false; abandoned=false; scoredThisRound=false;
+      myWinAt=null; outcomeShown=false; orderAnnounced=false; abandoned=false; scoredThisRound=false; wasMyTurn=false;
       $("setup").classList.add("hidden"); $("setupActions").classList.add("hidden");
       updateRoomTabs(false);   // 進遊戲:收起房間分頁列,棋盤佔滿
       $("playStatus").classList.add("hidden");
@@ -843,7 +872,18 @@
     // 副標列整列收起,替下方號碼格讓出縱向高度(落單倒數中則由倒數接管,不動)
     function updateTurnUI(){
       if(status!=="playing" || aloneTick)return;
+      notifyMyTurn();
       const subrow=$("mpSubrow"); if(subrow)subrow.classList.add("hidden");
+    }
+    // 換我出號了:偵測「不是我 → 是我」的邊緣,只提示一次(清亮提示音 + 可選震動)。
+    // 震動於 iOS Safari 不支援(navigator.vibrate 不存在)→ 自動略過;vibrateOn 由設定頁開關(game.js)。
+    function notifyMyTurn(){
+      const mine=isMyTurn();
+      if(mine && !wasMyTurn){
+        try{ Sound.turn(); }catch(e){}
+        if(typeof vibrateOn!=="undefined" && vibrateOn && navigator.vibrate){ try{ navigator.vibrate([90,60,90]); }catch(e){} }
+      }
+      wasMyTurn=mine;
     }
     function tap(i){
       if(!isMyTurn()){ showToast("還沒輪到你"); return; }
@@ -999,7 +1039,7 @@
     function backToLobby(){
       ready=false; state.mode="setup"; state.won=false; state.fill="auto"; state.card=shuffled(); curPhase="lobby";
       clearAloneCheck();
-      order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false;
+      order=[]; turnIndex=0; rps=null; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false; wasMyTurn=false;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       closeWin();
@@ -1020,6 +1060,7 @@
           if(isHost){
             if(meId) roomRef.child("players/"+meId).onDisconnect().cancel();
             roomRef.onDisconnect().cancel();
+            if(db&&code){ const ix=db.ref("rooms_index/"+code); ix.onDisconnect().cancel(); ix.remove(); }   // 連同大廳索引一起移除
             roomRef.remove();                       // 房主離開 → 關閉整個房間
           }else if(meId){
             const pr=roomRef.child("players/"+meId);
@@ -1033,7 +1074,7 @@
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; scores={}; calledList=[];
-      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false;
+      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false; wasMyTurn=false; lastIndexSig=null;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();

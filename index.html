@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.29.1 -->
-<meta name="version" content="1.29.1">
+<!-- BINGO 賓果遊戲 · v1.30.0 -->
+<meta name="version" content="1.30.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -308,6 +308,10 @@
           <div class="set-row" id="sfxVolRow">
             <span class="set-lbl">音量</span>
             <input class="rng" id="sfxVol" type="range" min="0" max="100" value="100" aria-label="音效音量(含勝敗音效)">
+          </div>
+          <div class="set-row" id="vibrateRow">
+            <span class="set-lbl">輪到你時震動<span class="set-sub">(連線 · 手機)</span></span>
+            <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="輪到你時震動"><span class="knob"></span></button>
           </div>
         </div>
 
