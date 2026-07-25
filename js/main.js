@@ -114,7 +114,9 @@
     Sound.wake();                                        // 每次(含回前景後)都喚醒一次 AudioContext + Silent Buffer Kick
     if(!audioUnlocked){ audioUnlocked=true; if(bgmOn)BGM.setOn(true); }
     // 等 resume 真的完成(context running)再補播,避免太早 pump 時 Sound.running() 仍為 false 又退回膠囊
-    const kick=()=>{ if(typeof kickVoiceQueue==="function") kickVoiceQueue(); };
+    // 等 context 真的 running 再補播語音,並補開背景音樂 —— iOS 從背景回前景時 resume() 常要等真實手勢
+    // 才成功,那一刻 setHidden(false) 已經跑過了,所以要在這裡用 nudge() 補一次(該播卻沒在播才動作)
+    const kick=()=>{ if(typeof kickVoiceQueue==="function") kickVoiceQueue(); BGM.nudge(); };
     if(Sound.resume) Sound.resume().then(kick); else kick();
   }
   function armAudioUnlock(){                              // 重新掛上「下一個手勢就喚醒」(同函式參考,重複掛會自動去重)
@@ -123,8 +125,13 @@
   }
   armAudioUnlock();
   document.addEventListener("visibilitychange",()=>{
-    if(document.hidden){ if(typeof markAudioStale==="function") markAudioStale(); return; }   // 切到背景 → 音訊視為未解鎖(iOS 回來常是 state=running 卻不出聲)
-    armAudioUnlock();   // 回前景一律重新武裝:下一個手勢(點任何地方 / 點播放膠囊)都會重新解鎖並補播等待中的語音
+    if(document.hidden){
+      if(typeof markAudioStale==="function") markAudioStale();   // 切到背景 → 音訊視為未解鎖(iOS 回來常是 state=running 卻不出聲)
+      BGM.setHidden(true);   // 最小化 / 切走 / 鎖屏 → 背景音樂暫停(v1.36.4;桌機與 Android 原本會一直放)
+      return;
+    }
+    BGM.setHidden(false);   // 回前景 → 使用者原本開著音樂就從原位接著播
+    armAudioUnlock();       // 回前景一律重新武裝:下一個手勢(點任何地方 / 點播放膠囊)都會重新解鎖並補播等待中的語音
   });
 
   // Service Worker:離線可玩 + 「加到主畫面」。只在 https / localhost 註冊(file:// 不支援);

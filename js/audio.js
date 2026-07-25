@@ -110,7 +110,10 @@
   const BGM=(function(){
     let src="mp3/Sunday_Morning.mp3";   // 目前曲目路徑(預設 Sunday Morning;可由 setSrc 切換,載入偏好時也會覆寫)
     let master=null, buffer=null, node=null, el=null;
-    let on=false, vol=0.35, ready=false, loading=false, failed=false, ducked=false;
+    let on=false, vol=0.35, ready=false, loading=false, failed=false, ducked=false, hidden=false;
+    // 播放位置:AudioBufferSourceNode 無法暫停,只能停掉再以偏移重開。記住「停的瞬間播到哪」,
+    // 從背景回來 / 語音播完時才是真的「接著播」而不是整首重頭(v1.36.4)
+    let startedAt=0, offset=0;
     function ctx(){ return (Sound.ctx && Sound.ctx()) || null; }
     function ensureMaster(c){
       if(!master || master.context!==c){ master=c.createGain(); master.gain.value=vol; master.connect(c.destination); }
@@ -126,35 +129,53 @@
         .then(b=>{ buffer=b; ready=true; loading=false; })
         .catch(()=>{ loading=false; failed=true; });   // 取不到就標記失敗,交給 HTMLAudio 後備
     }
-    function stopNode(){ if(node){ try{ node.stop(); node.disconnect(); }catch(e){} node=null; } }
+    function stopNode(){
+      if(!node)return;
+      const c=ctx();
+      // 記下播到哪(loop 過就取餘數),下次由此接續
+      if(c && buffer && buffer.duration>0) offset=(offset+Math.max(0,c.currentTime-startedAt))%buffer.duration;
+      try{ node.stop(); node.disconnect(); }catch(e){}
+      node=null;
+    }
     function playBuffer(){
       const c=ctx(); if(!c||!buffer)return;
       stopNode();
       const m=ensureMaster(c);
       if(c.state==="suspended"){ c.resume().catch(()=>{}); }
       node=c.createBufferSource(); node.buffer=buffer; node.loop=true;   // Web Audio 無縫循環
-      node.connect(m); node.start();
+      node.connect(m);
+      startedAt=c.currentTime;
+      node.start(0, buffer.duration>0 ? offset%buffer.duration : 0);     // 從上次停的位置接著播
     }
     function playFallback(){   // 後備:桌機/Android 仍能播(iOS 對 HTMLAudio 的音量可能無效)
       try{ if(!el){ el=new Audio(src); el.loop=true; } el.volume=vol; el.play().catch(()=>{}); }catch(e){}
     }
-    // 語音期間先停背景音樂,讓語音聽得清楚;語音全部播完再恢復(僅在使用者原本就開著時)
+    /* 該不該出聲 = 三個開關同時成立:使用者開著音樂、沒被語音 duck、App 也不在背景。
+       原本 setOn / duck / setSrc 各自複製一份「ready→playBuffer / failed→playFallback / 否則 load 後再播」
+       的分支,加入第三個條件會變成三份都要改 → 收斂成 applyPlayState() 一個點(v1.36.4)。 */
+    function shouldPlay(){ return on && !ducked && !hidden; }
+    function applyPlayState(){
+      if(!shouldPlay()){ stopNode(); if(el){ try{ el.pause(); }catch(e){} } return; }   // HTMLAudio 的 pause 本來就保留位置
+      if(ready){ playBuffer(); }
+      else if(failed){ playFallback(); }
+      else { load().then(()=>{ if(!shouldPlay())return; if(ready)playBuffer(); else playFallback(); }); }
+    }
+    // 語音期間先停背景音樂,讓語音聽得清楚;語音全部播完再從原位接著播(僅在使用者原本就開著時)
     function duck(d){
       d=!!d;
       if(d===ducked)return;
       ducked=d;
-      if(d){ stopNode(); if(el){ try{ el.pause(); }catch(e){} } }
-      else if(on){ if(ready)playBuffer(); else if(failed)playFallback(); else load().then(()=>{ if(on&&!ducked){ if(ready)playBuffer(); else playFallback(); } }); }
+      applyPlayState();
     }
     // 切換曲目:丟掉舊的已解碼 buffer / HTMLAudio,重設載入狀態;若正在播放就立刻換成新曲接著播
     function setSrc(s){
       s=s||src; if(s===src)return;
       src=s;
-      const wasPlaying = on && !ducked;
       stopNode();
       if(el){ try{ el.pause(); }catch(e){} el=null; }
       buffer=null; ready=false; failed=false; loading=false;
-      if(wasPlaying){ load().then(()=>{ if(!on||ducked)return; if(ready)playBuffer(); else if(failed)playFallback(); }); }
+      offset=0;              // 換曲從頭播,不要沿用上一首的播放位置
+      applyPlayState();      // 原本在播就接著播新曲;沒在播就只是停著(和舊行為一致,不預先載入)
     }
     return {
       isOn(){ return on; },
@@ -162,17 +183,19 @@
       src(){ return src; },
       setSrc,
       duck,
-      setOn(o){
-        on=!!o;
-        if(on){
-          if(ducked)return;   // 語音播放中:先記住偏好(on=true),等語音播完由 duck(false) 接手開播
-          if(ready){ playBuffer(); }
-          else if(failed){ playFallback(); }
-          else { load().then(()=>{ if(!on||ducked)return; if(ready)playBuffer(); else playFallback(); }); }
-        }else{
-          stopNode(); if(el){ try{ el.pause(); }catch(e){} }
-        }
+      // 使用者的音樂總開關。語音播放中 / App 在背景時只記住偏好,等 duck(false) / setHidden(false) 接手開播
+      setOn(o){ on=!!o; applyPlayState(); },
+      // App 切到背景就暫停、回前景再接著播(v1.36.4)。由 main.js 的 visibilitychange 驅動;
+      // 只動音樂,不去 suspend 共用的 AudioContext —— 那會連音效與語音佇列的解鎖機制一起影響
+      setHidden(h){
+        h=!!h;
+        if(h===hidden)return;
+        hidden=h;
+        applyPlayState();
       },
+      // 手勢喚醒後補開音樂:iOS 從背景回前景時 AudioContext.resume() 可能要等真實手勢才成功,
+      // 那一刻 setHidden(false) 已經呼叫過(hidden 早就是 false),所以需要一個「該播卻沒在播就補開」的入口
+      nudge(){ if(shouldPlay() && !node && !(el && !el.paused)) applyPlayState(); },
       setVolume(v){
         vol=Math.max(0,Math.min(1,+v||0));
         if(master){ try{ master.gain.setTargetAtTime(vol, master.context.currentTime, 0.05); }catch(e){ try{ master.gain.value=vol; }catch(_){} } }
