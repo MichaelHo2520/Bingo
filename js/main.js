@@ -8,12 +8,14 @@
   });
   $("fillSeg").addEventListener("click",e=>{
     const b=e.target.closest("button");if(!b)return;
-    [...$("fillSeg").children].forEach(x=>x.classList.remove("on"));
-    b.classList.add("on");
-    state.fill=b.dataset.fill;
-    if(state.fill==="auto"){ state.card=shuffled(); }
-    else { state.card=Array(nCells()).fill(0); }
-    render();applyFillUI();
+    const next=b.dataset.fill, changed=next!==state.fill;
+    state.fill=next;
+    // 自動填號:切過來、或已在自動再按一次 → 都重抽整張卡(選中後文案就是「🎲 換一組號碼」,這就是它的作用)
+    // 手動填號:只有「真的從自動切過來」才清空重填;已在手動又按一次不做事 ——
+    //          否則會把填一半的號碼一次清光,而且沒有確認也沒得復原
+    if(next==="auto"){ state.card=shuffled(); }
+    else if(changed){ state.card=Array(nCells()).fill(0); }
+    render();applyFillUI();   // applyFillUI() → syncFillSeg() 會把高亮 .on 與文案一起同步
   });
   $("sizeSeg").addEventListener("click",e=>{
     const b=e.target.closest("button");if(!b)return;
@@ -24,7 +26,8 @@
   });
   $("tMinus").addEventListener("click",()=>{state.target=Math.max(1,state.target-1);$("targetVal").textContent=state.target;savePrefs();if(state.online)MP.setTarget(state.target);});
   $("tPlus").addEventListener("click",()=>{state.target=Math.min(maxLines(),state.target+1);$("targetVal").textContent=state.target;savePrefs();if(state.online)MP.setTarget(state.target);});
-  $("reshuffleBtn").addEventListener("click",()=>{state.card=shuffled();render();if(state.online)MP.readyEnabled(true);});
+  // (v1.36.2:獨立的「換一組」鈕已移除 → 併回上面 #fillSeg 的「自動填號」。
+  //  原本這裡額外做的 MP.readyEnabled(true),applyFillUI() 的 auto 分支本來就會做,沒有遺漏)
   $("startBtn").addEventListener("click",startGame);
   $("exitBtn").addEventListener("click",toSetup);
   $("settingsBtn").addEventListener("click",openSettings);

@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.36.1 -->
-<meta name="version" content="1.36.1">
+<!-- BINGO 賓果遊戲 · v1.36.2 -->
+<meta name="version" content="1.36.2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -198,16 +198,16 @@
 
     <div class="grid" id="grid"></div>
 
-    <!-- 填號方式 + 換一組號碼:同一列(選項本身已有圖示+文字,不再另標「填號方式」標題)。
-         v1.36.1 起「換一組」由右下浮動 FAB 改成內嵌在這一列右側 —— 原本的 fixed 浮層在手機上
-         必然壓住「準備好了」的右端(它的顯示條件與準備列完全重疊),改內嵌後結構上不可能再重疊。
-         圖示改 🔄:同列左邊已有「🎲 自動填號」,再放一顆 🎲 會分不清。 -->
+    <!-- 填號方式:移到號碼格「下方」(選項本身已有圖示+文字,不再另標「填號方式」標題)。
+         「自動填號」選中後文案會由 syncFillSeg() 換成「🎲 換一組號碼」—— 因為選中之後它的功能
+         就只剩「再按一次重抽整張卡」,文案直接說出按下去會發生什麼。
+         v1.36.2 起獨立的「換一組」鈕已移除(v1.24.0~v1.36.0 是右下浮動 FAB、v1.36.1 內嵌在本列右側):
+         它跟這顆「自動填號」在做同一件事,留兩個入口只是多佔空間又要多解釋一次。 -->
     <div class="tab-hidden" id="fillRow">
       <div class="seg" id="fillSeg" role="tablist" aria-label="填號方式">
         <button class="on" data-fill="auto">🎲 自動填號</button>
         <button data-fill="manual">✏️ 手動填號</button>
       </div>
-      <button class="reshuffle-btn hidden" id="reshuffleBtn" type="button" title="換一組號碼" aria-label="換一組號碼">🔄</button>
     </div>
 
     <!-- 填號分頁的動作:連線鈕保留但已改由主選單進入,平時由 JS 隱藏(換一組已改為右下浮動鈕) -->

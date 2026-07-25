@@ -520,13 +520,13 @@
       mpHint();
     }
     function setLock(lock){
-      $("reshuffleBtn").disabled=lock;
+      // v1.36.2:獨立的「換一組」鈕已移除(併回「自動填號」),鎖定只需擋整條填號方式列 + 盤面
       $("fillSeg").style.pointerEvents=lock?"none":"";
       grid.style.pointerEvents=lock?"none":"";
-      // 準備好了 / 遊戲進行中:收起「換一組」骰子與「填號方式」列(取消準備會再顯示);切分頁時 applyRoomTab 也會依 amReady 重算
+      // 準備好了 / 遊戲進行中:收起「填號方式」列(取消準備會再顯示);切分頁時 applyRoomTab 也會依 amReady 重算
       // 進遊戲時 enterPlaying 會呼叫 setLock(false) 解鎖盤面,但填號方式列在遊戲中一律不該再出現,故用 state.mode==="play" 一併收起
       $("fillRow").classList.toggle("tab-hidden", state.mode==="play" || lock || (typeof roomTab!=="undefined" && roomTab==="settings"));
-      if(typeof updateReshuffleBtn==="function") updateReshuffleBtn();
+      if(typeof syncFillSeg==="function") syncFillSeg();
     }
     function toggleReady(){
       if(!ready){

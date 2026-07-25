@@ -338,7 +338,7 @@
     document.body.classList.toggle("room-tab-settings", settingsOn);
     const bar=$("roomTabs"); if(bar)[...bar.children].forEach(b=>b.classList.toggle("on", b.dataset.tab===roomTab));
     const sa=$("scrollArea"); if(sa)sa.scrollTop=0;   // 切換分頁時捲回頂端,兩個分頁各自從頭看(不再共用捲動位置)
-    updateReshuffleBtn();
+    syncFillSeg();
     scheduleBoardFit();   // 分頁切換會改變捲動區內容(設定列 ↔ 號碼格+填號列)→ 重算盤面可用高度
   }
   // show=true:進入 setup/大廳 → 顯示分頁列 + 主要動作列並套用目前分頁(defaultTab 指定預設頁)
@@ -353,7 +353,7 @@
       $("setup").classList.remove("tab-hidden");
       $("boardWrap").classList.remove("tab-hidden");
       $("fillRow").classList.add("tab-hidden");   // 填號方式列只屬於大廳/設定的「填號」分頁,離開一律收起
-      updateReshuffleBtn();   // 進遊戲/離開 → #fillRow 整列已收起,這裡順手同步「換一組」的狀態
+      syncFillSeg();   // 進遊戲/離開 → #fillRow 整列已收起,這裡順手把高亮與文案同步回正確狀態
       scheduleBoardFit();     // 分頁列/準備列收起 → 縱向空間釋出給號碼格
       return;
     }
@@ -380,7 +380,7 @@
 
   function applyFillUI(){
     const manual=state.fill==="manual";
-    updateReshuffleBtn();
+    syncFillSeg();
     if(manual){ updateManualUI(); }
     else {
       $("startBtn").disabled=false;$("startBtn").style.opacity="1";
@@ -389,12 +389,18 @@
     }
   }
   // 右下浮動「換一組」鈕:只在「設定中 + 填號分頁 + 自動填號」時出現(手動填號 / 設定分頁 / 遊戲中都收起)
-  // 「換一組」🔄 顯隱:v1.36.1 起它內嵌在填號方式列 #fillRow 裡,只需判「是不是自動填號」。
-  // 其餘條件(不在房間設定頁 / 不在填號分頁 / 已按準備好了 / 遊戲進行中)外層 #fillRow 本身
-  // 就會整列以 .tab-hidden 收起(見 setLock() 與 applyRoomTab()/updateRoomTabs()),不必重複判一次。
-  function updateReshuffleBtn(){
-    const btn=$("reshuffleBtn"); if(!btn)return;
-    btn.classList.toggle("hidden", state.fill!=="auto");
+  // 填號方式列的同步:高亮 .on ＋「自動填號」的文案(v1.36.2,取代原本的 updateReshuffleBtn())。
+  // 「自動填號」一旦選中,它的功能就只剩「再按一次重抽整張卡」——文案因此直接改成「🎲 換一組號碼」,
+  // 說出按下去會發生什麼;模式本身由橘色高亮表示。未選中時顯示模式名稱,那時按下去才是切換模式。
+  // 順帶修掉舊的顯示脫鉤:toSetup()、winNew、進大廳、回大廳續玩都會用程式把 state.fill 設回 "auto",
+  // 但過去只有點擊 handler 會切 .on → 高亮會留在「手動填號」上、和實際狀態不符。
+  function syncFillSeg(){
+    const seg=$("fillSeg"); if(!seg)return;
+    [...seg.children].forEach(b=>b.classList.toggle("on", b.dataset.fill===state.fill));
+    const ab=seg.querySelector('[data-fill="auto"]'); if(!ab)return;
+    const auto=state.fill==="auto";
+    ab.textContent = auto ? "🎲 換一組號碼" : "🎲 自動填號";
+    ab.title = auto ? "再按一次就換一組新號碼" : "改用自動填號(隨機發一張卡)";
   }
 
   /* ---------- Confetti ---------- */
