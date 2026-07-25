@@ -20,17 +20,71 @@
     return L;
   }
   let LINES=buildLines(SIZE);
-  // 套用格線欄列數與字級(格子越多字越小);--cellfont 由 .cell 讀取
+  // 套用格線欄列數;欄列模板與字級都在 CSS 由 --cols / --cellsize 推導(字級不再逐級寫死 clamp)
   function applyGridCols(){
-    grid.style.gridTemplateColumns="repeat("+SIZE+",1fr)";
-    grid.style.gridTemplateRows="repeat("+SIZE+",1fr)";
-    const fonts={5:"clamp(20px,6.5vw,40px)",6:"clamp(17px,5.4vw,33px)",7:"clamp(15px,4.6vw,28px)"};
     // 格子越多 → 間距/圓角縮小,把空間讓給格子本身,增加手機觸控面積、減少 6×6 / 7×7 的誤觸
     const gaps={5:"clamp(6px,1.6vw,10px)",6:"clamp(5px,1.3vw,8px)",7:"clamp(4px,1.1vw,6px)"};
     const radii={5:"16px",6:"13px",7:"10px"};
-    grid.style.setProperty("--cellfont", fonts[SIZE]||fonts[5]);
+    grid.style.setProperty("--cols", String(SIZE));
     grid.style.setProperty("--gap", gaps[SIZE]||gaps[5]);
     grid.style.setProperty("--cellradius", radii[SIZE]||radii[5]);
+    scheduleBoardFit();
+  }
+
+  /* ---------- 盤面自適應:實測「剩餘可視高度」寫進 --boardpx ----------
+     取代舊的 --board-cap 常數(依版面狀態寫死 160/170/240/300px)。那組常數實測低估上方佔用
+     66px(連線遊戲中)~139px(連線大廳),且房間橫幅高度會隨玩家人數換行每列再多 48px,
+     常數方案本質上不可能正確 → 矮螢幕 / 人多時號碼格必然溢出,使用者得上下捲。
+     改成每次版面變動就量一次:
+       可用高 = body 內容區高 − 文件流中的固定列(頂列/房間橫幅/分頁列/準備列)
+                − 捲動區內非盤面的內容 − 盤面容器內非號碼格的內容 − 各層 flex gap
+     量的都是「不受號碼格大小影響」的元素 → 不會與 ResizeObserver 形成回饋迴圈。 */
+  let boardFitRaf=0, lastBoardPx=null;
+  // 只算真正參與 flex 排版的子元素:display:none 與浮層(fixed/absolute)都不佔高度
+  function flowChildren(parent){
+    return [...parent.children].filter(el=>{
+      const cs=getComputedStyle(el);
+      return cs.display!=="none" && cs.position!=="fixed" && cs.position!=="absolute";
+    });
+  }
+  function sumRows(parent, skip){
+    const cs=getComputedStyle(parent), gap=parseFloat(cs.rowGap)||0;
+    const rows=flowChildren(parent);
+    let h=gap*Math.max(0,rows.length-1);
+    rows.forEach(el=>{ if(el!==skip) h+=el.getBoundingClientRect().height; });
+    return h;
+  }
+  function fitBoard(){
+    const sa=$("scrollArea"), bw=$("boardWrap");
+    if(!sa||!bw||!grid)return;
+    if(getComputedStyle(bw).display==="none")return;   // 盤面沒顯示(設定分頁/主選單)→ 不必算,切回來時會重算
+    const bodyCS=getComputedStyle(document.body);
+    // body 用 height:100dvh,clientHeight 就是它自己的框高(含 padding、不含 border)
+    const inner=document.body.clientHeight-(parseFloat(bodyCS.paddingTop)||0)-(parseFloat(bodyCS.paddingBottom)||0);
+    const used=sumRows(document.body,sa)+sumRows(sa,bw)+sumRows(bw,grid);
+    const px=Math.max(0,Math.round(inner-used));
+    // 抖動門檻:手機工具列收放時不要每 1px 都重算。第一次(lastBoardPx 還是 null)一定要寫,
+    // 否則算出 0 時會誤判「沒變」而不寫入,盤面就會退回 CSS 的 520px 保底值 → 反而爆版
+    if(lastBoardPx!==null && Math.abs(px-lastBoardPx)<2)return;
+    lastBoardPx=px;
+    document.body.style.setProperty("--boardpx",px+"px");
+  }
+  function scheduleBoardFit(){
+    if(boardFitRaf)return;
+    boardFitRaf=requestAnimationFrame(()=>{ boardFitRaf=0; fitBoard(); });
+  }
+  // 掛上觀察:固定列的高度變動(玩家人數、分頁列/準備列顯隱、副標列收放)都要重算
+  function initBoardFit(){
+    const sa=$("scrollArea");
+    if(typeof ResizeObserver!=="undefined"){
+      const ro=new ResizeObserver(scheduleBoardFit);
+      [...document.body.children].forEach(el=>{ if(el!==sa) ro.observe(el); });   // 略過捲動區本身,避免自我觸發
+      ["setup","playStatus","fillRow","setupActions","mpOrderPanel"].forEach(id=>{ const el=$(id); if(el)ro.observe(el); });
+    }
+    addEventListener("resize",scheduleBoardFit);
+    addEventListener("orientationchange",scheduleBoardFit);
+    if(window.visualViewport) visualViewport.addEventListener("resize",scheduleBoardFit);
+    fitBoard();
   }
   function clampTarget(){ state.target=Math.min(maxLines(),Math.max(1,state.target)); const t=$("targetVal"); if(t)t.textContent=state.target; }
   function syncSizeSeg(){ const seg=$("sizeSeg"); if(!seg)return; [...seg.children].forEach(b=>b.classList.toggle("on", (+b.dataset.size)===SIZE)); }
@@ -285,6 +339,7 @@
     const bar=$("roomTabs"); if(bar)[...bar.children].forEach(b=>b.classList.toggle("on", b.dataset.tab===roomTab));
     const sa=$("scrollArea"); if(sa)sa.scrollTop=0;   // 切換分頁時捲回頂端,兩個分頁各自從頭看(不再共用捲動位置)
     updateReshuffleBtn();
+    scheduleBoardFit();   // 分頁切換會改變捲動區內容(設定列 ↔ 號碼格+填號列)→ 重算盤面可用高度
   }
   // show=true:進入 setup/大廳 → 顯示分頁列 + 主要動作列並套用目前分頁(defaultTab 指定預設頁)
   // show=false:離開(進遊戲/猜拳/主選單) → 收起分頁列/主要動作列/填號列,setup 與 boardWrap 的顯示交還給各流程的 .hidden
@@ -299,6 +354,7 @@
       $("boardWrap").classList.remove("tab-hidden");
       $("fillRow").classList.add("tab-hidden");   // 填號方式列只屬於大廳/設定的「填號」分頁,離開一律收起
       updateReshuffleBtn();   // 進遊戲/離開 → 收起右下換一組浮動鈕
+      scheduleBoardFit();     // 分頁列/準備列收起 → 縱向空間釋出給號碼格
       return;
     }
     if(defaultTab)roomTab=defaultTab;

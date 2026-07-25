@@ -88,12 +88,11 @@
   .topbar,#mpBar,#soloHead,#roomTabs,#home,.primary-bar{flex:none}
   /* 填號分頁:改回 flex:1 撐滿(內容本來就有整片號碼格,不會空太多),讓準備列固定在最底,右下浮動鈕才有穩定的落點、不會壓到準備鈕 */
   body.room-tab-fill .scroll-area{flex:1 1 0}
-  /* 盤面尺寸上限:除了 92vw / 520px,再用「可視高度」夾一次,螢幕太寬時格子才不會變太大、下緣被切掉。
-     依目前版面(是否有房間橫幅 / 準備列 / HUD)預留不同的縱向空間 */
-  body{ --board-cap: calc(100dvh - 170px); }                    /* 遊戲中 / 主選單:僅上方 HUD + 邊距 */
-  body.has-primary-bar{ --board-cap: calc(100dvh - 240px); }    /* 設定 / 大廳:另含填號列 + 底部準備列 */
-  body.mp-on.has-primary-bar{ --board-cap: calc(100dvh - 300px); }        /* 連線大廳:再含房間橫幅 */
-  body.mp-on:not(.has-primary-bar){ --board-cap: calc(100dvh - 160px); }  /* 連線遊戲中:僅含房間橫幅(叫號框已移除、副標列也在遊戲中收起,盤面可更大;寬螢幕時號碼格不再被夾太小) */
+  /* 盤面尺寸上限:除了 92vw / 520px,再用「剩餘可視高度」夾一次,螢幕太矮/太寬時號碼格才不會溢出、要上下捲。
+     這個高度由 fitBoard()(js/game.js)每次版面變動就實測一次,寫進 --boardpx;
+     舊版是依版面狀態寫死四組常數(160/170/240/300px),實測低估 66~139px,人一多還會再差 48px/列 → 必然溢出。
+     下面只留一個保底值,給 JS 還沒跑到的第一次繪製用。 */
+  body{ --boardpx: 520px; }
   /* 固定背景層:取代 background-attachment:fixed(手機滑動時背景會被帶著跑、放開才重畫、跳一下)。
      改用 position:fixed 的合成層,滑動時由合成器釘住、不重繪,就不會跳動 */
   body::before{
@@ -193,16 +192,26 @@
   .board-wrap{width:min(92vw,520px);display:flex;flex-direction:column;align-items:center;gap:12px}
   .grid{
     --gap:clamp(6px,1.6vw,10px);
-    /* 寬度取 92vw / 520px / 可視高度上限 三者最小;max(160px,…) 防止極矮螢幕算出過小或負值 */
-    width:min(92vw,520px,max(160px,var(--board-cap,520px)));aspect-ratio:1;
-    display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,1fr);
+    --cols:5;
+    /* 寬度取 92vw / 520px / 實測剩餘高度 三者最小;max(160px,…) 是保底:低於這個尺寸格子已經
+       小到按不動,寧可讓它溢出可捲(只會發生在橫向手機的大廳這種固定列本來就塞滿的極端情況) */
+    --board:min(92vw,520px,max(160px,var(--boardpx,520px)));
+    --cellsize:calc((var(--board) - (var(--cols) - 1) * var(--gap)) / var(--cols));
+    width:var(--board);aspect-ratio:1;
+    display:grid;
+    /* minmax(0,1fr) 而非 1fr:1fr 隱含下限是格子內容的 min-content 尺寸,矮螢幕會把列高撐破,
+       aspect-ratio 失效、格子變成長條(實測 814×335 時單格 27×49)。minmax(0,…) 才是真的等分 */
+    grid-template-columns:repeat(var(--cols),minmax(0,1fr));
+    grid-template-rows:repeat(var(--cols),minmax(0,1fr));
     gap:var(--gap);
   }
   .cell{
     position:relative;border:0;cursor:pointer;border-radius:var(--cellradius,16px);
     background:var(--cell);border:2px solid var(--cell-edge);
     color:var(--cell-text);font-family:'Fredoka',sans-serif;font-weight:600;
-    font-size:var(--cellfont,clamp(20px,6.5vw,40px));
+    /* 字級跟著單格實際尺寸走(比例 .38 沿用原本 5/6/7 三組 clamp 換算出的值),下限 11px 保可讀 */
+    font-size:clamp(11px,calc(var(--cellsize) * .38),40px);line-height:1;
+    min-width:0;min-height:0;
     display:grid;place-items:center;overflow:hidden;
     transition:transform .12s ease, box-shadow .25s, border-color .25s;
     box-shadow:0 3px 0 var(--cell-edge);
@@ -466,6 +475,11 @@
   :root[data-theme="ebook"] .mp-live{background:#fff;border:1px solid #000}
   .mp-status{font-weight:800;font-size:13px;color:var(--accent)}
   .mp-players{display:flex;flex-wrap:wrap;gap:14px 12px;margin-top:12px}
+  /* 玩家晶片單列橫向捲動(不換行,大廳/遊戲中都套用,見 renderPlayers)。房間橫幅高度因此固定在
+     一列,不再每多一列玩家就吃掉 48px 的號碼格空間 —— 縱向空間優先給號碼格 */
+  .mp-players.oneline{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+    margin-top:9px;padding:3px 1px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+  .mp-players.oneline .mp-chip{flex:none}
   .mp-chip{
     display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.10);
     border:1px solid var(--panel-line);border-radius:999px;padding:6px 13px;font-weight:800;font-size:14px;
@@ -808,3 +822,30 @@
   @keyframes shakeX{0%,100%{transform:translateX(0)}20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 
   @media (prefers-reduced-motion:reduce){*{animation-duration:.001s!important;transition-duration:.05s!important}}
+
+  /* ---------- 矮視窗緊湊模式(橫向手機、小筆電視窗) ----------
+     這種螢幕縱向空間本來就少,固定列(頂列 / 房間橫幅 / 玩家晶片)一吃掉就沒剩多少給號碼格。
+     這裡把非號碼格的元素統一縮一號,把省下來的高度全部讓給盤面 —— 空間優先給數字牌。
+     fitBoard() 是實測的,縮多少就自動多給盤面多少,不必另外調參數。 */
+  @media (max-height:560px){
+    body{padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:8px}
+    .marquee .bulb{font-size:clamp(20px,5.5vw,28px)}
+    .topver{padding-bottom:2px;font-size:10px}
+    .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+    .quick-voice,.mp-act-btn{width:34px;height:34px;font-size:18px}
+    .quick-voice .qv-ico{font-size:18px}
+    #mpBar{padding:9px 12px}
+    .row{margin-top:9px}
+    .mp-subrow{margin-top:5px}
+    .mp-players{margin-top:8px;gap:8px}
+    .mp-players.oneline{margin-top:5px;padding:2px 1px}
+    .mp-chip{font-size:12.5px;padding:4px 10px}
+    .mp-chip.turn{font-size:13.5px}
+    .room-tabs button{padding:8px 4px 7px;font-size:13px}
+    .primary-bar{padding-top:2px}
+    .primary-bar .btn{padding:11px 14px;font-size:15px}
+    .board-wrap{gap:8px}
+    .scroll-area{gap:8px}
+    .status{padding:8px 14px}
+    .status .big{font-size:17px}
+  }

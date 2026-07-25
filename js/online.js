@@ -264,7 +264,8 @@
     }
     function hideMpVeil(){ $("mpVeil").classList.remove("show"); }
     // 猜拳卡住時的逃生:房主→取消回大廳(保留房間,大家可重來);訪客→離開房間回單機
-    function bailFromRps(){ if(isHost) resetRoomToLobby(); else leave(); }
+    // 房主是「取消猜拳回大廳」(不離房,不需確認);訪客是真的離開房間 → 先問一次
+    function bailFromRps(){ if(isHost) resetRoomToLobby(); else askLeave(); }
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0;   // ★ 進新房必歸零:MP 為常駐 IIFE,不重設會把上一間房累積的高 rev 帶進來,害新房快照被 onGame 的「rev<gameRev」全部誤丟 → 加入者卡在大廳、整房卡死
@@ -371,6 +372,25 @@
     }
     function closeKick(){ pendingKickId=null; $("kickVeil").classList.remove("show"); }
     function confirmKick(){ const id=pendingKickId; closeKick(); if(id)kick(id); }
+    // 離開房間:一律先跳確認小卡(誤觸返回鈕就斷線退出、把整房關掉太痛)。
+    // act 可帶入實際要執行的動作(猜拳蓋板走 bailFromRps 的訪客分支),省略就是 leave()
+    let pendingLeaveAct=null;
+    function askLeave(act){
+      if(!state.online){ (act||leave)(); return; }   // 已經不在房裡了 → 沒什麼可確認的,直接做
+      pendingLeaveAct=act||leave;
+      const inGame = status==="playing" && !winner && !abandoned;
+      const t=$("leaveTitle"), m=$("leaveMsg"), b=$("leaveConfirm");
+      if(t)t.textContent = inGame ? "遊戲中離開?" : "離開房間?";
+      if(m)m.innerHTML = isHost
+        ? (inGame ? "你是房主,離開會<b>直接關閉房間</b>,這局大家都玩不完。"
+                  : "你是房主,離開會<b>關閉整個房間</b>,其他人都會被退出。")
+        : (inGame ? "這局還沒結束,離開就<b>不算你的成績</b>,其他人會繼續玩。"
+                  : "確定要離開這個房間嗎?");
+      if(b)b.textContent = inGame ? "還是要離開" : "離開房間";
+      $("leaveVeil").classList.add("show");
+    }
+    function closeLeaveAsk(){ pendingLeaveAct=null; $("leaveVeil").classList.remove("show"); }
+    function confirmLeave(){ const act=pendingLeaveAct; closeLeaveAsk(); if(act)act(); }
     // 房主:把某位玩家移出房間(僅大廳階段,遊戲進行中不動出手順序)
     function kick(id){
       if(!isHost||!roomRef||id===meId)return;
@@ -443,6 +463,10 @@
 
     function renderPlayers(){
       const box=$("mpPlayers"); if(!box)return; box.innerHTML="";
+      // 玩家晶片一律單列橫捲(不換行):房間橫幅高度固定在一列,人再多也不會往下長、
+      // 吃掉號碼格的縱向空間 —— 縱向空間優先給數字牌。實測 6 人換行時橫幅會漲到 244px,
+      // 比號碼格本身(210px)還大。橫捲不影響點晶片傳表情,也不影響房主的移出鈕 ✕。
+      box.classList.add("oneline");
       const ids=Object.keys(players);
       // 確認框開著時,若對象已離開或已不在大廳,直接收掉避免踢到空氣
       if(pendingKickId && (status!=="lobby" || !players[pendingKickId])) closeKick();
@@ -470,6 +494,11 @@
         }
         box.appendChild(chip);
       });
+      // 單列橫捲時把「輪到誰」的晶片滑到中間:人多時不用自己左右撥就看得到換誰
+      if(box.classList.contains("oneline")){
+        const t=box.querySelector(".mp-chip.turn");
+        if(t&&t.scrollIntoView){ try{ t.scrollIntoView({block:"nearest",inline:"center",behavior:"smooth"}); }catch(e){} }
+      }
       const subrow=$("mpSubrow");
       if(aloneTick){ if(subrow)subrow.classList.remove("hidden"); /* 房主落單倒數中:副標列交給倒數顯示,不覆蓋 */ }
       else if(status==="playing"){ updateTurnUI(); }   // 遊戲中:副標列整列收起(換誰改看高亮的玩家晶片)
@@ -1133,6 +1162,7 @@
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();
+      closeLeaveAsk(); closeKick();   // 離開/被踢/房主關房都可能在確認卡開著時發生 → 一併收掉,不留孤兒蓋板
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();   // 離線:重置快速語音鈕狀態
       closeWin();
       $("mpBar").classList.add("hidden");
@@ -1215,5 +1245,6 @@
              reportLines, tryWin, reportReach, readyEnabled, isMyTurn, isCalled, tap,
              amHost, amReady:()=>ready, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,
              confirmKick, cancelKick:closeKick, refreshHint:mpHint,
+             askLeave, confirmLeave, cancelLeave:closeLeaveAsk,
              setScoreMode, setWinGoal, resetScores, winGoal:()=>winGoal, scoreMode:()=>scoreMode, usePrefs };
   })();

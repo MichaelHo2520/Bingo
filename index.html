@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.35.0 -->
-<meta name="version" content="1.35.0">
+<!-- BINGO 賓果遊戲 · v1.36.0 -->
+<meta name="version" content="1.36.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -376,6 +376,19 @@
 
   <!-- 快速換一組號碼:自動填號時浮在右下(連線時疊在麥克風上方),只留骰子圖示;點一下重抽整張卡 -->
   <button class="quick-reshuffle hidden" id="reshuffleBtn" type="button" title="換一組號碼" aria-label="換一組號碼">🎲</button>
+
+  <!-- 離開房間的確認:連線中按返回鈕不會直接斷線退出,先問一次(訊息依「大廳/遊戲中」與「房主/訪客」給不同後果) -->
+  <div class="veil" id="leaveVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">🚪</div>
+      <div class="confirm-title" id="leaveTitle">離開房間?</div>
+      <p id="leaveMsg">確定要離開這個房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="leaveCancel">留在房間</button>
+        <button class="btn danger" id="leaveConfirm">離開房間</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 房主移出玩家的確認 -->
   <div class="veil" id="kickVeil">

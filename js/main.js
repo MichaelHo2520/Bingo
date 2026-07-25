@@ -93,12 +93,15 @@
   $("rpsEmoteBtn").addEventListener("click",()=>openEmote("all"));    // 猜拳蓋板的表情鈕:開互動面板(疊在猜拳蓋板之上,含語音短訊)
   $("mpVeilLeave").addEventListener("click",()=>MP.bailFromRps());
   $("orderConfirm").addEventListener("click",()=>MP.confirmOrder());
-  $("mpLeaveBtn").addEventListener("click",()=>MP.leave());
+  $("mpLeaveBtn").addEventListener("click",()=>MP.askLeave());   // 房間橫幅的返回鈕:先跳確認,不再一按就斷線
   $("kickConfirm").addEventListener("click",()=>MP.confirmKick());
   $("kickCancel").addEventListener("click",()=>MP.cancelKick());
   $("kickVeil").addEventListener("click",e=>{ if(e.target===$("kickVeil"))MP.cancelKick(); });
+  $("leaveConfirm").addEventListener("click",()=>MP.confirmLeave());
+  $("leaveCancel").addEventListener("click",()=>MP.cancelLeave());
+  $("leaveVeil").addEventListener("click",e=>{ if(e.target===$("leaveVeil"))MP.cancelLeave(); });
   $("mpAgain").addEventListener("click",()=>MP.again());
-  $("mpLeaveWin").addEventListener("click",()=>MP.leave());
+  $("mpLeaveWin").addEventListener("click",()=>MP.askLeave());   // 結果卡的離開:房主一按就關房,同樣先確認
   addEventListener("resize",()=>{if(state.won){const cv=$("confetti");cv.width=innerWidth;cv.height=innerHeight;}});
   // 首次使用者互動:解鎖音訊;若偏好記得「要開背景音樂」就開始播(繞過瀏覽器自動播放限制)。
   // iOS 切背景/鎖屏會把 AudioContext 打回 suspended,故解鎖監聽做成「可重新武裝」:回前景後下一次手勢再喚醒一次。
@@ -139,4 +142,5 @@
   applyGridCols();syncSizeSeg();
   render();applyFillUI();
   syncSettingsUI();
-  enterHome();   // 進場先顯示主選單(選單機 / 連線)
+  enterHome();     // 進場先顯示主選單(選單機 / 連線)
+  initBoardFit();  // 號碼格自適應:掛上版面觀察並算第一次的可用高度(必須在 enterHome 之後,版面已定案)
