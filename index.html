@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.36.2 -->
-<meta name="version" content="1.36.2">
+<!-- BINGO 賓果遊戲 · v1.36.3 -->
+<meta name="version" content="1.36.3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -124,10 +124,11 @@
     </div>
     <div class="field hidden" id="mpOrderRow">
       <span class="field-label" id="orderLabel">出手順序由誰定</span>
+      <!-- 預設「🎲 隨機」(v1.36.3;原為猜拳):洗完直接開打,不必等所有人出拳 -->
       <div class="seg" id="orderSeg">
         <button data-order="host">👑 房主排</button>
-        <button class="on" data-order="rps">✊ 猜拳</button>
-        <button data-order="random">🎲 隨機</button>
+        <button data-order="rps">✊ 猜拳</button>
+        <button class="on" data-order="random">🎲 隨機</button>
       </div>
     </div>
     <div class="field hidden" id="scoreRow">

@@ -10,7 +10,7 @@
     let players={}, calledList=[], status="lobby", winner=null, ready=false;
     let autoStarting=false;   // 全部人準備好 → 房主端自動開打的一次性守衛(避免 status 尚未同步前重複觸發)
     let prevIds=null;   // 上一次的玩家 id 清單,用來偵測「有新玩家加入」放音效(null=進房後尚未收到第一次快照)
-    let orderMethod="rps", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];
+    let orderMethod="random", order=[], turnIndex=0, rps=null, curPhase="lobby", orderDraft=[];   // 預設隨機(v1.36.3,原為 rps)
     // 一局揮發狀態全收在單一 game 節點(status/order/turnIndex/calledList/rps/reveal/winner/roundId),每次推進帶單調遞增 rev。
     // 單一節點 → 沒有「跨欄位事件到達順序」問題;rev 每次遞增 → 值即使相同也算變化、事件必觸發(取代舊的「先寫 null」與 enterPlaying 重讀等 workaround)。
     let gameRev=0;   // 本地已套用的最新 game 版本;收到 rev 更舊的快照直接丟(過期快照)
@@ -224,7 +224,7 @@
       code=randomCode(); roomRef=db.ref("rooms/"+code);                  // 內部隨機 4 位碼當資料庫鍵值(玩家看不到)
       roomRef.child("host").once("value").then(snap=>{
         if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }   // 撞號就重抽一次
-        return roomRef.update({ host:meId, roomName:roomName, target:state.target, size:SIZE, orderMethod:"rps",
+        return roomRef.update({ host:meId, roomName:roomName, target:state.target, size:SIZE, orderMethod:"random",
           scoreMode:scoreMode, winGoal:winGoal,   // 用記住的計分偏好當建房預設
           emotes:null, createdAt:Date.now(),
           // 一局揮發狀態全收在 game(取代舊的散落頂層欄位);rev 由此起算,單調遞增
@@ -449,7 +449,8 @@
       emotesReady=false;
       roomRef.child("emotes").on("child_added",s=>{ if(emotesReady)handleEmote(s.val()); });
       roomRef.child("emotes").once("value",()=>{ emotesReady=true; });
-      roomRef.child("orderMethod").on("value",s=>{ orderMethod=s.val()||"host"; syncOrderSeg(); });
+      // fallback 對齊預設值(v1.36.3;原為 "host" —— 與建房寫入的預設不一致,節點缺失時房主與訪客會看到不同選項)
+      roomRef.child("orderMethod").on("value",s=>{ orderMethod=s.val()||"random"; syncOrderSeg(); });
       // 連線計分:模式 / 搶勝目標(roundId 已併入 game 節點,不再獨立監聽)
       roomRef.child("scoreMode").on("value",s=>{ scoreMode=(s.val()==="match")?"match":"rank"; syncScoreRow(); renderPlayers(); });
       roomRef.child("winGoal").on("value",s=>{ const n=s.val(); winGoal=(typeof n==="number"&&n>=2)?Math.min(20,n):3; syncScoreRow(); });
