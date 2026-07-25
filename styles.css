@@ -384,8 +384,9 @@
   .room-tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
   :root[data-theme="ebook"] .room-tabs{border-bottom-color:#000}
   :root[data-theme="ebook"] .room-tabs button.on{color:#000;border-bottom-color:#000}
-  /* 填號方式列:移到號碼格下方,寬度對齊;內部就是選項膠囊 .seg */
-  #fillRow{width:min(92vw,520px);margin-top:0}
+  /* 填號方式列:移到號碼格下方,寬度對齊;內部是選項膠囊 .seg + 右側「換一組」🔄(v1.36.1 起內嵌於此) */
+  #fillRow{width:min(92vw,520px);margin-top:0;display:flex;align-items:stretch;gap:8px}
+  #fillRow #fillSeg{flex:1;min-width:0}
   /* 主要動作列(準備/開始 + 現在該做什麼提示):在 app-shell 裡是 .scroll-area「下方」的固定列,不再 position:fixed 浮蓋內容 */
   .primary-bar{width:min(92vw,520px);display:flex;flex-direction:column;gap:8px;padding-top:4px}
   .action-hint{text-align:center;font-weight:800;font-size:14px;line-height:1.45;color:var(--text);
@@ -700,19 +701,22 @@
   :root[data-theme="ebook"] #emoteText{background:#fff;border:1px solid #000}
   /* 錄音中脈動動畫:表情面板內的錄音鈕已移除,此 keyframe 仍供房間框的快速語音鈕 .quick-voice.rec 使用 */
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
-  /* 換一組號碼 🎲:自動填號時的右下浮動 FAB(由 JS 切 .hidden 顯隱)。麥克風已改常駐房間框,這裡改浮在最右下角 */
-  .quick-reshuffle{position:fixed;z-index:40;display:inline-flex;align-items:center;justify-content:center;
-    right:16px;right:calc(16px + env(safe-area-inset-right));
-    bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom));
-    width:54px;height:54px;padding:0;font-size:24px;line-height:1;opacity:.6;
-    border:1px solid var(--panel-line);background:var(--accent);color:#1c1008;border-radius:50%;
-    cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.30);transition:transform .12s,background .2s,opacity .2s}
-  .quick-reshuffle:active{opacity:1;transform:scale(.93)}
-  .quick-reshuffle.hidden{display:none!important}
-  @media (hover:hover){ .quick-reshuffle:hover{opacity:1;transform:translateY(-2px)} }
-  :root[data-theme="midnight"] .quick-reshuffle,
-  :root[data-theme="arcade"] .quick-reshuffle{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .quick-reshuffle{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
+  /* 換一組號碼 🔄(v1.36.1):內嵌在填號方式列 #fillRow 右側,不再是 position:fixed 浮動 FAB。
+     舊 FAB 停在畫面右下 bottom:16px,而它的顯示條件(在房間設定頁 + 填號分頁 + 自動填號)
+     與底部「準備/開始」列完全重疊 → 手機上必然壓住按鈕右端 54px、點下去會誤觸重抽整張卡。
+     改內嵌後結構上不可能重疊,語意上也和同列的「自動/手動填號」歸成一組。
+     align-self:stretch 讓它自動與左邊的 .seg 等高,不必寫死高度(fitBoard 量到的列高也就不變)。 */
+  .reshuffle-btn{flex:none;align-self:stretch;width:46px;padding:0;
+    display:grid;place-items:center;font-size:20px;line-height:1;
+    border:1px solid var(--panel-line);background:var(--accent);color:#1c1008;border-radius:12px;
+    cursor:pointer;transition:transform .12s,background .2s,opacity .2s}
+  .reshuffle-btn:active{transform:scale(.92)}
+  .reshuffle-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+  .reshuffle-btn.hidden{display:none!important}
+  @media (hover:hover){ .reshuffle-btn:hover{transform:translateY(-2px)} }
+  :root[data-theme="midnight"] .reshuffle-btn,
+  :root[data-theme="arcade"] .reshuffle-btn{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .reshuffle-btn{background:#fff;border:1px solid #000;color:#000}
 
   /* 房間框右上動作鈕:麥克風(快速語音)+ 表情。大廳/遊戲中都常駐在房間框(不再浮在盤面、不會壓到號碼格),兩顆並排 */
   .mp-actions{display:flex;align-items:center;gap:8px;flex:none}
@@ -751,10 +755,6 @@
   :root[data-theme="midnight"] .voice-gate,
   :root[data-theme="arcade"] .voice-gate{color:var(--daub-ink)}
   :root[data-theme="ebook"] .voice-gate{background:#000;color:#fff;box-shadow:none}
-  .quick-reshuffle:active{transform:scale(.93)}
-  :root[data-theme="midnight"] .quick-reshuffle,
-  :root[data-theme="arcade"] .quick-reshuffle{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .quick-reshuffle{background:#fff;border:1px solid #000;color:#000;box-shadow:none}
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
   .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
     align-items:center;gap:3px;animation:emoteFloat 2.2s ease-out forwards}
@@ -841,6 +841,7 @@
     .mp-players.oneline{margin-top:5px;padding:2px 1px}
     .mp-chip{font-size:12.5px;padding:4px 10px}
     .mp-chip.turn{font-size:13.5px}
+    .reshuffle-btn{width:40px;font-size:18px}
     .room-tabs button{padding:8px 4px 7px;font-size:13px}
     .primary-bar{padding-top:2px}
     .primary-bar .btn{padding:11px 14px;font-size:15px}

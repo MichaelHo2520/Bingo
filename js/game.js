@@ -353,7 +353,7 @@
       $("setup").classList.remove("tab-hidden");
       $("boardWrap").classList.remove("tab-hidden");
       $("fillRow").classList.add("tab-hidden");   // 填號方式列只屬於大廳/設定的「填號」分頁,離開一律收起
-      updateReshuffleBtn();   // 進遊戲/離開 → 收起右下換一組浮動鈕
+      updateReshuffleBtn();   // 進遊戲/離開 → #fillRow 整列已收起,這裡順手同步「換一組」的狀態
       scheduleBoardFit();     // 分頁列/準備列收起 → 縱向空間釋出給號碼格
       return;
     }
@@ -389,12 +389,12 @@
     }
   }
   // 右下浮動「換一組」鈕:只在「設定中 + 填號分頁 + 自動填號」時出現(手動填號 / 設定分頁 / 遊戲中都收起)
+  // 「換一組」🔄 顯隱:v1.36.1 起它內嵌在填號方式列 #fillRow 裡,只需判「是不是自動填號」。
+  // 其餘條件(不在房間設定頁 / 不在填號分頁 / 已按準備好了 / 遊戲進行中)外層 #fillRow 本身
+  // 就會整列以 .tab-hidden 收起(見 setLock() 與 applyRoomTab()/updateRoomTabs()),不必重複判一次。
   function updateReshuffleBtn(){
     const btn=$("reshuffleBtn"); if(!btn)return;
-    const inRoom = !$("roomTabs").classList.contains("hidden");   // 分頁列有顯示=正在設定/大廳
-    // 已按準備好了(連線)就收起,避免準備後還能換卡
-    const show = inRoom && roomTab==="fill" && state.mode==="setup" && state.fill==="auto" && !amReadyLock();
-    btn.classList.toggle("hidden", !show);
+    btn.classList.toggle("hidden", state.fill!=="auto");
   }
 
   /* ---------- Confetti ---------- */
