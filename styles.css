@@ -834,3 +834,127 @@
     .status{padding:8px 14px}
     .status .big{font-size:17px}
   }
+
+  /* ==========================================================================
+     五子棋(gomoku.html 專用) — v1.37.0
+     ★ 這一段只「追加」,不修改上面任何既有規則:Bingo 的 DOM 沒有 .gmk-* / .as-link
+       這些 class,所以本段對 Bingo 完全無作用。反之五子棋頁刻意沿用 .panel / .btn /
+       .veil / .win-card / .mp-chip / .room-item / .set-card 等既有元件樣式 —— 兩個遊戲
+       外觀一致,且日後改那些通用樣式時兩邊會一起變(這是刻意的耦合,見 notes/plan)。
+     ========================================================================== */
+
+  /* 棋盤配色:各主題各給一組(只新增 --gmk-* 變數,不動既有變數) */
+  :root{ --gmk-wood:#e9c98d; --gmk-line:rgba(66,40,12,.55); --gmk-star:rgba(66,40,12,.75); --gmk-edge:rgba(66,40,12,.28); }
+  :root[data-theme="midnight"]{ --gmk-wood:#141c31; --gmk-line:rgba(140,190,255,.34); --gmk-star:rgba(140,190,255,.6); --gmk-edge:rgba(140,190,255,.2); }
+  :root[data-theme="bubblegum"]{ --gmk-wood:#fff0f8; --gmk-line:rgba(150,70,130,.4); --gmk-star:rgba(150,70,130,.65); --gmk-edge:rgba(150,70,130,.22); }
+  :root[data-theme="meadow"]{ --gmk-wood:#e6dfb8; --gmk-line:rgba(40,66,36,.5); --gmk-star:rgba(40,66,36,.72); --gmk-edge:rgba(40,66,36,.26); }
+  :root[data-theme="arcade"]{ --gmk-wood:#0d0d12; --gmk-line:rgba(255,230,0,.3); --gmk-star:rgba(255,230,0,.55); --gmk-edge:rgba(255,230,0,.18); }
+  :root[data-theme="ebook"]{ --gmk-wood:#ffffff; --gmk-line:#000000; --gmk-star:#000000; --gmk-edge:#000000; }
+
+  /* 大廳的捲動區撐滿剩餘高度,讓「準備好了」鈕固定在畫面最底 —— 與對戰中的「認輸」鈕同位置,
+     切換相位時按鈕不會跳。★ 只能用 .gmk-* class 選擇器:若寫成 #scrollArea 就會連 Bingo 一起改到。 */
+  .gmk-scroll{flex:1 1 auto}
+
+  /* <a> 當按鈕用(首頁的五子棋入口、五子棋頁的返回鈕):不必為了一個連結去改 js/main.js */
+  .as-link{text-decoration:none}
+  a.block-btn.as-link{display:flex;align-items:center;justify-content:center;text-align:center}
+  a.icon-btn.as-link{display:grid;place-items:center;flex:none}
+
+  /* ---------- 棋盤舞台:固定尺寸的棋盤 + JS 控制的縮放/平移 ----------
+     舞台本身把溢出裁掉(overflow:hidden),棋盤永遠是固定 px(n × --cell),
+     縮放只改 .gmk-canvas 的 transform → 不觸發 reflow,手機拖曳/縮放才順。
+     touch-action:none 是必要的:viewport 設了 user-scalable=no,原生 pinch 不可用,
+     所有手勢(單指拖曳 / 雙指縮放 / 點擊落子)都由 js/gomoku/board.js 自己處理。 */
+  .gmk-stage{
+    position:relative;flex:1 1 auto;min-height:0;width:min(92vw,520px);
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:20px;
+    overflow:hidden;touch-action:none;cursor:grab;
+    user-select:none;-webkit-user-select:none;
+  }
+  .gmk-stage.dragging{cursor:grabbing}
+  .gmk-canvas{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform}
+  /* 棋盤:格線用 background-image 畫(零 DOM),線在每格中心 → 棋子落在交叉點、四周留半格邊 */
+  .gmk-board{
+    position:relative;
+    width:calc(var(--n,15) * var(--gcell,40px));
+    height:calc(var(--n,15) * var(--gcell,40px));
+    background-color:var(--gmk-wood);
+    background-image:
+      linear-gradient(to right, var(--gmk-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--gmk-line) 1px, transparent 1px);
+    background-size:var(--gcell,40px) var(--gcell,40px);
+    background-position:calc(var(--gcell,40px) / 2) calc(var(--gcell,40px) / 2);
+    box-shadow:inset 0 0 0 1px var(--gmk-edge);
+    border-radius:6px;
+  }
+  /* 星位(天元 + 四星):5 個小圓點,由 board.js 依盤面大小放置 */
+  .gmk-star{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--gmk-star);
+    transform:translate(-50%,-50%);pointer-events:none}
+
+  /* 棋子:absolute 定位在交叉點,落子時只 append 一顆(不整盤重畫) */
+  .gmk-stone{
+    position:absolute;width:calc(var(--gcell,40px) * .88);height:calc(var(--gcell,40px) * .88);
+    border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;
+    animation:gmkDrop .16s ease-out;
+  }
+  .gmk-stone.b{background:radial-gradient(circle at 34% 28%, #7a7a7a 0%, #2b2b2b 45%, #050505 100%);
+    box-shadow:0 2px 5px rgba(0,0,0,.45), inset 0 -1px 3px rgba(255,255,255,.10)}
+  .gmk-stone.w{background:radial-gradient(circle at 34% 28%, #ffffff 0%, #f2ede4 45%, #c3bcb0 100%);
+    box-shadow:0 2px 5px rgba(0,0,0,.35), inset 0 -1px 3px rgba(0,0,0,.10)}
+  @keyframes gmkDrop{ from{transform:translate(-50%,-50%) scale(.4);opacity:.3} to{transform:translate(-50%,-50%) scale(1);opacity:1} }
+  /* 最後一手:小圓環標記(對手下在哪一眼看到) */
+  .gmk-stone.last::after{
+    content:"";position:absolute;inset:18%;border-radius:50%;
+    border:2.5px solid var(--accent);animation:gmkLast 1.4s ease-in-out infinite;
+  }
+  @keyframes gmkLast{ 0%,100%{opacity:.45} 50%{opacity:1} }
+  /* 連五那 5 顆:醒目光環 */
+  .gmk-stone.win{z-index:2;box-shadow:0 0 0 3px var(--accent), 0 0 14px 3px var(--accent);animation:gmkWin .9s ease-in-out infinite alternate}
+  @keyframes gmkWin{ from{box-shadow:0 0 0 3px var(--accent), 0 0 6px 1px var(--accent)} to{box-shadow:0 0 0 3px var(--accent), 0 0 20px 6px var(--accent)} }
+  /* 桌機滑鼠移過去的預覽子(半透明);觸控裝置不顯示 */
+  .gmk-ghost{position:absolute;width:calc(var(--gcell,40px) * .88);height:calc(var(--gcell,40px) * .88);
+    border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;opacity:.34;display:none}
+  .gmk-ghost.show{display:block}
+  :root[data-theme="ebook"] .gmk-stone.b{background:#000;box-shadow:none}
+  :root[data-theme="ebook"] .gmk-stone.w{background:#fff;box-shadow:inset 0 0 0 2px #000}
+  :root[data-theme="ebook"] .gmk-stone.win{box-shadow:inset 0 0 0 2px #000, 0 0 0 3px #000}
+
+  /* 縮放列:浮在舞台右下 */
+  .gmk-zoom{position:absolute;right:8px;bottom:8px;z-index:3;display:flex;flex-direction:column;gap:6px}
+  .gmk-zoom button{width:36px;height:36px;border:1px solid var(--panel-line);border-radius:12px;
+    background:rgba(0,0,0,.28);color:var(--text);font-family:'Fredoka',sans-serif;font-weight:700;
+    font-size:17px;line-height:1;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(6px)}
+  .gmk-zoom button:active{transform:scale(.9)}
+  .gmk-zoom button:disabled{opacity:.35;cursor:default}
+  :root[data-theme="bubblegum"] .gmk-zoom button{background:rgba(255,255,255,.55)}
+  :root[data-theme="ebook"] .gmk-zoom button{background:#fff;border:1px solid #000;color:#000;backdrop-filter:none}
+
+  /* 輪到誰:浮在舞台上緣的小膠囊(取代 Bingo 的副標列文字) */
+  .gmk-turn{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:3;
+    display:flex;align-items:center;gap:7px;white-space:nowrap;
+    padding:6px 14px;border-radius:999px;font-weight:800;font-size:13px;
+    background:rgba(0,0,0,.32);color:var(--text);border:1px solid var(--panel-line);backdrop-filter:blur(6px)}
+  .gmk-turn.mine{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008;border-color:transparent;
+    animation:gmkTurnPulse 1.5s ease-in-out infinite}
+  @keyframes gmkTurnPulse{ 0%,100%{transform:translateX(-50%) scale(1)} 50%{transform:translateX(-50%) scale(1.045)} }
+  :root[data-theme="midnight"] .gmk-turn.mine,:root[data-theme="arcade"] .gmk-turn.mine{color:var(--daub-ink)}
+  :root[data-theme="bubblegum"] .gmk-turn{background:rgba(255,255,255,.6)}
+  :root[data-theme="ebook"] .gmk-turn{background:#fff;border:1px solid #000;color:#000;backdrop-filter:none}
+  :root[data-theme="ebook"] .gmk-turn.mine{background:#000;color:#fff}
+  /* 棋子色小圖示(⚫/⚪ 用實心圓畫,不靠 emoji 避免各平台字型差異) */
+  .gmk-dot{width:13px;height:13px;border-radius:50%;flex:none;display:inline-block}
+  .gmk-dot.b{background:#111;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+  .gmk-dot.w{background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+
+  /* 大廳設定裡的「先手/棋色」小標示 */
+  .gmk-side{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;color:var(--muted)}
+
+  /* 五子棋頂列標題(取代 BINGO 跑馬燈) */
+  .gmk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
+    line-height:1;color:var(--marquee);letter-spacing:.06em}
+
+  @media (max-height:560px){
+    .gmk-turn{top:5px;padding:4px 11px;font-size:12px}
+    .gmk-zoom button{width:32px;height:32px;font-size:15px}
+    .gmk-brand{font-size:clamp(19px,5vw,26px)}
+  }

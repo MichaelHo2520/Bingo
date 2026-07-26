@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="sunset">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<!-- PWA:與 index.html 共用 manifest(同一個 App,首頁是遊戲選單) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="五子棋">
+<meta name="theme-color" content="#2a1136">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>五子棋 ｜ 連線對戰</title>
+<!-- 五子棋連線對戰 · v1.37.0 -->
+<meta name="version" content="1.37.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<!-- 共用 Bingo 的 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
+     id 與 class,樣式 100% 重用;棋盤與縮放是檔尾追加的 .gmk-* 段落 -->
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="gmk-brand display">五子棋</div>
+      <span class="topver" id="topVer" aria-label="版本"></span>
+    </div>
+    <div class="tools">
+      <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
+      <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
+    </div>
+  </div>
+
+  <!-- ====== 連線畫面(暱稱 / 建房 / 大廳清單)====== -->
+  <section class="panel" id="mpConnect">
+    <div class="mp-head">
+      <!-- 返回主選單:用 <a> 直接跳回 index.html(它的首頁就是遊戲選單) -->
+      <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+      <div class="subtitle">五子棋 · 連線對戰</div>
+    </div>
+    <div class="field">
+      <span class="field-label">你的暱稱(必填)</span>
+      <input id="mpName" class="mp-input" maxlength="8" placeholder="輸入你的名字">
+    </div>
+
+    <div class="or-divider"><span>建立新房間</span></div>
+    <div class="field">
+      <input id="mpRoomName" class="mp-input" maxlength="12" placeholder="房間名稱(留空用你的暱稱)">
+    </div>
+    <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
+
+    <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
+    <div class="mp-detect-row">
+      <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span><span id="mpLiveTxt">偵測目前房間中…</span>
+      </div>
+      <button class="mp-rescan" id="mpScan" title="重新偵測房間" aria-label="重新偵測房間">🔍</button>
+    </div>
+    <div class="room-list" id="mpRoomList"></div>
+    <div class="hint" id="mpConnMsg"></div>
+  </section>
+
+  <!-- ====== 房間橫幅(沿用 Bingo 的 #mpBar 樣式)====== -->
+  <div class="panel hidden" id="mpBar">
+    <div class="row" style="margin-top:0;flex-wrap:nowrap">
+      <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="盤面"></span>
+      <div class="mp-actions">
+        <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
+          <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
+        </button>
+        <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
+      </div>
+    </div>
+    <div class="mp-subrow" id="mpSubrow">
+      <span class="mp-status" id="mpStatusTxt">等待中…</span>
+    </div>
+    <div id="mpPlayers" class="mp-players"></div>
+  </div>
+
+  <!-- ====== 大廳設定(房主可改,訪客唯讀)====== -->
+  <div class="scroll-area gmk-scroll" id="scrollArea">
+    <section class="panel hidden" id="gmkSetup">
+      <div class="subtitle">對戰設定</div>
+
+      <div class="field">
+        <span class="field-label" id="gmkSizeLabel">棋盤大小</span>
+        <div class="seg" id="gmkSizeSeg" aria-label="棋盤大小">
+          <button data-size="13">13×13</button>
+          <button class="on" data-size="15">15×15</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label" id="gmkSwapLabel">每局換先手</span>
+        <div class="seg" id="gmkSwapSeg" aria-label="每局換先手">
+          <button class="on" data-swap="1">🔄 每局換邊</button>
+          <button data-swap="0">🎲 每局重抽</button>
+        </div>
+      </div>
+
+      <div class="field" id="scoreRow">
+        <span class="field-label" id="scoreLabel">連線計分</span>
+        <div class="seg" id="scoreSeg">
+          <button class="on" data-score="rank">🏆 累積排行</button>
+          <button data-score="match">🎯 搶勝</button>
+        </div>
+        <div class="score-extra hidden" id="scoreExtra">
+          <div class="wg-group hidden" id="wgGroup">
+            <span class="wg-lbl">先到</span>
+            <div class="wg-stepper">
+              <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+              <span class="target-val display" id="winGoalVal">3</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+            </div>
+            <span class="wg-lbl">勝奪冠</span>
+          </div>
+          <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
+          <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
+        </div>
+      </div>
+
+      <div class="hint" id="gmkRuleHint">規則:黑棋先下,橫、豎、斜任一方向連成 5 顆即勝(無禁手)。棋盤下滿判和。</div>
+    </section>
+  </div>
+
+  <!-- ====== 棋盤舞台(遊戲中顯示;縮放/平移全由 board.js 處理)====== -->
+  <div class="gmk-stage hidden" id="gmkStage">
+    <div class="gmk-canvas" id="gmkCanvas">
+      <div class="gmk-board" id="gmkBoard">
+        <div class="gmk-ghost" id="gmkGhost" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div class="gmk-turn" id="gmkTurn"><span class="gmk-dot b"></span><span id="gmkTurnTxt">準備中…</span></div>
+    <div class="gmk-zoom">
+      <button type="button" id="gmkZoomIn" title="放大" aria-label="放大棋盤">＋</button>
+      <button type="button" id="gmkZoomFit" title="整盤" aria-label="顯示整個棋盤">⤢</button>
+      <button type="button" id="gmkZoomOut" title="縮小" aria-label="縮小棋盤">－</button>
+    </div>
+  </div>
+
+  <!-- ====== 主要動作列 ====== -->
+  <div class="primary-bar hidden" id="primaryBar">
+    <div class="action-hint hidden" id="actionHint"></div>
+    <div class="actions" id="primaryActions">
+      <button class="btn primary hidden" id="mpReadyBtn">準備好了</button>
+      <button class="btn ghost hidden" id="resignBtn">🏳 認輸</button>
+    </div>
+  </div>
+
+  <!-- ====== 結果卡(沿用 Bingo 的 #veil / .win-card)====== -->
+  <div class="veil" id="veil">
+    <div class="win-card">
+      <div class="word display" id="winWord">你贏了!</div>
+      <p id="winMsg">五子連線 🎉</p>
+      <div class="win-champ hidden" id="winChamp"></div>
+      <div class="win-scores hidden" id="winScores"></div>
+      <div class="actions" id="mpWinBtns">
+        <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
+        <button class="btn primary" id="mpAgain">繼續 ▸</button>
+        <button class="btn ghost" id="mpLeaveWin">離開房間</button>
+      </div>
+      <button class="peek-link" id="winPeek">先看看棋盤 👀</button>
+    </div>
+  </div>
+  <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
+
+  <!-- ====== 設定(沿用 Bingo 的設定蓋板;偏好與 Bingo 共用,寫入採 merge)====== -->
+  <div class="veil" id="setVeil">
+    <div class="set-card">
+      <div class="set-head">設定</div>
+      <div class="set-body" id="setBody">
+
+        <div class="set-group">
+          <div class="set-group-title">外觀</div>
+          <div class="set-row">
+            <span class="set-lbl">主題</span>
+            <div class="swatches" id="swatches"></div>
+          </div>
+          <div class="set-row">
+            <span class="set-lbl">電子書模式</span>
+            <button class="switch" id="swEbook" role="switch" aria-checked="false" aria-label="電子書模式"><span class="knob"></span></button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">音效</div>
+          <div class="set-row">
+            <span class="set-lbl">開啟音效</span>
+            <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="開啟音效"><span class="knob"></span></button>
+          </div>
+          <div class="set-row" id="sfxVolRow">
+            <span class="set-lbl">音量</span>
+            <input class="rng" id="sfxVol" type="range" min="0" max="100" value="100" aria-label="音效音量">
+          </div>
+          <div class="set-row" id="vibrateRow">
+            <span class="set-lbl">輪到你時震動<span class="set-sub">(手機)</span></span>
+            <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="輪到你時震動"><span class="knob"></span></button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">背景音樂</div>
+          <div class="set-row">
+            <span class="set-lbl">開啟音樂</span>
+            <button class="switch" id="swBgm" role="switch" aria-checked="false" aria-label="開啟背景音樂"><span class="knob"></span></button>
+          </div>
+          <div class="set-row" id="bgmTrackRow">
+            <span class="set-lbl">曲目</span>
+            <select class="set-select" id="bgmTrackSel" aria-label="背景音樂曲目"></select>
+          </div>
+          <div class="set-row" id="bgmVolRow">
+            <span class="set-lbl">音量</span>
+            <input class="rng" id="bgmVol" type="range" min="0" max="100" value="35" aria-label="背景音樂音量">
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">語音（連線）</div>
+          <div class="set-row">
+            <span class="set-lbl">收到語音音量</span>
+            <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量">
+          </div>
+        </div>
+
+      </div>
+      <button class="btn primary" id="setClose">完成</button>
+      <div class="set-foot">五子棋 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+    </div>
+  </div>
+
+  <!-- ====== 好友互動表情 / 語音(沿用 Bingo)====== -->
+  <div class="veil" id="emoteVeil">
+    <div class="set-card emote-card">
+      <button class="card-x" id="emoteClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head" id="emoteHead">傳給全部人</div>
+      <div class="emote-to" id="emoteTo"></div>
+      <div class="emote-grid" id="emoteGrid"></div>
+      <div class="emote-sub">💬 一句話</div>
+      <div class="emote-phrases" id="emotePhrases"></div>
+      <div class="emote-sub">🔊 語音短訊</div>
+      <div class="emote-phrases" id="emoteClips"></div>
+      <div class="emote-input">
+        <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
+        <button class="btn" id="emoteSend" type="button">送出</button>
+      </div>
+    </div>
+  </div>
+  <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
+
+  <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
+
+  <!-- 離開房間確認 -->
+  <div class="veil" id="leaveVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">🚪</div>
+      <div class="confirm-title" id="leaveTitle">離開房間?</div>
+      <p id="leaveMsg">確定要離開這個房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="leaveCancel">留在房間</button>
+        <button class="btn danger" id="leaveConfirm">離開房間</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 認輸確認 -->
+  <div class="veil" id="resignVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">🏳</div>
+      <div class="confirm-title">認輸?</div>
+      <p>這局就直接算對手贏,確定嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="resignCancel">再想想</button>
+        <button class="btn danger" id="resignConfirm">我認輸</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 房主移出玩家確認 -->
+  <div class="veil" id="kickVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">⚠️</div>
+      <div class="confirm-title">移出玩家?</div>
+      <p id="kickMsg">確定要把這位玩家移出房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="kickCancel">取消</button>
+        <button class="btn danger" id="kickConfirm">移出房間</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas class="confetti" id="confetti"></canvas>
+
+<!-- Firebase SDK 由 js/gomoku/net.js 的 ensureFirebase() 動態載入(進連線畫面才載) -->
+
+<script>
+/* ============================================================
+   連線對戰設定 — 與 index.html(Bingo)使用同一個 Firebase 專案,
+   但五子棋的資料放在獨立的頂層節點 gomoku_rooms / gomoku_index,
+   與 bingo 的 rooms / rooms_index 完全隔離(見 notes/plan/PLAN-五子棋連線對戰.md)。
+   ⚠ 需在 Firebase 規則開放 gomoku_rooms 與 gomoku_index 的讀寫。
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBVBN3hRMSFq7KwWmyf3IR01Y82XmfhLQ0",
+  authDomain: "bingo-82e51.firebaseapp.com",
+  databaseURL: "https://bingo-82e51-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bingo-82e51",
+  storageBucket: "bingo-82e51.firebasestorage.app",
+  messagingSenderId: "954833280596",
+  appId: "1:954833280596:web:29c1d2aa434f62db91d7c1"
+};
+</script>
+
+<script src="js/audio.js"></script>
+<script src="js/gomoku/board.js"></script>
+<script src="js/gomoku/net.js"></script>
+<script src="js/gomoku/ui.js"></script>
+<script src="js/gomoku/main.js"></script>
+</body>
+</html>

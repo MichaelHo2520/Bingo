@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.36.4 -->
-<meta name="version" content="1.36.4">
+<!-- BINGO 賓果遊戲 · v1.37.0 -->
+<meta name="version" content="1.37.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -54,11 +54,14 @@
         <polygon class="bc-star" points="60,63 62.23,68.93 68.56,69.22 63.61,73.17 65.29,79.28 60,75.8 54.71,79.28 56.39,73.17 51.44,69.22 57.77,68.93"/>
       </svg>
       <div class="home-title display">BINGO</div>
-      <div class="home-tagline">和朋友連線比賽,或自己單機練習</div>
+      <div class="home-tagline">和朋友連線比賽、自己單機練習,或來一局五子棋</div>
     </div>
     <button class="btn primary block-btn home-btn" id="homeOnline">🌐 連線對戰</button>
     <button class="btn ghost block-btn home-btn" id="homeSolo">🎯 單機練習</button>
-    <div class="home-hint">連線可同房比賽、計分;單機自己玩一張卡</div>
+    <!-- 五子棋:獨立頁面(gomoku.html)。刻意用 <a> 而不是 <button> —— 這樣連 js/main.js
+         都不必加事件綁定,Bingo 的四支 js 全部維持零改動(見 notes/plan/PLAN-五子棋連線對戰.md) -->
+    <a class="btn ghost block-btn home-btn as-link" href="gomoku.html">⚫ 五子棋 · 連線對戰</a>
+    <div class="home-hint">賓果:連線同房比賽、單機自己玩一張卡;五子棋:連線 1 對 1</div>
   </section>
 
   <!-- ====== ONLINE: room banner(移到設定/棋盤上方,讓房內名單固定在頂端) ====== -->
