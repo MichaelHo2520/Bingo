@@ -108,6 +108,10 @@ document.addEventListener("visibilitychange",()=>{
   BGM.setHidden(false);
   armAudioUnlock();
 });
+// 換頁(回 index.html / 按上一頁)也要停音樂:Safari 換頁不發 visibilitychange,
+// 舊頁進 bfcache 還在放、新頁又開一首 → 背景音樂疊起來(v1.40.0)。與 js/main.js 同一套。
+addEventListener("pagehide",()=>{ markAudioStale(); BGM.setHidden(true); });
+addEventListener("pageshow",e=>{ if(!e.persisted)return; BGM.setHidden(false); armAudioUnlock(); });
 
 /* ---------- Service Worker(與 Bingo 共用 sw.js) ---------- */
 if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost" || location.hostname==="127.0.0.1")){

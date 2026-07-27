@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>五子棋 ｜ 連線對戰</title>
-<!-- 五子棋連線對戰 · v1.39.0 -->
-<meta name="version" content="1.39.0">
+<!-- 五子棋連線對戰 · v1.40.0 -->
+<meta name="version" content="1.40.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -65,14 +65,16 @@
     <div class="hint" id="mpConnMsg"></div>
   </section>
 
-  <!-- ====== 房間橫幅(沿用 Bingo 的 #mpBar 樣式)====== -->
-  <div class="panel hidden" id="mpBar">
-    <div class="row" style="margin-top:0;flex-wrap:nowrap">
+  <!-- ====== 房間橫幅(沿用 Bingo 的 #mpBar 樣式;.gmk-room 再把它壓矮、把認輸鈕收進來)====== -->
+  <div class="panel gmk-room hidden" id="mpBar">
+    <div class="row gmk-room-top">
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b></span>
+      <span class="label gmk-room-title">房間 <b id="mpRoomTitle" class="display">–</b></span>
+      <!-- 盤面徽章與認輸鈕在同一個位置輪流出現:大廳看盤面大小,對戰中改放認輸(棋盤自己就看得出幾路) -->
       <span class="mp-goal" id="mpBarGoal" aria-label="盤面"></span>
+      <button class="gmk-resign hidden" id="resignBtn" type="button" title="認輸">🏳 認輸</button>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
@@ -80,10 +82,14 @@
         <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
       </div>
     </div>
+    <!-- 狀態列:大廳時說明在等什麼;對戰中收起來(棋盤上的「輪到誰」膠囊已經在講同一件事),
+         只有落單倒數那種棋盤上看不到的訊息才臨時放出來(見 net.js syncSubrow) -->
     <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
     </div>
-    <div id="mpPlayers" class="mp-players"></div>
+    <div class="gmk-room-foot">
+      <div id="mpPlayers" class="mp-players"></div>
+    </div>
   </div>
 
   <!-- ====== 大廳設定(房主可改,訪客唯讀)====== -->
@@ -148,12 +154,11 @@
     </div>
   </div>
 
-  <!-- ====== 主要動作列 ====== -->
+  <!-- ====== 主要動作列(只剩大廳的「準備好了」;認輸鈕已搬進房間框,對戰中整列收起來讓給棋盤)====== -->
   <div class="primary-bar hidden" id="primaryBar">
     <div class="action-hint hidden" id="actionHint"></div>
     <div class="actions" id="primaryActions">
       <button class="btn primary hidden" id="mpReadyBtn">準備好了</button>
-      <button class="btn ghost hidden" id="resignBtn">🏳 認輸</button>
     </div>
   </div>
 

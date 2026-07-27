@@ -140,6 +140,7 @@
     function playBuffer(){
       const c=ctx(); if(!c||!buffer)return;
       stopNode();
+      if(el){ try{ el.pause(); }catch(e){} }   // 保險:兩條路徑互斥,絕不會 Web Audio 與 HTMLAudio 同時出聲
       const m=ensureMaster(c);
       if(c.state==="suspended"){ c.resume().catch(()=>{}); }
       node=c.createBufferSource(); node.buffer=buffer; node.loop=true;   // Web Audio 無縫循環
@@ -148,6 +149,7 @@
       node.start(0, buffer.duration>0 ? offset%buffer.duration : 0);     // 從上次停的位置接著播
     }
     function playFallback(){   // 後備:桌機/Android 仍能播(iOS 對 HTMLAudio 的音量可能無效)
+      stopNode();              // 同上:走後備就一定沒有 Web Audio 那條在跑
       try{ if(!el){ el=new Audio(src); el.loop=true; } el.volume=vol; el.play().catch(()=>{}); }catch(e){}
     }
     /* 該不該出聲 = 三個開關同時成立:使用者開著音樂、沒被語音 duck、App 也不在背景。
@@ -156,9 +158,14 @@
     function shouldPlay(){ return on && !ducked && !hidden; }
     function applyPlayState(){
       if(!shouldPlay()){ stopNode(); if(el){ try{ el.pause(); }catch(e){} } return; }   // HTMLAudio 的 pause 本來就保留位置
-      if(ready){ playBuffer(); }
-      else if(failed){ playFallback(); }
-      else { load().then(()=>{ if(!shouldPlay())return; if(ready)playBuffer(); else playFallback(); }); }
+      if(ready){ playBuffer(); return; }
+      if(failed){ playFallback(); return; }
+      // ★ 音檔還在載:直接回,交給下面那次 load().then 開播。
+      //   少了這道門會重疊播放 —— load() 在 loading 時是「立刻 resolve 但什麼都沒做」,
+      //   於是這一輪的 then 看到 ready 仍為 false 就退去開 HTMLAudio 後備,等真正的 fetch 完成
+      //   第一輪的 then 又開了 Web Audio,兩軌就一起響(setOn 後緊接著 nudge 必中,見 main.js 的解鎖流程)
+      if(loading) return;
+      load().then(()=>{ if(!shouldPlay())return; if(ready)playBuffer(); else if(!loading)playFallback(); });
     }
     // 語音期間先停背景音樂,讓語音聽得清楚;語音全部播完再從原位接著播(僅在使用者原本就開著時)
     function duck(d){

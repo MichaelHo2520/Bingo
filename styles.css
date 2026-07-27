@@ -960,6 +960,50 @@
   /* 大廳設定裡的「先手/棋色」小標示 */
   .gmk-side{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;color:var(--muted)}
 
+  /* ---------- 房間框(五子棋專用瘦身版,v1.40.0) ----------
+     只有兩個人,房間資訊沒 Bingo 那麼重要:整框內距/字級/按鈕全部縮一號,
+     認輸鈕也收進來(原本在畫面最底的 .primary-bar),省下來的縱向空間全給棋盤。
+     ★ 一律用 .gmk-room 開頭的後代選擇器 —— Bingo 的 #mpBar 沒有這個 class,完全不受影響。 */
+  .gmk-room{padding:9px 12px}
+  .gmk-room .row{margin-top:0}
+  .gmk-room-top{flex-wrap:nowrap;gap:8px}
+  .gmk-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
+  .gmk-room-title b{font-size:15px;color:var(--text)}
+  .gmk-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .gmk-room .quick-voice,.gmk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .gmk-room .quick-voice .qv-ico{font-size:18px}
+  .gmk-room .mp-subrow{margin-top:5px}
+  /* 名單列:整條都給玩家晶片(認輸鈕在上排,不跟名字搶寬度)。
+     固定兩人,所以不走 Bingo 那套橫向捲動(捲一半被切掉看起來像壞掉)——名字太長改用 … 截斷,一行永遠塞得下 */
+  .gmk-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .gmk-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  .gmk-room-foot .mp-players.oneline{overflow-x:hidden}
+  .gmk-room-foot .mp-players.oneline .mp-chip{flex:0 1 auto;min-width:0;padding:4px 10px;gap:5px}
+  /* 輪到誰已經有底色+脈動+放大三個訊號了,這裡不再跟著放大字級 —— 免得一換手兩張晶片寬度就跳一次 */
+  .gmk-room-foot .mp-chip.turn{font-size:14px}
+  .gmk-nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gmk-resign{flex:none;border:1px solid var(--panel-line);border-radius:999px;padding:7px 12px;
+    background:rgba(255,90,90,.14);color:var(--text);cursor:pointer;
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;line-height:1;white-space:nowrap;
+    transition:transform .1s,background .15s}
+  .gmk-resign:hover{background:rgba(255,90,90,.28)}
+  .gmk-resign:active{transform:scale(.94)}
+  :root[data-theme="ebook"] .gmk-resign{background:#fff;border:1px solid #000;color:#000}
+
+  /* 玩家晶片裡的執子標示:實心棋子 + 「黑 / 白」兩個字,直接貼在名字前面。
+     原本只有一顆 13px 小圓點,黑底主題下幾乎看不出誰是誰(v1.40.0) */
+  .gmk-seat{display:inline-flex;align-items:center;gap:5px;flex:none;
+    padding:2px 8px 2px 3px;border-radius:999px;font-weight:800;font-size:12px;line-height:1.6}
+  .gmk-seat i{width:15px;height:15px;border-radius:50%;flex:none;display:block}
+  .gmk-seat.b{background:#141414;color:#fff}
+  .gmk-seat.b i{background:radial-gradient(circle at 34% 28%,#8a8a8a 0%,#2b2b2b 45%,#050505 100%);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
+  .gmk-seat.w{background:#f4f1ea;color:#1c1008}
+  .gmk-seat.w i{background:radial-gradient(circle at 34% 28%,#ffffff 0%,#f2ede4 45%,#c3bcb0 100%);
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.32)}
+  :root[data-theme="ebook"] .gmk-seat.b{background:#000;color:#fff}
+  :root[data-theme="ebook"] .gmk-seat.w{background:#fff;color:#000;box-shadow:inset 0 0 0 1px #000}
+
   /* 五子棋頂列標題(取代 BINGO 跑馬燈) */
   .gmk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;color:var(--marquee);letter-spacing:.06em}

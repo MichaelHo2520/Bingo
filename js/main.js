@@ -136,6 +136,18 @@
     BGM.setHidden(false);   // 回前景 → 使用者原本開著音樂就從原位接著播
     armAudioUnlock();       // 回前景一律重新武裝:下一個手勢(點任何地方 / 點播放膠囊)都會重新解鎖並補播等待中的語音
   });
+  // 換頁(去 gomoku.html / 按上一頁)也要停音樂:Safari 換頁不發 visibilitychange,
+  // 舊頁被丟進 bfcache 卻還在放,新頁又開一首 → 兩首疊在一起(v1.40.0)。
+  // pageshow 的 persisted 代表是從 bfcache 復原(不是重新載入),此時才需要自己接回去播。
+  addEventListener("pagehide",()=>{
+    if(typeof markAudioStale==="function") markAudioStale();
+    BGM.setHidden(true);
+  });
+  addEventListener("pageshow",e=>{
+    if(!e.persisted)return;
+    BGM.setHidden(false);
+    armAudioUnlock();
+  });
 
   // Service Worker:離線可玩 + 「加到主畫面」。只在 https / localhost 註冊(file:// 不支援);
   // 採 network-first(見 sw.js),線上永遠拿最新版,不會有「更新出不來」的問題。

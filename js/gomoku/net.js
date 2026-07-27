@@ -265,7 +265,7 @@ const MPG = (function(){
     $("mpReadyBtn").classList.remove("hidden");
     $("resignBtn").classList.add("hidden");
     $("mpRoomTitle").textContent=roomName||("房間 "+code);
-    syncSetupRow(); updateReadyBtn(); updateMpGoal();
+    syncSubrow(); syncSetupRow(); updateReadyBtn(); updateMpGoal();
     listen(); watchConn();
   }
   // 回大廳續玩(本局結束 / 作廢):只重設本地,不動別人
@@ -280,7 +280,7 @@ const MPG = (function(){
     $("mpReadyBtn").classList.remove("hidden");
     $("resignBtn").classList.add("hidden");
     GB.reset(); GB.setInteractive(false);
-    syncSetupRow(); updateReadyBtn(); setActionHint("");
+    syncSubrow(); syncSetupRow(); updateReadyBtn(); updateMpGoal(); setActionHint("");
   }
   /* ---------- 相位:對戰中 ---------- */
   function enterPlaying(){
@@ -290,10 +290,11 @@ const MPG = (function(){
     $("scrollArea").classList.add("hidden");
     $("gmkSetup").classList.add("hidden");
     $("gmkStage").classList.remove("hidden");
-    $("primaryBar").classList.remove("hidden");
+    // 對戰中整條動作列收起來:準備鈕用不到、認輸鈕已搬進房間框,留著只是白吃一列高度
+    $("primaryBar").classList.add("hidden");
     $("mpReadyBtn").classList.add("hidden");
     $("resignBtn").classList.remove("hidden");
-    setActionHint("");
+    syncSubrow(); setActionHint("");
     GB.setSize(boardSize);
     GB.applyMoves(moves);
     // 舞台這一刻才從 hidden 變可見,同一個 tick 量到的 clientWidth 還是 0 → 下一格再算一次視角。
@@ -592,10 +593,12 @@ const MPG = (function(){
       chip.title=id===meId?"點一下傳送互動表情給全部人":"點一下傳送互動表情";
       chip.addEventListener("click",()=>openEmote(id===meId?"all":id));
       const seat=order.indexOf(id);
-      const dot=(curPhase==="playing"&&seat>=0)?'<span class="gmk-dot '+(seat===0?"b":"w")+'" title="'+(seat===0?"黑(先手)":"白")+'"></span>':'';
+      // 對戰中:換成「棋子+黑/白」徽章(小圓點在深色主題下看不出誰是誰);準備狀態的圓點這時已無意義,不再佔位
+      const inGame=(curPhase==="playing"&&seat>=0);
+      const side=inGame?'<span class="gmk-seat '+(seat===0?"b":"w")+'" title="'+(seat===0?"黑棋(先手)":"白棋")+'"><i></i>'+(seat===0?"黑":"白")+'</span>':'<span class="dot"></span>';
       const sc=scoreOf(id);
       const scoreBadge=sc>0?'<span class="score-badge" title="累積勝場">🏆'+sc+'</span>':'';
-      chip.innerHTML='<span class="dot"></span>'+dot+'<span>'+esc(dispName(id))+'</span>'+youTag(id)+scoreBadge;
+      chip.innerHTML=side+'<span class="gmk-nm">'+esc(dispName(id))+'</span>'+youTag(id)+scoreBadge;
       if(isHost && status==="lobby" && id!==meId){
         const k=document.createElement("button");
         k.type="button"; k.className="mp-kick"; k.title="移出房間";
@@ -609,11 +612,19 @@ const MPG = (function(){
     if(aloneTick){ /* 落單倒數中:狀態列交給倒數,不覆蓋 */ }
     else if(curPhase==="playing") onStatusTxt(winner?"這局結束":"對戰中…");
     else onStatusTxt(ids.length<2?"等待對手加入…":"等待雙方準備…");
-    updateMpGoal();
+    syncSubrow(); updateMpGoal();
+  }
+  // 狀態列的顯示與否:大廳一定要(在等什麼只有這裡說);對戰中收起來把高度讓給棋盤——
+  // 「輪到誰」棋盤上緣就有膠囊了,唯一例外是落單倒數(棋盤上看不到,得放出來)
+  function syncSubrow(){
+    const el=$("mpSubrow"); if(!el)return;
+    el.classList.toggle("hidden", curPhase==="playing" && !aloneTick);
   }
   function updateMpGoal(){
     const g=$("mpBarGoal"); if(!g)return;
     g.textContent = boardSize ? ("⬜ "+boardSize+"×"+boardSize) : "";
+    // 對戰中讓位給認輸鈕(同一格位置):幾路棋盤看盤面就知道,大廳才是真的需要看它挑設定
+    g.classList.toggle("hidden", curPhase==="playing");
   }
   // 輪到誰:棋盤上緣的膠囊(自己的回合會高亮脈動)
   function updateTurnUI(){
@@ -734,12 +745,13 @@ const MPG = (function(){
     let left=Math.ceil(ALONE_MS/1000);
     paintAloneCountdown(left);
     aloneTick=setInterval(()=>{ left--; if(left>0)paintAloneCountdown(left); },1000);
+    syncSubrow();   // 對戰中平常收起狀態列,倒數這種棋盤上看不到的訊息要放出來
     aloneTimer=setTimeout(()=>{
-      aloneTimer=null; if(aloneTick){ clearInterval(aloneTick); aloneTick=null; }
+      aloneTimer=null; if(aloneTick){ clearInterval(aloneTick); aloneTick=null; syncSubrow(); }
       if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1) hostAloneToLobby();
     },ALONE_MS);
   }
-  function clearAloneCheck(){ if(aloneTimer){ clearTimeout(aloneTimer); aloneTimer=null; } if(aloneTick){ clearInterval(aloneTick); aloneTick=null; } }
+  function clearAloneCheck(){ if(aloneTimer){ clearTimeout(aloneTimer); aloneTimer=null; } if(aloneTick){ clearInterval(aloneTick); aloneTick=null; syncSubrow(); } }
   function hostAloneToLobby(){
     if(curPhase==="lobby")return;
     abandoned=true;
