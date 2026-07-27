@@ -1,13 +1,25 @@
 "use strict";
 
 /* ============================================================================
-   五子棋 — 介面雜項:toast / 主題 / 偏好 / 設定蓋板 / 表情 / 語音佇列 / 彩帶
-   從 js/game.js 對應段落移植(表情與語音那套邏輯是踩過 iOS 音訊坑修出來的,照抄不要簡化)。
+   共用介面工具箱(ui-kit)— 五子棋 / 數獨共用。★ Bingo(index.html)不載入這支。
+   內容:toast / 結果卡開關 / 彩帶 / 主題與偏好 / 設定蓋板 / 表情面板 / 語音佇列。
+
+   由 js/gomoku/ui.js 抽出(v1.41.1)。表情與語音那套是踩過 iOS 音訊坑修出來的,照抄未改。
+
+   ⚠ 與遊戲的耦合只有三個點,全部走 MP(= MPCore.create() 的產物,由各遊戲的 adapter.js 建立):
+     • MP.prefsKey()    遊戲專屬偏好的 localStorage key
+     • MP.ownPrefs()    要存進去的內容 / MP.usePrefs(o) 讀回來套用
+     • MP.emoteAnchor() 表情飛出的錨點元素 id(五子棋是棋盤舞台,數獨是盤面)
+   除此之外本檔不認識任何遊戲。
 
    ⚠ 偏好的關鍵差異:主題/音量/暱稱與 Bingo 共用同一個 localStorage key,
      但**寫入一律 read-modify-write merge** —— 整份 JSON.stringify 覆寫會把 Bingo 的
-     target / size / scoreMode 等欄位清掉。五子棋專屬設定另存 gomoku.prefs.v1。
+     target / size / scoreMode 等欄位清掉。
    ========================================================================== */
+
+/* $ 在此定義,兩個遊戲的 board.js / adapter.js / main.js 共用(ui-kit 一律最先載入)。
+   ★ 各遊戲的檔案不可再宣告一次 const $ —— 同一詞法作用域重複宣告會直接 SyntaxError。 */
+const $ = id => document.getElementById(id);
 
 /* ---------- toast ---------- */
 let toastT;
@@ -69,9 +81,8 @@ let bgmTrack="sunday";
 function bgmSrcOf(id){ const t=BGM_TRACKS.find(t=>t.id===id); return (t||BGM_TRACKS[0]).src; }
 
 const SHARED_KEY="bingo.prefs.v1";     // 與 Bingo 共用:主題 / 音量 / 暱稱
-const OWN_KEY="gomoku.prefs.v1";       // 五子棋專屬:棋盤大小 / 換先手 / 計分
 function readJSON(k){ try{ return JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return {}; } }
-// ★ 共用 key 一律 merge 寫回,不整份覆寫(否則會清掉 Bingo 那些五子棋沒有的欄位)
+// ★ 共用 key 一律 merge 寫回,不整份覆寫(否則會清掉 Bingo 那些本遊戲沒有的欄位)
 function saveShared(patch){
   try{ localStorage.setItem(SHARED_KEY, JSON.stringify(Object.assign(readJSON(SHARED_KEY), patch))); }catch(e){}
 }
@@ -85,15 +96,14 @@ function savePrefs(){
     voiceVol:voiceVol, sfxVol:sfxVol, vibrate:vibrateOn,
     name:nameEl?nameEl.value.trim():""
   });
+  // 遊戲專屬偏好:各自的 key、各自的內容(五子棋是棋盤大小,數獨是難度/模式)
   try{
-    localStorage.setItem(OWN_KEY, JSON.stringify({
-      boardSize:MPG.boardSize(), swapFirst:MPG.swapFirst(),
-      scoreMode:MPG.scoreMode(), winGoal:MPG.winGoal()
-    }));
+    if(typeof MP!=="undefined" && MP.prefsKey && MP.ownPrefs)
+      localStorage.setItem(MP.prefsKey(), JSON.stringify(MP.ownPrefs()));
   }catch(e){}
 }
 function loadPrefs(){
-  const p=readJSON(SHARED_KEY), q=readJSON(OWN_KEY);
+  const p=readJSON(SHARED_KEY);
   if(p.theme && THEMES.indexOf(p.theme)>=0){
     lastColorTheme=p.theme;
     document.documentElement.setAttribute("data-theme",p.theme);
@@ -110,7 +120,7 @@ function loadPrefs(){
   if(p.bgmOn) bgmOn=true;             // 記住「想開」;實際播放等首次手勢
   if(p.ebook) setEbook(true,true);
   if(typeof p.name==="string" && p.name){ const el=$("mpName"); if(el) el.value=p.name; }
-  MPG.usePrefs(q);                    // 五子棋專屬偏好 → 建房預設
+  if(typeof MP!=="undefined" && MP.prefsKey && MP.usePrefs) MP.usePrefs(readJSON(MP.prefsKey()));
 }
 function buildSwatches(){
   const box=$("swatches"); if(!box)return; box.innerHTML="";
@@ -190,7 +200,7 @@ function toggleFull(){
 
 /* ---------- 好友互動:表情 / 罐頭句 / 語音短訊 ---------- */
 const EMOTES=["👍","👎","❤️","😂","🎉","🔥","👏","😮","😢","😭","😎","🤯","🥳","🤝","🙏","💪","😡","💩"];
-// 罐頭嘴砲:走機車搞笑路線(v1.40.0),與 js/game.js 那份保持同一批,兩個遊戲體驗一致
+// 罐頭嘴砲:走機車搞笑路線(v1.40.0),與 js/game.js 那份保持同一批,各遊戲體驗一致
 const PHRASES=["睡著了嗎 😴","阿嬤都比你快","笑死 🤣","菜就多練 💪","認真的嗎 👀","我讓你的啦~","運氣好而已","手在抖喔 🤏","再想我就叫外送了","不然你先投降?"];
 // 語音短訊:只傳代號,對方播本地預錄 m4a(與 Bingo 共用同一批檔案;不含 bingo 專屬的「聽牌」)
 const CLIPS=[
@@ -200,8 +210,8 @@ const CLIPS=[
 ];
 let emoteTarget="all";
 function openEmote(target){
-  if(!MPG.isOnline())return;
-  const roster=MPG.roster();
+  if(!MP.isOnline())return;
+  const roster=MP.roster();
   emoteTarget=(target && target!=="all" && roster.some(p=>p.id===target)) ? target : "all";
   buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases(); buildVoiceClips();
   const inp=$("emoteText"); if(inp)inp.value="";
@@ -214,7 +224,7 @@ function closeEmote(){
 }
 function buildEmoteRecipients(){
   const box=$("emoteTo"); if(!box)return; box.innerHTML="";
-  const list=[{id:"all",name:"🌐 全部人"}].concat(MPG.roster().filter(p=>!p.me).map(p=>({id:p.id,name:p.name})));
+  const list=[{id:"all",name:"🌐 全部人"}].concat(MP.roster().filter(p=>!p.me).map(p=>({id:p.id,name:p.name})));
   if(!list.some(r=>r.id===emoteTarget)) emoteTarget="all";
   list.forEach(r=>{
     const b=document.createElement("button");
@@ -224,14 +234,14 @@ function buildEmoteRecipients(){
     box.appendChild(b);
   });
   const head=$("emoteHead");
-  if(head) head.textContent = emoteTarget==="all" ? "傳給全部人" : "傳給 "+((MPG.roster().find(p=>p.id===emoteTarget)||{}).name||"");
+  if(head) head.textContent = emoteTarget==="all" ? "傳給全部人" : "傳給 "+((MP.roster().find(p=>p.id===emoteTarget)||{}).name||"");
 }
 function buildEmoteGrid(){
   const g=$("emoteGrid"); if(!g)return; g.innerHTML="";
   EMOTES.forEach(em=>{
     const b=document.createElement("button");
     b.type="button"; b.className="emote-btn"; b.textContent=em;
-    b.addEventListener("click",()=>{ MPG.sendEmote(emoteTarget,em); closeEmote(); });
+    b.addEventListener("click",()=>{ MP.sendEmote(emoteTarget,em); closeEmote(); });
     g.appendChild(b);
   });
 }
@@ -240,7 +250,7 @@ function buildEmotePhrases(){
   PHRASES.forEach(tx=>{
     const b=document.createElement("button");
     b.type="button"; b.className="phrase-btn"; b.textContent=tx;
-    b.addEventListener("click",()=>{ MPG.sendEmote(emoteTarget,tx,"text"); closeEmote(); });
+    b.addEventListener("click",()=>{ MP.sendEmote(emoteTarget,tx,"text"); closeEmote(); });
     g.appendChild(b);
   });
 }
@@ -252,7 +262,7 @@ function buildVoiceClips(){
     b.type="button"; b.className="phrase-btn clip-btn"; b.textContent="🔊 "+clip.label;
     b.addEventListener("click",()=>{
       markAudioArmed(); Sound.wake();
-      MPG.sendEmote(emoteTarget,"🔊","clip",clip.id);
+      MP.sendEmote(emoteTarget,"🔊","clip",clip.id);
       closeEmote();
     });
     g.appendChild(b);
@@ -262,13 +272,13 @@ function sendCustomText(){
   const inp=$("emoteText"); if(!inp)return;
   const tx=inp.value.trim();
   if(!tx)return;
-  MPG.sendEmote(emoteTarget,tx,"text"); inp.value=""; closeEmote();
+  MP.sendEmote(emoteTarget,tx,"text"); inp.value=""; closeEmote();
 }
-// 飛起的表情:起點在棋盤(或連線畫面)中央往上飄
+// 飛起的表情:起點在遊戲盤面中央往上飄(錨點由各遊戲的 adapter 指定)
 function showEmote(emoji,caption,anchorId,kind){
   const layer=$("emoteFly"); if(!layer)return;
   let x=innerWidth/2, y=innerHeight*0.5;
-  const anchor=$("gmkStage");
+  const anchor=$(MP.emoteAnchor());
   if(anchor){ const g=anchor.getBoundingClientRect(); if(g.width){ x=g.left+g.width/2; y=g.top+g.height/2; } }
   x+=(Math.random()-0.5)*36;
   const el=document.createElement("div");
@@ -297,7 +307,7 @@ function resetQuickVoiceBtn(){
   setQuickVoiceUI({ rec:false, disabled:false, ico:"🎤", lab:"語音" });
 }
 function toggleQuickVoice(){
-  if(!MPG.isOnline())return;
+  if(!MP.isOnline())return;
   if(!Voice.supported()){ showToast("此裝置/瀏覽器不支援錄音"); return; }
   if(Voice.recording()){ setQuickVoiceUI({ disabled:true, lab:"處理中…" }); Voice.stop(); return; }
   markAudioArmed(); Sound.wake(); kickVoiceQueue();
@@ -310,7 +320,7 @@ function toggleQuickVoice(){
     try{
       const url=Voice.toDataURL(wav);
       if(url.length>200000){ showToast("語音太長,請再短一點"); return; }   // RTDB 友善上限
-      MPG.sendEmote("all","🎤","voice",url);
+      MP.sendEmote("all","🎤","voice",url);
       showToast("已送出語音 🎤");
     }catch(e){ showToast("語音處理失敗"); }
   }).then(()=>{
@@ -408,3 +418,81 @@ function playVoiceGate(){
   if(Sound.resume) Sound.resume().then(go); else go();
 }
 function kickVoiceQueue(){ if(voiceQueue.length && !voiceBusy) pumpVoice(); }
+
+/* ---------- 共用啟動樣板(各遊戲 main.js 的重複部分) ---------- */
+// 版號:單一來源是 <meta name="version">
+function paintVersion(){
+  const m=document.querySelector('meta[name="version"]'), v=m?m.content:"";
+  const tv=$("topVer"); if(tv)tv.textContent=v?("v"+v):"";
+  const sv=$("setVer"); if(sv)sv.textContent=v?("v"+v):"";
+}
+// 設定蓋板 / 表情面板 / 音訊解鎖 / SW 註冊:兩個遊戲一字不差的那些綁定
+function bindCommonUI(){
+  $("settingsBtn").addEventListener("click",openSettings);
+  $("setClose").addEventListener("click",closeSettings);
+  $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
+  $("fsBtn").addEventListener("click",toggleFull);
+  $("swEbook").addEventListener("click",()=>toggleEbook());
+  $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
+  $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));
+  $("bgmTrackSel").addEventListener("change",e=>setBgmTrack(e.target.value));
+  $("bgmVol").addEventListener("input",e=>setBgmVol((+e.target.value||0)/100));
+  $("bgmVol").addEventListener("change",savePrefs);
+  $("voiceVol").addEventListener("input",e=>setVoiceVol((+e.target.value||0)/100));
+  $("voiceVol").addEventListener("change",savePrefs);
+  $("sfxVol").addEventListener("input",e=>setSfxVol((+e.target.value||0)/100));
+  $("sfxVol").addEventListener("change",savePrefs);
+  $("swVibrate").addEventListener("click",()=>setVibrate(!vibrateOn));
+
+  $("emoteOpenBtn").addEventListener("click",()=>openEmote("all"));
+  $("quickVoiceBtn").addEventListener("click",toggleQuickVoice);
+  $("emoteClose").addEventListener("click",closeEmote);
+  $("emoteVeil").addEventListener("pointerdown",e=>{ if(e.target===$("emoteVeil"))closeEmote(); });
+  $("emoteVeil").addEventListener("touchmove",e=>{
+    const card=e.target.closest?e.target.closest(".emote-card"):null;
+    if(card && card.scrollHeight>card.clientHeight) return;
+    e.preventDefault();
+  },{passive:false});
+  $("emoteSend").addEventListener("click",sendCustomText);
+  $("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
+  $("voiceGate").addEventListener("click",playVoiceGate);
+
+  // 結果卡是強制回應視窗:點/滑到卡片外一律吃掉手勢(不關卡、也不讓背景捲動)
+  $("veil").addEventListener("touchmove",e=>{
+    const card=e.target.closest?e.target.closest(".win-card"):null;
+    if(card && card.scrollHeight>card.clientHeight) return;
+    e.preventDefault();
+  },{passive:false});
+
+  addEventListener("resize",()=>{ const cv=$("confetti"); if(cv&&cv.width){ cv.width=innerWidth; cv.height=innerHeight; } });
+}
+/* 音訊解鎖(與 Bingo 同一套:iOS 切背景會把 AudioContext 打回 suspended) */
+let audioUnlocked=false;
+function unlockAudioOnce(){
+  markAudioArmed();
+  Sound.wake();
+  if(!audioUnlocked){ audioUnlocked=true; if(bgmOn)BGM.setOn(true); }
+  const kick=()=>{ kickVoiceQueue(); BGM.nudge(); };
+  if(Sound.resume) Sound.resume().then(kick); else kick();
+}
+function armAudioUnlock(){
+  addEventListener("pointerdown",unlockAudioOnce,{once:true});
+  addEventListener("keydown",unlockAudioOnce,{once:true});
+}
+function bindAudioLifecycle(){
+  armAudioUnlock();
+  document.addEventListener("visibilitychange",()=>{
+    if(document.hidden){ markAudioStale(); BGM.setHidden(true); return; }
+    BGM.setHidden(false);
+    armAudioUnlock();
+  });
+  // 換頁(回 index.html / 按上一頁)也要停音樂:Safari 換頁不發 visibilitychange,
+  // 舊頁進 bfcache 還在放、新頁又開一首 → 背景音樂疊起來(v1.40.0)。與 js/main.js 同一套。
+  addEventListener("pagehide",()=>{ markAudioStale(); BGM.setHidden(true); });
+  addEventListener("pageshow",e=>{ if(!e.persisted)return; BGM.setHidden(false); armAudioUnlock(); });
+}
+function registerSW(){
+  if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost" || location.hostname==="127.0.0.1")){
+    addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
+  }
+}

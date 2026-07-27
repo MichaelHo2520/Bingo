@@ -2,50 +2,52 @@
 
 /* ============================================================================
    五子棋 — 事件綁定與啟動(必須最後載入)
+   設定蓋板 / 表情面板 / 音訊解鎖 / SW 註冊那些兩個遊戲一字不差的綁定,
+   已收進 js/shared/ui-kit.js 的 bindCommonUI() / bindAudioLifecycle() / registerSW()。
    ========================================================================== */
 
 /* ---------- 棋盤 ---------- */
-GB.onTap(i=>MPG.tap(i));                       // 能不能下由 MPG.tap() 判定並給回饋(不用 disabled 靜默吃掉點擊)
+GB.onTap(i=>MP.tap(i));                        // 能不能下由 MP.tap() 判定並給回饋(不用 disabled 靜默吃掉點擊)
 $("gmkZoomIn").addEventListener("click",()=>GB.zoomIn());
 $("gmkZoomOut").addEventListener("click",()=>GB.zoomOut());
 $("gmkZoomFit").addEventListener("click",()=>GB.fit());
 
 /* ---------- 大廳設定(房主可改) ---------- */
-$("gmkSizeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MPG.setBoardSize(+b.dataset.size); });
-$("gmkSwapSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MPG.setSwapFirst(b.dataset.swap==="1"); });
-$("scoreSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MPG.setScoreMode(b.dataset.score); });
-$("wgMinus").addEventListener("click",()=>MPG.setWinGoal(MPG.winGoal()-1));
-$("wgPlus").addEventListener("click",()=>MPG.setWinGoal(MPG.winGoal()+1));
-$("resetScoreBtn").addEventListener("click",()=>MPG.resetScores());
+$("gmkSizeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setBoardSize(+b.dataset.size); });
+$("gmkSwapSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setSwapFirst(b.dataset.swap==="1"); });
+$("scoreSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setScoreMode(b.dataset.score); });
+$("wgMinus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()-1));
+$("wgPlus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()+1));
+$("resetScoreBtn").addEventListener("click",()=>MP.resetScores());
 
 /* ---------- 連線 / 房間 ---------- */
-$("mpCreate").addEventListener("click",()=>MPG.create($("mpName").value,$("mpRoomName").value));
-$("mpScan").addEventListener("click",()=>MPG.scanRooms());
+$("mpCreate").addEventListener("click",()=>MP.create($("mpName").value,$("mpRoomName").value));
+$("mpScan").addEventListener("click",()=>MP.scanRooms());
 $("mpName").addEventListener("change",savePrefs);
 $("mpName").addEventListener("input",()=>$("mpName").classList.remove("needs-name"));
-$("mpRoomName").addEventListener("keydown",e=>{ if(e.key==="Enter")MPG.create($("mpName").value,$("mpRoomName").value); });
-$("mpReadyBtn").addEventListener("click",()=>MPG.toggleReady());
-$("mpLeaveBtn").addEventListener("click",()=>MPG.askLeave());
-$("leaveConfirm").addEventListener("click",()=>MPG.confirmLeave());
-$("leaveCancel").addEventListener("click",()=>MPG.cancelLeave());
-$("leaveVeil").addEventListener("click",e=>{ if(e.target===$("leaveVeil"))MPG.cancelLeave(); });
-$("kickConfirm").addEventListener("click",()=>MPG.confirmKick());
-$("kickCancel").addEventListener("click",()=>MPG.cancelKick());
-$("kickVeil").addEventListener("click",e=>{ if(e.target===$("kickVeil"))MPG.cancelKick(); });
+$("mpRoomName").addEventListener("keydown",e=>{ if(e.key==="Enter")MP.create($("mpName").value,$("mpRoomName").value); });
+$("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
+$("mpLeaveBtn").addEventListener("click",()=>MP.askLeave());
+$("leaveConfirm").addEventListener("click",()=>MP.confirmLeave());
+$("leaveCancel").addEventListener("click",()=>MP.cancelLeave());
+$("leaveVeil").addEventListener("click",e=>{ if(e.target===$("leaveVeil"))MP.cancelLeave(); });
+$("kickConfirm").addEventListener("click",()=>MP.confirmKick());
+$("kickCancel").addEventListener("click",()=>MP.cancelKick());
+$("kickVeil").addEventListener("click",e=>{ if(e.target===$("kickVeil"))MP.cancelKick(); });
 
 /* ---------- 認輸 ---------- */
-$("resignBtn").addEventListener("click",()=>MPG.askResign());
-$("resignConfirm").addEventListener("click",()=>MPG.confirmResign());
-$("resignCancel").addEventListener("click",()=>MPG.cancelResign());
-$("resignVeil").addEventListener("click",e=>{ if(e.target===$("resignVeil"))MPG.cancelResign(); });
+$("resignBtn").addEventListener("click",()=>MP.askResign());
+$("resignConfirm").addEventListener("click",()=>MP.confirmResign());
+$("resignCancel").addEventListener("click",()=>MP.cancelResign());
+$("resignVeil").addEventListener("click",e=>{ if(e.target===$("resignVeil"))MP.cancelResign(); });
 
 /* ---------- 結果卡 ---------- */
-$("mpAgain").addEventListener("click",()=>MPG.again());
-$("mpLeaveWin").addEventListener("click",()=>MPG.askLeave());
-$("mpNewSeason").addEventListener("click",()=>{ MPG.resetScores(); MPG.again(); });
+$("mpAgain").addEventListener("click",()=>MP.again());
+$("mpLeaveWin").addEventListener("click",()=>MP.askLeave());
+$("mpNewSeason").addEventListener("click",()=>{ MP.resetScores(); MP.again(); });
 $("winPeek").addEventListener("click",peekBoard);
 $("reopenWin").addEventListener("click",showResult);
-// 賽後表情列:前五顆一鍵送給全部人(結果卡不關,對方也看得到飛出來的表情),😀 開完整面板。
+// 賽後表情列:四顆一鍵送給全部人(結果卡不關,對方也看得到飛出來的表情),😀 開完整面板。
 // 節流 600ms:結果卡是強制回應視窗,手指停在上面很容易連點狂送。
 let reactAt=0;
 $("gmkReactRow").addEventListener("click",e=>{
@@ -56,92 +58,19 @@ $("gmkReactRow").addEventListener("click",e=>{
   if(now-reactAt<600)return;
   reactAt=now;
   markAudioArmed(); Sound.wake();
-  MPG.sendEmote("all",em);
+  MP.sendEmote("all",em);
   b.classList.remove("sent"); void b.offsetWidth; b.classList.add("sent");
 });
-// 結果卡是強制回應視窗:點/滑到卡片外一律吃掉手勢(不關卡、也不讓背景捲動)
-$("veil").addEventListener("touchmove",e=>{
-  const card=e.target.closest?e.target.closest(".win-card"):null;
-  if(card && card.scrollHeight>card.clientHeight) return;
-  e.preventDefault();
-},{passive:false});
 
-/* ---------- 設定 ---------- */
-$("settingsBtn").addEventListener("click",openSettings);
-$("setClose").addEventListener("click",closeSettings);
-$("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
-$("fsBtn").addEventListener("click",toggleFull);
-$("swEbook").addEventListener("click",()=>toggleEbook());
-$("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
-$("swBgm").addEventListener("click",()=>setBgm(!bgmOn));
-$("bgmTrackSel").addEventListener("change",e=>setBgmTrack(e.target.value));
-$("bgmVol").addEventListener("input",e=>setBgmVol((+e.target.value||0)/100));
-$("bgmVol").addEventListener("change",savePrefs);
-$("voiceVol").addEventListener("input",e=>setVoiceVol((+e.target.value||0)/100));
-$("voiceVol").addEventListener("change",savePrefs);
-$("sfxVol").addEventListener("input",e=>setSfxVol((+e.target.value||0)/100));
-$("sfxVol").addEventListener("change",savePrefs);
-$("swVibrate").addEventListener("click",()=>setVibrate(!vibrateOn));
-
-/* ---------- 表情 / 語音 ---------- */
-$("emoteOpenBtn").addEventListener("click",()=>openEmote("all"));
-$("quickVoiceBtn").addEventListener("click",toggleQuickVoice);
-$("emoteClose").addEventListener("click",closeEmote);
-$("emoteVeil").addEventListener("pointerdown",e=>{ if(e.target===$("emoteVeil"))closeEmote(); });
-$("emoteVeil").addEventListener("touchmove",e=>{
-  const card=e.target.closest?e.target.closest(".emote-card"):null;
-  if(card && card.scrollHeight>card.clientHeight) return;
-  e.preventDefault();
-},{passive:false});
-$("emoteSend").addEventListener("click",sendCustomText);
-$("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
-$("voiceGate").addEventListener("click",playVoiceGate);
-
-addEventListener("resize",()=>{ const cv=$("confetti"); if(cv&&cv.width){ cv.width=innerWidth; cv.height=innerHeight; } });
-
-/* ---------- 音訊解鎖(與 Bingo 同一套:iOS 切背景會把 AudioContext 打回 suspended) ---------- */
-let audioUnlocked=false;
-function unlockAudioOnce(){
-  markAudioArmed();
-  Sound.wake();
-  if(!audioUnlocked){ audioUnlocked=true; if(bgmOn)BGM.setOn(true); }
-  const kick=()=>{ kickVoiceQueue(); BGM.nudge(); };
-  if(Sound.resume) Sound.resume().then(kick); else kick();
-}
-function armAudioUnlock(){
-  addEventListener("pointerdown",unlockAudioOnce,{once:true});
-  addEventListener("keydown",unlockAudioOnce,{once:true});
-}
-armAudioUnlock();
-document.addEventListener("visibilitychange",()=>{
-  if(document.hidden){
-    markAudioStale();
-    BGM.setHidden(true);
-    return;
-  }
-  BGM.setHidden(false);
-  armAudioUnlock();
-});
-// 換頁(回 index.html / 按上一頁)也要停音樂:Safari 換頁不發 visibilitychange,
-// 舊頁進 bfcache 還在放、新頁又開一首 → 背景音樂疊起來(v1.40.0)。與 js/main.js 同一套。
-addEventListener("pagehide",()=>{ markAudioStale(); BGM.setHidden(true); });
-addEventListener("pageshow",e=>{ if(!e.persisted)return; BGM.setHidden(false); armAudioUnlock(); });
-
-/* ---------- Service Worker(與 Bingo 共用 sw.js) ---------- */
-if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost" || location.hostname==="127.0.0.1")){
-  addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
-}
-
-/* ---------- 版號(單一來源:<meta name="version">) ---------- */
-(function(){
-  const m=document.querySelector('meta[name="version"]'), v=m?m.content:"";
-  const tv=$("topVer"); if(tv)tv.textContent=v?("v"+v):"";
-  const sv=$("setVer"); if(sv)sv.textContent=v?("v"+v):"";
-})();
+/* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */
+bindCommonUI();
+bindAudioLifecycle();
+registerSW();
+paintVersion();
 
 /* ---------- 啟動 ---------- */
 buildSwatches();
 loadPrefs();
 syncSettingsUI();
-GB.init();          // 棋盤 DOM + 手勢(舞台此時是 hidden,ResizeObserver 會在顯示後算 fit)
-MPG.openConnect();  // 進場直接進連線畫面(五子棋只有連線對戰)
+GB.init();         // 棋盤 DOM + 手勢(舞台此時是 hidden,ResizeObserver 會在顯示後算 fit)
+MP.openConnect();  // 進場直接進連線畫面(五子棋只有連線對戰)

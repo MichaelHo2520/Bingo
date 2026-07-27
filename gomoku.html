@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>五子棋 ｜ 連線對戰</title>
-<!-- 五子棋連線對戰 · v1.41.0 -->
-<meta name="version" content="1.41.0">
+<!-- 五子棋連線對戰 · v1.42.0 -->
+<meta name="version" content="1.42.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -315,13 +315,13 @@
 
   <canvas class="confetti" id="confetti"></canvas>
 
-<!-- Firebase SDK 由 js/gomoku/net.js 的 ensureFirebase() 動態載入(進連線畫面才載) -->
+<!-- Firebase SDK 由 js/shared/mp-core.js 的 ensureFirebase() 動態載入(進連線畫面才載) -->
 
 <script>
 /* ============================================================
    連線對戰設定 — 與 index.html(Bingo)使用同一個 Firebase 專案,
    但五子棋的資料放在獨立的頂層節點 gomoku_rooms / gomoku_index,
-   與 bingo 的 rooms / rooms_index 完全隔離(見 notes/plan/PLAN-五子棋連線對戰.md)。
+   與 bingo 的 rooms / rooms_index 完全隔離(見 notes/06-五子棋連線對戰.md)。
    ⚠ 需在 Firebase 規則開放 gomoku_rooms 與 gomoku_index 的讀寫。
    ============================================================ */
 const FIREBASE_CONFIG = {
@@ -335,10 +335,13 @@ const FIREBASE_CONFIG = {
 };
 </script>
 
+<!-- 載入順序固定:ui-kit(定義 $ 與介面工具)→ mp-core(連線核心)→ board(棋盤引擎)
+     → adapter(五子棋規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
+<script src="js/shared/ui-kit.js"></script>
+<script src="js/shared/mp-core.js"></script>
 <script src="js/gomoku/board.js"></script>
-<script src="js/gomoku/net.js"></script>
-<script src="js/gomoku/ui.js"></script>
+<script src="js/gomoku/adapter.js"></script>
 <script src="js/gomoku/main.js"></script>
 </body>
 </html>

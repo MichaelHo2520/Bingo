@@ -11,9 +11,10 @@
      棋子是 absolute 定位的 div,落子只 append 一顆,不整盤重畫。
    • index.html 的 viewport 設了 user-scalable=no(五子棋頁沿用),原生 pinch 不可用
      → 單指拖曳、雙指縮放、點擊落子全部自己用 Pointer Events 實作。
-   ========================================================================== */
 
-const $ = id => document.getElementById(id);
+   ⚠ $ 定義在 js/shared/ui-kit.js(一律最先載入),本檔不可再宣告一次 —— 同一詞法作用域
+     重複宣告 const 會整頁 SyntaxError。要單獨驗證棋盤時,測試頁記得也載入 ui-kit.js。
+   ========================================================================== */
 
 const GB = (function(){
   const CELL = 40;               // 每格固定 40px(視覺大小由 z 決定)
