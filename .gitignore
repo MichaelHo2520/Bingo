@@ -9,6 +9,9 @@ notes/
 # 例外:README.md 要公開在 GitHub 首頁(給人搜尋/瀏覽),放行上傳
 !README.md
 
+# 開發用工具腳本(連線雙人測試),不進公開 repo
+tools/
+
 # 舊/實驗殘留、未被 index.html 引用的資產
 back.jpg
 
