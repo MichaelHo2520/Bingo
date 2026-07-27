@@ -267,11 +267,19 @@
     render();
     applyFillUI();
   }
-  // 主選單:進場先選「單機 / 連線」;離開房間、單機返回都回到這裡
+  // 主選單的兩層:"pick"=選遊戲(BINGO / 五子棋) → "bingo"=選 BINGO 的玩法(連線 / 單機)。
+  // 五子棋只有連線一種玩法,第一層直接用 <a href="gomoku.html"> 連過去,不進第二層。
+  function showHomeLayer(which){
+    const pick=$("homePick"), sub=$("homeBingo");
+    if(pick) pick.classList.toggle("hidden", which!=="pick");
+    if(sub)  sub.classList.toggle("hidden", which!=="bingo");
+  }
+  // 主選單:進場先選遊戲;離開房間、單機返回都回到這裡(一律回第一層)
   function enterHome(){
     state.mode="home"; state.won=false; state.online=false; closeWin();
     document.body.classList.add("at-home");          // 藏頂列跑馬燈,主選單只留大標題那個 BINGO
     $("home").classList.remove("hidden");
+    showHomeLayer("pick");                            // 回主選單一律從「選遊戲」開始
     $("setup").classList.add("hidden");
     $("setupActions").classList.add("hidden");
     $("mpConnect").classList.add("hidden");

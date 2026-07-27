@@ -32,7 +32,8 @@ const MPG = (function(){
   let players={}, scores={}, status="lobby", curPhase="lobby", ready=false;
   let order=[], moves=[], winner=null, roundId=null;
   let gameRev=0;                          // 本地已套用的最新 game 版本(見上 #1)
-  let boardSize=15, swapFirst=true;
+  let boardSize=13, swapFirst=true;   // 預設中間的 13×13(手機上格子比 15×15 大一圈,好按)
+  const SIZES=[11,13,15];             // 可選盤面;預設值也定義在 gomoku.html 的 .on,兩處要一致
   let scoreMode="rank", winGoal=3, scoredThisRound=false, myRoundWin=false;
   let outcomeShown=false, abandoned=false, wasMyTurn=false, autoStarting=false;
   let prevIds=null, sawPlayers=false, sawMe=false, hostId=null, sawHost=false;
@@ -328,7 +329,7 @@ const MPG = (function(){
     roomRef.child("game").on("value",s=>onGame(s.val()));
     roomRef.child("boardSize").on("value",s=>{
       const v=s.val();
-      if(typeof v!=="number"||!(v===13||v===15)||v===boardSize)return;
+      if(typeof v!=="number"||SIZES.indexOf(v)<0||v===boardSize)return;
       boardSize=v;
       if(!isHost && ready){ ready=false; roomRef.child("players/"+meId).update({ready:false}); updateReadyBtn(); }
       if(curPhase==="playing"){ GB.setSize(boardSize); GB.applyMoves(moves); GB.fit(); }
@@ -661,7 +662,7 @@ const MPG = (function(){
   function setBoardSize(v){
     if(!isHost||!roomRef){ showToast("只有房主能改棋盤大小"); return; }
     if(status!=="lobby"){ showToast("對戰中不能改棋盤"); return; }
-    if(!(v===13||v===15))return;
+    if(SIZES.indexOf(v)<0)return;
     boardSize=v; roomRef.child("boardSize").set(v); syncSetupRow(); updateMpGoal(); savePrefs();
   }
   function setSwapFirst(on){
@@ -687,7 +688,7 @@ const MPG = (function(){
     o=o||{};
     if(o.scoreMode==="match"||o.scoreMode==="rank") scoreMode=o.scoreMode;
     if(typeof o.winGoal==="number"&&o.winGoal>=2) winGoal=Math.min(20,o.winGoal);
-    if(o.boardSize===13||o.boardSize===15) boardSize=o.boardSize;
+    if(SIZES.indexOf(o.boardSize)>=0) boardSize=o.boardSize;
     if(typeof o.swapFirst==="boolean") swapFirst=o.swapFirst;
   }
 

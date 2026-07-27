@@ -151,7 +151,8 @@ const GB = (function(){
   function computeFit(){
     const w = stage.clientWidth, h = stage.clientHeight, bp = boardPx();
     if(!w || !h){ fitZ = 1; return; }          // 舞台還沒顯示(hidden)→ 等顯示後 ResizeObserver 會再算
-    fitZ = Math.min(w/bp, h/bp);
+    const pad = 8;                             // 留邊:棋盤木板外緣那圈 3px box-shadow 才不會被舞台 overflow:hidden 裁掉
+    fitZ = Math.min((w-pad)/bp, (h-pad)/bp);
   }
   function clampPan(){
     const w = stage.clientWidth, h = stage.clientHeight, bs = boardPx()*z;   // bs:棋盤是正方形,寬高同值

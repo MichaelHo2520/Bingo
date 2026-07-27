@@ -70,7 +70,10 @@
     if(card && card.scrollHeight>card.clientHeight) return;   // 卡片內容超出畫面時,才讓卡片自己捲
     e.preventDefault();
   },{passive:false});
-  // 主選單:進場先選單機 / 連線
+  // 主選單第一層:選遊戲(五子棋是 <a href="gomoku.html">,不需綁定)
+  $("pickBingo").addEventListener("click",()=>showHomeLayer("bingo"));
+  $("homeBack").addEventListener("click",()=>showHomeLayer("pick"));
+  // 主選單第二層:BINGO 的玩法(單機 / 連線)
   $("homeSolo").addEventListener("click",enterSolo);
   $("homeOnline").addEventListener("click",()=>MP.openConnect());
   $("soloBack").addEventListener("click",enterHome);   // 單機頁「回主選單」

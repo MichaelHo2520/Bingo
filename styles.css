@@ -843,13 +843,14 @@
        外觀一致,且日後改那些通用樣式時兩邊會一起變(這是刻意的耦合,見 notes/plan)。
      ========================================================================== */
 
-  /* 棋盤配色:各主題各給一組(只新增 --gmk-* 變數,不動既有變數) */
-  :root{ --gmk-wood:#e9c98d; --gmk-line:rgba(66,40,12,.55); --gmk-star:rgba(66,40,12,.75); --gmk-edge:rgba(66,40,12,.28); }
-  :root[data-theme="midnight"]{ --gmk-wood:#141c31; --gmk-line:rgba(140,190,255,.34); --gmk-star:rgba(140,190,255,.6); --gmk-edge:rgba(140,190,255,.2); }
-  :root[data-theme="bubblegum"]{ --gmk-wood:#fff0f8; --gmk-line:rgba(150,70,130,.4); --gmk-star:rgba(150,70,130,.65); --gmk-edge:rgba(150,70,130,.22); }
-  :root[data-theme="meadow"]{ --gmk-wood:#e6dfb8; --gmk-line:rgba(40,66,36,.5); --gmk-star:rgba(40,66,36,.72); --gmk-edge:rgba(40,66,36,.26); }
-  :root[data-theme="arcade"]{ --gmk-wood:#0d0d12; --gmk-line:rgba(255,230,0,.3); --gmk-star:rgba(255,230,0,.55); --gmk-edge:rgba(255,230,0,.18); }
-  :root[data-theme="ebook"]{ --gmk-wood:#ffffff; --gmk-line:#000000; --gmk-star:#000000; --gmk-edge:#000000; }
+  /* 棋盤配色:各主題各給一組(只新增 --gmk-* 變數,不動既有變數)
+     --gmk-frame = 棋盤外框(木板邊 + 最外圈粗線),刻意比格線深,讓棋盤有明確邊界 */
+  :root{ --gmk-wood:#e9c98d; --gmk-line:rgba(66,40,12,.55); --gmk-star:rgba(66,40,12,.75); --gmk-edge:rgba(66,40,12,.28); --gmk-frame:#8a5a24; }
+  :root[data-theme="midnight"]{ --gmk-wood:#141c31; --gmk-line:rgba(140,190,255,.34); --gmk-star:rgba(140,190,255,.6); --gmk-edge:rgba(140,190,255,.2); --gmk-frame:#39527f; }
+  :root[data-theme="bubblegum"]{ --gmk-wood:#fff0f8; --gmk-line:rgba(150,70,130,.4); --gmk-star:rgba(150,70,130,.65); --gmk-edge:rgba(150,70,130,.22); --gmk-frame:#c07aa8; }
+  :root[data-theme="meadow"]{ --gmk-wood:#e6dfb8; --gmk-line:rgba(40,66,36,.5); --gmk-star:rgba(40,66,36,.72); --gmk-edge:rgba(40,66,36,.26); --gmk-frame:#5d7038; }
+  :root[data-theme="arcade"]{ --gmk-wood:#0d0d12; --gmk-line:rgba(255,230,0,.3); --gmk-star:rgba(255,230,0,.55); --gmk-edge:rgba(255,230,0,.18); --gmk-frame:#6b6220; }
+  :root[data-theme="ebook"]{ --gmk-wood:#ffffff; --gmk-line:#000000; --gmk-star:#000000; --gmk-edge:#000000; --gmk-frame:#000000; }
 
   /* 大廳的捲動區撐滿剩餘高度,讓「準備好了」鈕固定在畫面最底 —— 與對戰中的「認輸」鈕同位置,
      切換相位時按鈕不會跳。★ 只能用 .gmk-* class 選擇器:若寫成 #scrollArea 就會連 Bingo 一起改到。 */
@@ -884,8 +885,18 @@
       linear-gradient(to bottom, var(--gmk-line) 1px, transparent 1px);
     background-size:var(--gcell,40px) var(--gcell,40px);
     background-position:calc(var(--gcell,40px) / 2) calc(var(--gcell,40px) / 2);
-    box-shadow:inset 0 0 0 1px var(--gmk-edge);
+    /* 木板外緣:用 box-shadow 畫 3px 實邊(不用 border —— 全域 box-sizing:border-box 會讓
+       border 吃掉內容寬度,格線的 background 就跟著位移)。fit 時 computeFit() 留 8px 邊,
+       這圈外框才不會被舞台的 overflow:hidden 裁掉。 */
+    box-shadow:0 0 0 3px var(--gmk-frame), 0 8px 22px rgba(0,0,0,.32);
     border-radius:6px;
+  }
+  /* 棋盤「內框」:最外圈交叉點連成的矩形,加粗成真棋盤那條邊界線(否則只有 1px 細線,看起來不像棋盤) */
+  .gmk-board::after{
+    content:"";position:absolute;pointer-events:none;
+    left:calc(var(--gcell,40px) / 2); top:calc(var(--gcell,40px) / 2);
+    right:calc(var(--gcell,40px) / 2); bottom:calc(var(--gcell,40px) / 2);
+    border:2px solid var(--gmk-frame);
   }
   /* 星位(天元 + 四星):5 個小圓點,由 board.js 依盤面大小放置 */
   .gmk-star{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--gmk-star);
@@ -957,4 +968,55 @@
     .gmk-turn{top:5px;padding:4px 11px;font-size:12px}
     .gmk-zoom button{width:32px;height:32px;font-size:15px}
     .gmk-brand{font-size:clamp(19px,5vw,26px)}
+  }
+
+  /* ==========================================================================
+     遊戲選單 — index.html 首頁第一層(先選遊戲,再選玩法)
+     只追加新 class(.home-pick-* / .game-card / .gc-* / .gk-* / .home-sub-head),
+     既有的 .home-hero / .home-title / .home-btn 等原封不動,第二層照舊沿用。
+     ========================================================================== */
+  /* 首頁(兩層)垂直居中:第一層只有兩張卡,靠著頂列會顯得下半片空。
+     .at-home 只在 enterHome() 期間掛在 body 上,所以不影響遊戲中的任何畫面。 */
+  body.at-home #home{margin-top:auto;margin-bottom:auto}
+  .home-pick-head{margin:10px 0 18px}
+  .home-pick-title{font-family:'Fredoka';font-weight:700;font-size:clamp(26px,8vw,36px);line-height:1.1;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  :root[data-theme="ebook"] .home-pick-title{background:none;color:#000;-webkit-text-fill-color:#000}
+  .home-pick-head .home-tagline{margin-top:8px}
+
+  /* 遊戲卡:插圖 + 名稱 + 一行說明 + ▸(button 與 <a> 共用同一個外觀) */
+  .game-card{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:20px;
+    padding:14px 16px;margin-top:12px;cursor:pointer;color:var(--text);
+    font-family:'Nunito',sans-serif;transition:transform .15s, border-color .2s}
+  .game-card:hover{transform:translateY(-2px);border-color:var(--accent)}
+  .game-card:active{transform:scale(.985)}
+  /* 覆寫 .home-art 的大尺寸與置中(BINGO 卡直接重用那張賓果卡 svg 的 .bc-* 配色) */
+  .gc-art{width:54px;height:54px;flex:none;margin:0;display:block}
+  .gc-body{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+  .gc-name{font-size:23px;font-weight:700;line-height:1.05;letter-spacing:.02em}
+  .gc-desc{font-size:12.5px;color:var(--muted);font-weight:700;line-height:1.4}
+  .gc-go{font-family:'Fredoka',sans-serif;font-size:22px;color:var(--accent);flex:none}
+  :root[data-theme="ebook"] .game-card{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .gc-go{color:#000}
+
+  /* 五子棋卡的小棋盤插圖(沿用棋盤那組 --gmk-* 配色,主題會一起變) */
+  .gk-art .gk-bd{fill:var(--gmk-wood);stroke:var(--gmk-frame);stroke-width:2}
+  .gk-art .gk-ln path{stroke:var(--gmk-line);stroke-width:1;fill:none}
+  .gk-art .gk-b{fill:#141414}
+  .gk-art .gk-w{fill:#fff;stroke:rgba(0,0,0,.35);stroke-width:.7}
+  :root[data-theme="ebook"] .gk-art .gk-b{fill:#000}
+  :root[data-theme="ebook"] .gk-art .gk-w{fill:#fff;stroke:#000;stroke-width:1.2}
+
+  /* 第二層(選玩法)的返回列 */
+  .home-sub-head{display:flex;align-items:center;gap:10px;text-align:left}
+  .home-sub-head .subtitle{color:var(--muted)}
+
+  @media (max-height:560px){
+    .home-pick-head{margin:4px 0 10px}
+    .game-card{padding:11px 13px;margin-top:9px}
+    .gc-art{width:44px;height:44px}
+    .gc-name{font-size:20px}
+    .gc-desc{font-size:12px}
   }

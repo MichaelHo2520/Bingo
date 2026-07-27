@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>BINGO ｜ 賓果</title>
-<!-- BINGO 賓果遊戲 · v1.37.0 -->
-<meta name="version" content="1.37.0">
+<!-- BINGO 賓果遊戲 · v1.38.0 -->
+<meta name="version" content="1.38.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -34,8 +34,69 @@
     </div>
   </div>
 
-  <!-- ====== HOME:進場先選「單機 / 連線」 ====== -->
+  <!-- ====== HOME:兩層 —— 先選遊戲(#homePick),再選怎麼玩(#homeBingo) ======
+       五子棋只有連線一種玩法,所以第一層直接用 <a> 連過去,不再多一層。
+       層級切換是 showHomeLayer()(js/game.js);enterHome() 一律回到第一層。 -->
   <section class="panel" id="home">
+
+    <!-- 第一層:選遊戲 -->
+    <div id="homePick">
+      <div class="home-pick-head">
+        <div class="home-pick-title display">選一個遊戲</div>
+        <div class="home-tagline">和現場的朋友一起玩</div>
+      </div>
+
+      <button class="game-card" id="pickBingo" type="button">
+        <svg class="home-art gc-art" viewBox="0 0 120 116" role="img" aria-label="賓果卡">
+          <rect class="bc-card" x="3" y="3" width="114" height="110" rx="14"/>
+          <g class="bc-hd" text-anchor="middle">
+            <text x="14.4" y="25">B</text><text x="37.2" y="25">I</text><text x="60" y="25">N</text><text x="82.8" y="25">G</text><text x="105.6" y="25">O</text>
+          </g>
+          <line x1="10" y1="32" x2="110" y2="32" stroke="var(--panel-line)" stroke-width="1.5"/>
+          <g>
+            <rect class="bc-cell" x="5.4" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="39" width="18" height="18" rx="4"/>
+            <rect class="bc-cell" x="5.4" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="63" width="18" height="18" rx="4"/>
+            <rect class="bc-cell" x="5.4" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="87" width="18" height="18" rx="4"/>
+          </g>
+          <circle class="bc-daub" cx="37.2" cy="48" r="8.4"/><circle class="bc-daub" cx="82.8" cy="48" r="8.4"/>
+          <circle class="bc-daub" cx="14.4" cy="72" r="8.4"/><circle class="bc-daub" cx="105.6" cy="72" r="8.4"/>
+          <polygon class="bc-star" points="60,63 62.23,68.93 68.56,69.22 63.61,73.17 65.29,79.28 60,75.8 54.71,79.28 56.39,73.17 51.44,69.22 57.77,68.93"/>
+        </svg>
+        <span class="gc-body">
+          <span class="gc-name display">BINGO</span>
+          <span class="gc-desc">賓果 · 連線同房比賽,或自己單機練習</span>
+        </span>
+        <span class="gc-go" aria-hidden="true">▸</span>
+      </button>
+
+      <a class="game-card as-link" href="gomoku.html">
+        <svg class="gc-art gk-art" viewBox="0 0 56 56" role="img" aria-label="五子棋盤">
+          <rect class="gk-bd" x="2" y="2" width="52" height="52" rx="6"/>
+          <g class="gk-ln">
+            <path d="M9 9H47M9 18.5H47M9 28H47M9 37.5H47M9 47H47"/>
+            <path d="M9 9V47M18.5 9V47M28 9V47M37.5 9V47M47 9V47"/>
+          </g>
+          <circle class="gk-b" cx="28" cy="28" r="4.4"/>
+          <circle class="gk-w" cx="18.5" cy="18.5" r="4.4"/>
+          <circle class="gk-b" cx="37.5" cy="18.5" r="4.4"/>
+          <circle class="gk-w" cx="18.5" cy="37.5" r="4.4"/>
+        </svg>
+        <span class="gc-body">
+          <span class="gc-name display">五子棋</span>
+          <span class="gc-desc">連線 1 對 1 · 先連成五顆就贏</span>
+        </span>
+        <span class="gc-go" aria-hidden="true">▸</span>
+      </a>
+    </div>
+
+    <!-- 第二層:BINGO 要怎麼玩 -->
+    <div id="homeBingo" class="hidden">
+    <div class="home-sub-head">
+      <button class="icon-btn" id="homeBack" type="button" title="回遊戲選單" aria-label="回遊戲選單">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="subtitle">選擇玩法</span>
+    </div>
     <div class="home-hero">
       <svg class="home-art" viewBox="0 0 120 116" role="img" aria-label="賓果卡">
         <rect class="bc-card" x="3" y="3" width="114" height="110" rx="14"/>
@@ -54,14 +115,12 @@
         <polygon class="bc-star" points="60,63 62.23,68.93 68.56,69.22 63.61,73.17 65.29,79.28 60,75.8 54.71,79.28 56.39,73.17 51.44,69.22 57.77,68.93"/>
       </svg>
       <div class="home-title display">BINGO</div>
-      <div class="home-tagline">和朋友連線比賽、自己單機練習,或來一局五子棋</div>
+      <div class="home-tagline">和朋友連線比賽,或自己單機練習</div>
     </div>
     <button class="btn primary block-btn home-btn" id="homeOnline">🌐 連線對戰</button>
     <button class="btn ghost block-btn home-btn" id="homeSolo">🎯 單機練習</button>
-    <!-- 五子棋:獨立頁面(gomoku.html)。刻意用 <a> 而不是 <button> —— 這樣連 js/main.js
-         都不必加事件綁定,Bingo 的四支 js 全部維持零改動(見 notes/plan/PLAN-五子棋連線對戰.md) -->
-    <a class="btn ghost block-btn home-btn as-link" href="gomoku.html">⚫ 五子棋 · 連線對戰</a>
-    <div class="home-hint">賓果:連線同房比賽、單機自己玩一張卡;五子棋:連線 1 對 1</div>
+    <div class="home-hint">連線可同房比賽、計分;單機自己玩一張卡</div>
+    </div><!-- /#homeBingo -->
   </section>
 
   <!-- ====== ONLINE: room banner(移到設定/棋盤上方,讓房內名單固定在頂端) ====== -->
