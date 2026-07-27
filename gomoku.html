@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>五子棋 ｜ 連線對戰</title>
-<!-- 五子棋連線對戰 · v1.38.0 -->
-<meta name="version" content="1.38.0">
+<!-- 五子棋連線對戰 · v1.39.0 -->
+<meta name="version" content="1.39.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -94,9 +94,9 @@
       <div class="field">
         <span class="field-label" id="gmkSizeLabel">棋盤大小</span>
         <div class="seg" id="gmkSizeSeg" aria-label="棋盤大小">
-          <button data-size="11">11×11</button>
-          <button class="on" data-size="13">13×13</button>
           <button data-size="15">15×15</button>
+          <button class="on" data-size="19">19×19</button>
+          <button data-size="25">25×25</button>
         </div>
       </div>
 
@@ -129,7 +129,7 @@
         </div>
       </div>
 
-      <div class="hint" id="gmkRuleHint">規則:黑棋先下,橫、豎、斜任一方向連成 5 顆即勝(無禁手)。棋盤下滿判和。</div>
+      <div class="hint" id="gmkRuleHint">規則:黑棋先下,橫、豎、斜任一方向連成 5 顆即勝(無禁手)。棋盤下滿判和。<br>盤面越大越不容易頂到邊界;開局會自動放大到中央,雙指縮放或按 ⤢ 可看全盤。</div>
     </section>
   </div>
 

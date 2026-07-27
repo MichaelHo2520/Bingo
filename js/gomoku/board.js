@@ -45,7 +45,7 @@ const GB = (function(){
     setSize(n);
   }
   function setSize(nn){
-    if(!(nn >= 9 && nn <= 19)) return;
+    if(!(nn >= 9 && nn <= 29)) return;
     n = nn;
     board.style.setProperty("--n", String(n));
     board.style.setProperty("--gcell", CELL + "px");
@@ -60,12 +60,15 @@ const GB = (function(){
     // 只清棋子與勝利標記,保留星位與 ghost
     [...board.querySelectorAll(".gmk-stone")].forEach(el=>el.remove());
   }
-  // 星位:邊距 3、正中心一點(13×13 / 15×15 / 19×19 通用)
+  // 星位:邊距 3 的四角 + 天元;大盤面(≥17)補成圍棋的九星,大棋盤才有得定位
   function buildStars(){
     [...board.querySelectorAll(".gmk-star")].forEach(el=>el.remove());
-    const m = 3, c = (n-1)/2;
-    const pts = [[m,m],[m,n-1-m],[n-1-m,m],[n-1-m,n-1-m]];
-    if(Number.isInteger(c)) pts.push([c,c]);
+    const m = 3, c = (n-1)/2, far = n-1-m;
+    const pts = [[m,m],[m,far],[far,m],[far,far]];
+    if(Number.isInteger(c)){
+      pts.push([c,c]);
+      if(n >= 17) pts.push([m,c],[c,m],[c,far],[far,c]);   // 九星
+    }
     pts.forEach(([r,cc])=>{
       const d = document.createElement("div");
       d.className = "gmk-star";
@@ -160,6 +163,20 @@ const GB = (function(){
     ty = bs <= h ? (h - bs)/2 : Math.min(0, Math.max(h - bs, ty));
   }
   function fit(){ computeFit(); z = fitZ; clampPan(); applyT(); syncZoomBtns(); }
+  /* 開局的初始視角。大盤面(19×19 / 25×25)整盤塞進手機時每格只有 18~24px,一開局就要玩家
+     自己放大很煩;而開局本來都下在天元附近 → 格子太小就自動放大到 MIN_CELL 並把天元擺中間。
+     全盤仍隨時可看(⤢ / 雙指縮小);對手下在視野外時 focusOn() 會自動追過去。 */
+  const MIN_CELL = 30;                       // 開局時每格至少這麼大,否則改用放大視角
+  const OPEN_CELL = 34;                      // 放大視角下每格的目標大小
+  function initialView(){
+    computeFit();
+    if(CELL*fitZ >= MIN_CELL){ fit(); return; }
+    z = Math.max(fitZ, Math.min(ZMAX, OPEN_CELL/CELL));
+    const c = (n-1)/2;
+    tx = stage.clientWidth/2  - (c+0.5)*CELL*z;
+    ty = stage.clientHeight/2 - (c+0.5)*CELL*z;
+    clampPan(); applyT(); syncZoomBtns();
+  }
   // 以舞台座標 (ax,ay) 為錨縮放到 nz:錨點下的棋盤位置保持不動
   function zoomTo(nz, ax, ay){
     const w = stage.clientWidth, h = stage.clientHeight;
@@ -286,7 +303,7 @@ const GB = (function(){
     init, setSize, size:()=>n, reset, play, applyMoves,
     moves:()=>moves.slice(), stepCount, occupied, colorAt, colorOfStep, lastIndex, isFull,
     checkWin, markWin, coordName,
-    fit, zoomIn, zoomOut, focusOn, onTap, setInteractive,
+    fit, initialView, zoomIn, zoomOut, focusOn, onTap, setInteractive,
     setLastByIndex(i){ setLast(stones[i] || null); }
   };
 })();

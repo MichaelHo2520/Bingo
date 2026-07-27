@@ -32,8 +32,8 @@ const MPG = (function(){
   let players={}, scores={}, status="lobby", curPhase="lobby", ready=false;
   let order=[], moves=[], winner=null, roundId=null;
   let gameRev=0;                          // 本地已套用的最新 game 版本(見上 #1)
-  let boardSize=13, swapFirst=true;   // 預設中間的 13×13(手機上格子比 15×15 大一圈,好按)
-  const SIZES=[11,13,15];             // 可選盤面;預設值也定義在 gomoku.html 的 .on,兩處要一致
+  let boardSize=19, swapFirst=true;   // 預設中間的 19×19(圍棋盤大小:15×15 下起來很快就頂到邊界)
+  const SIZES=[15,19,25];             // 可選盤面;預設值也定義在 gomoku.html 的 .on,兩處要一致
   let scoreMode="rank", winGoal=3, scoredThisRound=false, myRoundWin=false;
   let outcomeShown=false, abandoned=false, wasMyTurn=false, autoStarting=false;
   let prevIds=null, sawPlayers=false, sawMe=false, hostId=null, sawHost=false;
@@ -296,8 +296,9 @@ const MPG = (function(){
     setActionHint("");
     GB.setSize(boardSize);
     GB.applyMoves(moves);
-    // 舞台這一刻才從 hidden 變可見,同一個 tick 量到的 clientWidth 還是 0 → 下一格再 fit 一次
-    requestAnimationFrame(()=>GB.fit());
+    // 舞台這一刻才從 hidden 變可見,同一個 tick 量到的 clientWidth 還是 0 → 下一格再算一次視角。
+    // initialView():小盤面直接 fit;大盤面(fit 後每格 < 30px)自動放大到中央天元,不必一開局就先手動放大
+    requestAnimationFrame(()=>GB.initialView());
     if(moves.length) GB.setLastByIndex(moves[moves.length-1]);
     updateTurnUI(); updateMpGoal();
     Sound.start();
