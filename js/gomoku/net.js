@@ -519,17 +519,21 @@ const MPG = (function(){
       },()=>{ if(winner) renderScoreboard(); });
     }
 
+    // 大字只講「對我而言」的輸贏,卡片再依結果換色(原本輸贏共用同一組金色漸層,輸了也一樣喜氣)
+    const card=$("gmkWinCard");
+    if(card){ card.classList.remove("win","lose","draw"); card.classList.add(isDraw?"draw":(iWon?"win":"lose")); }
+    renderWinnerRow(isDraw);
     if(isDraw){
       $("winWord").textContent="平手!";
       $("winMsg").textContent="棋盤下滿了,這局和局 🤝";
       if(!outcomeShown) Sound.win();
     }else if(iWon){
       $("winWord").textContent="你贏了!";
-      $("winMsg").textContent=winner.by==="resign" ? "對手認輸了 🎉" : "五子連線,漂亮 🎉";
+      $("winMsg").textContent=winner.by==="resign" ? "對手認輸 🏳" : "五子連線,漂亮 🎉";
       if(!outcomeShown){ Sound.win(); burst(); }
     }else{
       $("winWord").textContent="你輸了";
-      $("winMsg").textContent=winner.by==="resign" ? "你認輸了" : (dispName(winner.id)+" 連成五子");
+      $("winMsg").textContent=winner.by==="resign" ? "你認輸了 🏳" : "對手連成五子";
       if(!outcomeShown) Sound.lose();
     }
     renderScoreboard();
@@ -538,6 +542,14 @@ const MPG = (function(){
     // 本局結束就把自己設為未準備(下一局要各自重新按準備)
     if(meId && roomRef) { ready=false; roomRef.child("players/"+meId).update({ ready:false }); }
     updateTurnUI();
+  }
+  // 「這局是誰拿下」:大字是主觀的(你贏了/你輸了),這一列給客觀事實 —— 棋色 + 名字 +(你)
+  function renderWinnerRow(isDraw){
+    const el=$("gmkWinner"); if(!el)return;
+    if(isDraw){ el.innerHTML='<span class="gw-tag">🤝 雙方平手,各得 1 勝</span>'; return; }
+    const id=winner.id, seat=order.indexOf(id);
+    const side=seat>=0?'<span class="gmk-seat '+(seat===0?"b":"w")+'"><i></i>'+(seat===0?"黑":"白")+'</span>':'';
+    el.innerHTML=side+'<span class="gw-name">'+esc(dispName(id))+'</span>'+youTag(id)+'<span class="gw-tag">拿下這局</span>';
   }
   function scoreOf(id){ return (scores[id]&&scores[id].n)||0; }
   function scoredRoundOf(id){ return scores[id]&&scores[id].round; }
@@ -561,11 +573,14 @@ const MPG = (function(){
     }
     if(top>0 || scoreMode==="match"){
       const goalCap=(scoreMode==="match" && !champs.length) ? '<div class="ws-goal">🎯 搶 '+winGoal+' 勝</div>' : '';
+      // 本局 +1 的人:總數之外把「分數是怎麼變的」也講出來,才看得出這局誰得手
+      const gained=winner ? (winner.by==="draw" ? Object.keys(players) : [winner.id]) : [];
       sb.innerHTML=goalCap+rows.map((r,i)=>{
         const lead=r.score===top && top>0;
         const cls="ws-row"+(lead?" lead":"")+(r.id===meId?" me":"");
+        const plus=gained.indexOf(r.id)>=0 ? '<span class="gw-plus">+1</span>' : '';
         return '<div class="'+cls+'"><span class="ws-rank">'+(lead?"🏆":(i+1)+".")+'</span>'+
-               '<span class="ws-name">'+esc(r.name)+'</span><span class="ws-pts">'+r.score+' 勝</span></div>';
+               '<span class="ws-name">'+esc(r.name)+'</span>'+plus+'<span class="ws-pts">'+r.score+' 勝</span></div>';
       }).join("");
       sb.classList.remove("hidden");
     }else{ sb.innerHTML=""; sb.classList.add("hidden"); }

@@ -990,6 +990,53 @@
   .gmk-resign:active{transform:scale(.94)}
   :root[data-theme="ebook"] .gmk-resign{background:#fff;border:1px solid #000;color:#000}
 
+  /* ---------- 結果卡(五子棋,v1.41.0) ----------
+     問題:`.win-card .word` 不論輸贏都是同一組金色漸層,「你輸了」看起來跟「你贏了」一樣喜氣,
+     加上兩人都只看到「對自己」的說法 → 誰贏其實不直覺。三個對策:大字依結果變色、
+     補一列客觀的「誰拿下這局」、排行榜幫本局贏家標 +1。★ 全部靠 .gmk-win 這個 class 生效,Bingo 不受影響。 */
+  .gmk-win.lose .word{background:none;color:#ff8f8f;-webkit-text-fill-color:#ff8f8f}
+  .gmk-win.draw .word{background:none;color:var(--muted);-webkit-text-fill-color:var(--muted)}
+  .gmk-win.win{border-color:var(--accent);box-shadow:0 0 26px rgba(0,0,0,.25),0 0 0 1px var(--accent)}
+  .gmk-win{padding:30px 22px}      /* 左右內距收窄:排行榜的長名字與下面那排表情鈕才有地方站 */
+  .gmk-win p{margin:8px 0 18px}
+  /* 誰拿下這局:棋色 + 名字 +(你)+ 「拿下這局」 */
+  .gmk-winner{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;
+    margin:12px 0 0;padding:7px 14px;border-radius:999px;
+    background:rgba(255,255,255,.10);border:1px solid var(--panel-line);
+    font-weight:800;font-size:15px;max-width:100%}
+  .gmk-winner:empty{display:none}   /* 還沒填內容時不要露出一顆空膠囊 */
+  .gmk-winner .gw-name{font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px;
+    max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gmk-winner .gw-tag{font-size:13px;color:var(--muted)}
+  .gmk-winner .you-badge{margin-left:0}
+  .gmk-win.win .gmk-winner{background:var(--accent);border-color:var(--accent);color:#1c1008}
+  .gmk-win.win .gmk-winner .gw-tag{color:#1c1008;opacity:.75}
+  :root[data-theme="midnight"] .gmk-win.win .gmk-winner,
+  :root[data-theme="arcade"] .gmk-win.win .gmk-winner{color:var(--daub-ink)}
+  :root[data-theme="ebook"] .gmk-winner{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .gmk-win.win .gmk-winner{background:#000;color:#fff}
+  :root[data-theme="ebook"] .gmk-win.win .gmk-winner .gw-tag{color:#fff}
+  /* 排行榜上本局 +1 的人(把「分數怎麼變的」講出來,而不是只給一個總數) */
+  .win-scores .gw-plus{flex:none;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12.5px;
+    padding:2px 7px;border-radius:999px;background:var(--accent-2);color:#1c1008}
+  .win-scores .ws-row.lead .gw-plus{background:#1c1008;color:var(--accent)}
+  :root[data-theme="ebook"] .win-scores .gw-plus{background:#000;color:#fff}
+  :root[data-theme="ebook"] .win-scores .ws-row.lead .gw-plus{background:#fff;color:#000}
+  /* 賽後表情列:一鍵送給全部人,最後一顆 😀 開完整面板。
+     只放 4 顆快捷 + 😀 —— 卡片內寬最窄約 260px(360px 手機),再多一顆就會換行、剩 😀 孤零零在第二排 */
+  .gmk-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 18px}
+  .gmk-react{width:40px;height:40px;padding:0;flex:none;border-radius:50%;cursor:pointer;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.10);color:var(--text);
+    font-size:20px;line-height:1;display:grid;place-items:center;
+    transition:transform .1s,background .15s}
+  .gmk-react:hover{transform:translateY(-2px);background:rgba(255,255,255,.2)}
+  .gmk-react:active{transform:scale(.88)}
+  .gmk-react.more{background:var(--accent);border-color:var(--accent);color:#1c1008}
+  .gmk-react.sent{animation:gmkReactPop .32s ease-out}
+  @keyframes gmkReactPop{ 0%{transform:scale(1)} 40%{transform:scale(1.35)} 100%{transform:scale(1)} }
+  :root[data-theme="ebook"] .gmk-react{background:#fff;border:1px solid #000;color:#000}
+  :root[data-theme="ebook"] .gmk-react.more{background:#000;color:#fff}
+
   /* 玩家晶片裡的執子標示:實心棋子 + 「黑 / 白」兩個字,直接貼在名字前面。
      原本只有一顆 13px 小圓點,黑底主題下幾乎看不出誰是誰(v1.40.0) */
   .gmk-seat{display:inline-flex;align-items:center;gap:5px;flex:none;

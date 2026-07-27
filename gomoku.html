@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>五子棋 ｜ 連線對戰</title>
-<!-- 五子棋連線對戰 · v1.40.0 -->
-<meta name="version" content="1.40.0">
+<!-- 五子棋連線對戰 · v1.41.0 -->
+<meta name="version" content="1.41.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -162,13 +162,23 @@
     </div>
   </div>
 
-  <!-- ====== 結果卡(沿用 Bingo 的 #veil / .win-card)====== -->
+  <!-- ====== 結果卡(沿用 Bingo 的 #veil / .win-card;.gmk-win 再補「誰贏」與賽後表情列)====== -->
   <div class="veil" id="veil">
-    <div class="win-card">
+    <div class="win-card gmk-win" id="gmkWinCard">
       <div class="word display" id="winWord">你贏了!</div>
+      <!-- 這局是誰拿下:棋色徽章 + 名字 +(你)。大字只講「對我而言」的輸贏,這一列才是客觀事實 -->
+      <div class="gmk-winner" id="gmkWinner"></div>
       <p id="winMsg">五子連線 🎉</p>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
+      <!-- 賽後嘴砲:一鍵送表情給全部人;😀 開完整面板(表情蓋板 DOM 在後面,同 z-index 會疊在結果卡之上) -->
+      <div class="gmk-react-row" id="gmkReactRow">
+        <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
+        <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
+        <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
+        <button class="gmk-react" type="button" data-em="🤝" aria-label="送出 握手">🤝</button>
+        <button class="gmk-react more" type="button" id="winEmoteBtn" title="更多表情 / 一句話 / 語音" aria-label="開啟互動表情面板">😀</button>
+      </div>
       <div class="actions" id="mpWinBtns">
         <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
         <button class="btn primary" id="mpAgain">繼續 ▸</button>

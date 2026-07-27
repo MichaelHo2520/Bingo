@@ -45,6 +45,20 @@ $("mpLeaveWin").addEventListener("click",()=>MPG.askLeave());
 $("mpNewSeason").addEventListener("click",()=>{ MPG.resetScores(); MPG.again(); });
 $("winPeek").addEventListener("click",peekBoard);
 $("reopenWin").addEventListener("click",showResult);
+// 賽後表情列:前五顆一鍵送給全部人(結果卡不關,對方也看得到飛出來的表情),😀 開完整面板。
+// 節流 600ms:結果卡是強制回應視窗,手指停在上面很容易連點狂送。
+let reactAt=0;
+$("gmkReactRow").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  if(b.id==="winEmoteBtn"){ openEmote("all"); return; }
+  const em=b.dataset.em; if(!em)return;
+  const now=performance.now();
+  if(now-reactAt<600)return;
+  reactAt=now;
+  markAudioArmed(); Sound.wake();
+  MPG.sendEmote("all",em);
+  b.classList.remove("sent"); void b.offsetWidth; b.classList.add("sent");
+});
 // 結果卡是強制回應視窗:點/滑到卡片外一律吃掉手勢(不關卡、也不讓背景捲動)
 $("veil").addEventListener("touchmove",e=>{
   const card=e.target.closest?e.target.closest(".win-card"):null;
