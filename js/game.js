@@ -273,6 +273,15 @@
     const pick=$("homePick"), sub=$("homeBingo");
     if(pick) pick.classList.toggle("hidden", which!=="pick");
     if(sub)  sub.classList.toggle("hidden", which!=="bingo");
+    setTopBrand(which==="pick" ? "party" : "bingo");
+  }
+  // 頂列品牌字:"party"=選遊戲主選單顯示「派對遊戲」;"bingo"=其餘畫面顯示 B-I-N-G-O 跑馬燈。
+  // 只有這裡切換就夠 —— 離開第一層的唯一出口是 showHomeLayer("bingo")(另兩張卡是連到別頁的 <a>),
+  // 回主選單也一律經過 enterHome() → showHomeLayer("pick")。
+  function setTopBrand(which){
+    const hb=$("brandHome"), mq=$("marquee");
+    if(hb) hb.classList.toggle("hidden", which!=="party");
+    if(mq) mq.classList.toggle("hidden", which==="party");
   }
   // 主選單:進場先選遊戲;離開房間、單機返回都回到這裡(一律回第一層)
   function enterHome(){
@@ -642,6 +651,7 @@
     { id:"howlong", label:"是要多久?",   src:"mp3/是要多久.m4a" },
     { id:"ready",   label:"啊西好了沒?", src:"mp3/啊西好了沒.m4a" },
     { id:"hurry",   label:"快點來不及啦!", src:"mp3/快點，來不急啦.m4a" },
+    { id:"gofast",  label:"你就趕快啦!", src:"mp3/你就趕快啦.m4a" },
     // 「聽牌」為連線遊戲自動觸發(有人只差一號就達標),不放進手動表情選單 → auto:true 讓 buildVoiceClips 略過
     { id:"reach",   label:"聽牌",          src:"mp3/聽牌.m4a", auto:true },
   ];

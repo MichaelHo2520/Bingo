@@ -67,6 +67,8 @@ bindCommonUI();
 bindAudioLifecycle();
 registerSW();
 paintVersion();
+// 更新檢查:安全 = 沒在房裡(連線畫面本身可以直接重載,重載後照樣停在連線畫面)
+initUpdateCheck(()=>!MP.isOnline());
 
 /* ---------- 啟動 ---------- */
 buildSwatches();

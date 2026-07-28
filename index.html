@@ -13,8 +13,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>派對遊戲 ｜ BINGO · 五子棋 · 數獨</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨)· v1.47.1 -->
-<meta name="version" content="1.47.1">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨)· v1.48.1 -->
+<meta name="version" content="1.48.1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -24,6 +24,10 @@
 
   <div class="topbar">
     <div class="brand">
+      <!-- 頂列品牌字有兩種:選遊戲主選單顯示「派對遊戲」(這一層還沒選遊戲,叫 BINGO 名不符實),
+           進到 BINGO 之後才換成 B-I-N-G-O 燈泡跑馬燈 —— 那排燈是賓果的連線進度指示(refreshLines 逐顆點亮),
+           不是單純的標題。切換一律走 setTopBrand()(js/game.js),由 showHomeLayer() 呼叫。 -->
+      <div class="home-brand display hidden" id="brandHome">派對遊戲</div>
       <div class="marquee display" id="marquee" aria-label="BINGO 進度">
         <span class="bulb">B</span><span class="bulb">I</span><span class="bulb">N</span><span class="bulb">G</span><span class="bulb">O</span>
       </div>

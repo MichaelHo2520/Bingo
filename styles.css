@@ -1102,11 +1102,22 @@
   :root[data-theme="ebook"] .gk-art .gk-b{fill:#000}
   :root[data-theme="ebook"] .gk-art .gk-w{fill:#fff;stroke:#000;stroke-width:1.2}
 
+  /* 選遊戲主選單的頂列品牌字(取代 B-I-N-G-O 跑馬燈,見 index.html #brandHome)。
+     漸層與 .home-pick-title / .sdk-brand 同一組,字級對齊五子棋 .gmk-brand,三頁頂列高度才一致。 */
+  /* min-height 刻意跟 .marquee .bulb 的字級同一組 clamp:兩種品牌字占一樣高,
+     點 BINGO 切到第二層時頂列不會突然長高、整個面板跟著跳一下 */
+  .home-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
+    line-height:1;display:inline-flex;align-items:flex-end;min-height:clamp(28px,9vw,44px);
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  :root[data-theme="ebook"] .home-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+
   /* 第二層(選玩法)的返回列 */
   .home-sub-head{display:flex;align-items:center;gap:10px;text-align:left}
   .home-sub-head .subtitle{color:var(--muted)}
 
   @media (max-height:560px){
+    .home-brand{font-size:clamp(19px,5vw,26px);min-height:clamp(20px,5.5vw,28px)}
     .home-pick-head{margin:4px 0 10px}
     .game-card{padding:11px 13px;margin-top:9px}
     .gc-art{width:44px;height:44px}

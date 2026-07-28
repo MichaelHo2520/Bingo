@@ -162,6 +162,77 @@
     const sv=$("setVer"); if(sv)sv.textContent=v?("v"+v):"";
   })();
 
+  /* ---------- 更新檢查(v1.48.0) ----------
+     要解決的事:手機分頁常一整天不關(PWA 更是如此),程式已經上了新版,現場玩的人卻還跑著舊 JS。
+     sw.js 是 network-first,只要「重新載入」就會拿到最新版 —— 難的是沒有人會主動去重載。
+     做法:每 5 分鐘用 no-store 抓自己這一頁的 HTML,比對 <meta name="version">
+          (版號的單一來源就是那個 meta,不必再多一個 version.json 要記得改)。
+     抓到不一樣的版號 → 安全的時候自動重載;還在設定/對戰/玩到一半就先記著,等回主選單那一刻再套用,
+     絕不把人踢出局(連線中重載會斷線重連,單機中重載會整張卡重來)。
+     ★ 同一套邏輯在 js/shared/ui-kit.js 另有一份給五子棋/數獨(Bingo 不載入那支)—— 改一邊記得改另一邊。 */
+  const UPD_CHECK_MS=5*60*1000;     // 兩次連線檢查的最小間隔
+  const UPD_TICK_MS=4000;           // 心跳:也負責「pending 等到安全就套用」,所以要比檢查間隔密
+  const UPD_FROM_KEY="bingo.updfrom";
+  let updCur="", updPending="", updLastAt=0, updGoing=false;
+  // 安全 = 停在主選單(#home 還看得見)且不在連線房裡。選房間畫面也算不安全:
+  // 那時暱稱/房名可能打了一半,而且下一步就要進房了。
+  function updSafe(){ return state.mode==="home" && !state.online && !$("home").classList.contains("hidden"); }
+  function initUpdateCheck(){
+    const m=document.querySelector('meta[name="version"]');
+    updCur=m?m.content:"";
+    if(!updCur || location.protocol==="file:")return;   // 沒版號、或本機用 file:// 開(fetch 一定失敗)就不啟用
+    // 上一輪是為了更新而重載的話,回報結果。版號沒變 = 這次更新沒生效(CDN 還沒同步之類),
+    // 本次瀏覽就整個停掉檢查 —— 否則每 5 分鐘重載一次會變成無限重載。
+    let stuck=false;
+    try{
+      const from=sessionStorage.getItem(UPD_FROM_KEY);
+      if(from){
+        sessionStorage.removeItem(UPD_FROM_KEY);
+        if(from!==updCur) setTimeout(()=>showToast("已更新到 v"+updCur+" 🎉",2200),1200);
+        else stuck=true;
+      }
+    }catch(_){}
+    if(stuck)return;
+    updLastAt=Date.now();                              // 這頁剛載入本身就是最新的,第一次檢查等一個週期後
+    addEventListener("online",()=>{ updLastAt=0; });   // 離線時開的是快取版,一連上網就馬上查
+    setInterval(updTick,UPD_TICK_MS);
+  }
+  function updTick(){
+    if(updGoing)return;
+    if(updPending){ if(updSafe()) updApply(); return; }   // 有新版在等 → 只等「安全」這件事
+    if(document.hidden || navigator.onLine===false)return;
+    if(Date.now()-updLastAt < UPD_CHECK_MS)return;
+    updLastAt=Date.now();
+    fetch(location.pathname,{cache:"no-store"})            // 只抓自己這頁;no-store 繞過 HTTP 快取
+      .then(r=>r.ok?r.text():"")
+      .then(html=>{
+        const mm=html.match(/<meta\s+name="version"\s+content="([^"]+)"/i), v=mm?mm[1]:"";
+        if(!v || v===updCur)return;
+        updPending=v;                                      // 只要不同就算有更新(含刻意回退舊版)
+        if(!updSafe()) showToast("有新版本 v"+v+",這局結束後會自動更新",2600);
+      })
+      .catch(()=>{});                                      // 抓失敗(沒網路 / 伺服器暫時掛):安靜跳過,下個週期再試
+  }
+  function updApply(){
+    if(updGoing)return;
+    updGoing=true;
+    showToast("發現新版本 v"+updPending+",正在更新…",1600);
+    setTimeout(()=>{
+      if(!updSafe()){ updGoing=false; return; }             // 這 1 秒內又進房 / 開了新局 → 取消,等下個安全時機
+      let done=false;
+      const go=()=>{
+        if(done)return; done=true;
+        try{ sessionStorage.setItem(UPD_FROM_KEY,updCur); }catch(_){}   // 記下舊版號,重載後用來確認真的換版了
+        location.reload();
+      };
+      setTimeout(go,2500);                                  // 保險:SW 沒回應也照樣重載
+      // 先讓 SW 抓新的 sw.js(新版 install 會 skipWaiting 並清掉舊快取),再重載
+      if(navigator.serviceWorker && navigator.serviceWorker.getRegistration){
+        navigator.serviceWorker.getRegistration().then(r=>r?r.update():null).then(go).catch(go);
+      }else go();
+    },1100);
+  }
+
   buildSwatches();
   loadPrefs();
   applyGridCols();syncSizeSeg();
@@ -169,5 +240,6 @@
   syncSettingsUI();
   enterHome();     // 進場先顯示主選單(選單機 / 連線)
   initBoardFit();  // 號碼格自適應:掛上版面觀察並算第一次的可用高度(必須在 enterHome 之後,版面已定案)
+  initUpdateCheck();
   // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
   setTimeout(maybeShowInstallTip,1500);

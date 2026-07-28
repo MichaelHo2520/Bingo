@@ -131,6 +131,8 @@ bindCommonUI();
 bindAudioLifecycle();
 registerSW();
 paintVersion();
+// 更新檢查:安全 = 沒在房裡、也沒在單機局中(單機重載會把計時與填好的格子全部丟掉)
+initUpdateCheck(()=>!MP.isOnline() && !Solo.running());
 
 /* ---------- 啟動 ---------- */
 buildSwatches();
