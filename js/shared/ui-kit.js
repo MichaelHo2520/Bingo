@@ -815,6 +815,17 @@ function registerSW(){
     addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });
   }
 }
+/* 從 index.html 主選單的「現在有人在玩」點過來:?join=<4 位房號> → 直接進那間房(v1.52.0)。
+   ★ 進來後立刻把參數從 URL 抹掉 —— 更新檢查會自動重載整頁,留著參數就會在對戰中被重新
+     丟回「加入房間」一次。replaceState 不留歷史,按上一頁也不會又觸發一次。
+   回傳有沒有接手(true = 已經在往房間裡走,啟動流程就不要再自己 showScreen 了)。 */
+function autoJoinFromQuery(MP){
+  const m=/[?&]join=(\d{4})(?:&|$)/.exec(location.search);
+  if(!m)return false;
+  try{ history.replaceState(null,"",location.pathname+location.hash); }catch(e){}
+  MP.joinFromHome(m[1]);
+  return true;
+}
 
 /* ---------- 更新檢查(v1.48.0) ----------
    要解決的事:手機分頁常一整天不關(PWA 更是如此),程式已經上了新版,現場玩的人卻還跑著舊 JS。

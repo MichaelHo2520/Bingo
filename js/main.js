@@ -249,5 +249,6 @@
   initBoardFit();  // 號碼格自適應:掛上版面觀察並算第一次的可用高度(必須在 enterHome 之後,版面已定案)
   initUpdateCheck();
   initFullscreenKeep();   // 全螢幕跨頁保持:從五子棋/數獨回來後,第一個手勢自動接回全螢幕
+  HomeLive.boot();        // 首頁「現在有人在玩」看板:idle 後才載 Firebase SDK,首屏不等它
   // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
   setTimeout(maybeShowInstallTip,1500);

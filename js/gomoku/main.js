@@ -152,5 +152,6 @@ segOn("gmkSoloSizeSeg","size",Solo.size());
 segOn("gmkFirstSeg","first",Solo.first());
 paintAiHint();
 showScreen("home");   // 進場先選玩法(五子棋現在有連線也有電腦對決)
+autoJoinFromQuery(MP);   // 從主選單的「現在有人在玩」點過來(?join=1234)→ 直接進那間房
 // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
 setTimeout(maybeShowInstallTip,1500);

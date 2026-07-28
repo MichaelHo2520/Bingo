@@ -244,6 +244,13 @@
         joinNode(); enterLobby();
       }).catch(e=>setMsg("加入失敗:"+e.message));
     }
+    // 從主選單的「現在有人在玩」直接加入:先切到連線畫面,SDK 就緒後才 join。
+    // 順序很重要 —— openConnect() 的 then 會 startRoomWatch(),我們的 then 註冊在後面,
+    // 所以一定是「掛大廳監聽 → join → enterLobby 卸載監聽」,不會反過來留一條孤兒監聽。
+    function joinFromHome(inCode,inName){
+      openConnect();
+      ensureFirebase().then(()=>join(inCode,$("mpName").value,inName)).catch(()=>{});
+    }
     function joinNode(){
       armPresence({ name:meName, lines:0, ready:false });
       // 註:不再於房主斷線時「整房刪除」——短暫切背景改由寬限期+重連歸位處理(見 watchConn/resume);
@@ -1241,7 +1248,10 @@
       if(typeof kickVoiceQueue==="function") kickVoiceQueue();
     });
 
-    return { available, openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
+    // ensureLib / database 是給首頁看板(js/home-live.js)用的:它要讀三個大廳索引,
+    // 但不該自己再抄一份「動態載入 SDK + initializeApp」——那是這裡唯一的入口。
+    return { available, ensureLib:ensureFirebase, database:()=>init()?db:null, joinFromHome,
+             openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, reportReach, readyEnabled, isMyTurn, isCalled, tap,
              amHost, amReady:()=>ready, setSize:setBoardSize, roster, sendEmote, revealSkip, bailFromRps,

@@ -219,6 +219,14 @@ const MPCore = (function(){
         });
       }).catch(e=>setMsg("加入失敗:"+e.message));
     }
+    /* 從 index.html 主選單的「現在有人在玩」帶著 ?join=<code> 進來(見 autoJoinFromQuery)。
+       先切到連線畫面,SDK 就緒後才 join;openConnect() 的 then 註冊在前 → 一定是
+       「掛大廳監聽 → join → enterLobby 卸載監聽」,不會留下孤兒監聽。
+       房名不從 URL 帶(會被改),一律以房間本體的 roomName 為準;沒暱稱就停在連線畫面提示填。 */
+    function joinFromHome(inCode){
+      openConnect();
+      ensureFirebase().then(()=>join(inCode,$("mpName").value,"")).catch(()=>{});
+    }
     /* 入座:用 players 節點的 transaction 搶位 —— 必須擋住超額的人
        (多人同時點加入的競態,用 once+set 是擋不住的)。重連時同一個 meId 直接沿用原位。 */
     function claimSeat(done){
@@ -809,7 +817,7 @@ const MPCore = (function(){
 
     /* ---------- 對外 API(通用部分 + adapter 自己的) ---------- */
     const api = {
-      available, openConnect, scanRooms, create, join, leave,
+      available, openConnect, scanRooms, create, join, joinFromHome, leave,
       toggleReady, again,
       isOnline:()=>online, amHost:()=>isHost, amReady:()=>ready,
       setScoreMode, setWinGoal, resetScores,

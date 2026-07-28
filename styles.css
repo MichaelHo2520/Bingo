@@ -1558,3 +1558,43 @@
     .gmk-solotools{margin-top:5px}
     .gmk-tool{padding:5px 8px;font-size:12px}
   }
+
+  /* ==========================================================================
+     現在有人在玩 — index.html 首頁第一層的大廳即時看板(v1.52.0)
+     內容由 js/home-live.js 填(三個遊戲的 *_index 節點)。房間列**直接重用既有的
+     .room-item / .room-main / .join-cta**,長相與各遊戲大廳一致,這裡只加容器與兩顆標籤。
+     ⚠ #home 是 text-align:center → 容器要自己扳回 left,否則房名/人數會跑到中間。
+     ========================================================================== */
+  .hl-live{text-align:left;margin:0 0 16px;padding:12px;border-radius:18px;
+    border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.08)}
+  .hl-head{display:flex;align-items:center;gap:7px;margin-bottom:9px;
+    font-size:12.5px;font-weight:800;color:#22c55e;letter-spacing:.02em}
+  .hl-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;flex:none;
+    box-shadow:0 0 0 3px rgba(34,197,94,.18);animation:hl-pulse 1.8s ease-in-out infinite}
+  @keyframes hl-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  /* max-height:同時開 5、6 間房時看板會把三張遊戲卡整個推出畫面 —— 這裡是「選遊戲」的選單,
+     遊戲入口不能被擠掉。超過約 3 列就自己滾,看板本身的高度封頂。 */
+  .hl-rooms{display:flex;flex-direction:column;gap:8px;max-height:232px;overflow-y:auto}
+  /* <a> 版的房間列(別頁的遊戲):.room-item 本來是 button 的外觀,連結要自己收掉底線與連結色 */
+  .hl-item{text-decoration:none;color:var(--text)}
+  /* 哪個遊戲的房間 —— 首頁三個遊戲混在一起列,沒有這顆會分不出來 */
+  .hl-tag{flex:none;font-size:12px;font-weight:800;color:var(--muted);
+    padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.14);white-space:nowrap}
+  /* 遊戲卡上的即時徽章:接在 .gc-desc 下面自成一行(.gc-body 是 column) */
+  .hl-badge{align-self:flex-start;margin-top:2px;font-size:11.5px;font-weight:800;
+    padding:2px 8px;border-radius:999px;white-space:nowrap;
+    background:rgba(34,197,94,.16);color:#22c55e}
+  .hl-badge[data-state="busy"]{background:rgba(249,115,22,.16);color:#f97316}
+  :root[data-theme="ebook"] .hl-live{border:1px solid #000;background:#fff}
+  :root[data-theme="ebook"] .hl-head{color:#000}
+  :root[data-theme="ebook"] .hl-dot{background:#000;box-shadow:none;animation:none}
+  :root[data-theme="ebook"] .hl-item{color:#000}
+  :root[data-theme="ebook"] .hl-tag{background:#eee;border:1px solid #999;color:#000}
+  :root[data-theme="ebook"] .hl-badge{background:#eee;border:1px solid #999;color:#000}
+  :root[data-theme="ebook"] .hl-badge[data-state="busy"]{background:#eee;color:#555}
+
+  @media (max-height:560px){
+    .hl-live{margin-bottom:10px;padding:9px}
+    .hl-head{margin-bottom:7px}
+    .hl-badge{font-size:11px}
+  }

@@ -143,5 +143,6 @@ syncSettingsUI();
 [...$("sdkHomeDiffSeg").children].forEach(b=>b.classList.toggle("on",b.dataset.diff===Solo.level()));
 paintLevelHint();
 showScreen("home");   // 進場先選玩法(數獨有單機也有連線)
+autoJoinFromQuery(MP);   // 從主選單的「現在有人在玩」點過來(?join=1234)→ 直接進那間房
 // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
 setTimeout(maybeShowInstallTip,1500);
