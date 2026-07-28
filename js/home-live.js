@@ -115,7 +115,11 @@ const HomeLive = (function(){
   }
   function start(){
     if(failed || refs.length || loading)return;
-    if(!MP.available || !MP.available())return;    // 沒設定 Firebase → 首頁就當沒這功能
+    // ★ 守門只能問「config 填了沒」(configured = configReady)。
+    //   不可以用 MP.available() —— 它還要求 window.firebase 已存在,而首頁刻意還沒載 SDK,
+    //   於是第一次進首頁永遠 return、看板不出現;只有先進過一次連線對戰(SDK 被載進來)
+    //   再退回首頁才會冒出來。v1.52.1 修的就是這個。
+    if(!MP.configured || !MP.configured())return;   // 沒設定 Firebase → 首頁就當沒這功能
     loading=true;
     MP.ensureLib().then(()=>{
       loading=false;

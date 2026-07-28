@@ -1248,9 +1248,11 @@
       if(typeof kickVoiceQueue==="function") kickVoiceQueue();
     });
 
-    // ensureLib / database 是給首頁看板(js/home-live.js)用的:它要讀三個大廳索引,
+    // ensureLib / database / configured 是給首頁看板(js/home-live.js)用的:它要讀三個大廳索引,
     // 但不該自己再抄一份「動態載入 SDK + initializeApp」——那是這裡唯一的入口。
-    return { available, ensureLib:ensureFirebase, database:()=>init()?db:null, joinFromHome,
+    // ★ configured 是 configReady(只問 config 填了沒),不可以拿 available 當守門 ——
+    //   available 還要求「SDK 已載入」,而首頁本來就還沒載(v1.52.1 修:看板因此永遠不啟動)。
+    return { available, configured:configReady, ensureLib:ensureFirebase, database:()=>init()?db:null, joinFromHome,
              openConnect, closeConnect, create, join, scanRooms, toggleReady, startGame,
              setTarget, setOrderMethod, throwRps, confirmOrder, again, leave,
              reportLines, tryWin, reportReach, readyEnabled, isMyTurn, isCalled, tap,
