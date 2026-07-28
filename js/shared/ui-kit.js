@@ -243,7 +243,7 @@ function openEmote(target){
   if(!MP.isOnline())return;
   const roster=MP.roster();
   emoteTarget=(target && target!=="all" && roster.some(p=>p.id===target)) ? target : "all";
-  buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases(); buildVoiceClips();
+  buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases(); buildVoiceClips(); buildMyClips();
   const inp=$("emoteText"); if(inp)inp.value="";
   Sound.wake();
   $("emoteVeil").classList.add("show");
@@ -449,6 +449,203 @@ function playVoiceGate(){
 }
 function kickVoiceQueue(){ if(voiceQueue.length && !voiceBusy) pumpVoice(); }
 
+/* ---------- 自訂語音(自己錄幾組,連線時當罐頭按鈕送) ----------
+   ★★ 與 js/game.js 那份是雙胞胎(Bingo 不載入 js/shared/,比照 toggleFull 各留一份)。
+      改這個區塊一定要同時改另一邊 —— 用 grep myclips 就能找到兩處。
+
+   走的是既有的 kind="voice" 管道:存下來的就是 sendEmote 要傳的 dataURL,送出時零轉換。
+   因此不用改 Firebase 規則(audio 欄已放行 300,000 字元)、不用改 sw.js(沒有新增靜態音檔)、
+   對方也不需要有任何檔案(資料自帶)—— 這是與內建 CLIPS 最大的差別:CLIPS 只傳代號、雙方
+   都得有那支 m4a;自訂語音把音訊本身傳過去,舊版客戶端收到照播。
+
+   ⚠ 獨立一支 localStorage key,絕對不進 bingo.prefs.v1 —— 那份每次 savePrefs() 都是整包
+     read-modify-write,塞幾百 KB 進去等於「調一次音量就序列化幾百 KB」;更糟的是一旦
+     setItem 拋 QuotaExceededError,連主題/音量等一般偏好都會一起存不進去。 */
+const MYCLIP_KEY="bingo.myclips.v1";   // 三個遊戲共用同一批(與 bingo.pid / bingo.pwatip 同命名空間)
+const MYCLIP_MAX=6;                    // 上限 6 組(3 秒約 65KB/則 → 約 390KB,對 localStorage 約 5MB 的額度很安全)
+const MYCLIP_MS=3000;                  // 錄音上限 3 秒(內建即時語音是 6 秒;短一半 = 流量與本機容量都減半)
+const MYCLIP_LABEL_MAX=8;              // 名字上限 8 字(與 players.name 同調,按鈕才不會爆版)
+const MYCLIP_COOL=3000;                // 送出節流:見 sendMyClip
+let myClips=[];                        // 記憶體副本(開面板/開編輯浮層時重讀)
+let mvPending=null;                    // 錄好但還沒命名儲存的 dataURL
+let mvRecTmr=null, mvTick=null, mvLastSent=0;
+
+function loadMyClips(){
+  try{
+    const a=JSON.parse(localStorage.getItem(MYCLIP_KEY));
+    if(!Array.isArray(a))return [];
+    // 只收結構完整的,壞資料(手改壞、跨版本)直接濾掉而不是整批放棄
+    return a.filter(c=>c && typeof c.id==="string" && typeof c.data==="string" && c.data.slice(0,5)==="data:")
+            .map(c=>({ id:c.id, label:String(c.label||"語音").slice(0,MYCLIP_LABEL_MAX), data:c.data, at:c.at||0 }))
+            .slice(0,MYCLIP_MAX);
+  }catch(e){ return []; }
+}
+// 寫入失敗(多半是 QuotaExceededError)回 false 交給呼叫端提示,不讓例外冒出去打斷 UI
+function saveMyClips(list){
+  try{ localStorage.setItem(MYCLIP_KEY,JSON.stringify(list)); return true; }catch(e){ return false; }
+}
+
+/* ---- 互動面板的「我的語音」區 ---- */
+function buildMyClips(){
+  const g=$("emoteMyClips"), sub=$("myClipsSub");
+  if(!g)return;
+  myClips=loadMyClips();
+  g.innerHTML="";
+  const none=!myClips.length;
+  g.classList.toggle("hidden",none);
+  if(sub)sub.classList.toggle("hidden",none);   // 沒錄過就整區不出現,面板不會多一塊空的
+  myClips.forEach(c=>{
+    const b=document.createElement("button");
+    b.type="button"; b.className="phrase-btn mvc-btn"; b.textContent="🎤 "+c.label;
+    b.addEventListener("click",()=>sendMyClip(c.id));
+    g.appendChild(b);
+  });
+}
+/* 節流:做成按鈕之後按的頻率遠高於「按著錄 3 秒」的即時語音,而每按一次都是 ~65KB 上傳
+   + 房內每人各下載 65KB(6 人房約 390KB)。3 秒內只放一則過去,擋連環轟炸。 */
+function sendMyClip(id){
+  const c=myClips.find(c=>c.id===id); if(!c)return;
+  const now=Date.now();
+  if(now-mvLastSent<MYCLIP_COOL){ showToast("等一下再送 🙂"); return; }
+  mvLastSent=now;
+  markAudioArmed(); Sound.wake();   // 點按鈕=手勢,順手解鎖音訊(同回合收到別人的語音才能自動播)
+  MP.sendEmote(emoteTarget,"🎤","voice",c.data);
+  closeEmote();
+}
+
+/* ---- 編輯浮層 ---- */
+function openMyVoice(){
+  myClips=loadMyClips(); mvPending=null;
+  Sound.wake();
+  buildMyVoiceList(); syncMyVoiceUI();
+  const v=$("myVoiceVeil"); if(v)v.classList.add("show");
+}
+// 關閉一定要收乾淨:錄到一半關掉若不 cancel,麥克風會一直開著(分頁的錄音圖示不會消失)
+function closeMyVoice(){
+  const v=$("myVoiceVeil"); if(v)v.classList.remove("show");
+  abortMyVoiceRec();
+}
+function abortMyVoiceRec(){
+  if(mvRecTmr){ clearTimeout(mvRecTmr); mvRecTmr=null; }
+  if(mvTick){ clearInterval(mvTick); mvTick=null; }
+  if(Voice.recording()) Voice.cancel();
+  voiceRecording=false; refreshBgmDuck();
+  mvPending=null;
+  syncMyVoiceUI();
+}
+function buildMyVoiceList(){
+  const box=$("mvList"); if(!box)return;
+  box.innerHTML="";
+  if(!myClips.length){
+    const p=document.createElement("div");
+    p.className="mvc-empty";
+    p.textContent="還沒有自訂語音。錄一段,連線時就能在互動面板當按鈕送出。";
+    box.appendChild(p);
+    return;
+  }
+  // 一律用 createElement + textContent/value 塞值(不走 innerHTML)→ 名字不需要另外 escape
+  myClips.forEach(c=>{
+    const row=document.createElement("div"); row.className="mvc-row";
+    const play=document.createElement("button");
+    play.type="button"; play.className="mvc-play"; play.textContent="▶";
+    play.title="試聽"; play.setAttribute("aria-label","試聽 "+c.label);
+    play.addEventListener("click",()=>previewMyClip(c.id));
+    const name=document.createElement("input");
+    name.type="text"; name.className="mvc-name"; name.value=c.label;
+    name.maxLength=MYCLIP_LABEL_MAX; name.autocomplete="off";
+    name.setAttribute("aria-label","語音名稱");
+    name.addEventListener("change",()=>renameMyClip(c.id,name.value));
+    name.addEventListener("blur",()=>renameMyClip(c.id,name.value));
+    const del=document.createElement("button");
+    del.type="button"; del.className="mvc-del"; del.textContent="🗑";
+    del.title="刪除"; del.setAttribute("aria-label","刪除 "+c.label);
+    del.addEventListener("click",()=>removeMyClip(c.id));
+    row.appendChild(play); row.appendChild(name); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+// 試聽走 playVoiceOnce = 與對方實際聽到的同一條路徑(含 voiceVol 可放大到 300%),不會有「試聽小聲、對方很大聲」的落差
+function previewMyClip(id){
+  const c=myClips.find(c=>c.id===id); if(!c)return;
+  if(Sound.isMuted && Sound.isMuted()){ showToast("目前是靜音,請先開啟音效"); return; }
+  markAudioArmed(); Sound.wake();
+  playVoiceOnce(c.data);
+}
+function renameMyClip(id,label){
+  const c=myClips.find(c=>c.id===id); if(!c)return;
+  const nx=String(label||"").trim().slice(0,MYCLIP_LABEL_MAX);
+  if(!nx || nx===c.label){ buildMyVoiceList(); return; }   // 清空/沒改 → 還原顯示,不動資料
+  const old=c.label; c.label=nx;
+  if(!saveMyClips(myClips)){ c.label=old; showToast("存不進去,本機空間不足"); }
+  buildMyVoiceList();
+}
+function removeMyClip(id){
+  const next=myClips.filter(c=>c.id!==id);
+  if(!saveMyClips(next)){ showToast("刪除失敗"); return; }
+  myClips=next;
+  buildMyVoiceList(); syncMyVoiceUI();
+}
+function mvSetBtn(o){
+  const b=$("mvRecBtn"); if(!b)return;
+  if(o.disabled!=null) b.disabled=o.disabled;
+  if(o.rec!=null) b.classList.toggle("rec",o.rec);
+  if(o.label!=null) b.textContent=o.label;
+}
+function syncMyVoiceUI(){
+  const cnt=$("mvCount"); if(cnt)cnt.textContent=myClips.length+" / "+MYCLIP_MAX;
+  const saveRow=$("mvSaveRow"); if(saveRow)saveRow.classList.toggle("hidden",!mvPending);
+  if(Voice.recording())return;   // 錄音中的按鈕文字由倒數計時器管,別蓋掉
+  if(mvPending){ mvSetBtn({ rec:false, disabled:false, label:"🎤 重錄" }); return; }
+  const full=myClips.length>=MYCLIP_MAX;
+  mvSetBtn({ rec:false, disabled:full, label: full?("已達 "+MYCLIP_MAX+" 組上限"):("🎤 錄一段新的("+(MYCLIP_MS/1000)+" 秒)") });
+}
+function toggleMyVoiceRec(){
+  if(Voice.recording()){ mvSetBtn({disabled:true,label:"處理中…"}); Voice.stop(); return; }   // 提早停
+  if(mvPending){ mvPending=null; syncMyVoiceUI(); }                                          // 重錄:丟掉上一段
+  if(myClips.length>=MYCLIP_MAX){ showToast("已達 "+MYCLIP_MAX+" 組上限,請先刪除"); return; }
+  if(!Voice.supported()){ showToast("此裝置/瀏覽器不支援錄音"); return; }
+  markAudioArmed(); Sound.wake();
+  mvSetBtn({disabled:true,label:"準備中…"});
+  voiceRecording=true; refreshBgmDuck();   // 先停背景音樂再開麥克風(Android 的通話路徑會把音樂弄難聽)
+  Voice.start(wav=>{
+    if(mvRecTmr){ clearTimeout(mvRecTmr); mvRecTmr=null; }
+    if(mvTick){ clearInterval(mvTick); mvTick=null; }
+    voiceRecording=false; refreshBgmDuck();
+    if(!wav || wav.byteLength<=44){ showToast("沒有錄到聲音"); mvPending=null; syncMyVoiceUI(); return; }
+    try{ mvPending=Voice.toDataURL(wav); }
+    catch(e){ showToast("語音處理失敗"); mvPending=null; }
+    syncMyVoiceUI();
+    if(mvPending){ const inp=$("mvName"); if(inp){ inp.value=""; inp.focus(); } }
+  }).then(()=>{
+    /* 3 秒上限:Voice.MAX_MS 是寫死的 6000,但 stop() 是對外方法 → 在外面自己收。
+       stop() 內部的 detach() 會 clearTimeout 掉那顆 6 秒的內部計時器,兩者不會打架
+       —— 所以整支 js/audio.js 一行都不用改。 */
+    mvRecTmr=setTimeout(()=>{ try{ Voice.stop(); }catch(e){} }, MYCLIP_MS);
+    let left=Math.ceil(MYCLIP_MS/1000);
+    mvSetBtn({disabled:false,rec:true,label:"⏹ 停止 · "+left+"s"});
+    mvTick=setInterval(()=>{
+      left--;
+      if(left<=0){ if(mvTick){ clearInterval(mvTick); mvTick=null; } return; }
+      mvSetBtn({label:"⏹ 停止 · "+left+"s"});
+    },1000);
+  }).catch(err=>{
+    voiceRecording=false; refreshBgmDuck();
+    mvPending=null; syncMyVoiceUI();
+    showToast((err&&err.name==="NotAllowedError")?"麥克風權限被拒絕":"無法啟動錄音");
+  });
+}
+function saveMyVoicePending(){
+  if(!mvPending)return;
+  const inp=$("mvName");
+  const label=((inp?inp.value:"")||"").trim().slice(0,MYCLIP_LABEL_MAX) || ("語音"+(myClips.length+1));
+  const next=myClips.concat([{ id:"mc"+Date.now(), label:label, data:mvPending, at:Date.now() }]);
+  if(!saveMyClips(next)){ showToast("本機空間不足,請先刪掉幾組"); return; }   // 失敗時 mvPending 留著,可改短名字或刪舊的再試
+  myClips=next; mvPending=null;
+  if(inp)inp.value="";
+  buildMyVoiceList(); syncMyVoiceUI();
+  showToast("已加入「"+label+"」⭐");
+}
+
 /* ---------- 共用啟動樣板(各遊戲 main.js 的重複部分) ---------- */
 // 版號:單一來源是 <meta name="version">
 function paintVersion(){
@@ -473,6 +670,14 @@ function bindCommonUI(){
   $("sfxVol").addEventListener("input",e=>setSfxVol((+e.target.value||0)/100));
   $("sfxVol").addEventListener("change",savePrefs);
   $("swVibrate").addEventListener("click",()=>setVibrate(!vibrateOn));
+
+  // 自訂語音的編輯浮層(★ js/main.js 有一份同樣的綁定給 Bingo 用)
+  $("myVoiceBtn").addEventListener("click",openMyVoice);
+  $("mvClose").addEventListener("click",closeMyVoice);
+  $("myVoiceVeil").addEventListener("click",e=>{ if(e.target===$("myVoiceVeil"))closeMyVoice(); });
+  $("mvRecBtn").addEventListener("click",toggleMyVoiceRec);
+  $("mvSave").addEventListener("click",saveMyVoicePending);
+  $("mvName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveMyVoicePending(); } });
 
   $("emoteOpenBtn").addEventListener("click",()=>openEmote("all"));
   $("quickVoiceBtn").addEventListener("click",toggleQuickVoice);

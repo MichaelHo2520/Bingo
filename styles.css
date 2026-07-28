@@ -1453,3 +1453,64 @@
   .pwa-tip .pwa-ok{width:100%}
   :root[data-theme="ebook"] .pwa-tip{background:#fff;border-top:1px solid #000}
   @keyframes pwaTipUp{ from{transform:translateY(100%)} to{transform:translateY(0)} }
+
+  /* ---------- 自訂語音(三個遊戲共用,v1.49.0) ----------
+     設定卡「我的語音 → 編輯」開啟的浮層,以及互動面板裡的「⭐ 我的語音」按鈕。
+     ★ 一律 .mvc-* 前綴:取名前掃過整份 styles.css,.mvc-* 零命中(既有的是 .order-item .mv,
+       CSS class 是完整 token 比對,不會誤中 .mvc-xxx)。
+     ⚠ 但檔案前段有 .order-item .mv button 這種「裸 button 後代選擇器」——
+       本區塊的 UI 都不在 .order-item 底下,所以不受影響;日後搬位置要重新確認。 */
+
+  /* 設定卡入口鈕:收成小鈕(.btn 預設 flex:1 + min-width:120px 會把整列撐開)。
+     ⚠ 特異度陷阱 —— 這裡一定要用兩層選擇器:既有的 .set-card .btn{width:100%;margin-top:18px}
+       是 (0,2,0),單寫 .mvc-open (0,1,0) 會被它蓋掉 → 鈕撐滿整列、把標籤擠成「一字一行」。
+       比照檔案前段 .emote-card #emoteSend 同樣的壓制手法。 */
+  .set-row .mvc-open{flex:0 0 auto;min-width:0;width:auto;margin-top:0;
+    padding:9px 18px;font-size:14px;border-radius:12px}
+
+  .mvc-card{max-width:360px;position:relative}
+  .mvc-hint{font-size:12.5px;line-height:1.65;color:var(--muted);margin:2px 0 14px}
+  .mvc-hint b{color:var(--text)}
+
+  .mvc-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+  .mvc-empty{font-size:13px;line-height:1.7;color:var(--muted);text-align:center;
+    padding:18px 12px;border:1px dashed var(--panel-line);border-radius:14px}
+  .mvc-row{display:flex;align-items:center;gap:8px}
+  .mvc-play,.mvc-del{flex:0 0 auto;width:38px;height:38px;border-radius:11px;cursor:pointer;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    font-size:15px;line-height:1;transition:transform .15s, background .2s}
+  .mvc-play:hover,.mvc-del:hover{background:rgba(255,255,255,.2)}
+  .mvc-play:active,.mvc-del:active{transform:scale(.9)}
+  /* 名字本身就是輸入框 = 點一下直接改,不必再開一層對話框 */
+  .mvc-name{flex:1 1 auto;min-width:0;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;
+    color:var(--text);background:rgba(255,255,255,.06);border:1px solid var(--panel-line);
+    border-radius:11px;padding:9px 12px}
+  .mvc-name:focus{outline:2px solid var(--accent);outline-offset:1px}
+
+  .mvc-save{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+  .mvc-save input{flex:1 1 auto;min-width:0;font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;
+    color:var(--text);background:rgba(255,255,255,.06);border:1px solid var(--panel-line);
+    border-radius:11px;padding:11px 12px}
+  .mvc-save .btn{flex:0 0 auto;width:auto;min-width:0;padding:11px 20px;font-size:14px;border-radius:12px}
+
+  /* 同上,兩層選擇器把 .set-card .btn 的 margin-top:18px 收成自訂間距 */
+  .mvc-card .mvc-rec{width:100%;margin-top:4px;background:var(--panel);border:1px solid var(--panel-line);
+    color:var(--text);font-size:15px}
+  .mvc-rec:disabled{opacity:.45;cursor:default;transform:none}
+  /* 錄音中:紅底 + 脈動(復用檔案前段給快速語音鈕寫的 recPulse keyframe) */
+  .mvc-rec.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;border-color:transparent;
+    animation:recPulse 1s ease-in-out infinite}
+  .mvc-foot{margin-top:10px;text-align:center;font-size:12px;font-weight:800;color:var(--muted)}
+
+  /* 互動面板的自訂語音按鈕:金調底色,與內建語音短訊(.clip-btn 藍調)、一句話(.phrase-btn)三者一眼區隔 */
+  .mvc-btn{background:rgba(255,205,90,.16)}
+  .mvc-btn:hover{background:rgba(255,205,90,.3)}
+
+  /* 電子書模式:全白底黑框(比照 .phrase-btn / .clip-btn 的處理) */
+  :root[data-theme="ebook"] .mvc-btn,
+  :root[data-theme="ebook"] .mvc-play,
+  :root[data-theme="ebook"] .mvc-del,
+  :root[data-theme="ebook"] .mvc-name,
+  :root[data-theme="ebook"] .mvc-save input,
+  :root[data-theme="ebook"] .mvc-rec{background:#fff;color:#000;border:1px solid #000}
+  :root[data-theme="ebook"] .mvc-rec.rec{background:#000;color:#fff}

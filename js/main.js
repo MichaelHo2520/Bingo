@@ -58,6 +58,13 @@
   $("sfxVol").addEventListener("input",e=>setSfxVol((+e.target.value||0)/100));    // 音效音量:拖曳即時套用
   $("sfxVol").addEventListener("change",savePrefs);                                // 放開才存偏好
   $("swVibrate").addEventListener("click",()=>setVibrate(!vibrateOn));              // 「輪到你時震動」開關
+  // 自訂語音的編輯浮層(★ js/shared/ui-kit.js 的 bindCommonUI 有一份同樣的綁定給五子棋/數獨用)
+  $("myVoiceBtn").addEventListener("click",openMyVoice);
+  $("mvClose").addEventListener("click",closeMyVoice);
+  $("myVoiceVeil").addEventListener("click",e=>{ if(e.target===$("myVoiceVeil"))closeMyVoice(); });
+  $("mvRecBtn").addEventListener("click",toggleMyVoiceRec);
+  $("mvSave").addEventListener("click",saveMyVoicePending);
+  $("mvName").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveMyVoicePending(); } });
   $("fsBtn").addEventListener("click",toggleFull);
   $("winRestart").addEventListener("click",()=>{restart();});
   $("winNew").addEventListener("click",()=>{closeWin();state.card=shuffled();state.fill="auto";toSetup();});

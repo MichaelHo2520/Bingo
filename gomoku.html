@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>五子棋 ｜ 連線對戰</title>
-<!-- 五子棋連線對戰 · v1.48.1 -->
-<meta name="version" content="1.48.1">
+<!-- 五子棋連線對戰 · v1.49.0 -->
+<meta name="version" content="1.49.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -245,6 +245,10 @@
             <span class="set-lbl">收到語音音量</span>
             <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量">
           </div>
+          <div class="set-row">
+            <span class="set-lbl">我的語音<span class="set-sub">(自己錄 · 連線可送)</span></span>
+            <button class="btn ghost mvc-open" id="myVoiceBtn" type="button">編輯</button>
+          </div>
         </div>
 
       </div>
@@ -264,6 +268,9 @@
       <div class="emote-phrases" id="emotePhrases"></div>
       <div class="emote-sub">🔊 語音短訊</div>
       <div class="emote-phrases" id="emoteClips"></div>
+      <!-- 自訂語音:沒錄過就整區隱藏(buildMyClips 控制),面板不會多一塊空的 -->
+      <div class="emote-sub hidden" id="myClipsSub">⭐ 我的語音</div>
+      <div class="emote-phrases hidden" id="emoteMyClips"></div>
       <div class="emote-input">
         <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
         <button class="btn" id="emoteSend" type="button">送出</button>
@@ -271,6 +278,24 @@
     </div>
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
+
+  <!-- 自訂語音的編輯浮層(由設定卡的「我的語音 → 編輯」開啟)
+       自己錄 3 秒短語音存在本機 localStorage(bingo.myclips.v1,三個遊戲共用同一批),
+       連線時在互動面板當按鈕送出;走既有的 kind="voice" 管道 = 把音訊本身傳過去,對方不需要有任何檔案。 -->
+  <div class="veil" id="myVoiceVeil">
+    <div class="set-card mvc-card">
+      <button class="card-x" id="mvClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">我的語音</div>
+      <div class="mvc-hint">自己錄 3 秒短語音,連線時可在互動面板當按鈕送給別人。<b>只存在這台裝置</b>,換裝置不會跟著走。</div>
+      <div class="mvc-list" id="mvList"></div>
+      <div class="mvc-save hidden" id="mvSaveRow">
+        <input id="mvName" type="text" maxlength="8" placeholder="取個名字…" autocomplete="off" enterkeyhint="done">
+        <button class="btn primary" id="mvSave" type="button">儲存</button>
+      </div>
+      <button class="btn mvc-rec" id="mvRecBtn" type="button">🎤 錄一段新的(3 秒)</button>
+      <div class="mvc-foot"><span id="mvCount">0 / 6</span></div>
+    </div>
+  </div>
 
   <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
 
