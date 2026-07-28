@@ -133,6 +133,7 @@ registerSW();
 paintVersion();
 // 更新檢查:安全 = 沒在房裡、也沒在單機局中(單機重載會把計時與填好的格子全部丟掉)
 initUpdateCheck(()=>!MP.isOnline() && !Solo.running());
+initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過來,第一個手勢自動接回去
 
 /* ---------- 啟動 ---------- */
 buildSwatches();

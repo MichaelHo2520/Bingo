@@ -597,14 +597,33 @@
     clearTimeout(toastT);
     toastT=setTimeout(()=>el.classList.remove("show"),dur||1100);
   }
+  /* ---------- 全螢幕(跨頁保持,v1.49.1) ----------
+     三個遊戲是三個獨立 HTML,而 Fullscreen API 是綁在 document 上的 —— 換頁(去五子棋 / 按返回)
+     瀏覽器一定會把全螢幕收掉,於是「首頁按 ⛶ → 進遊戲 → 返回」就變回小視窗。
+     做法:把「使用者想要全螢幕」記在 sessionStorage(同一個分頁,換頁與重載都還在,關掉分頁才消失),
+          新頁載入時若記著要全螢幕,就掛監聽等第一個真實手勢再 requestFullscreen()
+          —— 沒有使用者手勢瀏覽器不給進全螢幕,那是唯一能自動接回去的時機。
+     ★ 這一整組在 js/shared/ui-kit.js 另有一份(Bingo 不載入 js/shared/,比照 toggleFull 各留一份)。 */
+  const FS_KEY="bingo.fs";
+  let fsLeaving=false;   // 換頁中:此時的 fullscreenchange 是瀏覽器收掉的,不代表使用者不想要了
+  function fsEl(){ return document.fullscreenElement||document.webkitFullscreenElement; }
+  function fsSupported(){ const de=document.documentElement; return !!(de.requestFullscreen||de.webkitRequestFullscreen); }
+  function fsWant(){ try{ return sessionStorage.getItem(FS_KEY)==="1"; }catch(e){ return false; } }
+  function setFsWant(on){ try{ if(on)sessionStorage.setItem(FS_KEY,"1"); else sessionStorage.removeItem(FS_KEY); }catch(e){} }
+  function fsRequest(){
+    const de=document.documentElement, req=de.requestFullscreen||de.webkitRequestFullscreen;
+    if(!req)return null;
+    try{ return req.call(de); }catch(e){ return null; }
+  }
   function toggleFull(){
-    const de=document.documentElement;
-    const req=de.requestFullscreen||de.webkitRequestFullscreen;   // webkit:舊 Safari/Android
-    const exit=document.exitFullscreen||document.webkitExitFullscreen;
-    const fsEl=document.fullscreenElement||document.webkitFullscreenElement;
-    if(req){
-      if(fsEl){ exit&&exit.call(document); }
-      else{ req.call(de); }
+    const exit=document.exitFullscreen||document.webkitExitFullscreen;   // webkit:舊 Safari/Android
+    if(fsSupported()){
+      if(fsEl()){ setFsWant(false); exit&&exit.call(document); }
+      else{
+        setFsWant(true);
+        const p=fsRequest();
+        if(p&&p.catch)p.catch(()=>setFsWant(false));   // 這一次就被拒:別把意願留著騷擾之後每一頁
+      }
     }else{
       // iOS Safari(iPhone)不支援 Fullscreen API → 引導改用「加入主畫面」以全螢幕開啟
       const standalone = ("standalone" in navigator && navigator.standalone) ||
@@ -612,6 +631,37 @@
       showToast(standalone ? "已是全螢幕模式 👍"
                            : "iOS 請按 Safari 分享鈕 → 加入主畫面,即可全螢幕", 3000);
     }
+  }
+  /* 掛「下一個手勢就接回全螢幕」。用 click(冒泡到 window)而不是 pointerdown:
+     按下去就切全螢幕會在 pointerdown/pointerup 之間改變版面,那一下的 click 可能就飛掉了。
+     點到 <a href>(去別頁 / 回主選單)或正在輸入框打字則跳過並繼續等 ——
+     前者進了全螢幕馬上又要換頁只會閃一下,後者打到一半版面亂跳很煩。 */
+  let fsArmed=null;
+  function armFsRestore(){
+    if(fsArmed || !fsWant() || fsEl() || !fsSupported())return;
+    fsArmed=e=>{
+      const t=e&&e.target;
+      if(t&&t.closest&&t.closest("a[href],input,textarea,select"))return;   // 這一下不算,留著等下一次
+      disarmFsRestore();
+      if(!fsWant() || fsEl())return;
+      fsRequest();   // 被拒就安靜算了(每頁只試這一次,不會纏著使用者)
+    };
+    addEventListener("click",fsArmed);
+    addEventListener("keydown",fsArmed);
+  }
+  function disarmFsRestore(){
+    if(!fsArmed)return;
+    removeEventListener("click",fsArmed);
+    removeEventListener("keydown",fsArmed);
+    fsArmed=null;
+  }
+  function initFullscreenKeep(){
+    const sync=()=>{ if(!fsLeaving) setFsWant(!!fsEl()); };   // 使用者自己按 Esc 退出 → 意願跟著關掉
+    document.addEventListener("fullscreenchange",sync);
+    document.addEventListener("webkitfullscreenchange",sync);
+    addEventListener("pagehide",()=>{ fsLeaving=true; });
+    addEventListener("pageshow",e=>{ fsLeaving=false; if(e.persisted)armFsRestore(); });   // 上一頁回來(bfcache)也要接回去
+    armFsRestore();
   }
   /* 上面那句提示藏在 ⛶ 鈕後面,實際上沒人會去按 → 首次進站主動講一次,按過就不再打擾。
      首頁是掃 QR 進站的落點,這個引導最該出現在這裡。

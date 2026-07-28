@@ -69,6 +69,7 @@ registerSW();
 paintVersion();
 // 更新檢查:安全 = 沒在房裡(連線畫面本身可以直接重載,重載後照樣停在連線畫面)
 initUpdateCheck(()=>!MP.isOnline());
+initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過來,第一個手勢自動接回去
 
 /* ---------- 啟動 ---------- */
 buildSwatches();
