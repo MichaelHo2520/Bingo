@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.44.0 -->
-<meta name="version" content="1.44.0">
+<!-- 數獨 · v1.45.0 -->
+<meta name="version" content="1.45.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -34,41 +34,55 @@
     </div>
   </div>
 
-  <!-- ====== 進場選單:單機練習(選難度直接開始)或連線對戰 ====== -->
+  <!-- ====== 進場選單(兩層):先選玩法(連線在上),點單機練習才挑難度 ====== -->
   <section class="panel" id="sdkHome">
-    <div class="mp-head">
+    <!-- 回 index.html 的返回列。只在第一層顯示 —— 第二層有自己的返回(回第一層),
+         兩個返回鈕同時出現會分不清誰是誰 -->
+    <div class="mp-head" id="sdkHomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
       <div class="subtitle">數獨 · 選擇玩法</div>
     </div>
 
-    <div class="sdk-hero">
-      <svg class="sdk-art" viewBox="0 0 56 56" role="img" aria-label="數獨盤">
-        <rect class="sk-bd" x="2" y="2" width="52" height="52" rx="6"/>
-        <g class="sk-ln"><path d="M19.3 4V52M36.6 4V52M4 19.3H52M4 36.6H52"/></g>
-        <g class="sk-tn"><path d="M13.6 4V52M25.1 4V52M30.9 4V52M42.4 4V52M4 13.6H52M4 25.1H52M4 30.9H52M4 42.4H52"/></g>
-        <g class="sk-nm"><text x="8.8" y="12">5</text><text x="26" y="12">7</text><text x="43.2" y="12">2</text>
-           <text x="14.5" y="29">3</text><text x="31.8" y="29">9</text><text x="49" y="29">1</text>
-           <text x="8.8" y="46">6</text><text x="37.5" y="46">4</text></g>
-      </svg>
-      <div class="home-tagline">填滿 1~9,每列每行每宮不重複</div>
-    </div>
-
-    <div class="or-divider"><span>🎯 單機練習</span></div>
-    <div class="field">
-      <span class="field-label">難度</span>
-      <div class="seg" id="sdkHomeDiffSeg" aria-label="單機難度">
-        <button data-diff="m6">迷你 6×6</button>
-        <button class="on" data-diff="e9">標準 9×9</button>
-        <button data-diff="h9">困難 9×9</button>
+    <!-- 第一層:先選怎麼玩(連線在上)。刻意與 index.html 的 #homeBingo 同一套結構與 class,
+         三個遊戲進門的操作一致 —— 原本把難度膠囊擺在最前面,等於逼人先回答一個還沒決定的問題 -->
+    <div id="sdkPickMode">
+      <div class="sdk-hero">
+        <svg class="sdk-art" viewBox="0 0 56 56" role="img" aria-label="數獨盤">
+          <rect class="sk-bd" x="2" y="2" width="52" height="52" rx="6"/>
+          <g class="sk-ln"><path d="M19.3 4V52M36.6 4V52M4 19.3H52M4 36.6H52"/></g>
+          <g class="sk-tn"><path d="M13.6 4V52M25.1 4V52M30.9 4V52M42.4 4V52M4 13.6H52M4 25.1H52M4 30.9H52M4 42.4H52"/></g>
+          <g class="sk-nm"><text x="8.8" y="12">5</text><text x="26" y="12">7</text><text x="43.2" y="12">2</text>
+             <text x="14.5" y="29">3</text><text x="31.8" y="29">9</text><text x="49" y="29">1</text>
+             <text x="8.8" y="46">6</text><text x="37.5" y="46">4</text></g>
+        </svg>
+        <div class="home-tagline">填滿 1~9,每列每行每宮不重複</div>
       </div>
+      <button class="btn primary block-btn home-btn" id="sdkGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="sdkPickSolo">🎯 單機練習</button>
+      <div class="home-hint">連線 2~4 人:<b>搶格</b>(同一張盤面搶著填)或<b>競速</b>(各解各的比快);單機自己練一題</div>
     </div>
-    <button class="btn primary block-btn" id="sdkStartSolo">開始練習 ▸</button>
 
-    <div class="or-divider"><span>或</span></div>
-    <button class="btn ghost block-btn" id="sdkGoOnline">🌐 連線對戰(2~4 人)</button>
-    <div class="hint">連線有兩種玩法:<b>搶格</b>(同一張盤面搶著填)與<b>競速</b>(各解各的比快)。</div>
+    <!-- 第二層:單機要先挑難度 -->
+    <div id="sdkPickLevel" class="hidden">
+      <div class="home-sub-head">
+        <button class="icon-btn" id="sdkLevelBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <span class="subtitle">單機練習 · 選難度</span>
+      </div>
+      <div class="field">
+        <span class="field-label">難度</span>
+        <div class="seg" id="sdkHomeDiffSeg" aria-label="單機難度">
+          <button data-diff="m6">迷你 6×6</button>
+          <button class="on" data-diff="e9">標準 9×9</button>
+          <button data-diff="h9">困難 9×9</button>
+        </div>
+      </div>
+      <button class="btn primary block-btn home-btn" id="sdkStartSolo">開始練習 ▸</button>
+      <div class="home-hint" id="sdkLevelHint"></div>
+    </div>
   </section>
 
   <!-- ====== 連線畫面(暱稱 / 建房 / 大廳清單)====== -->

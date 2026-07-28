@@ -24,6 +24,23 @@ function showScreen(which){
   }
   document.body.classList.toggle("sdk-at-home", which==="home");
   document.body.classList.toggle("solo-on", which==="solo");
+  if(which==="home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始(比照 Bingo 的 enterHome)
+}
+
+/* ---------- 進場選單的兩層 ----------
+   第一層選玩法(連線在上)、第二層才挑單機難度。與 index.html 的 #homePick/#homeBingo 同一個模式。
+   回 index.html 的返回列只在第一層顯示:第二層有自己的返回,兩顆並存會分不清誰是誰。 */
+function showHomeLayer(which){
+  const pick=$("sdkPickMode"), lvl=$("sdkPickLevel"), head=$("sdkHomeHead");
+  if(pick) pick.classList.toggle("hidden", which!=="pick");
+  if(lvl)  lvl.classList.toggle("hidden", which!=="level");
+  if(head) head.classList.toggle("hidden", which!=="pick");
+}
+// 第二層的難度說明:直接讀 SGen 的難度表,不另外硬編一份文案
+function paintLevelHint(){
+  const el=$("sdkLevelHint"); if(!el)return;
+  const L=SGen.levelOf(Solo.level());
+  el.textContent=L.label+" "+L.name+" · 空 "+L.holes+" 格 · "+L.desc;
 }
 
 /* ---------- 盤面:點格 → 點數字 ---------- */
@@ -41,9 +58,12 @@ $("sdkHomeDiffSeg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   Solo.setLevel(b.dataset.diff);
   [...$("sdkHomeDiffSeg").children].forEach(x=>x.classList.toggle("on",x===b));
+  paintLevelHint();
 });
 $("sdkStartSolo").addEventListener("click",()=>Solo.start());
 $("sdkGoOnline").addEventListener("click",()=>MP.openConnect());
+$("sdkPickSolo").addEventListener("click",()=>{ paintLevelHint(); showHomeLayer("level"); });
+$("sdkLevelBack").addEventListener("click",()=>showHomeLayer("pick"));
 
 /* ---------- 單機 HUD ---------- */
 $("sdkSoloBack").addEventListener("click",()=>Solo.quit());
@@ -119,6 +139,7 @@ loadPrefs();          // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 數獨的�
 Solo.loadOwn();       // 單機難度(獨立 key,不與連線的難度互相覆蓋)
 syncSettingsUI();
 [...$("sdkHomeDiffSeg").children].forEach(b=>b.classList.toggle("on",b.dataset.diff===Solo.level()));
+paintLevelHint();
 showScreen("home");   // 進場先選玩法(數獨有單機也有連線)
 // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
 setTimeout(maybeShowInstallTip,1500);
