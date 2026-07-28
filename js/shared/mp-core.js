@@ -467,7 +467,8 @@ const MPCore = (function(){
 
       const o=(A.outcome && A.outcome(winner,{ iWon, isDraw, mine:myRoundWin, ids:wids, first:!outcomeShown })) || {};
       $("winWord").textContent=o.word || (isDraw?"平手!":(iWon?"你贏了!":"你輸了"));
-      $("winMsg").textContent=o.msg || "";
+      // msg 是 HTML(數獨要在結果卡裡換行講自己的對/錯統計):adapter 端一律自己 esc() 玩家名字
+      $("winMsg").innerHTML=o.msg || "";
       if(!outcomeShown){
         if(iWon){ Sound.win(); burst(); }
         else if(myRoundWin) Sound.win();     // 平手且自己有份:有聲音但不放彩帶
@@ -859,6 +860,7 @@ const MPCore = (function(){
      chipLead(id)/chipTail(id)  玩家晶片的前綴 / 後綴 HTML
      lobbyStatusText(ids)/readyHint(ids,ready)  狀態列與準備列文案
      outcome(winner,{iWon,isDraw,first})  → {word,msg};順便做自己的結果收尾
+                        msg 當 HTML 塞(可用 <br>/<b>),玩家名字要自己 esc()
      refresh()          畫面重整鉤子(玩家名單變動 / 結果出爐時被呼叫)
      ownPrefs()/usePrefs(o)  遊戲專屬偏好
    ========================================================================== */
