@@ -435,7 +435,7 @@ const MPCore = (function(){
     /* ---------- 結果 / 計分 ---------- */
     function onWinner(){ if(winner) showOutcome(); }
     /* 這一局有誰得分。三種寫法都支援:
-       • winner.ids  → 並列名單(數獨 3~4 人同分時只有並列者得分)
+       • winner.ids  → 並列名單(數獨 3~6 人同分時只有並列者得分)
        • winner.id   → 單一贏家
        • 兩者皆無    → 全員(五子棋的和局:雙方各 +1) */
     function winnerIds(){
@@ -461,7 +461,7 @@ const MPCore = (function(){
       }
 
       // 大字只講「對我而言」的輸贏,卡片再依結果換色(原本輸贏共用同一組金色漸層,輸了也一樣喜氣)
-      // 平手但自己不在並列名單裡(3~4 人才會發生)→ 卡片仍走 lose,不要給喜氣的配色
+      // 平手但自己不在並列名單裡(3~6 人才會發生)→ 卡片仍走 lose,不要給喜氣的配色
       const card=$(A.winCardId||"gmkWinCard");
       if(card){ card.classList.remove("win","lose","draw"); card.classList.add(isDraw?(myRoundWin?"draw":"lose"):(iWon?"win":"lose")); }
 
