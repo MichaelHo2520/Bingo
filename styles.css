@@ -1291,6 +1291,13 @@
   /* 角標:這個數字全盤還剩幾格沒填(填滿就整顆變淡) */
   .sdk-kleft{position:absolute;top:3px;right:6px;font-size:10px;font-weight:800;color:var(--muted)}
   .sdk-key.done{opacity:.34}
+  /* 輔助模式:這格不可能填的數字。要跟 .done(整盤填滿了,單純變淡)一眼分得出來 ——
+     所以不是「更淡」而是「凹下去」:暗底 + 去邊框 + 灰階 + 明顯的刪除線。
+     opacity 不能壓太低,壓低了刪除線會跟著糊掉,兩種狀態就看起來一樣了。 */
+  .sdk-key.sdk-no{opacity:.5;filter:grayscale(1);background:rgba(0,0,0,.3);border-color:transparent}
+  .sdk-key.sdk-no:hover{background:rgba(0,0,0,.3)}
+  .sdk-key.sdk-no .sdk-kn{color:var(--muted);text-decoration:line-through;text-decoration-thickness:2.5px}
+  :root[data-theme="ebook"] .sdk-key.sdk-no{background:#e2e2e2;border:1px solid #000}
   .sdk-key.erase .sdk-kn{font-size:19px}
   :root[data-theme="ebook"] .sdk-key{background:#fff;border:1px solid #000}
 
@@ -1311,6 +1318,20 @@
   .sdk-hcard.p0 .sdk-bar i{background:var(--sp0)} .sdk-hcard.p1 .sdk-bar i{background:var(--sp1)}
   .sdk-hcard.p2 .sdk-bar i{background:var(--sp2)} .sdk-hcard.p3 .sdk-bar i{background:var(--sp3)}
   :root[data-theme="ebook"] .sdk-hcard{background:#fff;border:1px solid #000}
+  /* 分數變動飄字:計分規則靠回饋教,不靠說明文字去佔盤面上方的版面。
+     .sdk-hcard 是 overflow:hidden,所以只在卡片內短距離飄(飄出去會被裁掉)。 */
+  .sdk-pop{position:absolute;right:7px;top:6px;pointer-events:none;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;line-height:1;
+    animation:sdkPop .9s ease-out forwards}
+  .sdk-pop.up{color:#5fe08a}
+  .sdk-pop.down{color:#ff8f8f}
+  :root[data-theme="ebook"] .sdk-pop.up{color:#0a7a3a}
+  :root[data-theme="ebook"] .sdk-pop.down{color:#b00020}
+  @keyframes sdkPop{
+    0%{opacity:0;transform:translateY(6px)}
+    22%{opacity:1;transform:translateY(0)}
+    100%{opacity:0;transform:translateY(-10px)}
+  }
 
   /* ---------- 結果卡 ---------- */
   .sdk-win{padding:30px 22px}

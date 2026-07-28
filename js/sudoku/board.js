@@ -20,6 +20,7 @@ const SB = (function(){
   let cells=[], padBtns=[];
   let sel=-1, enabled=false, noteMode=false;
   let frozenUntil=0, freezeTick=null;
+  let assist=false;                  // 輔助模式(連線房主決定):把這格不可能的數字灰掉
   let cbPick=null, cbNum=null, cbErase=null;
   let board, pad, wrap;
 
@@ -93,6 +94,11 @@ const SB = (function(){
     if(sel<0){ showToast("先點一個空格 👆"); return; }
     if(puzzle[sel]){ showToast("這格是題目給的,不能改"); return; }
     if(noteMode){ toggleNote(sel,v); return; }
+    // 輔助模式:灰掉的數字按了不填、也**不算填錯**(不然灰鍵就變成陷阱),只說明為什麼
+    if(assist && !vals[sel] && !candAt(sel).has(v)){
+      showToast(v+" 在同列/行/宮已經有了 🚫",900);
+      return;
+    }
     if(cbNum) cbNum(sel,v);
   }
   // 鍵盤數字鍵(桌機):1~9 填數、方向鍵移動、Backspace 清除
@@ -141,6 +147,15 @@ const SB = (function(){
     if(ra===rb||ca===cb)return true;
     return Math.floor(ra/bh)===Math.floor(rb/bh) && Math.floor(ca/bw)===Math.floor(cb/bw);
   }
+  /* 這格還可能填哪些數字。**只做同列/同行/同宮的排除**,刻意不碰 sol ——
+     用解答回推的話,候選剩 1 個時等於直接發答案,推理就沒了。
+     這裡給的資訊玩家自己掃得出來,只是幫他省掉掃描的眼力。 */
+  function candAt(i){
+    const s=new Set();
+    for(let v=1;v<=n;v++) s.add(v);
+    eachPeer(i,j=>{ if(j!==i && vals[j]) s.delete(vals[j]); });
+    return s;
+  }
 
   /* ---------- 畫面 ---------- */
   function repaint(){
@@ -167,7 +182,10 @@ const SB = (function(){
     paintPad();
   }
   // 數字鍵角標:這個數字全盤還剩幾格沒填(填滿的數字整顆變淡)
+  // 輔助模式再多一層:選中格不可能的數字劃掉變灰(.sdk-no)。**不用 disabled** ——
+  // disabled 的按鈕連 click 都不發,玩家按了沒反應會以為當掉;改成按了給提示但不算錯。
   function paintPad(){
+    const cand = (assist && sel>=0 && !puzzle[sel] && !vals[sel]) ? candAt(sel) : null;
     padBtns.forEach(b=>{
       const v=+b.dataset.v;
       let left=n;
@@ -176,6 +194,7 @@ const SB = (function(){
       if(tag) tag.textContent = left>0 ? String(left) : "";
       b.classList.toggle("done", left<=0);
       b.classList.toggle("on", noteMode);
+      b.classList.toggle("sdk-no", !!cand && !cand.has(v));
     });
   }
   function flashWrong(i){
@@ -233,6 +252,10 @@ const SB = (function(){
     setEnabled(v){ enabled=!!v; if(wrap) wrap.classList.toggle("locked",!enabled); },
     setNoteMode(v){ noteMode=!!v; repaint(); },
     noteMode:()=>noteMode,
+    // 輔助模式由連線的房間設定驅動;單機不呼叫 → 永遠 false,行為完全不變。
+    // 值沒變就不重畫:applyGame 每次同步都會呼叫這支,盤面已經夠忙了
+    setAssist(v){ v=!!v; if(v===assist)return; assist=v; repaint(); },
+    assist:()=>assist,
     setSel(i){ sel=i; repaint(); },
     sel:()=>sel,
     valueAt:i=>vals[i]||0,

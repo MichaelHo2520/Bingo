@@ -65,6 +65,7 @@ $("sdkHud").addEventListener("click",e=>{
 /* ---------- 連線大廳設定(房主可改) ---------- */
 $("sdkModeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setMode(b.dataset.mode); });
 $("sdkDiffSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setDiff(b.dataset.diff); });
+$("sdkAssistSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setAssist(b.dataset.assist==="1"); });
 $("scoreSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setScoreMode(b.dataset.score); });
 $("wgMinus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()-1));
 $("wgPlus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()+1));

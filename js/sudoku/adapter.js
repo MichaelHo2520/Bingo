@@ -17,10 +17,10 @@
    ========================================================================== */
 
 const MP = MPCore.create((function(){
-  const FREEZE_MS=3000;            // 填錯的凍結懲罰(只罰時間、不扣分:扣分容易讓落後方棄賽)
+  const FREEZE_MS=3000;            // 填錯的凍結懲罰
   const COLORS=["p0","p1","p2","p3"];
-  let mode="grab", diff="e9";      // 房間設定(房主可改)
-  let gMode="grab", gDiff="e9";    // 開局當下鎖定的值(對戰中改設定不影響進行中的這局)
+  let mode="grab", diff="e9", assist=false;      // 房間設定(房主可改)
+  let gMode="grab", gDiff="e9", gAssist=false;   // 開局當下鎖定的值(對戰中改設定不影響進行中的這局)
   let ctx=null;
   let puzKey=null, holes=0, fills=[], tally=[], prog={};
   let myMiss=0, startedAt=0;
@@ -37,6 +37,20 @@ const MP = MPCore.create((function(){
   function seatOf(id){ return ctx.order().indexOf(id); }
   function mySeat(){ return seatOf(ctx.me()); }
   function colorOf(seat){ return COLORS[seat]||"p0"; }
+
+  /* ---------- 計分:唯一的加減分入口 ----------
+     一般模式只加不扣(原設計:扣分容易讓落後方棄賽)。
+     輔助模式才啟用 −1 —— 因為灰鍵把「明顯違規」濾掉之後,剩下的候選常常只有 2 個,
+     猜一個的期望成本只有 1.5 秒(3 秒 × 50%),時間懲罰根本擋不住亂猜,要用分數才擋得住。
+     **地板 0**:負分對落後方的心理殺傷力太大,而且 HUD 進度條算出負寬度會很醜。
+
+     ⚠ 三個地方都必須走這支(結算 / 重連整盤重建 / 平時增量),
+        漏掉任何一個就會出現「重連後分數跟別人對不上」的鬼 bug。
+     clamp 讓運算變得跟順序有關,但 fills 是有序陣列、各端重放順序一致,結果仍然相同。 */
+  function bump(t,seat,ok,as){
+    const cur=t[seat]||0;
+    t[seat] = ok ? cur+1 : (as ? Math.max(0,cur-1) : cur);
+  }
 
   /* ---------- 即時比分 HUD(盤面上方那一列) ---------- */
   function renderHud(){
@@ -65,6 +79,19 @@ const MP = MPCore.create((function(){
              '</div>';
     }).join("");
   }
+  /* 分數變動時在那個人的 HUD 卡片上飄一個 +1 / −1。
+     計分規則不寫成說明文字塞進盤面上方(那是玩的時候最寶貴的垂直空間),
+     改成讓玩家從「結果」學規則 —— 看到扣分飄出來,比讀任何一行字都清楚。
+     renderHud() 會重建 innerHTML,所以飄字一定要在它之後才掛。 */
+  function popScore(seat,delta){
+    const box=$("sdkHud"); if(!box)return;
+    const card=box.children[seat]; if(!card)return;
+    const el=document.createElement("span");
+    el.className="sdk-pop "+(delta>0?"up":"down");
+    el.textContent=(delta>0?"+":"−")+Math.abs(delta);
+    card.appendChild(el);
+    setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); },900);
+  }
 
   /* ---------- 填格 ---------- */
   function play(i,v){
@@ -82,6 +109,7 @@ const MP = MPCore.create((function(){
       myMiss++;
       SB.flashWrong(i);
       SB.freeze(FREEZE_MS);
+      showToast(gAssist?"填錯了 −1 分,冷靜 3 秒 🥶":"填錯了,冷靜 3 秒 🥶",1400);
       try{ Sound.lose(); }catch(e){}
       ctx.txGame(g=>{
         if(g.status!=="playing"||g.winner)return false;
@@ -109,6 +137,11 @@ const MP = MPCore.create((function(){
     }else{
       myMiss++;
       SB.flashWrong(i);
+      // 競速沒有分數可扣,輔助模式的懲罰只能是時間。不開輔助時維持原本「只計錯、不擋手」
+      if(gAssist){
+        SB.freeze(FREEZE_MS);
+        showToast("填錯了,冷靜 3 秒 🥶",1400);
+      }
       try{ Sound.lose(); }catch(e){}
       pushProgress();
     }
@@ -123,6 +156,16 @@ const MP = MPCore.create((function(){
     const r=ctx.ref("progress/"+ctx.me()); if(!r)return;
     r.set({ n:SB.filledCount(), m:myMiss, done:SB.isComplete(), at:Date.now()-startedAt });
   }
+  /* 結果卡上補一行「你 N 對 M 錯 → K 分」。只在有扣分時才附 ——
+     沒開輔助時分數就等於格數,講了是廢話。結果卡是解釋計分的最佳位置:
+     玩完才看得到,對戰中一格版面都不吃。 */
+  function myTail(){
+    if(!gAssist) return "";
+    const s=mySeat(); if(s<0) return "";
+    let ok=0, no=0;
+    fills.forEach(c=>{ const f=decFill(c); if(f.seat!==s)return; if(f.ok)ok++; else no++; });
+    return no ? "<br>你 "+ok+" 對 · "+no+" 錯 → "+(tally[s]||0)+" 分" : "";
+  }
   function settleRace(){
     ctx.txGame(g=>{
       if(g.winner)return false;
@@ -135,8 +178,9 @@ const MP = MPCore.create((function(){
     ctx.txGame(g=>{
       if(g.winner)return false;
       const arr=Array.isArray(g.fills)?g.fills:[];
+      const as=!!g.assist;           // 讀 game 節點而不是本地 gAssist:結算要以開局鎖定的值為準
       const t=[];
-      arr.forEach(c=>{ const f=decFill(c); if(f.ok) t[f.seat]=(t[f.seat]||0)+1; });
+      arr.forEach(c=>{ const f=decFill(c); bump(t,f.seat,f.ok,as); });
       const ord=ctx.order();
       let best=-1;
       ord.forEach((id,s)=>{ if((t[s]||0)>best) best=(t[s]||0); });
@@ -151,9 +195,22 @@ const MP = MPCore.create((function(){
   function ruleHint(){
     const el=$("sdkRuleHint"); if(!el)return;
     const L=SGen.levelOf(diff);
-    el.innerHTML = mode==="grab"
-      ? "<b>搶格</b>:大家看同一張盤面,同時搶著填。填對這格就歸你 +1 分,填錯凍結 3 秒。盤面填滿時分數最高的人贏。<br>盤面 "+L.label+"(空 "+L.holes+" 格)· "+L.desc
-      : "<b>競速</b>:同一題、各自解各自的,中途只看得到對手的進度條。最先把整盤填完的人贏。<br>盤面 "+L.label+"(空 "+L.holes+" 格)· "+L.desc;
+    const base = mode==="grab"
+      ? "<b>搶格</b>:大家看同一張盤面,同時搶著填。填對這格就歸你 <b>+1 分</b>,盤面填滿時分數最高的人贏。"
+      : "<b>競速</b>:同一題、各自解各自的,中途只看得到對手的進度條。最先把整盤填完的人贏。";
+    // 罰則寫在大廳(開打前看得完),對戰中不佔盤面上方任何一列
+    let pen;
+    if(mode==="grab") pen = assist ? "填錯 <b>−1 分</b>並凍結 3 秒(分數不會扣成負的)。" : "填錯凍結 3 秒,<b>不扣分</b>。";
+    else              pen = assist ? "填錯凍結 3 秒。" : "填錯只計次,不罰。";
+    const as = assist
+      ? "🔍 <b>候選提示:開</b> —— 點空格時,同列/行/宮已經有的數字會被劃掉,按了不算填錯。"
+      : "🔍 候選提示:關 —— 九個數字都能按,自己掃。";
+    // 實測種子題:開了候選之後只剩一個選擇的格子,6×6 占 42%、標準 9×9 占 30%、困難只占 11%。
+    // 6×6 幾乎變成「看哪個沒被劃掉就按」,先講一聲讓房主自己決定,不硬性擋
+    const warn = (assist && diff==="m6")
+      ? "<br>⚠️ 6×6 開候選提示,約四成的格子會只剩一個選擇(等於直接看到答案),建議搭配 9×9。"
+      : "";
+    el.innerHTML = base+pen+"<br>盤面 "+L.label+"(空 "+L.holes+" 格)· "+L.desc+"<br>"+as+warn;
   }
 
   return {
@@ -168,7 +225,7 @@ const MP = MPCore.create((function(){
     init(c){ ctx=c; },
 
     /* ---------- 房間層級設定 ---------- */
-    roomFields(){ return { mode:mode, diff:diff }; },
+    roomFields(){ return { mode:mode, diff:diff, assist:assist }; },
     onRoomField(k,v){
       if(k==="mode"){
         const nv=(v==="race")?"race":"grab";
@@ -177,11 +234,17 @@ const MP = MPCore.create((function(){
       }else if(k==="diff"){
         if(!SGen.LEVELS[v]||v===diff)return;
         diff=v; ctx.unreadyOnFieldChange(); ctx.syncSetup(); ctx.updateGoal(); ruleHint();
+      }else if(k==="assist"){
+        // 輔助模式**只能全房一致**:搶格比的是手速,省掉掃描時間就是直接贏,各自開就不用玩了
+        const nv=!!v;
+        if(nv===assist)return;
+        assist=nv; ctx.unreadyOnFieldChange(); ctx.syncSetup(); ctx.updateGoal(); ruleHint();
       }
     },
     readRoom(r){
       if(r.mode==="race"||r.mode==="grab") mode=r.mode;
       if(SGen.LEVELS[r.diff]) diff=r.diff;
+      assist=!!r.assist;
     },
 
     /* ---------- 額外監聽:競速模式的進度 ---------- */
@@ -200,12 +263,14 @@ const MP = MPCore.create((function(){
       if(prev && prev.length===ids.length) ord=prev.slice(1).concat(prev[0]);
       else { ord=ids.slice(); for(let i=ord.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=ord[i]; ord[i]=ord[j]; ord[j]=t; } }
       const pr=ctx.ref("progress"); if(pr) pr.remove();     // 上一局的進度不要帶到這局
-      return { order:ord, fills:[], puzzle:q.puzzle, sol:q.sol, mode:mode, diff:diff };
+      return { order:ord, fills:[], puzzle:q.puzzle, sol:q.sol, mode:mode, diff:diff, assist:assist };
     },
     applyGame(g, playing){
       if(!playing) return;
       gMode=(g.mode==="race")?"race":"grab";
       gDiff=SGen.LEVELS[g.diff]?g.diff:"e9";
+      gAssist=!!g.assist;
+      SB.setAssist(gAssist);          // 每次都設:重連歸位時也要跟著這局鎖定的值
       // 題目換了(新的一局)→ 重建盤面
       if(g.puzzle && g.puzzle!==puzKey){
         const L=SGen.levelOf(gDiff);
@@ -219,13 +284,14 @@ const MP = MPCore.create((function(){
       }
       if(gMode==="grab"){
         const next=Array.isArray(g.fills)?g.fills:[];
+        const pops=[];                 // 這批要飄的分數變動 (seat, delta)
         // 能延續就只補新的幾筆,否則整盤重建(重連 / 中途歸位)
         const extend = next.length>=fills.length && fills.every((v,k)=>next[k]===v);
         if(!extend){
           const L=SGen.levelOf(gDiff);
           SB.setPuzzle({ n:L.n, bw:L.bw, bh:L.bh, puzzle:g.puzzle, sol:g.sol });
           holes=SB.remaining(); tally=[];
-          next.forEach(c=>{ const f=decFill(c); if(f.ok){ SB.fill(f.i,f.v,colorOf(f.seat)); tally[f.seat]=(tally[f.seat]||0)+1; } });
+          next.forEach(c=>{ const f=decFill(c); if(f.ok) SB.fill(f.i,f.v,colorOf(f.seat)); bump(tally,f.seat,f.ok,gAssist); });
           fills=next.slice();
           SB.setSel(SB.firstEmpty());
         }else{
@@ -236,21 +302,26 @@ const MP = MPCore.create((function(){
           const quiet=added.length>1;
           added.forEach(c=>{
             const f=decFill(c);
+            const before=tally[f.seat]||0;
+            bump(tally,f.seat,f.ok,gAssist);
+            if(!quiet){ const d=(tally[f.seat]||0)-before; if(d) pops.push([f.seat,d]); }
             if(f.ok){
               SB.fill(f.i,f.v,colorOf(f.seat));
-              tally[f.seat]=(tally[f.seat]||0)+1;
               if(!quiet && f.seat!==me){
                 SB.flashTaken(f.i);
                 Sound.place();
                 showToast("⚡ "+ctx.dispName(ctx.order()[f.seat]||"")+" 搶下 "+SB.coordName(f.i),1100);
               }else if(!quiet) Sound.place();
             }else if(!quiet && f.seat!==me){
-              showToast("😅 "+ctx.dispName(ctx.order()[f.seat]||"")+" 填錯了",1100);
+              showToast("😅 "+ctx.dispName(ctx.order()[f.seat]||"")+" 填錯了"+(gAssist?" −1 分":""),1100);
             }
           });
         }
-        const done=(tally.reduce((a,b)=>a+(b||0),0))>=holes && holes>0;
+        // 填滿的判定改看盤面本身。原本是「總分 >= 空格數」,扣分之後總分會小於填對的格數,
+        // 那個判定會永遠不成立 → 整局結不了。
+        const done = holes>0 && SB.isComplete();
         renderHud();
+        pops.forEach(p=>popScore(p[0],p[1]));    // 一定要在 renderHud() 之後(它會重建 innerHTML)
         if(done && !ctx.winner()) settleGrab();
       }else{
         renderHud();
@@ -290,18 +361,22 @@ const MP = MPCore.create((function(){
     /* ---------- 大廳設定列 / 房間框徽章 ---------- */
     syncSetup(){
       const isHost=ctx.isHost();
-      const mSeg=$("sdkModeSeg"), dSeg=$("sdkDiffSeg");
+      const mSeg=$("sdkModeSeg"), dSeg=$("sdkDiffSeg"), aSeg=$("sdkAssistSeg");
       if(mSeg){ mSeg.classList.toggle("readonly",!isHost); [...mSeg.children].forEach(b=>b.classList.toggle("on",b.dataset.mode===mode)); }
       if(dSeg){ dSeg.classList.toggle("readonly",!isHost); [...dSeg.children].forEach(b=>b.classList.toggle("on",b.dataset.diff===diff)); }
+      if(aSeg){ aSeg.classList.toggle("readonly",!isHost); [...aSeg.children].forEach(b=>b.classList.toggle("on",(b.dataset.assist==="1")===assist)); }
       const mL=$("sdkModeLabel"); if(mL) mL.textContent=isHost?"玩法":"玩法(房主決定)";
       const dL=$("sdkDiffLabel"); if(dL) dL.textContent=isHost?"難度":"難度(房主決定)";
+      const aL=$("sdkAssistLabel"); if(aL) aL.textContent=isHost?"候選提示":"候選提示(房主決定)";
       ruleHint();
     },
     updateGoal(){
       const g=$("mpBarGoal"); if(!g)return;
-      const L=SGen.levelOf(ctx.phase()==="playing"?gDiff:diff);
-      const m=(ctx.phase()==="playing"?gMode:mode)==="grab" ? "⚡ 搶格" : "⏱ 競速";
-      g.textContent=m+" · "+L.label;
+      const live=ctx.phase()==="playing";
+      const L=SGen.levelOf(live?gDiff:diff);
+      const m=(live?gMode:mode)==="grab" ? "⚡ 搶格" : "⏱ 競速";
+      // 徽章補一個 🔍:對戰中要隨時看得出「這局有沒有開輔助/會不會扣分」,而這是既有的一列,不吃版面
+      g.textContent=m+" · "+L.label+((live?gAssist:assist)?" · 🔍":"");
       g.classList.remove("hidden");     // 數獨沒有認輸鈕來搶這個位置,對戰中也留著
     },
 
@@ -336,16 +411,18 @@ const MP = MPCore.create((function(){
         if(iWon) return { word:"你贏了!", msg:"最快解完整盤 🎉"+secs };
         return { word:"你輸了", msg:esc(w.name||"對手")+" 先解完了"+secs };
       }
-      if(isDraw) return { word:mine?"平手!":"你輸了", msg:"盤面填滿,最高分同分 🤝 各得 1 勝" };
-      if(iWon)   return { word:"你贏了!", msg:"搶下最多格,漂亮 🎉("+(w.pts||0)+" 格)" };
-      return { word:"你輸了", msg:esc(w.name||"對手")+" 搶下 "+(w.pts||0)+" 格" };
+      const u=gAssist?" 分":" 格";
+      if(isDraw) return { word:mine?"平手!":"你輸了", msg:"盤面填滿,最高分同分 🤝 各得 1 勝"+myTail() };
+      if(iWon)   return { word:"你贏了!", msg:"搶下最多格,漂亮 🎉("+(w.pts||0)+u+")"+myTail() };
+      return { word:"你輸了", msg:esc(w.name||"對手")+" 拿下 "+(w.pts||0)+u+myTail() };
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { mode:mode, diff:diff }; },
+    ownPrefs(){ return { mode:mode, diff:diff, assist:assist }; },
     usePrefs(o){
       if(o.mode==="race"||o.mode==="grab") mode=o.mode;
       if(SGen.LEVELS[o.diff]) diff=o.diff;
+      if(typeof o.assist==="boolean") assist=o.assist;
     },
 
     /* ---------- 額外暴露給 main.js ---------- */
@@ -356,6 +433,11 @@ const MP = MPCore.create((function(){
         v=(v==="race")?"race":"grab";
         if(!ctx.setRoomField("mode",v,{ lobbyOnly:true, denyMsg:"只有房主能改玩法", busyMsg:"對戰中不能改玩法" }))return;
         mode=v; ctx.syncSetup(); ctx.updateGoal(); savePrefs();
+      },
+      setAssist(v){
+        v=!!v;
+        if(!ctx.setRoomField("assist",v,{ lobbyOnly:true, denyMsg:"只有房主能改候選提示", busyMsg:"對戰中不能改候選提示" }))return;
+        assist=v; ctx.syncSetup(); ctx.updateGoal(); savePrefs();
       },
       setDiff(v){
         if(!SGen.LEVELS[v])return;

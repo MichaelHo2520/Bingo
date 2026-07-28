@@ -12,8 +12,8 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.42.0 -->
-<meta name="version" content="1.42.0">
+<!-- 數獨 · v1.43.0 -->
+<meta name="version" content="1.43.0">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
@@ -144,6 +144,15 @@
           <button data-diff="m6">迷你 6×6</button>
           <button class="on" data-diff="e9">標準 9×9</button>
           <button data-diff="h9">困難 9×9</button>
+        </div>
+      </div>
+
+      <!-- 候選提示:只能全房一致(搶格比手速,單方面省掉掃描時間就是直接贏) -->
+      <div class="field">
+        <span class="field-label" id="sdkAssistLabel">候選提示</span>
+        <div class="seg" id="sdkAssistSeg" aria-label="候選提示">
+          <button class="on" data-assist="0">關</button>
+          <button data-assist="1">🔍 開(填錯 −1)</button>
         </div>
       </div>
 
