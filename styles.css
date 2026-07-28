@@ -1271,6 +1271,22 @@
   @supports (font-size:1cqmin){ .sdk-nt i{font-size:calc(24cqmin / var(--sn,9))} }
   .sdk-board.sdk-6 .sdk-nt{grid-template-columns:repeat(2,1fr)}
 
+  /* 候選提示(v1.46.0):選中的空格右上角標「這格有幾個數字可填」,只有這一格會標。
+     用膠囊底色而不是純文字 —— 選中格本身有底色、旁邊還有同列同行的高亮,
+     裸著放一個小數字會跟格子裡填的值糊在一起(而且它不是「這格的答案」,更不能像)。
+     配色用 given(題目字色)當底、paper(紙色)當字 —— 這兩個變數每個主題都是一對高對比,
+     反白後在任何主題的盤面上都跳得出來,連 ebook 純黑白也不必特例。外圈再描一圈紙色,
+     壓在選中格的橘底 / 同列同行高亮上才不會糊掉。 */
+  .sdk-cnt{position:absolute;top:2px;right:2px;z-index:2;display:none;
+    font-family:'Fredoka',sans-serif;font-weight:700;line-height:1;
+    font-size:clamp(10px,2.6vw,18px);
+    color:var(--sdk-paper);background:var(--sdk-given);
+    border-radius:999px;padding:2px 5px;
+    box-shadow:0 0 0 1.5px var(--sdk-paper);
+    pointer-events:none}
+  @supports (font-size:1cqmin){ .sdk-cnt{font-size:clamp(10px,calc(30cqmin / var(--sn,9)),18px)} }
+  .sdk-cnt.on{display:block}
+
   /* 凍結倒數:蓋在盤面中央 */
   .sdk-freeze{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;
     font-family:'Fredoka',sans-serif;font-weight:700;font-size:34px;
@@ -1291,13 +1307,6 @@
   /* 角標:這個數字全盤還剩幾格沒填(填滿就整顆變淡) */
   .sdk-kleft{position:absolute;top:3px;right:6px;font-size:10px;font-weight:800;color:var(--muted)}
   .sdk-key.done{opacity:.34}
-  /* 輔助模式:這格不可能填的數字。要跟 .done(整盤填滿了,單純變淡)一眼分得出來 ——
-     所以不是「更淡」而是「凹下去」:暗底 + 去邊框 + 灰階 + 明顯的刪除線。
-     opacity 不能壓太低,壓低了刪除線會跟著糊掉,兩種狀態就看起來一樣了。 */
-  .sdk-key.sdk-no{opacity:.5;filter:grayscale(1);background:rgba(0,0,0,.3);border-color:transparent}
-  .sdk-key.sdk-no:hover{background:rgba(0,0,0,.3)}
-  .sdk-key.sdk-no .sdk-kn{color:var(--muted);text-decoration:line-through;text-decoration-thickness:2.5px}
-  :root[data-theme="ebook"] .sdk-key.sdk-no{background:#e2e2e2;border:1px solid #000}
   .sdk-key.erase .sdk-kn{font-size:19px}
   :root[data-theme="ebook"] .sdk-key{background:#fff;border:1px solid #000}
 

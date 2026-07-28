@@ -40,8 +40,8 @@ const MP = MPCore.create((function(){
 
   /* ---------- 計分:唯一的加減分入口 ----------
      一般模式只加不扣(原設計:扣分容易讓落後方棄賽)。
-     輔助模式才啟用 −1 —— 因為灰鍵把「明顯違規」濾掉之後,剩下的候選常常只有 2 個,
-     猜一個的期望成本只有 1.5 秒(3 秒 × 50%),時間懲罰根本擋不住亂猜,要用分數才擋得住。
+     候選提示才啟用 −1 —— 提示會公布「這格只有 2 個可填」,知道數量之後隨便按一個
+     期望成本只有 1.5 秒(3 秒 × 50%),時間懲罰根本擋不住亂猜,要用分數才擋得住。
      **地板 0**:負分對落後方的心理殺傷力太大,而且 HUD 進度條算出負寬度會很醜。
 
      ⚠ 三個地方都必須走這支(結算 / 重連整盤重建 / 平時增量),
@@ -63,7 +63,8 @@ const MP = MPCore.create((function(){
       let val, sub;
       if(gMode==="grab"){
         val=(tally[seat]||0);
-        sub="格";
+        // 單位一律是「分」不是「格」:開了候選提示會扣分,分數跟搶到的格數本來就不相等
+        sub="分";
       }else{
         const p=prog[id]||{};
         val=holes?Math.round(((p.n||0)/holes)*100):0;
@@ -203,14 +204,9 @@ const MP = MPCore.create((function(){
     if(mode==="grab") pen = assist ? "填錯 <b>−1 分</b>並凍結 3 秒(分數不會扣成負的)。" : "填錯凍結 3 秒,<b>不扣分</b>。";
     else              pen = assist ? "填錯凍結 3 秒。" : "填錯只計次,不罰。";
     const as = assist
-      ? "🔍 <b>候選提示:開</b> —— 點空格時,同列/行/宮已經有的數字會被劃掉,按了不算填錯。"
-      : "🔍 候選提示:關 —— 九個數字都能按,自己掃。";
-    // 實測種子題:開了候選之後只剩一個選擇的格子,6×6 占 42%、標準 9×9 占 30%、困難只占 11%。
-    // 6×6 幾乎變成「看哪個沒被劃掉就按」,先講一聲讓房主自己決定,不硬性擋
-    const warn = (assist && diff==="m6")
-      ? "<br>⚠️ 6×6 開候選提示,約四成的格子會只剩一個選擇(等於直接看到答案),建議搭配 9×9。"
-      : "";
-    el.innerHTML = base+pen+"<br>盤面 "+L.label+"(空 "+L.holes+" 格)· "+L.desc+"<br>"+as+warn;
+      ? "🔍 <b>候選提示:開</b> —— 點一個空格,右上角會標出<b>這格有幾個數字可填</b>;是哪幾個要自己掃,九顆鍵都能按。"
+      : "🔍 候選提示:關 —— 沒有任何標記,全部自己掃。";
+    el.innerHTML = base+pen+"<br>盤面 "+L.label+"(空 "+L.holes+" 格)· "+L.desc+"<br>"+as;
   }
 
   return {
@@ -411,10 +407,10 @@ const MP = MPCore.create((function(){
         if(iWon) return { word:"你贏了!", msg:"最快解完整盤 🎉"+secs };
         return { word:"你輸了", msg:esc(w.name||"對手")+" 先解完了"+secs };
       }
-      const u=gAssist?" 分":" 格";
+      // 單位一律「分」:開了候選提示會扣分,說「格」會跟實際搶到的格數對不上
       if(isDraw) return { word:mine?"平手!":"你輸了", msg:"盤面填滿,最高分同分 🤝 各得 1 勝"+myTail() };
-      if(iWon)   return { word:"你贏了!", msg:"搶下最多格,漂亮 🎉("+(w.pts||0)+u+")"+myTail() };
-      return { word:"你輸了", msg:esc(w.name||"對手")+" 拿下 "+(w.pts||0)+u+myTail() };
+      if(iWon)   return { word:"你贏了!", msg:"拿下最高分,漂亮 🎉("+(w.pts||0)+" 分)"+myTail() };
+      return { word:"你輸了", msg:esc(w.name||"對手")+" 拿下 "+(w.pts||0)+" 分"+myTail() };
     },
 
     /* ---------- 偏好 ---------- */

@@ -20,7 +20,7 @@ const SB = (function(){
   let cells=[], padBtns=[];
   let sel=-1, enabled=false, noteMode=false;
   let frozenUntil=0, freezeTick=null;
-  let assist=false;                  // 輔助模式(連線房主決定):把這格不可能的數字灰掉
+  let assist=false;                  // 候選提示(連線房主決定):選中的空格標出「有幾個數字可填」
   let cbPick=null, cbNum=null, cbErase=null;
   let board, pad, wrap;
 
@@ -54,7 +54,7 @@ const SB = (function(){
         + (c%bw===bw-1 && c<n-1 ? " rb" : "")
         + (r%bh===bh-1 && r<n-1 ? " bb" : "");
       el.dataset.i=i;
-      el.innerHTML='<span class="sdk-v"></span><span class="sdk-nt"></span>';
+      el.innerHTML='<span class="sdk-v"></span><span class="sdk-nt"></span><span class="sdk-cnt"></span>';
       el.addEventListener("click",()=>pick(i));
       board.appendChild(el);
       cells.push(el);
@@ -94,11 +94,8 @@ const SB = (function(){
     if(sel<0){ showToast("先點一個空格 👆"); return; }
     if(puzzle[sel]){ showToast("這格是題目給的,不能改"); return; }
     if(noteMode){ toggleNote(sel,v); return; }
-    // 輔助模式:灰掉的數字按了不填、也**不算填錯**(不然灰鍵就變成陷阱),只說明為什麼
-    if(assist && !vals[sel] && !candAt(sel).has(v)){
-      showToast(v+" 在同列/行/宮已經有了 🚫",900);
-      return;
-    }
+    // 候選提示開著時,九顆數字鍵**照樣全部能按**、按錯就是填錯。
+    // (v1.43.0 曾把不可能的數字劃掉並攔下不算錯 —— 那等於幫玩家把答案圈出來,見 candAt 的註解)
     if(cbNum) cbNum(sel,v);
   }
   // 鍵盤數字鍵(桌機):1~9 填數、方向鍵移動、Backspace 清除
@@ -147,9 +144,12 @@ const SB = (function(){
     if(ra===rb||ca===cb)return true;
     return Math.floor(ra/bh)===Math.floor(rb/bh) && Math.floor(ca/bw)===Math.floor(cb/bw);
   }
-  /* 這格還可能填哪些數字。**只做同列/同行/同宮的排除**,刻意不碰 sol ——
-     用解答回推的話,候選剩 1 個時等於直接發答案,推理就沒了。
-     這裡給的資訊玩家自己掃得出來,只是幫他省掉掃描的眼力。 */
+  /* 這格還可能填哪些數字。**只做同列/同行/同宮的排除**,刻意不碰 sol。
+     ⚠ 回傳的集合**只拿來數大小,不可以拿去標數字鍵**。
+        v1.43.0 的候選提示是把不可能的數字在鍵盤上劃掉,實測種子題:劃完之後只剩一個
+        亮鍵的格子在 6×6 占 42%、標準 9×9 占 30% —— 三分之一的格子變成「看哪顆沒被
+        劃掉就按」,推理整個消失。v1.46.0 改成只公布「這格有幾個可填」:一樣幫你挑出
+        好下手的格子,但是哪幾個數字仍然要自己掃。 */
   function candAt(i){
     const s=new Set();
     for(let v=1;v<=n;v++) s.add(v);
@@ -178,14 +178,21 @@ const SB = (function(){
         nt.innerHTML=[...notes[i]].sort((a,b)=>a-b).map(x=>'<i>'+x+'</i>').join("");
         nt.classList.add("on");
       }else{ nt.innerHTML=""; nt.classList.remove("on"); }
+      // 候選提示:只標**選中的那一格**,不整盤標。整盤標就成了「難易度地圖」,
+      // 掃一眼就知道全盤該從哪裡填到哪裡,一樣是把推理拿走
+      const ct=el.querySelector(".sdk-cnt");
+      if(ct){
+        if(assist && i===sel && !puzzle[i] && !v){
+          ct.textContent=String(candAt(i).size);
+          ct.classList.add("on");
+        }else{ ct.textContent=""; ct.classList.remove("on"); }
+      }
     }
     paintPad();
   }
-  // 數字鍵角標:這個數字全盤還剩幾格沒填(填滿的數字整顆變淡)
-  // 輔助模式再多一層:選中格不可能的數字劃掉變灰(.sdk-no)。**不用 disabled** ——
-  // disabled 的按鈕連 click 都不發,玩家按了沒反應會以為當掉;改成按了給提示但不算錯。
+  // 數字鍵角標:這個數字全盤還剩幾格沒填(填滿的數字整顆變淡)。
+  // 鍵盤不受候選提示影響 —— 開了提示也是九顆全亮全能按(見 candAt)
   function paintPad(){
-    const cand = (assist && sel>=0 && !puzzle[sel] && !vals[sel]) ? candAt(sel) : null;
     padBtns.forEach(b=>{
       const v=+b.dataset.v;
       let left=n;
@@ -194,7 +201,6 @@ const SB = (function(){
       if(tag) tag.textContent = left>0 ? String(left) : "";
       b.classList.toggle("done", left<=0);
       b.classList.toggle("on", noteMode);
-      b.classList.toggle("sdk-no", !!cand && !cand.has(v));
     });
   }
   function flashWrong(i){
