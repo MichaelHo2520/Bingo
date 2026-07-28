@@ -18,7 +18,7 @@
 
 const MP = MPCore.create((function(){
   const FREEZE_MS=3000;            // 填錯的凍結懲罰
-  const COLORS=["p0","p1","p2","p3"];
+  const COLORS=["p0","p1","p2","p3","p4","p5"];   // 對應 styles.css 的 --sp0~--sp5(要加人先加色)
   let mode="grab", diff="e9", assist=false;      // 房間設定(房主可改)
   let gMode="grab", gDiff="e9", gAssist=false;   // 開局當下鎖定的值(對戰中改設定不影響進行中的這局)
   let ctx=null;
@@ -26,7 +26,8 @@ const MP = MPCore.create((function(){
   let myMiss=0, startedAt=0;
 
   /* ---------- fills 的整數編碼 ---------- */
-  // i(0~80) / v(1~9) / seat(0~3) / ok(0|1) → 單一整數(上限 12951,RTDB 存起來最省)
+  // i(0~80) / v(1~9) / seat(0~5) / ok(0|1) → 單一整數(上限 12955,RTDB 存起來最省)
+  // seat 佔的是 8 進位那一位,能塞 0~7 —— v1.47.0 把人數從 4 開到 6 時,這支編碼一行都不用改
   function encFill(i,v,seat,ok){ return ((i*10+v)*8+seat)*2+(ok?1:0); }
   function decFill(c){
     const ok=c%2; c=(c-ok)/2;
@@ -58,6 +59,8 @@ const MP = MPCore.create((function(){
     if(ctx.phase()!=="playing"){ box.classList.add("hidden"); box.innerHTML=""; return; }
     const ord=ctx.order(), me=ctx.me();
     box.classList.remove("hidden");
+    // 5 人以上一列排不下(窄機一張卡不到 55px)→ 掛旗標讓 CSS 換成 3 欄兩列
+    box.classList.toggle("sdk-hud-two", ord.length>4);
     box.innerHTML=ord.map((id,seat)=>{
       const nm=esc(ctx.dispName(id));
       let val, sub;
@@ -211,7 +214,7 @@ const MP = MPCore.create((function(){
 
   return {
     ns:{ rooms:"sudoku_rooms", index:"sudoku_index" },
-    minPlayers:2, maxPlayers:4,
+    minPlayers:2, maxPlayers:6,      // v1.47.0 由 4 開到 6(色盤 --sp0~--sp5 與 HUD 兩列版面都跟著到 6)
     prefsKey:"sudoku.prefs.v1",
     emoteAnchor:"sdkStage",
     winCardId:"sdkWinCard",
@@ -388,11 +391,14 @@ const MP = MPCore.create((function(){
       const p=prog[id]||{};
       return '<span class="sdk-pts">'+(holes?Math.round(((p.n||0)/holes)*100):0)+'%</span>';
     },
+    // 人數一律讀 ctx.maxPlayers / ctx.minPlayers,不要再寫死 —— 上次從 4 開到 6 就是漏在這兩句文案
     lobbyStatusText(ids){
-      return ids.length<2 ? "等待其他人加入…(最多 4 人)" : "等待大家準備…("+ids.length+" 人)";
+      return ids.length<ctx.minPlayers
+        ? "等待其他人加入…(最多 "+ctx.maxPlayers+" 人)"
+        : "等待大家準備…("+ids.length+" 人)";
     },
     readyHint(ids,ready){
-      if(ids.length<2) return "至少要 2 個人才能開始(最多 4 人)";
+      if(ids.length<ctx.minPlayers) return "至少要 "+ctx.minPlayers+" 個人才能開始(最多 "+ctx.maxPlayers+" 人)";
       return ready ? "等其他人按準備…" : "按「準備好了」就開始";
     },
     refresh(){ renderHud(); },

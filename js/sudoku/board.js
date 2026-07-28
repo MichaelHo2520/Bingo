@@ -114,7 +114,7 @@ const SB = (function(){
   }
 
   /* ---------- 資料寫入(由呼叫端決定對錯與同步) ---------- */
-  // cls:填入者的顏色 class(連線搶格用 p0~p3;單機用 me)
+  // cls:填入者的顏色 class(連線搶格用 p0~p5;單機用 me)
   function fill(i,v,cls){
     if(i<0||i>=n*n||puzzle[i])return;
     vals[i]=v; owners[i]=cls||"me";

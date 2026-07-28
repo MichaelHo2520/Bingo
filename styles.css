@@ -1146,9 +1146,15 @@
          --sdk-given:#000000; --sdk-sel:#dddddd; --sdk-peer:#f2f2f2;
          --sdk-same:#e6e6e6; --sdk-note:#666666; }
 
-  /* 玩家顏色:四人各一色,刻意不用主題變數(不同主題下也要能穩定分辨誰是誰) */
-  :root{ --sp0:#ff8a3d; --sp1:#35c1ff; --sp2:#5fd06c; --sp3:#d98cff; }
-  :root[data-theme="ebook"]{ --sp0:#000; --sp1:#555; --sp2:#888; --sp3:#aaa; }
+  /* 玩家顏色:六人各一色(v1.47.0 由四色擴到六色),刻意不用主題變數 —— 不同主題下也要能穩定分辨誰是誰。
+     選色被兩件事同時夾住:同一組變數會畫在**淺色紙面**(sunset/bubblegum/meadow/ebook 的盤面數字)
+     也會畫在**深色面板**(色點、HUD 進度條),所以只能取中明度。
+     · 避開黃色帶:黃色明度天生高,放在近白的紙面上等於消失(這也是六色不能均分色相環的原因)
+     · 六個色相繞一圈散開:橘 22° → 綠 131° → 青 172° → 藍 218° → 紫 270° → 粉 337°
+     · 前四個維持原本的橘/藍/綠/紫,2~4 人的觀感不變;青與粉是這次新增的 */
+  :root{ --sp0:#ff7a33; --sp1:#3d8bff; --sp2:#3fc45a; --sp3:#b06bff; --sp4:#ff4d8d; --sp5:#00bfa8; }
+  /* e-ink 只有灰階可用:六階等距拉開。最淺的兩階靠色點自己的黑框(見 .sdk-seat)才站得住 */
+  :root[data-theme="ebook"]{ --sp0:#000; --sp1:#3a3a3a; --sp2:#6b6b6b; --sp3:#949494; --sp4:#b8b8b8; --sp5:#d8d8d8; }
 
   .sdk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));
@@ -1179,7 +1185,7 @@
   .sdk-room .mp-subrow{margin-top:5px}
   .sdk-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .sdk-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
-  /* 最多 4 人:窄機放不下就讓它橫向捲(和五子棋固定兩人的情況不同,這裡不能 hidden) */
+  /* 最多 6 人:窄機放不下就讓它橫向捲(和五子棋固定兩人的情況不同,這裡不能 hidden) */
   .sdk-room-foot .mp-players.oneline .mp-chip{flex:0 0 auto;min-width:0;padding:4px 9px;gap:5px}
   .sdk-room-foot .mp-chip.turn{font-size:14px}
   /* 對戰中收起名單列:比分 HUD 講的是同一件事、還更清楚,這 30px 讓給盤面 */
@@ -1190,6 +1196,7 @@
   .sdk-seat{width:12px;height:12px;border-radius:50%;flex:none;display:inline-block}
   .sdk-seat.p0{background:var(--sp0)} .sdk-seat.p1{background:var(--sp1)}
   .sdk-seat.p2{background:var(--sp2)} .sdk-seat.p3{background:var(--sp3)}
+  .sdk-seat.p4{background:var(--sp4)} .sdk-seat.p5{background:var(--sp5)}
   :root[data-theme="ebook"] .sdk-seat{box-shadow:inset 0 0 0 1px #000}
   /* 晶片上的即時分數 / 進度 */
   .sdk-pts{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--accent);flex:none}
@@ -1255,6 +1262,8 @@
   .sdk-cell.filled.p1 .sdk-v{color:var(--sp1)}
   .sdk-cell.filled.p2 .sdk-v{color:var(--sp2)}
   .sdk-cell.filled.p3 .sdk-v{color:var(--sp3)}
+  .sdk-cell.filled.p4 .sdk-v{color:var(--sp4)}
+  .sdk-cell.filled.p5 .sdk-v{color:var(--sp5)}
   .sdk-cell.filled.me .sdk-v{color:var(--accent)}
   .sdk-cell.filled.hintfill .sdk-v{color:var(--accent-2);font-style:italic}
   :root[data-theme="ebook"] .sdk-cell.filled .sdk-v{color:#000;text-decoration:underline}
@@ -1315,6 +1324,14 @@
   /* ---------- 即時比分 HUD(連線對戰中,盤面上方那一列) ---------- */
   .sdk-hud{flex:none;width:100%;display:grid;gap:6px;
     grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+  /* 5~6 人:硬塞一列的話,窄機(359px 可用寬)一張卡只剩 55px —— 名字被切光、分數還會溢出。
+     改 3 欄兩列:同樣的窄機每張 115px,桌機 169px。5 人時第二列只有兩張、右邊留白,
+     但「看得懂誰是誰」比排面整齊重要。多出來的一列高度由 .sdk-boardbox 自動吸收
+     (盤面是 height:min(100%,92vw,460px),不必回頭調常數)。 */
+  .sdk-hud.sdk-hud-two{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-two .sdk-hcard{padding:4px 7px 5px}
+  .sdk-hud.sdk-hud-two .sdk-hname{font-size:11px}
+  .sdk-hud.sdk-hud-two .sdk-hval{font-size:16px}
   .sdk-hcard{position:relative;overflow:hidden;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;
     padding:5px 8px 7px;display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -1328,7 +1345,10 @@
   .sdk-bar i{display:block;height:100%;border-radius:2px;transition:width .25s}
   .sdk-hcard.p0 .sdk-bar i{background:var(--sp0)} .sdk-hcard.p1 .sdk-bar i{background:var(--sp1)}
   .sdk-hcard.p2 .sdk-bar i{background:var(--sp2)} .sdk-hcard.p3 .sdk-bar i{background:var(--sp3)}
+  .sdk-hcard.p4 .sdk-bar i{background:var(--sp4)} .sdk-hcard.p5 .sdk-bar i{background:var(--sp5)}
   :root[data-theme="ebook"] .sdk-hcard{background:#fff;border:1px solid #000}
+  /* e-ink:進度條底色原本是 rgba(0,0,0,.18),最淺的兩階灰(p4/p5)壓上去會整條看不見 → 改白底黑框 */
+  :root[data-theme="ebook"] .sdk-bar{background:#fff;box-shadow:inset 0 0 0 1px #000}
   /* 分數變動飄字:計分規則靠回饋教,不靠說明文字去佔盤面上方的版面。
      .sdk-hcard 是 overflow:hidden,所以只在卡片內短距離飄(飄出去會被裁掉)。 */
   .sdk-pop{position:absolute;right:7px;top:6px;pointer-events:none;
@@ -1386,6 +1406,12 @@
     .sdk-hcard{padding:4px 6px 5px}
     .sdk-hval{font-size:16px}
     .sdk-play{gap:7px}
+  }
+  /* 橫向手機(矮但寬,667px 起跳):高度才是稀缺資源、寬度反而有剩
+     → 5~6 人收回一列,把兩列 HUD 多吃的那 ~45px 還給盤面。
+     min-width 是為了不誤傷「桌機把視窗拉得又矮又窄」那種情況(那時還是要兩列)。 */
+  @media (max-height:620px) and (min-width:600px){
+    .sdk-hud.sdk-hud-two{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
   }
   /* 盤面被鎖住(未開打 / 已結束)時,鍵盤跟著失效並變淡 —— 不讓它看起來還能按 */
   .sdk-play:has(.sdk-stage.locked) .sdk-pad{opacity:.4;pointer-events:none}
