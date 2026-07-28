@@ -22,7 +22,6 @@ function showScreen(which){
   if(which==="home"||which==="solo"){
     ["mpConnect","mpBar","primaryBar","scrollArea"].forEach(id=>{ const el=$(id); if(el) el.classList.add("hidden"); });
   }
-  document.body.classList.toggle("sdk-at-home", which==="home");
   document.body.classList.toggle("solo-on", which==="solo");
   if(which==="home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始(比照 Bingo 的 enterHome)
 }

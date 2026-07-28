@@ -112,7 +112,7 @@
   .brand{display:flex;align-items:flex-end;gap:8px;min-width:0}
   .topver{font-family:'Fredoka',sans-serif;font-weight:600;font-size:11px;color:var(--muted);
     opacity:.75;letter-spacing:.02em;padding-bottom:5px;white-space:nowrap}
-  /* 主選單也顯示版本:跑馬燈雖藏起來但仍佔位,版本號因此停在與其它頁完全相同的位置與大小 */
+  /* 跑馬燈在每一頁都顯示(含主選單):三個遊戲的頂列一律是「品牌字 + 版本號」,不再有哪一頁只剩孤零零的版本號 */
   .marquee{display:flex;gap:6px;align-items:flex-end}
   .marquee .bulb{
     font-family:'Fredoka',sans-serif;font-weight:700;
@@ -126,8 +126,6 @@
     text-shadow:0 0 8px var(--marquee), 0 0 22px var(--marquee);
     transform:translateY(-2px);
   }
-  /* 主選單:大標題已有一個大大的 BINGO,頂列跑馬燈就先藏起來(保留位置讓 ⛶/⚙️ 停在右上),免得整頁 BINGO 字太多 */
-  body.at-home .marquee{visibility:hidden}
   .tools{display:flex;gap:8px}
   .icon-btn{
     width:42px;height:42px;border-radius:13px;border:1px solid var(--panel-line);
@@ -778,9 +776,11 @@
   :root[data-theme="ebook"] .set-foot{color:#000;opacity:.6}
   /* 主選單(進場先選單機 / 連線) */
   #home{text-align:center;padding-top:8px}
-  .home-hero{margin:16px 0 24px}
+  /* 進場插圖區:數值與數獨的 .sdk-hero / .sdk-art 對齊(96×116 的卡片在 96px 寬時高度 ≈ 92px,
+     與數獨那張 92px 方形插圖等高),兩個遊戲的「選擇玩法」頁看起來才是同一套介面 */
+  .home-hero{margin:14px 0 4px}
   /* 主選單插圖:內嵌 SVG 賓果卡(取代原本會被誤認成撞球的 🎱);顏色全用主題變數,隨主題自動變色 */
-  .home-art{width:clamp(96px,30vw,132px);height:auto;margin:0 auto 6px;display:block;
+  .home-art{width:96px;height:auto;margin:0 auto 8px;display:block;
     filter:drop-shadow(0 6px 16px rgba(0,0,0,.28))}
   .home-art .bc-card{fill:var(--panel);stroke:var(--panel-line);stroke-width:2}
   .home-art .bc-hd{fill:var(--accent);font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px}
@@ -792,13 +792,11 @@
   :root[data-theme="ebook"] .home-art .bc-cell{fill:#fff;stroke:#000}
   :root[data-theme="ebook"] .home-art .bc-daub{fill:#000}
   :root[data-theme="ebook"] .home-art .bc-star{fill:#000}
-  .home-title{font-family:'Fredoka';font-weight:700;font-size:clamp(40px,13vw,64px);line-height:1;
-    background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;
-    background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.04em}
+  /* 註:第二層原本還有一個 .home-title 的巨大「BINGO」,已移除 —— 頂列跑馬燈就是 BINGO,
+     同一頁不需要第二個;拿掉後版面也與數獨的「選擇玩法」一致(插圖 + 一行說明 + 兩顆鈕) */
   .home-tagline{color:var(--muted);font-weight:700;margin-top:10px;font-size:15px}
   .home-btn{margin-top:12px;font-size:18px;padding:16px 10px}
   .home-hint{color:var(--muted);font-size:12.5px;margin-top:16px;opacity:.8}
-  :root[data-theme="ebook"] .home-title{background:none;color:#000;-webkit-text-fill-color:#000}
   /* 單機返回列:返回箭頭 + 標題,和連線對戰的 .mp-head 一致(取代舊的「‹ 主選單」文字鈕) */
   .solo-head{width:min(92vw,520px);display:flex;align-items:center;gap:10px}
   .solo-head .subtitle{margin:0}
@@ -816,6 +814,10 @@
     body{padding:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:8px}
     .marquee .bulb{font-size:clamp(20px,5.5vw,28px)}
     .topver{padding-bottom:2px;font-size:10px}
+    /* 進場插圖跟著縮(與數獨 .sdk-hero / .sdk-art 的緊湊值相同);.gc-art 在檔尾另有更小的一組,
+       靠後定義覆蓋這裡,遊戲卡不受影響 */
+    .home-hero{margin:6px 0 2px}
+    .home-art{width:64px}
     .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
     .quick-voice,.mp-act-btn{width:34px;height:34px;font-size:18px}
     .quick-voice .qv-ico{font-size:18px}
@@ -1064,11 +1066,11 @@
   /* ==========================================================================
      遊戲選單 — index.html 首頁第一層(先選遊戲,再選玩法)
      只追加新 class(.home-pick-* / .game-card / .gc-* / .gk-* / .home-sub-head),
-     既有的 .home-hero / .home-title / .home-btn 等原封不動,第二層照舊沿用。
+     既有的 .home-hero / .home-btn 等原封不動,第二層照舊沿用。
      ========================================================================== */
-  /* 首頁(兩層)垂直居中:第一層只有兩張卡,靠著頂列會顯得下半片空。
-     .at-home 只在 enterHome() 期間掛在 body 上,所以不影響遊戲中的任何畫面。 */
-  body.at-home #home{margin-top:auto;margin-bottom:auto}
+  /* 首頁一律貼齊頂列下方(與五子棋 #mpConnect、數獨 #sdkHome 同一個起始位置)。
+     舊版用 margin:auto 垂直居中,結果高螢幕上頂列與面板之間空一大塊,三個遊戲的進場畫面
+     起點各不相同 —— 現在統一由上往下排,空的留在下面。 */
   .home-pick-head{margin:10px 0 18px}
   .home-pick-title{font-family:'Fredoka';font-weight:700;font-size:clamp(26px,8vw,36px);line-height:1.1;
     background:linear-gradient(135deg,var(--accent),var(--accent-2));
@@ -1154,8 +1156,8 @@
   :root[data-theme="ebook"] .sdk-brand{background:none;color:#000;-webkit-text-fill-color:#000}
 
   .sdk-scroll{flex:1 1 auto}
-  /* 進場選單垂直居中(只有選玩法那一頁掛這個 class) */
-  body.sdk-at-home #sdkHome{margin-top:auto;margin-bottom:auto}
+  /* 註:進場選單原本用 margin:auto 垂直居中,已拿掉 —— 三個遊戲的進場畫面一律貼齊頂列下方
+     (理由見 index.html 首頁那段) */
 
   /* ---------- 進場插圖 ---------- */
   .sdk-hero{text-align:center;margin:14px 0 4px}

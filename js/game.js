@@ -277,7 +277,6 @@
   // 主選單:進場先選遊戲;離開房間、單機返回都回到這裡(一律回第一層)
   function enterHome(){
     state.mode="home"; state.won=false; state.online=false; closeWin();
-    document.body.classList.add("at-home");          // 藏頂列跑馬燈,主選單只留大標題那個 BINGO
     $("home").classList.remove("hidden");
     showHomeLayer("pick");                            // 回主選單一律從「選遊戲」開始
     $("setup").classList.add("hidden");
@@ -294,7 +293,6 @@
   // 從主選單進「單機」:顯示棋盤與單機設定,開全新一局(連線相關列/鈕都收起)
   function enterSolo(){
     state.online=false;
-    document.body.classList.remove("at-home");       // 離開主選單 → 恢復頂列跑馬燈
     $("home").classList.add("hidden");
     $("mpConnect").classList.add("hidden");
     $("mpBar").classList.add("hidden");

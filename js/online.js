@@ -88,7 +88,6 @@
     function youTag(id){ return id===meId ? '<span class="you-badge">你</span>' : ''; }
 
     function openConnect(){
-      document.body.classList.remove("at-home");     // 進連線畫面 → 恢復頂列跑馬燈
       $("home").classList.add("hidden");
       $("boardWrap").classList.add("hidden");
       $("setup").classList.add("hidden");
