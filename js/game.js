@@ -327,7 +327,13 @@
     state.marked=Array(nCells()).fill(false);state.won=false;state.lastLines=0;closeWin();
     resetMarquee();render();
   }
-  function resetMarquee(){[...$("marquee").children].forEach(b=>b.classList.remove("lit"));}
+  // 頂列跑馬燈:沒在玩的時候(主選單 / 設定 / 大廳)五個字母全亮 —— 那時它就是招牌,
+  // 灰的會像壞掉、也和五子棋/數獨那兩頁的品牌字不一樣。開打才全部熄掉,
+  // 之後由 refreshLines() 依完成線數逐一點亮(那才是它的本業:進度顯示)。
+  function resetMarquee(){
+    const lit = state.mode==="play" ? 0 : 5;
+    [...$("marquee").children].forEach((b,k)=>b.classList.toggle("lit", k<lit));
+  }
 
   /* ---------- 房間分頁:把「設定」與「號碼格」拆成兩個分頁,避免畫面一次太長 ---------- */
   let roomTab="fill";   // 目前分頁:'settings'=設定列 / 'fill'=號碼格

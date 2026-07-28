@@ -1135,6 +1135,7 @@
       $("onlineBtn").classList.add("hidden");
       $("mpReadyBtn").classList.remove("hidden");
       syncOrderRow(); syncScoreRow();
+      resetMarquee();   // 回大廳:跑馬燈變回招牌(全亮),不留上一局的線數
       setLock(false); updateReadyBtn(); render(); applyFillUI();
     }
     function leave(){
