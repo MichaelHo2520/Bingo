@@ -1378,3 +1378,30 @@
   }
   /* 盤面被鎖住(未開打 / 已結束)時,鍵盤跟著失效並變淡 —— 不讓它看起來還能按 */
   .sdk-play:has(.sdk-stage.locked) .sdk-pad{opacity:.4;pointer-events:none}
+
+  /* ---------- 手機沒進全螢幕時,玩的時候收掉頂列(v1.44.0) ----------
+     iPhone 的 Safari 不支援 Fullscreen API,網址列加底部工具列會吃掉近 100px。
+     所以在「觸控裝置 + 視窗不夠高 + 正在玩」時把頂列讓給盤面(約 44px)。
+     · pointer:coarse 讓桌機永遠不命中 —— 桌機空間本來就夠,收掉只會讓人找不到設定鈕
+     · 用 :has() 直接看盤面在不在,不必再維護一個 body class(也就不會忘了同步)
+     · #sdkPlay / #gmkStage 只存在於各自的 HTML,index.html 沒有 → Bingo 完全不受影響 */
+  @media (max-height:780px) and (pointer:coarse){
+    body:has(#sdkPlay:not(.hidden)) .topbar,
+    body:has(#gmkStage:not(.hidden)) .topbar{display:none}
+  }
+
+  /* ---------- iOS「加入主畫面」引導(v1.44.0) ----------
+     iPhone 全螢幕只有這一條路,但那句提示原本藏在 ⛶ 鈕後面、沒人會去按,
+     改成首次進站主動講一次(按過「知道了」就記住,不再打擾)。
+     貼齊底部是刻意的:iOS 的分享鈕就在底部工具列,提示離它越近越好懂。 */
+  .pwa-tip{position:fixed;left:0;right:0;bottom:0;z-index:99;
+    padding:16px 18px calc(16px + env(safe-area-inset-bottom));
+    background:var(--panel);border-top:1px solid var(--panel-line);
+    border-radius:18px 18px 0 0;box-shadow:0 -8px 30px rgba(0,0,0,.35);
+    backdrop-filter:blur(10px);animation:pwaTipUp .32s cubic-bezier(.2,.9,.3,1)}
+  .pwa-tip h4{margin:0 0 6px;font-family:'Fredoka',sans-serif;font-weight:700;font-size:17px;color:var(--text)}
+  .pwa-tip p{margin:0 0 10px;font-size:13px;line-height:1.6;color:var(--muted)}
+  .pwa-tip ol{margin:0 0 13px;padding-left:20px;font-size:13.5px;line-height:1.85;color:var(--text)}
+  .pwa-tip .pwa-ok{width:100%}
+  :root[data-theme="ebook"] .pwa-tip{background:#fff;border-top:1px solid #000}
+  @keyframes pwaTipUp{ from{transform:translateY(100%)} to{transform:translateY(0)} }

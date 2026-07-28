@@ -169,3 +169,5 @@
   syncSettingsUI();
   enterHome();     // 進場先顯示主選單(選單機 / 連線)
   initBoardFit();  // 號碼格自適應:掛上版面觀察並算第一次的可用高度(必須在 enterHome 之後,版面已定案)
+  // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
+  setTimeout(maybeShowInstallTip,1500);

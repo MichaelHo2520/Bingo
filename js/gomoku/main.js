@@ -74,3 +74,5 @@ loadPrefs();
 syncSettingsUI();
 GB.init();         // 棋盤 DOM + 手勢(舞台此時是 hidden,ResizeObserver 會在顯示後算 fit)
 MP.openConnect();  // 進場直接進連線畫面(五子棋只有連線對戰)
+// iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
+setTimeout(maybeShowInstallTip,1500);

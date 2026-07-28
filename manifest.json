@@ -1,7 +1,7 @@
 {
-  "name": "BINGO 賓果",
-  "short_name": "BINGO",
-  "description": "現場多人賓果遊戲:單機練習 + Firebase 連線對戰",
+  "name": "派對遊戲 · BINGO / 五子棋 / 數獨",
+  "short_name": "派對遊戲",
+  "description": "現場多人派對遊戲:BINGO、五子棋、數獨,單機練習 + 連線對戰",
   "lang": "zh-Hant",
   "start_url": "./index.html",
   "scope": "./",

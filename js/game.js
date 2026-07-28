@@ -600,6 +600,34 @@
                            : "iOS 請按 Safari 分享鈕 → 加入主畫面,即可全螢幕", 3000);
     }
   }
+  /* 上面那句提示藏在 ⛶ 鈕後面,實際上沒人會去按 → 首次進站主動講一次,按過就不再打擾。
+     首頁是掃 QR 進站的落點,這個引導最該出現在這裡。
+     ⚠ js/shared/ui-kit.js 有一份同樣的(Bingo 不載入 js/shared/,比照 toggleFull 各留一份)。 */
+  const PWA_TIP_KEY="bingo.pwatip";
+  function maybeShowInstallTip(){
+    try{
+      const standalone = ("standalone" in navigator && navigator.standalone) ||
+                         (matchMedia&&matchMedia("(display-mode: standalone)").matches);
+      if(standalone)return;                        // 已經是全螢幕了,不用講
+      const ua=navigator.userAgent||"";
+      // iPadOS 13+ 的 UA 會偽裝成 Macintosh,只能靠觸控點數認出來
+      const isIOS=/iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints>1);
+      if(!isIOS)return;                            // 其他平台按 ⛶ 就能全螢幕,不必囉嗦
+      if(localStorage.getItem(PWA_TIP_KEY)==="1")return;
+      const box=document.createElement("div");
+      box.className="pwa-tip";
+      box.innerHTML=
+        '<h4>📱 想玩得大一點?</h4>'+
+        '<p>iPhone 的 Safari 沒辦法直接全螢幕。把它「加入主畫面」之後,開起來就跟 App 一樣滿版。</p>'+
+        '<ol><li>按下面工具列的分享鈕 <b>⬆️</b></li><li>往下找 <b>「加入主畫面」</b></li></ol>'+
+        '<button class="btn primary pwa-ok" type="button">知道了</button>';
+      box.querySelector(".pwa-ok").addEventListener("click",()=>{
+        try{ localStorage.setItem(PWA_TIP_KEY,"1"); }catch(e){}
+        box.remove();
+      });
+      document.body.appendChild(box);
+    }catch(e){}
+  }
 
   /* ---------- 好友互動表情(連線用) ---------- */
   const EMOTES=["👍","👎","❤️","😂","🎉","🔥","👏","😮","😢","😭","😎","🤯","🥳","🤝","🙏","💪","😡","💩"];

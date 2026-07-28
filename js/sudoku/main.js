@@ -120,3 +120,5 @@ Solo.loadOwn();       // 單機難度(獨立 key,不與連線的難度互相覆�
 syncSettingsUI();
 [...$("sdkHomeDiffSeg").children].forEach(b=>b.classList.toggle("on",b.dataset.diff===Solo.level()));
 showScreen("home");   // 進場先選玩法(數獨有單機也有連線)
+// iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
+setTimeout(maybeShowInstallTip,1500);
