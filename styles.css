@@ -1514,3 +1514,47 @@
   :root[data-theme="ebook"] .mvc-save input,
   :root[data-theme="ebook"] .mvc-rec{background:#fff;color:#000;border:1px solid #000}
   :root[data-theme="ebook"] .mvc-rec.rec{background:#000;color:#fff}
+
+  /* ==========================================================================
+     五子棋 · 電腦對決(v1.51.0)
+     ★ 同一條鐵則:只「追加」,選擇器一律 .gmk-* —— Bingo 與數獨的 DOM 沒有這些 class。
+       進場選單刻意沿用既有的 .panel / .field / .seg / .home-btn / .home-hint /
+       .home-sub-head / .home-tagline(與數獨 #sdkHome 同一套),這裡只補五子棋自己的四塊:
+       進場插圖、單機 HUD、工具鈕、結果卡的單機差異。
+     ========================================================================== */
+  /* 進場插圖:尺寸與數獨 .sdk-art 對齊(兩頁的「選擇玩法」看起來才是同一套介面);
+     棋盤的配色沿用首頁遊戲卡那組 .gk-* 規則,主題會一起變 */
+  .gmk-hero{text-align:center;margin:14px 0 4px}
+  .gmk-art{width:92px;height:92px;display:block;margin:0 auto 8px}
+
+  /* 單機 HUD:比照 .gmk-room 的瘦身版,把高度讓給棋盤。
+     ⚠ .gmk-room 的那些後代選擇器父層是 #mpBar,這裡是另一塊面板 → icon-btn 與 .row 要自己再壓一次 */
+  .gmk-solobar{padding:9px 12px}
+  .gmk-solobar .row{margin-top:0}
+  .gmk-solobar .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .gmk-lvtag{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13.5px;font-weight:800;color:var(--text)}
+  .gmk-rec{flex:none;font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap}
+  .gmk-solotools{display:flex;gap:8px;margin-top:7px}
+  .gmk-tool{flex:1;border:1px solid var(--panel-line);border-radius:11px;padding:7px 10px;
+    background:rgba(255,255,255,.06);color:var(--text);font-family:'Nunito',sans-serif;
+    font-weight:800;font-size:13px;cursor:pointer;transition:transform .12s,background .2s}
+  .gmk-tool:hover{background:rgba(255,255,255,.12)}
+  .gmk-tool:active{transform:scale(.96)}
+  .gmk-tool:disabled{opacity:.4;cursor:default;transform:none}
+  :root[data-theme="ebook"] .gmk-tool{background:#fff;border:1px solid #000;color:#000}
+
+  /* 結果卡:單機沒有對手可以嘴砲,賽後表情列收起來。
+     (連線的 #mpWinBtns / #winScores / #winChamp 已由數獨那段既有的 body.solo-on 規則一併隱藏,
+      #soloWinBtns 也由同一組的 body:not(.solo-on) 那條管 —— 那些選擇器不帶遊戲前綴,三頁通用) */
+  body.solo-on .gmk-react-row{display:none}
+  /* 結果卡第二行的小字(盤面 · 難度 · 手數 · 戰績);#winMsg 是 innerHTML,由 solo.js 填 */
+  .gmk-solomsg{display:inline-block;margin-top:6px;font-size:12.5px;color:var(--muted);font-weight:700}
+
+  @media (max-height:560px){
+    .gmk-hero{margin:6px 0 2px}
+    .gmk-art{width:64px;height:64px}
+    .gmk-solobar{padding:7px 10px}
+    .gmk-solotools{margin-top:5px}
+    .gmk-tool{padding:5px 8px;font-size:12px}
+  }

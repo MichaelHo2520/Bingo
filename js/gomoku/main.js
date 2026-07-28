@@ -1,16 +1,85 @@
 "use strict";
 
 /* ============================================================================
-   五子棋 — 事件綁定與啟動(必須最後載入)
+   五子棋 — 畫面切換、事件綁定與啟動(必須最後載入)
    設定蓋板 / 表情面板 / 音訊解鎖 / SW 註冊那些兩個遊戲一字不差的綁定,
    已收進 js/shared/ui-kit.js 的 bindCommonUI() / bindAudioLifecycle() / registerSW()。
    ========================================================================== */
 
+/* ---------- 畫面切換 ----------
+   mpConnect / mpBar / scrollArea / primaryBar 由 mp-core 控制,這裡只管五子棋自己的區塊。
+   (與數獨 js/sudoku/main.js 的 showScreen 同一個模式) */
+const GMK_SCREENS=["gmkHome","gmkSoloBar","gmkSetup","gmkStage"];
+function showScreen(which){
+  const on={
+    home:    ["gmkHome"],
+    connect: [],                        // 連線畫面本體由 mp-core 顯示
+    lobby:   ["gmkSetup"],
+    play:    ["gmkStage"],              // 連線對戰中
+    solo:    ["gmkSoloBar","gmkStage"]  // 電腦對決
+  }[which] || [];
+  GMK_SCREENS.forEach(id=>{ const el=$(id); if(el) el.classList.toggle("hidden", on.indexOf(id)<0); });
+  // 離開連線的畫面(回選單 / 進電腦對決)時,把連線那幾塊一起收乾淨
+  if(which==="home"||which==="solo"){
+    ["mpConnect","mpBar","primaryBar","scrollArea"].forEach(id=>{ const el=$(id); if(el) el.classList.add("hidden"); });
+  }
+  document.body.classList.toggle("solo-on", which==="solo");
+  if(which==="home") showHomeLayer("pick");   // 回選單一律從「選玩法」開始
+}
+
+/* ---------- 進場選單的兩層 ----------
+   第一層選玩法(連線在上)、第二層才挑電腦對決的難度。與數獨 #sdkPickMode/#sdkPickLevel 同一個模式。
+   回 index.html 的返回列只在第一層顯示:第二層有自己的返回,兩顆並存會分不清誰是誰。 */
+function showHomeLayer(which){
+  const pick=$("gmkPickMode"), lvl=$("gmkPickLevel"), head=$("gmkHomeHead");
+  if(pick) pick.classList.toggle("hidden", which!=="pick");
+  if(lvl)  lvl.classList.toggle("hidden", which!=="solo");
+  if(head) head.classList.toggle("hidden", which!=="pick");
+}
+// 難度說明:直接讀 GAI 的難度表,不另外硬編一份文案;戰績另起一行 —— 接在同一行後面,
+// 窄螢幕會斷在「戰／績」中間(這是截圖才看得出來的)
+function paintAiHint(){
+  const el=$("gmkAiHint"); if(!el)return;
+  const lv=GAI.levelOf(Solo.level());
+  el.innerHTML=esc(lv.emoji+" "+lv.name+":"+lv.desc)+"<br>"+esc(Solo.recLine(lv.key));
+}
+// 膠囊列高亮(三個 seg 共用):資料屬性的值對得上就亮
+function segOn(segId, key, val){
+  const seg=$(segId); if(!seg)return;
+  [...seg.children].forEach(b=>b.classList.toggle("on", b.dataset[key]===String(val)));
+}
+
 /* ---------- 棋盤 ---------- */
-GB.onTap(i=>MP.tap(i));                        // 能不能下由 MP.tap() 判定並給回饋(不用 disabled 靜默吃掉點擊)
+// 能不能下由 Solo.tap() / MP.tap() 各自判定並給回饋(不用 disabled 靜默吃掉點擊)
+GB.onTap(i=>{ if(Solo.active()) Solo.tap(i); else MP.tap(i); });
 $("gmkZoomIn").addEventListener("click",()=>GB.zoomIn());
 $("gmkZoomOut").addEventListener("click",()=>GB.zoomOut());
 $("gmkZoomFit").addEventListener("click",()=>GB.fit());
+
+/* ---------- 進場選單 ---------- */
+$("gmkGoOnline").addEventListener("click",()=>MP.openConnect());
+$("gmkPickSolo").addEventListener("click",()=>{ paintAiHint(); showHomeLayer("solo"); });
+$("gmkLevelBack").addEventListener("click",()=>showHomeLayer("pick"));
+$("gmkAiSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  Solo.setLevel(b.dataset.ai); segOn("gmkAiSeg","ai",Solo.level()); paintAiHint();
+});
+$("gmkSoloSizeSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  Solo.setSize(+b.dataset.size); segOn("gmkSoloSizeSeg","size",Solo.size());
+});
+$("gmkFirstSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  Solo.setFirst(b.dataset.first); segOn("gmkFirstSeg","first",Solo.first());
+});
+$("gmkStartSolo").addEventListener("click",()=>Solo.start());
+
+/* ---------- 電腦對決的 HUD ---------- */
+$("gmkSoloBack").addEventListener("click",()=>Solo.quit());
+$("gmkUndoBtn").addEventListener("click",()=>Solo.undo());
+$("gmkRestartBtn").addEventListener("click",()=>Solo.again());
+$("soloAgain").addEventListener("click",()=>Solo.again());
+$("soloHome").addEventListener("click",()=>Solo.quit());
 
 /* ---------- 大廳設定(房主可改) ---------- */
 $("gmkSizeSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setBoardSize(+b.dataset.size); });
@@ -28,6 +97,7 @@ $("mpName").addEventListener("input",()=>$("mpName").classList.remove("needs-nam
 $("mpRoomName").addEventListener("keydown",e=>{ if(e.key==="Enter")MP.create($("mpName").value,$("mpRoomName").value); });
 $("mpReadyBtn").addEventListener("click",()=>MP.toggleReady());
 $("mpLeaveBtn").addEventListener("click",()=>MP.askLeave());
+$("mpConnBack").addEventListener("click",()=>showScreen("home"));
 $("leaveConfirm").addEventListener("click",()=>MP.confirmLeave());
 $("leaveCancel").addEventListener("click",()=>MP.cancelLeave());
 $("leaveVeil").addEventListener("click",e=>{ if(e.target===$("leaveVeil"))MP.cancelLeave(); });
@@ -67,15 +137,20 @@ bindCommonUI();
 bindAudioLifecycle();
 registerSW();
 paintVersion();
-// 更新檢查:安全 = 沒在房裡(連線畫面本身可以直接重載,重載後照樣停在連線畫面)
-initUpdateCheck(()=>!MP.isOnline());
+// 更新檢查:安全 = 沒在房裡、也沒在單機局中(局中重載會把整盤棋丟掉)
+initUpdateCheck(()=>!MP.isOnline() && !Solo.playing());
 initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過來,第一個手勢自動接回去
 
 /* ---------- 啟動 ---------- */
 buildSwatches();
-loadPrefs();
+loadPrefs();       // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 五子棋的連線偏好
+Solo.loadOwn();    // 電腦對決的難度 / 盤面 / 先手 / 戰績(獨立 key,不與連線那組互相覆蓋)
 syncSettingsUI();
 GB.init();         // 棋盤 DOM + 手勢(舞台此時是 hidden,ResizeObserver 會在顯示後算 fit)
-MP.openConnect();  // 進場直接進連線畫面(五子棋只有連線對戰)
+segOn("gmkAiSeg","ai",Solo.level());
+segOn("gmkSoloSizeSeg","size",Solo.size());
+segOn("gmkFirstSeg","first",Solo.first());
+paintAiHint();
+showScreen("home");   // 進場先選玩法(五子棋現在有連線也有電腦對決)
 // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
 setTimeout(maybeShowInstallTip,1500);

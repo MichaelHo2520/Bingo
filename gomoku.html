@@ -11,9 +11,9 @@
 <meta name="theme-color" content="#2a1136">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>五子棋 ｜ 連線對戰</title>
-<!-- 五子棋連線對戰 · v1.50.0 -->
-<meta name="version" content="1.50.0">
+<title>五子棋 ｜ 連線對戰 · 電腦對決</title>
+<!-- 五子棋連線對戰 + 電腦對決 · v1.51.0 -->
+<meta name="version" content="1.51.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -39,13 +39,83 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 連線畫面(暱稱 / 建房 / 大廳清單)====== -->
-  <section class="panel" id="mpConnect">
-    <div class="mp-head">
-      <!-- 返回主選單:用 <a> 直接跳回 index.html(它的首頁就是遊戲選單) -->
+  <!-- ====== 進場選單(兩層):先選玩法,點電腦對決才挑難度 ======
+       與數獨 #sdkHome 同一個模式(第一層兩顆鈕、第二層才問設定)—— 三個遊戲進門的操作一致。 -->
+  <section class="panel" id="gmkHome">
+    <!-- 回 index.html 的返回列。只在第一層顯示:第二層有自己的返回(回第一層),
+         兩個返回鈕同時出現會分不清誰是誰 -->
+    <div class="mp-head" id="gmkHomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
+      <div class="subtitle">選擇玩法</div>
+    </div>
+
+    <!-- 第一層:選怎麼玩(連線在上,與數獨同順序) -->
+    <div id="gmkPickMode">
+      <div class="gmk-hero">
+        <svg class="gmk-art gk-art" viewBox="0 0 56 56" role="img" aria-label="五子棋盤">
+          <rect class="gk-bd" x="2" y="2" width="52" height="52" rx="6"/>
+          <g class="gk-ln">
+            <path d="M9 9H47M9 18.5H47M9 28H47M9 37.5H47M9 47H47"/>
+            <path d="M9 9V47M18.5 9V47M28 9V47M37.5 9V47M47 9V47"/>
+          </g>
+          <circle class="gk-b" cx="28" cy="28" r="4.4"/>
+          <circle class="gk-w" cx="18.5" cy="18.5" r="4.4"/>
+          <circle class="gk-b" cx="37.5" cy="18.5" r="4.4"/>
+          <circle class="gk-w" cx="18.5" cy="37.5" r="4.4"/>
+        </svg>
+        <div class="home-tagline">橫、豎、斜任一方向連成 5 顆就贏</div>
+      </div>
+      <button class="btn primary block-btn home-btn" id="gmkGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="gmkPickSolo">🤖 電腦對決</button>
+      <div class="home-hint">連線 1 對 1 跟朋友下;電腦對決一個人也能玩,對手有 <b>新手 / 普通 / 高手</b> 三個強度</div>
+    </div>
+
+    <!-- 第二層:電腦對決的設定(難度 / 盤面 / 先手)。這些只影響單機,不動連線那組房間設定 -->
+    <div id="gmkPickLevel" class="hidden">
+      <div class="home-sub-head">
+        <button class="icon-btn" id="gmkLevelBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <span class="subtitle">電腦對決 · 選難度</span>
+      </div>
+      <div class="field">
+        <span class="field-label">對手強度</span>
+        <div class="seg" id="gmkAiSeg" aria-label="電腦強度">
+          <button data-ai="easy">🙂 新手</button>
+          <button class="on" data-ai="normal">🤔 普通</button>
+          <button data-ai="hard">😈 高手</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">棋盤大小</span>
+        <div class="seg" id="gmkSoloSizeSeg" aria-label="棋盤大小">
+          <button data-size="15">15×15</button>
+          <button class="on" data-size="19">19×19</button>
+          <button data-size="25">25×25</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">誰先下</span>
+        <div class="seg" id="gmkFirstSeg" aria-label="誰先下">
+          <button class="on" data-first="me">⚫ 我先</button>
+          <button data-first="ai">⚪ 電腦先</button>
+          <button data-first="random">🎲 隨機</button>
+        </div>
+      </div>
+      <button class="btn primary block-btn home-btn" id="gmkStartSolo">開始對局 ▸</button>
+      <div class="home-hint" id="gmkAiHint"></div>
+    </div>
+  </section>
+
+  <!-- ====== 連線畫面(暱稱 / 建房 / 大廳清單)====== -->
+  <section class="panel hidden" id="mpConnect">
+    <div class="mp-head">
+      <!-- 返回上一層(選擇玩法);回 index.html 的入口在第一層的 #gmkHomeHead -->
+      <button class="icon-btn" id="mpConnBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
       <div class="subtitle">連線對戰</div>
     </div>
     <div class="field">
@@ -98,7 +168,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
 
   <!-- ====== 大廳設定(房主可改,訪客唯讀)====== -->
-  <div class="scroll-area gmk-scroll" id="scrollArea">
+  <div class="scroll-area gmk-scroll hidden" id="scrollArea">
     <section class="panel hidden" id="gmkSetup">
       <div class="subtitle">對戰設定</div>
 
@@ -142,6 +212,22 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       <div class="hint" id="gmkRuleHint">規則:黑棋先下,橫、豎、斜任一方向連成 5 顆即勝(無禁手)。棋盤下滿判和。<br>盤面越大越不容易頂到邊界;開局會自動放大到中央,雙指縮放或按 ⤢ 可看全盤。</div>
     </section>
+  </div>
+
+  <!-- ====== 電腦對決的 HUD(單機才顯示;連線那排在 #mpBar)======
+       「輪到誰」不放這裡 —— 棋盤上緣的 #gmkTurn 膠囊單機也沿用,同一件事只講一次 -->
+  <div class="panel gmk-solobar hidden" id="gmkSoloBar">
+    <div class="row gmk-room-top">
+      <button class="icon-btn" id="gmkSoloBack" type="button" title="回選單" aria-label="回選單">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="gmk-lvtag" id="gmkSoloTag">19×19 · 🤔 普通</span>
+      <span class="gmk-rec" id="gmkSoloRec">尚無戰績</span>
+    </div>
+    <div class="gmk-solotools">
+      <button class="gmk-tool" id="gmkUndoBtn" type="button" title="收回自己上一手(電腦的回應一起收回)">↩ 悔棋</button>
+      <button class="gmk-tool" id="gmkRestartBtn" type="button" title="這盤重下">↻ 重新一局</button>
+    </div>
   </div>
 
   <!-- ====== 棋盤舞台(遊戲中顯示;縮放/平移全由 board.js 處理)====== -->
@@ -188,6 +274,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
         <button class="btn primary" id="mpAgain">繼續 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
+      </div>
+      <!-- 電腦對決的按鈕組(與連線那組在同一格位置輪流出現,靠 body.solo-on 切換;
+           id 刻意與數獨的同名 —— 兩個獨立頁面,樣式那條 body:not(.solo-on) 規則直接重用) -->
+      <div class="actions" id="soloWinBtns">
+        <button class="btn primary" id="soloAgain">再來一局 ▸</button>
+        <button class="btn ghost" id="soloHome">回選單</button>
       </div>
       <button class="peek-link" id="winPeek">先看看棋盤 👀</button>
     </div>
@@ -366,11 +458,14 @@ const FIREBASE_CONFIG = {
 </script>
 
 <!-- 載入順序固定:ui-kit(定義 $ 與介面工具)→ mp-core(連線核心)→ board(棋盤引擎)
-     → adapter(五子棋規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
+     → ai(電腦對手,純函式)→ solo(電腦對決)→ adapter(連線規則,在這裡 const MP = MPCore.create(...))
+     → main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <script src="js/shared/mp-core.js"></script>
 <script src="js/gomoku/board.js"></script>
+<script src="js/gomoku/ai.js"></script>
+<script src="js/gomoku/solo.js"></script>
 <script src="js/gomoku/adapter.js"></script>
 <script src="js/gomoku/main.js"></script>
 </body>

@@ -147,26 +147,22 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 相位的專屬畫面 ---------- */
-    openConnect(){
-      $("gmkSetup").classList.add("hidden");
-      $("gmkStage").classList.add("hidden");
-    },
+    // 各相位只說「要哪個畫面」,實際的 hidden 切換交給 main.js 的 showScreen()
+    // (v1.51.0 起五子棋也有進場選單與電腦對決,自己一塊一塊 toggle 會漏掉新畫面)
+    openConnect(){ showScreen("connect"); },
     enterLobby(){
-      $("gmkSetup").classList.remove("hidden");
-      $("gmkStage").classList.add("hidden");
+      showScreen("lobby");
       $("resignBtn").classList.add("hidden");
     },
     backToLobby(){
       moves=[]; wasMyTurn=false;
-      $("gmkSetup").classList.remove("hidden");
-      $("gmkStage").classList.add("hidden");
+      showScreen("lobby");
       $("resignBtn").classList.add("hidden");
       GB.reset(); GB.setInteractive(false);
     },
     enterPlaying(){
       wasMyTurn=false;
-      $("gmkSetup").classList.add("hidden");
-      $("gmkStage").classList.remove("hidden");
+      showScreen("play");
       $("resignBtn").classList.remove("hidden");
       GB.setSize(boardSize);
       GB.applyMoves(moves);
