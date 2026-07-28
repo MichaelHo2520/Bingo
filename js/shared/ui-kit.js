@@ -184,14 +184,21 @@ function syncSettingsUI(){
 }
 function openSettings(){ Sound.wake(); syncSettingsUI(); $("setVeil").classList.add("show"); }
 function closeSettings(){ $("setVeil").classList.remove("show"); }
-/* ---------- 全螢幕(跨頁保持,v1.49.1) ----------
-   三個遊戲是三個獨立 HTML,而 Fullscreen API 是綁在 document 上的 —— 換頁(回主選單 / 進遊戲)
-   瀏覽器一定會把全螢幕收掉,於是「首頁按 ⛶ → 進遊戲 → 返回」就變回小視窗。
-   做法:把「使用者想要全螢幕」記在 sessionStorage(同一個分頁,換頁與重載都還在,關掉分頁才消失),
-        新頁載入時若記著要全螢幕,就掛監聽等第一個真實手勢再 requestFullscreen()
-        —— 沒有使用者手勢瀏覽器不給進全螢幕,那是唯一能自動接回去的時機。
+/* ---------- 全螢幕(v1.50.0:外殼架構) ----------
+   Fullscreen API 綁在 document 上,**換頁瀏覽器一定收掉全螢幕**,而重進全螢幕一定要使用者手勢
+   (實測:換頁後立刻 requestFullscreen 會 REJECT "Permissions check failed",連「使用者是點連結
+   才換頁的」都不算數)。所以正常情況下這一頁跑在 app.html 的 iframe 裡:**全螢幕掛在外殼身上**,
+   換遊戲只是換 iframe 的 src,外層動都不動 → 全程不掉。這裡只負責把 ⛶ 轉給外殼。
+
+   沒被外殼包住時(直接開這一頁、file:// 本機開、e2e 測試頁)才走下面本地那一套:
+   意願記在 sessionStorage,新頁第一個真實手勢再接回(v1.49.1 的做法,退而求其次)。
+
    ★ 這一整組在 js/game.js 另有一份(Bingo 不載入本檔,比照 toggleFull 各留一份)—— 改一邊記得改另一邊。 */
 const FS_KEY="bingo.fs";
+const framed=(()=>{ try{ return window.top!==window.self; }catch(e){ return true; } })();
+// file:// 的 origin 是 "null",postMessage 不能拿它當 targetOrigin;外殼那邊改用 e.source 驗身分
+const SHELL_TO=(location.origin && location.origin!=="null") ? location.origin : "*";
+let shellEnv=null;     // 外殼回報的環境(支不支援全螢幕 / 是不是 standalone);iframe 裡自己測不準
 let fsLeaving=false;   // 換頁中:此時的 fullscreenchange 是瀏覽器收掉的,不代表使用者不想要了
 function fsEl(){ return document.fullscreenElement||document.webkitFullscreenElement; }
 function fsSupported(){ const de=document.documentElement; return !!(de.requestFullscreen||de.webkitRequestFullscreen); }
@@ -202,7 +209,25 @@ function fsRequest(){
   if(!req)return null;
   try{ return req.call(de); }catch(e){ return null; }
 }
+// 這一頁是哪一個遊戲(外殼用它更新 hash,做深層連結)。從檔名判斷,測試頁 t-gomoku-*.html 也認得。
+function fsPageKey(){
+  const f=(location.pathname.split("/").pop()||"").toLowerCase();
+  return f.indexOf("gomoku")>=0 ? "gomoku" : (f.indexOf("sudoku")>=0 ? "sudoku" : "bingo");
+}
+function shellMsg(act){
+  try{ parent.postMessage({ t:"bingo.fs", act:act, page:fsPageKey() }, SHELL_TO); }catch(e){}
+}
+// 是不是已經滿版(iOS standalone / 桌機 app 視窗)。在 iframe 裡 navigator.standalone 測不準,以外殼回報為準。
+function fsStandalone(){
+  if(framed) return shellEnv ? !!shellEnv.standalone : true;   // 外殼還沒回報就當作已滿版,寧可不囉嗦
+  return ("standalone" in navigator && navigator.standalone) ||
+         (matchMedia&&matchMedia("(display-mode: standalone)").matches);
+}
+function fsFallbackTip(){
+  showToast(fsStandalone()?"已是全螢幕模式 👍":"iOS 請按 Safari 分享鈕 → 加入主畫面,即可全螢幕",3000);
+}
 function toggleFull(){
+  if(framed){ shellMsg("toggle"); return; }   // 外殼代勞;它不支援時會回 unsupported,那時才跳提示
   const exit=document.exitFullscreen||document.webkitExitFullscreen;
   if(fsSupported()){
     if(fsEl()){ setFsWant(false); exit&&exit.call(document); }
@@ -211,23 +236,22 @@ function toggleFull(){
       const p=fsRequest();
       if(p&&p.catch)p.catch(()=>setFsWant(false));   // 這一次就被拒:別把意願留著騷擾之後每一頁
     }
-  }else{
-    const standalone=("standalone" in navigator && navigator.standalone) ||
-                     (matchMedia&&matchMedia("(display-mode: standalone)").matches);
-    showToast(standalone?"已是全螢幕模式 👍":"iOS 請按 Safari 分享鈕 → 加入主畫面,即可全螢幕",3000);
-  }
+  }else fsFallbackTip();
 }
 /* 掛「下一個手勢就接回全螢幕」。用 click(冒泡到 window)而不是 pointerdown:
    按下去就切全螢幕會在 pointerdown/pointerup 之間改變版面,那一下的 click 可能就飛掉了。
    點到 <a href>(回主選單)或正在輸入框打字則跳過並繼續等 ——
-   前者進了全螢幕馬上又要換頁只會閃一下,後者打到一半版面亂跳很煩。 */
+   前者進了全螢幕馬上又要換頁只會閃一下,後者打到一半版面亂跳很煩。
+   有外殼時這一下手勢是給外殼用的(外殼被 F5 重載過才需要接回,它自己判斷)。 */
 let fsArmed=null;
 function armFsRestore(){
-  if(fsArmed || !fsWant() || fsEl() || !fsSupported())return;
+  if(fsArmed)return;
+  if(!framed && (!fsWant() || fsEl() || !fsSupported()))return;
   fsArmed=e=>{
     const t=e&&e.target;
     if(t&&t.closest&&t.closest("a[href],input,textarea,select"))return;   // 這一下不算,留著等下一次
     disarmFsRestore();
+    if(framed){ shellMsg("gesture"); return; }
     if(!fsWant() || fsEl())return;
     fsRequest();   // 被拒就安靜算了(每頁只試這一次,不會纏著使用者)
   };
@@ -241,6 +265,17 @@ function disarmFsRestore(){
   fsArmed=null;
 }
 function initFullscreenKeep(){
+  if(framed){
+    addEventListener("message",e=>{
+      if(e.source!==parent)return;
+      const d=e.data; if(!d||d.t!=="bingo.shell")return;
+      if(d.act==="env"||d.act==="unsupported") shellEnv={ fsSupported:!!d.fsSupported, standalone:!!d.standalone };
+      if(d.act==="unsupported") fsFallbackTip();   // 外殼也進不了全螢幕(iPhone Safari)→ 引導加到主畫面
+    });
+    shellMsg("hello");   // 回報自己是哪一頁,順便換回外殼的 env
+    armFsRestore();
+    return;
+  }
   const sync=()=>{ if(!fsLeaving) setFsWant(!!fsEl()); };   // 使用者自己按 Esc 退出 → 意願跟著關掉
   document.addEventListener("fullscreenchange",sync);
   document.addEventListener("webkitfullscreenchange",sync);
@@ -255,9 +290,7 @@ function initFullscreenKeep(){
 const PWA_TIP_KEY="bingo.pwatip";
 function maybeShowInstallTip(){
   try{
-    const standalone=("standalone" in navigator && navigator.standalone) ||
-                     (matchMedia && matchMedia("(display-mode: standalone)").matches);
-    if(standalone)return;                        // 已經是全螢幕了,不用講
+    if(fsStandalone())return;                    // 已經是全螢幕了,不用講(在 iframe 裡以外殼回報的為準)
     const ua=navigator.userAgent||"";
     // iPadOS 13+ 的 UA 會偽裝成 Macintosh,只能靠觸控點數認出來
     const isIOS=/iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints>1);

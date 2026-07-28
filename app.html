@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="派對遊戲">
+<meta name="theme-color" content="#2a1136">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>派對遊戲 ｜ BINGO · 五子棋 · 數獨</title>
+<!-- 外殼(shell)· v1.50.0 -->
+<meta name="version" content="1.50.0">
+<!--
+  外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
+
+  為什麼要有這一層(v1.50.0):Fullscreen API 綁在 document 上,**換頁瀏覽器一定收掉全螢幕**,
+  而重進全螢幕一定要使用者手勢 —— 連「使用者是點連結才換頁的」都不算數(實測:換頁後立刻
+  requestFullscreen 會 REJECT "Permissions check failed")。所以在一般瀏覽器分頁裡,
+  「換頁不掉全螢幕」的唯一解法就是**不要換頁**:讓頂層 document 永遠是這一頁,全螢幕掛在它身上。
+
+  三個遊戲頁彼此本來就用 <a href> 互連,在 iframe 裡點下去就是換 iframe、外層動都不動,
+  所以那三頁的版面一行都不用改;只有 ⛶ 按鈕改成 postMessage 請這裡代勞。
+
+  設計上刻意保持極簡:內層遊戲有自動更新檢查(reload 只會重載 iframe,全螢幕反而不會掉),
+  但**這一頁自己不吃那套** —— 所以它必須簡單到幾乎不需要再改。要改請一併想清楚舊使用者
+  怎麼拿到新版(靠 sw.js 或關掉重開)。
+-->
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#2a1136;overscroll-behavior:none}
+  #stage{display:block;width:100%;height:100%;border:0}
+  .noscript{color:#eee;font:16px/1.6 system-ui,sans-serif;padding:24px}
+  .noscript a{color:#ffd24a}
+</style>
+</head>
+<body>
+<iframe id="stage" title="遊戲" allow="fullscreen; microphone; autoplay"></iframe>
+<noscript><div class="noscript">這個遊戲需要 JavaScript。<a href="index.html">直接進入首頁</a></div></noscript>
+<script>
+(function(){
+  "use strict";
+  // 只認得這三個 key —— hash 是外面來的字串,不可以直接拿去當 src
+  var PAGES = { bingo:"index.html", gomoku:"gomoku.html", sudoku:"sudoku.html" };
+  var stage = document.getElementById("stage");
+
+  function keyOfHash(){
+    var k = (location.hash || "").replace(/^#/, "");
+    return PAGES[k] ? k : "bingo";
+  }
+  // 深層連結:app.html#gomoku 直接開五子棋。iOS「加到主畫面」記的是當下網址(含 hash),
+  // 所以三個遊戲照樣可以各自加一個直接開該遊戲的圖示。
+  var cur = PAGES[keyOfHash()];   // iframe 目前是哪一頁;以內層 hello 回報的為準
+  stage.src = cur;
+  /* 只改 hash 是「同文件導覽」,瀏覽器不會重載這一頁 → 要自己聽(例如點了 app.html#sudoku 的書籤,
+     而分頁已經開在 #bingo)。
+     ⚠ 兩個坑:
+       1. 不認得的 hash 直接不理 —— 別因為別人亂填就把人踢回首頁。
+       2. **按上一頁時 iframe 自己也會往回走**,而歷史紀錄裡的 hash 同時會變 → 這裡若馬上設 src,
+          等於在瀏覽器的返回之上再疊一次導覽。所以延遲一下,等內層 hello 回報完再比對:
+          真的是它自己走回去的,cur 早就對上了,這裡就什麼都不做。
+       (回報 hello 用的是 history.replaceState,那個不會觸發 hashchange,不會自己打自己) */
+  addEventListener("hashchange", function(){
+    var k = (location.hash || "").replace(/^#/, "");
+    if(!PAGES[k]) return;
+    setTimeout(function(){
+      if(PAGES[k] !== cur){ cur = PAGES[k]; stage.src = PAGES[k]; }
+    }, 250);
+  });
+
+  /* ---------- 全螢幕:由這一層持有 ----------
+     內層點 ⛶ → postMessage 過來 → 這裡對「頂層 documentElement」requestFullscreen。
+     iframe 之後怎麼換頁都不會動到它。
+     ⚠ 靠的是「iframe 內的使用者手勢會把 user activation 傳給祖先 frame」——
+       已實測:iframe 內真實點擊 → 這裡 requestFullscreen() 成功。 */
+  var FS_KEY = "bingo.fs";
+  function fsEl(){ return document.fullscreenElement || document.webkitFullscreenElement; }
+  function fsSupported(){ var de=document.documentElement; return !!(de.requestFullscreen || de.webkitRequestFullscreen); }
+  function want(){ try{ return sessionStorage.getItem(FS_KEY) === "1"; }catch(e){ return false; } }
+  function setWant(on){ try{ if(on) sessionStorage.setItem(FS_KEY,"1"); else sessionStorage.removeItem(FS_KEY); }catch(e){} }
+  function request(){
+    var de = document.documentElement, req = de.requestFullscreen || de.webkitRequestFullscreen;
+    if(!req) return null;
+    try{ return req.call(de); }catch(e){ return null; }
+  }
+  function toggle(){
+    var exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if(fsEl()){ setWant(false); if(exit) exit.call(document); return; }
+    setWant(true);
+    var p = request();
+    if(p && p.catch) p.catch(function(){ setWant(false); });
+  }
+  // 使用者自己按 Esc 退出 → 意願跟著關掉(這一頁永不換頁,所以不需要 fsLeaving 那套)
+  function sync(){ setWant(!!fsEl()); }
+  document.addEventListener("fullscreenchange", sync);
+  document.addEventListener("webkitfullscreenchange", sync);
+
+  function tell(act, extra){
+    var msg = { t:"bingo.shell", act:act };
+    if(extra) for(var k in extra) msg[k] = extra[k];
+    try{ stage.contentWindow.postMessage(msg, "*"); }catch(e){}
+  }
+  function env(){
+    return {
+      fsSupported: fsSupported(),
+      standalone: ("standalone" in navigator && navigator.standalone) ||
+                  (window.matchMedia && matchMedia("(display-mode: standalone)").matches)
+    };
+  }
+
+  addEventListener("message", function(e){
+    // 身分檢查用 source(比對 origin 在 file:// 會是 "null",這樣寫本機直接開也能用)
+    if(e.source !== stage.contentWindow) return;
+    var d = e.data;
+    if(!d || d.t !== "bingo.fs") return;
+
+    if(d.act === "hello"){
+      // 內層回報自己是哪一頁 → 記下來(hashchange 要靠它判斷「是不是它自己走過去的」)
+      // 並更新 hash(用 replaceState,iframe 導覽本身已經有一筆歷史了,不要再多疊一筆)
+      if(PAGES[d.page]){
+        cur = PAGES[d.page];
+        var h = "#" + d.page;
+        if(location.hash !== h){ try{ history.replaceState(null, "", h); }catch(_){} }
+      }
+      tell("env", env());
+      return;
+    }
+    if(d.act === "toggle"){
+      if(!fsSupported()){ tell("unsupported", env()); return; }
+      toggle();
+      return;
+    }
+    if(d.act === "gesture"){
+      // 這一頁被 F5 重載過(全螢幕掉了但意願還記著)→ 借內層這一下手勢接回來
+      if(want() && !fsEl() && fsSupported()) request();
+      return;
+    }
+  });
+})();
+</script>
+</body>
+</html>

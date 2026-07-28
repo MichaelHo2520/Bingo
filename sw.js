@@ -3,10 +3,11 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.49.1";
+const VERSION = "1.50.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
+  "./app.html",        // 外殼(PWA 的 start_url):三個遊戲跑在它的 iframe 裡,全螢幕掛在它身上
   "./index.html",
   "./styles.css",
   "./js/audio.js",
@@ -61,11 +62,11 @@ self.addEventListener("fetch", e => {
   try { url = new URL(req.url); } catch (_) { return; }
   if (url.origin !== self.location.origin) return;   // 外部(Firebase / 字型)不攔,直接走網路
 
-  // network-first:先網路(順手更新快取),失敗才回退快取;導覽請求離線時退回 index.html
+  // network-first:先網路(順手更新快取),失敗才回退快取;導覽請求離線時退回外殼 app.html
   e.respondWith(
     fetch(req).then(res => {
       if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
       return res;
-    }).catch(() => caches.match(req).then(hit => hit || (req.mode === "navigate" ? caches.match("./index.html") : Response.error())))
+    }).catch(() => caches.match(req).then(hit => hit || (req.mode === "navigate" ? caches.match("./app.html") : Response.error())))
   );
 });
