@@ -76,6 +76,18 @@ $("soloHome").addEventListener("click",()=>Solo.quit());
    重洗刻意沒有按鈕(v1.54.0):死局時單機走 Solo 的 deadEnd()、連線走 adapter 的 armAuto()。 */
 $("mjHintBtn").addEventListener("click",()=>{ if(Solo.running()) Solo.hint(); });
 
+/* ---------- 設定:同款高亮(麻將專屬) ----------
+   ui-kit 的 syncSettingsUI() 是三個遊戲共用的,不把麻將專屬的列塞進去 —— 這顆自己綁、自己同步。
+   真相存在 MB 裡,savePrefs() 會透過 MP.ownPrefs() 把它寫進 mahjong.prefs.v1。 */
+function syncMjSame(){
+  const b=$("mjSwSame"); if(b) b.setAttribute("aria-checked",MB.sameHint()?"true":"false");
+}
+$("mjSwSame").addEventListener("click",()=>{
+  MB.setSameHint(!MB.sameHint());
+  savePrefs(); syncMjSame();
+  showToast(MB.sameHint()?"同款高亮:開":"同款高亮:關",1200);
+});
+
 /* 比分 HUD:點某個人的卡片 = 傳表情給他(對戰中名單列收起來了,這裡接手那個入口) */
 $("mjHud").addEventListener("click",e=>{
   const c=e.target.closest(".mj-hcard"); if(!c)return;
@@ -139,9 +151,10 @@ initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過�
 
 /* ---------- 啟動 ---------- */
 buildSwatches();
-loadPrefs();          // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 麻將的連線偏好
+loadPrefs();          // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 麻將的連線偏好 + 同款高亮
 Solo.loadOwn();       // 單機盤面大小(獨立 key,不與連線的設定互相覆蓋)
 syncSettingsUI();
+syncMjSame();         // 麻將專屬那一列不在 syncSettingsUI() 裡,要自己補
 [...$("mjHomeDiffSeg").children].forEach(b=>b.classList.toggle("on",b.dataset.diff===Solo.level()));
 paintLevelHint();
 showScreen("home");   // 進場先選玩法(麻將有單機也有連線)

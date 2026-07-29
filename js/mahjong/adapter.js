@@ -24,7 +24,7 @@
 const MP = MPCore.create((function(){
   const COLORS=["p0","p1","p2","p3","p4","p5"];   // 對應 styles.css 的 --sp0~--sp5(要加人先加色)
   let mode="grab", diff="m72";                    // 房間設定(房主可改)
-  let gMode="grab", gDiff="m72";                  // 開局當下鎖定的值(對戰中改設定不影響進行中的這局)
+  let gMode="grab", gDiff="m72", gShape="wide";   // 開局當下鎖定的值(對戰中改設定不影響進行中的這局)
   let ctx=null;
   let curRound=null, shufN=0, moves=[], tally=[], prog={};
   let total=0, myShuf=0, startedAt=0;
@@ -145,7 +145,7 @@ const MP = MPCore.create((function(){
     if(ctx.phase()!=="playing"||ctx.winner())return;
     if(MB.left()<2)return;
     if(gMode==="race"){
-      const nt=MGen.reshuffle(MB.level(),MB.aliveArr(),MB.tiles());
+      const nt=MGen.reshuffle(MB.level(),MB.shape(),MB.aliveArr(),MB.tiles());
       if(!nt){ stuck(); return; }
       MB.setTiles(nt); myShuf++;
       Sound.takeback(); showToast("已重洗你的盤面 🔀",1300);
@@ -158,7 +158,7 @@ const MP = MPCore.create((function(){
      先在本地算好新排法,再用交易搶 —— 交易裡檢查 shuf 與 moves 長度都沒變,
      變了就代表「別人已經洗過」或「期間又有人消了牌」,這份算好的排法已過期,直接放棄。 */
   function grabShuffle(){
-    const nt=MGen.reshuffle(MB.level(),MB.aliveArr(),MB.tiles());
+    const nt=MGen.reshuffle(MB.level(),MB.shape(),MB.aliveArr(),MB.tiles());
     if(!nt){ stuck(); return; }
     const wantShuf=shufN, wantLen=moves.length, code=nt.join("");
     ctx.txGame(g=>{
@@ -255,21 +255,29 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 一局的生命週期 ---------- */
-    lobbyGame(){ return { moves:[], tiles:null, shuf:0 }; },
+    lobbyGame(){ return { moves:[], tiles:null, shuf:0, shape:null }; },
     resetRound(){ clearAuto(); curRound=null; moves=[]; tally=[]; prog={}; shufN=0; myShuf=0; },
     newGame(ids, prev){
-      const q=MGen.make(diff);
+      /* 盤面形狀(v1.55.0):由**出題的這台裝置**依自己的畫面比例挑,再連同 tiles 一起寫進
+         game 節點 → 全房都照這個形狀擺。
+         ★ 絕對不可以讓每台各自算 —— 全房共用同一份 tiles + 格位索引,形狀不同就整盤錯位:
+           A 看到的第 37 格和 B 看到的第 37 格不是同一個位置,消掉的牌會亂飛。
+         ★ 副作用是「房主用手機開房,大家就都拿到直式」。可以接受:形狀只影響好不好按,
+           而寬版在手機上更難按,拿到直式的桌機玩家只是牌小一點。 */
+      const q=MGen.make(diff, MGen.pickShape(diff, innerWidth, innerHeight));
       // 座位順序每局輪換一次,顏色才不會永遠同一個人拿 p0
       let ord;
       if(prev && prev.length===ids.length) ord=prev.slice(1).concat(prev[0]);
       else { ord=ids.slice(); for(let i=ord.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=ord[i]; ord[i]=ord[j]; ord[j]=t; } }
       const pr=ctx.ref("progress"); if(pr) pr.remove();     // 上一局的進度不要帶到這局
-      return { order:ord, moves:[], shuf:0, tiles:q?q.code:"", mode:mode, diff:diff };
+      return { order:ord, moves:[], shuf:0, tiles:q?q.code:"", shape:q?q.shape:"wide", mode:mode, diff:diff };
     },
     applyGame(g, playing){
       if(!playing) return;
       gMode=(g.mode==="race")?"race":"grab";
       gDiff=MGen.LEVELS[g.diff]?g.diff:"m72";
+      // 舊版房間沒有 shape 欄位 → shapeOf() 會回 "wide",正好是 v1.54.0 以前唯一的佈局
+      gShape=MGen.shapeOf(g.shape);
 
       /* 新的一局 → 整盤重建。
          ★ 判斷「新局」用 roundId,**不可以用 g.tiles 有沒有變** —— 搶牌的重洗就是在改
@@ -278,7 +286,7 @@ const MP = MPCore.create((function(){
       if(g.tiles && rid!==curRound){
         clearAuto();                    // 上一局排的自動重洗絕不能洗到新的盤面上
         curRound=rid; shufN=g.shuf||0;
-        MB.setBoard({ level:gDiff, tiles:g.tiles });
+        MB.setBoard({ level:gDiff, shape:gShape, tiles:g.tiles });
         total=MB.total();
         moves=[]; tally=[]; myShuf=0; startedAt=Date.now();
         MB.setEnabled(true);
@@ -420,11 +428,14 @@ const MP = MPCore.create((function(){
       return { word:"你輸了", msg:esc(w.name||"對手")+" 消了 "+(w.pts||0)+" 對" };
     },
 
-    /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { mode:mode, diff:diff }; },
+    /* ---------- 偏好(mahjong.prefs.v1;ui-kit 的 savePrefs/loadPrefs 會呼叫這兩支)----------
+       ★ 同款高亮不是連線設定,但它的家在這裡 —— 這支 adapter 是 mahjong.prefs.v1 的擁有者,
+         而 loadPrefs() 在單機模式也會跑,所以單機一樣吃得到。真相存在 MB 裡,這裡只轉手。 */
+    ownPrefs(){ return { mode:mode, diff:diff, same:MB.sameHint() }; },
     usePrefs(o){
       if(o.mode==="race"||o.mode==="grab") mode=o.mode;
       if(MGen.LEVELS[o.diff]) diff=o.diff;
+      MB.setSameHint(o.same===true);      // 沒存過就是 false(預設不提醒)
     },
 
     /* ---------- 額外暴露給 main.js ---------- */

@@ -1624,12 +1624,20 @@
        理由:萬紅 / 條綠 / 筒藍是這遊戲唯一的辨識線索,牌面一變色就得重配九組花色色,
        而且深底淺字在 30px 的牌上根本讀不出來。真實麻將牌本來就是象牙白,看起來反而最對。
        電子書模式例外(只有黑白可用)。 */
+  /* 東南西北照實體牌是**藍**的(v1.55.0 從墨色改過來,970 那張花色表也是藍);
+     中=紅、發=綠、白=藍框,這三個本來就對。 */
   :root{ --mj-face:#fdf6ea; --mj-edge:#d9bb9d; --mj-side:#c19a72; --mj-ink:#3b2a1c;
-         --mj-w:#c0392b; --mj-b:#1f7a4d; --mj-d:#2563c9; --mj-z:#3b2a1c;
-         --mj-jz:#d0342c; --mj-jf:#1f7a4d; --mj-jb:#4a6fa5; --mj-h:#d97706; --mj-p:#7c3aed; }
+         --mj-z:#3f5896;
+         --mj-jz:#d0342c; --mj-jf:#1f7a4d; --mj-jb:#3f5896; --mj-h:#d97706; --mj-p:#7c3aed; }
   :root[data-theme="ebook"]{ --mj-face:#ffffff; --mj-edge:#000000; --mj-side:#888888; --mj-ink:#000000;
-         --mj-w:#000; --mj-b:#333; --mj-d:#555; --mj-z:#000;
+         --mj-z:#000;
          --mj-jz:#000; --mj-jf:#333; --mj-jb:#666; --mj-h:#444; --mj-p:#222; }
+  /* ---------- 數字牌的傳統三色(v1.55.0)----------
+     萬 / 條 / 筒的配色在真牌上是固定的(三筒藍紅綠斜排、九索三欄各一色、萬子藍字紅「萬」),
+     所以**刻意不跟主題變** —— 那是牌的一部分,不是我們的配色。
+     電子書模式例外(只有黑白):三色降成三階灰,圖案的分色關係才不會整片糊掉。 */
+  :root{ --mj-c-u:#3f5896; --mj-c-r:#c9524f; --mj-c-g:#3a8b69; }
+  :root[data-theme="ebook"]{ --mj-c-u:#000; --mj-c-r:#555; --mj-c-g:#333; }
 
   /* ---------- 頂列品牌字 / 進場插圖 ---------- */
   .mj-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
@@ -1709,20 +1717,30 @@
      ★ 花色只設在牌本身的 color 上,SVG 裡的圖案一律 currentColor → 一種花色一條規則,
        不必為每個圖形元素各寫一次(舊版是 .mj-g / .mj-m 兩個 span 各設一次色)。 */
   .mj-svg{display:block;width:100%;height:100%}
-  .mj-hole{fill:var(--mj-face)}        /* 筒的白圈 / 竹節 / 鳥眼:挖成牌面色 */
+  .mj-hole{fill:var(--mj-face)}        /* 筒的白圈 / 竹節 / 花心:挖成牌面色 */
   .mj-wing{fill:none;stroke:var(--mj-face);stroke-width:4;stroke-linecap:round}
   .mj-frm{fill:none;stroke:currentColor;stroke-width:6}          /* 白板的粗框 */
-  .mj-frn{fill:none;stroke:currentColor;stroke-width:2.4;opacity:.55}  /* 白板內框 / 花牌外框 */
+  /* 白板內框 + 四角切線 / 花牌外框。stroke-linecap 是給白板那四條斜線用的 */
+  .mj-frn{fill:none;stroke:currentColor;stroke-width:2.4;opacity:.55;stroke-linecap:round}
   /* 牌面的字:CJK 交給系統字型(Fredoka/Nunito 只有拉丁字母),置中靠 CSS 不寫進 SVG 屬性 */
   .mj-t{fill:currentColor;font-weight:700;text-anchor:middle;dominant-baseline:central;
     font-family:'Noto Sans TC','Microsoft JhengHei','PingFang TC','Heiti TC',sans-serif}
-  /* 萬子上面那個漢字數字是墨色(下面的「萬」才是紅的)。
-     ⚠ 必須兩層 .mj-t.mj-ink —— 單寫 .mj-ink 和 .mj-t 同級,後寫的 fill:currentColor 會贏,
-        數字就跟著變紅(第一版就是這樣,截圖才看得出來;同 v1.49.0 .mvc-open 那個坑)。 */
+  /* ---------- 數字牌的三色(v1.55.0)----------
+     圖形元素(圓 / 竹 / 花瓣)用一層就夠;**文字一定要另外寫兩層** ——
+     ⚠ .mj-t 已經有 fill:currentColor,權重同為 (0,1,0),單靠 source order 太脆弱:
+        誰在後面誰贏,以後有人在檔尾補一條 .mj-t 就整批變色(v1.54.0 的 .mj-ink 就踩過,
+        萬子的數字整片變成紅的,只有截圖才看得出來;同 v1.49.0 .mvc-open 那個坑)。 */
+  .mj-cu{fill:var(--mj-c-u)}
+  .mj-cr{fill:var(--mj-c-r)}
+  .mj-cg{fill:var(--mj-c-g)}
+  .mj-t.mj-cu{fill:var(--mj-c-u)}
+  .mj-t.mj-cr{fill:var(--mj-c-r)}
+  .mj-t.mj-cg{fill:var(--mj-c-g)}
   .mj-t.mj-ink{fill:var(--mj-ink)}
-  .mj-tile[data-suit="w"]{color:var(--mj-w)}
-  .mj-tile[data-suit="b"]{color:var(--mj-b)}
-  .mj-tile[data-suit="d"]{color:var(--mj-d)}
+  /* 只有字牌與花牌吃 data-suit 的 color(它們的圖案用 currentColor);
+     萬 / 條 / 筒沒有在這裡 —— v1.55.0 起那三種花色的每個圖形都自己帶 .mj-c* 三色 class。
+     ⚠ 不要「順手補回」w/b/d 三條 —— 補了之後,萬一有圖形漏掉 class 就會靜默吃到一個
+        看起來合理的顏色,那個 bug 只有把 42 張牌全部截圖比對才抓得到。 */
   .mj-tile[data-suit="z"]{color:var(--mj-z)}
   .mj-tile[data-suit="jz"]{color:var(--mj-jz)}
   .mj-tile[data-suit="jf"]{color:var(--mj-jf)}

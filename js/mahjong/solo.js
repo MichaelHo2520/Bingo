@@ -63,7 +63,9 @@ const Solo = (function(){
   /* ---------- 開始 / 結束 ---------- */
   function start(lv){
     level=lv||level;
-    const q=MGen.make(level);
+    /* 盤面形狀依畫面比例挑(v1.55.0):手機直立拿直式、桌機與橫向拿寬版。
+       ★ 在**出題這一刻**決定,之後整局不再變 —— 中途轉向只縮放,不重排(重排會毀掉進行中的局)。 */
+    const q=MGen.make(level, MGen.pickShape(level, innerWidth, innerHeight));
     if(!q){ showToast("出題失敗,再試一次 😥"); return; }    // 實測不會發生(單次成功率 100%),但不能讓它靜默壞掉
     clearAuto();
     elapsed=0; hints=0; shuffles=0; undos=0; paused=false; running=true; stack=[];
@@ -126,7 +128,7 @@ const Solo = (function(){
   function shuffle(){
     if(!running||paused)return;
     if(MB.left()<2)return;
-    const nt=MGen.reshuffle(MB.level(), MB.aliveArr(), MB.tiles());
+    const nt=MGen.reshuffle(MB.level(), MB.shape(), MB.aliveArr(), MB.tiles());
     /* 洗不出來 = 真死局:剩下的牌上下疊在一起,同一格位怎麼排都只有上面那張抽得出來。
        罕見但確實存在(最後一對剛好疊著),所以不能在這裡無聲重試 —— 要講出唯一的出路。 */
     if(!nt){ showToast("剩下的牌上下疊住了,洗也解不開 —— 按「↶ 悔棋」退一步再試",3600); return; }
