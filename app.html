@@ -16,8 +16,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>派對遊戲 ｜ BINGO · 五子棋 · 數獨</title>
-<!-- 外殼(shell)· v1.52.2 -->
-<meta name="version" content="1.52.2">
+<!-- 外殼(shell)· v1.53.0 -->
+<meta name="version" content="1.53.0">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
@@ -46,8 +46,8 @@
 <script>
 (function(){
   "use strict";
-  // 只認得這三個 key —— hash 是外面來的字串,不可以直接拿去當 src
-  var PAGES = { bingo:"index.html", gomoku:"gomoku.html", sudoku:"sudoku.html" };
+  // 只認得這四個 key —— hash 是外面來的字串,不可以直接拿去當 src
+  var PAGES = { bingo:"index.html", gomoku:"gomoku.html", sudoku:"sudoku.html", mahjong:"mahjong.html" };
   var stage = document.getElementById("stage");
 
   function keyOfHash(){

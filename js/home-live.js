@@ -22,9 +22,10 @@ const HomeLive = (function(){
   // max = 可加入的人數上限(要與各遊戲 adapter.js 的 maxPlayers 一致;Bingo 沒有上限 → 0)
   // href = 別頁的遊戲;沒有 href 的就是本頁(Bingo)
   const GAMES=[
-    { key:"bingo",  index:"rooms_index",  name:"BINGO",  icon:"🎲", badge:"hlBadgeBingo",  max:0 },
-    { key:"gomoku", index:"gomoku_index", name:"五子棋", icon:"⚫", badge:"hlBadgeGomoku", max:2, href:"gomoku.html" },
-    { key:"sudoku", index:"sudoku_index", name:"數獨",   icon:"🔢", badge:"hlBadgeSudoku", max:6, href:"sudoku.html" }
+    { key:"bingo",   index:"rooms_index",   name:"BINGO",  icon:"🎲", badge:"hlBadgeBingo",   max:0 },
+    { key:"gomoku",  index:"gomoku_index",  name:"五子棋", icon:"⚫", badge:"hlBadgeGomoku",  max:2, href:"gomoku.html" },
+    { key:"sudoku",  index:"sudoku_index",  name:"數獨",   icon:"🔢", badge:"hlBadgeSudoku",  max:6, href:"sudoku.html" },
+    { key:"mahjong", index:"mahjong_index", name:"麻將",   icon:"🀄", badge:"hlBadgeMahjong", max:6, href:"mahjong.html" }
   ];
 
   let refs=[];            // 掛著監聽的 firebase ref(stop 時逐一 off)

@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>派對遊戲 ｜ BINGO · 五子棋 · 數獨</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨)· v1.52.2 -->
-<meta name="version" content="1.52.2">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂)· v1.53.0 -->
+<meta name="version" content="1.53.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -125,6 +125,21 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <span class="gc-name display">數獨</span>
           <span class="gc-desc">單機練習 · 或 2~6 人連線搶格 / 競速</span>
           <span class="hl-badge hidden" id="hlBadgeSudoku"></span>
+        </span>
+        <span class="gc-go" aria-hidden="true">▸</span>
+      </a>
+
+      <a class="game-card as-link" href="mahjong.html">
+        <svg class="gc-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌">
+          <rect class="mk-bd" x="3.5" y="9" width="23" height="31" rx="4.5"/>
+          <rect class="mk-bd" x="29.5" y="16" width="23" height="31" rx="4.5"/>
+          <text class="mk-r" x="15" y="31">中</text>
+          <text class="mk-g" x="41" y="38">發</text>
+        </svg>
+        <span class="gc-body">
+          <span class="gc-name display">麻將消消樂</span>
+          <span class="gc-desc">配對消牌 · 單機或 2~6 人連線搶牌 / 競速</span>
+          <span class="hl-badge hidden" id="hlBadgeMahjong"></span>
         </span>
         <span class="gc-go" aria-hidden="true">▸</span>
       </a>

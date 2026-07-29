@@ -1598,3 +1598,237 @@
     .hl-head{margin-bottom:7px}
     .hl-badge{font-size:11px}
   }
+
+  /* ==========================================================================
+     麻將消消樂(mahjong.html 專用) — v1.53.0
+     ★ 同一條鐵則:只「追加」,選擇器一律 .mj-*(Bingo / 五子棋 / 數獨的 DOM 沒有這些 class)。
+       追加前掃過:.mj- 與 .ms- 在本檔零命中;新變數一律 --mj- 前綴。
+       也**反向**確認過沒有既有的兩層裸 class 規則會蓋掉這裡的一層選擇器
+       (v1.49.0 的 .mvc-open 被 .set-card .btn 蓋掉,就是只防了一個方向)。
+     沿用不重寫:.panel / .btn / .seg / .field / .veil / .win-card / .mp-* / 表情蓋板 / 設定蓋板 /
+     #soloWinBtns 與 #mpWinBtns 的 body.solo-on 切換(那組不帶遊戲前綴,四頁通用)。
+     ========================================================================== */
+
+  /* ---------- 牌面配色 ----------
+     ★ 牌面在所有彩色主題下都維持象牙白,只有背景(桌面)跟著主題變。
+       理由:萬紅 / 條綠 / 筒藍是這遊戲唯一的辨識線索,牌面一變色就得重配九組花色色,
+       而且深底淺字在 30px 的牌上根本讀不出來。真實麻將牌本來就是象牙白,看起來反而最對。
+       電子書模式例外(只有黑白可用)。 */
+  :root{ --mj-face:#fdf6ea; --mj-edge:#d9bb9d; --mj-side:#c19a72; --mj-ink:#3b2a1c;
+         --mj-w:#c0392b; --mj-b:#1f7a4d; --mj-d:#2563c9; --mj-z:#3b2a1c;
+         --mj-jz:#d0342c; --mj-jf:#1f7a4d; --mj-jb:#4a6fa5; --mj-h:#d97706; --mj-p:#7c3aed; }
+  :root[data-theme="ebook"]{ --mj-face:#ffffff; --mj-edge:#000000; --mj-side:#888888; --mj-ink:#000000;
+         --mj-w:#000; --mj-b:#333; --mj-d:#555; --mj-z:#000;
+         --mj-jz:#000; --mj-jf:#333; --mj-jb:#666; --mj-h:#444; --mj-p:#222; }
+
+  /* ---------- 頂列品牌字 / 進場插圖 ---------- */
+  .mj-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+    line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+  :root[data-theme="ebook"] .mj-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+  .mj-scroll{flex:1 1 auto}
+  .mj-hero{text-align:center;margin:14px 0 4px}
+  .mj-art{width:92px;height:92px;display:block;margin:0 auto 8px}
+  /* 牌堆小圖示:index.html 的第四張遊戲卡與本頁進場插圖共用同一組
+     (比照 .sk-* 在首頁卡與數獨進場兩邊共用) */
+  .mk-bd{fill:var(--mj-face);stroke:var(--mj-side);stroke-width:2}
+  .mk-r{fill:var(--mj-jz);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
+  .mk-g{fill:var(--mj-jf);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
+  :root[data-theme="ebook"] .mk-bd{fill:#fff;stroke:#000}
+
+  /* ---------- 房間橫幅 / 單機列(壓矮,把高度讓給盤面)----------
+     .mj-room .mj-room-title 刻意寫成兩層:既有的 .row .label 是 (0,2,0),
+     一層的 .mj-room-title 會被它蓋掉字級 —— 這就是 CLAUDE.md 說的「反方向也會撞」。 */
+  .mj-room{padding:9px 12px}
+  .mj-room .row{margin-top:0}
+  .mj-room-top{flex-wrap:nowrap;gap:8px}
+  .mj-room .mj-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13px;font-weight:700;color:var(--muted)}
+  .mj-room .mj-room-title b{font-size:15px;color:var(--text)}
+  .mj-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .mj-room .quick-voice,.mj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .mj-room .quick-voice .qv-ico{font-size:18px}
+  .mj-room .mp-subrow{margin-top:5px}
+  .mj-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .mj-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  /* 對戰中收起名單列:比分 HUD 已經在講同一件事,那 30px 讓給盤面 */
+  .mj-room.playing .mj-room-foot{display:none}
+
+  .mj-solobar{padding:9px 12px}
+  .mj-solobar .row{margin-top:0}
+  .mj-solobar .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .mj-lvtag{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13px;font-weight:800;color:var(--muted)}
+  .mj-timer{font-size:19px;font-weight:700;letter-spacing:.5px;flex:none}
+  .mj-mini{width:34px;height:34px;border-radius:11px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.08);color:var(--text);font-size:15px;flex:none;cursor:pointer}
+  .mj-mini:active{transform:scale(.9)}
+
+  /* ---------- 盤面整體版面 ----------
+     boardbox 吃掉剩餘高度,牌寬由 MB.fit() 量實際可視高寬後寫進 --mjw。
+     整盤外框大小完全由 --mjw × 欄列數算出來 → 轉向 / HUD 換行都自動跟著縮,不寫死常數。 */
+  .mj-play{flex:1 1 auto;min-height:0;width:min(98vw,780px);
+    display:flex;flex-direction:column;align-items:center;gap:8px}
+  .mj-boardbox{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+  .mj-stage{position:relative;
+    width:calc((var(--cols,10) + var(--lmax,2) * 0.13) * var(--mjw,32px));
+    height:calc((var(--rows,5) * 1.32 + var(--lmax,2) * 0.13) * var(--mjw,32px))}
+  .mj-stage.locked{opacity:.72;pointer-events:none}
+  .mj-stage.done{filter:saturate(.6)}
+
+  /* ---------- 一張牌 ----------
+     位置全部用 calc + 每張牌自己的 --c/--r/--l:JS 只寫一個 --mjw,不必重寫 144 個 inline style。
+     上層往左上位移(用 lmax − l 當倍數)→ 最上層貼齊左上角,外框大小才好算。
+     ★ 不用 Unicode 麻將字元(U+1F000 那一段):只有 🀄 有 emoji 呈現,其餘 43 個是文字呈現,
+       Android 覆蓋率不保證(缺字就是豆腐框),字級與顏色也完全控不了。 */
+  .mj-tile{position:absolute;border:0;padding:0;cursor:pointer;overflow:hidden;
+    width:var(--mjw,32px);
+    height:calc(var(--mjw,32px) * 1.32);
+    left:calc((var(--c) + (var(--lmax) - var(--l)) * 0.13) * var(--mjw,32px));
+    top:calc((var(--r) * 1.32 + (var(--lmax) - var(--l)) * 0.13) * var(--mjw,32px));
+    background:linear-gradient(150deg,#fff,var(--mj-face) 46%,var(--mj-face));
+    border-radius:calc(var(--mjw,32px) * 0.17);
+    box-shadow:inset 0 0 0 1px var(--mj-edge),
+               calc(var(--mjw,32px) * 0.055) calc(var(--mjw,32px) * 0.065) 0 0 var(--mj-side),
+               0 2px 5px rgba(0,0,0,.28);
+    transition:transform .1s,filter .12s}
+  .mj-tile:active{transform:scale(.94)}
+  .mj-face{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    height:100%;width:100%;line-height:1}
+  .mj-g{font-family:'Nunito',sans-serif;font-weight:800;font-size:calc(var(--mjw,32px) * 0.54);color:var(--mj-ink)}
+  .mj-m{font-family:'Nunito',sans-serif;font-weight:800;font-size:calc(var(--mjw,32px) * 0.28);
+    margin-top:calc(var(--mjw,32px) * 0.04);opacity:.9}
+  /* 字牌(風/三元/花)沒有花色小字 → 大字放大置中,不要在牌面上留一塊空 */
+  .mj-tile[data-suit="z"] .mj-g,.mj-tile[data-suit="jz"] .mj-g,.mj-tile[data-suit="jf"] .mj-g,
+  .mj-tile[data-suit="jb"] .mj-g,.mj-tile[data-suit="h"] .mj-g,.mj-tile[data-suit="p"] .mj-g{
+    font-size:calc(var(--mjw,32px) * 0.6)}
+  .mj-tile[data-suit="w"] .mj-g,.mj-tile[data-suit="w"] .mj-m{color:var(--mj-w)}
+  .mj-tile[data-suit="b"] .mj-g,.mj-tile[data-suit="b"] .mj-m{color:var(--mj-b)}
+  .mj-tile[data-suit="d"] .mj-g,.mj-tile[data-suit="d"] .mj-m{color:var(--mj-d)}
+  .mj-tile[data-suit="z"] .mj-g{color:var(--mj-z)}
+  .mj-tile[data-suit="jz"] .mj-g{color:var(--mj-jz)}
+  .mj-tile[data-suit="jf"] .mj-g{color:var(--mj-jf)}
+  .mj-tile[data-suit="jb"] .mj-g{color:var(--mj-jb)}
+  .mj-tile[data-suit="h"] .mj-g{color:var(--mj-h)}
+  .mj-tile[data-suit="p"] .mj-g{color:var(--mj-p)}
+
+  /* 被壓住 / 兩邊都有牌 = 現在點不動:壓暗一點當引導。
+     這不會把難度拿走 —— 這遊戲的難點是「該挑哪一對」,不是「哪幾張抽得出來」,
+     而在 30px 的牌上用肉眼判斷有沒有被壓住純粹是眼力刑求。 */
+  .mj-tile.blocked{filter:brightness(.84) saturate(.62)}
+  .mj-tile.sel{transform:translateY(-3px);
+    box-shadow:inset 0 0 0 2px var(--accent),
+               calc(var(--mjw,32px) * 0.055) calc(var(--mjw,32px) * 0.065) 0 0 var(--mj-side),
+               0 0 0 3px var(--accent),0 6px 14px rgba(0,0,0,.35);
+    z-index:9999}
+  /* 同款高亮:選了一張之後標出「可動 且 同群」的其他牌
+     (只標可動的 —— 標了壓在底下的那些,等於叫人去點點不到的東西) */
+  .mj-tile.same{box-shadow:inset 0 0 0 2px var(--accent-2),
+               calc(var(--mjw,32px) * 0.055) calc(var(--mjw,32px) * 0.065) 0 0 var(--mj-side),
+               0 0 0 2px var(--accent-2),0 2px 5px rgba(0,0,0,.28)}
+  .mj-tile.hintpair{animation:mj-hint .7s ease-in-out infinite}
+  @keyframes mj-hint{0%,100%{box-shadow:inset 0 0 0 2px var(--accent),0 0 0 2px var(--accent),0 2px 5px rgba(0,0,0,.28)}
+                     50%{box-shadow:inset 0 0 0 2px var(--accent),0 0 0 7px rgba(255,255,255,.30),0 2px 5px rgba(0,0,0,.28)}}
+  .mj-tile.bad{animation:mj-bad .4s ease}
+  @keyframes mj-bad{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  /* 消掉:先跑完動畫才真的收起來,不然會「啪」一下不見,看不出是哪兩張被拿走 */
+  .mj-tile.gone{pointer-events:none;animation:mj-pop .26s ease forwards}
+  @keyframes mj-pop{to{opacity:0;transform:scale(.5) rotate(8deg)}}
+  .mj-tile.off{display:none}
+  /* 搶牌模式:被誰拿走的,消失前閃一下那個人的顏色 */
+  .mj-tile.gone.p0{box-shadow:0 0 0 3px var(--sp0)} .mj-tile.gone.p1{box-shadow:0 0 0 3px var(--sp1)}
+  .mj-tile.gone.p2{box-shadow:0 0 0 3px var(--sp2)} .mj-tile.gone.p3{box-shadow:0 0 0 3px var(--sp3)}
+  .mj-tile.gone.p4{box-shadow:0 0 0 3px var(--sp4)} .mj-tile.gone.p5{box-shadow:0 0 0 3px var(--sp5)}
+
+  /* ---------- 工具列(單機與連線共用一列)---------- */
+  .mj-tools{flex:none;width:100%;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
+  .mj-count{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13.5px;color:var(--muted);
+    padding:6px 9px;border-radius:10px;background:rgba(0,0,0,.16);white-space:nowrap;flex:none}
+  /* 可消 0 組 = 死局:整顆標紅。這時畫面唯一該引導的就是「重洗」 */
+  .mj-count.dead{color:#fff;background:var(--daub)}
+  .mj-tool{flex:1 1 0;min-width:82px;border:1px solid var(--panel-line);border-radius:11px;padding:7px 8px;
+    background:rgba(255,255,255,.07);color:var(--text);font-weight:800;font-size:13px;cursor:pointer;
+    white-space:nowrap}
+  .mj-tool:active{transform:scale(.96)}
+  .mj-tool:disabled{opacity:.4;cursor:default}
+  .mj-tool.urge:not(:disabled){background:var(--accent);border-color:var(--accent);color:#1c1008;
+    animation:mj-urge 1.1s ease-in-out infinite}
+  @keyframes mj-urge{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  /* 連線沒有提示與悔棋:提示等於直接送分,悔棋在全房共用的盤面上根本沒有意義 */
+  body.mj-mp .mj-solo-only{display:none}
+  :root[data-theme="ebook"] .mj-tool{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .mj-tool.urge:not(:disabled){background:#000;color:#fff}
+  :root[data-theme="ebook"] .mj-count{background:#eee;border:1px solid #999;color:#000}
+  :root[data-theme="ebook"] .mj-count.dead{background:#000;color:#fff}
+
+  /* ---------- 即時比分 HUD(盤面上方那一列)---------- */
+  .mj-hud{flex:none;width:100%;display:grid;gap:6px;
+    grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+  .mj-hud.mj-hud-two{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .mj-hud.mj-hud-two .mj-hcard{padding:4px 7px 5px}
+  .mj-hud.mj-hud-two .mj-hname{font-size:11px}
+  .mj-hud.mj-hud-two .mj-hval{font-size:16px}
+  .mj-hcard{position:relative;overflow:hidden;cursor:pointer;
+    padding:5px 9px 6px;border-radius:12px;border:1px solid var(--panel-line);
+    background:var(--panel);display:flex;flex-direction:column;gap:1px}
+  .mj-hcard:active{transform:scale(.97)}
+  .mj-hcard.me{border-color:var(--accent)}
+  .mj-hname{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mj-hname b{color:var(--accent);font-size:10px}
+  .mj-hval{font-family:'Fredoka',sans-serif;font-weight:700;font-size:19px;line-height:1;color:var(--text)}
+  .mj-hval em{font-style:normal;font-size:11px;font-weight:800;color:var(--muted);margin-left:2px}
+  .mj-bar{display:block;height:3px;border-radius:2px;background:rgba(0,0,0,.18);overflow:hidden;margin-top:2px}
+  .mj-bar i{display:block;height:100%;border-radius:2px;transition:width .25s}
+  .mj-hcard.p0 .mj-bar i{background:var(--sp0)} .mj-hcard.p1 .mj-bar i{background:var(--sp1)}
+  .mj-hcard.p2 .mj-bar i{background:var(--sp2)} .mj-hcard.p3 .mj-bar i{background:var(--sp3)}
+  .mj-hcard.p4 .mj-bar i{background:var(--sp4)} .mj-hcard.p5 .mj-bar i{background:var(--sp5)}
+  .mj-seat{width:12px;height:12px;border-radius:50%;flex:none;display:inline-block}
+  .mj-seat.p0{background:var(--sp0)} .mj-seat.p1{background:var(--sp1)}
+  .mj-seat.p2{background:var(--sp2)} .mj-seat.p3{background:var(--sp3)}
+  .mj-seat.p4{background:var(--sp4)} .mj-seat.p5{background:var(--sp5)}
+  :root[data-theme="ebook"] .mj-seat{box-shadow:inset 0 0 0 1px #000}
+  .mj-pts{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--accent);flex:none}
+  :root[data-theme="ebook"] .mj-pts{color:#000}
+  /* 分數飄字:renderHud() 會重建 innerHTML,所以一定要在它之後才掛 */
+  .mj-pop{position:absolute;right:8px;top:4px;font-family:'Fredoka',sans-serif;font-weight:700;
+    font-size:15px;pointer-events:none;animation:mj-pop-up .9s ease forwards}
+  .mj-pop.up{color:#22c55e}
+  @keyframes mj-pop-up{0%{opacity:0;transform:translateY(6px)}25%{opacity:1;transform:translateY(0)}
+                       100%{opacity:0;transform:translateY(-14px)}}
+
+  /* ---------- 結果卡 ---------- */
+  .mj-win{padding:30px 22px}
+  .mj-win p{margin:8px 0 16px}
+  .mj-win.lose .word{background:none;color:#ff8f8f;-webkit-text-fill-color:#ff8f8f}
+  .mj-win.draw .word{background:none;color:var(--muted);-webkit-text-fill-color:var(--muted)}
+  .mj-win.win{border-color:var(--accent);box-shadow:0 0 26px rgba(0,0,0,.25),0 0 0 1px var(--accent)}
+  .mj-winner{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;
+    padding:6px 12px;margin:2px 0 4px;border-radius:999px;
+    border:1px solid var(--panel-line);background:rgba(0,0,0,.14)}
+  .mj-winner:empty{display:none}
+  .mj-winner .gw-name{font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px;color:var(--text)}
+  .mj-winner .gw-tag{font-size:13px;color:var(--muted)}
+  .mj-winner .you-badge{margin-left:0}
+  .mj-win.win .mj-winner{background:var(--accent);border-color:var(--accent)}
+  .mj-win.win .mj-winner .gw-name,.mj-win.win .mj-winner .gw-tag{color:#1c1008}
+  .mj-stats{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+  .mj-stat{display:flex;flex-direction:column;gap:2px;min-width:62px;
+    padding:7px 10px;border-radius:12px;background:rgba(0,0,0,.16)}
+  .ms-k{font-size:11px;font-weight:800;color:var(--muted)}
+  .ms-v{font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;color:var(--text)}
+  .mj-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  /* #winScores / #winChamp / #mpWinBtns / #soloWinBtns 的顯隱由數獨那段既有的 body.solo-on
+     規則一併處理(那些選擇器不帶遊戲前綴,四頁通用),這裡只補自己這兩塊 */
+  body.solo-on .mj-react-row{display:none}
+  body:not(.solo-on) .mj-stats{display:none}
+
+  @media (max-height:560px){
+    .mj-hero{margin:6px 0 2px}
+    .mj-art{width:64px;height:64px}
+    .mj-play{gap:5px}
+    .mj-tools{gap:4px}
+    .mj-tool{padding:5px 7px;font-size:12px}
+    .mj-count{padding:4px 7px;font-size:12px}
+    .mj-solobar,.mj-room{padding:6px 10px}
+  }
