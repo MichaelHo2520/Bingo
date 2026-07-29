@@ -1628,10 +1628,20 @@
      中=紅、發=綠、白=藍框,這三個本來就對。 */
   :root{ --mj-face:#fdf6ea; --mj-edge:#d9bb9d; --mj-side:#c19a72; --mj-ink:#3b2a1c;
          --mj-z:#3f5896;
-         --mj-jz:#d0342c; --mj-jf:#1f7a4d; --mj-jb:#3f5896; --mj-h:#d97706; --mj-p:#7c3aed; }
+         --mj-jz:#d0342c; --mj-jf:#1f7a4d; --mj-jb:#3f5896; }
   :root[data-theme="ebook"]{ --mj-face:#ffffff; --mj-edge:#000000; --mj-side:#888888; --mj-ink:#000000;
          --mj-z:#000;
-         --mj-jz:#000; --mj-jf:#333; --mj-jb:#666; --mj-h:#444; --mj-p:#222; }
+         --mj-jz:#000; --mj-jf:#333; --mj-jb:#666; }
+  /* ---------- 花牌:8 種各一色(v1.56.0)----------
+     v1.55.0 是兩個群色(--mj-h 橘 / --mj-p 紫),因為那時同群的四張可以互相配。
+     改成**嚴格同款**之後那樣最糟:四張同色同圖案的牌互相消不掉,看起來就是 bug。
+     所以拆成 8 色 —— 顏色是 30px 下最快的線索,圖案類別(菊形/梅形)與大字再各補一層。
+     ⚠ 春(亮綠)與竹(墨綠)、秋(亮橙)與菊(暗金)刻意留不同明度,別把它們調近。
+     電子書模式只有黑白 → 只能靠字區分,灰階輪替只是讓相鄰的兩張不完全一樣。 */
+  :root{ --mj-ha:#34a853; --mj-hb:#e0533f; --mj-hc:#e8890c; --mj-hd:#3f5896;   /* 春 夏 秋 冬 */
+         --mj-pa:#d6417a; --mj-pb:#8b5cf6; --mj-pc:#15803d; --mj-pd:#a16207; } /* 梅 蘭 竹 菊 */
+  :root[data-theme="ebook"]{ --mj-ha:#000; --mj-hb:#444; --mj-hc:#222; --mj-hd:#555;
+         --mj-pa:#333; --mj-pb:#000; --mj-pc:#555; --mj-pd:#222; }
   /* ---------- 數字牌的傳統三色(v1.55.0)----------
      萬 / 條 / 筒的配色在真牌上是固定的(三筒藍紅綠斜排、九索三欄各一色、萬子藍字紅「萬」),
      所以**刻意不跟主題變** —— 那是牌的一部分,不是我們的配色。
@@ -1688,7 +1698,13 @@
   .mj-play{flex:1 1 auto;min-height:0;width:min(98vw,780px);
     display:flex;flex-direction:column;align-items:center;gap:8px}
   .mj-boardbox{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
-  .mj-stage{position:relative;
+  /* ★ z-index:0 不是裝飾 —— 它讓整個盤面自成一個 stacking context(v1.56.0 修)。
+     每張牌的 z-index 是「層 → 列 → 行」算出來的(l144 最大到 800 多),.mj-tile.sel 更是 9999。
+     少了這一行,那些數字會直接在**根層**跟 .veil(50)/彩帶(60)/toast(70)/.pwa-tip(99) 比大小
+     → 症狀是「按離開房間,確認框上面浮著幾張麻將牌」,結果卡 / 設定蓋板 / 暫停蓋板全中招
+     (只有 z 值超過蓋板的那幾張會穿出來,所以看起來像隨機幾張牌錯位疊在對話框上)。
+     盤面內部的上下層關係完全不受影響:同一個 context 裡各張牌的相對大小沒有變。 */
+  .mj-stage{position:relative;z-index:0;
     width:calc((var(--cols,10) + var(--lmax,2) * 0.13) * var(--mjw,32px));
     height:calc((var(--rows,5) * 1.32 + var(--lmax,2) * 0.13) * var(--mjw,32px))}
   .mj-stage.locked{opacity:.72;pointer-events:none}
@@ -1745,8 +1761,15 @@
   .mj-tile[data-suit="jz"]{color:var(--mj-jz)}
   .mj-tile[data-suit="jf"]{color:var(--mj-jf)}
   .mj-tile[data-suit="jb"]{color:var(--mj-jb)}
-  .mj-tile[data-suit="h"]{color:var(--mj-h)}
-  .mj-tile[data-suit="p"]{color:var(--mj-p)}
+  /* 花牌:8 種各一色(v1.56.0 從兩個群色拆開,理由見上面的變數定義) */
+  .mj-tile[data-suit="ha"]{color:var(--mj-ha)}
+  .mj-tile[data-suit="hb"]{color:var(--mj-hb)}
+  .mj-tile[data-suit="hc"]{color:var(--mj-hc)}
+  .mj-tile[data-suit="hd"]{color:var(--mj-hd)}
+  .mj-tile[data-suit="pa"]{color:var(--mj-pa)}
+  .mj-tile[data-suit="pb"]{color:var(--mj-pb)}
+  .mj-tile[data-suit="pc"]{color:var(--mj-pc)}
+  .mj-tile[data-suit="pd"]{color:var(--mj-pd)}
 
   /* 被壓住 / 兩邊都有牌 = 現在點不動:壓暗一點當引導。
      這不會把難度拿走 —— 這遊戲的難點是「該挑哪一對」,不是「哪幾張抽得出來」,

@@ -176,25 +176,35 @@ const MP = MPCore.create((function(){
     clearAuto();
     if(gMode==="grab"){
       showToast("剩下的牌上下疊住了,洗也解不開 —— 直接以目前分數結算",3600);
-      if(!ctx.winner()) settleGrab();
+      if(!ctx.winner()) settleGrab(true);   // 盤面沒清空也要結算 → 要略過「清空了才算」那道守衛
       return;
     }
     showToast("剩下的牌上下疊住了,這盤救不回來 😥",3600);
   }
 
-  /* ---------- 結算 ---------- */
+  /* ---------- 結算 ----------
+     ★ 兩支都用 { local:false }(v1.56.0):決定勝負的寫入**不做本地樂觀套用**。
+       樂觀套用會讓「搶最後一手」的那一台先看到一個之後被伺服器推翻的贏家 —— 而看到贏家
+       就會放彩帶、播勝利音效、往 scores/{me} 寫 +1,那三件事都不會隨交易回退
+       (核心那邊有反向修正把分數收回來,但畫面上閃過「你贏了!」還是像出 bug)。
+       代價是自己清完盤面到結果卡跳出多一趟往返(~100~300ms),很划算。 */
   function settleRace(){
     ctx.txGame(g=>{
       if(g.winner)return false;
       g.winner={ id:ctx.me(), name:ctx.name(), by:"time", ms:Date.now()-startedAt };
-    });
+    },{ local:false });
   }
-  // 搶牌:盤面清空就結算。誰看到誰寫,交易保證只有第一個成功
-  //(不指定「消最後一對的人」,免得那個人剛好斷線就沒人寫、整局卡住)
-  function settleGrab(){
+  /* 搶牌:盤面清空就結算。誰看到誰寫,交易保證只有第一個成功
+     (不指定「消最後一對的人」,免得那個人剛好斷線就沒人寫、整局卡住)
+     force=true 只給 stuck() 用:那是「洗也解不開」,盤面沒清空也得結算。 */
+  function settleGrab(force){
     ctx.txGame(g=>{
       if(g.winner)return false;
       const arr=Array.isArray(g.moves)?g.moves:[];
+      /* ★ 用**交易裡看到的 moves**(= 伺服器真值)再確認一次盤面真的清空了。
+         本地畫面清空不代表伺服器上清空:搶最後一對時我的那一手可能被對手搶先而回退,
+         少了這道守衛就會在盤面還有牌的情況下寫下贏家、把整局提早結束掉。 */
+      if(!force && arr.length*2<total) return false;
       const t=[];
       arr.forEach(c=>bump(t,dec(c).seat));
       const ord=ctx.order();
@@ -204,7 +214,7 @@ const MP = MPCore.create((function(){
       g.winner = ids.length===1
         ? { id:ids[0], name:ctx.dispName(ids[0]), by:"score", pts:best }
         : { ids:ids, by:"draw", pts:best };
-    });
+    },{ local:false });
   }
 
   /* ---------- 大廳說明 ---------- */

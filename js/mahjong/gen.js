@@ -25,29 +25,40 @@
 
 const MGen = (function(){
 
-  /* ---------- 牌組:34 種各 4 張 + 8 張花 = 144 ---------- */
+  /* ---------- 牌組:34 種各 4 張(136)+ 8 種花牌各 2 張(16)= 152 張 = 76 對 ----------
+     ★ 花牌刻意**不照真麻將的「每種 1 張」**:嚴格同款配對(v1.56.0)下那 8 張會全部
+       找不到伴。改成每種 2 張,牌池就從 144 變成 152 —— 見 deckPairs() 的註解。 */
   const NUM_SUITS = ["w","b","d"];                          // 萬 / 條 / 筒
   const HONORS    = ["fe","fs","fw","fn","jz","jf","jb"];   // 東南西北 / 中發白
+  const FLOWERS   = ["ha","hb","hc","hd","pa","pb","pc","pd"];  // 春夏秋冬 / 梅蘭竹菊
   const SUIT_MARK = { w:"萬", b:"條", d:"筒" };
 
-  // 牌面:[大字, CSS 花色 class]。數字牌由代號推導,不列在這裡
+  /* 牌面:[大字, CSS 花色 class]。數字牌由代號推導,不列在這裡。
+     ★ 花牌的 class 是**每種各一個**(ha…pd),不是 v1.55.0 的兩個群色(h / p)——
+       嚴格同款之後,四張同色同圖案的牌互相配不起來會非常困惑,必須一眼看出是不同的牌。 */
   const FACE = {
     fe:["東","z"],  fs:["南","z"],  fw:["西","z"],  fn:["北","z"],
     jz:["中","jz"], jf:["發","jf"], jb:["白","jb"],
-    ha:["春","h"],  hb:["夏","h"],  hc:["秋","h"],  hd:["冬","h"],
-    pa:["梅","p"],  pb:["蘭","p"],  pc:["竹","p"],  pd:["菊","p"]
+    ha:["春","ha"], hb:["夏","hb"], hc:["秋","hc"], hd:["冬","hd"],
+    pa:["梅","pa"], pb:["蘭","pb"], pc:["竹","pc"], pd:["菊","pd"]
   };
 
-  /* 配對群組:同群即可配。
-     花牌刻意讓「春夏秋冬」四張互通、「梅蘭竹菊」四張互通 —— 這是傳統消牌的規則,
-     也讓花牌變成好用的救援牌(死局時通常靠它解套)。 */
-  function grpOf(code){
-    const c=code.charCodeAt(0);
-    if(c===104) return "H";      // 'h' → 春夏秋冬
-    if(c===112) return "P";      // 'p' → 梅蘭竹菊
-    return code;
-  }
-  function matches(a,b){ return grpOf(a)===grpOf(b); }
+  /* 配對群組:**只有完全一樣的兩張才配得起來**(v1.56.0)。
+     ★ v1.55.0 以前花牌是「春夏秋冬四張互通、梅蘭竹菊四張互通」(傳統消牌的規則,也讓花牌
+       變成死局時的救援牌)。但那讓整個遊戲有兩套規則 —— 首頁明明寫著「兩張一樣的牌,配成
+       一對就消掉」,偏偏 8 張花牌不照這句話走,而且畫面上長得像的兩張有時能配有時不能。
+       現在統一成「一樣才消」,首頁那句話才名副其實。
+     ★ 反直覺的實測結果:拿掉互通,「開局可消組數」確實變少(l144 23.3 → 21.5),
+       但**隨機亂玩的通關率反而上升 1~5 個百分點**(l144/tall 48.9% → 54.2%,每格 10000 局)。
+       原因是「選擇變少」同時代表「選錯的機會變少」—— 每種花牌恰好 2 張,配對是**唯一解、
+       不可能揮霍掉**;舊規則下把 ha 配給 hb,剩下的 hc/hd 就可能卡在拿不到的位置。
+       ⚠ 所以不要拿「可消組數」當難度指標,它跟通關率不同號(細節見 notes/10)。
+     ★ 連帶必須改牌組:真麻將的花牌是**每種只有 1 張**,嚴格同款下那 8 張全部找不到伴、
+       整副解不開 —— 所以 deckPairs() 改成每種花牌 2 張(見那支的註解)。
+     grpOf 保留成 identity 而不是就地改用 code:它是「什麼叫同款」的**單一定義點**,
+     movesOf / pairsFrom / board.js 的同款高亮都問它,散開來寫遲早有一處走鐘。 */
+  function grpOf(code){ return code; }
+  function matches(a,b){ return a===b; }
 
   // 牌面資料給 board.js 用:{ glyph 大字, mark 花色小字, cls, name 給 aria/toast }
   function faceOf(code){
@@ -348,19 +359,26 @@ const MGen = (function(){
     for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; }
     return a;
   }
-  // 整副 144 張切成 72 對(同群才成對)。花牌 4 張互通 → 隨便兩張湊一對都合法
+  /* 牌池 → 洗好的「對」清單。**每一對都是完全一樣的兩張**(v1.56.0 起嚴格同款)。
+     數字 27 種 × 2 對 = 54,字牌 7 種 × 2 對 = 14,花牌 8 種 × 1 對 = 8 → 共 **76 對 / 152 張**。
+
+     ★ 花牌為什麼是每種 2 張(而不是真麻將的每種 1 張):嚴格同款下,單張花牌永遠找不到伴。
+       要維持「一副剛好 144 張」就只能把花牌砍成 4 種各 2 張 —— 那是**永久少掉 4 種牌面**,
+       比較起來損失更大。所以改成 8 種各 2 張,牌池變 152 張。
+     ★ 牌池比最大盤面(144)大 4 對是刻意的,不是算錯:make() 只取前 N/2 對,所以 144 牌局
+       等於「從 76 對裡隨機抽 72 對」。副作用是**偶爾會少 1~2 種牌**(每種花牌只有 1 對,
+       被丟掉就整種消失;數字/字牌各有 2 對,丟 1 對還剩 1 對)—— 玩起來完全無感,
+       反而讓每局的牌組略有變化。⚠ 所以測試不能斷言「144 牌局一定有 42 種」。 */
   function deckPairs(){
     const ps=[];
     NUM_SUITS.forEach(s=>{ for(let v=1;v<=9;v++){ ps.push([s+v,s+v]); ps.push([s+v,s+v]); } });
     HONORS.forEach(c=>{ ps.push([c,c]); ps.push([c,c]); });
-    ps.push(["ha","hb"],["hc","hd"],["pa","pb"],["pc","pd"]);
-    shuffle(ps);
-    // 對內也洗:花牌那四對的兩張不一樣,誰放前面會影響擺在哪一格
-    ps.forEach(p=>{ if(Math.random()<0.5){ const t=p[0]; p[0]=p[1]; p[1]=t; } });
-    return ps;
+    FLOWERS.forEach(c=>{ ps.push([c,c]); });
+    // 對內不必再洗:每一對的兩張現在完全一樣,誰放前面都沒差(v1.55.0 以前花牌那四對才需要)
+    return shuffle(ps);
   }
   /* 把一堆現有的牌重新湊成對(重洗用)。
-     每群的張數恆為偶數 —— 玩家每次消牌都從同一群拿走 2 張,這個不變量不會被破壞。 */
+     每一款的張數恆為偶數 —— 玩家每次消牌都拿走兩張同款,這個不變量不會被破壞。 */
   function pairsFrom(codes){
     const by={};
     codes.forEach(c=>{ const g=grpOf(c); (by[g]=by[g]||[]).push(c); });
@@ -411,6 +429,10 @@ const MGen = (function(){
       const order=removalOrder(S,null);
       if(!order) continue;
       const ps=deckPairs();
+      /* ⚠ 牌池要夠鋪滿這個佈局。目前 76 對對上最大的 144 牌(72 對)還有 4 對餘裕,
+         但加更大的佈局時這裡會靜默寫出一堆 undefined(整盤變成空白牌、code 長度也不對),
+         所以寧可直接放棄這一題讓呼叫端跳「出題失敗」,不要生出壞盤面。 */
+      if(ps.length<order.length) return null;
       const tiles=new Array(S.list.length);
       order.forEach((pr,k)=>{ tiles[pr[0]]=ps[k][0]; tiles[pr[1]]=ps[k][1]; });
       // order 是「保證解得開」的那條參考解法。連線只傳 code,不會外流;
@@ -423,8 +445,12 @@ const MGen = (function(){
 
   /* 重洗:保留「哪些格還有牌」,把剩下的牌重新排成一定解得開的樣子。
      回傳新的 tiles 陣列(整份,已死的格位維持原值不影響);失敗回 null。
-     ⚠ shape 必須是**這局用的那個**(MB.shape()),不是重算一次 —— 中途轉向也不會換形狀。 */
-  function reshuffle(levelKey, shape, alive, tiles, tries){
+     ⚠ shape 必須是**這局用的那個**(MB.shape()),不是重算一次 —— 中途轉向也不會換形狀。
+     ★ 選填的 out 物件會收到 out.order = 這次用的參考解法。生產程式一律不傳;
+       它存在的理由是讓 node 測試能**重走**這條路來證明「洗完解得開」——
+       跑 DFS solver 去驗 144 牌會超時,而超時既不能證明有解也不能證明無解
+       (同 make() 附回 order 的理由,見第 4a 節的註解)。 */
+  function reshuffle(levelKey, shape, alive, tiles, tries, out){
     const S=slotsOf(LEVELS[levelKey]?levelKey:"m72", shape);
     const codes=[];
     for(let i=0;i<alive.length;i++) if(alive[i]) codes.push(tiles[i]);
@@ -434,9 +460,14 @@ const MGen = (function(){
       const order=removalOrder(S,alive);
       if(!order) continue;
       const ps=pairsFrom(codes);
-      const out=tiles.slice();
-      order.forEach((pr,k)=>{ out[pr[0]]=ps[k][0]; out[pr[1]]=ps[k][1]; });
-      return out;
+      /* ⚠ 守衛「每一款張數為偶數」這個不變量。pairsFrom() 對落單的那張無能為力,會直接
+         少給一對 —— 沒有這一行就會靜默寫出 undefined,盤面出現空白牌。玩家消牌永遠是
+         一次兩張同款,所以正常情況下不可能發生;會走到這裡代表有人動壞了盤面狀態。 */
+      if(ps.length<order.length) return null;
+      const res=tiles.slice();
+      order.forEach((pr,k)=>{ res[pr[0]]=ps[k][0]; res[pr[1]]=ps[k][1]; });
+      if(out) out.order=order;
+      return res;
     }
     return null;
   }
@@ -476,6 +507,9 @@ const MGen = (function(){
     levelOf:k=>LEVELS[k]||LEVELS.m72,
     shapeOf, geoOf, pickShape, tileW,
     slotsOf, isFree, freeList, movesOf, matches, grpOf, faceOf,
+    // deckPairs 暴露出來是為了讓 node 測試直接驗牌池本身(「有沒有孤張」是 v1.56.0 的地雷:
+    // 少了配套改牌組,那 8 張花牌永遠消不掉,而 make() 仍然「成功」、盤面看起來完全正常)
+    deckPairs,
     make, reshuffle, removalOrder, parse, validate
   };
 })();

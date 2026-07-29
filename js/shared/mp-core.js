@@ -353,14 +353,18 @@ const MPCore = (function(){
     /* ---------- game 節點:寫入輔助 + 派發 ---------- */
     function setGame(g){ if(!roomRef)return; g.rev=gameRev+1; roomRef.child("game").set(g); }
     function patchGame(p){ if(!roomRef)return; p.rev=gameRev+1; roomRef.child("game").update(p); }
-    function txGame(mut){
+    /* opts.local===false → 交易**不做本地樂觀套用**(Firebase 的第三個參數 applyLocally)。
+       代價是自己那一手要等一趟往返才看得到,換來的是「本地永遠不會出現一個之後會被推翻的
+       狀態」。決定勝負的那種寫入要用它 —— 樂觀的贏家會觸發計分/彩帶/音效,而那些副作用
+       在另一個節點,交易回退救不回來(見 showOutcome 的反向修正)。 */
+    function txGame(mut,opts){
       if(!roomRef)return;
       roomRef.child("game").transaction(g=>{
         if(!g)return;                 // ★ 回傳 undefined 中止;回傳 null 會刪掉節點(見檔頭 #4)
         if(mut(g)===false)return;
         g.rev=(g.rev||0)+1;
         return g;
-      });
+      }, undefined, !(opts && opts.local===false));
     }
     function onGame(g){
       g=g||{};
@@ -465,6 +469,21 @@ const MPCore = (function(){
         roomRef.child("scores/"+meId).transaction(s=>{
           if(s && s.round===roundId) return;
           return { n:((s&&s.n)||0)+1, round:roundId };
+        },()=>{ if(winner) renderScoreboard(); });
+      }
+      /* ★ 反向修正:這一局先前判給我、後來的真值改判別人 → 把那一分收回來(v1.56.0 修)。
+         為什麼會發生:Firebase 交易**會先在本地樂觀套用並發出 value 事件**,伺服器有衝突時
+         才用真值重跑。搶最後一手的時候(麻將搶牌 / 數獨搶格),我這台會先看到「我贏」的
+         樂觀快照 → 這裡就把 +1 寫進 scores/{me};接著伺服器真值回來說是對手贏,
+         **game 節點回退了,但分數是寫在另一個節點,不會跟著回退** ——
+         症狀就是「明明對手贏了,我的勝場卻也多一分」。
+         寫回去時把 round 標成 "void":一局只收回一次,而且如果真值又改回我贏(理論上
+         不會,伺服器值是終局),上面那條看到 round 不等於 roundId 會再補一次 → 自我收斂。 */
+      else if(!myRoundWin && meId && roomRef && roundId && scoredRoundOf(meId)===roundId){
+        scoredThisRound=false;
+        roomRef.child("scores/"+meId).transaction(s=>{
+          if(!s || s.round!==roundId) return;      // 不是這一局記的 → 別亂動
+          return { n:Math.max(0,(s.n||0)-1), round:"void" };
         },()=>{ if(winner) renderScoreboard(); });
       }
 
