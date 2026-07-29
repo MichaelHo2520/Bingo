@@ -1799,12 +1799,64 @@
   .mj-tile.gone.p2{box-shadow:0 0 0 3px var(--sp2)} .mj-tile.gone.p3{box-shadow:0 0 0 3px var(--sp3)}
   .mj-tile.gone.p4{box-shadow:0 0 0 3px var(--sp4)} .mj-tile.gone.p5{box-shadow:0 0 0 3px var(--sp5)}
 
+  /* ---------- 僵局的兩件視覺(v1.57.0)----------
+     ★ 兩者都 pointer-events:none,**刻意不是蓋板** —— 搶牌是全房同時比手速,誰的畫面被遮住
+       誰吃虧;而遮住的那一瞬間別人剛好消掉一對,感受就是「我被搶了」。
+     ★ 兩者都是 .mj-stage 的子元素。stage 自己是 stacking context(上面那條 z-index:0),
+       所以這裡的 z-index 再大也只在盤面內部比大小,不會跑到根層去跟 .veil(50)/ 彩帶(60)/
+       .toast(70) 打架 —— 那正是 v1.56.0「確認框上面浮著幾張麻將牌」那個坑。 */
+
+  /* 探照燈:把「有解的那一對」所在的欄帶框起來,不指出是哪兩張。
+     位置只吃 --z0/--z1(欄號)+ --mjw,和每張牌同一套算法 → 視窗縮放時自己跟著縮。
+     右界多加 --lmax*0.13:同一欄不同層的牌有左上位移,不補這一段最上層那張會露在框外。 */
+  .mj-zone{position:absolute;pointer-events:none;z-index:10000;
+    top:-4px;height:calc(100% + 8px);
+    left:calc(var(--z0,0) * var(--mjw,32px) - 4px);
+    width:calc((var(--z1,1) - var(--z0,0) + var(--lmax,2) * 0.13) * var(--mjw,32px) + 8px);
+    border:2px dashed var(--accent);border-radius:12px;
+    background:rgba(255,255,255,.05);
+    /* ⚠ 外側要一圈深色襯托:框的左右邊會壓在**象牙白的牌面**上,而 --accent 在幾個主題是
+       亮黃 / 亮青(#ffe600 / #22e0ff),沒有襯托的話那兩段等於消失 */
+    box-shadow:0 0 0 2px rgba(0,0,0,.32);
+    animation:mj-zone-in .28s ease both,mj-zone-b 1.8s ease-in-out .28s infinite}
+  @keyframes mj-zone-in{from{opacity:0;transform:scale(1.06)}to{opacity:1;transform:scale(1)}}
+  @keyframes mj-zone-b{0%,100%{opacity:.95}50%{opacity:.45}}
+
+  /* 過場:一道光帶橫掃盤面(+ 可選的中央一行字),1.25 秒後由 JS 收掉 */
+  .mj-sweep{position:absolute;inset:0;pointer-events:none;z-index:10001;
+    overflow:hidden;border-radius:12px}
+  .mj-sweep-band{position:absolute;top:-25%;left:-45%;width:38%;height:150%;
+    transform:skewX(-14deg);
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.42),transparent);
+    animation:mj-sweep-go .85s ease-out forwards}
+  @keyframes mj-sweep-go{to{left:118%}}
+  .mj-sweep-txt{position:absolute;left:50%;top:50%;
+    font-family:'Fredoka',sans-serif;font-weight:800;color:#fff;white-space:nowrap;
+    font-size:clamp(15px,4.2vw,25px);padding:9px 17px;border-radius:15px;
+    background:rgba(0,0,0,.58);box-shadow:0 6px 18px rgba(0,0,0,.35);
+    animation:mj-sweep-txt 1.25s ease forwards}
+  @keyframes mj-sweep-txt{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.82)}
+    18%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    72%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-58%) scale(.96)}}
+  :root[data-theme="ebook"] .mj-zone{border-color:#000;background:rgba(0,0,0,.06)}
+  :root[data-theme="ebook"] .mj-sweep-txt{background:#000}
+
   /* ---------- 工具列(單機與連線共用一列)---------- */
   .mj-tools{flex:none;width:100%;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
   .mj-count{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13.5px;color:var(--muted);
     padding:6px 9px;border-radius:10px;background:rgba(0,0,0,.16);white-space:nowrap;flex:none}
   /* 可消 0 組 = 死局:整顆標紅(接著會自動重洗,見 adapter 的 armAuto / solo 的 deadEnd) */
   .mj-count.dead{color:#fff;background:var(--daub)}
+  /* 僵局(v1.57.0):第一階把「✦ N」讀數點起來 —— 零遮擋、純氣氛 */
+  .mj-count.mj-warm{color:var(--text);animation:mj-warm 1.5s ease-in-out infinite}
+  @keyframes mj-warm{0%,100%{background:rgba(0,0,0,.16)}50%{background:rgba(255,255,255,.20)}}
+  /* 僵局讀數:連線專屬 —— 單機卡多久是自己的節奏,不該催(HTML 那顆刻意帶 .mj-stall) */
+  body:not(.mj-mp) .mj-stall{display:none}
+  /* ⚠ 熱起來只提亮文字 + 加一圈框,**不換背景色** —— var(--accent-2) 在幾個主題是亮黃
+     (#ffd24a / #ffcf47),配白字直接讀不出來;--daub 又是死局讀數(.dead)的顏色,會撞義。 */
+  .mj-stall.mj-hot{color:var(--text);box-shadow:inset 0 0 0 2px var(--accent)}
   .mj-tool{flex:1 1 0;min-width:82px;border:1px solid var(--panel-line);border-radius:11px;padding:7px 8px;
     background:rgba(255,255,255,.07);color:var(--text);font-weight:800;font-size:13px;cursor:pointer;
     white-space:nowrap}
@@ -1816,6 +1868,9 @@
   :root[data-theme="ebook"] .mj-tool{background:#fff;border:1px solid #000}
   :root[data-theme="ebook"] .mj-count{background:#eee;border:1px solid #999;color:#000}
   :root[data-theme="ebook"] .mj-count.dead{background:#000;color:#fff}
+  /* 電子書只有黑白 → 脈動改走灰階(上面那組 keyframes 的 rgba 疊在 #eee 上幾乎看不出來) */
+  :root[data-theme="ebook"] .mj-count.mj-warm{animation:mj-warm-e 1.5s ease-in-out infinite}
+  @keyframes mj-warm-e{0%,100%{background:#eee}50%{background:#c4c4c4}}
 
   /* ---------- 即時比分 HUD(盤面上方那一列)---------- */
   .mj-hud{flex:none;width:100%;display:grid;gap:6px;

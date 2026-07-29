@@ -30,6 +30,7 @@ const MB = (function(){
   let level="m72", shape="wide", S=null, tiles=[], alive=null;
   let els=[], sel=-1, enabled=false, hintPair=null, hintT=null;
   let stage=null, box=null, ro=null, lastW=null;
+  let zoneEl=null, sweepEl=null;                  // 僵局的探照燈欄帶 / 過場光帶(見 showZone / flash)
   let cbPair=null, cbBlocked=null;
   /* 同款高亮預設**關閉**(v1.55.0)。選一張牌就把同款的其他牌全部框亮 = 直接把答案指出來,
      這遊戲的難點本來就是「該挑哪一對」。想要輔助的人自己去設定裡開(mahjong.prefs.v1)。 */
@@ -256,6 +257,7 @@ const MB = (function(){
   function setTiles(nt){
     tiles=Array.isArray(nt)?nt.slice():MGen.parse(nt||"");
     sel=-1; hintPair=null;
+    clearZone();                  // 牌全換過了,舊的探照燈框指的位置已經沒有意義
     paintFaces();
     repaint();
   }
@@ -263,6 +265,7 @@ const MB = (function(){
   function build(){
     if(!stage)return;
     stage.innerHTML="";
+    zoneEl=null; sweepEl=null;              // 上面那行已經把它們從樹上拔掉,指標也要跟著放掉
     stage.classList.remove("done");
     const L=MGen.geoOf(level,shape);
     stage.style.setProperty("--cols",String(L.cols));
@@ -356,6 +359,7 @@ const MB = (function(){
     });
     if(sel===i||sel===j) sel=-1;
     clearHint();
+    clearZone();          // 有人消掉了 = 僵局解除,探照燈在這裡收掉,adapter 不必自己記得
     repaint();
     return true;
   }
@@ -384,6 +388,73 @@ const MB = (function(){
   function clearHint(){
     if(hintT){ clearTimeout(hintT); hintT=null; }
     if(hintPair){ hintPair=null; }
+  }
+
+  /* ---------- 僵局的兩件視覺(v1.57.0;目前只有連線在用)----------
+     ★ 兩者都是 pointer-events:none 的覆蓋層,**刻意不做成蓋板** —— 搶牌是全房同時比手速,
+       誰的畫面被遮住誰吃虧;而遮住的那一瞬間別人剛好消掉一對,感受就是「我被搶了」。
+     ★ 兩者都掛在 .mj-stage 裡面。stage 自己是 stacking context(z-index:0),所以這裡的
+       z-index 再大也只在盤面內部比大小,不會跑到根層去跟蓋板 / 彩帶 / toast 打架
+       —— 那正是 v1.56.0「確認框上面浮著幾張麻將牌」那個坑。 */
+
+  /* 探照燈:把「有解的那一對」所在的**欄帶**框起來,不指出是哪兩張。
+     這是刻意的強度選擇 —— 直接框亮一組(showHint 那種)等於把答案送出去,而這遊戲的難點
+     本來就是「該挑哪一對」(同「只給可消組數、不給是哪幾組」的原則)。
+     挑**欄距最小**的那一組:跨到左右兩端的那種框起來等於沒縮小範圍。 */
+  function zoneCols(){
+    const mv=moves(); if(!mv.length)return null;
+    let best=null, bw=1e9;
+    mv.forEach(m=>{
+      const a=S.list[m[0]], b=S.list[m[1]];
+      const lo=Math.min(a.c,b.c), hi=Math.max(a.c,b.c);
+      if(hi-lo<bw){ bw=hi-lo; best=[lo,hi]; }
+    });
+    return best;
+  }
+  function showZone(){
+    if(!stage||!S)return false;
+    const z=zoneCols(); if(!z)return false;
+    const L=MGen.geoOf(level,shape);
+    // 左右各放寬一欄:框得剛好貼著那兩張,就等於直接把答案圈出來了
+    const c0=Math.max(0,z[0]-1), c1=Math.min(L.cols-1,z[1]+1);
+    if(!zoneEl){
+      zoneEl=document.createElement("div");
+      zoneEl.className="mj-zone";
+      stage.appendChild(zoneEl);
+    }
+    // 位置一律交給 CSS(同每張牌的做法):這裡只寫欄號,--mjw 一變框自己跟著縮
+    zoneEl.style.setProperty("--z0",String(c0));
+    zoneEl.style.setProperty("--z1",String(c1+1));
+    return true;
+  }
+  function clearZone(){
+    if(zoneEl && zoneEl.parentNode) zoneEl.parentNode.removeChild(zoneEl);
+    zoneEl=null;
+  }
+
+  /* 過場:一道光帶橫掃盤面(+ 可選的中央一行字),約 1.2 秒後自己收掉。
+     除了「把靜止的畫面推一把」,它還有一個實用目的:**重洗時遮掩換牌** ——
+     整盤無預警變樣很突兀(v1.54.0 為此加了 0.9 秒延遲提示),光帶掃過再換才像真的洗過。
+     ★ 重洗那一趟刻意**不帶字**:「盤面已重洗」那句話既有的 toast 已經在講,
+       兩個地方同時跳同一句只是吵。 */
+  function flash(text){
+    if(!stage)return;
+    if(sweepEl && sweepEl.parentNode) sweepEl.parentNode.removeChild(sweepEl);
+    const el=document.createElement("div");
+    el.className="mj-sweep";
+    const band=document.createElement("span"); band.className="mj-sweep-band";
+    el.appendChild(band);
+    if(text){
+      const txt=document.createElement("span"); txt.className="mj-sweep-txt";
+      txt.textContent=text;               // 永遠是自己的固定字串,用 textContent 就不必 esc
+      el.appendChild(txt);
+    }
+    stage.appendChild(el);
+    sweepEl=el;
+    setTimeout(()=>{
+      if(el.parentNode) el.parentNode.removeChild(el);
+      if(sweepEl===el) sweepEl=null;
+    },1250);
   }
 
   /* ---------- 畫面 ---------- */
@@ -434,6 +505,8 @@ const MB = (function(){
     faceHTML,
     init, setBoard, setTiles, remove, fit, repaint, markDone,
     showHint, clearHint, bestPair, moves, movesLeft, anyMove,
+    // 僵局用(v1.57.0):探照燈欄帶 + 過場光帶。目前只有 adapter 呼叫,單機不碰
+    showZone, clearZone, flash,
     setEnabled(v){ enabled=!!v; if(stage) stage.classList.toggle("locked",!enabled); },
     // 同款高亮的開關(設定蓋板)。關掉時要立刻重畫 —— 不然當下已經框亮的那幾張會留在畫面上
     setSameHint(v){ sameHint=!!v; if(S) repaint(); },
@@ -454,7 +527,7 @@ const MB = (function(){
         if(!on){ el.className="mj-tile gone off"; }
         else el.className="mj-tile";
       }
-      sel=-1; clearHint(); repaint();
+      sel=-1; clearHint(); clearZone(); repaint();
     },
     aliveAt:i=>!!alive[i],
     freeAt, left, total, cleared,

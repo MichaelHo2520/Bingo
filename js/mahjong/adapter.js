@@ -29,6 +29,7 @@ const MP = MPCore.create((function(){
   let curRound=null, shufN=0, moves=[], tally=[], prog={};
   let total=0, myShuf=0, startedAt=0;
   let autoT=null;                                 // 死局自動重洗的排程(見 armAuto())
+  let stallFrom=0, stallLv=0, stallT=null, stallShufN=0;   // 僵局偵測(見 stallTick())
 
   /* ---------- moves 的整數編碼 ----------
      一次「消掉一對」記成一個整數:i / j 是格位(<144)、seat 是座位(0~7)。
@@ -110,6 +111,7 @@ const MP = MPCore.create((function(){
     MB.remove(i,j);
     Sound.place();
     pushProgress();
+    stallReset();                   // 有進度了 → 僵局時鐘歸零(競速量的是自己有沒有在動)
     if(MB.cleared()){ settleRace(); return; }
     if(!MB.anyMove()) armAuto();
   }
@@ -139,7 +141,97 @@ const MP = MPCore.create((function(){
       autoT=setTimeout(()=>{ autoT=null; if(!MB.anyMove()) armAuto(); },2600);
     },wait);
   }
-  function clearAuto(){ if(autoT){ clearTimeout(autoT); autoT=null; } }
+  /* ★ 這支同時把**僵局時鐘**一起停掉(v1.57.0)。兩支 timer 的生命週期完全一樣
+     —— 都只在「這一局進行中」才有意義 —— 合在同一個出口清,加新出口時就不會只記得一半。
+     現有出口:新局(roundId 變)/ 回大廳 / 離房 / 結算 / resetRound / stuck。
+     漏掉的下場是「上一局排的重洗洗到新盤面上」,或僵局提示跳在大廳畫面裡。 */
+  function clearAuto(){
+    if(autoT){ clearTimeout(autoT); autoT=null; }
+    stallOff();
+  }
+
+  /* ---------- 僵局:太久沒有人消掉(v1.57.0)----------
+     死局(可消 0 組)有 armAuto 接手,但真正難受的是**「✦ 1」或「✦ 2」卻沒人找到**那一段:
+     讀數顯示一切正常,實際上全房在乾瞪眼。搶牌尤其糟 —— 全房同一個盤面、大家卡在同一個
+     難點,連一條進度條都不會動,畫面完全靜止,「搶」的刺激感就沒了。
+
+     機制只有一支時鐘:量的是**距離上一次有人消掉**多久,不是開局多久。三階升壓:
+
+     | 停滯   | 做什麼                                        | 遮擋 |
+     |--------|----------------------------------------------|------|
+     | 8s     | 「✦ N」讀數開始脈動 + 補一顆停滯秒數讀數        | 無   |
+     | 15s    | 光帶過場 + 一聲 Sound.turn() + 探照燈框出欄帶   | 無   |
+     | 25s    | 讀數倒數 3→2→1,然後全房重洗                  | 無   |
+
+     ★ 錨點是「moves 變長」(grab)/「自己消掉一對」(race)—— **全部本地推算,零 DB、
+       零 schema 變動**。各台差幾百毫秒無所謂:提示不需要全房同一秒,而唯一需要全房一致的
+       重洗已經有 shuf 交易在管。
+     ★ 絕對不可以拿「g.tiles 有沒有變」當錨點 —— 重洗就是在改 tiles(同 applyGame 那個最大的坑)。
+     ★ 只有一個 interval、沒有別的 timer:連倒數都是在 tick 裡用時間差算出來的。
+       這遊戲的 timer 出口清理已經踩過一次(clearAuto 要掛四個出口),能不多開就不多開。
+     ★ 15 秒那一階刻意只框**欄帶**、不指出是哪兩張(MB.showZone 的註解有完整理由)。 */
+  const STALL={ warm:8000, hint:15000, shuf:25000, count:3000, maxShuf:2, tick:500 };
+
+  function stallOn(){ stallOff(); stallFrom=Date.now(); stallShufN=0; stallT=setInterval(stallTick,STALL.tick); }
+  function stallOff(){
+    if(stallT){ clearInterval(stallT); stallT=null; }
+    stallLv=0; paintStall(""); markWarm(false); MB.clearZone();
+  }
+  // 有人消掉 / 剛重洗過 → 時鐘歸零,升壓的階梯也一起退回去
+  function stallReset(){
+    stallFrom=Date.now();
+    stallLv=0; paintStall(""); markWarm(false); MB.clearZone();
+  }
+
+  function stallTick(){
+    if(ctx.phase()!=="playing"||ctx.winner()||!total){ stallOff(); return; }
+    // 死局歸 armAuto:那邊自己會洗,僵局不插隊(而且可消 0 組時探照燈根本沒東西可指)
+    if(autoT||!MB.anyMove()){ if(stallLv) stallReset(); return; }
+    const el=Date.now()-stallFrom;
+    // 洗過兩次還是沒人動 = 大概全房都掛機了(那有落單倒數接手),別把盤面洗成跑馬燈
+    const top=stallShufN>=STALL.maxShuf?2:3;
+    const lv=Math.min(top, el>=STALL.shuf?3 : el>=STALL.hint?2 : el>=STALL.warm?1 : 0);
+    if(lv!==stallLv) stallUp(lv);
+    if(stallLv>=3){
+      const rest=Math.ceil((STALL.shuf+STALL.count-el)/1000);
+      if(rest>0){ paintStall("🔀 "+rest); return; }
+      stallShuffle();
+    }else if(stallLv>=1){
+      paintStall("⏱ "+Math.floor(el/1000)+"s"+(gMode==="grab"?" 沒人消":" 沒進度"));
+    }
+  }
+
+  /* 升壓。前兩階完全不影響操作 —— 搶牌是比手速,任何遮擋都是在扣某個人的分 */
+  function stallUp(lv){
+    const up=lv>stallLv;
+    stallLv=lv;
+    markWarm(lv>=1);
+    if(!up)return;
+    if(lv===2){
+      MB.flash(gMode==="grab"?"⚡ 全場僵持中":"⏱ 卡住了?");
+      Sound.turn();     // 麻將沒有回合制,turn() 整支遊戲沒用到,拿來當「注意一下」正好
+      MB.showZone();
+    }
+  }
+
+  /* 第三階:重洗。走的是死局那條現成的路(grab 用 shuf 交易搶 / race 只洗自己)。
+     ★ 先重置時鐘再洗:洗完的推播要跑一趟往返,不先重置的話這幾百毫秒內會再觸發一次。
+       交易搶輸(別人先洗了)也一樣 —— 對方洗成功的推播照樣會過來。 */
+  function stallShuffle(){
+    stallShufN++;
+    stallReset();
+    shuffle();
+  }
+
+  function paintStall(txt){
+    const el=$("mjStall"); if(!el)return;
+    if(!txt){ el.classList.add("hidden"); el.textContent=""; return; }
+    el.classList.remove("hidden");
+    el.textContent=txt;
+    el.classList.toggle("mj-hot",stallLv>=2);
+  }
+  // 第一階唯一做的事:把「✦ N」讀數點起來。零遮擋、純氣氛
+  function markWarm(on){ const el=$("mjMoves"); if(el) el.classList.toggle("mj-warm",!!on); }
 
   function shuffle(){
     if(ctx.phase()!=="playing"||ctx.winner())return;
@@ -148,8 +240,10 @@ const MP = MPCore.create((function(){
       const nt=MGen.reshuffle(MB.level(),MB.shape(),MB.aliveArr(),MB.tiles());
       if(!nt){ stuck(); return; }
       MB.setTiles(nt); myShuf++;
+      MB.flash("");                 // 純光帶,遮掩整盤換牌那一瞬間(訊息交給下面的 toast)
       Sound.takeback(); showToast("已重洗你的盤面 🔀",1300);
       pushProgress();
+      stallReset();
       return;
     }
     grabShuffle();
@@ -300,6 +394,7 @@ const MP = MPCore.create((function(){
         total=MB.total();
         moves=[]; tally=[]; myShuf=0; startedAt=Date.now();
         MB.setEnabled(true);
+        stallOn();                        // 僵局時鐘跟著這一局起跑(total 這時才有值)
         if(gMode==="race") pushProgress();
       }
       if(!total) return;
@@ -308,10 +403,13 @@ const MP = MPCore.create((function(){
         // 重洗:牌面換了但存活狀態不動
         if(g.tiles && (g.shuf||0)!==shufN){
           shufN=g.shuf||0;
+          MB.flash("");                   // 純光帶,遮掩整盤換牌那一瞬間(訊息交給下面的 toast)
           MB.setTiles(MGen.parse(g.tiles));
           Sound.takeback();
           showToast("盤面已重洗 🔀",1400);
+          stallReset();
         }
+        const wasN=moves.length;
         const next=Array.isArray(g.moves)?g.moves:[];
         const pops=[];
         // 能延續就只補新的幾筆,否則整盤重建(重連 / 中途歸位)
@@ -340,6 +438,7 @@ const MP = MPCore.create((function(){
             }
           });
         }
+        if(moves.length!==wasN) stallReset();   // 有人消掉了(誰都算)→ 僵局時鐘歸零
         renderHud();
         pops.forEach(s=>popScore(s));       // 一定要在 renderHud() 之後(它會重建 innerHTML)
         if(MB.cleared()){ if(!ctx.winner()) settleGrab(); }
@@ -453,6 +552,8 @@ const MP = MPCore.create((function(){
       // shuffle 沒有 UI 入口(v1.54.0 拿掉按鈕):死局時由 armAuto() 自動呼叫,
       // 仍然暴露出來是為了 tools/gen-e2e.py 能直接驗兩種模式的重洗語意(搶牌 shuf+1 / 競速只動自己)
       onPair, shuffle,
+      // 僵局只能靠時間觸發,e2e 等不了 8/15/25 秒 → 讓測試把時鐘往回撥(tools/gen-e2e.py 在用)
+      stallAge(ms){ stallFrom-=(+ms||0); },
       mode:()=>mode, diff:()=>diff, gameMode:()=>gMode,
       setMode(v){
         v=(v==="race")?"race":"grab";
