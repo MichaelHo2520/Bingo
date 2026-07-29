@@ -72,10 +72,9 @@ $("mjUndoBtn").addEventListener("click",()=>Solo.undo());
 $("soloAgain").addEventListener("click",()=>{ closeWin(); Solo.start(); });
 $("soloHome").addEventListener("click",()=>Solo.quit());
 
-/* 提示與重洗:單機與連線共用同兩顆鈕,由「現在是不是單機」決定去哪一邊。
-   連線沒有提示(那等於直接送分),所以提示鈕在連線時是隱藏的(CSS body.mj-mp)。 */
+/* 提示:連線沒有提示(那等於直接送分),所以提示鈕在連線時是隱藏的(CSS body.mj-mp)。
+   重洗刻意沒有按鈕(v1.54.0):死局時單機走 Solo 的 deadEnd()、連線走 adapter 的 armAuto()。 */
 $("mjHintBtn").addEventListener("click",()=>{ if(Solo.running()) Solo.hint(); });
-$("mjShuffleBtn").addEventListener("click",()=>{ if(Solo.running()) Solo.shuffle(); else MP.shuffle(); });
 
 /* 比分 HUD:點某個人的卡片 = 傳表情給他(對戰中名單列收起來了,這裡接手那個入口) */
 $("mjHud").addEventListener("click",e=>{

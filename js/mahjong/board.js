@@ -7,8 +7,11 @@
    設計要點:
    • **牌面不用 Unicode 麻將字元(U+1F000 那一段)**。只有 🀄 有 emoji 呈現,其餘 43 個是
      文字呈現 —— Android 覆蓋率不保證(缺字就是豆腐框),而且字級、對齊、花色顏色全部
-     由系統字型決定,控不了。改成「大字 + 花色小字 + 顏色」自繪:所有用到的字
-     (東南西北中發白春夏秋冬梅蘭竹菊萬條筒)任何 CJK 字型都有。
+     由系統字型決定,控不了。
+   • **改成一張牌一個 SVG 自繪圖案**(v1.54.0):筒是同心圓、條是竹節棒(一條是雀鳥)、
+     萬是漢字數字 + 紅「萬」、白板是藍框。之前是「大字 + 花色小字」(5 + 筒),
+     字是對的但沒有麻將的樣子 —— 而數字牌(筒/條)在真牌上本來就是圖案不是數字。
+     字牌與花牌維持單字,因為真牌上那幾張就是字。
    • **位置全部用 CSS calc + 每張牌的 --c/--r/--l**,JS 只寫一個 --mjw(牌寬)。
      轉向 / 換難度 / 視窗縮放都只要改那一個變數,不必重寫 144 個 inline style。
    • 立體感:上層往左上位移,下層往右下 → 用 (lmax − l) 當位移倍數,這樣最上層貼齊
@@ -26,6 +29,106 @@ const MB = (function(){
   let els=[], sel=-1, enabled=false, hintPair=null, hintT=null;
   let stage=null, box=null, ro=null, lastW=null;
   let cbPair=null, cbBlocked=null;
+
+  /* ==========================================================================
+     牌面自繪:一張牌一個 SVG,viewBox 固定 0 0 100 132(= 1 : RATIO)
+     ★ 圖案顏色一律 currentColor,花色設在 .mj-tile 的 color 上(CSS 依 data-suit)——
+       所以每個圖案都只是「單色 + 象牙白挖空(.mj-hole)」,換主題不用改一行 JS。
+     ★ 座標寫死在 viewBox 座標系裡,牌實際多大由 CSS 的 --mjw 決定,這裡不必知道。
+     ★ 42 種牌面各只算一次就快取:144 張的盤面重洗時是 144 次 innerHTML,
+       字串重算純屬浪費(而且每張牌的同一種花色長得一模一樣)。
+     ========================================================================== */
+  const NUM=["一","二","三","四","五","六","七","八","九"];
+  const svgCache={};
+
+  // 筒:同心圓(外圈實心 → 白圈 → 中心點),真牌上的餅就是這個樣子
+  function pin(x,y,r){
+    return '<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="currentColor"/>'+
+           '<circle class="mj-hole" cx="'+x+'" cy="'+y+'" r="'+(r*0.60).toFixed(1)+'"/>'+
+           '<circle cx="'+x+'" cy="'+y+'" r="'+(r*0.28).toFixed(1)+'" fill="currentColor"/>';
+  }
+  /* 幾筒排在哪:照傳統排法(三筒斜著、七筒上三下四…),不是機械式的方格 */
+  const PIN_P={
+    2:[[50,42],[50,90]],
+    3:[[26,36],[50,66],[74,96]],
+    4:[[32,44],[68,44],[32,88],[68,88]],
+    5:[[30,42],[70,42],[50,66],[30,90],[70,90]],
+    6:[[32,38],[68,38],[32,66],[68,66],[32,94],[68,94]],
+    7:[[28,28],[50,44],[72,60],[32,86],[68,86],[32,112],[68,112]],
+    8:[[34,26],[66,26],[34,52],[66,52],[34,78],[66,78],[34,104],[66,104]],
+    9:[[26,32],[50,32],[74,32],[26,66],[50,66],[74,66],[26,100],[50,100],[74,100]]
+  };
+  const PIN_R={ 2:18, 3:16, 4:16, 5:14, 6:13, 7:11.5, 8:11.5, 9:12 };
+  function pins(v){
+    // 一筒:真牌上是一個大同心圓,圈數比別的多
+    if(v===1) return '<circle cx="50" cy="66" r="31" fill="currentColor"/>'+
+                     '<circle class="mj-hole" cx="50" cy="66" r="25.5"/>'+
+                     '<circle cx="50" cy="66" r="19.5" fill="currentColor"/>'+
+                     '<circle class="mj-hole" cx="50" cy="66" r="13"/>'+
+                     '<circle cx="50" cy="66" r="6.5" fill="currentColor"/>';
+    return (PIN_P[v]||[]).map(p=>pin(p[0],p[1],PIN_R[v])).join("");
+  }
+
+  // 條:一根竹子 = 圓角棒 + 兩道白色竹節(少了竹節就只是一根棒子,看不出是竹)
+  function stick(x,y,w,h){
+    const l=(x-w/2).toFixed(1), t=(y-h/2).toFixed(1);
+    const nh=Math.max(1.6,h*0.05);
+    return '<rect x="'+l+'" y="'+t+'" width="'+w+'" height="'+h+'" rx="'+(w*0.45).toFixed(1)+'" fill="currentColor"/>'+
+           '<rect class="mj-hole" x="'+l+'" y="'+(y-h/6-nh/2).toFixed(1)+'" width="'+w+'" height="'+nh.toFixed(1)+'"/>'+
+           '<rect class="mj-hole" x="'+l+'" y="'+(y+h/6-nh/2).toFixed(1)+'" width="'+w+'" height="'+nh.toFixed(1)+'"/>';
+  }
+  const BAM={
+    2:{ w:17, h:46, p:[[50,40],[50,92]] },
+    3:{ w:15, h:44, p:[[50,36],[34,92],[66,92]] },
+    4:{ w:15, h:46, p:[[33,42],[67,42],[33,92],[67,92]] },
+    5:{ w:13, h:38, p:[[31,34],[69,34],[50,66],[31,98],[69,98]] },
+    6:{ w:13, h:48, p:[[28,40],[50,40],[72,40],[28,94],[50,94],[72,94]] },
+    7:{ w:12, h:34, p:[[50,24],[28,66],[50,66],[72,66],[28,106],[50,106],[72,106]] },
+    8:{ w:12, h:34, p:[[38,24],[62,24],[28,66],[50,66],[72,66],[28,106],[50,106],[72,106]] },
+    9:{ w:12, h:32, p:[[28,30],[50,30],[72,30],[28,66],[50,66],[72,66],[28,102],[50,102],[72,102]] }
+  };
+  /* 一條 = 雀鳥(真牌就是一隻鳥,少了它整副牌就沒那個味道)。
+     刻意只用五塊、每塊都畫得粗 —— 30px 寬的牌上,細節一律糊成一團。 */
+  function bird(){
+    return '<polygon points="34,84 8,124 41,101" fill="currentColor"/>'+
+           '<ellipse cx="47" cy="74" rx="21" ry="25" fill="currentColor"/>'+
+           '<circle cx="62" cy="38" r="14" fill="currentColor"/>'+
+           '<polygon points="74,31 93,40 74,46" fill="currentColor"/>'+
+           '<circle class="mj-hole" cx="66" cy="34" r="3.4"/>'+
+           '<path class="mj-wing" d="M38 60 Q53 74 43 93"/>';
+  }
+  function bams(v){
+    if(v===1) return bird();
+    const b=BAM[v]; if(!b) return "";
+    return b.p.map(p=>stick(p[0],p[1],b.w,b.h)).join("");
+  }
+
+  // 字:x 置中、dominant-baseline 交給 CSS(.mj-t),這裡只給字級與中心高度
+  function chr(t,size,y,cls){
+    return '<text class="mj-t'+(cls?" "+cls:"")+'" x="50" y="'+y+'" font-size="'+size+'">'+t+'</text>';
+  }
+  // 白板:真牌上是一個藍框(不是寫「白」)。整副牌裡唯一「空的」那張,最好認
+  function white(){
+    return '<rect class="mj-frm" x="21" y="30" width="58" height="72" rx="8"/>'+
+           '<rect class="mj-frn" x="31" y="41" width="38" height="50" rx="5"/>';
+  }
+
+  function draw(code){
+    if(code==="jb") return white();
+    const s=code.charAt(0), v=+code.charAt(1);
+    if(s==="d") return pins(v);
+    if(s==="b") return bams(v);
+    // 萬:上面漢字數字(墨色)、下面紅「萬」,和實體牌一致
+    if(s==="w") return chr(NUM[v-1]||"一",46,42,"mj-ink")+chr("萬",42,96);
+    const f=MGen.faceOf(code);
+    // 花牌:單字 + 細框(真牌的花牌也有一圈框,同時和字牌區隔開)
+    if(s==="h"||s==="p") return '<rect class="mj-frn" x="15" y="26" width="70" height="80" rx="11"/>'+chr(f.glyph,52,68);
+    return chr(f.glyph,64,66);          // 東南西北 / 中 / 發
+  }
+  function faceHTML(code){
+    return svgCache[code] ||
+      (svgCache[code]='<svg class="mj-svg" viewBox="0 0 100 132" aria-hidden="true">'+draw(code)+'</svg>');
+  }
 
   /* ---------- 建立 ---------- */
   function init(o){
@@ -81,7 +184,6 @@ const MB = (function(){
       el.style.setProperty("--l",String(s.l));
       // 層 → 列 → 行 遞增:上層蓋下層,同層右下蓋左上(立體邊才不會被切掉)
       el.style.zIndex=String((s.l*(L.rows+1)+s.r)*(L.cols+1)+s.c+1);
-      el.innerHTML='<span class="mj-face"><span class="mj-g"></span><span class="mj-m"></span></span>';
       el.addEventListener("click",()=>tap(i));
       stage.appendChild(el);
       els.push(el);
@@ -90,10 +192,9 @@ const MB = (function(){
   }
   function paintFaces(){
     els.forEach((el,i)=>{
-      const f=MGen.faceOf(tiles[i]||"w1");
-      el.querySelector(".mj-g").textContent=f.glyph;
-      el.querySelector(".mj-m").textContent=f.mark;
-      el.dataset.suit=f.cls;
+      const code=tiles[i]||"w1", f=MGen.faceOf(code);
+      el.innerHTML=faceHTML(code);
+      el.dataset.suit=f.cls;              // 花色 → CSS 給 color,SVG 裡的 currentColor 就跟著變
       el.setAttribute("aria-label",f.name);
     });
   }
@@ -222,11 +323,8 @@ const MB = (function(){
     if(mo){
       mo.textContent="✦ "+mv;
       mo.classList.toggle("dead",mv===0);
-      mo.title = mv===0 ? "沒有可以消的牌了 —— 按「重洗」" : "目前有 "+mv+" 組可以消(是哪幾組要自己找)";
+      mo.title = mv===0 ? "沒有可以消的牌了 —— 會自動重洗" : "目前有 "+mv+" 組可以消(是哪幾組要自己找)";
     }
-    // 死局時讓「重洗」自己發亮:這時 UI 唯一該引導的就是它
-    const sb=$("mjShuffleBtn");
-    if(sb) sb.classList.toggle("urge", mv===0 && left()>0);
   }
   function markDone(){ if(stage) stage.classList.add("done"); }
 

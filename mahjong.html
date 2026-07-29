@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>麻將消消樂 ｜ 單機練習與連線對戰</title>
-<!-- 麻將消消樂 · v1.53.0 -->
-<meta name="version" content="1.53.0">
+<!-- 麻將消消樂 · v1.54.0 -->
+<meta name="version" content="1.54.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -214,8 +214,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="mj-tools" id="mjTools">
       <span class="mj-count" id="mjLeft" title="盤面上還剩幾張">🀄 0</span>
       <span class="mj-count" id="mjMoves" title="目前有幾組可以消">✦ 0</span>
+      <!-- 重洗沒有按鈕(v1.54.0):死局時自動洗 + 跳提示,那顆鈕整場亮著卻只有最後可能用到 -->
       <button class="mj-tool mj-solo-only" id="mjHintBtn" type="button">💡 提示 5</button>
-      <button class="mj-tool" id="mjShuffleBtn" type="button" title="沒得消時把剩下的牌重排">🔀 重洗</button>
       <button class="mj-tool mj-solo-only" id="mjUndoBtn" type="button">↶ 悔棋</button>
     </div>
   </div>

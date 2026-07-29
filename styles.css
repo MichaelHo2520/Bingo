@@ -85,7 +85,17 @@
   .scroll-area{flex:0 1 auto;min-height:0;width:min(92vw,520px);
     display:flex;flex-direction:column;align-items:center;gap:14px;
     overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
-  .topbar,#mpBar,#soloHead,#roomTabs,#home,.primary-bar{flex:none}
+  .topbar,#mpBar,#soloHead,#roomTabs,.primary-bar{flex:none}
+  /* 頂層選單面板(不在 .scroll-area 裡,直接掛在 body 上)——
+     內容比視窗高時**自己**要能捲。body 是 overflow:hidden,面板又曾是 flex:none,
+     兩個加起來的結果是「超出的部分直接被裁掉,而且沒有任何地方捲得到」:
+     首頁長到四張遊戲卡 + 即時看板之後,900×430 實測第四張卡(麻將)的底部在 719px、
+     可視高度只有 335px → 整張卡點不到(v1.54.0 修)。
+     flex:0 1 auto + min-height:0 才會「內容短時貼合內容、內容長時縮到可視高度」。
+     ⚠ 刻意只列這幾個 id,不寫 body>.panel —— 那會把 #mpBar(房間橫幅)也變成捲動容器,
+        飄出框外的表情動畫會被裁掉。 */
+  #home,#gmkHome,#sdkHome,#mjHome,#mpConnect{flex:0 1 auto;min-height:0;
+    overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   /* 填號分頁:改回 flex:1 撐滿(內容本來就有整片號碼格,不會空太多),讓準備列固定在最底,右下浮動鈕才有穩定的落點、不會壓到準備鈕 */
   body.room-tab-fill .scroll-area{flex:1 1 0}
   /* 盤面尺寸上限:除了 92vw / 520px,再用「剩餘可視高度」夾一次,螢幕太矮/太寬時號碼格才不會溢出、要上下捲。
@@ -1693,24 +1703,32 @@
                0 2px 5px rgba(0,0,0,.28);
     transition:transform .1s,filter .12s}
   .mj-tile:active{transform:scale(.94)}
-  .mj-face{display:flex;flex-direction:column;align-items:center;justify-content:center;
-    height:100%;width:100%;line-height:1}
-  .mj-g{font-family:'Nunito',sans-serif;font-weight:800;font-size:calc(var(--mjw,32px) * 0.54);color:var(--mj-ink)}
-  .mj-m{font-family:'Nunito',sans-serif;font-weight:800;font-size:calc(var(--mjw,32px) * 0.28);
-    margin-top:calc(var(--mjw,32px) * 0.04);opacity:.9}
-  /* 字牌(風/三元/花)沒有花色小字 → 大字放大置中,不要在牌面上留一塊空 */
-  .mj-tile[data-suit="z"] .mj-g,.mj-tile[data-suit="jz"] .mj-g,.mj-tile[data-suit="jf"] .mj-g,
-  .mj-tile[data-suit="jb"] .mj-g,.mj-tile[data-suit="h"] .mj-g,.mj-tile[data-suit="p"] .mj-g{
-    font-size:calc(var(--mjw,32px) * 0.6)}
-  .mj-tile[data-suit="w"] .mj-g,.mj-tile[data-suit="w"] .mj-m{color:var(--mj-w)}
-  .mj-tile[data-suit="b"] .mj-g,.mj-tile[data-suit="b"] .mj-m{color:var(--mj-b)}
-  .mj-tile[data-suit="d"] .mj-g,.mj-tile[data-suit="d"] .mj-m{color:var(--mj-d)}
-  .mj-tile[data-suit="z"] .mj-g{color:var(--mj-z)}
-  .mj-tile[data-suit="jz"] .mj-g{color:var(--mj-jz)}
-  .mj-tile[data-suit="jf"] .mj-g{color:var(--mj-jf)}
-  .mj-tile[data-suit="jb"] .mj-g{color:var(--mj-jb)}
-  .mj-tile[data-suit="h"] .mj-g{color:var(--mj-h)}
-  .mj-tile[data-suit="p"] .mj-g{color:var(--mj-p)}
+
+  /* ---------- 牌面圖案(v1.54.0)----------
+     一張牌一個 SVG(viewBox 0 0 100 132),圖案由 js/mahjong/board.js 畫。
+     ★ 花色只設在牌本身的 color 上,SVG 裡的圖案一律 currentColor → 一種花色一條規則,
+       不必為每個圖形元素各寫一次(舊版是 .mj-g / .mj-m 兩個 span 各設一次色)。 */
+  .mj-svg{display:block;width:100%;height:100%}
+  .mj-hole{fill:var(--mj-face)}        /* 筒的白圈 / 竹節 / 鳥眼:挖成牌面色 */
+  .mj-wing{fill:none;stroke:var(--mj-face);stroke-width:4;stroke-linecap:round}
+  .mj-frm{fill:none;stroke:currentColor;stroke-width:6}          /* 白板的粗框 */
+  .mj-frn{fill:none;stroke:currentColor;stroke-width:2.4;opacity:.55}  /* 白板內框 / 花牌外框 */
+  /* 牌面的字:CJK 交給系統字型(Fredoka/Nunito 只有拉丁字母),置中靠 CSS 不寫進 SVG 屬性 */
+  .mj-t{fill:currentColor;font-weight:700;text-anchor:middle;dominant-baseline:central;
+    font-family:'Noto Sans TC','Microsoft JhengHei','PingFang TC','Heiti TC',sans-serif}
+  /* 萬子上面那個漢字數字是墨色(下面的「萬」才是紅的)。
+     ⚠ 必須兩層 .mj-t.mj-ink —— 單寫 .mj-ink 和 .mj-t 同級,後寫的 fill:currentColor 會贏,
+        數字就跟著變紅(第一版就是這樣,截圖才看得出來;同 v1.49.0 .mvc-open 那個坑)。 */
+  .mj-t.mj-ink{fill:var(--mj-ink)}
+  .mj-tile[data-suit="w"]{color:var(--mj-w)}
+  .mj-tile[data-suit="b"]{color:var(--mj-b)}
+  .mj-tile[data-suit="d"]{color:var(--mj-d)}
+  .mj-tile[data-suit="z"]{color:var(--mj-z)}
+  .mj-tile[data-suit="jz"]{color:var(--mj-jz)}
+  .mj-tile[data-suit="jf"]{color:var(--mj-jf)}
+  .mj-tile[data-suit="jb"]{color:var(--mj-jb)}
+  .mj-tile[data-suit="h"]{color:var(--mj-h)}
+  .mj-tile[data-suit="p"]{color:var(--mj-p)}
 
   /* 被壓住 / 兩邊都有牌 = 現在點不動:壓暗一點當引導。
      這不會把難度拿走 —— 這遊戲的難點是「該挑哪一對」,不是「哪幾張抽得出來」,
@@ -1744,20 +1762,17 @@
   .mj-tools{flex:none;width:100%;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
   .mj-count{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13.5px;color:var(--muted);
     padding:6px 9px;border-radius:10px;background:rgba(0,0,0,.16);white-space:nowrap;flex:none}
-  /* 可消 0 組 = 死局:整顆標紅。這時畫面唯一該引導的就是「重洗」 */
+  /* 可消 0 組 = 死局:整顆標紅(接著會自動重洗,見 adapter 的 armAuto / solo 的 deadEnd) */
   .mj-count.dead{color:#fff;background:var(--daub)}
   .mj-tool{flex:1 1 0;min-width:82px;border:1px solid var(--panel-line);border-radius:11px;padding:7px 8px;
     background:rgba(255,255,255,.07);color:var(--text);font-weight:800;font-size:13px;cursor:pointer;
     white-space:nowrap}
   .mj-tool:active{transform:scale(.96)}
   .mj-tool:disabled{opacity:.4;cursor:default}
-  .mj-tool.urge:not(:disabled){background:var(--accent);border-color:var(--accent);color:#1c1008;
-    animation:mj-urge 1.1s ease-in-out infinite}
-  @keyframes mj-urge{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-  /* 連線沒有提示與悔棋:提示等於直接送分,悔棋在全房共用的盤面上根本沒有意義 */
+  /* 連線沒有提示與悔棋:提示等於直接送分,悔棋在全房共用的盤面上根本沒有意義
+     → 連線時這一列只剩兩顆讀數(v1.54.0 把「重洗」也拿掉了,死局自動洗) */
   body.mj-mp .mj-solo-only{display:none}
   :root[data-theme="ebook"] .mj-tool{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .mj-tool.urge:not(:disabled){background:#000;color:#fff}
   :root[data-theme="ebook"] .mj-count{background:#eee;border:1px solid #999;color:#000}
   :root[data-theme="ebook"] .mj-count.dead{background:#000;color:#fff}
 

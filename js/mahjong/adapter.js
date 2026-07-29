@@ -18,6 +18,7 @@
      • grab:全房同一個盤面 → 重洗必須是**全房一致的一次事件**,用 game.shuf 這個單調遞增的
        計數器 + 交易來搶(誰先搶到誰的洗牌結果算數),不指定房主 —— 免得房主剛好斷線就沒人洗、
        整局卡死(同 settleGrab 不指定「消最後一對的人」的理由)
+     v1.54.0 起**重洗沒有按鈕**:死局時自動觸發(armAuto),對戰中的工具列因此只剩兩顆讀數。
    ========================================================================== */
 
 const MP = MPCore.create((function(){
@@ -27,6 +28,7 @@ const MP = MPCore.create((function(){
   let ctx=null;
   let curRound=null, shufN=0, moves=[], tally=[], prog={};
   let total=0, myShuf=0, startedAt=0;
+  let autoT=null;                                 // 死局自動重洗的排程(見 armAuto())
 
   /* ---------- moves 的整數編碼 ----------
      一次「消掉一對」記成一個整數:i / j 是格位(<144)、seat 是座位(0~7)。
@@ -109,33 +111,55 @@ const MP = MPCore.create((function(){
     Sound.place();
     pushProgress();
     if(MB.cleared()){ settleRace(); return; }
-    if(!MB.anyMove()) showToast("沒得消了 —— 按「🔀 重洗」重排剩下的牌",2400);
+    if(!MB.anyMove()) armAuto();
   }
   function pushProgress(){
     const r=ctx.ref("progress/"+ctx.me()); if(!r)return;
     r.set({ n:Math.floor((total-MB.left())/2), s:myShuf, done:MB.cleared(), at:Date.now()-startedAt });
   }
 
-  /* ---------- 重洗 ---------- */
+  /* ---------- 死局 → 自動重洗(v1.54.0)----------
+     之前是工具列上一顆「🔀 重洗」等玩家自己按。拿掉的理由:死局時重洗是唯一的選擇,
+     那顆鈕在對戰全程都亮著卻只有最後可能用到,一開局就讓人看不懂那是什麼。
+     ★ 一定要「先跳提示、隔一下才洗」:直接換牌畫面會無預警整盤變樣,玩家會以為出 bug。
+     ★ 搶牌:全房每個人都會偵測到同一個死局、都會去洗,交易保證只有第一個算數
+       (shuf 單調遞增)。延遲刻意按座位錯開,少幾次註定白跑的交易。
+     ★ 洗完要再確認一次:交易可能整批失敗(極少見),沒人洗成功就要再排一次,
+       不能把全房留在死局裡等一個不會再來的事件(grab 的 applyGame 只在資料變動時才跑)。 */
+  function armAuto(){
+    if(autoT)return;
+    if(MB.left()<2)return;
+    showToast("沒得消了 —— 自動重洗中…",1600);
+    const wait = 900 + (gMode==="grab" ? Math.max(0,mySeat())*150 : 0);
+    autoT=setTimeout(()=>{
+      autoT=null;
+      if(ctx.phase()!=="playing"||ctx.winner())return;
+      if(MB.anyMove())return;                       // 這段時間裡別人已經洗過了(搶牌)
+      shuffle();
+      autoT=setTimeout(()=>{ autoT=null; if(!MB.anyMove()) armAuto(); },2600);
+    },wait);
+  }
+  function clearAuto(){ if(autoT){ clearTimeout(autoT); autoT=null; } }
+
   function shuffle(){
     if(ctx.phase()!=="playing"||ctx.winner())return;
     if(MB.left()<2)return;
     if(gMode==="race"){
       const nt=MGen.reshuffle(MB.level(),MB.aliveArr(),MB.tiles());
-      if(!nt){ showToast("重洗失敗,再按一次 😥"); return; }
+      if(!nt){ stuck(); return; }
       MB.setTiles(nt); myShuf++;
       Sound.takeback(); showToast("已重洗你的盤面 🔀",1300);
       pushProgress();
       return;
     }
-    grabShuffle(false);
+    grabShuffle();
   }
   /* 搶牌的重洗:全房共用一個盤面 → 只能有一次生效。
      先在本地算好新排法,再用交易搶 —— 交易裡檢查 shuf 與 moves 長度都沒變,
      變了就代表「別人已經洗過」或「期間又有人消了牌」,這份算好的排法已過期,直接放棄。 */
-  function grabShuffle(auto){
+  function grabShuffle(){
     const nt=MGen.reshuffle(MB.level(),MB.aliveArr(),MB.tiles());
-    if(!nt){ if(!auto) showToast("重洗失敗,再按一次 😥"); return; }
+    if(!nt){ stuck(); return; }
     const wantShuf=shufN, wantLen=moves.length, code=nt.join("");
     ctx.txGame(g=>{
       if(g.status!=="playing"||g.winner)return false;
@@ -143,6 +167,19 @@ const MP = MPCore.create((function(){
       if((Array.isArray(g.moves)?g.moves:[]).length!==wantLen)return false;
       g.tiles=code; g.shuf=wantShuf+1;
     });
+  }
+  /* 洗不出來 = 真死局:剩下的牌上下疊在一起,同一批格位怎麼排都只有上面那張抽得出來。
+     罕見但確實存在(最後一對剛好疊著)。這裡不能無聲重試 ——
+     • 搶牌:全房看同一個盤面,誰都動不了 → 直接以目前分數結算,不然整局掛在那裡
+     • 競速:只有我的盤面卡住,對手還在跑 → 講清楚,勝負交給對手清完或落單倒數 */
+  function stuck(){
+    clearAuto();
+    if(gMode==="grab"){
+      showToast("剩下的牌上下疊住了,洗也解不開 —— 直接以目前分數結算",3600);
+      if(!ctx.winner()) settleGrab();
+      return;
+    }
+    showToast("剩下的牌上下疊住了,這盤救不回來 😥",3600);
   }
 
   /* ---------- 結算 ---------- */
@@ -178,8 +215,8 @@ const MP = MPCore.create((function(){
       ? "<b>搶牌</b>:大家看同一個盤面,同時搶著消。消掉一對就 <b>+1 分</b>,盤面清空時分數最高的人贏。"
       : "<b>競速</b>:同一副牌、各消各的,中途只看得到對手的進度條。最先清空整盤的人贏。";
     const dead = mode==="grab"
-      ? "沒得消時任何人都能按「🔀 重洗」,**整房一起換**(只有第一個按的算數)。"
-      : "沒得消時自己按「🔀 重洗」,只洗你自己的盤面 —— 不限次數,代價是花掉的時間。";
+      ? "沒得消的時候<b>整房一起自動重洗</b>(格位不動,只把剩下的牌重排),不必按任何鈕。"
+      : "沒得消的時候<b>自動重洗你自己的盤面</b>(格位不動,只把剩下的牌重排),代價是花掉的時間。";
     el.innerHTML = base+"<br>"+dead+"<br>盤面 "+L.label+" · "+L.name+" · "+L.desc;
   }
 
@@ -219,7 +256,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 一局的生命週期 ---------- */
     lobbyGame(){ return { moves:[], tiles:null, shuf:0 }; },
-    resetRound(){ curRound=null; moves=[]; tally=[]; prog={}; shufN=0; myShuf=0; },
+    resetRound(){ clearAuto(); curRound=null; moves=[]; tally=[]; prog={}; shufN=0; myShuf=0; },
     newGame(ids, prev){
       const q=MGen.make(diff);
       // 座位順序每局輪換一次,顏色才不會永遠同一個人拿 p0
@@ -239,6 +276,7 @@ const MP = MPCore.create((function(){
             g.tiles,拿 tiles 當判準會把重洗誤判成新局、把大家消掉的牌全部復活。 */
       const rid=ctx.roundId();
       if(g.tiles && rid!==curRound){
+        clearAuto();                    // 上一局排的自動重洗絕不能洗到新的盤面上
         curRound=rid; shufN=g.shuf||0;
         MB.setBoard({ level:gDiff, tiles:g.tiles });
         total=MB.total();
@@ -287,7 +325,7 @@ const MP = MPCore.create((function(){
         renderHud();
         pops.forEach(s=>popScore(s));       // 一定要在 renderHud() 之後(它會重建 innerHTML)
         if(MB.cleared()){ if(!ctx.winner()) settleGrab(); }
-        else if(!MB.anyMove()) showToast("全房都沒得消了 —— 按「🔀 重洗」",2400);
+        else if(!MB.anyMove()) armAuto();
       }else{
         renderHud();
       }
@@ -304,6 +342,7 @@ const MP = MPCore.create((function(){
     backToLobby(){
       showScreen("lobby");
       $("mpBar").classList.remove("playing");
+      clearAuto();
       curRound=null; moves=[]; tally=[]; shufN=0; myShuf=0;
       MB.setEnabled(false);
       const box=$("mjHud"); if(box){ box.classList.add("hidden"); box.innerHTML=""; }
@@ -317,6 +356,7 @@ const MP = MPCore.create((function(){
       Sound.start();
     },
     onLeave(){
+      clearAuto();
       curRound=null; moves=[]; tally=[]; prog={}; shufN=0; myShuf=0;
       MB.setEnabled(false);
       const box=$("mjHud"); if(box){ box.classList.add("hidden"); box.innerHTML=""; }
@@ -366,6 +406,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 結果 ---------- */
     outcome(w,{ iWon, isDraw, mine }){
+      clearAuto();
       MB.setEnabled(false); MB.clearSel();
       renderHud(); renderWinnerRow(w,isDraw);
       const box=$("mjStats"); if(box){ box.classList.add("hidden"); box.innerHTML=""; }
@@ -388,6 +429,8 @@ const MP = MPCore.create((function(){
 
     /* ---------- 額外暴露給 main.js ---------- */
     api:{
+      // shuffle 沒有 UI 入口(v1.54.0 拿掉按鈕):死局時由 armAuto() 自動呼叫,
+      // 仍然暴露出來是為了 tools/gen-e2e.py 能直接驗兩種模式的重洗語意(搶牌 shuf+1 / 競速只動自己)
       onPair, shuffle,
       mode:()=>mode, diff:()=>diff, gameMode:()=>gMode,
       setMode(v){

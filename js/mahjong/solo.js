@@ -2,7 +2,8 @@
 
 /* ============================================================================
    麻將消牌 — 單機練習(Solo)。完全不碰 Firebase,就是「連線模式扣掉連線層」。
-   共用 MB(盤面)與結果卡,只是周邊 HUD 換成計時 / 剩餘 / 提示 / 重洗 / 悔棋。
+   共用 MB(盤面)與結果卡,只是周邊 HUD 換成計時 / 剩餘 / 提示 / 悔棋。
+   (重洗沒有按鈕:死局時自動洗,見 deadEnd())
 
    單機才有意義、連線刻意不做的:悔棋、暫停。對戰節奏快,那兩個會拖慢或破壞公平。
 
@@ -19,6 +20,7 @@ const Solo = (function(){
   let t0=0, elapsed=0, tick=null, paused=false, running=false;
   let hints=0, shuffles=0, undos=0;
   let stack=[];            // 悔棋用:依序記下消掉的每一對 [i,j]
+  let autoT=null;          // 死局自動重洗的排程(見 deadEnd())
 
   function fmt(ms){
     const s=Math.floor(ms/1000), m=Math.floor(s/60);
@@ -36,7 +38,6 @@ const Solo = (function(){
     const h=$("mjHintBtn");
     if(h){ h.textContent="💡 提示 "+(MAX_HINT-hints); h.disabled = hints>=MAX_HINT || !running || paused || mv===0; }
     const u=$("mjUndoBtn"); if(u) u.disabled = !stack.length || !running || paused;
-    const s=$("mjShuffleBtn"); if(s) s.disabled = !running || paused || MB.left()<2;
   }
   function startTick(){
     stopTick();
@@ -64,6 +65,7 @@ const Solo = (function(){
     level=lv||level;
     const q=MGen.make(level);
     if(!q){ showToast("出題失敗,再試一次 😥"); return; }    // 實測不會發生(單次成功率 100%),但不能讓它靜默壞掉
+    clearAuto();
     elapsed=0; hints=0; shuffles=0; undos=0; paused=false; running=true; stack=[];
     MB.setBoard(q);
     MB.setEnabled(true);
@@ -74,6 +76,7 @@ const Solo = (function(){
     saveOwn();
   }
   function quit(){
+    clearAuto();
     running=false; stopTick(); MB.setEnabled(false);
     closeWin();
     showScreen("home");
@@ -86,6 +89,8 @@ const Solo = (function(){
     const v=$("mjPauseVeil"); if(v) v.classList.toggle("show",paused);
     const b=$("mjPauseBtn"); if(b) b.textContent=paused?"▶":"⏸";
     paintHud();
+    // 剛好在自動重洗排程中按暫停 → 那一次會被跳過(不能在暫停時動盤面),解除暫停要補回來
+    if(!paused && running && !MB.anyMove()) deadEnd();
   }
 
   /* ---------- 操作 ---------- */
@@ -98,9 +103,14 @@ const Solo = (function(){
     paintHud();
     if(!MB.anyMove()) deadEnd();
   }
+  /* 死局 → 自動重洗(v1.54.0;之前是讓「🔀 重洗」鈕發亮等玩家自己按)。
+     死局時「重洗」是唯一的選擇,叫玩家再去找一顆按鈕只是多一步 —— 那顆鈕因此整個拿掉了。
+     ★ 一定要「先跳提示、隔一下才洗」:直接換牌的話畫面會無預警整盤變樣,玩家會以為出 bug。
+       這也是舊版不自動洗的理由,提示補上之後那個顧慮就沒了。 */
   function deadEnd(){
-    // 不自動重洗:自動洗會讓玩家搞不清楚盤面為什麼整個變了。給提示 + 讓「重洗」鈕自己發亮
-    showToast("沒有可以消的牌了 —— 按「🔀 重洗」重排剩下的牌",2600);
+    if(autoT)return;
+    showToast("沒得消了 —— 自動重洗中…",1500);
+    autoT=setTimeout(()=>{ autoT=null; if(running&&!paused&&!MB.anyMove()) shuffle(); },900);
   }
   function hint(){
     if(!running||paused||hints>=MAX_HINT)return;
@@ -111,12 +121,15 @@ const Solo = (function(){
   }
   /* 重洗:把「還在盤上」的牌重新排成一定解得開的樣子(格位不變、牌換位置)。
      次數不設限 —— 死局多半不是玩家的錯(出題保證有解,但任何一步走岔就可能回不去),
-     用「計入結算」來表達代價就夠了,擋住只會讓人卡在那裡出不去。 */
+     用「計入結算」來表達代價就夠了,擋住只會讓人卡在那裡出不去。
+     只由 deadEnd() 呼叫(v1.54.0 起沒有手動入口)。 */
   function shuffle(){
     if(!running||paused)return;
     if(MB.left()<2)return;
     const nt=MGen.reshuffle(MB.level(), MB.aliveArr(), MB.tiles());
-    if(!nt){ showToast("重洗失敗,再按一次 😥"); return; }
+    /* 洗不出來 = 真死局:剩下的牌上下疊在一起,同一格位怎麼排都只有上面那張抽得出來。
+       罕見但確實存在(最後一對剛好疊著),所以不能在這裡無聲重試 —— 要講出唯一的出路。 */
+    if(!nt){ showToast("剩下的牌上下疊住了,洗也解不開 —— 按「↶ 悔棋」退一步再試",3600); return; }
     MB.setTiles(nt);
     // ★ 悔棋堆一定要清掉:重洗只重排「還在盤上」的牌,悔棋會把已經消掉的牌放回來 ——
     //   那兩張沒有被算進這次重洗,放回去就破壞了「解得開」的保證
@@ -126,6 +139,7 @@ const Solo = (function(){
     showToast("已重洗剩下的 "+MB.left()+" 張 🔀",1400);
     paintHud();
   }
+  function clearAuto(){ if(autoT){ clearTimeout(autoT); autoT=null; } }
   function undo(){
     if(!running||paused||!stack.length)return;
     const p=stack.pop();
@@ -135,9 +149,12 @@ const Solo = (function(){
     undos++;
     Sound.takeback();
     paintHud();
+    // 悔棋是「真死局(洗也解不開)」唯一的出路,但退回來的那一步也可能還是死局 → 重新排一次自動重洗
+    if(!MB.anyMove()) deadEnd();
   }
 
   function finish(){
+    clearAuto();
     running=false; stopTick(); MB.setEnabled(false); MB.markDone();
     const L=MGen.levelOf(level);
     const card=$("mjWinCard");
@@ -158,6 +175,8 @@ const Solo = (function(){
   }
 
   return {
+    // shuffle 沒有 UI 入口(v1.54.0 拿掉按鈕):死局時由 deadEnd() 自動呼叫,
+    // 仍然暴露出來是為了 tools/gen-e2e.py 能直接驗重洗本身的性質(張數不變 / 悔棋堆清空)
     start, quit, togglePause, hint, shuffle, undo, onPair, loadOwn, paintHud,
     running:()=>running, level:()=>level,
     setLevel(v){ if(MGen.LEVELS[v]){ level=v; saveOwn(); } },
