@@ -150,7 +150,8 @@ const MP = MPCore.create((function(){
     if(a.discard && !box.children.length){
       const tag = document.createElement("span");
       tag.className = "m16-timer";
-      tag.textContent = "點牌兩次打出";
+      // 一段式 / 兩段式看裝置,只有盤面知道 → 提示文字跟它要
+      tag.textContent = M16B.discardHint();
       box.appendChild(tag);
     }
   }

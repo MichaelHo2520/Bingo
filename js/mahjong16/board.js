@@ -18,9 +18,18 @@
          **一排的牌寬 ≥ ONE_ROW_MIN 就用一排,否則用兩排(依花色分組)。**
        ONE_ROW_MIN 是**辨識度**常數(21px 明確不行、34px 明確可以),不是版面偏好。
 
-   ── ★ 兩段式打牌 ─────────────────────────────────────────────────────────
-     點一下選取上浮、再點同一張才真的打出。
-     理由:①小牌面防誤觸 ②**打錯牌在麻將是不可逆的**(不像消消樂配錯根本不成立)。
+   ── ★ 打牌操作:看裝置分兩套(v1.58.1) ─────────────────────────────────
+     觸控 → **兩段式**:點一下選取上浮、再點同一張才真的打出。
+     滑鼠 → **hover 上浮 + 點一下打出**:游標移過去就站起來(等於第一段的預覽已經有了),
+            再要求點兩下反而像「第一下沒反應」。
+     判準是 `(hover:hover) and (pointer:fine)`,CSS 與 JS 讀同一條,不會一邊上浮一邊卻要點兩次。
+     兩段式存在的理由不變:①小牌面防誤觸 ②**打錯牌在麻將不可逆**(不像消消樂配錯根本不成立)。
+
+   ── ★ sel 存「格位」不存「牌」 ────────────────────────────────────────────
+     v1.58.0 的 bug:sel 存牌值 t,手上有一對時 `sel===t` 兩張都命中 → 一起站起來。
+     現在存 render() 給的格位鍵 data-k(手牌 "h<序號>"、摸進來那張 "d")。
+     ⚠ 格位鍵會隨手牌內容位移,所以手牌一變(吃碰槓 / 打出 / 換局)就把 sel 清掉,
+       不然舊索引會指到別張牌上。
    ========================================================================== */
 
 const M16B = (function(){
@@ -32,7 +41,13 @@ const M16B = (function(){
   const TILE_MIN = 20, TILE_MAX = 64;
   const DRAW_GAP = 0.45;       // 摸進來那張與手牌之間的間隔(幾張牌寬)
 
-  let host=null, cb={}, st=null, me=0, sel=-1, hint=false;
+  let host=null, cb={}, st=null, me=0, sel="", hint=false, lastSig="";
+
+  /* 有滑鼠 = 一段式(hover 已經給了「是哪一張」的回饋);觸控 = 兩段式。
+     ⚠ 一定要跟 styles.css 那條 @media 用同一個字串,否則會出現「牌浮起來卻要點兩次」。 */
+  const FINE = (typeof matchMedia==="function")
+    ? matchMedia("(hover:hover) and (pointer:fine)") : null;
+  function oneTap(){ return !!(FINE && FINE.matches); }
 
   /* ---------- 小工具 ---------- */
   function tileHTML(code, cls, extra){
@@ -132,6 +147,11 @@ const M16B = (function(){
     const plan = planHand(hand, hasDraw, avail);
     const tw = plan.tw;
 
+    /* 手牌一動(打出 / 被吃碰 / 補花 / 換局)格位鍵就位移了 → 舊的 sel 會指到別張牌。
+       tap() 自己觸發的 render() 不會走進來(st 沒變 → 簽章相同),選取因此留得住。 */
+    const sig = me+"|"+hand.join(",")+"|"+(hasDraw?st.drawn:"");
+    if(sig!==lastSig){ lastSig=sig; sel=""; }
+
     /* --- 對手 --- */
     let html = '<div class="m16-foes">';
     for(let k=1;k<st.seats;k++) html += foeHTML((me+k)%st.seats, tw);
@@ -158,17 +178,21 @@ const M16B = (function(){
     const canAct = MJT.ownActions(st, me).discard;
     // 聽牌提示:打掉這張之後聽幾張(只給自己看,不指出是哪幾張以外的資訊)
     html += '<div class="m16-hand'+(canAct?" live":"")+'" style="--m16w:'+tw+'px">';
+    /* planHand() 保證 rows 串起來就是 hand 的原順序(切點只切在花色邊界),
+       所以一路數下去的 hi 就是這張牌在 hand 裡的索引 —— 拿它當格位鍵。 */
+    let hi = 0;
     plan.rows.forEach((row,ri)=>{
       html += '<div class="m16-row">';
       row.forEach(t=>{
+        const k = "h"+(hi++);
         const n = (hint && canAct) ? MJT.tenpaiAfter(st, me, t).length : 0;
-        html += tileHTML(codeOf(t), "m16-ht"+(sel===t?" sel":"")+(n?" tenpai":""),
-                         ' data-t="'+t+'"'+(n?' data-n="'+n+'"':''));
+        html += tileHTML(codeOf(t), "m16-ht"+(sel===k?" sel":"")+(n?" tenpai":""),
+                         ' data-t="'+t+'" data-k="'+k+'"'+(n?' data-n="'+n+'"':''));
       });
       if(hasDraw && ri===plan.drawRow){
         const n = hint ? MJT.tenpaiAfter(st, me, st.drawn).length : 0;
-        html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel===st.drawn?" sel":"")+(n?" tenpai":""),
-                         ' data-t="'+st.drawn+'"'+(n?' data-n="'+n+'"':''));
+        html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+(n?" tenpai":""),
+                         ' data-t="'+st.drawn+'" data-k="d"'+(n?' data-n="'+n+'"':''));
       }
       html += '</div>';
     });
@@ -191,13 +215,14 @@ const M16B = (function(){
   /* ==========================================================================
      操作
      ========================================================================== */
-  function tap(t){
+  function tap(k, t){
     const a = MJT.ownActions(st, me);
     if(!a.discard) return;
-    /* ★ 兩段式:第一次點是選取(上浮),第二次點同一張才打出。
-       打錯牌在麻將不可逆,而且手機上牌只有 34~47px 寬。 */
-    if(sel !== t){ sel = t; render(); return; }
-    sel = -1;
+    /* ★ 滑鼠:hover 已經把牌抬起來了,這一下就是打出。
+       ★ 觸控:兩段式 —— 第一次點是選取(上浮),第二次點**同一個格位**才打出。
+         比的是格位 k 不是牌值 t,手上有一對時才不會兩張一起亮(v1.58.1)。 */
+    if(!oneTap() && sel !== k){ sel = k; render(); return; }
+    sel = "";
     if(cb.onDiscard) cb.onDiscard(t);
   }
 
@@ -207,7 +232,7 @@ const M16B = (function(){
     if(!host) return;
     host.addEventListener("click", e=>{
       const el = e.target.closest(".m16-ht");
-      if(el && el.dataset.t!==undefined){ tap(+el.dataset.t); return; }
+      if(el && el.dataset.t!==undefined){ tap(el.dataset.k||"", +el.dataset.t); return; }
       const foe = e.target.closest(".m16-foe");
       if(foe && cb.onFoe) cb.onFoe(+foe.dataset.seat);
     });
@@ -217,10 +242,13 @@ const M16B = (function(){
 
   return {
     mount, render,
-    clearSel(){ sel=-1; },
+    clearSel(){ sel=""; },
     setNames(fn){ nameOf = fn || (s=>"座位 "+(s+1)); },
     setHint(v){ hint = !!v; render(); },
     hintOn(){ return hint; },
+    /* 操作提示由盤面出,因為只有它知道這台裝置走一段式還是兩段式 */
+    discardHint(){ return oneTap() ? "滑過選牌 · 點一下打出" : "點牌兩次打出"; },
+    oneTap,
     // 給測試頁與 e2e:直接問排版決策,不必去讀 DOM
     planFor(hand, hasDraw, avail){ return planHand(hand, hasDraw, avail); },
     ONE_ROW_MIN
