@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 2~4 人連線對戰</title>
-<!-- 台灣 16 張麻將 · v1.58.4 -->
-<meta name="version" content="1.58.4">
+<!-- 台灣 16 張麻將 · v1.59.0 -->
+<meta name="version" content="1.59.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -128,6 +128,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button class="on" data-goal="4">一圈 4 局</button>
           <button data-goal="8">8 局</button>
           <button data-goal="16">一將 16 局</button>
+        </div>
+      </div>
+      <!-- 吃碰思考時間(v1.59.0):別人打出的牌你吃得下時,有幾秒可以決定。
+           ★ 一定是**房間設定**不是各人偏好 —— 到期補「過」是「誰的 timer 先響誰結算」,
+             各自設定的話全房會被最短的那台決定(見 js/mahjong16/adapter.js 檔頭常數)。 -->
+      <div class="field">
+        <span class="field-label" id="m16SecLabel">吃碰思考時間</span>
+        <div class="seg" id="m16SecSeg" aria-label="吃碰思考時間">
+          <button data-sec="8">8 秒</button>
+          <button class="on" data-sec="12">12 秒</button>
+          <button data-sec="20">20 秒</button>
+          <button data-sec="30">30 秒</button>
         </div>
       </div>
       <div class="field" id="scoreRow">

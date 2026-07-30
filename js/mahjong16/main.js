@@ -45,6 +45,9 @@ $("m16GoOnline").addEventListener("click",()=>MP.openConnect());
 $("m16GoalSeg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(b) MP.setGoal(b.dataset.goal);
 });
+$("m16SecSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(b) MP.setSec(b.dataset.sec);
+});
 $("scoreSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setScoreMode(b.dataset.score); });
 $("wgMinus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()-1));
 $("wgPlus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()+1));

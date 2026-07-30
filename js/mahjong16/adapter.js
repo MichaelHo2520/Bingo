@@ -25,10 +25,16 @@
 const MP = MPCore.create((function(){
 
   const COLORS = ["p0","p1","p2","p3"];
-  const CLAIM_MS = 7000;            // 宣告視窗:7 秒沒表態就當「過」
+  /* 宣告視窗長度(秒):房主可選,預設 12(v1.59.0 從寫死的 7 秒改過來 ——
+     實際上手回報「8 秒太快了」,真牌桌上思考吃碰的時間本來就比這長)。
+     ★ 一定要是**房間層級設定**、不能各人存自己的偏好:到期補「過」是「誰的 timer
+       先響誰結算」,各台設不同秒數的話等於全房都被最短的那個決定。
+     可選的秒數寫在 mahjong16.html 的 #m16SecSeg(8 / 12 / 20 / 30),這裡只守範圍。 */
+  const SEC_DEF = 12;
 
   let ctx = null;
   let handsGoal = 4;                // 打幾局(房間設定)
+  let claimSec = SEC_DEF;           // 宣告視窗幾秒(房間設定)
   let st = null;                    // 目前這一局的 MJT state(解碼後)
   let curRound = null;
   let tai = {};                     // tai 節點快照
@@ -167,10 +173,26 @@ const MP = MPCore.create((function(){
          也要有一個比較容易看到的」。 */
     if(st.claim){
       const types = st.claim.elig[me];
+      /* ★★ 不是我在決定的時候,這裡**一個字都不能提吃碰**(v1.59.0)。
+         使用者:「在決定要碰牌或吃牌時,我不希望其他人可以看到這個資訊,這樣就太容易
+         猜到你有這個牌了」。舊版無論有沒有資格,全桌都看到「等別人決定要不要吃碰…」
+         + 一顆倒數環 —— 出牌的人只要看見那行字,就知道**有人手上有這張**,
+         就算對方最後過了也已經洩出去了(而且他還知道是這一張,牌情比什麼都值錢)。
+         現在:①非當事人只看到中性的「等其他人…」②倒數環只給正在決定的人。
+         ★ 我自己表態完也要收掉環 —— 環還在走就等於「還有別人在想」,同一個洩漏。
+         ⚠ 到期補「過」的 timer **照樣每台都要跑**(見 armClaimT),藏的只有畫面。
+         ⚠ 停頓本身藏不掉(沒人有資格就直接換下一家,有人有資格就會頓一下)。那和真
+           牌桌上有人猶豫一樣,而且「有人在想」與「有人可以吃碰你打的這張」差很多:
+           後者是牌情,前者只是節奏。要連停頓都藏掉只能每一張都空等,不划算。 */
       if(!types || st.claim.bids[me] || myBid){
+        stopCd();
         const tag = document.createElement("span");
         tag.className = "m16-timer";
-        tag.textContent = types ? "已表態,等其他人…" : "等別人決定要不要吃碰…";
+        /* 「已表態」只回給**按過的那個人自己**(他早就知道自己有資格、剛按了什麼),
+           所以這一句不洩漏任何別人的牌情 —— 而它省不掉:按了「過」之後如果畫面跟
+           「沒資格」長得一模一樣,使用者會以為那一下沒吃到。 */
+        tag.textContent = (types && (st.claim.bids[me] || myBid))
+          ? "已表態,等其他人…" : "等其他人…";
         box.appendChild(tag);
         return;
       }
@@ -285,9 +307,12 @@ const MP = MPCore.create((function(){
     claimKey = ""; stopCd();
   }
   /* ★ 只在「換了一個宣告視窗」時重新計時(v1.58.4)。
-     原本每次 applyGame 都無條件重新 setTimeout —— 別人一表態 state 就變、視窗就多 7 秒,
-     四個人輪流表態可以拖到 28 秒。畫面上看不出來,但**畫了倒數環之後就藏不住**
-     (環圈會忽然彈回滿格)。順手把規則改對:視窗從開啟那一刻起算,固定 7 秒。 */
+     原本每次 applyGame 都無條件重新 setTimeout —— 別人一表態 state 就變、視窗就多幾秒,
+     四個人輪流表態可以拖到 4 倍長。畫面上看不出來,但**畫了倒數環之後就藏不住**
+     (環圈會忽然彈回滿格)。順手把規則改對:視窗從開啟那一刻起算,固定 claimSec 秒。
+     ★ v1.59.0:timer 與倒數環**分開** —— timer 每一台都要跑(不指定房主,誰先響誰補
+       「過」,某個人切到 LINE 也不會卡住全桌),但那顆環只有**正在決定的人**看得到
+       (理由見 renderActs 裡那段:環在走 = 有人可以吃碰,那是牌情)。 */
   function armClaimT(){
     if(!st || !st.claim || st.over){ clearClaimT(); return; }
     const key = st.claim.t+"@"+st.claim.from;
@@ -297,9 +322,14 @@ const MP = MPCore.create((function(){
     /* 誰都可以在到期後補結算。刻意加一點依座位錯開的延遲,避免四台同時發交易
        (交易本身擋得住,但四筆同時打過去只是浪費) */
     const jitter = Math.max(0, mySeat()) * 220;
-    const ms = CLAIM_MS + jitter;
+    const ms = claimSec*1000 + jitter;
     claimT = setTimeout(resolveExpired, ms);
-    startCd(ms);
+    /* ⚠ timer 在上面**無條件** arm(每一台都要跑);下面這行只決定「這顆環給不給看」。
+       兩件事寫在一起過,順序倒過來就是「沒資格的人不 arm timer」→ 當事人切到 LINE
+       全桌卡死在這個視窗(e2e 的 Q 段有一條專門守它)。 */
+    const me = mySeat();
+    if(me>=0 && st.claim.elig[me] && !st.claim.bids[me] && !myBid) startCd(ms);
+    else stopCd();
   }
 
   /* ---------- 大廳說明 ---------- */
@@ -310,6 +340,8 @@ const MP = MPCore.create((function(){
       "人數不同牌組也不同 —— <b>4 人</b>用整副 144 張;<b>2~3 人去掉萬子</b>(108 張),"+
       "而且 <b>3 人不能吃</b>(去一門之後吃會失衡)。<br>"+
       "計分照麻將的<b>相互算台</b>:自摸三家付、放槍一家付,全桌台數加起來永遠是 0。<br>"+
+      "別人打的牌你吃得下時有 <b>"+claimSec+" 秒</b>可以想(沒表態就自動過),"+
+      "而且<b>別人看不到你在考慮</b> —— 動作列只會寫「等其他人…」。<br>"+
       "打滿 <b>"+handsGoal+" 局</b>後結算,台數最高的人贏。"+
       "<br><span class=\"m16-warn\">⚠ 手牌與牌山在資料庫是明碼,只適合親友之間玩,不防作弊。</span>";
   }
@@ -326,15 +358,26 @@ const MP = MPCore.create((function(){
     init(c){ ctx = c; },
 
     /* ---------- 房間設定 ---------- */
-    roomFields(){ return { handsGoal:handsGoal }; },
+    roomFields(){ return { handsGoal:handsGoal, claimSec:claimSec }; },
     onRoomField(k,v){
-      if(k!=="handsGoal") return;
       const n = +v;
-      if(!(n>0) || n===handsGoal) return;
-      handsGoal = n;
-      ctx.unreadyOnFieldChange(); ctx.syncSetup(); ctx.updateGoal(); ruleHint();
+      if(k==="handsGoal"){
+        if(!(n>0) || n===handsGoal) return;
+        handsGoal = n;
+        ctx.unreadyOnFieldChange(); ctx.syncSetup(); ctx.updateGoal(); ruleHint();
+        return;
+      }
+      if(k==="claimSec"){
+        // 範圍守門而不是白名單:舊房間 / 手改資料庫進來的值也要能用
+        if(!(n>=5 && n<=60) || n===claimSec) return;
+        claimSec = n;
+        ctx.unreadyOnFieldChange(); ctx.syncSetup(); ruleHint();
+      }
     },
-    readRoom(r){ if(+r.handsGoal>0) handsGoal = +r.handsGoal; },
+    readRoom(r){
+      if(+r.handsGoal>0) handsGoal = +r.handsGoal;
+      if(+r.claimSec>=5 && +r.claimSec<=60) claimSec = +r.claimSec;
+    },
 
     listen(){
       const r = ctx.ref("tai"); if(!r) return;
@@ -419,6 +462,13 @@ const MP = MPCore.create((function(){
       }
       const L = $("m16GoalLabel");
       if(L) L.textContent = isHost ? "打幾局" : "打幾局(房主決定)";
+      const seg2 = $("m16SecSeg");
+      if(seg2){
+        seg2.classList.toggle("readonly", !isHost);
+        [...seg2.children].forEach(b=>b.classList.toggle("on", +b.dataset.sec===claimSec));
+      }
+      const L2 = $("m16SecLabel");
+      if(L2) L2.textContent = isHost ? "吃碰思考時間" : "吃碰思考時間(房主決定)";
       ruleHint();
     },
     /* 房間框那顆徽章(麥克風左邊)。
@@ -489,9 +539,10 @@ const MP = MPCore.create((function(){
                msg: esc(w.name||"對手")+" "+how+"<br>"+line+(last?"<br>"+seasonMsg():"") };
     },
 
-    ownPrefs(){ return { handsGoal:handsGoal, hint:M16B.hintOn() }; },
+    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, hint:M16B.hintOn() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
+      if(+o.claimSec>=5 && +o.claimSec<=60) claimSec = +o.claimSec;
       M16B.setHint(o.hint===true);
     },
 
@@ -502,7 +553,14 @@ const MP = MPCore.create((function(){
         if(!ctx.setRoomField("handsGoal", v, { lobbyOnly:true, denyMsg:"只有房主能改局數", busyMsg:"對戰中不能改局數" })) return;
         handsGoal = v; ctx.syncSetup(); ctx.updateGoal(); savePrefs();
       },
-      taiOf, handsDone, goal:()=>handsGoal,
+      /* 宣告視窗幾秒。lobbyOnly:對戰中改會讓「誰的 timer 先響」在同一個視窗裡不一致,
+         而且改設定本來就該回大廳談(同局數)。 */
+      setSec(v){
+        v = +v; if(!(v>=5 && v<=60)) return;
+        if(!ctx.setRoomField("claimSec", v, { lobbyOnly:true, denyMsg:"只有房主能改思考時間", busyMsg:"對戰中不能改思考時間" })) return;
+        claimSec = v; ctx.syncSetup(); savePrefs();
+      },
+      taiOf, handsDone, goal:()=>handsGoal, sec:()=>claimSec,
       state:()=>st, seat:mySeat,
       // 盤面切換「要吃哪一組」之後,✔ 按鈕上的字要跟著換 → 回頭叫這支重畫動作列
       refreshActs: renderActs,
