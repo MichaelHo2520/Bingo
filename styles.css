@@ -270,6 +270,9 @@
     padding:34px 30px;text-align:center;max-width:380px;backdrop-filter:blur(14px);
     animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
   @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+  /* ⚠ 這個字級是給 BINGO 的「你贏了 / 你輸了」設計的(三個字、每字都是大字)。
+     字數一多就爆版:麻將的「你沒胡」「本場結束」在 76px 下會撐滿整張卡、
+     把下面的台數表擠出畫面。四個字以上的遊戲各自壓小,見 .mj-win / .sdk-win。 */
   .win-card .word{font-family:'Fredoka';font-weight:700;font-size:clamp(46px,15vw,76px);line-height:1;
     background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
   .win-card p{color:var(--muted);margin:10px 0 22px;font-weight:700}
@@ -1920,6 +1923,13 @@
   /* ---------- 結果卡 ---------- */
   .mj-win{padding:30px 22px}
   .mj-win p{margin:8px 0 16px}
+  /* ★ 大字壓小(v1.58.2):共用的 .win-card .word 是 clamp(46,15vw,76) —— 那是給 BINGO
+     的「你贏了」三個字設計的。麻將的字串長得多(「本場結束」「你沒胡」「這一局沒人胡」),
+     76px 下整張卡被一行字佔滿,底下的台數表被推出畫面。
+     ⚠ 權重要 (0,3,0) 才壓得過 .win-card .word (0,2,0) —— 只寫 .mj-win .word 是同級,
+       靠「誰在後面」贏,以後有人搬動段落順序就會回彈。
+     ★ 消消樂與台灣麻將共用這條(兩頁的結果卡都是 .win-card.mj-win)。 */
+  .win-card.mj-win .word{font-size:clamp(30px,7.5vw,44px)}
   .mj-win.lose .word{background:none;color:#ff8f8f;-webkit-text-fill-color:#ff8f8f}
   .mj-win.draw .word{background:none;color:var(--muted);-webkit-text-fill-color:var(--muted)}
   .mj-win.win{border-color:var(--accent);box-shadow:0 0 26px rgba(0,0,0,.25),0 0 0 1px var(--accent)}
@@ -2018,9 +2028,16 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 .m16-tile[data-suit="pc"]{color:var(--mj-pc)}
 .m16-tile[data-suit="pd"]{color:var(--mj-pd)}
 
+/* ---------- 我這一邊(花 → 明牌 → 手牌)----------
+   ★ margin-top:auto 掛在外框,整組貼底。明牌**緊貼手牌上方**是 v1.58.2 的修正:
+     原本它夾在牌河與花牌之間、又縮到 66%,實際上手的回報是「碰完牌就消失了」——
+     它其實有畫,只是畫在沒人會看的地方。 */
+.m16-mine{display:flex;flex-direction:column;align-items:center;gap:4px;
+  width:100%;margin-top:auto;flex:none}
+
 /* ---------- 我的手牌 ---------- */
 .m16-hand{display:flex;flex-direction:column;gap:4px;align-items:center;
-  width:100%;margin-top:auto;padding-top:4px}
+  width:100%;padding-top:2px}
 .m16-row{display:flex;align-items:flex-end;flex-wrap:nowrap}
 .m16-ht{transition:transform .12s}
 .m16-hand.live .m16-ht{cursor:pointer}
@@ -2041,30 +2058,63 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 }
 /* 摸進來那張隔開放 —— 真牌桌的慣例,也讓「打掉剛摸的」這個最常見的操作不必瞄準 */
 .m16-draw{margin-left:calc(var(--m16w,36px) * 0.45)}
+/* ---------- 宣告視窗:吃 / 碰 / 槓直接畫在牌上(v1.58.2) ----------
+   選擇在牌上、動作在按鈕上。一次只站起來**一組**,其他組的牌點一顆小點 ——
+   這就是「重疊怎麼顯示」的答案:不同時顯示,用切換(理由見 js/mahjong16/board.js 檔頭)。
+   ⚠ .m16-ht.sel 已經負責「站起來」,這裡只加顏色與可點手勢,不要再寫一次 transform。 */
+.m16-hand.claim .m16-ht{cursor:default;opacity:.55}
+.m16-hand.claim .m16-ht.opt,
+.m16-hand.claim .m16-ht.alt{opacity:1;cursor:pointer}
+.m16-ht.opt{box-shadow:inset 0 0 0 2px var(--mj-jf),
+            0 calc(var(--m16w,36px) * 0.10) 0 0 var(--mj-side)}
+/* 其他組的候選:不站起來,只在頂端疊一顆小點(告訴你「這張也可以點,還有別組」)。
+   ⚠ 這是**真的元素**(<i class="m16-omk">)不是 ::before —— 只為了可測性:
+     偽元素沒辦法用 elementFromPoint 驗「有沒有被牌面蓋住」,寫成 ::before 就只驗得到
+     「它存在」,那條沒有牙齒。
+   註:z-index:2 是保險而非必要 —— 絕對定位的子元素本來就畫在非定位的牌面 SVG 之上
+   (變異測試證實:拿掉 z-index,elementFromPoint 那條照樣綠)。留著是為了以後
+   有人給 .mj-svg 加 position 時不會突然翻轉。
+   ⚠ 一開始畫成 7px 的小圓點,縮到手機尺寸(牌只有 27px)根本看不見 ——
+     改成貼底的一整條色帶,縮到多小都還在。 */
+.m16-omk{position:absolute;z-index:2;left:10%;right:10%;bottom:0;height:14%;
+  min-height:3px;border-radius:2px 2px 0 0;background:var(--mj-jf);
+  box-shadow:0 0 0 1px rgba(0,0,0,.30)}
+
 /* 聽牌提示(設定裡可開):打掉這張之後聽幾張 */
 .m16-ht.tenpai::after{content:attr(data-n);position:absolute;top:1px;right:1px;
   min-width:13px;height:13px;line-height:13px;padding:0 2px;border-radius:7px;
   background:var(--mj-jf);color:#fff;font:800 9px/13px 'Nunito',sans-serif;text-align:center}
 
-/* ---------- 明牌(吃碰槓攤出來的) ---------- */
-.m16-mymelds,.m16-fmelds{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end}
-.m16-meld{display:inline-flex;align-items:flex-end;gap:1px}
+/* ---------- 明牌(吃碰槓攤出來的) ----------
+   ★ v1.58.2:①不再把「跟人要來的那張」橫放 —— 26~40px 的牌轉 90° 之後糊成一塊,
+     看起來像壞掉的牌而不是資訊;②每一組加底色框,一眼數得出攤了幾組。 */
+.m16-mymelds,.m16-fmelds{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.m16-meld{display:inline-flex;align-items:flex-end;gap:1px;
+  padding:3px;border-radius:8px;background:rgba(255,255,255,.10)}
+/* 暗槓底色不同:它在算台時是暗刻,和攤出來的碰不是同一回事 */
+.m16-meld.cc{background:rgba(0,0,0,.22)}
+.m16-mymelds .m16-meld{background:rgba(255,255,255,.16);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
 .m16-mt{opacity:.96}
-/* 被拿走的那一張橫放:真牌桌就是這樣標「這組是跟人要來的」 */
-.m16-lay{width:calc(var(--m16w,36px) * 1.32);height:var(--m16w,36px)}
-.m16-lay .mj-svg{position:absolute;left:50%;top:50%;
-  width:var(--m16w,36px);height:calc(var(--m16w,36px) * 1.32);
-  transform:translate(-50%,-50%) rotate(-90deg)}
 
-/* ---------- 牌河 ---------- */
-.m16-pool{display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start;
+/* ---------- 牌河 ----------
+   ★ v1.58.2:不再 flex:1 吃掉整片高度(空盤時預留一大塊黑,看起來像壞掉)。
+     改成「最新那張放大、其餘縮小」—— 最新那張才是全桌正在盯的那張。
+     max-height 用 em 是刻意的:牌寬變了列高也跟著變,不必寫死 px。 */
+/* ⚠ flex:none 不可省。預設的 flex-shrink:1 會在盤面塞不下時**把牌河壓扁**,
+   而它 overflow-y:auto → 最新那張放大的牌直接被切掉一半(看起來像牌破了)。
+   盤面塞不下一律靠 board.js 那道「量高度 → 縮小牌寬」處理,不靠 flex 擠壓。
+   同理 .m16-foes / .m16-mine 也都 flex:none。 */
+.m16-pool{display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start;justify-content:center;
   padding:5px;border-radius:10px;background:rgba(0,0,0,.14);
-  min-height:calc(var(--m16w,22px) * 1.32);flex:1 1 auto;overflow-y:auto}
-.m16-pt{opacity:.92}
+  min-height:calc(var(--m16w,22px) * 1.32);
+  max-height:calc(var(--m16w,22px) * 1.32 * 4 + 20px);
+  flex:none;overflow-y:auto;scrollbar-gutter:stable}
+.m16-pt{opacity:.8;align-self:flex-end}
 .m16-pt.last{outline:2px solid var(--mj-jz);outline-offset:1px;opacity:1}
 
 /* ---------- 對手 ---------- */
-.m16-foes{display:flex;flex-direction:column;gap:4px}
+.m16-foes{display:flex;flex-direction:column;gap:4px;flex:none}
 .m16-foe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;
   padding:3px 7px;border-radius:9px;background:rgba(255,255,255,.07);
   font:700 11px/1.4 'Nunito',sans-serif}
@@ -2083,8 +2133,13 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 .m16-act{border:0;border-radius:11px;padding:8px 15px;cursor:pointer;
   font:800 14px/1 'Nunito',sans-serif;color:#fff;background:var(--mj-z)}
 .m16-act.win{background:var(--mj-jz)}
-.m16-act.pass{background:rgba(255,255,255,.22)}
+/* ✔ 送出目前選的那一組(吃 / 碰 / 槓)。綠底 = 和牌上站起來那組的外框同色,兩者是一件事 */
+.m16-act.take{background:var(--mj-jf)}
+/* 「過」刻意做得跟其他鈕一樣大、一樣是實心底 —— 使用者要求「要放棄的話也要有一個
+   比較容易看到的」;做成低調的文字鈕反而是最常被找不到的那一顆 */
+.m16-act.pass{background:rgba(255,255,255,.26);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
 .m16-act:active{transform:scale(.95)}
+.m16-more{opacity:.75;font-size:11px}
 /* 宣告視窗的倒數:不遮畫面(同消消樂僵局那條 —— 遮住的那一瞬間別人剛好動作,感受就是「被搶了」) */
 .m16-timer{font:800 12px/1 'Nunito',sans-serif;opacity:.85;align-self:center}
 
@@ -2093,36 +2148,33 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
   width:100%;padding:4px 8px;font:700 12px/1.4 'Nunito',sans-serif}
 .m16-chip{padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.12)}
 
-/* ---------- 台灣 16 張:比分列 / 台數表 / 玩家晶片 ----------
+/* ---------- 台灣 16 張:房間框裡的玩家晶片 ----------
+   ★ v1.58.2 拿掉了獨立的比分列(.m16-hud 那一整組 grid 大卡片),台數 / 風 / 輪到誰
+     全部回到**房間框的玩家晶片**上 —— 五子棋 / 數獨 / 消消樂都是那樣,這一頁另立一套
+     確實不一致(使用者:「我們原來的設計元素是這樣,沒有衝突的話,應該要有一致感」)。
+   ⚠ 因此要**取消**上面 .mj-room.playing .mj-room-foot{display:none}(那是為了把 30px
+     讓給盤面才收起來的);對戰中反而正是最需要看到台數的時候。
+     權重 (0,4,0) 壓得過原本的 (0,3,0)。
    座位色沿用既有的 --sp0~--sp3(與五子棋 / 數獨 / 消消樂同一組) */
-.m16-hud{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));
-  gap:5px;width:100%;padding:5px 8px 0}
-.m16-hcard{position:relative;overflow:hidden;cursor:pointer;
-  display:flex;flex-direction:column;gap:1px;
-  padding:5px 8px 6px;border-radius:11px;
-  border:2px solid transparent;background:rgba(255,255,255,.10)}
-.m16-hcard:active{transform:scale(.97)}
-.m16-hcard.me{border-color:var(--accent)}
-/* 輪到誰:整張卡亮起來。★ 這是玩家最常找的資訊,不要只用小字 */
-.m16-hcard.on{background:rgba(255,255,255,.22);box-shadow:inset 0 0 0 2px var(--mj-jf)}
-.m16-hw{position:absolute;top:4px;right:6px;font:800 11px/1 'Nunito',sans-serif;opacity:.55}
-.m16-hname{font:800 12px/1.3 'Nunito',sans-serif;
-  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.m16-hname b{color:var(--accent)}
-.m16-htai{font:800 17px/1.1 'Fredoka','Nunito',sans-serif;color:var(--mj-jf)}
-.m16-htai.neg{color:var(--mj-jz)}
-.m16-htai em{font:700 10px/1 'Nunito',sans-serif;font-style:normal;opacity:.7;margin-left:2px}
-.m16-hcard.p0{background:color-mix(in srgb,var(--sp0) 18%,transparent)}
-.m16-hcard.p1{background:color-mix(in srgb,var(--sp1) 18%,transparent)}
-.m16-hcard.p2{background:color-mix(in srgb,var(--sp2) 18%,transparent)}
-.m16-hcard.p3{background:color-mix(in srgb,var(--sp3) 18%,transparent)}
+body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
+/* 晶片上的座位風(東南西北):圈起來才不會和名字黏成一團 */
+.m16-cw{display:inline-grid;place-items:center;min-width:17px;height:17px;padding:0 3px;
+  border-radius:6px;background:rgba(0,0,0,.24);
+  font:800 11px/1 'Nunito',sans-serif}
+/* 輪到誰的晶片底色是 accent(亮黃),半透明黑疊上去只會變成濁黃、字整個糊掉 ——
+   照既有 .mp-chip.turn .seat-badge 的做法用**實心深色**反白。 */
+.mp-chip.turn .m16-cw{background:#1c1008;color:var(--accent)}
+:root[data-theme="ebook"] .mp-chip.turn .m16-cw{background:#fff;color:#000}
 
 /* 玩家晶片上的座位點與台數 */
 .m16-seat{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
 .m16-seat.p0{background:var(--sp0)} .m16-seat.p1{background:var(--sp1)}
 .m16-seat.p2{background:var(--sp2)} .m16-seat.p3{background:var(--sp3)}
-.m16-pts{font:800 12px/1 'Nunito',sans-serif;color:var(--mj-jf);margin-left:4px}
+.m16-pts{font:800 13px/1 'Fredoka','Nunito',sans-serif;color:var(--mj-jf);margin-left:3px}
 .m16-pts.neg{color:var(--mj-jz)}
+.m16-pts em{font:700 9.5px/1 'Nunito',sans-serif;font-style:normal;opacity:.72;margin-left:1px}
+/* 輪到誰時晶片底色是 accent(亮黃),綠字 / 紅字都糊掉 → 反白成深色 */
+.mp-chip.turn .m16-pts,.mp-chip.turn .m16-pts.neg{color:#1c1008}
 
 /* 結果卡的收付表 */
 .m16-tai{margin:8px 0 4px;padding:8px 10px;border-radius:11px;

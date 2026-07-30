@@ -244,6 +244,10 @@ const MJT = (function(){
       k: type==="chow" ? "chow" : (type==="kong" ? "kong" : "pung"),
       // 吃的那組要記「最小的那張」當 t,才對得上 rules/scoring 的順子表示法
       t: type==="chow" ? Math.min(tile, tiles[0], tiles[1]) : tile,
+      /* g = 跟人要來的**那一張**。碰 / 槓 時 g 就等於 t(三張同款,記了也無妨),
+         吃的時候才有資訊量 —— 盤面要把它排在中間當「這組是吃來的」的記號
+         (v1.58.2 改掉原本把它橫放的畫法:小尺寸下橫放的牌面糊成一塊,看起來像壞掉)。 */
+      g: tile,
       c: false, from: from
     }]);
     s.claim = null;

@@ -66,24 +66,14 @@ const MP = MPCore.create((function(){
   function taiOf(id){ return (typeof tai[id]==="number") ? tai[id] : 0; }
   function handsDone(){ return tai._r ? Object.keys(tai._r).length : 0; }
 
-  /* ---------- 比分列 ---------- */
-  function renderHud(){
-    const box = $("m16Hud"); if(!box) return;
-    if(ctx.phase()!=="playing" && !ctx.winner()){ box.classList.add("hidden"); box.innerHTML=""; return; }
-    box.classList.remove("hidden");
-    const ord = ctx.order(), me = ctx.me();
-    box.innerHTML = ord.map((id,s)=>{
-      const t = taiOf(id);
-      const wind = st ? MJFace.info(MJ16.codeOf(MJT.seatWind(s, st.dealer, st.seats))).glyph : "";
-      const turnNow = st && !st.over && st.turn===s;
-      return '<div class="m16-hcard '+colorOf(s)+(id===me?" me":"")+(turnNow?" on":"")+
-             '" data-id="'+id+'" title="點一下傳送互動表情">'+
-             '<span class="m16-hw">'+wind+'</span>'+
-             '<span class="m16-hname">'+esc(ctx.dispName(id))+(id===me?' <b>你</b>':'')+'</span>'+
-             '<span class="m16-htai'+(t<0?" neg":"")+'">'+(t>0?"+":"")+t+'<em>台</em></span>'+
-             '</div>';
-    }).join("");
-  }
+  /* ---------- 比分列 ----------
+     ★ v1.58.2 拿掉了獨立的 .m16-hud 大卡片,改成走**房間框裡的玩家晶片**
+       (chipLead / chipTail / turnId 三個鉤子)—— 使用者的話是「人員的台數那個框,
+       應該要放進房間框裡,我們原來的設計元素是這樣,沒有衝突的話應該要有一致感」。
+       五子棋 / 數獨 / 消消樂都是那樣,這一頁自己另立一套確實不一致。
+     ⚠ 因此這一頁要**取消** .mj-room.playing .mj-room-foot{display:none}
+       (見 styles.css 的 body.m16-mp 那條),否則對戰中晶片列整條被收起來。 */
+  function renderHud(){ ctx.renderPlayers(); }
 
   /* ---------- 動作列 ---------- */
   function actBtn(label, cls, fn){
@@ -102,7 +92,11 @@ const MP = MPCore.create((function(){
     if(me<0){ box.classList.add("hidden"); return; }
     box.classList.remove("hidden");
 
-    /* --- 宣告視窗 --- */
+    /* --- 宣告視窗 ----------------------------------------------------------
+       ★ v1.58.2:吃 / 碰 / 槓**不再各出一顆按鈕** —— 選哪一組是在牌上點的(見 board.js
+         檔頭)。這裡只留三顆:✔ 送出目前這一組、胡!、過。
+       ★「過」永遠在最後、永遠在,而且是整列最容易命中的位置 —— 使用者要求「要放棄的話
+         也要有一個比較容易看到的」。 */
     if(st.claim){
       const types = st.claim.elig[me];
       if(!types || st.claim.bids[me] || myBid){
@@ -114,21 +108,24 @@ const MP = MPCore.create((function(){
       }
       const tag = document.createElement("span");
       tag.className = "m16-timer";
-      tag.textContent = "「"+face(st.claim.t).name+"」";
+      tag.textContent = "別人打「"+face(st.claim.t).name+"」";
       box.appendChild(tag);
-      types.forEach(t=>{
-        if(t==="chow"){
-          const cl = MJ16.claimsFor(MJ16.toCounts(st.hands[me]), st.claim.t,
-                     { need:MJT.needOf(st,me), chow:true, fromLeft:true });
-          cl.chow.forEach(pair=>{
-            box.appendChild(actBtn("吃 "+face(pair[0]).name+face(pair[1]).name, "",
-              ()=>sendBid("chow", pair)));
-          });
-        }else{
-          const lbl = { win:"胡!", kong:"槓", pong:"碰" }[t] || t;
-          box.appendChild(actBtn(lbl, t==="win"?"win":"", ()=>sendBid(t, null)));
+
+      const co  = M16B.claimOpts();
+      const cur = M16B.claimCur();
+      if(cur){
+        const lbl = { chow:"吃", pong:"碰", kong:"槓" }[cur.type] || cur.type;
+        const b = actBtn("✔ "+lbl+" "+cur.tiles.map(t=>face(t).name).join(""), "take",
+                         ()=>sendBid(cur.type, cur.type==="chow" ? cur.tiles : null));
+        box.appendChild(b);
+        if(co.length>1){
+          const n = document.createElement("span");
+          n.className = "m16-timer m16-more";
+          n.textContent = (co.indexOf(cur)+1)+" / "+co.length+" · 點手牌換一組";
+          box.appendChild(n);
         }
-      });
+      }
+      if(types.indexOf("win")>=0) box.appendChild(actBtn("胡!", "win", ()=>sendBid("win", null)));
       box.appendChild(actBtn("過", "pass", ()=>sendBid("pass", null)));
       return;
     }
@@ -318,8 +315,8 @@ const MP = MPCore.create((function(){
     backToLobby(){
       showScreen("lobby"); $("mpBar").classList.remove("playing");
       clearClaimT(); st=null; curRound=null; myBid=false;
-      const b=$("m16Hud"); if(b){ b.classList.add("hidden"); b.innerHTML=""; }
       const a=$("m16Acts"); if(a){ a.classList.add("hidden"); a.innerHTML=""; }
+      ctx.renderPlayers();                 // 台數在晶片上,回大廳要重畫(st 已清掉,風會收起來)
       ruleHint();
     },
     enterPlaying(){
@@ -329,7 +326,7 @@ const MP = MPCore.create((function(){
     },
     onLeave(){
       clearClaimT(); st=null; curRound=null; tai={}; myBid=false;
-      ["m16Hud","m16Acts"].forEach(id=>{ const e=$(id); if(e){ e.classList.add("hidden"); e.innerHTML=""; } });
+      const a=$("m16Acts"); if(a){ a.classList.add("hidden"); a.innerHTML=""; }
     },
 
     /* ---------- 大廳設定 / 徽章 ---------- */
@@ -350,13 +347,19 @@ const MP = MPCore.create((function(){
       g.classList.remove("hidden");
     },
 
+    /* 輪到誰:核心會把 .turn 打在晶片上(底色 + 脈動 + 放大),四個遊戲同一套。
+       ⚠ 消消樂不需要實作這支(它沒有回合),真麻將有,一定要給。 */
+    turnId(){ return (st && !st.over) ? idOfSeat(st.turn) : null; },
     chipLead(id){
       const s = seatOf(id);
-      return s<0 ? null : '<span class="m16-seat '+colorOf(s)+'"></span>';
+      if(s<0) return null;
+      const wind = st ? MJFace.info(MJ16.codeOf(MJT.seatWind(s, st.dealer, st.seats))).glyph : "";
+      return '<span class="m16-seat '+colorOf(s)+'"></span>'+
+             (wind?'<span class="m16-cw">'+wind+'</span>':'');
     },
     chipTail(id){
       const t = taiOf(id);
-      return '<span class="m16-pts'+(t<0?" neg":"")+'">'+(t>0?"+":"")+t+'</span>';
+      return '<span class="m16-pts'+(t<0?" neg":"")+'">'+(t>0?"+":"")+t+'<em>台</em></span>';
     },
     lobbyStatusText(ids){
       return ids.length<ctx.minPlayers
@@ -407,6 +410,8 @@ const MP = MPCore.create((function(){
       },
       taiOf, handsDone, goal:()=>handsGoal,
       state:()=>st, seat:mySeat,
+      // 盤面切換「要吃哪一組」之後,✔ 按鈕上的字要跟著換 → 回頭叫這支重畫動作列
+      refreshActs: renderActs,
       /* 盤面不知道玩家是誰(它只有座位號),名字由這裡餵。
          ⚠ 核心沒有把 order() 暴露到 MP 上(那是 ctx 的東西),所以一定要走這支 ——
             main.js 第一版寫成 MP.order() 直接是 undefined。 */

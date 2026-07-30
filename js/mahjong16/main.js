@@ -27,7 +27,9 @@ function showScreen(which){
 M16B.mount({
   hostId:"m16Stage",
   onDiscard(t){ MP.onDiscard(t); },
-  // 點對手那一列 = 傳表情給他(對戰中玩家晶片列是收起來的,這裡接手那個入口)
+  // 宣告視窗:在牌上換了一組(吃三四 ↔ 吃四五)→ ✔ 按鈕上的字要跟著換
+  onClaimUI(){ MP.refreshActs(); },
+  // 點對手那一列 = 傳表情給他
   onFoe(seat){
     const id = MP.seatId(seat);
     openEmote(id || "all");
@@ -60,13 +62,8 @@ $("m16SwHint").addEventListener("click",()=>{
   showToast(M16B.hintOn()?"聽牌提示:開":"聽牌提示:關",1200);
 });
 
-/* 比分列:點某個人的卡片 = 傳表情給他 */
-$("m16Hud").addEventListener("click",e=>{
-  const c=e.target.closest(".m16-hcard"); if(!c)return;
-  const id=c.dataset.id; if(!id)return;
-  const me=(MP.roster().find(p=>p.me)||{}).id;
-  openEmote(id===me ? "all" : id);
-});
+/* (v1.58.2:比分列 #m16Hud 已移除 —— 台數改顯示在房間框的玩家晶片上,
+    點晶片傳表情那個入口是核心 renderPlayers() 自己綁的,這裡不必再接一次) */
 
 /* ---------- 連線 / 房間 ---------- */
 $("mpCreate").addEventListener("click",()=>MP.create($("mpName").value,$("mpRoomName").value));

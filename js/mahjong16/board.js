@@ -50,10 +50,14 @@ const M16B = (function(){
   function oneTap(){ return !!(FINE && FINE.matches); }
 
   /* ---------- 小工具 ---------- */
-  function tileHTML(code, cls, extra){
+  /* inner:牌面之後再疊上去的東西(目前只有宣告視窗的候選小點)。
+     ⚠ 刻意做成**真的元素**而不是 ::before,理由只有一個:可測性。
+       偽元素沒辦法用 elementFromPoint 驗「有沒有被牌面蓋住」,只驗得到「它存在」——
+       實測過那條沒有牙齒(把 z-index 拿掉照樣全綠)。 */
+  function tileHTML(code, cls, extra, inner){
     const inf = F.info(code);
     return '<div class="m16-tile'+(cls?" "+cls:"")+'" data-suit="'+inf.cls+'"'+
-           (extra||"")+' aria-label="'+inf.name+'">'+F.faceHTML(code)+'</div>';
+           (extra||"")+' aria-label="'+inf.name+'">'+F.faceHTML(code)+(inner||"")+'</div>';
   }
   function backTile(cls){
     return '<div class="m16-tile m16-back'+(cls?" "+cls:"")+'" aria-hidden="true">'+F.backHTML()+'</div>';
@@ -102,18 +106,27 @@ const M16B = (function(){
     return best;
   }
 
-  /* ---------- 一組明牌 ---------- */
+  /* ---------- 一組明牌 ----------
+     ★ v1.58.2 兩處改法(都是實際上手回報的):
+       ①**不再把跟人要來的那張橫放**。真牌桌是靠橫放標「這組是要來的」,但畫成 26~40px
+         的小方塊之後,旋轉 90° 的牌面糊成一團,看起來像壞掉的牌而不是資訊。
+       ②**吃的那組把要來的那張排到中間**(m.g),位置本身就是記號,不必再轉。 */
   function meldHTML(m, tw){
-    const n = (m.k==="kong") ? 4 : 3;
-    let tiles = [];
-    if(m.k==="chow") tiles = [m.t, m.t+1, m.t+2];
-    else for(let i=0;i<n;i++) tiles.push(m.t);
-    return '<span class="m16-meld" style="--m16w:'+tw+'px">'+
+    let tiles;
+    if(m.k==="chow"){
+      const seq = [m.t, m.t+1, m.t+2];
+      const got = (typeof m.g==="number" && seq.indexOf(m.g)>=0) ? m.g : -1;
+      if(got>=0){ const rest = seq.filter(t=>t!==got); tiles = [rest[0], got, rest[1]]; }
+      else tiles = seq;                                   // 舊資料沒有 g → 照順子排
+    }else{
+      tiles = new Array(m.k==="kong" ? 4 : 3).fill(m.t);
+    }
+    const kind = m.c ? "cc" : m.k;                        // 暗槓自成一類(底色不同)
+    return '<span class="m16-meld '+kind+'" style="--m16w:'+tw+'px">'+
       tiles.map((t,i)=>{
-        // 暗槓:中間兩張蓋著(真牌桌的擺法)
+        // 暗槓:中間兩張蓋著(真牌桌的擺法 —— 這個記號在小尺寸下依然清楚,保留)
         if(m.k==="kong" && m.c && (i===1||i===2)) return backTile("m16-mt");
-        // 吃 / 碰 / 明槓:被拿走的那張橫放(第一張),一眼看出是跟人要來的
-        return tileHTML(codeOf(t), "m16-mt"+((!m.c && i===0)?" m16-lay":""));
+        return tileHTML(codeOf(t), "m16-mt");
       }).join("")+'</span>';
   }
 
@@ -136,7 +149,10 @@ const M16B = (function(){
      渲染
      ========================================================================== */
   function render(state, mySeat){
-    if(state) st = state;
+    /* ⚠ 有新狀態進來就把選項快取丟掉。不能只靠下面那個簽章 ——
+       「我表態完了」改的是 claim.bids,牌與 claim.t 都沒變、簽章一樣,
+       快取留著的話牌會繼續站在那裡等你點。 */
+    if(state){ st = state; opts = null; }
     if(typeof mySeat==="number") me = mySeat;
     if(!st || !host) return;
 
@@ -148,46 +164,103 @@ const M16B = (function(){
     const tw = plan.tw;
 
     /* 手牌一動(打出 / 被吃碰 / 補花 / 換局)格位鍵就位移了 → 舊的 sel 會指到別張牌。
-       tap() 自己觸發的 render() 不會走進來(st 沒變 → 簽章相同),選取因此留得住。 */
-    const sig = me+"|"+hand.join(",")+"|"+(hasDraw?st.drawn:"");
-    if(sig!==lastSig){ lastSig=sig; sel=""; }
+       tap() 自己觸發的 render() 不會走進來(st 沒變 → 簽章相同),選取因此留得住。
+       ⚠ 宣告視窗也要進簽章:同一副手牌、換一張別人打的牌,選項整組不一樣。 */
+    const cl = st.claim;
+    const sig = me+"|"+hand.join(",")+"|"+(hasDraw?st.drawn:"")+
+                "|"+(cl?cl.t+"@"+cl.from:"");
+    if(sig!==lastSig){ lastSig=sig; sel=""; copt=0; }   // 換一張別人打的牌 → 選項從第一組重來
 
+    const canAct = MJT.ownActions(st, me).discard;
+    const co = claimOpts();                              // 宣告視窗:可吃 / 碰 / 槓的組合
+    if(co.length) copt = Math.min(copt, co.length-1);
+
+    const draw = t => { host.innerHTML = paint(plan, t, hasDraw, canAct, co); return host.scrollHeight; };
+    let h1 = draw(tw);
+
+    /* ★★ 高度也要夾(v1.58.2)——「碰完牌就消失了」的真正機制在這裡。
+       牌寬原本只受**寬度**約束,但每攤一組明牌就多出一整排(0.82×tw×1.32 ≈ 半張牌高),
+       盤面塞不下時手牌就被擠出可視範圍 —— 使用者看到的是「牌不見了」。
+
+       ⚠ 不能用「照比例縮一次」了事:總高度裡有**不隨牌寬變**的部分(對手列的 11px 字與
+         內距),縮 20% 牌寬並不會讓總高度縮 20%。所以取兩點解一條直線:
+           H(tw) = fixed + S × tw
+         量 tw 與 0.7×tw 兩次,解出 S 與 fixed,直接算出塞得下的牌寬。
+       ⚠ 直線只是近似(明牌 / 對手列會換行,是階梯不是直線),所以後面再收兩次保險。
+       ⚠ clientHeight 太小(面板還沒顯示)時整段不做,否則會一路縮到 TILE_MIN;
+         顯示出來時 ResizeObserver 會再叫一次 render()。 */
+    const hh = host.clientHeight;
+    if(hh > 80 && h1 > hh + 2 && tw > TILE_MIN){
+      const t2 = Math.max(TILE_MIN, Math.round(tw * 0.7));
+      let nt = t2;
+      if(t2 < tw){
+        const h2 = draw(t2);
+        if(h1 > h2){
+          const S = (h1 - h2) / (tw - t2);          // 牌寬每 1px 帶來多少總高度
+          const fixed = h1 - tw * S;                // 不隨牌寬變的那一截
+          nt = Math.floor((hh - 2 - fixed) / S);
+        }
+      }
+      nt = Math.max(TILE_MIN, Math.min(tw, nt));
+      if(nt !== t2) draw(nt);
+      let guard = 0;
+      while(host.scrollHeight > hh + 2 && nt > TILE_MIN && guard++ < 3){
+        nt = Math.max(TILE_MIN, Math.floor(nt * 0.92));
+        draw(nt);
+      }
+    }
+
+    host.classList.toggle("m16-myturn", canAct);
+    paintNames();
+    if(cb.onClaimUI) cb.onClaimUI(co, copt);             // 動作列跟著換(✔ / 胡 / 過)
+  }
+
+  /* 把整個盤面畫成 HTML 字串。抽出來是為了上面那道「量高度 → 縮小 → 再畫一次」——
+     兩次畫的差別只有 tw,排法(幾排、摸的那張放哪排)刻意不重算,免得縮一下就跳版。 */
+  function paint(plan, tw, hasDraw, canAct, co){
     /* --- 對手 --- */
     let html = '<div class="m16-foes">';
     for(let k=1;k<st.seats;k++) html += foeHTML((me+k)%st.seats, tw);
     html += '</div>';
 
-    /* --- 牌河 --- */
-    const pw = Math.max(16, Math.round(tw*0.62));
+    /* --- 牌河 ----------------------------------------------------------------
+       ★ v1.58.2:牌河不再 flex:1 吃掉整片高度(空盤時預留一大塊黑,看起來像壞掉),
+         改成「最新那張放大、其餘縮小」—— 最新那張才是所有人正在盯的資訊。 */
+    const pw   = Math.max(14, Math.round(tw*0.46));      // 舊牌:小
+    const pwL  = Math.max(20, Math.round(tw*0.78));      // 最新那張:大
+    const last = st.discards.length-1;
     html += '<div class="m16-pool" id="m16Pool" style="--m16w:'+pw+'px">'+
       st.discards.map((d,i)=>tileHTML(codeOf(d.t),
-        "m16-pt"+(i===st.discards.length-1?" last":""),
-        ' data-seat="'+d.seat+'"')).join("")+
+        "m16-pt"+(i===last?" last":""),
+        ' data-seat="'+d.seat+'"'+(i===last?' style="--m16w:'+pwL+'px"':''))).join("")+
       '</div>';
 
-    /* --- 我的明牌 --- */
-    if((st.melds[me]||[]).length)
-      html += '<div class="m16-mymelds">'+st.melds[me].map(m=>meldHTML(m, Math.round(tw*0.66))).join("")+'</div>';
-
-    /* --- 我的花牌 --- */
+    /* --- 我這一邊(花 → 明牌 → 手牌)-----------------------------------------
+       ★ margin-top:auto 掛在這個外框上,整組貼底。明牌**緊貼手牌上方**是刻意的:
+         v1.58.1 之前它夾在牌河與花牌之間、又縮到 66%,實際上手的回報是
+         「碰完牌就消失了,桌上沒留下記錄」—— 它其實有畫,只是畫在沒人會看的地方。 */
+    html += '<div class="m16-mine">';
     if((st.flowers[me]||[]).length)
-      html += '<div class="m16-myfl" style="--m16w:'+Math.round(tw*0.5)+'px">'+
+      html += '<div class="m16-myfl" style="--m16w:'+Math.round(tw*0.44)+'px">'+
               st.flowers[me].map(t=>tileHTML(codeOf(t),"m16-ft")).join("")+'</div>';
+    if((st.melds[me]||[]).length)
+      html += '<div class="m16-mymelds">'+
+              st.melds[me].map(m=>meldHTML(m, Math.round(tw*0.82))).join("")+'</div>';
 
-    /* --- 我的手牌(兩段式:data-t 給點擊用) --- */
-    const canAct = MJT.ownActions(st, me).discard;
-    // 聽牌提示:打掉這張之後聽幾張(只給自己看,不指出是哪幾張以外的資訊)
-    html += '<div class="m16-hand'+(canAct?" live":"")+'" style="--m16w:'+tw+'px">';
+    /* --- 我的手牌 --- */
+    const inClaim = co.length>0;
+    const focus = inClaim ? co[copt] : null;
+
+    html += '<div class="m16-hand'+(canAct?" live":"")+(inClaim?" claim":"")+
+            '" style="--m16w:'+tw+'px">';
     /* planHand() 保證 rows 串起來就是 hand 的原順序(切點只切在花色邊界),
        所以一路數下去的 hi 就是這張牌在 hand 裡的索引 —— 拿它當格位鍵。 */
     let hi = 0;
     plan.rows.forEach((row,ri)=>{
       html += '<div class="m16-row">';
       row.forEach(t=>{
-        const k = "h"+(hi++);
-        const n = (hint && canAct) ? MJT.tenpaiAfter(st, me, t).length : 0;
-        html += tileHTML(codeOf(t), "m16-ht"+(sel===k?" sel":"")+(n?" tenpai":""),
-                         ' data-t="'+t+'" data-k="'+k+'"'+(n?' data-n="'+n+'"':''));
+        const i = hi++, k = "h"+i;
+        html += handTile(t, k, i, canAct, focus, co);
       });
       if(hasDraw && ri===plan.drawRow){
         const n = hint ? MJT.tenpaiAfter(st, me, st.drawn).length : 0;
@@ -196,11 +269,23 @@ const M16B = (function(){
       }
       html += '</div>';
     });
-    html += '</div>';
+    return html + '</div></div>';
+  }
 
-    host.innerHTML = html;
-    host.classList.toggle("m16-myturn", canAct);
-    paintNames();
+  /* 一張手牌。宣告視窗時,屬於「目前這一組」的牌站起來,其他候選只點一顆小點。 */
+  function handTile(t, k, i, canAct, focus, co){
+    let cls = "m16-ht", extra = ' data-t="'+t+'" data-k="'+k+'"';
+    if(focus){
+      if(focus.idx.indexOf(i)>=0) return tileHTML(codeOf(t), cls+" sel opt", extra);
+      // 其他組的候選:不站起來,只在頂端疊一顆小點(「這張也能點,還有別組」)
+      if(co.some(o=>o.idx.indexOf(i)>=0))
+        return tileHTML(codeOf(t), cls+" alt", extra, '<i class="m16-omk"></i>');
+      return tileHTML(codeOf(t), cls, extra);
+    }
+    if(sel===k) cls += " sel";
+    const n = (hint && canAct) ? MJT.tenpaiAfter(st, me, t).length : 0;
+    if(n){ cls += " tenpai"; extra += ' data-n="'+n+'"'; }
+    return tileHTML(codeOf(t), cls, extra);
   }
 
   /* 玩家名字由外面餵(單機用座位名、連線用暱稱)—— 盤面不知道玩家是誰 */
@@ -213,9 +298,76 @@ const M16B = (function(){
   }
 
   /* ==========================================================================
+     宣告視窗:吃 / 碰 / 槓直接畫在牌上(v1.58.2)
+     ──────────────────────────────────────────────────────────────────────────
+     舊版是一排「吃 三四 / 吃 四五 / 碰 / 過」按鈕 —— 使用者的話是「這種選擇方式我不喜歡」。
+     問題在按鈕上的文字要玩家**自己在腦中對回手牌**:「吃 三四」是哪兩張?
+
+     新的做法:
+       · 每一種吃法 / 碰 / 槓 都是一個「選項」,選項的牌**直接在手牌裡站起來**
+       · 一次只站起來**一組**(目前這一組)。其他組的牌點一顆小點當提示 —— 這就是
+         「重疊怎麼顯示」的答案:不同時顯示,用切換。同時把三種吃法都攤開只會更亂,
+         而且同一張牌會屬於好幾組,顏色再多也講不清楚。
+       · 點任何一張候選牌 = 切到「包含這張的下一組」(循環)。點得到的資訊是牌本身,
+         不是文字標籤。
+       · **送出與放棄一律走動作列的大按鈕**(✔ 碰 / 胡! / 過)—— 選擇在牌上、動作在按鈕上,
+         誤觸不會直接吃掉一張牌;「過」也因此永遠在同一個位置、夠大、找得到。
+     ★ 胡刻意**不做成選項** —— 它不吃特定手牌(用不到 idx),而且它是最重要的一個,
+       必須永遠是獨立的大按鈕。
+     ========================================================================== */
+  let opts = null, copt = 0;
+
+  /* 從手牌裡挑出 values 對應的位置(同款牌要挑不同格位) */
+  function pickIdx(hand, values){
+    const used = {}, out = [];
+    values.forEach(v=>{
+      for(let i=0;i<hand.length;i++){
+        if(hand[i]===v && !used[i]){ used[i]=1; out.push(i); return; }
+      }
+    });
+    return out.length===values.length ? out : null;
+  }
+  function claimOpts(){
+    if(opts) return opts;
+    opts = [];
+    if(!st || !st.claim || st.over) return opts;
+    const types = st.claim.elig[me];
+    if(!types || st.claim.bids[me]) return opts;         // 沒資格 / 已經表態過
+    const hand = st.hands[me] || [], t = st.claim.t;
+    const add = (type, values, label) => {
+      const idx = pickIdx(hand, values);
+      if(idx) opts.push({ type, idx, tiles:values, label });
+    };
+    if(types.indexOf("kong")>=0) add("kong", [t,t,t], "槓");
+    if(types.indexOf("pong")>=0) add("pong", [t,t], "碰");
+    if(types.indexOf("chow")>=0){
+      const c = R.claimsFor(R.toCounts(hand), t,
+                { need:MJT.needOf(st,me), chow:true, fromLeft:true });
+      c.chow.forEach(pair=>add("chow", pair, "吃"));
+    }
+    return opts;
+  }
+  /* 點到某張候選牌 → 切到「包含這張的下一組」(循環) */
+  function cycleTo(i){
+    const co = claimOpts();
+    const owners = [];
+    co.forEach((o,k)=>{ if(o.idx.indexOf(i)>=0) owners.push(k); });
+    if(!owners.length) return false;
+    const at = owners.indexOf(copt);
+    copt = owners[(at+1) % owners.length];
+    render();
+    return true;
+  }
+
+  /* ==========================================================================
      操作
      ========================================================================== */
   function tap(k, t){
+    // 宣告視窗優先:這時候點牌不是打牌,是選要吃哪一組
+    if(claimOpts().length){
+      if(k && k[0]==="h") cycleTo(+k.slice(1));
+      return;
+    }
     const a = MJT.ownActions(st, me);
     if(!a.discard) return;
     /* ★ 滑鼠:hover 已經把牌抬起來了,這一下就是打出。
@@ -242,7 +394,11 @@ const M16B = (function(){
 
   return {
     mount, render,
-    clearSel(){ sel=""; },
+    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; },
+    /* 宣告視窗:動作列問「現在是哪一組」,按下 ✔ 時回頭拿它送出 */
+    claimOpts(){ return claimOpts(); },
+    claimCur(){ const co=claimOpts(); return co.length ? co[Math.min(copt,co.length-1)] : null; },
+    setClaimCur(i){ const co=claimOpts(); if(i>=0&&i<co.length){ copt=i; render(); } },
     setNames(fn){ nameOf = fn || (s=>"座位 "+(s+1)); },
     setHint(v){ hint = !!v; render(); },
     hintOn(){ return hint; },
