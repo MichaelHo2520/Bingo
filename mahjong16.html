@@ -11,9 +11,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>台灣 16 張麻將 ｜ 2~4 人連線對戰</title>
-<!-- 台灣 16 張麻將 · v1.59.0 -->
-<meta name="version" content="1.59.0">
+<title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
+<!-- 台灣 16 張麻將 · v1.60.0 -->
+<meta name="version" content="1.60.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -39,30 +39,75 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 進場 ======
-       ⚠ 這一頁目前只有連線(沒有 AI,湊不到人就打不起來)。單機的聽牌練習排在 P6。 -->
+  <!-- ====== 進場選單(兩層)======
+       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度 / 人數 / 局數。
+       與消消樂 #mjHome、數獨 #sdkHome 同一套結構。 -->
   <section class="panel" id="m16Home">
-    <div class="mp-head">
+    <!-- 回 index.html 的返回列。只在第一層顯示 —— 第二層有自己的返回(回第一層) -->
+    <div class="mp-head" id="m16HomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
       <div class="subtitle">台灣 16 張</div>
     </div>
-    <div class="mj-hero">
-      <svg class="mj-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌">
-        <rect class="mk-bd" x="3.5" y="9" width="23" height="31" rx="4.5"/>
-        <rect class="mk-bd" x="29.5" y="16" width="23" height="31" rx="4.5"/>
-        <text class="mk-r" x="15" y="31">中</text>
-        <text class="mk-g" x="41" y="38">發</text>
-      </svg>
-      <div class="home-tagline">真的打麻將:摸打吃碰槓,湊 5 組面子 + 1 對將</div>
-      <div><span class="mk-tune">🛠 遊戲調校中～有問題歡迎回報</span></div>
+
+    <!-- 第一層:選怎麼玩 -->
+    <div id="m16PickMode">
+      <div class="mj-hero">
+        <svg class="mj-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌">
+          <rect class="mk-bd" x="3.5" y="9" width="23" height="31" rx="4.5"/>
+          <rect class="mk-bd" x="29.5" y="16" width="23" height="31" rx="4.5"/>
+          <text class="mk-r" x="15" y="31">中</text>
+          <text class="mk-g" x="41" y="38">發</text>
+        </svg>
+        <div class="home-tagline">真的打麻將:摸打吃碰槓,湊 5 組面子 + 1 對將</div>
+        <div><span class="mk-tune">🛠 遊戲調校中～有問題歡迎回報</span></div>
+      </div>
+      <button class="btn primary block-btn home-btn" id="m16GoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="m16GoSolo">🤖 單機對電腦</button>
+      <div class="home-hint">
+        <b>2~4 人</b>都能開:4 人用整副 144 張,<b>2~3 人去掉萬子</b>(108 張),3 人不能吃。<br>
+        計分照麻將的<b>相互算台</b>——自摸三家付、放槍一家付。<br>
+        單機湊不到人也打得起來,電腦分<b>三個強度</b>。
+        <br><span class="m16-warn">⚠ 連線時手牌與牌山在資料庫是明碼,只適合親友之間玩,不防作弊。</span>
+      </div>
     </div>
-    <button class="btn primary block-btn home-btn" id="m16GoOnline">🌐 連線對戰</button>
-    <div class="home-hint">
-      <b>2~4 人</b>都能開:4 人用整副 144 張,<b>2~3 人去掉萬子</b>(108 張),3 人不能吃。<br>
-      計分照麻將的<b>相互算台</b>——自摸三家付、放槍一家付。
-      <br><span class="m16-warn">⚠ 手牌與牌山在資料庫是明碼,只適合親友之間玩,不防作弊。</span>
+
+    <!-- 第二層:單機設定 -->
+    <div id="m16PickSolo" class="hidden">
+      <div class="home-sub-head">
+        <button class="icon-btn" id="m16SoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <span class="subtitle">單機對電腦</span>
+      </div>
+      <div class="field">
+        <span class="field-label">電腦強度</span>
+        <div class="seg" id="m16LvSeg" aria-label="電腦強度">
+          <button data-lv="easy">🙂 新手</button>
+          <button class="on" data-lv="normal">🤔 普通</button>
+          <button data-lv="hard">😈 高手</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">幾家</span>
+        <div class="seg" id="m16SeatSeg" aria-label="幾家">
+          <button data-seats="2">2 人</button>
+          <button data-seats="3">3 人</button>
+          <button class="on" data-seats="4">4 人</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">打幾局</span>
+        <div class="seg" id="m16SoloGoalSeg" aria-label="打幾局">
+          <button data-goal="1">1 局</button>
+          <button class="on" data-goal="4">一圈 4 局</button>
+          <button data-goal="8">8 局</button>
+          <button data-goal="16">一將 16 局</button>
+        </div>
+      </div>
+      <button class="btn primary block-btn home-btn" id="m16StartSolo">開始 ▸</button>
+      <div class="home-hint" id="m16SoloHint"></div>
     </div>
   </section>
 
@@ -114,6 +159,23 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
     <div class="mj-room-foot">
       <div id="mpPlayers" class="mp-players"></div>
+    </div>
+  </div>
+
+  <!-- ====== 單機的牌桌列 ======
+       刻意沿用房間橫幅同一組 .mj-room / .mp-chip 外觀:連線與單機長得一樣才有一致感
+       (同 v1.58.2 把台數搬進房間框的理由)。晶片由 js/mahjong16/solo.js 自己畫 ——
+       mp-core 的 renderPlayers() 是連線專屬的,單機不經過它。 -->
+  <div class="panel mj-room hidden" id="m16SoloBar">
+    <div class="row mj-room-top">
+      <button class="icon-btn mp-leave-btn" id="m16SoloExit" title="離開牌桌" aria-label="離開牌桌">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="label mj-room-title">單機 <b id="m16SoloLv" class="display">普通</b></span>
+      <span class="mp-goal" id="m16SoloGoal" aria-label="局數"></span>
+    </div>
+    <div class="mj-room-foot">
+      <div id="m16SoloPlayers" class="mp-players"></div>
     </div>
   </div>
 
@@ -171,6 +233,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
        的玩家晶片上(adapter 的 chipLead / chipTail / turnId),與其他三個遊戲一致。
        ⚠ v1.58.3 又拿掉了盤面頂端的資訊列 #m16Bar:第幾局搬到房間框的徽章
        (#mpBarGoal,麥克風左邊)、莊搬到每一家自己那一列,可吃 / 牌山直接刪掉。 -->
+  <!-- 單機與連線**共用這一整塊**(盤面 M16B + 動作列),差別只在上面那條列與
+       結果卡的按鈕組 —— 靠 body.solo-on 切換(同五子棋 / 數獨 / 消消樂)。 -->
   <div class="mj-play hidden" id="m16Play">
     <!-- 盤面:對手列 / 牌河 / 我的明牌 / 我的手牌,全部由 M16B.render() 畫 -->
     <div class="m16-stage" id="m16Stage"></div>
@@ -208,6 +272,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
         <button class="btn primary" id="mpAgain">下一局 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
+      </div>
+      <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
+           id 刻意與數獨 / 消消樂同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
+      <div class="actions" id="soloWinBtns">
+        <button class="btn primary" id="m16SoloAgain">下一局 ▸</button>
+        <button class="btn ghost" id="m16SoloHome">回選單</button>
       </div>
       <button class="peek-link" id="winPeek">先看看牌桌 👀</button>
     </div>
@@ -369,7 +439,8 @@ const FIREBASE_CONFIG = {
 </script>
 
 <!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)→ mj-faces(牌面,與消消樂共用)
-     → rules(規則)→ scoring(台數)→ table(輪次狀態機)→ board(盤面)
+     → rules(規則)→ scoring(台數)→ table(輪次狀態機)→ ai(電腦對手,只相依 rules)
+     → board(盤面)→ solo(單機,要 board 與 ai)
      → adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
@@ -378,7 +449,9 @@ const FIREBASE_CONFIG = {
 <script src="js/mahjong16/rules.js"></script>
 <script src="js/mahjong16/scoring.js"></script>
 <script src="js/mahjong16/table.js"></script>
+<script src="js/mahjong16/ai.js"></script>
 <script src="js/mahjong16/board.js"></script>
+<script src="js/mahjong16/solo.js"></script>
 <script src="js/mahjong16/adapter.js"></script>
 <script src="js/mahjong16/main.js"></script>
 </body>

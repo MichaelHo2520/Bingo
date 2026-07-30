@@ -2284,3 +2284,14 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 
 /* 「不防作弊」那句提醒:刻意不做成警告色的大框 —— 它是說明,不是錯誤 */
 .m16-warn{display:inline-block;margin-top:4px;opacity:.75;font-size:11px}
+
+/* ---------- 台灣 16 張:單機對電腦(v1.60.0) ----------
+   ★ 這一段刻意只有一條規則:單機**整組畫面都是重用的** ——
+     牌桌是同一個 .mj-play / .m16-stage / .m16-acts,上面那條列重用房間橫幅的
+     .mj-room + .mp-chip,結果卡的按鈕組重用數獨那組 body.solo-on / #soloWinBtns
+     (那組選擇器不帶遊戲前綴,四頁通用),進場第二層重用 .home-sub-head + .seg。
+     會需要新規則的只剩「桌面要放寬」這件事,而它原本綁在 body.m16-mp 上。
+   ⚠ 不要圖方便把 m16-solo 併進上面那條 body.m16-mp —— 那個 class 還兼著
+     「對戰中把房間框的名單列放出來」(.mj-room.playing .mj-room-foot),
+     單機沒有房間框,混用只會讓兩件事日後互相絆倒。 */
+body.m16-solo .mj-play{width:min(98vw,960px)}
