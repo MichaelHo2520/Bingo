@@ -3,36 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<!-- PWA:與 index.html 共用 manifest(同一個 App,首頁是遊戲選單) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="數獨">
+<meta name="apple-mobile-web-app-title" content="台灣麻將">
 <meta name="theme-color" content="#2a1136">
 <link rel="manifest" href="manifest.json">
-<!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.58.0 -->
+<title>台灣 16 張麻將 ｜ 2~4 人連線對戰</title>
+<!-- 台灣 16 張麻將 · v1.58.0 -->
 <meta name="version" content="1.58.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
-  location.replace("app.html#sudoku");
+  location.replace("app.html#mahjong16");
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
-<!-- 共用 Bingo 的 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
-     id 與 class,樣式 100% 重用;盤面與數字鍵盤是檔尾追加的 .sdk-* 段落 -->
+<!-- 共用 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
+     id 與 class;牌面與盤面是檔尾追加的 .m16-* 段落 -->
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <div class="topbar">
     <div class="brand">
-      <div class="sdk-brand display">數獨</div>
+      <div class="mj-brand display">台灣麻將</div>
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
@@ -41,61 +39,36 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 進場選單(兩層):先選玩法(連線在上),點單機練習才挑難度 ====== -->
-  <section class="panel" id="sdkHome">
-    <!-- 回 index.html 的返回列。只在第一層顯示 —— 第二層有自己的返回(回第一層),
-         兩個返回鈕同時出現會分不清誰是誰 -->
-    <div class="mp-head" id="sdkHomeHead">
+  <!-- ====== 進場 ======
+       ⚠ 這一頁目前只有連線(沒有 AI,湊不到人就打不起來)。單機的聽牌練習排在 P6。 -->
+  <section class="panel" id="m16Home">
+    <div class="mp-head">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
-      <div class="subtitle">選擇玩法</div>
+      <div class="subtitle">台灣 16 張</div>
     </div>
-
-    <!-- 第一層:先選怎麼玩(連線在上)。刻意與 index.html 的 #homeBingo 同一套結構與 class,
-         三個遊戲進門的操作一致 —— 原本把難度膠囊擺在最前面,等於逼人先回答一個還沒決定的問題 -->
-    <div id="sdkPickMode">
-      <div class="sdk-hero">
-        <svg class="sdk-art" viewBox="0 0 56 56" role="img" aria-label="數獨盤">
-          <rect class="sk-bd" x="2" y="2" width="52" height="52" rx="6"/>
-          <g class="sk-ln"><path d="M19.3 4V52M36.6 4V52M4 19.3H52M4 36.6H52"/></g>
-          <g class="sk-tn"><path d="M13.6 4V52M25.1 4V52M30.9 4V52M42.4 4V52M4 13.6H52M4 25.1H52M4 30.9H52M4 42.4H52"/></g>
-          <g class="sk-nm"><text x="8.8" y="12">5</text><text x="26" y="12">7</text><text x="43.2" y="12">2</text>
-             <text x="14.5" y="29">3</text><text x="31.8" y="29">9</text><text x="49" y="29">1</text>
-             <text x="8.8" y="46">6</text><text x="37.5" y="46">4</text></g>
-        </svg>
-        <div class="home-tagline">填滿 1~9,每列每行每宮不重複</div>
-      </div>
-      <button class="btn primary block-btn home-btn" id="sdkGoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="sdkPickSolo">🎯 單機練習</button>
-      <div class="home-hint">連線 2~6 人:<b>搶格</b>(同一張盤面搶著填)或<b>競速</b>(各解各的比快);單機自己練一題</div>
+    <div class="mj-hero">
+      <svg class="mj-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌">
+        <rect class="mk-bd" x="3.5" y="9" width="23" height="31" rx="4.5"/>
+        <rect class="mk-bd" x="29.5" y="16" width="23" height="31" rx="4.5"/>
+        <text class="mk-r" x="15" y="31">中</text>
+        <text class="mk-g" x="41" y="38">發</text>
+      </svg>
+      <div class="home-tagline">真的打麻將:摸打吃碰槓,湊 5 組面子 + 1 對將</div>
     </div>
-
-    <!-- 第二層:單機要先挑難度 -->
-    <div id="sdkPickLevel" class="hidden">
-      <div class="home-sub-head">
-        <button class="icon-btn" id="sdkLevelBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <span class="subtitle">單機練習 · 選難度</span>
-      </div>
-      <div class="field">
-        <span class="field-label">難度</span>
-        <div class="seg" id="sdkHomeDiffSeg" aria-label="單機難度">
-          <button data-diff="m6">迷你 6×6</button>
-          <button class="on" data-diff="e9">標準 9×9</button>
-          <button data-diff="h9">困難 9×9</button>
-        </div>
-      </div>
-      <button class="btn primary block-btn home-btn" id="sdkStartSolo">開始練習 ▸</button>
-      <div class="home-hint" id="sdkLevelHint"></div>
+    <button class="btn primary block-btn home-btn" id="m16GoOnline">🌐 連線對戰</button>
+    <div class="home-hint">
+      <b>2~4 人</b>都能開:4 人用整副 144 張,<b>2~3 人去掉萬子</b>(108 張),3 人不能吃。<br>
+      計分照麻將的<b>相互算台</b>——自摸三家付、放槍一家付。
+      <br><span class="m16-warn">⚠ 手牌與牌山在資料庫是明碼,只適合親友之間玩,不防作弊。</span>
     </div>
   </section>
 
-  <!-- ====== 連線畫面(暱稱 / 建房 / 大廳清單)====== -->
+  <!-- ====== 連線畫面 ====== -->
   <section class="panel hidden" id="mpConnect">
     <div class="mp-head">
-      <button class="icon-btn" id="mpConnBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+      <button class="icon-btn" id="mpConnBack" type="button" title="回上一層" aria-label="回上一層">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
       <div class="subtitle">連線對戰</div>
@@ -104,13 +77,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="field-label">你的暱稱(必填)</span>
       <input id="mpName" class="mp-input" maxlength="8" placeholder="輸入你的名字">
     </div>
-
     <div class="or-divider"><span>建立新房間</span></div>
     <div class="field">
       <input id="mpRoomName" class="mp-input" maxlength="12" placeholder="房間名稱(留空用你的暱稱)">
     </div>
     <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
-
     <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
     <div class="mp-detect-row">
       <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
@@ -122,14 +93,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="hint" id="mpConnMsg"></div>
   </section>
 
-  <!-- ====== 房間橫幅(沿用 Bingo 的 #mpBar;.sdk-room 再把它壓矮)====== -->
-  <div class="panel sdk-room hidden" id="mpBar">
-    <div class="row sdk-room-top">
+  <!-- ====== 房間橫幅 ====== -->
+  <div class="panel mj-room hidden" id="mpBar">
+    <div class="row mj-room-top">
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label sdk-room-title">房間 <b id="mpRoomTitle" class="display">–</b></span>
-      <span class="mp-goal" id="mpBarGoal" aria-label="玩法與難度"></span>
+      <span class="label mj-room-title">房間 <b id="mpRoomTitle" class="display">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="局數"></span>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
@@ -137,46 +108,27 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
       </div>
     </div>
-    <!-- 狀態列:大廳說明在等什麼;對戰中收起來(比分 HUD 已經在盤面上方),落單倒數才臨時放出來 -->
     <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
     </div>
-    <div class="sdk-room-foot">
+    <div class="mj-room-foot">
       <div id="mpPlayers" class="mp-players"></div>
     </div>
   </div>
 
-  <!-- ====== 連線大廳設定(房主可改,訪客唯讀)====== -->
-  <div class="scroll-area sdk-scroll hidden" id="scrollArea">
-    <section class="panel hidden" id="sdkSetup">
+  <!-- ====== 大廳設定 ====== -->
+  <div class="scroll-area mj-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="m16Setup">
       <div class="subtitle">對戰設定</div>
-
       <div class="field">
-        <span class="field-label" id="sdkModeLabel">玩法</span>
-        <div class="seg" id="sdkModeSeg" aria-label="玩法">
-          <button class="on" data-mode="grab">⚡ 搶格</button>
-          <button data-mode="race">⏱ 競速</button>
+        <span class="field-label" id="m16GoalLabel">打幾局</span>
+        <div class="seg" id="m16GoalSeg" aria-label="打幾局">
+          <button data-goal="1">1 局</button>
+          <button class="on" data-goal="4">一圈 4 局</button>
+          <button data-goal="8">8 局</button>
+          <button data-goal="16">一將 16 局</button>
         </div>
       </div>
-
-      <div class="field">
-        <span class="field-label" id="sdkDiffLabel">難度</span>
-        <div class="seg" id="sdkDiffSeg" aria-label="難度">
-          <button data-diff="m6">迷你 6×6</button>
-          <button class="on" data-diff="e9">標準 9×9</button>
-          <button data-diff="h9">困難 9×9</button>
-        </div>
-      </div>
-
-      <!-- 候選提示:只能全房一致(搶格比手速,單方面省掉掃描時間就是直接贏) -->
-      <div class="field">
-        <span class="field-label" id="sdkAssistLabel">候選提示</span>
-        <div class="seg" id="sdkAssistSeg" aria-label="候選提示">
-          <button class="on" data-assist="0">關</button>
-          <button data-assist="1">🔍 開(填錯 −1)</button>
-        </div>
-      </div>
-
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">
@@ -197,44 +149,20 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
         </div>
       </div>
-
-      <div class="hint" id="sdkRuleHint"></div>
+      <div class="hint" id="m16RuleHint"></div>
     </section>
   </div>
 
-  <!-- ====== 單機 HUD(時間 / 錯誤 / 提示 / 筆記)====== -->
-  <div class="panel sdk-solobar hidden" id="sdkSoloBar">
-    <div class="row sdk-room-top">
-      <button class="icon-btn" id="sdkSoloBack" type="button" title="回選單" aria-label="回選單">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <span class="sdk-lvtag" id="sdkLevelTag">9×9 · 標準</span>
-      <span class="sdk-timer display" id="sdkTime">00:00</span>
-      <span class="sdk-miss" id="sdkMiss">✗ 0</span>
-      <button class="sdk-mini" id="sdkPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
-    </div>
-    <div class="sdk-solotools">
-      <button class="sdk-tool" id="sdkHintBtn" type="button">💡 提示 3</button>
-      <button class="sdk-tool" id="sdkNoteBtn" type="button" title="筆記模式:先把可能的數字記在格子裡">✎ 筆記</button>
-    </div>
+  <!-- ====== 牌桌 ====== -->
+  <div class="mj-play hidden" id="m16Play">
+    <div class="m16-hud hidden" id="m16Hud"></div>
+    <div class="m16-bar" id="m16Bar"></div>
+    <!-- 盤面:對手列 / 牌河 / 我的明牌 / 我的手牌,全部由 M16B.render() 畫 -->
+    <div class="m16-stage" id="m16Stage"></div>
+    <div class="m16-acts hidden" id="m16Acts"></div>
   </div>
 
-  <!-- ====== 盤面 + 數字鍵盤(單機與連線共用)====== -->
-  <div class="sdk-play hidden" id="sdkPlay">
-    <!-- 即時比分:連線才顯示(搶格看分數、競速看進度條) -->
-    <div class="sdk-hud hidden" id="sdkHud"></div>
-    <!-- boardbox 吃掉剩餘高度,盤面再用 height:min(100%,92vw,460px) + aspect-ratio 自己夾成正方形
-         → 不必像 Bingo 那樣用 JS 實測高度寫進 --boardpx(數獨沒有那麼多變動的固定列) -->
-    <div class="sdk-boardbox">
-      <div class="sdk-stage" id="sdkStage">
-        <div class="sdk-board" id="sdkBoard"></div>
-        <div class="sdk-freeze hidden" id="sdkFreeze">🥶 3</div>
-      </div>
-    </div>
-    <div class="sdk-pad" id="sdkPad"></div>
-  </div>
-
-  <!-- ====== 主要動作列(連線大廳的「準備好了」)====== -->
+  <!-- ====== 主要動作列 ====== -->
   <div class="primary-bar hidden" id="primaryBar">
     <div class="action-hint hidden" id="actionHint"></div>
     <div class="actions" id="primaryActions">
@@ -242,16 +170,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 結果卡(單機與連線共用;按鈕組靠 body.solo-on 切換)====== -->
+  <!-- ====== 結果卡 ====== -->
   <div class="veil" id="veil">
-    <div class="win-card sdk-win" id="sdkWinCard">
-      <div class="word display" id="winWord">完成!</div>
-      <div class="sdk-winner" id="sdkWinner"></div>
+    <div class="win-card mj-win" id="m16WinCard">
+      <div class="word display" id="winWord">本局結束</div>
       <p id="winMsg"></p>
-      <div class="sdk-stats hidden" id="sdkStats"></div>
+      <!-- 相互算台的收付表:全桌相加必為 0 -->
+      <div class="m16-tai hidden" id="m16Tai"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
-      <div class="sdk-react-row" id="sdkReactRow">
+      <div class="mj-react-row" id="m16ReactRow">
         <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
         <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
         <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
@@ -260,33 +188,19 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </div>
       <div class="actions" id="mpWinBtns">
         <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
-        <button class="btn primary" id="mpAgain">繼續 ▸</button>
+        <button class="btn primary" id="mpAgain">下一局 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
-      <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="soloAgain">再來一局 ▸</button>
-        <button class="btn ghost" id="soloHome">回選單</button>
-      </div>
-      <button class="peek-link" id="winPeek">先看看盤面 👀</button>
+      <button class="peek-link" id="winPeek">先看看牌桌 👀</button>
     </div>
   </div>
   <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
 
-  <!-- 單機暫停 -->
-  <div class="veil" id="sdkPauseVeil">
-    <div class="win-card confirm-card">
-      <div class="confirm-ico">⏸</div>
-      <div class="confirm-title">暫停中</div>
-      <p>點畫面任一處繼續</p>
-    </div>
-  </div>
-
-  <!-- ====== 設定(沿用 Bingo 的設定蓋板;偏好與 Bingo 共用,寫入採 merge)====== -->
+  <!-- ====== 設定 ====== -->
   <div class="veil" id="setVeil">
     <div class="set-card">
       <div class="set-head">設定</div>
       <div class="set-body" id="setBody">
-
         <div class="set-group">
           <div class="set-group-title">外觀</div>
           <div class="set-row">
@@ -296,6 +210,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="set-row">
             <span class="set-lbl">電子書模式</span>
             <button class="switch" id="swEbook" role="switch" aria-checked="false" aria-label="電子書模式"><span class="knob"></span></button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">玩法輔助</div>
+          <div class="set-row">
+            <span class="set-lbl">聽牌提示<span class="set-sub">(每張牌角落顯示「打掉它之後聽幾張」)</span></span>
+            <button class="switch" id="m16SwHint" role="switch" aria-checked="false" aria-label="聽牌提示"><span class="knob"></span></button>
           </div>
         </div>
 
@@ -342,14 +264,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <button class="btn ghost mvc-open" id="myVoiceBtn" type="button">編輯</button>
           </div>
         </div>
-
       </div>
       <button class="btn primary" id="setClose">完成</button>
-      <div class="set-foot">數獨 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+      <div class="set-foot">台灣 16 張麻將 · <span id="setVer"></span> · 開發者 Michael Ho</div>
     </div>
   </div>
 
-  <!-- ====== 好友互動表情 / 語音(沿用 Bingo)====== -->
+  <!-- ====== 表情 / 語音 ====== -->
   <div class="veil" id="emoteVeil">
     <div class="set-card emote-card">
       <button class="card-x" id="emoteClose" type="button" aria-label="關閉">✕</button>
@@ -360,7 +281,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="emote-phrases" id="emotePhrases"></div>
       <div class="emote-sub">🔊 語音短訊</div>
       <div class="emote-phrases" id="emoteClips"></div>
-      <!-- 自訂語音:沒錄過就整區隱藏(buildMyClips 控制),面板不會多一塊空的 -->
       <div class="emote-sub hidden" id="myClipsSub">⭐ 我的語音</div>
       <div class="emote-phrases hidden" id="emoteMyClips"></div>
       <div class="emote-input">
@@ -371,9 +291,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
 
-  <!-- 自訂語音的編輯浮層(由設定卡的「我的語音 → 編輯」開啟)
-       自己錄 3 秒短語音存在本機 localStorage(bingo.myclips.v1,三個遊戲共用同一批),
-       連線時在互動面板當按鈕送出;走既有的 kind="voice" 管道 = 把音訊本身傳過去,對方不需要有任何檔案。 -->
   <div class="veil" id="myVoiceVeil">
     <div class="set-card mvc-card">
       <button class="card-x" id="mvClose" type="button" aria-label="關閉">✕</button>
@@ -391,7 +308,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
   <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
 
-  <!-- 離開房間確認 -->
   <div class="veil" id="leaveVeil">
     <div class="win-card confirm-card">
       <div class="confirm-ico">🚪</div>
@@ -404,7 +320,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- 房主移出玩家確認 -->
   <div class="veil" id="kickVeil">
     <div class="win-card confirm-card">
       <div class="confirm-ico">⚠️</div>
@@ -419,13 +334,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
   <canvas class="confetti" id="confetti"></canvas>
 
-<!-- Firebase SDK 由 js/shared/mp-core.js 的 ensureFirebase() 動態載入(進連線畫面才載) -->
-
 <script>
 /* ============================================================
-   連線對戰設定 — 與 index.html(Bingo)、gomoku.html 使用同一個 Firebase 專案,
-   但數獨的資料放在獨立的頂層節點 sudoku_rooms / sudoku_index。
-   ⚠ 需在 Firebase 規則開放 sudoku_rooms 與 sudoku_index 的讀寫。
+   與其他四個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 mj16_rooms / mj16_index。
+   ⚠ 需在資料庫規則開放那兩段 —— 整份規則在 notes/firebase-rules.json,可直接複製貼上。
    ============================================================ */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBVBN3hRMSFq7KwWmyf3IR01Y82XmfhLQ0",
@@ -438,15 +350,18 @@ const FIREBASE_CONFIG = {
 };
 </script>
 
-<!-- 載入順序固定:ui-kit(定義 $ 與介面工具)→ mp-core(連線核心)→ gen(出題)→ board(盤面)
-     → solo(單機)→ adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
+<!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)→ mj-faces(牌面,與消消樂共用)
+     → rules(規則)→ scoring(台數)→ table(輪次狀態機)→ board(盤面)
+     → adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <script src="js/shared/mp-core.js"></script>
-<script src="js/sudoku/gen.js"></script>
-<script src="js/sudoku/board.js"></script>
-<script src="js/sudoku/solo.js"></script>
-<script src="js/sudoku/adapter.js"></script>
-<script src="js/sudoku/main.js"></script>
+<script src="js/shared/mj-faces.js"></script>
+<script src="js/mahjong16/rules.js"></script>
+<script src="js/mahjong16/scoring.js"></script>
+<script src="js/mahjong16/table.js"></script>
+<script src="js/mahjong16/board.js"></script>
+<script src="js/mahjong16/adapter.js"></script>
+<script src="js/mahjong16/main.js"></script>
 </body>
 </html>
