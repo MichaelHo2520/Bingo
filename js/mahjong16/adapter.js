@@ -298,7 +298,7 @@ const MP = MPCore.create((function(){
          before.claim.t!==s.claim.t || before.claim.from!==s.claim.from) myBid = false;
 
       M16B.render(st, Math.max(0, mySeat()));
-      renderHud(); renderActs(); paintBar();
+      renderHud(); renderActs(); ctx.updateGoal();
 
       if(s.claim && !s.over) armClaimT(); else clearClaimT();
 
@@ -341,21 +341,34 @@ const MP = MPCore.create((function(){
       if(L) L.textContent = isHost ? "打幾局" : "打幾局(房主決定)";
       ruleHint();
     },
+    /* 房間框那顆徽章(麥克風左邊)。
+       ★ v1.58.3:對戰中改成「第 n/N 局」—— 使用者的話是「原來那裡寫 4 局之類的內容,
+         我覺得沒什麼意義,就換成第多局的內容」。大廳還是只寫目標局數(還沒開始打,
+         沒有「第幾局」可言,而且那裡正是房主在設定的那個數字)。
+       ⚠ 進度來自 tai._r 的筆數,而 tai 一變就會 renderPlayers() → updateGoal(),
+         所以這裡不必自己訂閱;applyGame() 也補叫一次(同一局內換手也要更新)。 */
     updateGoal(){
       const g = $("mpBarGoal"); if(!g) return;
-      g.textContent = "🀄 " + handsGoal + " 局";
+      const n = Math.min(handsGoal, handsDone()+1);
+      g.textContent = (ctx.phase()==="playing")
+        ? "🀄 第 "+n+"/"+handsGoal+" 局"
+        : "🀄 "+handsGoal+" 局";
       g.classList.remove("hidden");
     },
 
     /* 輪到誰:核心會把 .turn 打在晶片上(底色 + 脈動 + 放大),四個遊戲同一套。
        ⚠ 消消樂不需要實作這支(它沒有回合),真麻將有,一定要給。 */
     turnId(){ return (st && !st.over) ? idOfSeat(st.turn) : null; },
+    /* 晶片前綴:座位色點 + 門風 +(是莊的話)莊。
+       ★ 莊家記號 v1.58.3 從盤面頂端那條資訊列搬過來 —— 盤面上是掛在每一家自己那一列
+         (board.js 的 foeHTML),我自己那一家沒有「一列」,就靠這裡。 */
     chipLead(id){
       const s = seatOf(id);
       if(s<0) return null;
       const wind = st ? MJFace.info(MJ16.codeOf(MJT.seatWind(s, st.dealer, st.seats))).glyph : "";
       return '<span class="m16-seat '+colorOf(s)+'"></span>'+
-             (wind?'<span class="m16-cw">'+wind+'</span>':'');
+             (wind?'<span class="m16-cw">'+wind+'</span>':'')+
+             (st && s===st.dealer ? '<span class="m16-dz">莊</span>' : '');
     },
     chipTail(id){
       const t = taiOf(id);
@@ -420,16 +433,12 @@ const MP = MPCore.create((function(){
     }
   };
 
-  /* ---------- 對戰中的頂部資訊 ---------- */
-  function paintBar(){
-    const el = $("m16Bar"); if(!el || !st) return;
-    const rs = MJ16.RULESETS[st.rs];
-    el.innerHTML =
-      '<span class="m16-chip">第 '+Math.min(handsGoal, handsDone()+1)+' / '+handsGoal+' 局</span>'+
-      '<span class="m16-chip">牌山 '+MJT.wallLeft(st)+'</span>'+
-      '<span class="m16-chip">莊 '+esc(nameOfSeat(st.dealer))+'</span>'+
-      '<span class="m16-chip">'+(rs.chow?"可吃":"不可吃")+'</span>';
-  }
+  /* (v1.58.3:盤面頂端那條資訊列 #m16Bar 整條拿掉了 —— 使用者:「我想要省掉房間框
+      下面那一行」。四個欄位的下落:
+        · 可吃 / 不可吃  → 刪掉(開局就定的房間設定,大廳說明裡已經寫了)
+        · 牌山還剩幾張   → 刪掉(玩的人不看;真要看,流局本身就是提示)
+        · 第 n / N 局    → 搬到房間框的 #mpBarGoal(麥克風左邊,見 updateGoal)
+        · 莊 某某        → 搬到每一家自己那一列 / 玩家晶片(board.foeHTML + chipLead)) */
 
   /* ---------- 結果卡的台數表 ---------- */
   function paintTaiTable(final){

@@ -30,6 +30,23 @@
      現在存 render() 給的格位鍵 data-k(手牌 "h<序號>"、摸進來那張 "d")。
      ⚠ 格位鍵會隨手牌內容位移,所以手牌一變(吃碰槓 / 打出 / 換局)就把 sel 清掉,
        不然舊索引會指到別張牌上。
+
+   ── ★★ 牌的大小在一局裡要「幾乎不動」(v1.58.3,實際上手回報)─────────────
+     回報是「打牌的過程中會一直不停的變換牌的大小」。牌寬是算出來的(寬度 →
+     再被高度夾),所以**任何讓總高度或總寬度變一點的東西都會讓整副牌換一次大小**。
+     四個來源,一個一個堵掉,而不是去調那個夾取演算法:
+       ① **摸進來那張**:有它 17.45 單位、沒它 16 單位 → 每摸一張縮 8%、每打一張放大
+          回來,**每一輪來回一次**,這是最刺眼的那個。
+          → 那一格**一律預留**(沒摸牌時放一個等寬的透明佔位 .m16-slot),
+            牌寬與手牌的水平位置因此整局固定。
+       ② **牌河長高**:換一排就多 20~30px。→ 牌河高度寫死成 POOL_ROWS 排(超過就捲,
+          並自動捲到底讓最新那張看得見)。
+       ③ **動作列忽高忽低**:純文字 12px vs 一排 30px 的按鈕。→ .m16-acts 給 min-height。
+       ④ 攤明牌 / 補花 真的會多一排 —— 這個省不掉,所以改成「**只縮不放**」:
+          在同一個容器尺寸(寬 × 高)與同一局裡,牌寬單調不遞增;容器尺寸一變或換局
+          才重新量。放大回去對排版沒有好處,只會讓人覺得畫面在跳。
+     ⚠ 「只縮不放」的 key **一定要含容器高度** —— 動作列 / 房間框長高會讓盤面變矮,
+       若只認寬度,一局之內會被一路棘輪縮到 TILE_MIN。
    ========================================================================== */
 
 const M16B = (function(){
@@ -40,8 +57,12 @@ const M16B = (function(){
   const ONE_ROW_MIN = 32;      // 一排時的最小可辨識牌寬(見檔頭)
   const TILE_MIN = 20, TILE_MAX = 64;
   const DRAW_GAP = 0.45;       // 摸進來那張與手牌之間的間隔(幾張牌寬)
+  const POOL_ROWS = 3;         // 牌河固定留幾排(見檔頭②;超過就捲)
 
   let host=null, cb={}, st=null, me=0, sel="", hint=false, lastSig="";
+  /* 「只縮不放」的狀態(見檔頭④):fitKey = 容器尺寸,換了就重新量;
+     fitTw = 這個容器尺寸下目前用的牌寬,同一局裡只會變小。 */
+  let fitKey="", fitTw=0;
 
   /* 有滑鼠 = 一段式(hover 已經給了「是哪一張」的回饋);觸控 = 兩段式。
      ⚠ 一定要跟 styles.css 那條 @media 用同一個字串,否則會出現「牌浮起來卻要點兩次」。 */
@@ -68,14 +89,18 @@ const M16B = (function(){
      依花色邊界切,選「算出來的牌寬最大」的切點;摸進來那張放較短的那一排。
      回傳 { rows:[[t…],[t…]], drawRow, tw } */
   function suitGroup(t){ return R.isNumber(t) ? R.suitOf(t) : "z"; }
-  function unitsOf(rows, drawRow, hasDraw){
+  function unitsOf(rows, drawRow){
     let u=0;
-    rows.forEach((r,i)=>{ u = Math.max(u, r.length + ((hasDraw && i===drawRow) ? 1+DRAW_GAP : 0)); });
+    rows.forEach((r,i)=>{ u = Math.max(u, r.length + ((i===drawRow) ? 1+DRAW_GAP : 0)); });
     return u;
   }
+  /* ★ hasDraw 刻意**不參與計算**(v1.58.3):摸牌那一格一律預留。
+     算進去的話「我摸了一張」與「我打掉一張」會讓整副牌一大一小輪流跳,
+     每一輪來回一次 —— 那就是「一直不停的變換牌的大小」最主要的來源(見檔頭①)。
+     參數留著只為了呼叫端讀起來清楚(以及 planFor 的既有測試簽章)。 */
   function planHand(hand, hasDraw, avail){
     // 方案 A:一排
-    const uA = unitsOf([hand], 0, hasDraw);
+    const uA = unitsOf([hand], 0);
     const twA = Math.floor(avail / Math.max(1,uA));
     if(twA >= ONE_ROW_MIN) return { rows:[hand], drawRow:0, tw:Math.min(twA, TILE_MAX) };
 
@@ -91,7 +116,7 @@ const M16B = (function(){
       const r1=[], r2=[];
       groups.forEach((g,i)=>{ const t=(i<k)?r1:r2; t.push.apply(t,g); });
       const dr = (r1.length<=r2.length) ? 0 : 1;
-      const u  = unitsOf([r1,r2], dr, hasDraw);
+      const u  = unitsOf([r1,r2], dr);
       const tw = Math.floor(avail/Math.max(1,u));
       if(!best || tw>best.tw) best = { rows:[r1,r2], drawRow:dr, tw:tw };
     }
@@ -100,7 +125,7 @@ const M16B = (function(){
       const h=Math.ceil(hand.length/2);
       const rows=[hand.slice(0,h), hand.slice(h)];
       const dr=(rows[0].length<=rows[1].length)?0:1;
-      best={ rows:rows, drawRow:dr, tw:Math.floor(avail/Math.max(1,unitsOf(rows,dr,hasDraw))) };
+      best={ rows:rows, drawRow:dr, tw:Math.floor(avail/Math.max(1,unitsOf(rows,dr))) };
     }
     best.tw = Math.max(TILE_MIN, Math.min(best.tw, TILE_MAX));
     return best;
@@ -130,18 +155,35 @@ const M16B = (function(){
       }).join("")+'</span>';
   }
 
-  /* ---------- 對手那一列 ---------- */
+  /* ---------- 一組花牌 ----------
+     ★ v1.58.3:花牌**畫成真的牌**,和吃 / 碰同一種外框(只換底色成琥珀)。
+       原本對手的花牌是一串 Unicode 字符(🀢🀦…),使用者的話是「寫個字在那裡,
+       有點沒感覺」—— 而且那些字符在小字級下根本認不出是哪一張花。
+     ⚠ 底色一定要寫成兩層 `.m16-meld.m16-flg`:既有的 `.m16-mymelds .m16-meld`
+       是 (0,2,0),一層的 .m16-flg 會被它蓋掉(CLAUDE.md 那條「反方向也會撞」)。 */
+  function flowerHTML(tiles, tw){
+    return '<span class="m16-meld m16-flg" style="--m16w:'+tw+'px" aria-label="花牌">'+
+      tiles.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+'</span>';
+  }
+
+  /* ---------- 對手那一列 ----------
+     ★ 莊家的記號放在**每個人自己那一列**(v1.58.3)——原本寫在盤面頂端那條資訊列
+       («莊 某某»),但那條整列被拿掉了(可吃 / 牌山對玩的人沒有用)。
+       我自己是不是莊,由房間框的玩家晶片講(adapter.chipLead),兩邊同一套記號。 */
   function foeHTML(seat, tw){
-    const rs = R.RULESETS[st.rs];
     const wind = R.codeOf(MJT.seatWind(seat, st.dealer, st.seats));
     const cnt  = st.hands[seat].length + ((st.turn===seat && st.drawn>=0)?1:0);
     const fl   = st.flowers[seat];
+    const mtw  = Math.round(tw*0.52);
     return '<div class="m16-foe'+(st.turn===seat?" on":"")+'" data-seat="'+seat+'">'+
       '<span class="m16-wind">'+F.info(wind).glyph+'</span>'+
+      (seat===st.dealer?'<span class="m16-dz">莊</span>':'')+
       '<span class="m16-foename" data-seat="'+seat+'"></span>'+
       '<span class="m16-cnt">🀫 '+cnt+'</span>'+
-      (fl.length?'<span class="m16-fl">'+fl.map(t=>F.info(codeOf(t)).glyph).join("")+'</span>':'')+
-      '<span class="m16-fmelds">'+st.melds[seat].map(m=>meldHTML(m, Math.round(tw*0.52))).join("")+'</span>'+
+      '<span class="m16-fmelds">'+
+        (fl.length?flowerHTML(fl, mtw):"")+
+        st.melds[seat].map(m=>meldHTML(m, mtw)).join("")+
+      '</span>'+
     '</div>';
   }
 
@@ -161,7 +203,18 @@ const M16B = (function(){
     const hand = st.hands[me] || [];
     const hasDraw = (st.turn===me && st.drawn>=0);
     const plan = planHand(hand, hasDraw, avail);
-    const tw = plan.tw;
+
+    /* ---- 只縮不放(見檔頭④)----
+       key 是**容器的寬 × 高**:它一變(轉向 / 動作列長高 / 房間框換行)就重新量,
+       否則同一局裡牌寬只會變小 —— 攤了明牌縮下去,不會在下一手又彈回去。
+       ⚠ 高度一定要進 key,不然動作列一長高就開始一路棘輪縮到 TILE_MIN。
+       牌寬另外對齊到 2px:量到的寬度偶爾差 1px(捲軸 / 四捨五入),沒有這一步
+       會為了 1px 重畫一次整副牌。 */
+    const hh = host.clientHeight;
+    const key = avail+"x"+hh;
+    if(key !== fitKey){ fitKey = key; fitTw = 0; }
+    let tw = plan.tw - (plan.tw % 2);
+    if(fitTw) tw = Math.min(tw, fitTw);
 
     /* 手牌一動(打出 / 被吃碰 / 補花 / 換局)格位鍵就位移了 → 舊的 sel 會指到別張牌。
        tap() 自己觸發的 render() 不會走進來(st 沒變 → 簽章相同),選取因此留得住。
@@ -175,7 +228,8 @@ const M16B = (function(){
     const co = claimOpts();                              // 宣告視窗:可吃 / 碰 / 槓的組合
     if(co.length) copt = Math.min(copt, co.length-1);
 
-    const draw = t => { host.innerHTML = paint(plan, t, hasDraw, canAct, co); return host.scrollHeight; };
+    let cur = tw;
+    const draw = t => { cur = t; host.innerHTML = paint(plan, t, hasDraw, canAct, co); return host.scrollHeight; };
     let h1 = draw(tw);
 
     /* ★★ 高度也要夾(v1.58.2)——「碰完牌就消失了」的真正機制在這裡。
@@ -189,7 +243,6 @@ const M16B = (function(){
        ⚠ 直線只是近似(明牌 / 對手列會換行,是階梯不是直線),所以後面再收兩次保險。
        ⚠ clientHeight 太小(面板還沒顯示)時整段不做,否則會一路縮到 TILE_MIN;
          顯示出來時 ResizeObserver 會再叫一次 render()。 */
-    const hh = host.clientHeight;
     if(hh > 80 && h1 > hh + 2 && tw > TILE_MIN){
       const t2 = Math.max(TILE_MIN, Math.round(tw * 0.7));
       let nt = t2;
@@ -209,6 +262,11 @@ const M16B = (function(){
         draw(nt);
       }
     }
+    if(hh > 80) fitTw = cur;        // 記住這個容器尺寸下的牌寬(只縮不放的地板)
+
+    /* 牌河高度寫死成 POOL_ROWS 排 → 打超過就要捲,而**最新那張永遠得看得見** */
+    const pool = host.querySelector(".m16-pool");
+    if(pool) pool.scrollTop = pool.scrollHeight;
 
     host.classList.toggle("m16-myturn", canAct);
     paintNames();
@@ -225,34 +283,49 @@ const M16B = (function(){
 
     /* --- 牌河 ----------------------------------------------------------------
        ★ v1.58.2:牌河不再 flex:1 吃掉整片高度(空盤時預留一大塊黑,看起來像壞掉),
-         改成「最新那張放大、其餘縮小」—— 最新那張才是所有人正在盯的資訊。 */
+         改成「最新那張放大、其餘縮小」—— 最新那張才是所有人正在盯的資訊。
+       ★ v1.58.3 兩件事(都是實際上手回報的):
+         ①**靠左**。原本 justify-content:center → 每打一張整條牌河就左右挪一次,
+           永遠對不齊;靠左之後打過的牌像牌譜一樣一格一格往右長。
+         ②**高度寫死** POOL_ROWS 排(不是 min~max 之間長)。牌河換一排就多 20~30px,
+           而牌寬受總高度約束 → 那一刻整副牌會縮一次。寫死之後這個來源就沒了。
+           滿了就捲(render() 收尾會捲到底,最新那張一定看得見)。 */
     const pw   = Math.max(14, Math.round(tw*0.46));      // 舊牌:小
     const pwL  = Math.max(20, Math.round(tw*0.78));      // 最新那張:大
     const last = st.discards.length-1;
-    html += '<div class="m16-pool" id="m16Pool" style="--m16w:'+pw+'px">'+
+    // 最後一排要留給放大的那張(它永遠在最後);+2 是列距、+10 是內距
+    const poolH = Math.round(pw*1.32)*(POOL_ROWS-1) + Math.round(pwL*1.32)
+                  + 2*(POOL_ROWS-1) + 10;
+    html += '<div class="m16-pool" id="m16Pool" style="--m16w:'+pw+'px;--m16ph:'+poolH+'px">'+
       st.discards.map((d,i)=>tileHTML(codeOf(d.t),
         "m16-pt"+(i===last?" last":""),
         ' data-seat="'+d.seat+'"'+(i===last?' style="--m16w:'+pwL+'px"':''))).join("")+
       '</div>';
 
-    /* --- 我這一邊(花 → 明牌 → 手牌)-----------------------------------------
+    /* --- 我這一邊(攤出去的 → 手牌)-----------------------------------------
        ★ margin-top:auto 掛在這個外框上,整組貼底。明牌**緊貼手牌上方**是刻意的:
          v1.58.1 之前它夾在牌河與花牌之間、又縮到 66%,實際上手的回報是
-         「碰完牌就消失了,桌上沒留下記錄」—— 它其實有畫,只是畫在沒人會看的地方。 */
+         「碰完牌就消失了,桌上沒留下記錄」—— 它其實有畫,只是畫在沒人會看的地方。
+       ★ v1.58.3:花牌與明牌**併成同一排**(花牌在最前面,底色不同)。
+         原本花牌自己一排,補到花就多一排 → 整副牌縮一次;而且花牌與明牌
+         本來就是同一類東西(攤在桌上的),分兩排只是白吃一排高度。 */
     html += '<div class="m16-mine">';
-    if((st.flowers[me]||[]).length)
-      html += '<div class="m16-myfl" style="--m16w:'+Math.round(tw*0.44)+'px">'+
-              st.flowers[me].map(t=>tileHTML(codeOf(t),"m16-ft")).join("")+'</div>';
-    if((st.melds[me]||[]).length)
-      html += '<div class="m16-mymelds">'+
-              st.melds[me].map(m=>meldHTML(m, Math.round(tw*0.82))).join("")+'</div>';
+    const mtw = Math.round(tw*0.82);
+    const shown = [];
+    if((st.flowers[me]||[]).length) shown.push(flowerHTML(st.flowers[me], mtw));
+    (st.melds[me]||[]).forEach(m=>shown.push(meldHTML(m, mtw)));
+    if(shown.length) html += '<div class="m16-mymelds">'+shown.join("")+'</div>';
 
     /* --- 我的手牌 --- */
     const inClaim = co.length>0;
     const focus = inClaim ? co[copt] : null;
 
+    /* 兩排時**兩排等寬**(寬度取最長那排,含預留的摸牌格)→ 左緣對齊成一塊。
+       原本每排各自居中,兩排長度不同就錯開幾十 px,看起來歪歪的
+       (使用者要的「整齊的感覺」不只是牌河)。 */
+    const hw = Math.round(unitsOf(plan.rows, plan.drawRow) * tw);
     html += '<div class="m16-hand'+(canAct?" live":"")+(inClaim?" claim":"")+
-            '" style="--m16w:'+tw+'px">';
+            '" style="--m16w:'+tw+'px;--m16hw:'+hw+'px">';
     /* planHand() 保證 rows 串起來就是 hand 的原順序(切點只切在花色邊界),
        所以一路數下去的 hi 就是這張牌在 hand 裡的索引 —— 拿它當格位鍵。 */
     let hi = 0;
@@ -262,10 +335,17 @@ const M16B = (function(){
         const i = hi++, k = "h"+i;
         html += handTile(t, k, i, canAct, focus, co);
       });
-      if(hasDraw && ri===plan.drawRow){
-        const n = hint ? MJT.tenpaiAfter(st, me, st.drawn).length : 0;
-        html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+(n?" tenpai":""),
-                         ' data-t="'+st.drawn+'" data-k="d"'+(n?' data-n="'+n+'"':''));
+      /* ★ 摸進來那一格**沒摸牌時也要佔住**(v1.58.3)—— 放一個等寬的透明佔位。
+         planHand() 已經一律把這一格算進寬度,這裡若不畫,同一副手牌會在
+         「我摸了一張 / 我打掉一張」之間左右挪半張牌,看起來就是整副牌在跳。 */
+      if(ri===plan.drawRow){
+        if(hasDraw){
+          const n = hint ? MJT.tenpaiAfter(st, me, st.drawn).length : 0;
+          html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+(n?" tenpai":""),
+                           ' data-t="'+st.drawn+'" data-k="d"'+(n?' data-n="'+n+'"':''));
+        }else{
+          html += '<i class="m16-slot" aria-hidden="true"></i>';
+        }
       }
       html += '</div>';
     });
@@ -394,7 +474,9 @@ const M16B = (function(){
 
   return {
     mount, render,
-    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; },
+    /* 換局 / 回大廳 / 結算都會叫這支 —— 順便把「只縮不放」的地板放掉,
+       新的一局從頭量一次(不然上一局縮下去的牌寬會一直背著走)。 */
+    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; fitTw=0; },
     /* 宣告視窗:動作列問「現在是哪一組」,按下 ✔ 時回頭拿它送出 */
     claimOpts(){ return claimOpts(); },
     claimCur(){ const co=claimOpts(); return co.length ? co[Math.min(copt,co.length-1)] : null; },

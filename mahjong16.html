@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 2~4 人連線對戰</title>
-<!-- 台灣 16 張麻將 · v1.58.2 -->
-<meta name="version" content="1.58.2">
+<!-- 台灣 16 張麻將 · v1.58.3 -->
+<meta name="version" content="1.58.3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -156,9 +156,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
   <!-- ====== 牌桌 ====== -->
   <!-- ⚠ v1.58.2 拿掉了獨立的比分列 #m16Hud:台數 / 風 / 輪到誰全部改顯示在**房間框**
-       的玩家晶片上(adapter 的 chipLead / chipTail / turnId),與其他三個遊戲一致。 -->
+       的玩家晶片上(adapter 的 chipLead / chipTail / turnId),與其他三個遊戲一致。
+       ⚠ v1.58.3 又拿掉了盤面頂端的資訊列 #m16Bar:第幾局搬到房間框的徽章
+       (#mpBarGoal,麥克風左邊)、莊搬到每一家自己那一列,可吃 / 牌山直接刪掉。 -->
   <div class="mj-play hidden" id="m16Play">
-    <div class="m16-bar" id="m16Bar"></div>
     <!-- 盤面:對手列 / 牌河 / 我的明牌 / 我的手牌,全部由 M16B.render() 畫 -->
     <div class="m16-stage" id="m16Stage"></div>
     <div class="m16-acts hidden" id="m16Acts"></div>

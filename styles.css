@@ -1995,7 +1995,7 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
       而牌寬是 render() 拿 host.clientWidth 算出來的 → 寬度與內容互相決定,
       整個咬死在 render() 裡 Math.max(200,…) 那個地板值:手機量到 host 只有 ~270px,
       牌 27px(該有 50px)、桌機 818px 的視窗只用掉 300px。
-      .m16-hud / .m16-bar / .m16-acts 同一個原因,一起補。
+      .m16-acts 同一個原因,一起補(.m16-hud / .m16-bar 那兩列已經不存在了)。
    ★ scrollbar-gutter:stable —— 沒有的話「內容變高 → 出捲軸 → clientWidth 少 15px →
      牌變小 → 不再溢出 → 捲軸消失」會來回抖。 */
 .m16-stage{position:relative;isolation:isolate;z-index:0;
@@ -2038,7 +2038,12 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 /* ---------- 我的手牌 ---------- */
 .m16-hand{display:flex;flex-direction:column;gap:4px;align-items:center;
   width:100%;padding-top:2px}
-.m16-row{display:flex;align-items:flex-end;flex-wrap:nowrap}
+/* ★ 兩排等寬(--m16hw = 最長那排的寬,board.js 算)+ 內容靠左 → 兩排**左緣對齊**。
+   原本每排各自 shrink-to-fit 又居中,長度不同的兩排會錯開幾十 px(v1.58.3 修)。
+   ⚠ max-width:100% 是保險:--m16hw 是照 avail 算的,理論上塞得下,
+     但牌寬被高度夾小之後若有捨入誤差,寧可讓那一排縮回容器內也不要橫向溢出。 */
+.m16-row{display:flex;align-items:flex-end;flex-wrap:nowrap;justify-content:flex-start;
+  width:var(--m16hw,auto);max-width:100%}
 .m16-ht{transition:transform .12s}
 .m16-hand.live .m16-ht{cursor:pointer}
 /* 兩段式打牌的第一段:選取上浮。第二次點同一張才真的打出去
@@ -2058,6 +2063,10 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 }
 /* 摸進來那張隔開放 —— 真牌桌的慣例,也讓「打掉剛摸的」這個最常見的操作不必瞄準 */
 .m16-draw{margin-left:calc(var(--m16w,36px) * 0.45)}
+/* 沒摸牌時佔住同一格(v1.58.3)。寬度 = 間隔 0.45 + 一張牌 1 = 1.45 ——
+   要與上面那條 margin-left 加上牌寬**完全相等**,不然「摸 / 打」之間手牌會左右挪。
+   ⚠ 這是版面穩定的一半,另一半在 board.js 的 planHand()(一律把這一格算進寬度)。 */
+.m16-slot{flex:none;width:calc(var(--m16w,36px) * 1.45)}
 /* ---------- 宣告視窗:吃 / 碰 / 槓直接畫在牌上(v1.58.2) ----------
    選擇在牌上、動作在按鈕上。一次只站起來**一組**,其他組的牌點一顆小點 ——
    這就是「重疊怎麼顯示」的答案:不同時顯示,用切換(理由見 js/mahjong16/board.js 檔頭)。
@@ -2096,6 +2105,14 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 .m16-mymelds .m16-meld{background:rgba(255,255,255,.16);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
 .m16-mt{opacity:.96}
+/* 花牌組(v1.58.3):和明牌**同一種外框、同一個尺寸**,只換成琥珀底 ——
+   使用者的話是「對方的花牌,我想要像吃跟碰那樣正常的顯示」,原本是一串 Unicode 字符。
+   ⚠ 必須寫成兩層 `.m16-meld.m16-flg`(0,2,0):上面的 `.m16-mymelds .m16-meld` 也是
+     (0,2,0),一層的 .m16-flg 會被它蓋掉底色 —— CLAUDE.md「反方向也會撞」那條。
+     第二個選擇器把我方那一排寫到 (0,3,0),完全不靠段落先後決定勝負。 */
+.m16-meld.m16-flg,
+.m16-mymelds .m16-meld.m16-flg{background:rgba(255,196,80,.20);
+  box-shadow:inset 0 0 0 1px rgba(255,196,80,.42)}
 
 /* ---------- 牌河 ----------
    ★ v1.58.2:不再 flex:1 吃掉整片高度(空盤時預留一大塊黑,看起來像壞掉)。
@@ -2105,10 +2122,13 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
    而它 overflow-y:auto → 最新那張放大的牌直接被切掉一半(看起來像牌破了)。
    盤面塞不下一律靠 board.js 那道「量高度 → 縮小牌寬」處理,不靠 flex 擠壓。
    同理 .m16-foes / .m16-mine 也都 flex:none。 */
-.m16-pool{display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start;justify-content:center;
+/* ★ v1.58.3:①**靠左**(原本 center → 每打一張整條牌河左右挪一次,永遠對不齊);
+   ②高度改成**寫死**(--m16ph 由 board.js 算,固定 POOL_ROWS 排)。
+   原本 min~max 之間自由長高,每換一排就讓總高度跳一次 → 整副牌跟著縮一次,
+   那正是「打牌的過程中會一直不停的變換牌的大小」的成因之一。滿了就捲。 */
+.m16-pool{display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start;justify-content:flex-start;
   padding:5px;border-radius:10px;background:rgba(0,0,0,.14);
-  min-height:calc(var(--m16w,22px) * 1.32);
-  max-height:calc(var(--m16w,22px) * 1.32 * 4 + 20px);
+  height:var(--m16ph,auto);
   flex:none;overflow-y:auto;scrollbar-gutter:stable}
 .m16-pt{opacity:.8;align-self:flex-end}
 .m16-pt.last{outline:2px solid var(--mj-jz);outline-offset:1px;opacity:1}
@@ -2124,12 +2144,18 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
   font:800 11px/19px 'Nunito',sans-serif;flex:none}
 .m16-foename{font-weight:800;max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .m16-cnt{opacity:.8}
-.m16-fl{opacity:.9;letter-spacing:1px}
-.m16-myfl{display:flex;gap:2px}
-.m16-ft{opacity:.95}
+/* 莊家記號(v1.58.3):盤面上掛在每一家自己那一列、房間框裡掛在玩家晶片上 ——
+   原本寫在盤面頂端的資訊列「莊 某某」,但那整列被拿掉了(可吃 / 牌山對玩的人沒有用)。 */
+.m16-dz{display:inline-grid;place-items:center;min-width:18px;height:17px;padding:0 3px;flex:none;
+  border-radius:6px;background:var(--mj-jz);color:#fff;
+  font:800 11px/1 'Nunito',sans-serif}
 
-/* ---------- 動作列(吃 / 碰 / 槓 / 胡 / 過) ---------- */
-.m16-acts{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:4px 0;width:100%}
+/* ---------- 動作列(吃 / 碰 / 槓 / 胡 / 過) ----------
+   ★ min-height(v1.58.3):這一列在「一行 12px 提示字」與「一排 30px 按鈕」之間跳,
+     而盤面吃剩餘高度 → 它一長高,整副牌就縮一次。撐成固定高度就沒這回事。
+     算法:按鈕 8+14+8 = 30,加上下 4px 內距 = 38。 */
+.m16-acts{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;align-items:center;
+  padding:4px 0;width:100%;min-height:38px}
 .m16-act{border:0;border-radius:11px;padding:8px 15px;cursor:pointer;
   font:800 14px/1 'Nunito',sans-serif;color:#fff;background:var(--mj-z)}
 .m16-act.win{background:var(--mj-jz)}
@@ -2143,10 +2169,10 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 /* 宣告視窗的倒數:不遮畫面(同消消樂僵局那條 —— 遮住的那一瞬間別人剛好動作,感受就是「被搶了」) */
 .m16-timer{font:800 12px/1 'Nunito',sans-serif;opacity:.85;align-self:center}
 
-/* ---------- 頂部資訊列 ---------- */
-.m16-bar{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
-  width:100%;padding:4px 8px;font:700 12px/1.4 'Nunito',sans-serif}
-.m16-chip{padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.12)}
+/* (v1.58.3:盤面頂端那條資訊列 .m16-bar / .m16-chip 整組拿掉了 ——
+    「可吃 / 不可吃」是開局就定的房間設定、「牌山還剩幾張」玩的人不看,
+    「第幾局」搬到房間框的 #mpBarGoal(麥克風左邊)、「莊」搬到每一家自己那一列。
+    使用者:「我想要省掉房間框下面那一行」。) */
 
 /* ---------- 台灣 16 張:房間框裡的玩家晶片 ----------
    ★ v1.58.2 拿掉了獨立的比分列(.m16-hud 那一整組 grid 大卡片),台數 / 風 / 輪到誰
