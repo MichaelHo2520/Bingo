@@ -33,6 +33,7 @@ const MP = MPCore.create((function(){
   let curRound = null;
   let tai = {};                     // tai 節點快照
   let claimT = null;                // 宣告視窗的計時器
+  let claimKey = "";                // 目前這個宣告視窗的身分(哪張牌 @ 誰打的)
   let myBid = false;                // 這一輪我表態過了沒(只擋自己重複點)
 
   function seatOf(id){ return ctx.order().indexOf(id); }
@@ -75,7 +76,73 @@ const MP = MPCore.create((function(){
        (見 styles.css 的 body.m16-mp 那條),否則對戰中晶片列整條被收起來。 */
   function renderHud(){ ctx.renderPlayers(); }
 
+  /* ---------- 宣告視窗的倒數環(v1.58.4) ----------
+     使用者:「吃碰這些選擇時,要有一個倒數的時間可以看,而且這個時間要好看一點,
+     我想要有點特效」。做法是一顆 SVG 環圈 + 中間的秒數:環圈隨時間排空,
+     最後 3 秒轉紅並脈動。
+
+     ★ 「動」全部交給 CSS animation(環圈是 stroke-dashoffset 的 linear 動畫),
+       JS 只負責換中間那個數字 —— **不可以**用 setInterval 重畫整條動作列:
+       renderActs() 會因為「別人表態了」「我切換吃法」被叫很多次,每一次重畫都會讓
+       動畫從頭開始,倒數就會忽然跳回滿格。
+     ★ 因此這顆是**持久節點**:renderActs() 清空動作列時刻意跳過它。
+       ⚠ 不能再用 box.innerHTML="" —— 元素一離開文件,CSS 動畫就被取消,
+         插回去等於重跑一次,症狀跟上面那條一模一樣。 */
+  let cdEl = null, cdT = null, cdEnd = 0;
+  function ensureCd(){
+    if(cdEl) return cdEl;
+    const box = $("m16Acts"); if(!box) return null;
+    cdEl = document.createElement("span");
+    cdEl.className = "m16-cd hidden";
+    cdEl.setAttribute("aria-hidden","true");
+    cdEl.innerHTML =
+      '<svg viewBox="0 0 40 40"><circle class="m16-cdbg" cx="20" cy="20" r="17"/>'+
+      '<circle class="m16-cdfg" cx="20" cy="20" r="17"/></svg><b class="m16-cdn">–</b>';
+    box.appendChild(cdEl);
+    return cdEl;
+  }
+  function stopCd(){
+    if(cdT){ clearInterval(cdT); cdT=null; }
+    if(cdEl){ cdEl.classList.add("hidden"); cdEl.classList.remove("m16-hot"); }
+  }
+  function startCd(ms){
+    const el = ensureCd(); if(!el) return;
+    if(cdT){ clearInterval(cdT); cdT=null; }
+    cdEnd = performance.now() + ms;
+    el.classList.remove("hidden","m16-hot");
+    const ring = el.querySelector(".m16-cdfg");
+    /* 重跑動畫:只改 animation-duration 不會重新開始 —— 要先拿掉、強制 reflow、再掛回去 */
+    ring.style.animation = "none"; void ring.offsetWidth;
+    ring.style.animation = "m16cd "+ms+"ms linear forwards";
+    tickCd();
+    cdT = setInterval(tickCd, 200);
+  }
+  function tickCd(){
+    if(!cdEl) return;
+    const left = Math.max(0, cdEnd - performance.now());
+    const s = String(Math.ceil(left/1000));
+    const n = cdEl.querySelector(".m16-cdn");
+    if(n.textContent !== s){
+      n.textContent = s;
+      n.classList.remove("m16-beat"); void n.offsetWidth; n.classList.add("m16-beat");
+    }
+    cdEl.classList.toggle("m16-hot", left <= 3000);      // 最後 3 秒:轉紅 + 脈動
+    if(left<=0){ clearInterval(cdT); cdT=null; }
+  }
+
   /* ---------- 動作列 ---------- */
+  /* ⚠ 清空但**留下倒數環**(見 ensureCd 的註解) */
+  function clearActs(box){
+    [...box.children].forEach(el=>{ if(el!==cdEl) el.remove(); });
+  }
+  /* 離房 / 回大廳:整條收掉,倒數環也一起丟。
+     ⚠ cdEl 一定要跟著設回 null —— 只清 innerHTML 的話 cdEl 會指著一個已經脫離文件的
+       節點,ensureCd() 看到它非 null 就直接回傳,那顆環從此再也不會出現在畫面上。 */
+  function wipeActs(){
+    stopCd(); cdEl = null;
+    const a = $("m16Acts"); if(!a) return;
+    a.classList.add("hidden"); a.innerHTML = "";
+  }
   function actBtn(label, cls, fn){
     const b = document.createElement("button");
     b.type = "button";
@@ -86,7 +153,8 @@ const MP = MPCore.create((function(){
   }
   function renderActs(){
     const box = $("m16Acts"); if(!box) return;
-    box.innerHTML = "";
+    ensureCd();                       // 先建好,倒數環才永遠是這一列的第一個
+    clearActs(box);
     if(!st || st.over || ctx.phase()!=="playing"){ box.classList.add("hidden"); return; }
     const me = mySeat();
     if(me<0){ box.classList.add("hidden"); return; }
@@ -212,14 +280,26 @@ const MP = MPCore.create((function(){
   }
 
   /* ---------- 宣告視窗的計時器 ---------- */
-  function clearClaimT(){ if(claimT){ clearTimeout(claimT); claimT=null; } }
+  function clearClaimT(){
+    if(claimT){ clearTimeout(claimT); claimT=null; }
+    claimKey = ""; stopCd();
+  }
+  /* ★ 只在「換了一個宣告視窗」時重新計時(v1.58.4)。
+     原本每次 applyGame 都無條件重新 setTimeout —— 別人一表態 state 就變、視窗就多 7 秒,
+     四個人輪流表態可以拖到 28 秒。畫面上看不出來,但**畫了倒數環之後就藏不住**
+     (環圈會忽然彈回滿格)。順手把規則改對:視窗從開啟那一刻起算,固定 7 秒。 */
   function armClaimT(){
-    clearClaimT();
-    if(!st || !st.claim || st.over) return;
+    if(!st || !st.claim || st.over){ clearClaimT(); return; }
+    const key = st.claim.t+"@"+st.claim.from;
+    if(key === claimKey && claimT) return;
+    if(claimT){ clearTimeout(claimT); claimT=null; }
+    claimKey = key;
     /* 誰都可以在到期後補結算。刻意加一點依座位錯開的延遲,避免四台同時發交易
        (交易本身擋得住,但四筆同時打過去只是浪費) */
     const jitter = Math.max(0, mySeat()) * 220;
-    claimT = setTimeout(resolveExpired, CLAIM_MS + jitter);
+    const ms = CLAIM_MS + jitter;
+    claimT = setTimeout(resolveExpired, ms);
+    startCd(ms);
   }
 
   /* ---------- 大廳說明 ---------- */
@@ -315,7 +395,7 @@ const MP = MPCore.create((function(){
     backToLobby(){
       showScreen("lobby"); $("mpBar").classList.remove("playing");
       clearClaimT(); st=null; curRound=null; myBid=false;
-      const a=$("m16Acts"); if(a){ a.classList.add("hidden"); a.innerHTML=""; }
+      wipeActs();
       ctx.renderPlayers();                 // 台數在晶片上,回大廳要重畫(st 已清掉,風會收起來)
       ruleHint();
     },
@@ -326,7 +406,7 @@ const MP = MPCore.create((function(){
     },
     onLeave(){
       clearClaimT(); st=null; curRound=null; tai={}; myBid=false;
-      const a=$("m16Acts"); if(a){ a.classList.add("hidden"); a.innerHTML=""; }
+      wipeActs();
     },
 
     /* ---------- 大廳設定 / 徽章 ---------- */
@@ -394,6 +474,7 @@ const MP = MPCore.create((function(){
       const done = handsDone();
       const last = done >= handsGoal;
       paintTaiTable(last);
+      paintWinTiles();                 // 胡的人攤什麼牌(流局時自己收起來)
 
       if(!st || !st.over || st.over.type==="draw")
         return { word: last ? "本場結束" : "流局", msg: last ? seasonMsg() : "牌山見底,這一局不收付 🀫" };
@@ -439,6 +520,24 @@ const MP = MPCore.create((function(){
         · 牌山還剩幾張   → 刪掉(玩的人不看;真要看,流局本身就是提示)
         · 第 n / N 局    → 搬到房間框的 #mpBarGoal(麥克風左邊,見 updateGoal)
         · 莊 某某        → 搬到每一家自己那一列 / 玩家晶片(board.foeHTML + chipLead)) */
+
+  /* ---------- 結果卡:胡牌那家的攤牌(v1.58.4) ----------
+     使用者:「如果別人胡了,我覺得應該要顯示出胡的人是什麼牌」。
+     ★ 手牌明碼那個架構決策在這裡再拿一次紅利:攤牌不必等誰上傳,每台裝置本來就有
+       完整的 state,自己畫就是。
+     ⚠ 牌大小照張數算 —— 結果卡內容寬只有約 300px,清一色 17 張硬塞會爆出去;
+       有明牌時手牌短很多,反而可以畫大一點。 */
+  function paintWinTiles(){
+    const box = $("m16Win"); if(!box) return;
+    if(!st || !st.over || st.over.type!=="win"){ box.classList.add("hidden"); box.innerHTML=""; return; }
+    const o = st.over;
+    const n = (st.hands[o.seat]||[]).length;
+    const tw = Math.max(17, Math.min(28, Math.floor(300 / Math.max(1,n))));
+    box.classList.remove("hidden");
+    box.innerHTML =
+      '<div class="m16-showh">'+esc(nameOfSeat(o.seat))+' 的牌 · <em>紅框</em>是胡的那張</div>'+
+      M16B.revealHTML(st, o.seat, tw, o.tile);
+  }
 
   /* ---------- 結果卡的台數表 ---------- */
   function paintTaiTable(final){

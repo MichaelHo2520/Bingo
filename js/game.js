@@ -249,12 +249,15 @@
     showResult();
     burst();
   }
+  /* ⚠ 這三支在 js/shared/ui-kit.js 還有一份(Bingo 不載入 js/shared/)—— 改一邊記得改另一邊。
+     body.peeking(v1.58.4)讓 CSS 把「🏆 看結果」浮動鈕那一條的高度留出來,
+     否則它蓋在盤面正下方中央(麻將那頁最明顯:手牌就在那裡)。 */
   // 叫出結果卡(順便收起「看結果」浮動鈕)
-  function showResult(){ $("reopenWin").classList.add("hidden"); $("veil").classList.add("show"); }
+  function showResult(){ $("reopenWin").classList.add("hidden"); $("veil").classList.add("show"); document.body.classList.remove("peeking"); }
   // 徹底收掉結果(重來/離開時用):卡片與浮動鈕都關
-  function closeWin(){ $("veil").classList.remove("show"); $("reopenWin").classList.add("hidden"); }
+  function closeWin(){ $("veil").classList.remove("show"); $("reopenWin").classList.add("hidden"); document.body.classList.remove("peeking"); }
   // 只把結果卡收起來看牌面,留一顆浮動鈕可再叫回結果
-  function peekBoard(){ $("veil").classList.remove("show"); $("reopenWin").classList.remove("hidden"); }
+  function peekBoard(){ $("veil").classList.remove("show"); $("reopenWin").classList.remove("hidden"); document.body.classList.add("peeking"); }
 
   /* ---------- Mode switches ---------- */
   function toSetup(){

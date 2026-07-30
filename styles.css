@@ -266,8 +266,15 @@
   .veil{position:fixed;inset:0;display:none;place-items:center;z-index:50;
     background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:20px}
   .veil.show{display:grid}
+  /* ★ max-height + overflow-y:auto 不可省(v1.58.4)。這張卡沒有捲動能力時,內容一多
+     (麻將的攤牌 + 台數表 + 排行榜)就直接**超出畫面而且捲不到** —— .veil 是
+     position:fixed 的,body 又是 overflow:hidden,超出的部分沒有任何地方捲得到。
+     使用者的回報是「按不到下面的『先看看牌桌』」:那顆鈕在卡的最後一列,是第一個掉出去的。
+     ⚠ 高度用 calc(100dvh - 40px) 寫死而不是 max-height:100% —— 後者要靠 grid area
+       的高度是 definite 才算得出來,寫死不必賭。40px = .veil 的上下 padding。 */
   .win-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
     padding:34px 30px;text-align:center;max-width:380px;backdrop-filter:blur(14px);
+    max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;
     animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
   @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
   /* ⚠ 這個字級是給 BINGO 的「你贏了 / 你輸了」設計的(三個字、每字都是大字)。
@@ -309,7 +316,15 @@
     color:var(--muted);font-family:'Nunito';font-weight:800;font-size:14px;
     text-decoration:underline;text-underline-offset:3px}
   .peek-link:hover{color:var(--text)}
-  /* 偷看牌面時,浮在底部、可再叫回結果卡 */
+  /* 偷看牌面時,浮在底部、可再叫回結果卡。
+     ★ body.peeking 把它那一條的高度**留出來**(v1.58.4)。它浮在畫面正下方中央,而麻將的
+       手牌就在那裡 —— 使用者:「看結果按鈕會擋到中間的牌,導致沒辦法看到完整的牌」。
+       body 是 height:100dvh 的 flex column,多給 padding-bottom 就等於整個版面變矮:
+       四個遊戲的盤面都掛了 ResizeObserver,會自己重新 fit,不必各自改一份。
+       ⚠ 這是**留位置**而不是把鈕移到角落 —— 移到角落只是換一個被蓋住的東西
+         (麻將的手牌一排就佔滿整個寬度,沒有哪個角落是空的)。
+       66px = 鈕高 ~44 + bottom:20 + 2 保險。 */
+  body.peeking{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px))}
   .peek-reopen{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:55;
     background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008;border:0;
     border-radius:999px;padding:12px 22px;cursor:pointer;
@@ -2153,9 +2168,22 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 /* ---------- 動作列(吃 / 碰 / 槓 / 胡 / 過) ----------
    ★ min-height(v1.58.3):這一列在「一行 12px 提示字」與「一排 30px 按鈕」之間跳,
      而盤面吃剩餘高度 → 它一長高,整副牌就縮一次。撐成固定高度就沒這回事。
-     算法:按鈕 8+14+8 = 30,加上下 4px 內距 = 38。 */
+     算法:按鈕 8+14+8 = 30,加上下 4px 內距 = 38。
+
+   ★★ flex:none 不可省(v1.58.4 修一個 ResizeObserver 迴圈)。
+     .mj-play 底下只有兩個 flex item:盤面(1 1 auto)與這一列。兩個都可壓縮的話,
+     可視高度不足時會**按 basis 比例**分攤壓縮 —— 而 basis:auto = 內容高度,於是
+     「盤面的高度取決於它自己的內容高度」,牌寬又是量了高度算出來的:
+       內容變高 → 盤面被壓更矮 → 牌變小 → 內容變矮 → 盤面又變高 → …
+     實測 820×500 瀏覽器直接丟「ResizeObserver loop completed with undelivered
+     notifications」—— 那不是雜訊,是「這一輪沒收斂」的告示(e2e 的「零錯誤」抓到的)。
+     這一列改成不可壓縮之後,壓縮全部落在盤面身上:
+       盤面高度 = 容器 − 這一列  → 與內容無關,迴圈就斷了。
+     ⚠ 不要改用 .m16-stage{flex:1 1 0} 去解 —— column flex 下 basis 會**蓋掉 height**,
+       開發頁 tools/t-mj16-fx.html 把盤面的高度寫死來截圖,那樣做整頁塌成 0(試過)。
+     ⚠ 動作列本來就不該被壓縮:它是「過 / 胡」在的地方,少一個像素都不能少。 */
 .m16-acts{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;align-items:center;
-  padding:4px 0;width:100%;min-height:38px}
+  padding:4px 0;width:100%;min-height:38px;flex:none}
 .m16-act{border:0;border-radius:11px;padding:8px 15px;cursor:pointer;
   font:800 14px/1 'Nunito',sans-serif;color:#fff;background:var(--mj-z)}
 .m16-act.win{background:var(--mj-jz)}
@@ -2166,8 +2194,35 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 .m16-act.pass{background:rgba(255,255,255,.26);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
 .m16-act:active{transform:scale(.95)}
 .m16-more{opacity:.75;font-size:11px}
-/* 宣告視窗的倒數:不遮畫面(同消消樂僵局那條 —— 遮住的那一瞬間別人剛好動作,感受就是「被搶了」) */
+/* 宣告視窗的說明字:不遮畫面(同消消樂僵局那條 —— 遮住的那一瞬間別人剛好動作,感受就是「被搶了」) */
 .m16-timer{font:800 12px/1 'Nunito',sans-serif;opacity:.85;align-self:center}
+
+/* ---------- 宣告視窗的倒數環(v1.58.4) ----------
+   使用者:「吃碰這些選擇時,要有一個倒數的時間可以看,而且這個時間要好看一點,
+   我想要有點特效」。一顆 SVG 環圈 + 中間的秒數:環圈隨時間排空,最後 3 秒轉紅並脈動。
+   ★ 動畫全部在 CSS(JS 只換數字)—— 理由見 js/mahjong16/adapter.js 的 ensureCd()。
+   ★ 三段「特效」刻意都只作用在這 34px 上,不碰盤面:秒數每跳一次縮放一下、
+     最後 3 秒整顆脈動 + 轉紅。放大的是**注意力**,不是遮擋(同僵局視覺那條紅線)。 */
+.m16-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+.m16-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.m16-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+.m16-cdbg{stroke:rgba(255,255,255,.16)}
+/* 107 ≈ 2πr(r=17)。從 0 排到滿 = 環圈整圈消失 */
+.m16-cdfg{stroke:var(--mj-jf);stroke-dasharray:107;stroke-dashoffset:0}
+@keyframes m16cd{from{stroke-dashoffset:0}to{stroke-dashoffset:107}}
+.m16-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+.m16-cdn.m16-beat{animation:m16beat .34s ease-out}
+@keyframes m16beat{0%{transform:scale(1.55);opacity:.55}70%{transform:scale(1)}100%{transform:scale(1)}}
+.m16-cd.m16-hot .m16-cdfg{stroke:var(--mj-jz)}
+.m16-cd.m16-hot .m16-cdn{color:var(--mj-jz)}
+.m16-cd.m16-hot{animation:m16cdhot .9s ease-in-out infinite}
+@keyframes m16cdhot{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+:root[data-theme="ebook"] .m16-cdbg{stroke:rgba(0,0,0,.18)}
+/* 會動的東西一律尊重系統的「減少動態效果」 */
+@media (prefers-reduced-motion:reduce){
+  .m16-cd.m16-hot{animation:none}
+  .m16-cdn.m16-beat{animation:none}
+}
 
 /* (v1.58.3:盤面頂端那條資訊列 .m16-bar / .m16-chip 整組拿掉了 ——
     「可吃 / 不可吃」是開局就定的房間設定、「牌山還剩幾張」玩的人不看,
@@ -2201,6 +2256,22 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 .m16-pts em{font:700 9.5px/1 'Nunito',sans-serif;font-style:normal;opacity:.72;margin-left:1px}
 /* 輪到誰時晶片底色是 accent(亮黃),綠字 / 紅字都糊掉 → 反白成深色 */
 .mp-chip.turn .m16-pts,.mp-chip.turn .m16-pts.neg{color:#1c1008}
+
+/* ---------- 結果卡:胡牌那家的攤牌(v1.58.4) ----------
+   牌桌上別人的手牌永遠是 🀫 N,一局結束時沒有任何地方看得到他到底胡了什麼牌
+   (使用者:「如果別人胡了,我覺得應該要顯示出胡的人是什麼牌」)。
+   ⚠ 這一段會讓結果卡變高 —— 同一版把 .win-card 改成可捲的,兩件事是一起的。 */
+.m16-showhand{margin:2px 0 12px}
+.m16-showh{font:700 11.5px/1.6 'Nunito',sans-serif;opacity:.75;margin-bottom:5px}
+.m16-showh em{font-style:normal;font-weight:800;color:var(--mj-jz)}
+.m16-reveal{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;align-items:flex-end}
+/* 手牌那一組:清一色 17 張會超過卡片寬(內容寬只有約 300px)→ 這一組自己要能換行。
+   ⚠ .m16-meld 預設是 nowrap 的 inline-flex,不加這條就是**橫向溢出**而不是換行。
+   ⚠ 底色寫成兩層 .m16-meld.m16-hg(同 .m16-flg 那條的理由)。 */
+.m16-meld.m16-hg{flex-wrap:wrap;max-width:100%;justify-content:center;
+  background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+/* 胡的那張:紅框 —— 沿用牌河「最新那張」的同一組語彙,不另發明一種標記 */
+.m16-mt.m16-wt{outline:2px solid var(--mj-jz);outline-offset:1px}
 
 /* 結果卡的收付表 */
 .m16-tai{margin:8px 0 4px;padding:8px 10px;border-radius:11px;

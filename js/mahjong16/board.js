@@ -187,6 +187,30 @@ const M16B = (function(){
     '</div>';
   }
 
+  /* ---------- 攤牌(結果卡用,v1.58.4)----------
+     把某一家的牌整組畫出來:手牌(含胡的那張,標記)+ 明牌 + 花。
+     使用者:「如果別人胡了,我覺得應該要顯示出胡的人是什麼牌」——
+     牌桌上別人的手牌永遠是 🀫 N,一局結束時沒有任何地方看得到他到底胡了什麼牌。
+
+     ★ 做成 M16B 的一支 export、而不是在 adapter 裡拼字串:牌面、明牌的排法
+       (吃到的那張排中間、暗槓中間兩張蓋著)、花牌的外框全部在這裡,
+       兩個地方各寫一份一定會走鐘。
+     ⚠ 胡的那張用**索引**標記不是牌值 —— 手上有一對時拿牌值比會兩張都亮
+       (v1.58.0 那個「一對牌一起站起來」的同一個坑)。 */
+  function revealHTML(state, seat, tw, winTile){
+    const s = state || st;
+    if(!s || !s.hands || !s.hands[seat]) return "";
+    const hand = s.hands[seat].slice().sort((a,b)=>a-b);
+    const mark = (typeof winTile==="number") ? hand.indexOf(winTile) : -1;
+    const parts = [];
+    if(hand.length)
+      parts.push('<span class="m16-meld m16-hg">'+
+        hand.map((t,i)=>tileHTML(codeOf(t), "m16-mt"+(i===mark?" m16-wt":""))).join("")+'</span>');
+    (s.melds[seat]||[]).forEach(m=>parts.push(meldHTML(m, tw)));
+    if((s.flowers[seat]||[]).length) parts.push(flowerHTML(s.flowers[seat], tw));
+    return '<div class="m16-reveal" style="--m16w:'+tw+'px">'+parts.join("")+'</div>';
+  }
+
   /* ==========================================================================
      渲染
      ========================================================================== */
@@ -473,7 +497,7 @@ const M16B = (function(){
   }
 
   return {
-    mount, render,
+    mount, render, revealHTML,
     /* 換局 / 回大廳 / 結算都會叫這支 —— 順便把「只縮不放」的地板放掉,
        新的一局從頭量一次(不然上一局縮下去的牌寬會一直背著走)。 */
     clearSel(){ sel=""; opts=null; copt=0; lastSig=""; fitTw=0; },
@@ -489,7 +513,7 @@ const M16B = (function(){
     oneTap,
     // 給測試頁與 e2e:直接問排版決策,不必去讀 DOM
     planFor(hand, hasDraw, avail){ return planHand(hand, hasDraw, avail); },
-    ONE_ROW_MIN
+    ONE_ROW_MIN, TILE_MIN
   };
 })();
 

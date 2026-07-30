@@ -38,10 +38,14 @@ function setActionHint(text){
   el.classList.toggle("hidden", !text);
 }
 
-/* ---------- 結果卡 ---------- */
-function showResult(){ $("reopenWin").classList.add("hidden"); $("veil").classList.add("show"); }
-function closeWin(){ $("veil").classList.remove("show"); $("reopenWin").classList.add("hidden"); }
-function peekBoard(){ $("veil").classList.remove("show"); $("reopenWin").classList.remove("hidden"); }
+/* ---------- 結果卡 ----------
+   ★ body.peeking(v1.58.4):偷看牌面時,「🏆 看結果」那顆鈕浮在畫面正下方中央,
+     而麻將的手牌就在那裡 —— 這個 class 讓 CSS 把那一條的高度留出來(見 styles.css)。
+     盤面各自有 ResizeObserver,版面變矮會自己重新 fit。
+   ⚠ 這三支在 js/game.js 還有一份(Bingo 不載入 js/shared/)—— 改一邊記得改另一邊。 */
+function showResult(){ $("reopenWin").classList.add("hidden"); $("veil").classList.add("show"); document.body.classList.remove("peeking"); }
+function closeWin(){ $("veil").classList.remove("show"); $("reopenWin").classList.add("hidden"); document.body.classList.remove("peeking"); }
+function peekBoard(){ $("veil").classList.remove("show"); $("reopenWin").classList.remove("hidden"); document.body.classList.add("peeking"); }
 
 /* ---------- 彩帶 ---------- */
 function burst(){
