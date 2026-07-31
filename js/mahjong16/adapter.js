@@ -783,17 +783,15 @@ const MP = MPCore.create((function(){
                msg: esc(w.name||"對手")+" "+how+"<br>"+line+(last?"<br>"+seasonMsg():"") };
     },
 
-    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, hint:M16B.hintOn(),
-                         voice:M16Sfx.voiceOn() }; },
+    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, voice:M16Sfx.voiceOn() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
       if(o.claimSec!==undefined && secOK(+o.claimSec)) claimSec = +o.claimSec;
-      M16B.setHint(o.hint===true);
       /* 喊牌語音預設**開**:舊偏好裡沒有這個欄位(undefined),要當成開,
          寫成 `=== true` 的話所有老玩家升上來都會是關的,而他們根本不知道有這個開關。 */
       M16Sfx.setVoice(o.voice !== false);
-      /* ⚠ v1.66.0 那顆「聽牌提醒」開關已經拿掉(聽牌改成主動宣告 = 規則動作,
-         照吃碰槓一樣沒有開關)。舊偏好裡殘留的 `ready` 欄位讀不到就忽略,無害。 */
+      /* ⚠ 舊偏好裡殘留的 `ready`(v1.66.0 的聽牌提醒)與 `hint`(v1.66.0~v1.67.2 的
+         聽牌提示)沒有人讀了 —— 兩顆開關都已經拿掉,讀不到就忽略,無害。 */
     },
 
     api:{

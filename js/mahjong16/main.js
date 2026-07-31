@@ -127,20 +127,14 @@ $("wgMinus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()-1));
 $("wgPlus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()+1));
 $("resetScoreBtn").addEventListener("click",()=>MP.resetScores());
 
-/* ---------- 設定:聽牌提示(這一頁專屬) ----------
-   打掉某張之後聽幾張 —— 只給數字,不指出是哪幾張(維持「要自己算」的成分)。
-   ui-kit 的 syncSettingsUI() 是共用的,專屬那一列自己綁、自己同步。 */
-function syncM16Hint(){
-  const b=$("m16SwHint"); if(b) b.setAttribute("aria-checked", M16B.hintOn()?"true":"false");
-}
-$("m16SwHint").addEventListener("click",()=>{
-  M16B.setHint(!M16B.hintOn());
-  savePrefs(); syncM16Hint();
-  showToast(M16B.hintOn()?"聽牌提示:開":"聽牌提示:關",1200);
-});
-
-/* (v1.66.0 那顆「聽牌提醒」開關已經拿掉 —— 聽牌在 v1.67.0 改成**玩家主動宣告**,
-    那是規則動作而不是輔助提示,所以照吃 / 碰 / 槓一樣不給開關。) */
+/* ---------- 設定裡的「玩法輔助」整組已經拿掉(v1.68.0) ----------
+   曾經有兩顆:
+     · 聽牌提醒(v1.66.0):系統偵測到你聽牌就唸「聽牌」+ 列出聽哪幾張。
+       v1.67.0 改成**玩家主動宣告聽牌**之後拿掉 —— 宣告是規則動作,照吃 / 碰 / 槓一樣不給開關。
+     · 聽牌提示(v1.66.0~v1.67.2):每張手牌角落顯示「打掉它之後聽幾張」。
+   兩顆都是**替玩家算牌**,而這一頁的賣點正是「真的打麻將」;算牌本來就是玩家自己的事。
+   ⚠ 規則層的 `MJT.tenpaiAfter()` / `tenpaiNow()` 不可以跟著刪 —— 宣告聽牌要靠它們
+     算「哪幾張打掉會聽牌」與驗證宣告資格。 */
 
 /* ---------- 設定:喊牌語音(這一頁專屬,v1.62.0) ----------
    碰 / 吃 / 槓 / 胡 / 流局會用 zh-TW 語音唸出來(音檔在 mp3/m16-voice-*.wav)。
@@ -212,7 +206,6 @@ buildSwatches();
 loadPrefs();
 Solo.loadOwn();
 syncSettingsUI();
-syncM16Hint();
 syncM16Voice();      // ⚠ loadPrefs() 之後才同步(偏好裡的喊牌語音開關要先讀進來)
 syncSoloSeg();
 showScreen("home");

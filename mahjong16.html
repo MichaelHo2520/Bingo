@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.67.2 -->
-<meta name="version" content="1.67.2">
+<!-- 台灣 16 張麻將 · v1.68.0 -->
+<meta name="version" content="1.68.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -306,18 +306,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           </div>
         </div>
 
-        <div class="set-group">
-          <div class="set-group-title">玩法輔助</div>
-          <!-- ⚠ v1.66.0 曾經在這裡放過一顆「聽牌提醒」開關(系統偵測到聽牌就自動提示)。
-               v1.67.0 改成**玩家主動宣告聽牌**(明星三缺一的規則)之後那顆就拿掉了 ——
-               宣告是規則動作,照吃 / 碰 / 槓一樣不需要開關。
-               下面這一列是**進階輔助**(每張牌都告訴你打掉會聽幾張),維持預設關;
-               它在 v1.67.0 之後更有用:那是「要不要宣告、打哪張宣告」的判斷依據。 -->
-          <div class="set-row">
-            <span class="set-lbl">聽牌提示<span class="set-sub">(每張牌角落顯示「打掉它之後聽幾張」)</span></span>
-            <button class="switch" id="m16SwHint" role="switch" aria-checked="false" aria-label="聽牌提示"><span class="knob"></span></button>
-          </div>
-        </div>
+        <!-- ⚠ 「玩法輔助」整組已經拿掉(v1.68.0):兩顆開關都是替玩家算牌 ——
+             聽牌提醒(v1.66.0,系統偵測到就提示)在 v1.67.0 改成主動宣告時先拿掉,
+             聽牌提示(每張牌角落顯示打掉它之後聽幾張)v1.68.0 也拿掉。
+             這一頁的賣點是「真的打麻將」,算牌是玩家自己的事。理由見 notes/11。 -->
 
         <div class="set-group">
           <div class="set-group-title">音效</div>

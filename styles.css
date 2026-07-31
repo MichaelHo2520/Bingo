@@ -2118,10 +2118,8 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
   min-height:3px;border-radius:2px 2px 0 0;background:var(--mj-jf);
   box-shadow:0 0 0 1px rgba(0,0,0,.30)}
 
-/* 聽牌提示(設定裡可開):打掉這張之後聽幾張 */
-.m16-ht.tenpai::after{content:attr(data-n);position:absolute;top:1px;right:1px;
-  min-width:13px;height:13px;line-height:13px;padding:0 2px;border-radius:7px;
-  background:var(--mj-jf);color:#fff;font:800 9px/13px 'Nunito',sans-serif;text-align:center}
+/* (v1.68.0 拿掉了 `.m16-ht.tenpai::after` —— 那是「聽牌提示」的角落數字,
+    開關與整組「玩法輔助」一起收掉了,理由見 notes/11。) */
 
 /* ---------- 明牌(吃碰槓攤出來的) ----------
    ★ v1.58.2:①不再把「跟人要來的那張」橫放 —— 26~40px 的牌轉 90° 之後糊成一塊,

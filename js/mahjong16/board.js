@@ -59,7 +59,7 @@ const M16B = (function(){
   const DRAW_GAP = 0.45;       // 摸進來那張與手牌之間的間隔(幾張牌寬)
   const POOL_ROWS = 3;         // 牌河固定留幾排(見檔頭②;超過就捲)
 
-  let host=null, cb={}, st=null, me=0, sel="", hint=false, lastSig="";
+  let host=null, cb={}, st=null, me=0, sel="", lastSig="";
   /* 宣告聽牌的選牌模式(v1.67.0):按了動作列那顆「宣告聽牌」之後為 true,
      這時點手牌 = 選要打哪一張來宣告。⚠ 換局 / 離房 / 宣告成立都要清掉(clearSel)。 */
   let tingPick = false;
@@ -429,18 +429,17 @@ const M16B = (function(){
       html += '<div class="m16-row">';
       row.forEach(t=>{
         const i = hi++, k = "h"+i;
-        html += handTile(t, k, i, canAct, focus, co, tt);
+        html += handTile(t, k, i, focus, co, tt);
       });
       /* ★ 摸進來那一格**沒摸牌時也要佔住**(v1.58.3)—— 放一個等寬的透明佔位。
          planHand() 已經一律把這一格算進寬度,這裡若不畫,同一副手牌會在
          「我摸了一張 / 我打掉一張」之間左右挪半張牌,看起來就是整副牌在跳。 */
       if(ri===plan.drawRow){
         if(hasDraw){
-          const n = hint ? MJT.tenpaiAfter(st, me, st.drawn).length : 0;
           /* 宣告模式下,摸進來那張也可能是「打了它就聽牌」的選項之一(通常就是摸切) */
           const tk = tt ? (tt.indexOf(st.drawn)>=0 ? " tingok" : " tingno") : "";
-          html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+(n?" tenpai":"")+tk,
-                           ' data-t="'+st.drawn+'" data-k="d"'+(n?' data-n="'+n+'"':''));
+          html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+tk,
+                           ' data-t="'+st.drawn+'" data-k="d"');
         }else{
           html += '<i class="m16-slot" aria-hidden="true"></i>';
         }
@@ -452,10 +451,8 @@ const M16B = (function(){
 
   /* 一張手牌。宣告視窗時,屬於「目前這一組」的牌站起來,其他候選只點一顆小點。
      tt(v1.67.0)= 宣告聽牌的選牌模式:這一份裡的牌打掉之後會聽牌 → 亮起來,其餘壓暗。 */
-  function handTile(t, k, i, canAct, focus, co, tt){
+  function handTile(t, k, i, focus, co, tt){
     let cls = "m16-ht", extra = ' data-t="'+t+'" data-k="'+k+'"';
-    /* ★ 宣告模式優先於「聽牌提示」的角落數字:那一刻要回答的問題只有一個 ——
-       「打哪一張來宣告」,再疊一層數字只會讓人分心。 */
     if(tt){
       cls += (tt.indexOf(t)>=0 ? " tingok" : " tingno");
       if(sel===k) cls += " sel";
@@ -469,8 +466,6 @@ const M16B = (function(){
       return tileHTML(codeOf(t), cls, extra);
     }
     if(sel===k) cls += " sel";
-    const n = (hint && canAct) ? MJT.tenpaiAfter(st, me, t).length : 0;
-    if(n){ cls += " tenpai"; extra += ' data-n="'+n+'"'; }
     return tileHTML(codeOf(t), cls, extra);
   }
 
@@ -605,8 +600,6 @@ const M16B = (function(){
     claimCur(){ const co=claimOpts(); return co.length ? co[Math.min(copt,co.length-1)] : null; },
     setClaimCur(i){ const co=claimOpts(); if(i>=0&&i<co.length){ copt=i; render(); } },
     setNames(fn){ nameOf = fn || (s=>"座位 "+(s+1)); },
-    setHint(v){ hint = !!v; render(); },
-    hintOn(){ return hint; },
     /* 操作提示由盤面出,因為只有它知道這台裝置走一段式還是兩段式 */
     discardHint(){ return oneTap() ? "滑過選牌 · 點一下打出" : "點牌兩次打出"; },
     oneTap,
