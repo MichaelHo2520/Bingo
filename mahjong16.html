@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.62.0 -->
-<meta name="version" content="1.62.0">
+<!-- 台灣 16 張麻將 · v1.63.0 -->
+<meta name="version" content="1.63.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -196,8 +196,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ★ 一定是**房間設定**不是各人偏好 —— 到期補「過」是「誰的 timer 先響誰結算」,
              各自設定的話全房會被最短的那台決定(見 js/mahjong16/adapter.js 檔頭常數)。 -->
       <div class="field">
-        <span class="field-label" id="m16SecLabel">吃碰思考時間</span>
-        <div class="seg" id="m16SecSeg" aria-label="吃碰思考時間">
+        <span class="field-label" id="m16SecLabel">操作倒數</span>
+        <!-- v1.63.0:同一個秒數同時管「吃碰要不要」與「輪到你出牌」——
+             使用者的話是「後續的出牌也沒秒數限制,這樣不是很奇怪,應該是要倒數秒數
+             是做為這次的完全操作倒數」。0 = 關掉(兩邊都不限時,見 adapter 的 secOn) -->
+        <div class="seg" id="m16SecSeg" aria-label="操作倒數">
+          <button data-sec="0">關</button>
           <button data-sec="8">8 秒</button>
           <button class="on" data-sec="12">12 秒</button>
           <button data-sec="20">20 秒</button>

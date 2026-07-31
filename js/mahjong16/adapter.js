@@ -25,12 +25,18 @@
 const MP = MPCore.create((function(){
 
   const COLORS = ["p0","p1","p2","p3"];
-  /* 宣告視窗長度(秒):房主可選,預設 12(v1.59.0 從寫死的 7 秒改過來 ——
+  /* 操作倒數(秒):房主可選,預設 12(v1.59.0 從寫死的 7 秒改過來 ——
      實際上手回報「8 秒太快了」,真牌桌上思考吃碰的時間本來就比這長)。
-     ★ 一定要是**房間層級設定**、不能各人存自己的偏好:到期補「過」是「誰的 timer
-       先響誰結算」,各台設不同秒數的話等於全房都被最短的那個決定。
-     可選的秒數寫在 mahjong16.html 的 #m16SecSeg(8 / 12 / 20 / 30),這裡只守範圍。 */
+     ★ 一定要是**房間層級設定**、不能各人存自己的偏好:到期補「過」/ 自動打牌都是
+       「誰的 timer 先響誰結算」,各台設不同秒數的話等於全房都被最短的那個決定。
+     ★ v1.63.0:這個秒數**同時**管兩件事 —— 吃碰要不要,以及**輪到你出牌**。
+       使用者的話是「後續的出牌也沒秒數限制,這樣不是很奇怪,應該是要倒數秒數是做為
+       這次的完全操作倒數」。
+     ★ **0 = 關掉**(#m16SecSeg 的第一顆)。關掉之後兩邊都不限時 —— 沒有人催,
+       但**某個人離開牌桌就會全桌一直等**(現場親友喊一聲就好,所以這是使用者的選擇)。
+     可選的值寫在 mahjong16.html 的 #m16SecSeg(關 / 8 / 12 / 20 / 30),這裡只守範圍。 */
   const SEC_DEF = 12;
+  const secOK = n => n === 0 || (n >= 5 && n <= 60);      // 守門用範圍,舊房間 / 手改 DB 的值也要能用
 
   let ctx = null;
   let handsGoal = 4;                // 打幾局(房間設定)
@@ -41,6 +47,9 @@ const MP = MPCore.create((function(){
   let claimT = null;                // 宣告視窗的計時器
   let claimKey = "";                // 目前這個宣告視窗的身分(哪張牌 @ 誰打的)
   let myBid = false;                // 這一輪我表態過了沒(只擋自己重複點)
+  let turnT = null, turnKey = "";   // 出牌倒數的計時器與「這一手」的身分(v1.63.0)
+
+  const secOn = () => claimSec > 0;                       // 操作倒數有沒有開
 
   function seatOf(id){ return ctx.order().indexOf(id); }
   function mySeat(){ return seatOf(ctx.me()); }
@@ -333,6 +342,7 @@ const MP = MPCore.create((function(){
        (理由見 renderActs 裡那段:環在走 = 有人可以吃碰,那是牌情)。 */
   function armClaimT(){
     if(!st || !st.claim || st.over){ clearClaimT(); return; }
+    if(!secOn()){ clearClaimT(); return; }        // ★ 倒數關掉 → 不催、也不畫環(等到有人按)
     const key = st.claim.t+"@"+st.claim.from;
     if(key === claimKey && claimT) return;
     if(claimT){ clearTimeout(claimT); claimT=null; }
@@ -350,6 +360,71 @@ const MP = MPCore.create((function(){
     else stopCd();
   }
 
+  /* ---------- 出牌倒數(v1.63.0) ----------
+     使用者:「我覺得對戰遊戲,要做一個設定開關,要不要有倒數秒數功能,而不是只有倒數判斷
+     有沒有要吃碰牌…後續的出牌也沒秒數限制,這樣不是很奇怪,應該是要倒數秒數是做為這次的
+     完全操作倒數」。
+
+     ★ 與宣告視窗**共用同一個秒數**(claimSec)與同一顆環 —— 兩者不會同時發生
+       (有宣告視窗時沒有人在出牌)。
+     ★ **這顆環全桌都看得到**,和宣告視窗那顆相反。判準是 v1.61.2 震動那條原則:
+       「輪到誰」是全桌本來就知道的事(晶片上就有 .turn),不是牌情;而「誰可以吃碰」是牌情。
+       讓大家看到「還在等他、剩幾秒」也才知道為什麼卡著。
+     ★ 到期**自動幫他打一張**:摸切優先(打剛摸進來那張,不動手牌),吃 / 碰之後沒有摸牌時
+       借 AI 挑一張(比亂打好)。同樣不指定房主 —— 誰的 timer 先響誰發交易,搶輸的中止。
+     ⚠ 「這一手」的身分要含 turn / 牌河長度 / 明牌組數 / 有沒有摸牌 —— 每次有人動作至少一個會變,
+       所以會重新計時;而宣告視窗中別人陸續表態時 claim 非 null,這裡根本不 arm(不會被重設)。 */
+  function handKey(s){
+    let m = 0;
+    for(let i=0;i<s.seats;i++) m += s.melds[i].length;
+    return s.turn+":"+s.discards.length+":"+m+":"+(s.drawn>=0?1:0);
+  }
+  function clearTurnT(){
+    if(turnT){ clearTimeout(turnT); turnT=null; }
+    turnKey = "";
+  }
+  function armTurnT(){
+    if(!secOn() || !st || st.claim || st.over || ctx.phase()!=="playing"){ clearTurnT(); stopCd(); return; }
+    if(!MJT.toPlay(st, st.turn)){ clearTurnT(); stopCd(); return; }   // 還沒摸到牌 / 不是該打牌的狀態
+    const key = handKey(st);
+    if(key === turnKey && turnT) return;
+    if(turnT){ clearTimeout(turnT); turnT=null; }
+    turnKey = key;
+    const jitter = Math.max(0, mySeat()) * 220;    // 錯開,避免全桌同時發交易
+    const ms = claimSec*1000 + jitter;
+    turnT = setTimeout(autoDiscard, ms);
+    startCd(ms);                                   // 全桌都看得到(見上面那段)
+  }
+  function autoDiscard(){
+    if(!secOn()) return;
+    if(st && !st.claim && !st.over && st.turn === mySeat())
+      showToast("時間到,自動幫你打出一張", 1600);
+    ctx.txGame(g=>{
+      if(g.status!=="playing" || g.winner) return false;
+      const s0 = MJT.dec(g);
+      if(!s0 || s0.claim || s0.over) return false;
+      const seat = s0.turn;
+      if(!MJT.toPlay(s0, seat)) return false;
+      // ①摸切(不動手牌,對玩家最無害)
+      let s1 = (s0.drawn>=0) ? MJT.discard(s0, seat, s0.drawn) : null;
+      // ②吃 / 碰之後沒有摸牌 → 借 AI 挑一張。⚠ 各台挑的可能不同,但這是交易搶,先到先算
+      if(!s1){
+        try{
+          const a = MJ16AI.pickTurn(MJ16AI.viewOf(s0, seat), "normal");
+          if(a && a.act === "discard") s1 = MJT.discard(s0, seat, a.t);
+        }catch(e){}
+      }
+      // ③真的都不行 → 手上第一張打得掉的(不要讓全桌卡死)
+      if(!s1){
+        const all = MJT.allTiles(s0, seat);
+        for(let i=0;i<all.length && !s1;i++) s1 = MJT.discard(s0, seat, all[i]);
+      }
+      if(!s1) return false;
+      Object.assign(g, MJT.enc(s1));
+      if(s1.over) finishInto(g, s1);
+    }, { local:false });
+  }
+
   /* ---------- 大廳說明 ---------- */
   function ruleHint(){
     const el = $("m16RuleHint"); if(!el) return;
@@ -358,8 +433,15 @@ const MP = MPCore.create((function(){
       "人數不同牌組也不同 —— <b>4 人</b>用整副 144 張;<b>2~3 人去掉萬子</b>(108 張),"+
       "而且 <b>3 人不能吃</b>(去一門之後吃會失衡)。<br>"+
       "計分照麻將的<b>相互算台</b>:自摸三家付、放槍一家付,全桌台數加起來永遠是 0。<br>"+
-      "別人打的牌你吃得下時有 <b>"+claimSec+" 秒</b>可以想(沒表態就自動過),"+
-      "而且<b>別人看不到你在考慮</b> —— 動作列只會寫「等其他人…」。<br>"+
+      (secOn()
+        ? ("每一次操作都有 <b>"+claimSec+" 秒</b>:吃得下別人的牌時可以想這麼久(沒表態就自動過),"+
+           "<b>輪到你出牌也一樣</b>(時間到會幫你摸切)。"+
+           "吃碰時<b>別人看不到你在考慮</b> —— 動作列只會寫「等其他人…」;"+
+           "出牌的倒數則是<b>全桌都看得到</b>(輪到誰本來就不是秘密)。<br>")
+        : ("<b>操作倒數關閉中</b>:吃碰與出牌都不限時,沒有人會被催。"+
+           "吃碰時<b>別人看不到你在考慮</b>。"+
+           "<br><span class=\"m16-warn\">⚠ 關掉之後,如果有人離開牌桌,全桌會一直等他 —— "+
+           "現場喊一聲就好,不然就設個秒數。</span><br>"))+
       "打滿 <b>"+handsGoal+" 局</b>後結算,台數最高的人贏。"+
       "<br><span class=\"m16-warn\">⚠ 手牌與牌山在資料庫是明碼,只適合親友之間玩,不防作弊。</span>";
   }
@@ -387,14 +469,14 @@ const MP = MPCore.create((function(){
       }
       if(k==="claimSec"){
         // 範圍守門而不是白名單:舊房間 / 手改資料庫進來的值也要能用
-        if(!(n>=5 && n<=60) || n===claimSec) return;
+        if(!secOK(n) || n===claimSec) return;
         claimSec = n;
         ctx.unreadyOnFieldChange(); ctx.syncSetup(); ruleHint();
       }
     },
     readRoom(r){
       if(+r.handsGoal>0) handsGoal = +r.handsGoal;
-      if(+r.claimSec>=5 && +r.claimSec<=60) claimSec = +r.claimSec;
+      if(r.claimSec!==undefined && secOK(+r.claimSec)) claimSec = +r.claimSec;
     },
 
     listen(){
@@ -404,7 +486,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 一局的生命週期 ---------- */
     lobbyGame(){ return { wall:null, turn:0, over:null }; },
-    resetRound(){ clearClaimT(); st=null; curRound=null; myBid=false; },
+    resetRound(){ clearClaimT(); clearTurnT(); st=null; curRound=null; myBid=false; },
 
     newGame(ids, prev){
       // 座位每局輪換,顏色與莊家才不會永遠同一個人
@@ -449,7 +531,9 @@ const MP = MPCore.create((function(){
       M16B.render(st, Math.max(0, mySeat()));
       renderHud(); renderActs(); ctx.updateGoal();
 
-      if(s.claim && !s.over) armClaimT(); else clearClaimT();
+      /* 兩種倒數各自 arm(不會同時:有宣告視窗時沒有人在出牌) */
+      if(s.claim && !s.over){ clearTurnT(); armClaimT(); }
+      else { clearClaimT(); armTurnT(); }
 
       // 一局結束 → 記台數(交易冪等,誰先到誰寫)
       if(s.over && rid){
@@ -463,7 +547,7 @@ const MP = MPCore.create((function(){
     enterLobby(){ showScreen("lobby"); $("mpBar").classList.remove("playing"); ruleHint(); },
     backToLobby(){
       showScreen("lobby"); $("mpBar").classList.remove("playing");
-      clearClaimT(); st=null; curRound=null; myBid=false;
+      clearClaimT(); clearTurnT(); st=null; curRound=null; myBid=false;
       wipeActs();
       ctx.renderPlayers();                 // 台數在晶片上,回大廳要重畫(st 已清掉,風會收起來)
       ruleHint();
@@ -475,7 +559,7 @@ const MP = MPCore.create((function(){
       M16Sfx.preload();          // 喊牌音檔先載好,第一次碰才有聲音(見 sfx.js 的 preload)
     },
     onLeave(){
-      clearClaimT(); st=null; curRound=null; tai={}; myBid=false;
+      clearClaimT(); clearTurnT(); st=null; curRound=null; tai={}; myBid=false;
       wipeActs();
     },
 
@@ -495,7 +579,7 @@ const MP = MPCore.create((function(){
         [...seg2.children].forEach(b=>b.classList.toggle("on", +b.dataset.sec===claimSec));
       }
       const L2 = $("m16SecLabel");
-      if(L2) L2.textContent = isHost ? "吃碰思考時間" : "吃碰思考時間(房主決定)";
+      if(L2) L2.textContent = isHost ? "操作倒數" : "操作倒數(房主決定)";
       ruleHint();
     },
     /* 房間框那顆徽章(麥克風左邊)。
@@ -545,7 +629,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 結果 ---------- */
     outcome(w, { iWon, isDraw, mine }){
-      clearClaimT();
+      clearClaimT(); clearTurnT();
       M16B.clearSel();
       renderHud(); renderActs();
       const done = handsDone();
@@ -570,7 +654,7 @@ const MP = MPCore.create((function(){
                          voice:M16Sfx.voiceOn() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
-      if(+o.claimSec>=5 && +o.claimSec<=60) claimSec = +o.claimSec;
+      if(o.claimSec!==undefined && secOK(+o.claimSec)) claimSec = +o.claimSec;
       M16B.setHint(o.hint===true);
       /* 喊牌語音預設**開**:舊偏好裡沒有這個欄位(undefined),要當成開,
          寫成 `=== true` 的話所有老玩家升上來都會是關的,而他們根本不知道有這個開關。 */
@@ -584,11 +668,12 @@ const MP = MPCore.create((function(){
         if(!ctx.setRoomField("handsGoal", v, { lobbyOnly:true, denyMsg:"只有房主能改局數", busyMsg:"對戰中不能改局數" })) return;
         handsGoal = v; ctx.syncSetup(); ctx.updateGoal(); savePrefs();
       },
-      /* 宣告視窗幾秒。lobbyOnly:對戰中改會讓「誰的 timer 先響」在同一個視窗裡不一致,
+      /* 操作倒數幾秒(0 = 關)。同時管吃碰與出牌兩種倒數。
+         lobbyOnly:對戰中改會讓「誰的 timer 先響」在同一手裡不一致,
          而且改設定本來就該回大廳談(同局數)。 */
       setSec(v){
-        v = +v; if(!(v>=5 && v<=60)) return;
-        if(!ctx.setRoomField("claimSec", v, { lobbyOnly:true, denyMsg:"只有房主能改思考時間", busyMsg:"對戰中不能改思考時間" })) return;
+        v = +v; if(!secOK(v)) return;
+        if(!ctx.setRoomField("claimSec", v, { lobbyOnly:true, denyMsg:"只有房主能改操作倒數", busyMsg:"對戰中不能改操作倒數" })) return;
         claimSec = v; ctx.syncSetup(); savePrefs();
       },
       taiOf, handsDone, goal:()=>handsGoal, sec:()=>claimSec,

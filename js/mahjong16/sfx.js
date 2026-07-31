@@ -77,6 +77,13 @@ const M16Sfx = (function(){
     [659,880,1175].forEach((f,i)=>T(f,{ type:"triangle", dur:0.16, vol:0.26, delay:i*0.07 }));
     T(1568,{ type:"sine", dur:0.32, vol:0.18, delay:0.21 });
   }
+  /* 自摸:比胡別人的牌更盛大(四音上行 + 更高的亮頂)。
+     ★ 自摸與胡是**兩個事件**而不是同一個 —— state 裡本來就分得出來(over.from === null),
+       而牌桌上這兩件事的感受差很多(自摸是三家付)。 */
+  function synthZimo(){
+    [659,880,1047,1319].forEach((f,i)=>T(f,{ type:"triangle", dur:0.16, vol:0.26, delay:i*0.065 }));
+    T(1760,{ type:"sine", dur:0.34, vol:0.18, delay:0.26 });
+  }
   function synthWashout(){                       // 流局:兩音下行的收攤感(整體上移一個八度才聽得到)
     T(587,{ type:"triangle", dur:0.20, vol:0.22, slideTo:440 });
     T(392,{ type:"triangle", dur:0.34, vol:0.20, delay:0.16, slideTo:294 });
@@ -85,6 +92,7 @@ const M16Sfx = (function(){
   /* ---------- 事件表 ----------
      順序就是「同一個 diff 裡誰先響」(見 play 的錯開延遲):重的、代表整件事的先響。 */
   const EV = [
+    { k:"zimo",    synth:synthZimo },
     { k:"hu",      synth:synthHu },
     { k:"kong",    synth:synthKong },
     { k:"pong",    synth:synthPong },
@@ -113,7 +121,7 @@ const M16Sfx = (function(){
        音效總音量。換成音檔之後這三個問題全部消失,而且離線也能用。
      ⚠ 語音槽**沒有合成音後備**(synth 傳 null):音檔取不到就是不講話。拿音階去墊會變成
        同一個事件響兩次很像的聲音。 */
-  const VOICE = { pong:"碰", chow:"吃", kong:"槓", hu:"胡", washout:"流局" };
+  const VOICE = { pong:"碰", chow:"吃", kong:"槓", hu:"胡", zimo:"自摸", washout:"流局" };
   let vOn = true;                                  // 偏好存在 mahjong16.prefs.v1(adapter 的 ownPrefs)
 
   /* ⚠ 發聲前一定要確認 Sound 這一版**有**音效槽那組 API。理由是混合快取:sw.js 是
@@ -169,7 +177,10 @@ const M16Sfx = (function(){
          聽起來就是「槓!…摸一張」,那是對的。 */
     if(after.drawn >= 0 && after.turn === me && !(before.drawn >= 0 && before.turn === me)) add("draw");
 
-    if(!before.over && after.over) add(after.over.type === "win" ? "hu" : "washout");
+    /* 胡的兩種:自摸(from 為 null,三家付)與胡別人打的牌(放槍,一家付)。
+       ★ 分成兩個事件是使用者要的(「麻煩再增加自摸的音效」),而 state 裡本來就分得出來。 */
+    if(!before.over && after.over)
+      add(after.over.type !== "win" ? "washout" : (after.over.from === null ? "zimo" : "hu"));
 
     out.sort((x,y)=>ORDER.indexOf(x) - ORDER.indexOf(y));
     return out;
