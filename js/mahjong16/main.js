@@ -137,6 +137,21 @@ $("m16SwHint").addEventListener("click",()=>{
   showToast(M16B.hintOn()?"聽牌提示:開":"聽牌提示:關",1200);
 });
 
+/* ---------- 設定:喊牌語音(這一頁專屬,v1.62.0) ----------
+   碰 / 吃 / 槓 / 胡 / 流局會用 zh-TW 語音唸出來(音檔在 mp3/m16-voice-*.wav)。
+   ★ 打開的當下順手播一聲「碰」試聽 —— 這種開關看不出效果,不試聽的話使用者
+     還要真的打到有人碰才知道有沒有生效(而且點開關本身就是手勢,順便解鎖音訊)。 */
+function syncM16Voice(){
+  const b=$("m16SwVoice"); if(b) b.setAttribute("aria-checked", M16Sfx.voiceOn()?"true":"false");
+}
+$("m16SwVoice").addEventListener("click",()=>{
+  M16Sfx.setVoice(!M16Sfx.voiceOn());
+  savePrefs(); syncM16Voice();
+  const on = M16Sfx.voiceOn();
+  if(on){ markAudioArmed(); Sound.wake(); M16Sfx.say("pong"); }
+  showToast(on?"喊牌語音:開":"喊牌語音:關",1200);
+});
+
 /* (v1.58.2:比分列 #m16Hud 已移除 —— 台數改顯示在房間框的玩家晶片上,
     點晶片傳表情那個入口是核心 renderPlayers() 自己綁的,這裡不必再接一次) */
 
@@ -193,6 +208,7 @@ loadPrefs();
 Solo.loadOwn();
 syncSettingsUI();
 syncM16Hint();
+syncM16Voice();      // ⚠ loadPrefs() 之後才同步(偏好裡的喊牌語音開關要先讀進來)
 syncSoloSeg();
 showScreen("home");
 autoJoinFromQuery(MP);

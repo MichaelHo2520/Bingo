@@ -472,6 +472,7 @@ const MP = MPCore.create((function(){
       showScreen("play");
       $("mpBar").classList.add("playing");
       Sound.start();
+      M16Sfx.preload();          // 喊牌音檔先載好,第一次碰才有聲音(見 sfx.js 的 preload)
     },
     onLeave(){
       clearClaimT(); st=null; curRound=null; tai={}; myBid=false;
@@ -565,11 +566,15 @@ const MP = MPCore.create((function(){
                msg: esc(w.name||"對手")+" "+how+"<br>"+line+(last?"<br>"+seasonMsg():"") };
     },
 
-    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, hint:M16B.hintOn() }; },
+    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, hint:M16B.hintOn(),
+                         voice:M16Sfx.voiceOn() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
       if(+o.claimSec>=5 && +o.claimSec<=60) claimSec = +o.claimSec;
       M16B.setHint(o.hint===true);
+      /* 喊牌語音預設**開**:舊偏好裡沒有這個欄位(undefined),要當成開,
+         寫成 `=== true` 的話所有老玩家升上來都會是關的,而他們根本不知道有這個開關。 */
+      M16Sfx.setVoice(o.voice !== false);
     },
 
     api:{

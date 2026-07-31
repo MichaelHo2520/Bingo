@@ -96,6 +96,26 @@ const M16Sfx = (function(){
   ];
   const ORDER = EV.map(e=>e.k);
 
+  /* ---------- 喊牌語音層(v1.62.0) ----------
+     使用者:「你的吃碰這些,我是可以聽到文字的聲音嗎?目前我試起來是沒有」——
+     他要的是真的喊出「碰」這個字,而不是三個音的和弦。
+
+     ★ 與音效槽是**分開的兩層**,刻意不互相取代:音效是「牌拍到桌上」的動作聲,語音是
+       喊牌 —— 真牌桌上兩個同時有。所以之後就算他把音效槽換成自己的音效檔,
+       語音照樣會疊上去。
+     ★ 只有**宣告動作**有語音(碰 / 吃 / 槓 / 胡 / 流局)。摸牌與打牌一局要響三十幾次,
+       每次唸字會吵死人 —— 那兩個維持合成音。
+     ★ 音檔是 `tools/gen-mj16-voice.ps1` 用系統的 zh-TW 語音(Microsoft Hanhan)產生的,
+       **裁掉前後靜音 + 音量正規化**:SAPI 的原始輸出前後各塞一段靜音,單字「碰」也有
+       1 秒多,直接用會慢半拍(牌都拍下去了才聽到聲音)。
+     ⚠ 刻意**不用瀏覽器的 speechSynthesis**:①各家中文語音差很多,有些 Android 根本
+       沒裝中文語音包 ②iOS 還要額外的手勢解鎖 ③它不經過 AudioContext,吃不到靜音與
+       音效總音量。換成音檔之後這三個問題全部消失,而且離線也能用。
+     ⚠ 語音槽**沒有合成音後備**(synth 傳 null):音檔取不到就是不講話。拿音階去墊會變成
+       同一個事件響兩次很像的聲音。 */
+  const VOICE = { pong:"碰", chow:"吃", kong:"槓", hu:"胡", washout:"流局" };
+  let vOn = true;                                  // 偏好存在 mahjong16.prefs.v1(adapter 的 ownPrefs)
+
   /* ⚠ 發聲前一定要確認 Sound 這一版**有**音效槽那組 API。理由是混合快取:sw.js 是
      network-first,但裝置有可能拿到新的 sfx.js 卻還吃著舊的 audio.js(沒有 def / sfx)——
      那時直接呼叫會 TypeError,而這支是從 render() / applyGame() 裡叫的,
@@ -108,7 +128,12 @@ const M16Sfx = (function(){
   function ensureDefs(){
     if(defed || !ready() || !Sound.def) return;
     defed = true;
+    /* 動作聲:候選音檔**現在還不存在**(等使用者放),所以刻意**不開 HTMLAudio 後備** ——
+       那一層對不存在的檔案會「假成功」,合成音就再也不播了(見 audio.js 的 playClipEl)。 */
     EV.forEach(e=>Sound.def("m16"+e.k, ["mp3/m16-"+e.k+".mp3", "mp3/m16-"+e.k+".wav"], e.synth));
+    /* 語音層:沒有合成音後備(見上面那段註解),但音檔是**跟程式一起發佈**的 →
+       開 HTMLAudio 後備,這樣用 file:// 直接開網頁(fetch 被擋)時照樣喊得出來。 */
+    Object.keys(VOICE).forEach(k=>Sound.def("m16v"+k, ["mp3/m16-voice-"+k+".wav"], null, { el:true }));
   }
 
   /* ==========================================================================
@@ -155,24 +180,55 @@ const M16Sfx = (function(){
      ★ 同一個 diff 可能有兩件事(「別人打牌」+「我摸一張」、「槓」+「槓上補摸」),
        所以依序錯開 90ms —— 全部疊在同一個瞬間會糊成一聲。
      ========================================================================== */
+  /* 排一聲。delay 0 就直接播(排 setTimeout 會多等一個 tick,拍牌聲要即時) */
+  function at(key, delay){
+    if(!delay){ Sound.sfx(key); return; }
+    setTimeout(()=>{ if(ready()) Sound.sfx(key); }, delay);
+  }
   function play(before, after, me){
     const ev = eventsOf(before, after, me);
     if(!ev.length || !ready()) return ev;
     ensureDefs();
     ev.forEach((k,i)=>{
-      if(i === 0) Sound.sfx("m16"+k);
-      else setTimeout(()=>{ if(ready()) Sound.sfx("m16"+k); }, i*90);
+      const t = i*90;
+      at("m16"+k, t);                              // 動作聲(拍牌 / 摸牌…)
+      /* 喊牌壓在動作聲後面 60ms:兩者相隔太近人耳會融成一團,太遠又像回音。
+         ★ 只有宣告動作有語音,其它事件 VOICE 裡沒有就自然跳過。 */
+      if(vOn && VOICE[k]) at("m16v"+k, t+60);
     });
     return ev;
   }
 
   /* 單獨播一個事件(給不是靠 diff 的地方用,例如 tools/t-mj16-sfx.html 試聽頁) */
-  function one(k){
+  function one(k, withVoice){
     if(!ready()) return;
-    ensureDefs(); Sound.sfx("m16"+k);
+    ensureDefs();
+    Sound.sfx("m16"+k);
+    if(withVoice !== false && vOn && VOICE[k]) at("m16v"+k, 60);
+  }
+  /* 只播喊牌那一聲(試聽頁要能單獨聽) */
+  function say(k){
+    if(!ready() || !VOICE[k]) return;
+    ensureDefs(); Sound.sfx("m16v"+k);
+  }
+  /* 進牌桌時把喊牌音檔先載好(五個檔共約 65KB)。
+     ⚠ 這不是效能優化,是**正確性**:音效槽是懶載入的,而語音層沒有合成音可以墊 ——
+       不預載的話「一局裡第一次碰」永遠是沒聲音的(音檔那時才開始飛),
+       使用者只會覺得「有時候有、有時候沒有」。 */
+  function preload(){
+    if(!ready() || !Sound.prime) return;
+    ensureDefs();
+    Object.keys(VOICE).forEach(k=>Sound.prime("m16v"+k));
   }
 
-  return { eventsOf, play, one, KEYS:ORDER };
+  return {
+    eventsOf, play, one, say, preload,
+    KEYS:ORDER,
+    VOICE_KEYS: Object.keys(VOICE),
+    wordOf(k){ return VOICE[k] || ""; },
+    setVoice(v){ vOn = !!v; },
+    voiceOn(){ return vOn; }
+  };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = M16Sfx;

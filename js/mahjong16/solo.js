@@ -104,6 +104,7 @@ const Solo = (function(){
     showScreen("solo");
     closeWin();
     Sound.start();
+    M16Sfx.preload();                             // 喊牌音檔先載好(見 sfx.js 的 preload)
     newHand();
   }
   function newHand(){

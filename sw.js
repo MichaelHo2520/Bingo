@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.61.2";
+const VERSION = "1.62.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -55,9 +55,16 @@ const CORE = [
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",
   "./mp3/lose.wav",
-  /* ⚠ 台灣麻將的喊牌音檔(mp3/m16-pong.mp3 之類)刻意**不列在這裡** —— 它們現在還不存在,
-     而 addAll() 是全有全無的:清單裡有一個 404,整批快取就失敗(離線就整個不能玩了)。
-     那些檔案走 network-first 的順手快取,放進 mp3/ 之後第一次播就會被收進來。 */
+  /* 台灣麻將的喊牌語音(v1.62.0,由 tools/gen-mj16-voice.ps1 產生,共約 65KB)。
+     ⚠ 這五個**確實存在**才列進來 —— addAll() 是全有全無的,清單裡有一個 404
+     整批快取就失敗(離線變成整個不能玩)。所以刪音檔的時候一定要一起把這幾行拿掉。
+     ⚠ 另一組「使用者自己要放的音效檔」(mp3/m16-pong.mp3 之類)刻意**不列**:那些還不存在,
+     走 network-first 的順手快取,放進 mp3/ 之後第一次播就會被收進來。 */
+  "./mp3/m16-voice-pong.wav",
+  "./mp3/m16-voice-chow.wav",
+  "./mp3/m16-voice-kong.wav",
+  "./mp3/m16-voice-hu.wav",
+  "./mp3/m16-voice-washout.wav",
   "./mp3/是要多久.m4a",
   "./mp3/啊西好了沒.m4a",
   "./mp3/快點，來不急啦.m4a",

@@ -93,6 +93,32 @@
         .then(b=>{ cl.buf=b; cl.ready=true; cl.loading=false; })
         .catch(()=>{ cl.loading=false; loadClip(key); });   // 這個候選不行 → 試下一個
     }
+    /* HTMLAudio 後備(同 win/lose 的 playEl)。
+       ⚠ 這一層不是「錦上添花」:**用 file:// 直接開網頁時 fetch 會被 CORS 擋**,
+         所有走 Web Audio 的音檔都載不到。合成音的槽沒差(它有 synth 可以墊),但
+         **沒有合成音後備的槽(台灣麻將的喊牌語音)就會完全沒聲音** —— 而 file:// 正是
+         這個專案的主要玩法之一(README 就寫「直接用瀏覽器開 index.html」)。
+       ⚠ HTMLMediaElement 不受 fetch 的那套限制,所以它播得出來;音量要自己套
+         (它不經過 masterNode),靜音則在 sfx() 入口就擋掉了。
+       ⚠⚠ **只有 def() 時明確開了 `el:true` 的槽才走這裡**(檔案是跟程式一起發佈的)。
+         理由:`el.play()` 對**不存在的檔案也會回傳成功**(錯誤要等 error 事件才知道)——
+         拿它當通用後備的話,「使用者還沒放進來的自訂音效檔」會被判定成播成功,
+         於是 return 掉、**合成音再也不播**,八種動作聲一起消失。
+         (v1.62.0 就是這樣紅了一條「碰的合成音真的發了出去」才抓到。) */
+    function playClipEl(cl){
+      if(!cl || cl.elIdx>=cl.files.length) return false;
+      try{
+        const src=cl.files[cl.elIdx];
+        if(!cl.el || cl.elSrc!==src){
+          cl.el=new Audio(src); cl.elSrc=src;
+          cl.el.addEventListener("error",()=>{ cl.elIdx++; cl.el=null; },{ once:true });
+        }
+        cl.el.volume=Math.max(0,Math.min(1,vol));
+        cl.el.currentTime=0;
+        const p=cl.el.play(); if(p&&p.catch)p.catch(()=>{});
+        return true;
+      }catch(e){ return false; }
+    }
     return {
       toggle(){muted=!muted; if(!muted)tone(660,{type:"triangle",dur:0.08,vol:0.15}); return muted;},
       setMuted(m){muted=!!m;},
@@ -118,13 +144,21 @@
       // 平手不走這裡(平手用 win);lose 只在自己輸時播
       lose(){ if(muted)return; if(playBuf(loseBuf))return; if(!sfxReady.lose&&!sfxFailed.lose)loadSfx("lose"); if(sfxFailed.lose&&playEl("lose"))return; synthLose(); },
       // 註冊一格音效槽:files 可以是單一路徑或候選陣列(依序試),synth 是取不到音檔時的合成音後備
-      def(key,files,synth){ clips[key]={ files:[].concat(files||[]), synth:synth||null, buf:null, ready:false, failed:false, loading:false, i:0 }; },
+      /* 註冊一格音效槽。opts.el = 允許 HTMLAudio 後備(只給「檔案一定隨程式發佈」的槽,見 playClipEl) */
+      def(key,files,synth,opts){ clips[key]={ files:[].concat(files||[]), synth:synth||null, useEl:!!(opts&&opts.el),
+                                              buf:null, ready:false, failed:false, loading:false, i:0, el:null, elSrc:"", elIdx:0 }; },
+      /* 先載好但不播。給「沒有合成音後備」的音效槽用(台灣麻將的喊牌語音):
+         懶載入的話**第一次觸發不會有聲音**(音檔還在飛),而那一格沒有東西可以墊。
+         ⚠ 呼叫時機要選在已經有使用者手勢之後(例如進牌桌),不然只是白白建立 AudioContext。 */
+      prime(key){ loadClip(key); },
       // 播一格音效槽:音檔載好了就播音檔,否則(順手開始載)先用合成音墊著 —— 確保永遠有聲
       sfx(key){
         if(muted)return;
         const cl=clips[key]; if(!cl)return;
         if(cl.ready&&playBuf(cl.buf))return;
         loadClip(key);
+        // fetch 取不到(離線 / file://)→ HTMLAudio(只有 el:true 的槽);再不行才用合成音墊
+        if(cl.failed&&cl.useEl&&playClipEl(cl))return;
         if(cl.synth)cl.synth();
       },
       // 單顆合成音:給各遊戲寫自己的音效樂句用(走 masterNode,吃靜音與總音量)
