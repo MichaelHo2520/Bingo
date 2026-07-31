@@ -45,8 +45,25 @@
        ④ 攤明牌 / 補花 真的會多一排 —— 這個省不掉,所以改成「**只縮不放**」:
           在同一個容器尺寸(寬 × 高)與同一局裡,牌寬單調不遞增;容器尺寸一變或換局
           才重新量。放大回去對排版沒有好處,只會讓人覺得畫面在跳。
-     ⚠ 「只縮不放」的 key **一定要含容器高度** —— 動作列 / 房間框長高會讓盤面變矮,
-       若只認寬度,一局之內會被一路棘輪縮到 TILE_MIN。
+       ⑤ **花色切點**(v1.70.1,又一次上手回報:「手牌沒有長度變化,卻因為別人打的牌
+          突然縮小,下一把摸到牌又放大回來」)。牌寬原本是「在花色邊界裡挑**牌寬最大**
+          的那個切點」算出來的 —— 佔得到便宜就用大牌,但可切的邊界**每摸一張、每打
+          一張都在變**:16 張手牌在 9/7 切法(9 單位 → 51px)與 8/8 切法(9.45 單位
+          → 49px)之間來回,張數明明一直是 16。實測(tools/gen-mj16-fit-diag.js)
+          一局裡來回三次,而且高度夾取從頭到尾**沒有觸發**(h1 == hh)——
+          病灶完全在寬度這一側。
+          → 牌寬改成只看**張數**的預算 budgetUnits(),切點只決定「哪些牌在哪一排」。
+     ⚠ 「只縮不放」曾經拿「容器寬 × 高」當 key、尺寸一變就重量(v1.58.3~v1.70.0)。
+       ★ v1.70.1 拿掉了:盤面變矮的**原因**分不出來 —— 視窗真的變了(該重量)與
+         動作列 / 房間框長高一格(不該重量)在尺寸上長得一樣,矮視窗上每一手都放一次
+         收一次(e2e 750×485 量到同一個容器尺寸下 25 ↔ 27 反覆)。
+         現在改成原因驅動:地板只由 resetFit() 放掉 —— 換局 / 離房 / 視窗 resize。
+       ⚠ 當年把高度放進 key 是為了防「一路棘輪縮到 TILE_MIN」。原因驅動之後那個顧慮
+         也解決了:暫時變矮只會縮**一次**(之後高度恢復,內容塞得下就不再縮)。
+     ⚠⚠ 地板 fitTw **不可以讓 clearSel() 順手清掉**(v1.70.1 的另一半):那一支在
+       「吃碰成立」「我表態完」也會被叫到(solo.js 四處),清掉等於每次宣告結束都
+       允許再放大一次 —— 縮下去卡住、宣告完彈回來,就是回報裡那個「又放大回來」。
+       換局 / 離開牌桌才該重新量,那時請叫 resetFit()。
    ========================================================================== */
 
 const M16B = (function(){
@@ -63,9 +80,18 @@ const M16B = (function(){
   /* 宣告聽牌的選牌模式(v1.67.0):按了動作列那顆「宣告聽牌」之後為 true,
      這時點手牌 = 選要打哪一張來宣告。⚠ 換局 / 離房 / 宣告成立都要清掉(clearSel)。 */
   let tingPick = false;
-  /* 「只縮不放」的狀態(見檔頭④):fitKey = 容器尺寸,換了就重新量;
-     fitTw = 這個容器尺寸下目前用的牌寬,同一局裡只會變小。 */
-  let fitKey="", fitTw=0;
+  /* 「只縮不放」的地板(見檔頭④):fitTw = 目前用的牌寬,一局裡單調不遞增。
+     ★ v1.70.1 拿掉了原本一起記的 fitKey(容器寬 × 高,一變就把地板放掉)——
+       「盤面變矮」有兩種,而尺寸值分不出來:
+         · 視窗真的變了(轉向 / 縮放 / 手機工具列)→ **該**重新量
+         · 動作列 / 房間框的內容長高一格 → **不該**重新量
+       矮視窗上後者每一手都可能發生一次,於是地板一放一收、牌寬在兩個值之間來回
+       (e2e 750×485 實測同一個容器尺寸下 25 ↔ 27 反覆)。
+       現在地板只由 resetFit() 放掉,而它掛在「換局 / 離房 / 視窗 resize」三處 ——
+       原因驅動,不是尺寸驅動。
+     ⚠ 這樣「暫時變矮」會讓牌永久縮一級(直到換局),但**不會反覆棘輪** ——
+       比忽大忽小好,而且動作列有 min-height:38px 撐著,正常不會長高。 */
+  let fitTw = 0;
 
   /* 有滑鼠 = 一段式(hover 已經給了「是哪一張」的回饋);觸控 = 兩段式。
      ⚠ 一定要跟 styles.css 那條 @media 用同一個字串,否則會出現「牌浮起來卻要點兩次」。 */
@@ -106,17 +132,25 @@ const M16B = (function(){
     rows.forEach((r,i)=>{ u = Math.max(u, r.length + ((i===drawRow) ? 1+DRAW_GAP : 0)); });
     return u;
   }
+  /* 這副手牌的**寬度預算** = 兩排最平均分 + 摸進來那一格,★ 只看**張數**。
+     牌寬一律用它算(見檔頭⑤):切在哪個花色邊界只影響「哪些牌在哪一排」,不影響大小。
+     n=16 → 8/8,摸牌格放短排 → max(8, 8+1.45) = 9.45 單位(492px 寬下 48px)。 */
+  function budgetUnits(n){
+    const a = Math.ceil(n/2), b = n - a;
+    return Math.max(a, b + 1 + DRAW_GAP);
+  }
   /* ★ hasDraw 刻意**不參與計算**(v1.58.3):摸牌那一格一律預留。
      算進去的話「我摸了一張」與「我打掉一張」會讓整副牌一大一小輪流跳,
      每一輪來回一次 —— 那就是「一直不停的變換牌的大小」最主要的來源(見檔頭①)。
      參數留著只為了呼叫端讀起來清楚(以及 planFor 的既有測試簽章)。 */
   function planHand(hand, hasDraw, avail){
-    // 方案 A:一排
+    // 方案 A:一排(這一支本來就只看張數,穩定)
     const uA = unitsOf([hand], 0);
     const twA = Math.floor(avail / Math.max(1,uA));
     if(twA >= ONE_ROW_MIN) return { rows:[hand], drawRow:0, tw:Math.min(twA, TILE_MAX) };
 
     // 方案 C:兩排,切在花色邊界
+    const bu = budgetUnits(hand.length);
     const groups=[], keys=[];
     hand.forEach(t=>{
       const g = suitGroup(t);
@@ -129,18 +163,20 @@ const M16B = (function(){
       groups.forEach((g,i)=>{ const t=(i<k)?r1:r2; t.push.apply(t,g); });
       const dr = (r1.length<=r2.length) ? 0 : 1;
       const u  = unitsOf([r1,r2], dr);
-      const tw = Math.floor(avail/Math.max(1,u));
-      if(!best || tw>best.tw) best = { rows:[r1,r2], drawRow:dr, tw:tw };
+      if(!best || u<best.u) best = { rows:[r1,r2], drawRow:dr, u:u };   // 最平均的那個切點
     }
-    // 只有一種花色(清一色)就沒有邊界可切 → 對半分
-    if(!best){
+    /* 沒有邊界可切(清一色)**或**最好的邊界切法比預算還擠(例如 11/5)→ 拆花色對半分。
+       ⚠ 這裡刻意不讓牌寬跟著那種擠法縮:縮下去會被「只縮不放」的地板卡住一整局,
+         代價比「一組花色被拆到兩排」大得多(而牌本身仍然照花色順序排,只是換行)。 */
+    if(!best || best.u > bu + 1e-9){
       const h=Math.ceil(hand.length/2);
       const rows=[hand.slice(0,h), hand.slice(h)];
       const dr=(rows[0].length<=rows[1].length)?0:1;
-      best={ rows:rows, drawRow:dr, tw:Math.floor(avail/Math.max(1,unitsOf(rows,dr))) };
+      best={ rows:rows, drawRow:dr, u:unitsOf(rows,dr) };
     }
-    best.tw = Math.max(TILE_MIN, Math.min(best.tw, TILE_MAX));
-    return best;
+    const tw = Math.floor(avail / Math.max(1, bu, best.u));
+    return { rows:best.rows, drawRow:best.drawRow,
+             tw:Math.max(TILE_MIN, Math.min(tw, TILE_MAX)) };
   }
 
   /* ---------- 一組明牌 ----------
@@ -291,14 +327,13 @@ const M16B = (function(){
     const plan = planHand(hand, hasDraw, avail);
 
     /* ---- 只縮不放(見檔頭④)----
-       key 是**容器的寬 × 高**:它一變(轉向 / 動作列長高 / 房間框換行)就重新量,
-       否則同一局裡牌寬只會變小 —— 攤了明牌縮下去,不會在下一手又彈回去。
-       ⚠ 高度一定要進 key,不然動作列一長高就開始一路棘輪縮到 TILE_MIN。
+       同一局裡牌寬只會變小 —— 攤了明牌縮下去,不會在下一手又彈回去。
+       ⚠ v1.70.1:地板**不再看容器尺寸**(舊版拿「寬 × 高」當 key,一變就重量)——
+         盤面變矮的原因分不出來,結果是每一手放一次、收一次(見上面 fitTw 的註解)。
+         真的該重量的三個時機由 resetFit() 明確驅動:換局 / 離房 / 視窗 resize。
        牌寬另外對齊到 2px:量到的寬度偶爾差 1px(捲軸 / 四捨五入),沒有這一步
        會為了 1px 重畫一次整副牌。 */
     const hh = host.clientHeight;
-    const key = avail+"x"+hh;
-    if(key !== fitKey){ fitKey = key; fitTw = 0; }
     let tw = plan.tw - (plan.tw % 2);
     if(fitTw) tw = Math.min(tw, fitTw);
 
@@ -583,8 +618,13 @@ const M16B = (function(){
       const foe = e.target.closest(".m16-foe");
       if(foe && cb.onFoe) cb.onFoe(+foe.dataset.seat);
     });
+    /* ⚠ 盤面自己的 ResizeObserver **只重畫、不放掉地板**(v1.70.1):它連
+       「動作列長高一格」都會叫,拿它當重量的觸發就是那個忽大忽小的來回。 */
     if(window.ResizeObserver) new ResizeObserver(()=>render()).observe(host);
-    addEventListener("orientationchange", ()=>setTimeout(()=>render(),180));
+    /* 視窗真的變了 → 放掉地板重新量(轉向 / 縮放 / 手機工具列收放)。
+       ⚠ 只認 window 層級的事件,理由同上面那條。 */
+    addEventListener("orientationchange", ()=>setTimeout(()=>{ fitTw=0; render(); },180));
+    addEventListener("resize", ()=>{ fitTw=0; });
   }
 
   /* ==========================================================================
@@ -636,9 +676,16 @@ const M16B = (function(){
 
   return {
     mount, render, revealHTML, readyHTML, overWord,
-    /* 換局 / 回大廳 / 結算都會叫這支 —— 順便把「只縮不放」的地板放掉,
-       新的一局從頭量一次(不然上一局縮下去的牌寬會一直背著走)。 */
-    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; fitTw=0; tingPick=false; },
+    /* 只清「選取 / 宣告選項」那一組狀態。
+       ⚠⚠ **不動牌寬的地板 fitTw**(v1.70.1,見檔頭⑤下面那條):這一支在
+         「吃碰成立」「我表態完」也會被叫到,順手清掉地板就等於每次宣告結束
+         都允許整副牌再放大一次 —— 回報裡「下一把摸牌之後又放大回來」就是它。
+         要重新量牌寬請叫 resetFit()。 */
+    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; tingPick=false; },
+    /* 把「只縮不放」的地板放掉,下一次 render() 從頭量一次。
+       ★ 只有**換局 / 離開牌桌**該叫:新的一局明牌清空、手牌回到 16 張,
+         上一局縮下去的牌寬不該背著走。(視窗 resize / 轉向由 mount() 自己接。) */
+    resetFit(){ fitTw = 0; },
     /* 宣告聽牌的選牌模式。動作列那顆鈕開 / 關它,宣告成立或取消都要關掉。 */
     setTingPick(v){ tingPick = !!v; sel=""; render(); },
     tingPicking(){ return tingPick; },

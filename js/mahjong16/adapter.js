@@ -637,7 +637,10 @@ const MP = MPCore.create((function(){
       if(!s) return;
       const rid = ctx.roundId();
       const newRnd = (rid !== curRound);
-      if(newRnd){ curRound = rid; myBid = false; M16B.clearSel(); }
+      /* ⚠ resetFit() 只掛在**換局**這一格(v1.70.1):牌寬重新量一次。
+         其他路徑(吃碰成立 / 我表態完 / 結算)只清選取,不可以放掉地板 ——
+         那會讓整副牌在一局裡忽大忽小(理由見 board.js 檔頭⑤)。 */
+      if(newRnd){ curRound = rid; myBid = false; M16B.clearSel(); M16B.resetFit(); }
 
       const before = st;
       st = s;

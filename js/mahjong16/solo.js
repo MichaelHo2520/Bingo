@@ -127,6 +127,7 @@ const Solo = (function(){
        (再來一場會把 handNo 歸零),只靠那一層擋不住。 */
     sfxPrev = null;
     M16B.clearSel();
+    M16B.resetFit();                              // 換局才重新量牌寬(v1.70.1,見 board.js 檔頭⑤)
     closeWin();
     st = MJT.newRound({
       rs: "p" + seats,
@@ -143,6 +144,7 @@ const Solo = (function(){
     killTimers();
     active = false; st = null; settled = false; sfxPrev = null;
     M16B.clearSel();
+    M16B.resetFit();                              // 離開牌桌:下次進來從頭量
     closeWin();
     const box = $("m16Acts");
     if(box){ box.classList.add("hidden"); box.innerHTML = ""; }
