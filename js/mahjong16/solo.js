@@ -448,7 +448,13 @@ const Solo = (function(){
     let word, msg;
     if(o.type !== "win"){
       word = last ? "本場結束" : "流局";
-      msg = "牌山見底,這一局不收付 🀫" + (last ? "<br>" + seasonMsg() : "");
+      /* ⚠ 句尾不要放 Unicode 麻將字元(U+1F000 那一段)。原本是「…不收付 🀫」,
+         而 U+1F02B(牌背)在**桌機與手機都畫成一個空心方框** —— 看起來就是缺字的豆腐,
+         使用者的回報是「流局的時候變得好奇怪」。這條規矩專案早就寫過兩次
+         (styles.css 的牌面段落、js/mahjong/board.js 檔頭):那 43 個字元只有 🀄 有
+         emoji 呈現,其餘一律文字呈現、各家字型畫出來的東西都不一樣。
+         ★ 這裡是**散文句尾的裝飾**,拿掉就好(要放圖一律用 MJFace 自繪的牌)。 */
+      msg = "牌山見底,這一局不收付" + (last ? "<br>" + seasonMsg() : "");
     }else{
       const tags = o.list.map(function(x){ return esc(x.name)+" "+x.tai; }).join("、");
       const how = (o.from === null) ? "自摸" : ("胡 " + esc(seatName(o.from)) + " 打的牌");

@@ -637,8 +637,10 @@ const MP = MPCore.create((function(){
       paintTaiTable(last);
       paintWinTiles();                 // 胡的人攤什麼牌(流局時自己收起來)
 
+      /* ⚠ 句尾不要放 Unicode 麻將字元 —— 理由與 solo.js 那份同一條(U+1F02B 會畫成空心
+         方框,看起來就是豆腐)。結果卡有兩份,改一邊一定要改另一邊。 */
       if(!st || !st.over || st.over.type==="draw")
-        return { word: last ? "本場結束" : "流局", msg: last ? seasonMsg() : "牌山見底,這一局不收付 🀫" };
+        return { word: last ? "本場結束" : "流局", msg: last ? seasonMsg() : "牌山見底,這一局不收付" };
 
       const o = st.over;
       const tag = o.list.map(x=>esc(x.name)+" "+x.tai).join("、");
