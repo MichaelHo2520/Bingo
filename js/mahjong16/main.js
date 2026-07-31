@@ -137,6 +137,25 @@ $("m16SwHint").addEventListener("click",()=>{
   showToast(M16B.hintOn()?"聽牌提示:開":"聽牌提示:關",1200);
 });
 
+/* ---------- 設定:聽牌提醒(這一頁專屬,v1.66.0) ----------
+   聽牌的那一刻響一聲 + 唸「聽牌」,動作列同時列出聽哪幾張。一顆開關管聲音與畫面
+   (兩邊都讀 M16Sfx.readyOn()),不會出現「有聲音卻沒列牌」。
+   ★ 打開的當下順手播一聲試聽 —— 同喊牌語音那顆:這種開關看不出效果,
+     不試聽的話要真的打到聽牌才知道有沒有生效(而且點開關本身就是手勢,順便解鎖音訊)。
+   ⚠ 切換之後要**重畫動作列**:那一排「聽哪幾張」是 renderActs / paintActs 畫的,
+     不重畫的話關掉之後它會留在畫面上直到下一次 state 變動(看起來像沒關掉)。 */
+function syncM16Ready(){
+  const b=$("m16SwReady"); if(b) b.setAttribute("aria-checked", M16Sfx.readyOn()?"true":"false");
+}
+$("m16SwReady").addEventListener("click",()=>{
+  M16Sfx.setReady(!M16Sfx.readyOn());
+  savePrefs(); syncM16Ready();
+  const on = M16Sfx.readyOn();
+  if(on){ markAudioArmed(); Sound.wake(); M16Sfx.one("ready"); }
+  if(Solo.active()) Solo.refreshActs(); else MP.refreshActs();
+  showToast(on?"聽牌提醒:開":"聽牌提醒:關",1200);
+});
+
 /* ---------- 設定:喊牌語音(這一頁專屬,v1.62.0) ----------
    碰 / 吃 / 槓 / 胡 / 流局會用 zh-TW 語音唸出來(音檔在 mp3/m16-voice-*.wav)。
    ★ 打開的當下順手播一聲「碰」試聽 —— 這種開關看不出效果,不試聽的話使用者
@@ -209,6 +228,7 @@ Solo.loadOwn();
 syncSettingsUI();
 syncM16Hint();
 syncM16Voice();      // ⚠ loadPrefs() 之後才同步(偏好裡的喊牌語音開關要先讀進來)
+syncM16Ready();      // 同上(聽牌提醒)
 syncSoloSeg();
 showScreen("home");
 autoJoinFromQuery(MP);

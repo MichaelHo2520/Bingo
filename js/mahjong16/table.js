@@ -393,6 +393,17 @@ const MJT = (function(){
     if(!rest) return [];
     return R.winningTiles(R.toCounts(rest), needOf(st,seat));
   }
+  /* ★ 「我現在聽哪幾張」(v1.66.0)—— 打完牌之後的那個狀態。
+     ★ 基準刻意是 st.hands[seat] 而**不含剛摸到那張**:16 張(need*3+1)才是「聽牌」的
+       張數。摸到牌之後手上 17 張,那時要問的是「打掉哪張之後聽什麼」= tenpaiAfter();
+       而摸切(打掉剛摸的那張)聽的就還是這一份 —— 所以摸牌途中拿它當「我現在聽什麼」
+       是正確且穩定的(不會因為摸進來一張沒用的牌就閃一下說我沒聽牌了)。
+     ⚠ 吃 / 碰之後手上也多一張(hands 比基準多 1),winningTiles() 的張數守衛會回空陣列
+       —— 那是對的:那一刻還沒打出去,還不算聽牌。 */
+  function tenpaiNow(st, seat){
+    if(!st || !st.hands || !st.hands[seat]) return [];
+    return R.winningTiles(R.toCounts(st.hands[seat]), needOf(st, seat));
+  }
   function wallLeft(st){ return st.wall.length - st.pos; }
 
   /* ---------- 序列化:整包寫進 Firebase 的 game 節點 ----------
@@ -437,7 +448,7 @@ const MJT = (function(){
   return {
     newRound, autoDraw, discard, bid, allBidsIn, resolveClaim,
     concealedKong, addKong, selfDrawWin, settleWin,
-    ownActions, tenpaiAfter, eligibleFor, wallLeft,
+    ownActions, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft,
     seatWind, leftOf, nextOf, needOf, toPlay, holding, allTiles, enc, dec
   };
 })();

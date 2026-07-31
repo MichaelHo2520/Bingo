@@ -2214,6 +2214,21 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 /* 宣告視窗的說明字:不遮畫面(同消消樂僵局那條 —— 遮住的那一瞬間別人剛好動作,感受就是「被搶了」) */
 .m16-timer{font:800 12px/1 'Nunito',sans-serif;opacity:.85;align-self:center}
 
+/* ---------- 「我現在聽哪幾張」(v1.66.0) ----------
+   聽牌的那一刻除了響一聲,動作列還會列出聽的牌 —— 聲音講「發生了什麼」,這一排講「聽什麼」。
+   ★ 綠底沿用牌角那顆聽牌數字的 --mj-jf:同一件事只用一種顏色語彙,不另外發明。
+   ⚠ 這一排**只有自己看得到**(每台裝置各畫自己的動作列),所以不違反 v1.59.0 那條
+     「牌情不可以洩漏」—— 它洩的是我自己的牌情,而我本來就看得到自己的手牌。
+   ⚠ 高度必須吃得下在 .m16-acts 的 min-height:38px 裡:16px 牌 → 21px 高 + 上下 2px 內距
+     = 25px。長高一點都會讓盤面變矮 → 整副牌縮一次(board.js 檔頭③)。
+   ⚠ 子元素選擇器一律用 `>`:牌面裡面也有 <i>(宣告視窗的候選小點 .m16-omk),
+     寫成 `.m16-ready i` 有一天會連它一起中。 */
+.m16-ready{display:inline-flex;align-items:center;gap:3px;flex:none;
+  padding:2px 6px 2px 5px;border-radius:9px;
+  background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px var(--mj-jf)}
+.m16-ready>b{font:800 11px/1 'Nunito',sans-serif;color:var(--mj-jf);letter-spacing:.5px}
+.m16-ready>i{font:800 10px/1 'Nunito',sans-serif;font-style:normal;opacity:.85}
+
 /* ---------- 宣告視窗的倒數環(v1.58.4) ----------
    使用者:「吃碰這些選擇時,要有一個倒數的時間可以看,而且這個時間要好看一點,
    我想要有點特效」。一顆 SVG 環圈 + 中間的秒數:環圈隨時間排空,最後 3 秒轉紅並脈動。

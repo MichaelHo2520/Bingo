@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.65.0 -->
-<meta name="version" content="1.65.0">
+<!-- 台灣 16 張麻將 · v1.66.0 -->
+<meta name="version" content="1.66.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -309,6 +309,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
         <div class="set-group">
           <div class="set-group-title">玩法輔助</div>
+          <!-- 這一列(v1.66.0)預設**開**:知道自己聽牌了是基本體驗(真牌桌上你自己當然算得出來),
+               不是外掛式的輔助。下面那一列才是進階的(每張牌都告訴你打掉會聽幾張),維持預設關。
+               ⚠ 副標一定要講「鄰座聽得到」—— 親友聚會是坐在一起玩的,這一聲等於報給全桌 -->
+          <div class="set-row">
+            <span class="set-lbl">聽牌提醒<span class="set-sub">(聽牌那一刻唸「聽牌」+ 列出聽哪幾張;聲音鄰座聽得到,想藏就關掉)</span></span>
+            <button class="switch" id="m16SwReady" role="switch" aria-checked="true" aria-label="聽牌提醒"><span class="knob"></span></button>
+          </div>
           <div class="set-row">
             <span class="set-lbl">聽牌提示<span class="set-sub">(每張牌角落顯示「打掉它之後聽幾張」)</span></span>
             <button class="switch" id="m16SwHint" role="switch" aria-checked="false" aria-label="聽牌提示"><span class="knob"></span></button>

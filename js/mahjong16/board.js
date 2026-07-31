@@ -234,6 +234,31 @@ const M16B = (function(){
     return '<div class="m16-reveal" style="--m16w:'+tw+'px">'+parts.join("")+'</div>';
   }
 
+  /* ---------- 「我現在聽哪幾張」(v1.66.0)----------
+     畫在動作列上的一小排(單機與連線共用這一份 —— 牌面與尺寸只有一份,不會走鐘)。
+     ★ 給**牌**不給牌名:使用者在 v1.58.3 為對手的花牌講過「寫個字在那裡,有點沒感覺」,
+       牌面一開始就決定自繪正是為了這種地方(也順手守住「不准用 Unicode 麻將字元」那條)。
+     ⚠ 牌寬**寫死** 20px,不跟著盤面的 tw 走:這一排在 .m16-acts 裡,而動作列一長高
+       盤面就變矮、整副牌跟著縮一次(檔頭③那條紅線)。20px → 26px 高 + 內距 = 30px,
+       塞得進 .m16-acts 原本的 min-height:38px → 動作列高度完全不變。
+     ⚠ 20 是**放大截圖比對**出來的(第一版寫 16px,和牌河最小的牌同級 —— 放大 3 倍認得出,
+       原尺寸卻要瞇著眼看,而這一排的全部價值就是「一眼看出聽什麼」)。同 v1.64.0 那條
+       迷你牌背的教訓:縮到很小還認不認得出來,斷言測不到,只有放大截圖看得出來。
+     ⚠ 最多列 READY_MAX 張,其餘寫成「+N」—— 寬度有上限,動作列才不會被一長排牌推到換行
+       (換行 = 動作列長高 = 整副牌縮一次)。 */
+  const READY_TW = 20, READY_MAX = 5;
+  function readyHTML(state, seat){
+    const s = state || st;
+    if(!s || !F || !R || typeof MJT === "undefined" || !(seat >= 0)) return "";
+    const w = MJT.tenpaiNow(s, seat);
+    if(!w.length) return "";
+    const show = w.slice(0, READY_MAX);
+    return '<span class="m16-ready" style="--m16w:'+READY_TW+'px" aria-label="聽牌">'+
+      '<b>聽</b>'+show.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+
+      (w.length > show.length ? '<i>+'+(w.length-show.length)+'</i>' : '')+
+    '</span>';
+  }
+
   /* ==========================================================================
      渲染
      ========================================================================== */
@@ -520,7 +545,7 @@ const M16B = (function(){
   }
 
   return {
-    mount, render, revealHTML,
+    mount, render, revealHTML, readyHTML,
     /* 換局 / 回大廳 / 結算都會叫這支 —— 順便把「只縮不放」的地板放掉,
        新的一局從頭量一次(不然上一局縮下去的牌寬會一直背著走)。 */
     clearSel(){ sel=""; opts=null; copt=0; lastSig=""; fitTw=0; },

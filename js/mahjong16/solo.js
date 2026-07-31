@@ -379,6 +379,15 @@ const Solo = (function(){
     b.addEventListener("click", fn);
     return b;
   }
+  /* 聽牌那一排(v1.66.0)。牌面與尺寸走 M16B.readyHTML(),與連線共用同一份 ——
+     ⚠ 但「插在哪一格」的那幾行與 adapter.js 的 appendReady() 是**兩份**(grep m16-ready)。
+     ⚠⚠ 它**不可以只在沒有宣告視窗時出現**:我打完一張牌,聽牌那排突然不見了 =
+       電腦吃得下我剛打的那張(v1.59.0 那條紅線的第 6 條管道,單機更明顯 —— 就那兩三家)。 */
+  function appendReady(box, seat){
+    if(!M16Sfx.readyOn()) return;
+    const h = M16B.readyHTML(st, seat);
+    if(h) box.insertAdjacentHTML("beforeend", h);
+  }
   function paintActs(){
     const box = $("m16Acts");
     if(!box) return;
@@ -391,6 +400,12 @@ const Solo = (function(){
       el.textContent = txt;
       box.appendChild(el);
     };
+
+    /* ★ 聽牌那一排(v1.66.0):**一律先插**,只跳過「我自己正在決定要不要吃碰」那一格
+       (那時已經有 ✔ / 胡 / 過 三顆鈕,再多一排會換行 → 動作列長高 → 整副牌縮一次)。
+       ⚠ 條件刻意與 st.claim **無關**,見 appendReady 的註解那條第 6 管道。 */
+    const iDecide = !!(st.claim && st.claim.elig[ME] && !st.claim.bids[ME]);
+    if(!iDecide) appendReady(box, ME);
 
     /* --- 宣告視窗 --- */
     if(st.claim){
@@ -435,7 +450,9 @@ const Solo = (function(){
     a.akong.forEach(function(t){
       box.appendChild(actBtn("加槓 " + face(t).name, "", function(){ ownAct("akong", t); }));
     });
-    if(a.discard && !box.children.length) tag(M16B.discardHint());
+    /* ⚠ 判準是「有沒有按鈕」而不是「這一列空不空」(v1.66.0 改)——
+       聽牌那一排也是子元素,用 children.length 的話一聽牌操作提示就消失了。 */
+    if(a.discard && !box.querySelector(".m16-act")) tag(M16B.discardHint());
   }
 
   /* ---------- 結果卡 ----------

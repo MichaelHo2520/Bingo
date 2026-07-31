@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 /* ============================================================================
    台灣 16 張麻將 — 連線適配器(接上 js/shared/mp-core.js)。
@@ -244,6 +244,22 @@ const MP = MPCore.create((function(){
     b.addEventListener("click", fn);
     return b;
   }
+  /* ---------- 聽牌那一排(v1.66.0) ----------
+     「我現在聽哪幾張」。★ 只有自己這台看得到(每台各畫自己的動作列),洩的是我自己的
+       牌情 —— 而我本來就看得著自己的手牌,所以與 v1.59.0 那條紅線無關。
+     ⚠ 與 solo.js 的 paintActs() 是**兩份**(同 renderActs 那整條),grep m16-ready 找兩處。
+     ⚠⚠ **它不可以只在「沒有宣告視窗」時出現** —— 那會變成 v1.59.0 那條紅線的第 6 條
+       洩漏管道:我打完一張牌,聽牌那排突然不見了 = 有人吃得下我剛打的那張。所以插入條件
+       與 claim **無關**,唯一的例外是「我自己正在決定要不要吃碰」那一格(見 renderActs):
+       那時是我自己知道自己有資格,不洩漏給任何人,跳過只是為了不把三顆按鈕推到換行。
+     ⚠ 混合快取:裝置有可能拿到新的 adapter.js 卻還吃著舊的 sfx.js / board.js ——
+       那時整條動作列會炸在這裡,而它是牌桌上最重要的一列(「過」「胡」都在上面)。 */
+  function appendReady(box, seat){
+    if(typeof M16Sfx === "undefined" || typeof M16Sfx.readyOn !== "function" || !M16Sfx.readyOn()) return;
+    if(typeof M16B.readyHTML !== "function") return;
+    const h = M16B.readyHTML(st, seat);
+    if(h) box.insertAdjacentHTML("beforeend", h);
+  }
   function renderActs(){
     const box = $("m16Acts"); if(!box) return;
     ensureCd();                       // 先建好,倒數環才永遠是這一列的第一個
@@ -255,6 +271,12 @@ const MP = MPCore.create((function(){
     const me = mySeat();
     if(me<0){ box.classList.add("hidden"); return; }
     box.classList.remove("hidden");
+
+    /* ★ 聽牌那一排(v1.66.0):**一律先插**,只跳過「我自己正在決定要不要吃碰」那一格
+       (那時動作列有 ✔ / 胡 / 過 三顆鈕,再多一排會換行 → 動作列長高 → 整副牌縮一次)。
+       ⚠ 條件刻意與 st.claim **無關** —— 見 appendReady 的註解那條第 6 管道。 */
+    const iDecide = !!(st.claim && st.claim.elig[me] && !st.claim.bids[me] && !myBid);
+    if(!iDecide) appendReady(box, me);
 
     /* --- 宣告視窗 ----------------------------------------------------------
        ★ v1.58.2:吃 / 碰 / 槓**不再各出一顆按鈕** —— 選哪一組是在牌上點的(見 board.js
@@ -741,7 +763,7 @@ const MP = MPCore.create((function(){
     },
 
     ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, hint:M16B.hintOn(),
-                         voice:M16Sfx.voiceOn() }; },
+                         voice:M16Sfx.voiceOn(), ready:M16Sfx.readyOn() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
       if(o.claimSec!==undefined && secOK(+o.claimSec)) claimSec = +o.claimSec;
@@ -749,6 +771,7 @@ const MP = MPCore.create((function(){
       /* 喊牌語音預設**開**:舊偏好裡沒有這個欄位(undefined),要當成開,
          寫成 `=== true` 的話所有老玩家升上來都會是關的,而他們根本不知道有這個開關。 */
       M16Sfx.setVoice(o.voice !== false);
+      M16Sfx.setReady(o.ready !== false);       // 聽牌提醒同理:預設開(理由同上)
     },
 
     api:{
