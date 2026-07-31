@@ -504,8 +504,16 @@
   /* 玩家晶片單列橫向捲動(不換行,大廳/遊戲中都套用,見 renderPlayers)。房間橫幅高度因此固定在
      一列,不再每多一列玩家就吃掉 48px 的號碼格空間 —— 縱向空間優先給號碼格 */
   .mp-players.oneline{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
-    margin-top:9px;padding:3px 1px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+    margin-top:9px;padding:3px;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
   .mp-players.oneline .mp-chip{flex:none}
+  /* ⚠ 第一個晶片放大時要「從左緣長」(v1.60.1 修:「房間框第一個人換他的時候,左邊會被卡掉一點點」)。
+     .mp-chip.turn 是 scale(1.04) + 2px 光環,預設 transform-origin 在中心 → 第一張晶片會往
+     容器左邊長出約 3~4px,而那裡是捲動容器的 padding box 外面 —— LTR 的**左側溢出捲不到**
+     (右側溢出反而沒事,捲過去就看得到),於是只有第一個人被削掉一角。
+     改成從左緣放大 = 只往右長(往右是可捲的);剩下 2px 光環靠上面那圈 padding 讓出來。
+     ★ 這是「容器尺寸無關」的修法 —— 溢出量 ≈ 晶片寬 × 2%,名字越長溢得越多,
+       單純加 padding 永遠會被更長的名字追上。 */
+  .mp-players.oneline .mp-chip:first-child{transform-origin:left center}
   .mp-chip{
     display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.10);
     border:1px solid var(--panel-line);border-radius:999px;padding:6px 13px;font-weight:800;font-size:14px;
@@ -853,7 +861,7 @@
     .row{margin-top:9px}
     .mp-subrow{margin-top:5px}
     .mp-players{margin-top:8px;gap:8px}
-    .mp-players.oneline{margin-top:5px;padding:2px 1px}
+    .mp-players.oneline{margin-top:5px;padding:2px 3px}   /* 左右 3px 是光環的位置,見上面 :first-child 那條 */
     .mp-chip{font-size:12.5px;padding:4px 10px}
     .mp-chip.turn{font-size:13.5px}
     .room-tabs button{padding:8px 4px 7px;font-size:13px}
