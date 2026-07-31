@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.70.2";
+const VERSION = "1.70.3";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -55,18 +55,29 @@ const CORE = [
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",
   "./mp3/lose.wav",
-  /* 台灣麻將的喊牌語音(v1.62.0;v1.64.0 起由 tools/gen-mj16-voice-edge.py 產生,共約 155KB)。
+  /* 台灣麻將的語音(v1.62.0;v1.64.0 起由 tools/gen-mj16-voice-edge.py 產生)。
+     ⚠ v1.71.0 起全部收在 **mp3/mj16/** 底下(舊路徑是 mp3/m16-voice-*.wav):mp3/ 根留給
+     五個遊戲共用的東西。改路徑要連 js/mahjong16/sfx.js 的 ensureDefs 與兩支產生器一起改。
      ⚠ 這幾個**確實存在**才列進來 —— addAll() 是全有全無的,清單裡有一個 404
      整批快取就失敗(離線變成整個不能玩)。所以刪音檔的時候一定要一起把這幾行拿掉。
-     ⚠ 另一組「使用者自己要放的音效檔」(mp3/m16-pong.mp3 之類)刻意**不列**:那些還不存在,
-     走 network-first 的順手快取,放進 mp3/ 之後第一次播就會被收進來。 */
-  "./mp3/m16-voice-pong.wav",
-  "./mp3/m16-voice-chow.wav",
-  "./mp3/m16-voice-kong.wav",
-  "./mp3/m16-voice-hu.wav",
-  "./mp3/m16-voice-zimo.wav",
-  "./mp3/m16-voice-washout.wav",
-  "./mp3/m16-voice-ready.wav",       // 聽牌(v1.66.0)
+     ⚠ 另一組「使用者自己要放的音效檔」(mp3/mj16/pong.mp3 之類)刻意**不列**:那些還不存在,
+     走 network-first 的順手快取,放進去之後第一次播就會被收進來。 */
+  "./mp3/mj16/voice-pong.wav",
+  "./mp3/mj16/voice-chow.wav",
+  "./mp3/mj16/voice-kong.wav",
+  "./mp3/mj16/voice-hu.wav",
+  "./mp3/mj16/voice-zimo.wav",
+  "./mp3/mj16/voice-washout.wav",
+  "./mp3/mj16/voice-ready.wav",      // 聽牌(v1.66.0)
+  /* 打出字牌時報的牌名(v1.71.0)。★ 這七個一定要進清單:語音層**沒有合成音後備**,
+     離線又抓不到檔的話就是整組默默不出聲(見 sfx.js 的 VOICE 那段)。 */
+  "./mp3/mj16/voice-tile-fe.wav",
+  "./mp3/mj16/voice-tile-fs.wav",
+  "./mp3/mj16/voice-tile-fw.wav",
+  "./mp3/mj16/voice-tile-fn.wav",
+  "./mp3/mj16/voice-tile-jz.wav",
+  "./mp3/mj16/voice-tile-jf.wav",
+  "./mp3/mj16/voice-tile-jb.wav",
   "./mp3/是要多久.m4a",
   "./mp3/啊西好了沒.m4a",
   "./mp3/快點，來不急啦.m4a",
