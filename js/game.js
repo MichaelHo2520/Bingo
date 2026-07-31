@@ -1184,18 +1184,84 @@
     if(!tx)return;
     MP.sendEmote(emoteTarget,tx,"text"); inp.value=""; closeEmote();
   }
-  // 顯示一個飛起的表情:定位到目標玩家的晶片(找不到就畫面中央),下方標註誰傳給誰
-  function showEmote(emoji,caption,anchorId,kind){
+  /* 顯示一個飛起的表情:起點在賓果卡正中央往上飄,下方標註誰傳給誰
+     ★ v1.67.0 錯開:原本只有 ±18px 隨機抖動,而底下那顆「阿明 → 全部人」膠囊常常 150px 以上,
+       人多一起按就全部疊在同一點、走同一條軌跡 → 看不清(Bingo 沒有人數上限,最慘的就是它)。
+       改成四件事一起做:
+         ① 輪替發位:畫面切成 EF_LANES 個發位,每則挑「最久沒被用到」的那個
+            → 還在飛的一定不會落在同一條;越往上飄越往外側漂(--ef-dx),不會在上方交錯
+         ② 時間錯開:每則至少間隔 EF_GAP 才起飛,同一批進來的變成一串泡泡
+            ⚠ 一定要靠**延後 append** 而不是 animation-delay —— 電子書模式是
+              `animation:none!important`,那時 delay 完全不生效,排隊中的全部會提前現形在起點
+         ③ 同時上限 EF_MAX 則,超出的排隊等前面飄走;隊伍上限 EF_QMAX,再多就丟最舊的
+            (有人狂按時不要積壓成幾十秒的慢動作)
+         ④ 併發縮小:含自己 ≥ EF_SMALL 則時整則縮一號(.ef-sm)。只影響**新的**那則 ——
+            回頭改已經在飛的會看到「飛到一半忽然縮一下」
+       另外同一個人連發沿用他上次的發位往上串(位置穩定不亂跳,而且看得出是同一個人在按)。
+     ⚠ EF_POS 的順序是**中央 → 左 → 右 → 更左 → 更右**,不是由左到右排:
+       最常見的情況是「只有一個人按」,那一則必須落在賓果卡正中央(= 改動前的位置),
+       不然平常玩就會看到表情莫名固定跑到畫面最左邊,只有人多時才正常。
+     ⚠ 發位數必須 ≥ 同時上限(EF_POS.length >= EF_MAX),否則額滿時一定有兩則落在同一條。
+     ⚠ 只錯開 x 不夠:emoji 只有 46px,分開很容易,但底下那顆膠囊有 140px 上下(長暱稱更寬),
+       五條並排在手機上一定橫向相撞 → 每個發位再配一個**固定的垂直偏移** EF_DY,
+       不必犧牲同時則數就能錯開(膠囊高約 18px,差 24 再扣掉 ±5 的抖動也還夠)。
+       ⚠ EF_DY 必須**兩兩**都差 ≥24,不可以只保證「按 x 排序後相鄰的那幾對」——
+         下面的夾回畫面內會把最外側兩條**拉近中央**,所以「這兩條 x 差得遠所以可以同高」
+         這個假設會破功(第一版寫成 0/24/24/0/0,長暱稱時最外側被夾到離中央只剩 73px,dy=0 → 疊住)。
+     ⚠ 「同時幾則」一律問 DOM(efCount)而不是自己記數器:計數器一旦與實際子元素脫節就會永遠判定額滿。
+     ⚠ js/shared/ui-kit.js 有另一份一樣的(Bingo 不載入 js/shared/) —— 改一邊要改另一邊
+       (grep showEmote;`node tools/test-emote-twin.js` 會逐字比對這兩份) */
+  const EF_POS=[0,-.5,.5,-1,1], EF_DY=[0,24,48,-24,-48], EF_LANES=EF_POS.length,
+        EF_GAP=150, EF_MAX=5, EF_QMAX=10, EF_SMALL=4;
+  const efLaneAt=[], efLaneBy=[];
+  let efQ=[], efPumpT=null, efNextAt=0;
+  function efCount(){ const l=$("emoteFly"); return l?l.children.length:0; }
+  function showEmote(emoji,caption,who,kind){
+    if(!$("emoteFly"))return;
+    efQ.push({ emoji:emoji, caption:caption, who:who||"", kind:kind });
+    while(efQ.length>EF_QMAX) efQ.shift();
+    efPump();
+  }
+  function efPump(){
+    if(efPumpT||!efQ.length||efCount()>=EF_MAX)return;   // 額滿就不排 timer(免得空轉),等元素飄走時的回呼再叫一次
+    efPumpT=setTimeout(()=>{
+      efPumpT=null;
+      if(efCount()<EF_MAX&&efQ.length) efFly(efQ.shift());
+      efPump();
+    }, Math.max(0,efNextAt-Date.now()));
+  }
+  // 挑發位:同一個人 2.6 秒內連發沿用他上次那條,否則挑最久沒被用到的
+  function efLane(who){
+    const now=Date.now();
+    if(who) for(let i=0;i<EF_LANES;i++) if(efLaneBy[i]===who && now-(efLaneAt[i]||0)<2600) return i;
+    let pick=0;
+    for(let i=1;i<EF_LANES;i++) if((efLaneAt[i]||0)<(efLaneAt[pick]||0)) pick=i;
+    return pick;
+  }
+  function efFly(m){
     const layer=$("emoteFly"); if(!layer)return;
-    let x=innerWidth/2, y=innerHeight*0.5;
-    const grid=$("grid");          // 起點固定在棋盤正中央,往上飄(不再錨定玩家晶片)
-    if(grid){ const g=grid.getBoundingClientRect(); if(g.width){ x=g.left+g.width/2; y=g.top+g.height/2; } }
-    x += (Math.random()-0.5)*36;   // 一點點抖動,避免連發完全重疊
-    const el=document.createElement("div"); el.className="emote-fly"+(kind==="text"?" is-text":"")+(kind==="voice"?" is-voice":"");
-    el.style.left=x+"px"; el.style.top=y+"px";
-    el.innerHTML='<span class="ef-emo">'+esc(emoji)+'</span><span class="ef-cap">'+esc(caption)+'</span>';   // esc:防止對方送入惡意內容
+    let cx=innerWidth/2, cy=innerHeight*0.5, bw=0;
+    const grid=$("grid");          // 起點在賓果卡正中央(不錨定玩家晶片 —— 晶片在頂列,往上飄馬上出畫面)
+    if(grid){ const g=grid.getBoundingClientRect(); if(g.width){ cx=g.left+g.width/2; cy=g.top+g.height/2; bw=g.width; } }
+    const lane=efLane(m.who), t=EF_POS[lane]||0;                            // t:-1(最左)~ 0(正中央)~ +1(最右)
+    efLaneAt[lane]=Date.now(); efLaneBy[lane]=m.who;
+    const span=Math.min(innerWidth*0.72, Math.max(bw,300))/2;               // 發位鋪在賓果卡寬度上,窄卡也至少散開 300px
+    const dur=2.05+Math.random()*0.4;                                      // 時長微擾:同時起飛的也不會整批同步
+    const el=document.createElement("div");
+    el.className="emote-fly"+(m.kind==="text"?" is-text":"")+(m.kind==="voice"?" is-voice":"")
+              +((efCount()+1>=EF_SMALL)?" ef-sm":"");
+    el.style.setProperty("--ef-dx",(t*20).toFixed(1)+"px");
+    el.style.setProperty("--ef-dur",dur.toFixed(2)+"s");
+    el.style.left=(cx+t*span+(Math.random()-0.5)*14)+"px";
+    el.style.top=(cy+(EF_DY[lane]||0)+(Math.random()-0.5)*10)+"px";
+    el.innerHTML='<span class="ef-emo">'+esc(m.emoji)+'</span><span class="ef-cap">'+esc(m.caption)+'</span>';   // esc:防止對方送入惡意內容
     layer.appendChild(el);
-    setTimeout(()=>{ el.remove(); },2300);   // 用 timeout 移除(電子書模式關動畫仍會清掉)
+    // append 完才量得到實際寬度,再把邊緣發位夾回畫面內(長名字的膠囊很寬,不夾會被裁掉)
+    // ⚠ 要用 offsetWidth,不可以用 getBoundingClientRect —— 動畫 0% 有 scale(.4),rect 量到的是縮小後的寬度
+    const half=el.offsetWidth/2+8;
+    if(half>8) el.style.left=Math.max(half,Math.min(innerWidth-half,parseFloat(el.style.left)))+"px";
+    efNextAt=Date.now()+EF_GAP;
+    setTimeout(()=>{ el.remove(); efPump(); }, dur*1000+120);   // 用 timeout 移除(電子書模式關動畫仍會清掉)
   }
   function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
