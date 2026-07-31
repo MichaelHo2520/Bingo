@@ -83,6 +83,15 @@ const M16B = (function(){
   function backTile(cls){
     return '<div class="m16-tile m16-back'+(cls?" "+cls:"")+'" aria-hidden="true">'+F.backHTML()+'</div>';
   }
+  /* 對手張數標籤前面那顆迷你牌背(v1.63.1 之前是 Unicode 的 🀫)。
+     ⚠ 不可以用 U+1F000 那一段的字元:只有 🀄 有 emoji 呈現,🀫(U+1F02B)在桌機與手機
+       都被畫成一個**空心方框**,看起來就是缺字的豆腐(CLAUDE.md 有這條紅線)。
+     ★ 尺寸與框粗由 CSS 的 .m16-cntb 決定 —— 12×16px 下 mj-faces 原本的 stroke-width:3
+       換算只有 0.36px(等於看不見),所以那邊用兩層選擇器把它加粗回來。
+     ⚠ F 可能是 null(mj-faces.js 沒載到),那時就只留數字,不要整列爆掉。 */
+  function cntBack(){
+    return F ? '<span class="m16-cntb">'+F.backHTML()+'</span>' : "";
+  }
   const codeOf = t => R.codeOf(t);
 
   /* ---------- 手牌分排 ----------
@@ -179,7 +188,7 @@ const M16B = (function(){
       '<span class="m16-wind">'+F.info(wind).glyph+'</span>'+
       (seat===st.dealer?'<span class="m16-dz">莊</span>':'')+
       '<span class="m16-foename" data-seat="'+seat+'"></span>'+
-      '<span class="m16-cnt">🀫 '+cnt+'</span>'+
+      '<span class="m16-cnt">'+cntBack()+cnt+'</span>'+
       '<span class="m16-fmelds">'+
         (fl.length?flowerHTML(fl, mtw):"")+
         st.melds[seat].map(m=>meldHTML(m, mtw)).join("")+

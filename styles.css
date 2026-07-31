@@ -2166,7 +2166,16 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
   width:19px;height:19px;border-radius:50%;background:var(--mj-z);color:#fff;
   font:800 11px/19px 'Nunito',sans-serif;flex:none}
 .m16-foename{font-weight:800;max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.m16-cnt{opacity:.8}
+/* 對手手牌張數(v1.63.1 起前面那顆是 MJFace 自繪的迷你牌背,不再是 Unicode 的 🀫 ——
+   那個字元在桌機與手機都被畫成一個空心方框,看起來就是缺字的豆腐)。
+   ⚠ .mj-svg 是 width/height:100%,尺寸一定要由這個外框給,不然量不出來(塌成 0)。
+   ⚠ 加粗框那條**一定要兩層** `.m16-cntb .mj-bkl`(0,2,0)才蓋得過 `.mj-bkl`(0,1,0):
+     原始的 stroke-width:3 是給 100×132 的 viewBox 用的,縮到 16px 高只剩 0.36px =
+     看不見,整顆會變成一塊沒有細節的綠色圓角矩形(跟豆腐方框一樣沒有辨識度)。
+     9 換算回來約 1.1px,連中央那顆菱形都還認得出來(截圖比對過 11/12/14px 三種)。 */
+.m16-cnt{opacity:.8;display:inline-flex;align-items:center;gap:4px}
+.m16-cntb{width:12px;height:16px;flex:none;display:block}
+.m16-cntb .mj-bkl{stroke-width:9}
 /* 莊家記號(v1.58.3):盤面上掛在每一家自己那一列、房間框裡掛在玩家晶片上 ——
    原本寫在盤面頂端的資訊列「莊 某某」,但那整列被拿掉了(可吃 / 牌山對玩的人沒有用)。 */
 .m16-dz{display:inline-grid;place-items:center;min-width:18px;height:17px;padding:0 3px;flex:none;
