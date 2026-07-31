@@ -768,18 +768,28 @@ const MP = MPCore.create((function(){
       paintTaiTable(last);
       paintWinTiles();                 // 胡的人攤什麼牌(流局時自己收起來)
 
+      /* 大字:四種輸法分開講(v1.70.0)。文案表與挑選規則在 M16B.overWord() —— 單機那份
+         叫的是同一支,所以這裡**不再是「兩份要一起改」**的其中一份。
+         ★ 卡片配色順手覆寫:核心只知道「贏 / 沒贏」,而「別人放槍給別人胡」我一毛都不用付,
+           掛 lose 的紅字看起來像我賠了。核心是在呼叫這支之前掛的,覆寫得掉。 */
+      const ow = M16B.overWord(st && st.over, mySeat());
+      const card = $("m16WinCard");
+      if(card){ card.classList.remove("win","lose","draw"); card.classList.add(ow.tone); }
+
       /* ⚠ 句尾不要放 Unicode 麻將字元 —— 理由與 solo.js 那份同一條(U+1F02B 會畫成空心
-         方框,看起來就是豆腐)。結果卡有兩份,改一邊一定要改另一邊。 */
+         方框,看起來就是豆腐)。msg 這一半仍然是兩份,改一邊一定要改另一邊。 */
       if(!st || !st.over || st.over.type==="draw")
-        return { word: last ? "本場結束" : "流局", msg: last ? seasonMsg() : "牌山見底,這一局不收付" };
+        return { word: last ? "本場結束" : ow.word, msg: last ? seasonMsg() : "牌山見底,這一局不收付" };
 
       const o = st.over;
       const tag = o.list.map(x=>esc(x.name)+" "+x.tai).join("、");
       const how = (o.from===null) ? "自摸" : ("胡 "+esc(nameOfSeat(o.from))+" 打的牌");
       const line = "底 "+o.base+" + 台 "+o.tai+" = <b>"+o.total+"</b> 台("+(tag||"無台")+")";
-      if(iWon) return { word: last?"本場結束":"你胡了!",
+      /* ★ 最後一局仍是「本場結束」(與單機同步):那張卡的主角是總結算,
+         這一手怎麼輸的 msg 那行寫得清清楚楚。 */
+      if(iWon) return { word: last?"本場結束":ow.word,
                         msg: how+"<br>"+line+(last?"<br>"+seasonMsg():"") };
-      return { word: last?"本場結束":"你沒胡",
+      return { word: last?"本場結束":ow.word,
                msg: esc(w.name||"對手")+" "+how+"<br>"+line+(last?"<br>"+seasonMsg():"") };
     },
 

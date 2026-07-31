@@ -491,8 +491,12 @@ const Solo = (function(){
   function paintResult(last){
     const o = st.over;
     const iWon = (o.type === "win" && o.seat === ME);
+    /* 大字與卡片配色都由 M16B.overWord() 決定(v1.70.0,與連線那份同一支)。
+       ⚠ 這裡原本只 remove 不 add —— 單機的結果卡從來沒上過色,贏了輸了都是同一組
+         金色漸層。連線那半是核心 mp-core 幫忙掛的,單機沒有核心,要自己掛。 */
+    const ow = M16B.overWord(o, ME);
     const card = $("m16WinCard");
-    if(card) card.classList.remove("win","lose","draw");
+    if(card){ card.classList.remove("win","lose","draw"); card.classList.add(ow.tone); }
 
     // 攤出胡牌那家的牌
     const box = $("m16Win");
@@ -509,7 +513,7 @@ const Solo = (function(){
 
     let word, msg;
     if(o.type !== "win"){
-      word = last ? "本場結束" : "流局";
+      word = last ? "本場結束" : ow.word;
       /* ⚠ 句尾不要放 Unicode 麻將字元(U+1F000 那一段)。原本是「…不收付 🀫」,
          而 U+1F02B(牌背)在**桌機與手機都畫成一個空心方框** —— 看起來就是缺字的豆腐,
          使用者的回報是「流局的時候變得好奇怪」。這條規矩專案早就寫過兩次
@@ -521,7 +525,9 @@ const Solo = (function(){
       const tags = o.list.map(function(x){ return esc(x.name)+" "+x.tai; }).join("、");
       const how = (o.from === null) ? "自摸" : ("胡 " + esc(seatName(o.from)) + " 打的牌");
       const line = "底 " + o.base + " + 台 " + o.tai + " = <b>" + o.total + "</b> 台(" + (tags||"無台") + ")";
-      word = last ? "本場結束" : (iWon ? "你胡了!" : "你沒胡");
+      /* ★ 最後一局仍然是「本場結束」(單機 e2e 在斷言這句):那一張卡的主角是總結算,
+         不是這一手怎麼輸的 —— 誰胡誰放槍 msg 那一行本來就寫得清清楚楚。 */
+      word = last ? "本場結束" : ow.word;
       msg = (iWon ? how : (esc(seatName(o.seat)) + " " + how)) + "<br>" + line +
             (last ? "<br>" + seasonMsg() : "");
     }

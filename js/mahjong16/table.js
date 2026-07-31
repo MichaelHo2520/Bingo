@@ -438,7 +438,11 @@ const MJT = (function(){
       s.hands[seat] = sortHand(s.hands[seat].concat([o.tile]));
     }
     s.claim = null; s.drawn = -1; s.robbable = null;
-    s.over = { type:"win", seat:seat, from:o.from, tile:o.tile,
+    /* rob:這一胡是不是搶槓來的(v1.70.0 加)。台數表本來就認得搶槓,但那是**贏家**的
+       台種;結果卡要對**被搶的那家**講「槓被搶了」,得從 over 認得出來 ——
+       st.claim 到這裡已經清掉了,不留記號就再也問不到。
+       ⚠ over 是整包 JSON.stringify 進 Firebase(見 enc),加欄位不必動序列化。 */
+    s.over = { type:"win", seat:seat, from:o.from, tile:o.tile, rob:!!o.rob,
                tai:res.tai, base:res.base, total:res.total,
                list:res.list, deltas:deltas };
     return s;

@@ -587,8 +587,55 @@ const M16B = (function(){
     addEventListener("orientationchange", ()=>setTimeout(()=>render(),180));
   }
 
+  /* ==========================================================================
+     結果卡的大字(v1.70.0)
+     ── 為什麼在這裡 ──────────────────────────────────────────────────────────
+       結果卡有兩份(solo.js paintResult / adapter.js outcome),原本兩邊各寫一次
+       「你胡了! / 你沒胡」。文案要分情境之後,兩份各寫一遍遲早走鐘 ——
+       **這一支是唯一真相**,兩份都叫它。
+     ── ★ 「你沒胡」講的是結果,不是這一局發生什麼事 ──────────────────────────
+       使用者:「如果今天是被胡了,應該寫『放槍了』之類的」。麻將輸的方式不只一種,
+       而且**賠的錢差很多**(見 scoring.js settle):
+         · 我放槍(over.from === 我)     → 食胡一家付,全部我出   → 最痛的那個
+         · 我加槓被搶(還多一個 rob 記號) → 同上,而且是自己遞出去的
+         · 別人自摸(over.from === null) → 三家各付一份
+         · 別人放槍給別人胡             → **我一毛都不用付**,寫「你沒胡」太委屈
+       所以大字照這四種分開,語氣也照痛的程度分。
+     ── ★ 同一局一定要挑到同一句(決定性) ──────────────────────────────────────
+       每種情境有好幾句輪替,但**不可以用 Math.random()**:連線的 outcome() 會被
+       核心重複呼叫(applyGame 每次都會走一遍,只有音效被 outcomeShown 擋住),
+       隨機挑會讓大字在結果卡上自己跳來跳去。改用 over 自己的欄位當種子 ——
+       同一局永遠同一句,換一局才換。
+     ⚠ 字數上限抓 6 個字:大字是 clamp(30px,7.5vw,44px)、卡內容寬約 336px,
+       44px × 6 ≈ 264px 還進得去(e2e「M. 結果卡大字不會撐爆整張卡」在守這條)。
+     ========================================================================== */
+  const OVER_WORDS = {
+    tsumo:   ["自摸啦!", "自摸!", "摸到了!"],              // 我自摸
+    win:     ["你胡了!", "胡啦!", "這張我要"],             // 我食胡
+    fire:    ["放槍了…", "這槍你放的", "槍是你開的"],       // ★ 我放槍
+    robbed:  ["槓被搶了!", "槓…被胡走", "搶槓,你的"],      // ★ 我加槓被搶(罕見但很有戲)
+    tsumoed: ["被自摸…", "他自摸了", "自摸,你也賠"],       // 別人自摸,我陪付
+    bystand: ["不干你的事", "別人放的槍", "你躲過了"]       // 別人放槍給別人胡,我不付
+  };
+  function pickWord(list, seed){
+    return list[((seed % list.length) + list.length) % list.length];
+  }
+  /* over = MJT state 的 st.over;me = 我的座位(單機固定 0,連線是 mySeat())。
+     回傳 { word, tone } —— tone 直接就是結果卡要掛的 class(win / lose / draw)。 */
+  function overWord(over, me){
+    if(!over) return { word:"本局結束", tone:"draw" };
+    if(over.type !== "win") return { word:"流局", tone:"draw" };
+    const seed = (over.tile|0)*7 + (over.total|0)*13 + (over.seat|0)*3 +
+                 (over.from==null ? 0 : (over.from|0)+1);
+    if(over.seat === me) return { word:pickWord(over.from==null?OVER_WORDS.tsumo:OVER_WORDS.win, seed), tone:"win" };
+    if(over.from === me) return { word:pickWord(over.rob?OVER_WORDS.robbed:OVER_WORDS.fire, seed), tone:"lose" };
+    if(over.from == null) return { word:pickWord(OVER_WORDS.tsumoed, seed), tone:"lose" };
+    /* 別人放槍給別人胡:收付表上我是 0 台。紅字(lose)看起來像我賠了,給中性的 draw。 */
+    return { word:pickWord(OVER_WORDS.bystand, seed), tone:"draw" };
+  }
+
   return {
-    mount, render, revealHTML, readyHTML,
+    mount, render, revealHTML, readyHTML, overWord,
     /* 換局 / 回大廳 / 結算都會叫這支 —— 順便把「只縮不放」的地板放掉,
        新的一局從頭量一次(不然上一局縮下去的牌寬會一直背著走)。 */
     clearSel(){ sel=""; opts=null; copt=0; lastSig=""; fitTw=0; tingPick=false; },
