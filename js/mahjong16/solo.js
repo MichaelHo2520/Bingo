@@ -19,8 +19,11 @@
 
    ── ★ 電腦「在想什麼」不可以洩漏給玩家 ────────────────────────────────────
      同 v1.59.0 那條(連線版):玩家打出一張牌之後,如果電腦正在決定要不要吃碰,
-     動作列只能寫中性的「等其他人…」。寫成「等電腦決定要不要吃碰」等於告訴玩家
+     動作列不可以透露這件事。寫成「等電腦決定要不要吃碰」等於告訴玩家
      「有人手上有這張」—— 單機一樣是牌情,而且單機更明顯(就那幾家)。
+     ★★ v1.65.0:中性的「等其他人…」**還是不夠** —— 沒有宣告視窗時那一格寫的是
+       「輪到 ○○…」,兩句話不一樣就照樣看得出來。現在兩種情況顯示**同一句**
+       (turnText(dispTurn())),對手列的高亮也一起走 board.js 的 shownTurn()。
    ========================================================================== */
 
 const Solo = (function(){
@@ -86,6 +89,15 @@ const Solo = (function(){
 
   /* ---------- 名字 / 座位 ---------- */
   function seatName(s){ return s === ME ? "你" : (AI_NAMES[(s-1) % AI_NAMES.length] || ("電腦"+s)); }
+  /* 畫面上「輪到誰」——宣告視窗開著時 st.turn 還停在打牌的人身上,沒人能宣告時
+     turn 早就跳到下一家了 → 直接顯示 st.turn 等於告訴玩家「電腦在考慮吃你這張」。
+     ⚠ 與 adapter.js 的 dispTurn() / board.js 的 shownTurn() 同一條規則(grep dispTurn)。 */
+  function dispTurn(){
+    if(!st) return 0;
+    if(st.claim && !st.claim.rob) return (st.claim.from + 1) % st.seats;
+    return st.turn;
+  }
+  function turnText(s){ return s === ME ? "輪到你…" : ("輪到 " + seatName(s) + "…"); }
   function windGlyph(s){
     if(!st) return "";
     return MJFace.info(MJ16.codeOf(MJT.seatWind(s, st.dealer, st.seats))).glyph;
@@ -383,9 +395,13 @@ const Solo = (function(){
     /* --- 宣告視窗 --- */
     if(st.claim){
       const types = st.claim.elig[ME];
-      /* ★ 沒我的事 / 我已經表態 → 一個字都不提吃碰(見檔頭那條)。 */
+      /* ★ 沒我的事 / 我已經表態 → 一個字都不提吃碰(見檔頭那條)。
+         ★★ v1.65.0:連「等其他人…」都不能寫 —— 沒有宣告視窗時這裡是「輪到 ○○…」,
+           兩句話不一樣,玩家照樣看得出「電腦在考慮要不要吃我這張」。單機更致命:
+           就那兩三家,等於直接報牌。改成走 turnText(dispTurn()),兩種情況的字一模一樣。
+           ⚠ 與 adapter.js 的 renderActs() 是**兩份**,改一邊要看另一邊(grep dispTurn)。 */
       if(!types || st.claim.bids[ME]){
-        tag(st.claim.bids[ME] ? "已表態,等其他人…" : "等其他人…");
+        tag(st.claim.bids[ME] ? "已表態,等其他人…" : turnText(dispTurn()));
         return;
       }
       tag("別人打「" + face(st.claim.t).name + "」");
@@ -408,7 +424,7 @@ const Solo = (function(){
     }
 
     /* --- 不是我的回合 --- */
-    if(st.turn !== ME){ tag("輪到 " + seatName(st.turn) + "…"); return; }
+    if(st.turn !== ME){ tag(turnText(st.turn)); return; }     // ★ 與宣告視窗那句一模一樣
 
     /* --- 我的回合 --- */
     const a = MJT.ownActions(st, ME);

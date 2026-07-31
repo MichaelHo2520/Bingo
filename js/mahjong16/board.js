@@ -175,16 +175,30 @@ const M16B = (function(){
       tiles.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+'</span>';
   }
 
+  /* 畫面上「輪到誰」——★ v1.65.0。宣告視窗開著時 st.turn 還停在**打牌的人**身上
+     (discard 遇到有人能宣告就不換手),沒人能宣告時 turn 早就跳到下一家了 ——
+     高亮還在不在出牌者身上,等於直接告訴他「有人吃得下你剛打的那張」。
+     連線與單機都適用(「電腦在考慮吃碰」同樣不可以被看出來),所以判斷寫在盤面這一層。
+     ⚠ 與 adapter.js 的 dispTurn() 是同一條規則,改一邊要看另一邊(grep dispTurn)。
+     ⚠ 搶槓視窗例外:槓完本來就還是加槓的人繼續打。 */
+  function shownTurn(){
+    if(st.claim && !st.claim.rob) return (st.claim.from + 1) % st.seats;
+    return st.turn;
+  }
+
   /* ---------- 對手那一列 ----------
      ★ 莊家的記號放在**每個人自己那一列**(v1.58.3)——原本寫在盤面頂端那條資訊列
        («莊 某某»),但那條整列被拿掉了(可吃 / 牌山對玩的人沒有用)。
        我自己是不是莊,由房間框的玩家晶片講(adapter.chipLead),兩邊同一套記號。 */
   function foeHTML(seat, tw){
     const wind = R.codeOf(MJT.seatWind(seat, st.dealer, st.seats));
+    /* ⚠ 張數用**真的** st.turn:宣告視窗中下一家還沒摸牌(16 張),沒人宣告時他早就摸到
+       (17 張)—— 這是藏不掉的殘留管道,但刻意不假造。顯示 17 之後若有人碰,那家會從
+       17 掉回 16,反而更明顯;而張數要主動去數才看得出來(見 adapter.js renderActs)。 */
     const cnt  = st.hands[seat].length + ((st.turn===seat && st.drawn>=0)?1:0);
     const fl   = st.flowers[seat];
     const mtw  = Math.round(tw*0.52);
-    return '<div class="m16-foe'+(st.turn===seat?" on":"")+'" data-seat="'+seat+'">'+
+    return '<div class="m16-foe'+(shownTurn()===seat?" on":"")+'" data-seat="'+seat+'">'+
       '<span class="m16-wind">'+F.info(wind).glyph+'</span>'+
       (seat===st.dealer?'<span class="m16-dz">莊</span>':'')+
       '<span class="m16-foename" data-seat="'+seat+'"></span>'+

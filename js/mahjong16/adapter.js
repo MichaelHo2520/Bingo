@@ -32,6 +32,16 @@ const MP = MPCore.create((function(){
      ★ v1.63.0:這個秒數**同時**管兩件事 —— 吃碰要不要,以及**輪到你出牌**。
        使用者的話是「後續的出牌也沒秒數限制,這樣不是很奇怪,應該是要倒數秒數是做為
        這次的完全操作倒數」。
+     ★★ v1.65.0:這個秒數是**一手的總預算**,不是「吃碰 N 秒 + 出牌再 N 秒」。
+       使用者的話是「如果我選了三十秒,這三十秒應該是要包含思考要不要吃,而不是如果
+       下家在考慮要不要吃,選完後,我會重新有三十秒,這樣不就被知道這張牌,對方是有
+       相關的」。v1.63.0 的兩段各自起算,等於把 v1.59.0 好不容易藏起來的牌情從
+       **時間**這條管道洩回去:打完牌之後環沒有馬上出現、出現之後又跑滿一整輪 ——
+       那就是「有人吃得下你剛打的那張」的明碼訊號(而且連他想了幾秒都看得到)。
+       所以現在改成:**從「有人打出一張牌」那一刻起算 claimSec 秒**,宣告視窗與後續
+       出牌共用這一份預算,到 0 為止一定會有一張新的牌落到牌河。
+     ★ 宣告階段最多吃掉一半(claimMs)—— 用滿的話下一家會 0 秒被自動摸切,而拖滿的
+       通常是掛機的人、被罰的卻是下一家。**留一半不影響對稱性**:總長度仍然固定。
      ★ **0 = 關掉**(#m16SecSeg 的第一顆)。關掉之後兩邊都不限時 —— 沒有人催,
        但**某個人離開牌桌就會全桌一直等**(現場親友喊一聲就好,所以這是使用者的選擇)。
      可選的值寫在 mahjong16.html 的 #m16SecSeg(關 / 8 / 12 / 20 / 30),這裡只守範圍。 */
@@ -48,8 +58,42 @@ const MP = MPCore.create((function(){
   let claimKey = "";                // 目前這個宣告視窗的身分(哪張牌 @ 誰打的)
   let myBid = false;                // 這一輪我表態過了沒(只擋自己重複點)
   let turnT = null, turnKey = "";   // 出牌倒數的計時器與「這一手」的身分(v1.63.0)
+  let handAt = 0;                   // ★ v1.65.0:「這一手」的錨點(本地 performance.now())
 
-  const secOn = () => claimSec > 0;                       // 操作倒數有沒有開
+  const secOn   = () => claimSec > 0;                     // 操作倒數有沒有開
+  const budgetMs = () => claimSec * 1000;                 // 一手的總預算(從 handAt 起算)
+  const claimMs  = () => Math.ceil(claimSec/2) * 1000;    // 其中宣告階段最多佔掉的那一半
+
+  /* 「新的一手」= 全桌**本來就看得到**的公開動作,倒數從這裡重新起算:
+       ①有人打出一張牌(牌河變長)—— 絕大多數情況就是這一條
+       ②有人槓(槓要補一張再打,是額外動作;槓本身公開,多給時間不洩漏任何牌情)
+       ③搶槓視窗開啟(加槓引發的,同②;不重設的話這一手的預算通常已經用掉了,
+         視窗會瞬間到期 → 有人本來能搶槓卻被跳過,那是規則錯誤而不只是手感問題)
+     ⚠ 吃 / 碰**刻意不算**:它們發生在宣告視窗裡,重新起算就等於「有人吃碰 → 這一手變長」,
+       那正是這一版要堵的洩漏。碰的人用這一手剩下的時間(他主動碰,早想好要打什麼)。
+     ⚠ 連兩次槓(槓完摸到又能槓)不會再重設一次 —— 罕見,而且最壞只是被自動摸切一次,
+       不是規則錯誤。不用 melds 長度判是因為加槓不會讓 melds 變長(pong 就地變 kong)。 */
+  function isNewHand(b, a){
+    if(!b) return true;
+    if(a.discards.length > b.discards.length) return true;
+    if(a.kongDraw && !b.kongDraw) return true;
+    if(a.claim && a.claim.rob && !(b.claim && b.claim.rob)) return true;
+    return false;
+  }
+
+  /* 畫面上「輪到誰」——★ v1.65.0 的第二條洩漏管道。
+     宣告視窗開著時 st.turn 還停在**打牌的人**身上(discard 遇到有人能宣告就不換手),
+     而沒人能宣告時 turn 早就跳到下一家了 —— 出牌的人只要看晶片 / 對手列的高亮還在不在
+     自己身上,就知道有人吃得下他剛打的那張(和動作列那行字一樣直白)。
+     所以宣告視窗中一律顯示**推測的下一家**。猜錯不要緊:真的有人吃碰時輪次會跳到他身上,
+     而那時「他碰了」本來就已經公開。
+     ⚠ 搶槓視窗例外 —— 槓完本來就還是加槓的人繼續打,顯示 claim.from 才是對的。 */
+  function dispTurn(){
+    if(!st) return 0;
+    if(st.claim && !st.claim.rob) return (st.claim.from + 1) % st.seats;
+    return st.turn;
+  }
+  function turnText(s){ return (s===mySeat()) ? "輪到你…" : ("輪到 "+esc(nameOfSeat(s))+"…"); }
 
   function seatOf(id){ return ctx.order().indexOf(id); }
   function mySeat(){ return seatOf(ctx.me()); }
@@ -91,7 +135,7 @@ const MP = MPCore.create((function(){
        (見 styles.css 的 body.m16-mp 那條),否則對戰中晶片列整條被收起來。 */
   function renderHud(){ ctx.renderPlayers(); }
 
-  /* ---------- 宣告視窗的倒數環(v1.58.4) ----------
+  /* ---------- 操作倒數的環(v1.58.4) ----------
      使用者:「吃碰這些選擇時,要有一個倒數的時間可以看,而且這個時間要好看一點,
      我想要有點特效」。做法是一顆 SVG 環圈 + 中間的秒數:環圈隨時間排空,
      最後 3 秒轉紅並脈動。
@@ -103,7 +147,7 @@ const MP = MPCore.create((function(){
      ★ 因此這顆是**持久節點**:renderActs() 清空動作列時刻意跳過它。
        ⚠ 不能再用 box.innerHTML="" —— 元素一離開文件,CSS 動畫就被取消,
          插回去等於重跑一次,症狀跟上面那條一模一樣。 */
-  let cdEl = null, cdT = null, cdEnd = 0;
+  let cdEl = null, cdT = null, cdEnd = 0, cdKey = "";
   function ensureCd(){
     if(cdEl) return cdEl;
     const box = $("m16Acts"); if(!box) return null;
@@ -118,19 +162,53 @@ const MP = MPCore.create((function(){
   }
   function stopCd(){
     if(cdT){ clearInterval(cdT); cdT=null; }
+    cdKey = "";
     if(cdEl){ cdEl.classList.add("hidden"); cdEl.classList.remove("m16-hot"); }
   }
-  function startCd(ms){
+  /* 畫一顆「總長 totalMs、在 endAt 歸零」的環。
+     ★ v1.65.0 兩個關鍵改動:
+       ①**同一顆環就不重跑**(cdKey)。宣告階段 → 出牌階段是同一個 endAt,不去重的話
+         環會在換階段那一刻彈回滿格 —— 那個彈跳本身就是「剛剛有宣告視窗」的訊號。
+       ②**接續播放**用負的 animation-delay。環的 duration 永遠是那一段的總長(所以
+         e2e 量 animationDuration 量得到設定值),已經跑掉的部分靠負延遲跳過去。 */
+  function startCd(totalMs, endAt){
     const el = ensureCd(); if(!el) return;
+    const key = Math.round(totalMs)+"@"+Math.round(endAt);
+    /* ⚠ 去重條件**不可以**看 cdT:數字走到 0 之後 tickCd() 就把 interval 停掉了,而
+       timer 還有 jitter 那幾百毫秒沒響 —— 那段空窗裡只要有人叫一次 renderActs()
+       (盤面 ResizeObserver 就會),環就會彈回滿格。 */
+    if(cdKey === key && !el.classList.contains("hidden")) return;
+    cdKey = key;
     if(cdT){ clearInterval(cdT); cdT=null; }
-    cdEnd = performance.now() + ms;
+    cdEnd = endAt;
     el.classList.remove("hidden","m16-hot");
     const ring = el.querySelector(".m16-cdfg");
-    /* 重跑動畫:只改 animation-duration 不會重新開始 —— 要先拿掉、強制 reflow、再掛回去 */
+    const past = Math.max(0, Math.min(totalMs, totalMs - (endAt - performance.now())));
+    /* 重跑動畫:只改 animation-duration 不會重新開始 —— 要先拿掉、強制 reflow、再掛回去。
+       ⚠ animationDelay 一定要寫在 shorthand **之後**(shorthand 會把 delay 歸零)。 */
     ring.style.animation = "none"; void ring.offsetWidth;
-    ring.style.animation = "m16cd "+ms+"ms linear forwards";
+    ring.style.animation = "m16cd "+totalMs+"ms linear forwards";
+    ring.style.animationDelay = (-past)+"ms";
     tickCd();
     cdT = setInterval(tickCd, 200);
+  }
+  /* 這一刻的環該長什麼樣 —— **唯一**決定環的地方(renderActs / arm*T 都只呼叫它)。
+     ★★ 非當事人看到的一律是「這一手的總截止」,從有人打出一張牌一路連續跑到底:
+       中間有沒有開過宣告視窗、別人想了幾秒,在畫面上完全反映不出來。
+     ★ 只有**還沒表態的當事人**看到比較短的那顆(他的宣告截止)—— 他自己本來就知道
+       自己有資格,所以這顆環不洩漏任何別人的牌情;而他需要知道還剩幾秒可以決定。
+       表態完就切回總截止(環會變長一點,那是「這一手還剩多久」的正確資訊)。 */
+  function syncCd(){
+    if(!secOn() || !st || st.over || !handAt || ctx.phase()!=="playing"){ stopCd(); return; }
+    const me = mySeat();
+    if(me<0){ stopCd(); return; }
+    if(st.claim){
+      if(st.claim.elig[me] && !st.claim.bids[me] && !myBid){ startCd(claimMs(), handAt + claimMs()); return; }
+      startCd(budgetMs(), handAt + budgetMs());
+      return;
+    }
+    if(!MJT.toPlay(st, st.turn)){ stopCd(); return; }     // 還沒摸到牌 / 不是該打牌的狀態
+    startCd(budgetMs(), handAt + budgetMs());
   }
   function tickCd(){
     if(!cdEl) return;
@@ -170,6 +248,9 @@ const MP = MPCore.create((function(){
     const box = $("m16Acts"); if(!box) return;
     ensureCd();                       // 先建好,倒數環才永遠是這一列的第一個
     clearActs(box);
+    /* 環在**這裡統一決定**(syncCd 只看 state / myBid,不看動作列畫了什麼)——
+       擺在所有 return 之前,才不會有哪一條路徑忘了收環或忘了接上。 */
+    syncCd();
     if(!st || st.over || ctx.phase()!=="playing"){ box.classList.add("hidden"); return; }
     const me = mySeat();
     if(me<0){ box.classList.add("hidden"); return; }
@@ -187,21 +268,21 @@ const MP = MPCore.create((function(){
          猜到你有這個牌了」。舊版無論有沒有資格,全桌都看到「等別人決定要不要吃碰…」
          + 一顆倒數環 —— 出牌的人只要看見那行字,就知道**有人手上有這張**,
          就算對方最後過了也已經洩出去了(而且他還知道是這一張,牌情比什麼都值錢)。
-         現在:①非當事人只看到中性的「等其他人…」②倒數環只給正在決定的人。
-         ★ 我自己表態完也要收掉環 —— 環還在走就等於「還有別人在想」,同一個洩漏。
+         ★★ v1.65.0 再往前一步:v1.59.0 的「等其他人…」**本身還是一個訊號** ——
+           沒有宣告視窗時這裡寫的是「輪到 ○○…」,兩句話不一樣,出牌的人照樣看得出來。
+           現在非當事人一律走 turnText(dispTurn()),兩種情況下的字**完全相同**。
          ⚠ 到期補「過」的 timer **照樣每台都要跑**(見 armClaimT),藏的只有畫面。
-         ⚠ 停頓本身藏不掉(沒人有資格就直接換下一家,有人有資格就會頓一下)。那和真
-           牌桌上有人猶豫一樣,而且「有人在想」與「有人可以吃碰你打的這張」差很多:
-           後者是牌情,前者只是節奏。要連停頓都藏掉只能每一張都空等,不划算。 */
+         ⚠ 藏不掉的殘留管道只剩一條:**下一家的張數**(宣告視窗中他還沒摸牌 → 16 張,
+           沒人宣告時他早就摸到 → 17 張)。刻意不假造 —— 顯示 17 之後若有人碰,那家
+           會從 17 掉回 16,反而是更明顯的破綻;而張數要主動去數才看得出來。 */
       if(!types || st.claim.bids[me] || myBid){
-        stopCd();
         const tag = document.createElement("span");
         tag.className = "m16-timer";
         /* 「已表態」只回給**按過的那個人自己**(他早就知道自己有資格、剛按了什麼),
            所以這一句不洩漏任何別人的牌情 —— 而它省不掉:按了「過」之後如果畫面跟
            「沒資格」長得一模一樣,使用者會以為那一下沒吃到。 */
         tag.textContent = (types && (st.claim.bids[me] || myBid))
-          ? "已表態,等其他人…" : "等其他人…";
+          ? "已表態,等其他人…" : turnText(dispTurn());
         box.appendChild(tag);
         return;
       }
@@ -233,7 +314,7 @@ const MP = MPCore.create((function(){
     if(st.turn!==me){
       const tag = document.createElement("span");
       tag.className = "m16-timer";
-      tag.textContent = "輪到 "+esc(nameOfSeat(st.turn))+"…";
+      tag.textContent = turnText(st.turn);      // ★ 與宣告視窗中那句**一模一樣**(見上面)
       box.appendChild(tag);
       return;
     }
@@ -329,35 +410,37 @@ const MP = MPCore.create((function(){
   }
 
   /* ---------- 宣告視窗的計時器 ---------- */
+  /* ⚠ v1.65.0 起這裡**不可以** stopCd():宣告視窗一結算就會馬上 armTurnT(),中間收一次環
+     等於把 cdKey 清掉 → 下一次 startCd 重跑動畫 → 環在換階段那一刻彈回滿格,
+     而那個彈跳本身就是「剛剛有宣告視窗」的訊號。環一律交給 syncCd()。 */
   function clearClaimT(){
     if(claimT){ clearTimeout(claimT); claimT=null; }
-    claimKey = ""; stopCd();
+    claimKey = "";
   }
   /* ★ 只在「換了一個宣告視窗」時重新計時(v1.58.4)。
      原本每次 applyGame 都無條件重新 setTimeout —— 別人一表態 state 就變、視窗就多幾秒,
      四個人輪流表態可以拖到 4 倍長。畫面上看不出來,但**畫了倒數環之後就藏不住**
      (環圈會忽然彈回滿格)。順手把規則改對:視窗從開啟那一刻起算,固定 claimSec 秒。
      ★ v1.59.0:timer 與倒數環**分開** —— timer 每一台都要跑(不指定房主,誰先響誰補
-       「過」,某個人切到 LINE 也不會卡住全桌),但那顆環只有**正在決定的人**看得到
-       (理由見 renderActs 裡那段:環在走 = 有人可以吃碰,那是牌情)。 */
+       「過」,某個人切到 LINE 也不會卡住全桌),環則交給 syncCd() 決定給誰看。
+     ★ v1.65.0:截止時間改成從**這一手的錨點**算(handAt + claimMs),不再是「視窗開啟
+       後再給一整份 claimSec」—— 宣告與後續出牌共用一份預算,見檔頭。 */
   function armClaimT(){
     if(!st || !st.claim || st.over){ clearClaimT(); return; }
-    if(!secOn()){ clearClaimT(); return; }        // ★ 倒數關掉 → 不催、也不畫環(等到有人按)
-    const key = st.claim.t+"@"+st.claim.from;
+    if(!secOn()){ clearClaimT(); return; }        // ★ 倒數關掉 → 不催(等到有人按)
+    const key = st.claim.t+"@"+st.claim.from+"@"+Math.round(handAt);
     if(key === claimKey && claimT) return;
     if(claimT){ clearTimeout(claimT); claimT=null; }
     claimKey = key;
     /* 誰都可以在到期後補結算。刻意加一點依座位錯開的延遲,避免四台同時發交易
-       (交易本身擋得住,但四筆同時打過去只是浪費) */
+       (交易本身擋得住,但四筆同時打過去只是浪費)。
+       ⚠ timer **無條件** arm(每一台都要跑)—— 寫成「沒資格就不 arm」的話,當事人切到
+         LINE 全桌就卡死在這個視窗(e2e 的 Q 段有一條專門守它)。
+       ⚠ 下限 1200ms:錨點是本地時鐘,慢半拍收到 state 的那台可能算出「已經過期」,
+         沒有下限就會一收到就補過(當事人連按鈕都來不及看見)。 */
     const jitter = Math.max(0, mySeat()) * 220;
-    const ms = claimSec*1000 + jitter;
-    claimT = setTimeout(resolveExpired, ms);
-    /* ⚠ timer 在上面**無條件** arm(每一台都要跑);下面這行只決定「這顆環給不給看」。
-       兩件事寫在一起過,順序倒過來就是「沒資格的人不 arm timer」→ 當事人切到 LINE
-       全桌卡死在這個視窗(e2e 的 Q 段有一條專門守它)。 */
-    const me = mySeat();
-    if(me>=0 && st.claim.elig[me] && !st.claim.bids[me] && !myBid) startCd(ms);
-    else stopCd();
+    const left = Math.max(1200, handAt + claimMs() - performance.now());
+    claimT = setTimeout(resolveExpired, left + jitter);
   }
 
   /* ---------- 出牌倒數(v1.63.0) ----------
@@ -365,35 +448,31 @@ const MP = MPCore.create((function(){
      有沒有要吃碰牌…後續的出牌也沒秒數限制,這樣不是很奇怪,應該是要倒數秒數是做為這次的
      完全操作倒數」。
 
-     ★ 與宣告視窗**共用同一個秒數**(claimSec)與同一顆環 —— 兩者不會同時發生
-       (有宣告視窗時沒有人在出牌)。
-     ★ **這顆環全桌都看得到**,和宣告視窗那顆相反。判準是 v1.61.2 震動那條原則:
-       「輪到誰」是全桌本來就知道的事(晶片上就有 .turn),不是牌情;而「誰可以吃碰」是牌情。
+     ★ 與宣告視窗**共用同一份預算**(handAt + budgetMs)與同一顆環 —— 兩者不會同時發生
+       (有宣告視窗時沒有人在出牌),而**接起來的總長度固定**,這正是 v1.65.0 的重點。
+     ★ **這顆環全桌都看得到**。判準是 v1.61.2 震動那條原則:「輪到誰」是全桌本來就知道
+       的事(晶片上就有 .turn),不是牌情;而「誰可以吃碰」是牌情。
        讓大家看到「還在等他、剩幾秒」也才知道為什麼卡著。
      ★ 到期**自動幫他打一張**:摸切優先(打剛摸進來那張,不動手牌),吃 / 碰之後沒有摸牌時
        借 AI 挑一張(比亂打好)。同樣不指定房主 —— 誰的 timer 先響誰發交易,搶輸的中止。
-     ⚠ 「這一手」的身分要含 turn / 牌河長度 / 明牌組數 / 有沒有摸牌 —— 每次有人動作至少一個會變,
-       所以會重新計時;而宣告視窗中別人陸續表態時 claim 非 null,這裡根本不 arm(不會被重設)。 */
-  function handKey(s){
-    let m = 0;
-    for(let i=0;i<s.seats;i++) m += s.melds[i].length;
-    return s.turn+":"+s.discards.length+":"+m+":"+(s.drawn>=0?1:0);
-  }
+     ⚠ key 用**錨點**(handAt)而不是 v1.63.0 那份 handKey:同一手裡吃碰完換人打牌時
+       截止時間不變,不該重排 timer(重排 = 又多給一份時間,洩漏就跑回來了)。 */
   function clearTurnT(){
     if(turnT){ clearTimeout(turnT); turnT=null; }
     turnKey = "";
   }
   function armTurnT(){
-    if(!secOn() || !st || st.claim || st.over || ctx.phase()!=="playing"){ clearTurnT(); stopCd(); return; }
-    if(!MJT.toPlay(st, st.turn)){ clearTurnT(); stopCd(); return; }   // 還沒摸到牌 / 不是該打牌的狀態
-    const key = handKey(st);
+    if(!secOn() || !st || st.claim || st.over || ctx.phase()!=="playing"){ clearTurnT(); return; }
+    if(!MJT.toPlay(st, st.turn)){ clearTurnT(); return; }   // 還沒摸到牌 / 不是該打牌的狀態
+    const key = Math.round(handAt)+":"+st.turn;
     if(key === turnKey && turnT) return;
     if(turnT){ clearTimeout(turnT); turnT=null; }
     turnKey = key;
     const jitter = Math.max(0, mySeat()) * 220;    // 錯開,避免全桌同時發交易
-    const ms = claimSec*1000 + jitter;
-    turnT = setTimeout(autoDiscard, ms);
-    startCd(ms);                                   // 全桌都看得到(見上面那段)
+    /* 下限同 armClaimT:宣告階段最多吃掉一半,所以正常一定還剩一半;
+       只有網路慢半拍那種異常才會壓到下限。 */
+    const left = Math.max(1200, handAt + budgetMs() - performance.now());
+    turnT = setTimeout(autoDiscard, left + jitter);
   }
   function autoDiscard(){
     if(!secOn()) return;
@@ -434,10 +513,12 @@ const MP = MPCore.create((function(){
       "而且 <b>3 人不能吃</b>(去一門之後吃會失衡)。<br>"+
       "計分照麻將的<b>相互算台</b>:自摸三家付、放槍一家付,全桌台數加起來永遠是 0。<br>"+
       (secOn()
-        ? ("每一次操作都有 <b>"+claimSec+" 秒</b>:吃得下別人的牌時可以想這麼久(沒表態就自動過),"+
-           "<b>輪到你出牌也一樣</b>(時間到會幫你摸切)。"+
-           "吃碰時<b>別人看不到你在考慮</b> —— 動作列只會寫「等其他人…」;"+
-           "出牌的倒數則是<b>全桌都看得到</b>(輪到誰本來就不是秘密)。<br>")
+        ? ("每打出一張牌就起算 <b>"+claimSec+" 秒</b>,這是<b>一整手的總時間</b> —— "+
+           "別人考慮吃碰、以及接著出牌,通通算在這 "+claimSec+" 秒裡"+
+           "(沒表態就自動過,輪到出牌沒動作就幫他摸切)。<br>"+
+           "所以<b>別人看不到你在考慮吃碰</b>:動作列的字、倒數環、輪到誰的高亮,"+
+           "在「有人想吃你這張」和「沒人要」兩種情況下<b>長得一模一樣</b> —— "+
+           "不然光看那一手拖了多久就猜得到了。<br>")
         : ("<b>操作倒數關閉中</b>:吃碰與出牌都不限時,沒有人會被催。"+
            "吃碰時<b>別人看不到你在考慮</b>。"+
            "<br><span class=\"m16-warn\">⚠ 關掉之後,如果有人離開牌桌,全桌會一直等他 —— "+
@@ -486,7 +567,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 一局的生命週期 ---------- */
     lobbyGame(){ return { wall:null, turn:0, over:null }; },
-    resetRound(){ clearClaimT(); clearTurnT(); st=null; curRound=null; myBid=false; },
+    resetRound(){ clearClaimT(); clearTurnT(); stopCd(); st=null; curRound=null; myBid=false; handAt=0; },
 
     newGame(ids, prev){
       // 座位每局輪換,顏色與莊家才不會永遠同一個人
@@ -517,6 +598,12 @@ const MP = MPCore.create((function(){
 
       const before = st;
       st = s;
+      /* ★ v1.65.0:「這一手」的錨點。整份操作倒數(宣告 + 出牌)都從這裡起算,所以
+         **從有人打出一張牌到下一張牌落桌,總長度固定** —— 中間有沒有人在考慮吃碰,
+         在時間上完全反映不出來(見檔頭與 isNewHand)。
+         ⚠ 換局 / 斷線重連(before 為 null)一律重新起算:整包重發,diff 出來的東西沒有意義。
+           重連的那台錨點會比別人晚 → 它的 timer 也比較晚響,由先響的那台結算,安全。 */
+      if(newRnd || isNewHand(before, s)) handAt = performance.now();
       /* 摸打吃碰槓胡的音效。★ 與單機**共用同一份判斷**(js/mahjong16/sfx.js):兩邊的動作
          路徑完全不同(這裡要等交易回來才換手),但「有人碰了」是同一個 state diff,所以
          音效沒有變成第三份「兩份」。
@@ -547,9 +634,9 @@ const MP = MPCore.create((function(){
     enterLobby(){ showScreen("lobby"); $("mpBar").classList.remove("playing"); ruleHint(); },
     backToLobby(){
       showScreen("lobby"); $("mpBar").classList.remove("playing");
-      clearClaimT(); clearTurnT(); st=null; curRound=null; myBid=false;
+      clearClaimT(); clearTurnT(); st=null; curRound=null; myBid=false; handAt=0;
       wipeActs();
-      ctx.renderPlayers();                 // 台數在晶片上,回大廳要重畫(st 已清掉,風會收起來)
+      ctx.renderPlayers();               // 台數在晶片上,回大廳要重畫(st 已清掉,風會收起來)
       ruleHint();
     },
     enterPlaying(){
@@ -559,7 +646,7 @@ const MP = MPCore.create((function(){
       M16Sfx.preload();          // 喊牌音檔先載好,第一次碰才有聲音(見 sfx.js 的 preload)
     },
     onLeave(){
-      clearClaimT(); clearTurnT(); st=null; curRound=null; tai={}; myBid=false;
+      clearClaimT(); clearTurnT(); st=null; curRound=null; tai={}; myBid=false; handAt=0;
       wipeActs();
     },
 
@@ -599,7 +686,8 @@ const MP = MPCore.create((function(){
 
     /* 輪到誰:核心會把 .turn 打在晶片上(底色 + 脈動 + 放大),四個遊戲同一套。
        ⚠ 消消樂不需要實作這支(它沒有回合),真麻將有,一定要給。 */
-    turnId(){ return (st && !st.over) ? idOfSeat(st.turn) : null; },
+    // ★ dispTurn() 而不是 st.turn:宣告視窗中晶片不可以還亮在出牌者身上(見 dispTurn 的註解)
+    turnId(){ return (st && !st.over) ? idOfSeat(dispTurn()) : null; },
     /* 晶片前綴:座位色點 + 門風 +(是莊的話)莊。
        ★ 莊家記號 v1.58.3 從盤面頂端那條資訊列搬過來 —— 盤面上是掛在每一家自己那一列
          (board.js 的 foeHTML),我自己那一家沒有「一列」,就靠這裡。 */
