@@ -2015,6 +2015,15 @@
 /* 真麻將的桌面比消消樂需要更多橫向空間(對手列 + 明牌 + 一排 16 張手牌),
    所以只有這一頁把 .mj-play 的上限從 780 放寬。掛在 body.m16-mp 上,不會影響消消樂。 */
 body.m16-mp .mj-play{width:min(98vw,960px)}
+/* 房間框跟著桌面一起放寬(v1.68.1)。原本吃 .panel 的 min(92vw,520px):寬螢幕上
+   桌面 960、房間框 520,兩塊邊界對不齊之外**四家的晶片列根本塞不下** ——
+   1250px 實測 clientW 494 / scrollW 605,第四家被 .mp-players.oneline 的橫向捲動
+   切掉 111px(改完 934/934,四家都在)。
+   ⚠ 只把上限 520 換成 960、前面那段**維持 .panel 原本的 92vw**:
+     ①抄桌面那條 98vw 會超出 body 的 16px padding,而房間框有底色和圓角,
+       被 overflow:hidden 削到的是看得見的一角(桌面沒事是因為它的內容置中,削到空白)
+     ②窄螢幕照舊 = 只有寬螢幕會變,手機上一個 px 都沒動。 */
+body.m16-mp .mj-room{width:min(92vw,960px)}
 
 /* 盤面容器。★ isolation:isolate —— 照 v1.56.0 那條紅線先把 stacking context 關起來,
    之後要加任何覆蓋層都掛在裡面,不會跑到根層去跟 .veil/.toast/.pwa-tip 比大小。
@@ -2365,3 +2374,4 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
      「對戰中把房間框的名單列放出來」(.mj-room.playing .mj-room-foot),
      單機沒有房間框,混用只會讓兩件事日後互相絆倒。 */
 body.m16-solo .mj-play{width:min(98vw,960px)}
+body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(v1.68.1) */
