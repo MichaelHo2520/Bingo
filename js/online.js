@@ -1221,7 +1221,11 @@
       }
       if(e.kind==="clip"){
         showEmote("🔊", fromNm+" → "+toNm, (to!=="all")?to:e.from, "voice");
-        if(!mine && forMe) enqueueClip(e.clip);     // 語音短訊:依代號播本地 m4a(沿用語音佇列);自己送的不回放
+        // 語音短訊:依代號播本地 m4a(沿用語音佇列)。★ v1.69.0 起「自己送的也播」——
+        // 按了罐頭卻一點聲音都沒有,現場的反應是「是不是沒送出去?」而再按一次。
+        // 與即時語音(上面那段)刻意不同:那是自己剛講完的話,回放只是多聽一次。
+        // 條件是 mine||forMe 而不是 forMe:送給某一個人時 forMe 為 false,但送出者本人要聽到。
+        if(mine || forMe) enqueueClip(e.clip);
         return;
       }
       if(e.kind==="reach"){                          // 有人聽牌:全部人(含聽牌者本人)都播「聽牌」語音

@@ -1163,7 +1163,7 @@
       g.appendChild(b);
     });
   }
-  // 語音短訊按鈕:文字選單,點擊只送代號(kind="clip");送出者本機不回放(比照語音),對方播本地 m4a
+  // 語音短訊按鈕:文字選單,點擊只送代號(kind="clip"),各端播自己本地的 m4a;送出者本人也聽得到(v1.69.0)
   function buildVoiceClips(){
     const g=$("emoteClips"); if(!g)return; g.innerHTML="";
     CLIPS.forEach(clip=>{

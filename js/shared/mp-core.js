@@ -804,7 +804,10 @@ const MPCore = (function(){
       }
       if(e.kind==="clip"){
         showEmote("🔊",fromNm+" → "+toNm,(to!=="all")?to:e.from,"voice");
-        if(!mine&&forMe) enqueueClip(e.clip);
+        // ★ v1.69.0 起「自己送的也播」(與 js/online.js 那份同步改)——按了罐頭卻沒聲音,
+        // 現場的反應是「是不是沒送出去?」而再按一次。條件用 mine||forMe 而不是 forMe:
+        // 送給某一個人時 forMe 為 false,但送出者本人要聽到。上面的即時語音刻意維持不回放。
+        if(mine||forMe) enqueueClip(e.clip);
         return;
       }
       if(!e.emoji)return;
