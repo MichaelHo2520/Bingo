@@ -412,10 +412,17 @@ const MP = MPCore.create((function(){
       const s = MJT.dec(g);
       if(!s) return;
       const rid = ctx.roundId();
-      if(rid !== curRound){ curRound = rid; myBid = false; M16B.clearSel(); }
+      const newRnd = (rid !== curRound);
+      if(newRnd){ curRound = rid; myBid = false; M16B.clearSel(); }
 
       const before = st;
       st = s;
+      /* 摸打吃碰槓胡的音效。★ 與單機**共用同一份判斷**(js/mahjong16/sfx.js):兩邊的動作
+         路徑完全不同(這裡要等交易回來才換手),但「有人碰了」是同一個 state diff,所以
+         音效沒有變成第三份「兩份」。
+         ⚠ 換局那一手不比 —— 整包重發,逐欄位 diff 出來的東西沒有意義(會在開局瞬間響一串
+           吃碰槓);斷線重連時 before 是 null,sfx 自己也會擋掉。 */
+      if(!newRnd) M16Sfx.play(before, s, mySeat());
       // 宣告視窗換了一輪 → 我的表態記號要清掉
       if(!before || !before.claim || !s.claim ||
          before.claim.t!==s.claim.t || before.claim.from!==s.claim.from) myBid = false;

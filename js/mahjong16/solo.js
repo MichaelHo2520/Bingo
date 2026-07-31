@@ -41,6 +41,7 @@ const Solo = (function(){
   let handNo = 0;                                 // 打完幾局了
   let active = false, settled = false;
   let claimDone = "";                             // 這個宣告視窗的電腦表態排過了沒
+  let sfxPrev = null;                             // 上一次餵給音效的 state(見 sfxTick)
   let gen = 0, timers = [];
 
   /* ---------- 計時器:全部帶 gen 記號(見檔頭) ---------- */
@@ -108,6 +109,10 @@ const Solo = (function(){
   function newHand(){
     killTimers();
     settled = false; claimDone = "";
+    /* ⚠ 一定要清:換局是整包重發,拿上一局的 state 去 diff 會在開局瞬間響一串吃碰槓。
+       sfx 自己也用 handNo 擋了一層,但「打 1 局」那個設定下新的一局 handNo 同樣是 1
+       (再來一場會把 handNo 歸零),只靠那一層擋不住。 */
+    sfxPrev = null;
     M16B.clearSel();
     closeWin();
     st = MJT.newRound({
@@ -123,7 +128,7 @@ const Solo = (function(){
   }
   function quit(){
     killTimers();
-    active = false; st = null; settled = false;
+    active = false; st = null; settled = false; sfxPrev = null;
     M16B.clearSel();
     closeWin();
     const box = $("m16Acts");
@@ -150,9 +155,19 @@ const Solo = (function(){
 
   function render(){
     if(!st) return;
+    sfxTick();
     M16B.render(st, ME);
     paintBar();
     paintActs();
+  }
+  /* 摸打吃碰槓胡的音效。★ 刻意集中在這一處、用前後兩份 state 比對,而不是在每個動作點
+     插一句 Sound.xxx():單機的 st 在 applyAI / onDiscard / ownAct / resolveClaim 四處都會
+     換手,一個個插一定會漏(而且連線那邊還得再插一遍 —— 現在兩邊共用同一份判斷,
+     見 js/mahjong16/sfx.js 的檔頭)。 */
+  function sfxTick(){
+    const prev = sfxPrev;
+    sfxPrev = st;
+    if(prev !== st) M16Sfx.play(prev, st, ME);
   }
 
   /* ==========================================================================
@@ -179,19 +194,16 @@ const Solo = (function(){
     else if(a.act === "ckong") nx = MJT.concealedKong(st, seat, a.t);
     else if(a.act === "akong") nx = MJT.addKong(st, seat, a.t);
     if(nx){
-      if(a.act === "win") Sound.win();
-      else{
+      if(a.act !== "win")
         showToast(seatName(seat) + (a.act === "ckong" ? " 暗槓 " : " 加槓 ") + face(a.t).name, 1300);
-        Sound.mark();
-      }
     }else{
       if(a.act === "discard") nx = MJT.discard(st, seat, a.t);
       if(!nx){
         const all = MJT.allTiles(st, seat);
         for(let i=0;i<all.length && !nx;i++) nx = MJT.discard(st, seat, all[i]);
       }
-      if(nx) Sound.place();
     }
+    /* ⚠ 這裡刻意不播音效 —— 摸打吃碰槓胡一律由 sfxTick() 從 state diff 播(見那支的註解)。 */
     if(!nx){                                       // 真的沒救(不該發生)
       st = Object.assign({}, st, { over:{ type:"draw" }, claim:null });
       showToast("這一局出了狀況,當流局處理", 1800);
@@ -246,8 +258,7 @@ const Solo = (function(){
       const m = after.melds[s][a-1];
       const w = m.k === "chow" ? "吃" : (m.k === "kong" ? "槓" : "碰");
       showToast(seatName(s) + " " + w + "!", 1200);
-      Sound.mark();
-      return;
+      return;                                      // 聲音由 sfxTick() 出(吃 / 碰 / 槓 各有各的音)
     }
   }
 
@@ -260,7 +271,7 @@ const Solo = (function(){
     if(st.turn !== ME) return;
     const nx = MJT.discard(st, ME, t);
     if(!nx) return;
-    st = nx; Sound.place();
+    st = nx;
     step();
   }
   function ownAct(kind, t){
@@ -271,7 +282,6 @@ const Solo = (function(){
     else if(kind === "akong") nx = MJT.addKong(st, ME, t);
     if(!nx){ showToast("這個動作現在不能做"); return; }
     st = nx;
-    if(kind !== "win") Sound.mark();
     step();
   }
   function humanBid(type, tiles){

@@ -71,6 +71,28 @@
     // 合成音後備:音檔還沒載好 / 全都取不到時,至少有聲(即原本的勝敗提示音)
     function synthWin(){ [523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46}); }
     function synthLose(){ [415,349,277].forEach((f,i)=>tone(f,{type:"triangle",dur:0.30,vol:0.20,delay:i*0.16})); tone(220,{type:"sine",dur:0.6,vol:0.13,delay:0.5,slideTo:147}); }
+
+    /* ---------- 可換音檔的音效槽(v1.61.0) ----------
+       遊戲用 def(key, 候選檔案, 合成音) 註冊一格,播放走 sfx(key)。
+       ★ 存在理由:台灣麻將的碰 / 吃 / 槓 / 胡要「先用合成音玩,之後換成錄好的喊牌」,
+         而 win/lose 那套「音檔優先、取不到就退回合成音」正是想要的行為 —— 只是它把
+         兩個 key 寫死了。這裡把同一套路做成通用的,新遊戲不必再抄一份載入流程。
+       ★ 懶載入(第一次要播才 fetch):音檔還沒放進 mp3/ 的人,只在第一次觸發時吃一次
+         404,failed 記住後就不再試 —— 而那一次照樣有合成音,聽不出差別。
+       ★ 候選檔案**依序試**,所以 .mp3 / .wav 丟哪一種進去都會生效(免得為了換音檔改程式)。
+       ⚠ 一律走 playBuf / tone → 都經過 masterNode,所以靜音開關與音效總音量自動吃得到。 */
+    const clips={};
+    function loadClip(key){
+      const cl=clips[key]; if(!cl||cl.ready||cl.failed||cl.loading)return;
+      if(cl.i>=cl.files.length){ cl.failed=true; return; }
+      const c=ac(); if(!c)return;
+      const url=cl.files[cl.i++];
+      cl.loading=true;
+      fetch(url).then(r=>{ if(!r.ok)throw 0; return r.arrayBuffer(); })
+        .then(ab=>new Promise((res,rej)=>c.decodeAudioData(ab,b=>res(b),e=>rej(e))))
+        .then(b=>{ cl.buf=b; cl.ready=true; cl.loading=false; })
+        .catch(()=>{ cl.loading=false; loadClip(key); });   // 這個候選不行 → 試下一個
+    }
     return {
       toggle(){muted=!muted; if(!muted)tone(660,{type:"triangle",dur:0.08,vol:0.15}); return muted;},
       setMuted(m){muted=!!m;},
@@ -95,6 +117,18 @@
       win(){ if(muted)return; if(playBuf(winBuf))return; if(!sfxReady.win&&!sfxFailed.win)loadSfx("win"); if(sfxFailed.win&&playEl("win"))return; synthWin(); },
       // 平手不走這裡(平手用 win);lose 只在自己輸時播
       lose(){ if(muted)return; if(playBuf(loseBuf))return; if(!sfxReady.lose&&!sfxFailed.lose)loadSfx("lose"); if(sfxFailed.lose&&playEl("lose"))return; synthLose(); },
+      // 註冊一格音效槽:files 可以是單一路徑或候選陣列(依序試),synth 是取不到音檔時的合成音後備
+      def(key,files,synth){ clips[key]={ files:[].concat(files||[]), synth:synth||null, buf:null, ready:false, failed:false, loading:false, i:0 }; },
+      // 播一格音效槽:音檔載好了就播音檔,否則(順手開始載)先用合成音墊著 —— 確保永遠有聲
+      sfx(key){
+        if(muted)return;
+        const cl=clips[key]; if(!cl)return;
+        if(cl.ready&&playBuf(cl.buf))return;
+        loadClip(key);
+        if(cl.synth)cl.synth();
+      },
+      // 單顆合成音:給各遊戲寫自己的音效樂句用(走 masterNode,吃靜音與總音量)
+      tone(freq,o){ tone(freq,o); },
       // 音效總音量(0~1):即時套到總音量節點與 HTMLAudio 後備(偏好記憶在 game.js)
       setVolume(v){ vol=Math.max(0,Math.min(1,+v||0)); if(master){ try{ master.gain.setTargetAtTime(vol,master.context.currentTime,0.03); }catch(e){ try{ master.gain.value=vol; }catch(_){} } } if(winEl){try{winEl.volume=vol;}catch(e){}} if(loseEl){try{loseEl.volume=vol;}catch(e){}} },
       vol(){ return vol; }

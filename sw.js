@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.60.1";
+const VERSION = "1.61.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -25,6 +25,7 @@ const CORE = [
   "./js/mahjong16/scoring.js",
   "./js/mahjong16/table.js",
   "./js/mahjong16/ai.js",
+  "./js/mahjong16/sfx.js",     // 摸打吃碰槓胡的音效(v1.61.0)
   "./js/mahjong16/board.js",
   "./js/mahjong16/solo.js",
   "./js/mahjong16/adapter.js",
@@ -54,6 +55,9 @@ const CORE = [
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",
   "./mp3/lose.wav",
+  /* ⚠ 台灣麻將的喊牌音檔(mp3/m16-pong.mp3 之類)刻意**不列在這裡** —— 它們現在還不存在,
+     而 addAll() 是全有全無的:清單裡有一個 404,整批快取就失敗(離線就整個不能玩了)。
+     那些檔案走 network-first 的順手快取,放進 mp3/ 之後第一次播就會被收進來。 */
   "./mp3/是要多久.m4a",
   "./mp3/啊西好了沒.m4a",
   "./mp3/快點，來不急啦.m4a",
