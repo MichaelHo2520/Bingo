@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 /* ============================================================================
    台灣 16 張麻將 — 連線適配器(接上 js/shared/mp-core.js)。
@@ -243,6 +243,24 @@ const MP = MPCore.create((function(){
     }
   }
 
+  /* ---------- 「輪到你」震動(v1.61.2) ----------
+     設定面板那顆「震動(手機)」開關是五個遊戲共用的,但在這一頁**沒有人讀它** ——
+     開了也不會震,比沒有這顆開關更糟。
+
+     ★ 時機刻意就是音效的 `draw` 事件(「別人打完、輪到我摸牌」那一刻):
+       ①不必再寫一份「輪到誰」的判斷,和聲音同一個真相
+       ②吃 / 碰之後輪到我打牌**不會**震 —— 那是我自己剛動作,我知道輪到我
+       ③換局那一手不比 diff,所以開局第一摸不震(那時人正看著螢幕)
+     ★ 只有連線震:單機的對手是電腦、一秒內就回手,不需要提醒(五子棋也是只有連線震)。
+     ⚠ **宣告視窗不震**:手機放在桌上,震動的嗡嗡聲鄰座聽得到 —— 那等於告訴出牌的人
+       「有人手上有這張」。同 v1.59.0 那條紅線,也同這一版音效不給宣告提示音的理由:
+       **震動只給「全桌本來就知道」的事(輪到誰),不給「只有你知道」的牌情。**
+     ⚠ iOS Safari 沒有 navigator.vibrate → 自動略過(同 Bingo 與五子棋)。 */
+  function buzzTurn(){
+    if(typeof vibrateOn === "undefined" || !vibrateOn || !navigator.vibrate) return;
+    try{ navigator.vibrate([90,60,90]); }catch(e){}
+  }
+
   /* ---------- 動作 → 交易 ----------
      ★ 交易內用**伺服器上的那份 state** 重跑一次動作,不是把本地算好的結果寫上去 ——
        兩個人同時動作時,晚到的那筆會在真值上重算、發現不合法而中止。 */
@@ -422,7 +440,8 @@ const MP = MPCore.create((function(){
          音效沒有變成第三份「兩份」。
          ⚠ 換局那一手不比 —— 整包重發,逐欄位 diff 出來的東西沒有意義(會在開局瞬間響一串
            吃碰槓);斷線重連時 before 是 null,sfx 自己也會擋掉。 */
-      if(!newRnd) M16Sfx.play(before, s, mySeat());
+      const ev = newRnd ? [] : (M16Sfx.play(before, s, mySeat()) || []);
+      if(ev.indexOf("draw") >= 0) buzzTurn();
       // 宣告視窗換了一輪 → 我的表態記號要清掉
       if(!before || !before.claim || !s.claim ||
          before.claim.t!==s.claim.t || before.claim.from!==s.claim.from) myBid = false;
