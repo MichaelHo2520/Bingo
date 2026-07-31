@@ -24,24 +24,18 @@
      ② **別人摸牌不出聲**。摸牌音只給自己(見 EV.draw),它同時兼任「換你了」——
         四家每一巡都響一次的話,一局要響幾百次。
 
-   ── ★ 聽牌(v1.66.0)—— 唯一一個「不是從欄位差異、而是從牌型算出來」的事件 ────
-     使用者要的是「聽牌要有音效」。它與上面九個事件的差別是:melds / discards 那些
-     diff 看不出聽牌,得真的把手牌拿去 winningTiles() 算(MJT.tenpaiNow)——
-     所以這一支從 v1.66.0 起**相依 MJT**(仍然零 DOM、零 Sound,node 測得到)。
-     ⚠ **只報自己那一家**,而且是唯一報得起的一家:別人聽不聽牌是全桌最值錢的牌情,
-       報出來等於開外掛(而且它算得出來 —— 手牌在這個專案是明碼)。
-     ⚠ 「從沒聽 → 聽牌」才響一次。一直維持同一個聽牌不會每摸一張都響
-       (摸切之後手牌沒變 → 前後都是聽牌 → 不出聲)。
-     ⚠ 這一聲**鄰座聽得到**,所以它有自己的開關(setReady),而且刻意與宣告視窗那條
-       紅線分開判斷:輪到誰、誰聽牌都是「打完之後」的事,不會洩漏「有人正在考慮吃碰」。
+   ── ★ 聽牌(v1.67.0 改成「有人宣告」)────────────────────────────────────────
+     使用者:「聽牌不是主動告知的,是可以讓我選擇要不要按聽牌」——
+     所以這一格不是「系統偵測到你聽牌」,而是**有人按下宣告聽牌**(MJT 的 ting 欄位)。
+
+     ★ 這一改讓它變成最單純的一格:宣告是**喊出來的公開動作**,所以
+       ①**全桌都播**(不像摸牌只給自己)—— 真牌桌上那一聲「聽牌」本來就是喊給大家聽的
+       ②不必再算牌型 → 這一支回到**零依賴**(v1.66.0 為了偵測聽牌相依過 MJT,現在不用了)
+       ③沒有洩漏問題:宣告本身就是公開資訊,不需要像宣告視窗那樣藏
+     ⚠ 因此它也**沒有自己的開關** —— 照吃 / 碰 / 槓那樣,是規則動作的聲音,不是輔助提示。
    ============================================================================ */
 
 const M16Sfx = (function(){
-
-  /* ⚠ 只為了聽牌判定(tenpaiNow)。載入順序是 table → sfx,所以瀏覽器裡 MJT 一定在;
-     node 測試用 require 兜(那邊 global.MJT 也已經設好,兩條路都通)。 */
-  const TB = (typeof MJT !== "undefined") ? MJT
-           : ((typeof require === "function") ? require("./table.js") : null);
 
   /* ---------- 合成音樂句 ----------
      ★ 音色是「聽得出是哪一個」而不是「好聽」:碰 / 吃 / 槓 都是把牌拍到桌上,差別在
@@ -104,9 +98,9 @@ const M16Sfx = (function(){
     T(587,{ type:"triangle", dur:0.20, vol:0.22, slideTo:440 });
     T(392,{ type:"triangle", dur:0.34, vol:0.20, delay:0.16, slideTo:294 });
   }
-  /* 聽牌:**往上滑**的一聲 + 亮頂。
+  /* 聽牌(有人宣告):**往上滑**的一聲 + 亮頂。
      ★ 這一組音效裡只有它是上滑的(打牌 / 碰 / 槓 / 流局全是下滑),所以就算沒聽清楚
-       是哪個音,「往上」這個方向本身就分得出來 —— 而它的語意正是「還差一張」。
+       是哪個音,「往上」這個方向本身就分得出來 —— 而它的語意正是「我只差一張了」。
      ⚠ 不要寫成「胡的簡化版」(659→880→1175 那種上行三連):那兩個會被聽成同一件事,
        而胡與聽牌在牌桌上差得最遠。 */
   function synthReady(){
@@ -150,14 +144,10 @@ const M16Sfx = (function(){
      ⚠ 語音槽**沒有合成音後備**(synth 傳 null):音檔取不到就是不講話。拿音階去墊會變成
        同一個事件響兩次很像的聲音。 */
   const VOICE = { pong:"碰", chow:"吃", kong:"槓", hu:"胡", zimo:"自摸", washout:"流局",
-                  /* 聽牌不是「喊」出來的(真牌桌上聽牌是秘密),但它是最需要**講清楚是什麼事**
-                     的一個 —— 音階聽不出「聽牌」兩個字,而不會算牌的人正是這個功能的對象。 */
+                  /* 「聽牌」和碰 / 吃 / 槓一樣是**喊出來的宣告**(v1.67.0 起是玩家自己按的),
+                     所以它本來就該唸出來給全桌聽 —— 這一格從此與其他喊牌完全同級。 */
                   ready:"聽牌" };
   let vOn = true;                                  // 偏好存在 mahjong16.prefs.v1(adapter 的 ownPrefs)
-  /* 聽牌提醒(聲音 + 動作列那一排「聽哪幾張」)的總開關,v1.66.0。預設開。
-     ★ 刻意獨立於喊牌語音:這一聲**鄰座聽得到**,等於告訴全桌你聽牌了 —— 想藏的人
-       要關得掉,而想被提醒的人(不會算牌的親友)本來就該預設有。 */
-  let rOn = true;
 
   /* ⚠ 發聲前一定要確認 Sound 這一版**有**音效槽那組 API。理由是混合快取:sw.js 是
      network-first,但裝置有可能拿到新的 sfx.js 卻還吃著舊的 audio.js(沒有 def / sfx)——
@@ -217,20 +207,13 @@ const M16Sfx = (function(){
     if(!before.over && after.over)
       add(after.over.type !== "win" ? "washout" : (after.over.from === null ? "zimo" : "hu"));
 
-    /* ★ 聽牌(見檔頭):**只算我自己那一家**,而且只在「剛剛才變成聽牌」時報一次。
-       ⚠ 這一局已經結束就不報 —— 胡牌時贏家手上會多出胡的那張(settleWin 把它收進手裡),
-         張數變成 need*3+2 → tenpaiNow 本來就會回空;但流局那一手手牌沒動,
-         那時報「你聽牌」等於在結果卡前面補一刀,而且沒有任何用處。 */
-    if(!after.over && isTenpai(after, me) && !isTenpai(before, me)) add("ready");
+    /* ★ 聽牌:**有人宣告了**(見檔頭)。全桌都播 —— 那一聲本來就是喊給大家聽的。
+       ⚠ 舊 state 沒有 ting 欄位(v1.67.0 之前的房間 / 造出來的測資),一律當成沒宣告。 */
+    const tb = before.ting || [], ta = after.ting || [];
+    for(let s=0;s<after.seats;s++) if(!tb[s] && ta[s]){ add("ready"); break; }
 
     out.sort((x,y)=>ORDER.indexOf(x) - ORDER.indexOf(y));
     return out;
-  }
-  /* 這一家現在有沒有聽牌。⚠ 判定只有一份(MJT.tenpaiNow),畫面上那排「聽哪幾張」
-     走的是同一支 —— 不然會出現「響了聲音卻沒列出牌」這種對不起來的狀況。 */
-  function isTenpai(s, seat){
-    if(!TB || !s || !s.hands || seat < 0 || !s.hands[seat]) return false;
-    return TB.tenpaiNow(s, seat).length > 0;
   }
 
   /* ==========================================================================
@@ -244,10 +227,7 @@ const M16Sfx = (function(){
     setTimeout(()=>{ if(ready()) Sound.sfx(key); }, delay);
   }
   function play(before, after, me){
-    let ev = eventsOf(before, after, me);
-    /* 聽牌提醒關掉 → 這一格整個不發(連語音)。★ 過濾放在 play() 而不是 eventsOf() ——
-       eventsOf 要保持「剛才發生了什麼」的純粹陳述,偏好不該改變它的答案(node 測試也才好寫)。 */
-    if(!rOn) ev = ev.filter(k=>k !== "ready");
+    const ev = eventsOf(before, after, me);
     if(!ev.length || !ready()) return ev;
     ensureDefs();
     ev.forEach((k,i)=>{
@@ -288,11 +268,7 @@ const M16Sfx = (function(){
     VOICE_KEYS: Object.keys(VOICE),
     wordOf(k){ return VOICE[k] || ""; },
     setVoice(v){ vOn = !!v; },
-    voiceOn(){ return vOn; },
-    /* 聽牌提醒(v1.66.0):聲音由 play() 讀,動作列那排「聽哪幾張」由 adapter / solo 讀 ——
-       一顆開關管兩邊,不會出現「有聲音卻沒列牌」。 */
-    setReady(v){ rOn = !!v; },
-    readyOn(){ return rOn; }
+    voiceOn(){ return vOn; }
   };
 })();
 

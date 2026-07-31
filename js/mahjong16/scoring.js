@@ -118,6 +118,17 @@ const MJ16S = (function(){
     { id:"diHu",   name:"地胡", tai:16, test:c=> c.firstTurn && !c.isDealer && c.selfDraw },
     { id:"renHu",  name:"人胡", tai:12, test:c=> c.firstTurn && !c.isDealer && !c.selfDraw },
 
+    /* ---- 宣告聽牌(v1.67.0)----
+       台數照**明星三缺一 16 張**的官方台數表:聽牌 1 / 地聽 4 / 天聽 8。
+       ★ 這一台換來的代價是「宣告之後只能摸切、不能吃碰」(見 table.js 的 declareTing)——
+         明星三缺一的說明就是「聽牌之後不能眼牌,所以額外給宣告聽牌者加一台」。
+       ★ 天聽 / 地聽**不與聽牌重複計台**(excl),同大三元蓋掉中發白那一套。
+       ⚠ 「獨聽」(只聽一張)在本表就是既有的**單吊**1 台,不另外開一格 —— 它與宣告無關,
+         沒宣告也算得到。 */
+    { id:"ting",     name:"聽牌", tai:1, test:c=> !!c.ting },
+    { id:"diTing",   name:"地聽", tai:4, excl:["ting"], test:c=> c.ting==="di" },
+    { id:"tianTing", name:"天聽", tai:8, excl:["ting","diTing"], test:c=> c.ting==="tian" },
+
     /* ---- 花牌 ---- */
     { id:"baXian", name:"八仙過海", tai:8, excl:["huaGang","zhengHua"],
       test:c=> c.flowers.length===8 },
@@ -151,6 +162,10 @@ const MJ16S = (function(){
     c.lastTile   = !!hand.lastTile;
     c.robKong    = !!hand.robKong;
     c.firstTurn  = !!hand.firstTurn;
+    /* 宣告聽牌(v1.67.0):null / "normal" / "di" / "tian"。由 MJT.settleWin 從 state 帶進來。
+       ⚠ 一律正規化成這四個值之一 —— 舊房間 / 手改 DB 可能塞進別的字串,
+         那時當成「一般的宣告」(有宣告總比漏算好),而不是讓 test() 拿到怪東西。 */
+    c.ting = (hand.ting==="tian" || hand.ting==="di") ? hand.ting : (hand.ting ? "normal" : null);
 
     c.allConcealed = sets.every(s=>s.concealed);     // 暗槓仍算門清
 

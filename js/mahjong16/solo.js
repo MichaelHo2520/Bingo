@@ -201,13 +201,22 @@ const Solo = (function(){
   /* ⚠ 這一段的每一條退路都不能少:AI 只要出一次非法動作,單機就**永遠卡在那一家**
      (沒有別台裝置會來救,也沒有 timer 會補)。所以一律「試 → 不行就退回打牌 →
      再不行就打手上第一張」,而且真的全部失敗時直接把這局判流局,不要靜靜卡死。 */
+  /* ⚠⚠ pickTurn 新增動作時**每一個呼叫端都要跟著加一條**,漏了不會壞掉、只會變笨:
+     這裡的 else 分支會退回「打 a.t 或手上第一張」,而 a.t 對別的動作而言不是要打的牌
+     → 電腦變成亂打。v1.67.0 加 "ting" 時三個呼叫端(這裡 + test-mj16-ai 的 playHand
+     + test-mj16-sfx 的對局迴圈)全都漏過一次,症狀就是 AI 測試的「高手比較會聽牌」紅掉。 */
   function applyAI(seat, a){
     let nx = null;
     if(a.act === "win")        nx = MJT.selfDrawWin(st, seat);
     else if(a.act === "ckong") nx = MJT.concealedKong(st, seat, a.t);
     else if(a.act === "akong") nx = MJT.addKong(st, seat, a.t);
+    else if(a.act === "ting")  nx = MJT.declareTing(st, seat, a.t);
     if(nx){
-      if(a.act !== "win")
+      /* 宣告聽牌是**公開**的 → 一定要報出來(聲音由 sfxTick 的 diff 出)。
+         ⚠ 不報的話玩家只會看到「電腦忽然不吃碰了」,而那一台是他要付的。 */
+      if(a.act === "ting")
+        showToast(seatName(seat) + " 聽牌!", 1500);
+      else if(a.act !== "win")
         showToast(seatName(seat) + (a.act === "ckong" ? " 暗槓 " : " 加槓 ") + face(a.t).name, 1300);
     }else{
       if(a.act === "discard") nx = MJT.discard(st, seat, a.t);
@@ -284,6 +293,15 @@ const Solo = (function(){
     if(st.turn !== ME) return;
     const nx = MJT.discard(st, ME, t);
     if(!nx) return;
+    st = nx;
+    step();
+  }
+  /* 宣告聽牌 + 打出那一張(v1.67.0)。★ 一個動作 —— 中間沒有「已宣告但還沒打」的狀態。 */
+  function onTing(t){
+    if(!active || !st || st.over || st.claim || st.turn !== ME) return;
+    const nx = MJT.declareTing(st, ME, t);
+    if(!nx){ showToast("這張打掉不會聽牌"); return; }
+    M16B.setTingPick(false);
     st = nx;
     step();
   }
@@ -379,14 +397,17 @@ const Solo = (function(){
     b.addEventListener("click", fn);
     return b;
   }
-  /* 聽牌那一排(v1.66.0)。牌面與尺寸走 M16B.readyHTML(),與連線共用同一份 ——
-     ⚠ 但「插在哪一格」的那幾行與 adapter.js 的 appendReady() 是**兩份**(grep m16-ready)。
-     ⚠⚠ 它**不可以只在沒有宣告視窗時出現**:我打完一張牌,聽牌那排突然不見了 =
-       電腦吃得下我剛打的那張(v1.59.0 那條紅線的第 6 條管道,單機更明顯 —— 就那兩三家)。 */
+  /* 已宣告聽牌的那一排(v1.67.0 起只在宣告後出現)。牌面與尺寸走 M16B.readyHTML(),
+     與連線共用同一份 —— ⚠ 但「插在哪一格」的那幾行與 adapter.js 的 appendReady()
+     是**兩份**(grep m16-ready)。 */
   function appendReady(box, seat){
-    if(!M16Sfx.readyOn()) return;
     const h = M16B.readyHTML(st, seat);
     if(h) box.insertAdjacentHTML("beforeend", h);
+  }
+  /* 正在選「要打哪一張來宣告聽牌」。⚠ 一定要同時問 canDeclareTing:模式開著但
+     輪次已經走掉時,那顆取消鈕要跟著消失(board 那邊也自己失效)。 */
+  function tingPicking(){
+    return !!(st && M16B.tingPicking && M16B.tingPicking() && MJT.canDeclareTing(st, ME));
   }
   function paintActs(){
     const box = $("m16Acts");
@@ -442,6 +463,12 @@ const Solo = (function(){
     if(st.turn !== ME){ tag(turnText(st.turn)); return; }     // ★ 與宣告視窗那句一模一樣
 
     /* --- 我的回合 --- */
+    /* ★ 宣告聽牌的選牌模式(v1.67.0):這一列只留提示與取消(理由同 adapter 那份)。 */
+    if(tingPicking()){
+      tag("點一張亮起來的牌打出 → 宣告聽牌");
+      box.appendChild(actBtn("取消", "pass", function(){ M16B.setTingPick(false); paintActs(); }));
+      return;
+    }
     const a = MJT.ownActions(st, ME);
     if(a.win) box.appendChild(actBtn("自摸!", "win", function(){ ownAct("win"); }));
     a.ckong.forEach(function(t){
@@ -450,6 +477,8 @@ const Solo = (function(){
     a.akong.forEach(function(t){
       box.appendChild(actBtn("加槓 " + face(t).name, "", function(){ ownAct("akong", t); }));
     });
+    if(MJT.canDeclareTing(st, ME))
+      box.appendChild(actBtn("宣告聽牌", "ting", function(){ M16B.setTingPick(true); paintActs(); }));
     /* ⚠ 判準是「有沒有按鈕」而不是「這一列空不空」(v1.66.0 改)——
        聽牌那一排也是子元素,用 children.length 的話一聽牌操作提示就消失了。 */
     if(a.discard && !box.querySelector(".m16-act")) tag(M16B.discardHint());
@@ -541,7 +570,7 @@ const Solo = (function(){
 
   return {
     start, quit, again, newHand, loadOwn, saveOwn,
-    onDiscard, onFoe, humanBid,
+    onDiscard, onTing, onFoe, humanBid,
     refreshActs: paintActs,
     seatName, recText,
     active: function(){ return active; },

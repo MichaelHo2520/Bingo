@@ -244,21 +244,24 @@ const MP = MPCore.create((function(){
     b.addEventListener("click", fn);
     return b;
   }
-  /* ---------- 聽牌那一排(v1.66.0) ----------
-     「我現在聽哪幾張」。★ 只有自己這台看得到(每台各畫自己的動作列),洩的是我自己的
-       牌情 —— 而我本來就看得著自己的手牌,所以與 v1.59.0 那條紅線無關。
+  /* ---------- 已宣告聽牌的那一排(v1.66.0 起,v1.67.0 改成只在宣告後出現) ----------
+     「我宣告了,而且聽這幾張」。★ 只有自己這台看得到 —— 別人只知道我宣告了
+       (那是公開的,對手列有記號),不知道我聽什麼。
      ⚠ 與 solo.js 的 paintActs() 是**兩份**(同 renderActs 那整條),grep m16-ready 找兩處。
-     ⚠⚠ **它不可以只在「沒有宣告視窗」時出現** —— 那會變成 v1.59.0 那條紅線的第 6 條
-       洩漏管道:我打完一張牌,聽牌那排突然不見了 = 有人吃得下我剛打的那張。所以插入條件
-       與 claim **無關**,唯一的例外是「我自己正在決定要不要吃碰」那一格(見 renderActs):
-       那時是我自己知道自己有資格,不洩漏給任何人,跳過只是為了不把三顆按鈕推到換行。
-     ⚠ 混合快取:裝置有可能拿到新的 adapter.js 卻還吃著舊的 sfx.js / board.js ——
+     ⚠ 插入條件與 claim **無關**(唯一例外是「我自己正在決定要不要吃碰」那一格,見 renderActs
+       —— 跳過純粹為了不把三顆按鈕推到換行)。v1.66.0 那版是自動偵測,那時「它有沒有出現」
+       本身就是牌情;現在宣告是公開動作,這條顧慮消失了,但一律插入仍然是最簡單的寫法。
+     ⚠ 混合快取:裝置有可能拿到新的 adapter.js 卻還吃著舊的 board.js ——
        那時整條動作列會炸在這裡,而它是牌桌上最重要的一列(「過」「胡」都在上面)。 */
   function appendReady(box, seat){
-    if(typeof M16Sfx === "undefined" || typeof M16Sfx.readyOn !== "function" || !M16Sfx.readyOn()) return;
     if(typeof M16B.readyHTML !== "function") return;
     const h = M16B.readyHTML(st, seat);
     if(h) box.insertAdjacentHTML("beforeend", h);
+  }
+  /* 現在是不是「正在選要打哪一張來宣告聽牌」。⚠ 一定要同時問 canDeclareTing ——
+     模式開著但輪次已經被自動打牌推走時,那顆取消鈕要跟著消失(board 那邊也自己失效)。 */
+  function tingPicking(me){
+    return !!(M16B.tingPicking && M16B.tingPicking() && MJT.canDeclareTing(st, me));
   }
   function renderActs(){
     const box = $("m16Acts"); if(!box) return;
@@ -340,12 +343,28 @@ const MP = MPCore.create((function(){
       box.appendChild(tag);
       return;
     }
+    /* ★ 宣告聽牌的選牌模式(v1.67.0):這一列只留提示與取消 ——
+       那一刻要回答的問題只有一個「打哪一張來宣告」,留著自摸 / 槓只會讓人分心。
+       ⚠ 倒數環照舊(syncCd 已經在開頭跑過)—— 宣告不該讓這一手變長。 */
+    if(tingPicking(me)){
+      const tag = document.createElement("span");
+      tag.className = "m16-timer";
+      tag.textContent = "點一張亮起來的牌打出 → 宣告聽牌";
+      box.appendChild(tag);
+      box.appendChild(actBtn("取消", "pass", ()=>{ M16B.setTingPick(false); renderActs(); }));
+      return;
+    }
+
     const a = MJT.ownActions(st, me);
     if(a.win) box.appendChild(actBtn("自摸!", "win", ()=>doAct(s=>MJT.selfDrawWin(s, me))));
     a.ckong.forEach(t=>box.appendChild(actBtn("暗槓 "+face(t).name, "",
       ()=>doAct(s=>MJT.concealedKong(s, me, t)))));
     a.akong.forEach(t=>box.appendChild(actBtn("加槓 "+face(t).name, "",
       ()=>doAct(s=>MJT.addKong(s, me, t)))));
+    /* ★ 宣告聽牌(v1.67.0)。放在槓之後、打牌提示之前:它比槓少見,但一按下去手牌就鎖死,
+       所以要在「我還在想這一手怎麼打」的視線裡。 */
+    if(MJT.canDeclareTing(st, me))
+      box.appendChild(actBtn("宣告聽牌", "ting", ()=>{ M16B.setTingPick(true); renderActs(); }));
     if(a.discard && !box.children.length){
       const tag = document.createElement("span");
       tag.className = "m16-timer";
@@ -353,6 +372,11 @@ const MP = MPCore.create((function(){
       tag.textContent = M16B.discardHint();
       box.appendChild(tag);
     }
+  }
+  /* 宣告聽牌 → 走交易(同其他動作:交易內用伺服器上的 state 重跑一次) */
+  function onTing(tile){
+    M16B.setTingPick(false);
+    doAct(s=>MJT.declareTing(s, mySeat(), tile));
   }
 
   /* ---------- 「輪到你」震動(v1.61.2) ----------
@@ -763,7 +787,7 @@ const MP = MPCore.create((function(){
     },
 
     ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, hint:M16B.hintOn(),
-                         voice:M16Sfx.voiceOn(), ready:M16Sfx.readyOn() }; },
+                         voice:M16Sfx.voiceOn() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
       if(o.claimSec!==undefined && secOK(+o.claimSec)) claimSec = +o.claimSec;
@@ -771,11 +795,13 @@ const MP = MPCore.create((function(){
       /* 喊牌語音預設**開**:舊偏好裡沒有這個欄位(undefined),要當成開,
          寫成 `=== true` 的話所有老玩家升上來都會是關的,而他們根本不知道有這個開關。 */
       M16Sfx.setVoice(o.voice !== false);
-      M16Sfx.setReady(o.ready !== false);       // 聽牌提醒同理:預設開(理由同上)
+      /* ⚠ v1.66.0 那顆「聽牌提醒」開關已經拿掉(聽牌改成主動宣告 = 規則動作,
+         照吃碰槓一樣沒有開關)。舊偏好裡殘留的 `ready` 欄位讀不到就忽略,無害。 */
     },
 
     api:{
       onDiscard(t){ doAct(s=>MJT.discard(s, mySeat(), t)); },
+      onTing,                                  // 宣告聽牌 + 打出那一張(v1.67.0)
       setGoal(v){
         v = +v; if(!(v>0)) return;
         if(!ctx.setRoomField("handsGoal", v, { lobbyOnly:true, denyMsg:"只有房主能改局數", busyMsg:"對戰中不能改局數" })) return;

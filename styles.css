@@ -775,8 +775,9 @@
   :root[data-theme="arcade"] .voice-gate{color:var(--daub-ink)}
   :root[data-theme="ebook"] .voice-gate{background:#000;color:#fff;box-shadow:none}
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
-  .emote-fly{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;
-    align-items:center;gap:3px;animation:emoteFloat 2.2s ease-out forwards}
+  /* --ef-dx / --ef-dur 由 showEmote 逐則寫入(發位越外側漂越多、時長微擾),沒寫時就是原本的正中央 2.2s */
+  .emote-fly{position:absolute;--ef-dx:0px;transform:translate(-50%,-50%);display:flex;flex-direction:column;
+    align-items:center;gap:3px;animation:emoteFloat var(--ef-dur,2.2s) ease-out forwards}
   .emote-fly .ef-emo{font-size:46px;line-height:1;filter:drop-shadow(0 3px 8px rgba(0,0,0,.4))}
   .emote-fly .ef-cap{font-family:'Fredoka';font-weight:600;font-size:12px;color:#fff;white-space:nowrap;
     background:rgba(0,0,0,.5);padding:2px 9px;border-radius:999px}
@@ -790,11 +791,16 @@
   /* 語音訊息飛出時:麥克風圖示輕微脈動,暗示正在播放 */
   .emote-fly.is-voice .ef-emo{animation:voicePulse .55s ease-in-out infinite alternate}
   @keyframes voicePulse{from{transform:scale(1)}to{transform:scale(1.14)}}
+  /* 同時飛的則數多的時候整則縮一號(人多一起按時空間才夠;只有新的那則會套,免得飛到一半忽然縮)
+     ⚠ 三條都要壓得過上面的 .emote-fly .ef-emo (0,2,0) 與 .emote-fly.is-text .ef-emo (0,3,0) */
+  .emote-fly.ef-sm .ef-emo{font-size:34px}
+  .emote-fly.ef-sm .ef-cap{font-size:11px;padding:1px 7px}
+  .emote-fly.ef-sm.is-text .ef-emo{font-size:16px;padding:6px 12px;border-radius:13px}
   @keyframes emoteFloat{
     0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
-    15%{opacity:1;transform:translate(-50%,-90%) scale(1.15)}
-    32%{transform:translate(-50%,-140%) scale(1)}
-    100%{opacity:0;transform:translate(-50%,-360%) scale(1)}
+    15%{opacity:1;transform:translate(calc(-50% + var(--ef-dx) * .15),-90%) scale(1.15)}
+    32%{transform:translate(calc(-50% + var(--ef-dx) * .35),-140%) scale(1)}
+    100%{opacity:0;transform:translate(calc(-50% + var(--ef-dx)),-360%) scale(1)}
   }
   :root[data-theme="ebook"] .emote-fly .ef-cap{background:#000}
   #toast{
@@ -2214,13 +2220,14 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 /* 宣告視窗的說明字:不遮畫面(同消消樂僵局那條 —— 遮住的那一瞬間別人剛好動作,感受就是「被搶了」) */
 .m16-timer{font:800 12px/1 'Nunito',sans-serif;opacity:.85;align-self:center}
 
-/* ---------- 「我現在聽哪幾張」(v1.66.0) ----------
-   聽牌的那一刻除了響一聲,動作列還會列出聽的牌 —— 聲音講「發生了什麼」,這一排講「聽什麼」。
-   ★ 綠底沿用牌角那顆聽牌數字的 --mj-jf:同一件事只用一種顏色語彙,不另外發明。
-   ⚠ 這一排**只有自己看得到**(每台裝置各畫自己的動作列),所以不違反 v1.59.0 那條
-     「牌情不可以洩漏」—— 它洩的是我自己的牌情,而我本來就看得到自己的手牌。
-   ⚠ 高度必須吃得下在 .m16-acts 的 min-height:38px 裡:16px 牌 → 21px 高 + 上下 2px 內距
-     = 25px。長高一點都會讓盤面變矮 → 整副牌縮一次(board.js 檔頭③)。
+/* ---------- 已宣告聽牌的那一排(v1.66.0 起,v1.67.0 改成只在宣告後出現) ----------
+   宣告聽牌之後,動作列列出「我聽哪幾張」——「聽 / 地聽 / 天聽」的標籤 + 牌面。
+   ★ 綠底沿用牌角那顆聽牌數字的 --mj-jf:同一件事只用一種顏色語彙,不另外發明
+     (對手列的宣告記號 .m16-tg 也是這個綠 —— 全套「聽牌」都是綠的)。
+   ⚠ 這一排**只有自己看得到**(每台裝置各畫自己的動作列):別人知道我宣告了
+     (對手列有記號),但不知道我聽什麼。
+   ⚠ 高度必須吃得下在 .m16-acts 的 min-height:38px 裡:20px 牌 → 26px 高 + 上下 2px 內距
+     = 30px。長高一點都會讓盤面變矮 → 整副牌縮一次(board.js 檔頭③)。
    ⚠ 子元素選擇器一律用 `>`:牌面裡面也有 <i>(宣告視窗的候選小點 .m16-omk),
      寫成 `.m16-ready i` 有一天會連它一起中。 */
 .m16-ready{display:inline-flex;align-items:center;gap:3px;flex:none;
@@ -2228,6 +2235,39 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
   background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px var(--mj-jf)}
 .m16-ready>b{font:800 11px/1 'Nunito',sans-serif;color:var(--mj-jf);letter-spacing:.5px}
 .m16-ready>i{font:800 10px/1 'Nunito',sans-serif;font-style:normal;opacity:.85}
+
+/* ---------- 宣告聽牌(v1.67.0) ----------
+   規則照明星三缺一:自己按下宣告,之後手牌鎖死只能摸切,胡了多算台(聽牌 1 / 地聽 4 / 天聽 8)。
+   ★ 全套用發財綠(--mj-jf),與上面那一排、牌角的聽牌數字同一組語彙。
+   ⚠ 撞名檢查:`locked` 這個裸名專案裡用過 5 次,但**全部都是兩層**
+     (.swatches.locked / .mj-stage.locked / .sdk-stage.locked …),第一層都不是 .m16-hand
+     → 兩個方向都不會撞(CLAUDE.md「反方向也會撞」那條)。 */
+.m16-act.ting{background:var(--mj-jf)}
+
+/* 選牌模式:「打掉之後會聽牌」的亮起來,其餘壓暗且點不動 ——
+   ⚠ 一定要 pointer-events:none 而不是只壓暗:宣告**不可逆**,誤點一張不會聽牌的
+     就等於白白鎖死手牌。規則層(MJT.declareTing)是最後一道,但不該讓它擋得到。 */
+.m16-hand.tingpick .m16-ht.tingno{opacity:.32;filter:grayscale(.65);pointer-events:none}
+.m16-hand.tingpick .m16-ht.tingok{cursor:pointer;
+  box-shadow:inset 0 0 0 2px var(--mj-jf),0 calc(var(--m16w,36px) * 0.10) 0 0 var(--mj-side)}
+.m16-hand.tingpick .m16-ht.tingok.sel{transform:translateY(-22%)}
+
+/* 宣告之後:手牌鎖死,只有摸進來那一張可以點(摸切)。
+   ⚠ .m16-draw 那條要寫在後面才蓋得過上面那條的 pointer-events(同級,後者勝)。
+   ⚠⚠ 第一版只寫 `opacity:.6`,**放大截圖才看出來那根本看不出鎖死了** ——
+     深色底 + 白色牌面在 0.6 下還是很亮。改成 0.5 + 輕度去彩,而且**讓唯一能打的那張
+     自己標出來**(綠框,與「宣告聽牌」全套同色):「只能打這張」用指示比用壓暗清楚得多。
+     ⚠ 不可以再壓更暗 —— 宣告過的人還是要看得清自己手上有什麼(他要判斷能不能胡)。 */
+.m16-hand.locked .m16-ht{opacity:.5;filter:grayscale(.45);pointer-events:none}
+.m16-hand.locked .m16-draw{opacity:1;filter:none;pointer-events:auto;
+  box-shadow:inset 0 0 0 2px var(--mj-jf),0 calc(var(--m16w,36px) * 0.10) 0 0 var(--mj-side)}
+
+/* 誰宣告了 —— **公開資訊**,對手列與我自己都要看得到(與「誰在考慮吃碰」剛好相反)。
+   ⚠ 底色刻意與莊家記號 .m16-dz(紅)分開,而且它是小膠囊、.m16-foe.on 是整列的框,
+     同樣用綠也不會混淆。 */
+.m16-tg{display:inline-grid;place-items:center;min-width:18px;height:17px;padding:0 4px;flex:none;
+  border-radius:6px;background:var(--mj-jf);color:#fff;
+  font:800 10.5px/1 'Nunito',sans-serif;letter-spacing:.3px}
 
 /* ---------- 宣告視窗的倒數環(v1.58.4) ----------
    使用者:「吃碰這些選擇時,要有一個倒數的時間可以看,而且這個時間要好看一點,

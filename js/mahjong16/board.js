@@ -60,6 +60,9 @@ const M16B = (function(){
   const POOL_ROWS = 3;         // 牌河固定留幾排(見檔頭②;超過就捲)
 
   let host=null, cb={}, st=null, me=0, sel="", hint=false, lastSig="";
+  /* 宣告聽牌的選牌模式(v1.67.0):按了動作列那顆「宣告聽牌」之後為 true,
+     這時點手牌 = 選要打哪一張來宣告。⚠ 換局 / 離房 / 宣告成立都要清掉(clearSel)。 */
+  let tingPick = false;
   /* 「只縮不放」的狀態(見檔頭④):fitKey = 容器尺寸,換了就重新量;
      fitTw = 這個容器尺寸下目前用的牌寬,同一局裡只會變小。 */
   let fitKey="", fitTw=0;
@@ -198,9 +201,13 @@ const M16B = (function(){
     const cnt  = st.hands[seat].length + ((st.turn===seat && st.drawn>=0)?1:0);
     const fl   = st.flowers[seat];
     const mtw  = Math.round(tw*0.52);
-    return '<div class="m16-foe'+(shownTurn()===seat?" on":"")+'" data-seat="'+seat+'">'+
+    /* ★ 宣告聽牌是**公開**的(v1.67.0):誰宣告了全桌都要看得到 —— 不然玩家不知道
+       該不該小心放槍,那一台就變成偷襲而不是宣告。⚠ 與「誰在考慮吃碰」剛好相反。 */
+    const tk = (typeof MJT !== "undefined" && MJT.tingOf) ? MJT.tingOf(st, seat) : null;
+    return '<div class="m16-foe'+(shownTurn()===seat?" on":"")+(tk?" ting":"")+'" data-seat="'+seat+'">'+
       '<span class="m16-wind">'+F.info(wind).glyph+'</span>'+
       (seat===st.dealer?'<span class="m16-dz">莊</span>':'')+
+      (tk?'<span class="m16-tg">'+(TING_LBL[tk]||"聽")+'</span>':'')+
       '<span class="m16-foename" data-seat="'+seat+'"></span>'+
       '<span class="m16-cnt">'+cntBack()+cnt+'</span>'+
       '<span class="m16-fmelds">'+
@@ -234,8 +241,11 @@ const M16B = (function(){
     return '<div class="m16-reveal" style="--m16w:'+tw+'px">'+parts.join("")+'</div>';
   }
 
-  /* ---------- 「我現在聽哪幾張」(v1.66.0)----------
-     畫在動作列上的一小排(單機與連線共用這一份 —— 牌面與尺寸只有一份,不會走鐘)。
+  /* ---------- 「我宣告的聽牌」那一排(v1.66.0 起,v1.67.0 改成只在宣告後出現)----------
+     ★★ v1.67.0 的關鍵改動:**只有我自己按過「宣告聽牌」才畫**。
+       v1.66.0 那版是系統自動偵測到聽牌就畫 —— 那時「它有沒有出現」本身就是牌情
+       (CLAUDE.md 那條第 6 管道)。現在宣告是**公開動作**,它的存在洩漏不了任何東西。
+     ★ 但**聽哪幾張仍然只有自己看得到**:別人只知道我宣告了,不知道我聽什麼。
      ★ 給**牌**不給牌名:使用者在 v1.58.3 為對手的花牌講過「寫個字在那裡,有點沒感覺」,
        牌面一開始就決定自繪正是為了這種地方(也順手守住「不准用 Unicode 麻將字元」那條)。
      ⚠ 牌寬**寫死** 20px,不跟著盤面的 tw 走:這一排在 .m16-acts 裡,而動作列一長高
@@ -245,16 +255,20 @@ const M16B = (function(){
        原尺寸卻要瞇著眼看,而這一排的全部價值就是「一眼看出聽什麼」)。同 v1.64.0 那條
        迷你牌背的教訓:縮到很小還認不認得出來,斷言測不到,只有放大截圖看得出來。
      ⚠ 最多列 READY_MAX 張,其餘寫成「+N」—— 寬度有上限,動作列才不會被一長排牌推到換行
-       (換行 = 動作列長高 = 整副牌縮一次)。 */
+       (換行 = 動作列長高 = 整副牌縮一次)。
+     ⚠ 宣告後**槓牌**是允許的(明星三缺一的規則),槓完聽的牌可能變 → 這一排會跟著更新,
+       甚至可能變成「一張都不聽」。那時只留標籤(不要整排消失 —— 宣告的事實還在)。 */
   const READY_TW = 20, READY_MAX = 5;
+  const TING_LBL = { normal:"聽", di:"地聽", tian:"天聽" };
   function readyHTML(state, seat){
     const s = state || st;
     if(!s || !F || !R || typeof MJT === "undefined" || !(seat >= 0)) return "";
+    const kind = MJT.tingOf ? MJT.tingOf(s, seat) : null;
+    if(!kind) return "";                                 // 沒宣告 → 什麼都不畫
     const w = MJT.tenpaiNow(s, seat);
-    if(!w.length) return "";
     const show = w.slice(0, READY_MAX);
-    return '<span class="m16-ready" style="--m16w:'+READY_TW+'px" aria-label="聽牌">'+
-      '<b>聽</b>'+show.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+
+    return '<span class="m16-ready" style="--m16w:'+READY_TW+'px" aria-label="已宣告聽牌">'+
+      '<b>'+(TING_LBL[kind]||"聽")+'</b>'+show.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+
       (w.length > show.length ? '<i>+'+(w.length-show.length)+'</i>' : '')+
     '</span>';
   }
@@ -391,12 +405,22 @@ const M16B = (function(){
     /* --- 我的手牌 --- */
     const inClaim = co.length>0;
     const focus = inClaim ? co[copt] : null;
+    /* 宣告聽牌的兩種狀態(v1.67.0):
+         iTing  = 我已經宣告過 → 手牌鎖死,只有摸進來那張可以點(摸切)
+         tt     = 正在選「要打哪一張來宣告」→ 只有這些牌打掉之後會聽牌 */
+    const iTing = (typeof MJT !== "undefined" && MJT.tingOf) ? !!MJT.tingOf(st, me) : false;
+    /* ⚠ 空陣列是 truthy —— 寫成 `tingPick ? MJT.tingTiles(...) : null` 的話,
+       「模式還開著但已經不能宣告了」(輪次被自動打牌推走)會讓**整副手牌都變暗**。
+       所以沒得選就一律當成不在模式,模式自己失效,不必到處去清那個 flag。 */
+    const ttl = (tingPick && MJT.tingTiles) ? MJT.tingTiles(st, me) : [];
+    const tt = ttl.length ? ttl : null;
 
     /* 兩排時**兩排等寬**(寬度取最長那排,含預留的摸牌格)→ 左緣對齊成一塊。
        原本每排各自居中,兩排長度不同就錯開幾十 px,看起來歪歪的
        (使用者要的「整齊的感覺」不只是牌河)。 */
     const hw = Math.round(unitsOf(plan.rows, plan.drawRow) * tw);
     html += '<div class="m16-hand'+(canAct?" live":"")+(inClaim?" claim":"")+
+            (iTing?" locked":"")+(tt?" tingpick":"")+
             '" style="--m16w:'+tw+'px;--m16hw:'+hw+'px">';
     /* planHand() 保證 rows 串起來就是 hand 的原順序(切點只切在花色邊界),
        所以一路數下去的 hi 就是這張牌在 hand 裡的索引 —— 拿它當格位鍵。 */
@@ -405,7 +429,7 @@ const M16B = (function(){
       html += '<div class="m16-row">';
       row.forEach(t=>{
         const i = hi++, k = "h"+i;
-        html += handTile(t, k, i, canAct, focus, co);
+        html += handTile(t, k, i, canAct, focus, co, tt);
       });
       /* ★ 摸進來那一格**沒摸牌時也要佔住**(v1.58.3)—— 放一個等寬的透明佔位。
          planHand() 已經一律把這一格算進寬度,這裡若不畫,同一副手牌會在
@@ -413,7 +437,9 @@ const M16B = (function(){
       if(ri===plan.drawRow){
         if(hasDraw){
           const n = hint ? MJT.tenpaiAfter(st, me, st.drawn).length : 0;
-          html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+(n?" tenpai":""),
+          /* 宣告模式下,摸進來那張也可能是「打了它就聽牌」的選項之一(通常就是摸切) */
+          const tk = tt ? (tt.indexOf(st.drawn)>=0 ? " tingok" : " tingno") : "";
+          html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+(n?" tenpai":"")+tk,
                            ' data-t="'+st.drawn+'" data-k="d"'+(n?' data-n="'+n+'"':''));
         }else{
           html += '<i class="m16-slot" aria-hidden="true"></i>';
@@ -424,9 +450,17 @@ const M16B = (function(){
     return html + '</div></div>';
   }
 
-  /* 一張手牌。宣告視窗時,屬於「目前這一組」的牌站起來,其他候選只點一顆小點。 */
-  function handTile(t, k, i, canAct, focus, co){
+  /* 一張手牌。宣告視窗時,屬於「目前這一組」的牌站起來,其他候選只點一顆小點。
+     tt(v1.67.0)= 宣告聽牌的選牌模式:這一份裡的牌打掉之後會聽牌 → 亮起來,其餘壓暗。 */
+  function handTile(t, k, i, canAct, focus, co, tt){
     let cls = "m16-ht", extra = ' data-t="'+t+'" data-k="'+k+'"';
+    /* ★ 宣告模式優先於「聽牌提示」的角落數字:那一刻要回答的問題只有一個 ——
+       「打哪一張來宣告」,再疊一層數字只會讓人分心。 */
+    if(tt){
+      cls += (tt.indexOf(t)>=0 ? " tingok" : " tingno");
+      if(sel===k) cls += " sel";
+      return tileHTML(codeOf(t), cls, extra);
+    }
     if(focus){
       if(focus.idx.indexOf(i)>=0) return tileHTML(codeOf(t), cls+" sel opt", extra);
       // 其他組的候選:不站起來,只在頂端疊一顆小點(「這張也能點,還有別組」)
@@ -522,6 +556,20 @@ const M16B = (function(){
     }
     const a = MJT.ownActions(st, me);
     if(!a.discard) return;
+
+    /* ★ 宣告聽牌的選牌模式(v1.67.0):點的是「要打哪一張來宣告」,不是普通打牌。
+       ⚠ 兩段式照舊(觸控要點兩次)—— 宣告**不可逆**,比普通打牌更該防誤觸。 */
+    if(tingPick){
+      const tt = MJT.tingTiles(st, me);
+      if(tt.indexOf(t) < 0) return;                   // 打了它並不會聽牌 → 不理
+      if(!oneTap() && sel !== k){ sel = k; render(); return; }
+      sel = "";
+      if(cb.onTing) cb.onTing(t);
+      return;
+    }
+    /* ★ 已經宣告過 → 手牌鎖死,只有摸進來那一張可以打(摸切)。
+       CSS 也擋了 pointer-events,這裡是第二道 —— 規則層(MJT.discard)是第三道。 */
+    if(MJT.tingOf && MJT.tingOf(st, me) && k !== "d") return;
     /* ★ 滑鼠:hover 已經把牌抬起來了,這一下就是打出。
        ★ 觸控:兩段式 —— 第一次點是選取(上浮),第二次點**同一個格位**才打出。
          比的是格位 k 不是牌值 t,手上有一對時才不會兩張一起亮(v1.58.1)。 */
@@ -548,7 +596,10 @@ const M16B = (function(){
     mount, render, revealHTML, readyHTML,
     /* 換局 / 回大廳 / 結算都會叫這支 —— 順便把「只縮不放」的地板放掉,
        新的一局從頭量一次(不然上一局縮下去的牌寬會一直背著走)。 */
-    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; fitTw=0; },
+    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; fitTw=0; tingPick=false; },
+    /* 宣告聽牌的選牌模式。動作列那顆鈕開 / 關它,宣告成立或取消都要關掉。 */
+    setTingPick(v){ tingPick = !!v; sel=""; render(); },
+    tingPicking(){ return tingPick; },
     /* 宣告視窗:動作列問「現在是哪一組」,按下 ✔ 時回頭拿它送出 */
     claimOpts(){ return claimOpts(); },
     claimCur(){ const co=claimOpts(); return co.length ? co[Math.min(copt,co.length-1)] : null; },

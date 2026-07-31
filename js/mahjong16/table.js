@@ -81,7 +81,11 @@ const MJT = (function(){
       over: null,
       firstGo: true,          // 還在第一巡(天 / 地 / 人胡)
       kongDraw: false,        // 這一摸是槓上補的
-      robbable: null          // 正在加槓、可被搶槓的那張
+      robbable: null,         // 正在加槓、可被搶槓的那張
+      /* ★ 宣告聽牌(v1.67.0):ting[seat] = null | "normal" | "di" | "tian"。
+         **公開資訊** —— 宣告是喊出來的動作,全桌都該看得到(與「誰在考慮吃碰」相反)。
+         宣告之後那一家只能摸切,而且不能吃 / 碰(見 discard 與 eligibleFor)。 */
+      ting: new Array(seats).fill(null)
     };
     for(let s=0;s<seats;s++){ st.hands.push([]); st.melds.push([]); st.flowers.push([]); }
 
@@ -121,6 +125,11 @@ const MJT = (function(){
     if(st.over || st.claim) return null;
     if(st.turn!==seat) return null;
     if(!toPlay(st, seat)) return null;                 // 不是該打牌的狀態(見 toPlay 的註解)
+    /* ★ 宣告聽牌之後**只能摸切**(v1.67.0):摸什麼打什麼,不可以動手牌 ——
+       那就是「宣告」換來一台的代價(明星三缺一的規則:只有補花 / 槓 / 自摸能把牌留著)。
+       ⚠ 這一條也是 declareTing() 能重用 discard() 的原因:宣告的那一刻 ting 還是 null,
+         寫入 ting 是在 discard 回來之後。 */
+    if(tingOf(st, seat) && !(st.drawn>=0 && st.drawn===tile)) return null;
     const s = { ...st, hands:st.hands.map(h=>h.slice()), discards:st.discards.slice() };
 
     /* 打的可以是剛摸進來那張,也可以是手裡原有的(打手裡的 → 摸進來那張補進手牌)。
@@ -160,9 +169,15 @@ const MJT = (function(){
       });
       const types = [];
       if(cl.win)  types.push("win");
+      /* ★ 宣告聽牌之後不能吃 / 碰(那會動到手牌),但**槓與胡照給** ——
+         明星三缺一的規則:「只有補花、槓牌(明、暗都可以)或者自摸可以把牌留著」。
+         ⚠ 槓完聽的牌有可能變,那是規則允許的(不另外檢查「槓完聽牌形有沒有變」——
+           那是日麻立直的講究,這副牌沒有振聽也沒有那套判定)。 */
       if(cl.kong) types.push("kong");
-      if(cl.pong) types.push("pong");
-      if(cl.chow.length) types.push("chow");
+      if(!tingOf(st, s)){
+        if(cl.pong) types.push("pong");
+        if(cl.chow.length) types.push("chow");
+      }
       if(types.length) out[s] = types;
     }
     return out;
@@ -261,6 +276,64 @@ const MJT = (function(){
   }
 
   /* ==========================================================================
+     宣告聽牌(v1.67.0)—— 規則照明星三缺一
+     ──────────────────────────────────────────────────────────────────────────
+     使用者:「聽牌不是主動告知的,是可以讓我選擇要不要按聽牌,如果按了聽牌,就不能在
+     換牌了,然後在結算時,會多台數」。
+
+     ★ 一個動作做兩件事:**宣告 + 打出那一張**。分成兩步(先宣告、再打)會產生一個
+       「已宣告但還沒打牌」的中間狀態,而那個狀態下所有規則都要多一組判斷
+       (能不能改主意?這時被人碰走怎麼算?)—— 併成一步就沒有這個狀態。
+     ★ 打出去那一張**必須真的讓我聽牌**,否則不合法:按了鎖死手牌卻胡不了,
+       那是 bug 不是玩法。手牌明碼 → 每台裝置都驗得出來,不必指定房主。
+     ★ 不要求門清(碰過照樣可以宣告)—— 查明星三缺一的規則就是這樣,只是拿不到天 / 地聽。
+     ========================================================================== */
+  /* 這一家宣告了什麼(舊 state 沒有 ting 欄位時一律當成沒宣告) */
+  function tingOf(st, seat){
+    return (st.ting && st.ting[seat]) ? st.ting[seat] : null;
+  }
+  /* 「打掉哪些牌之後我會聽牌」= 宣告時可以打的那些。回傳牌種(去重、升冪)。
+     空陣列 = 現在不能宣告。 */
+  function tingTiles(st, seat){
+    if(st.over || st.claim || st.turn!==seat || !toPlay(st, seat)) return [];
+    if(tingOf(st, seat)) return [];                      // 已經宣告過,不能再宣告
+    const seen = {}, out = [];
+    allTiles(st, seat).forEach(t=>{
+      if(seen[t]) return;
+      seen[t] = 1;
+      if(tenpaiAfter(st, seat, t).length) out.push(t);
+    });
+    return out.sort((a,b)=>a-b);
+  }
+  function canDeclareTing(st, seat){ return tingTiles(st, seat).length>0; }
+
+  /* 天聽 / 地聽 / 一般。★ 兩個特殊台的共同前提是**全桌還沒有人吃碰槓**
+     (明星三缺一:「無發生吃、碰、槓的情況下宣告聽牌」)。
+       天聽 = 莊家取完牌後的**第一打**(牌河還是空的)
+       地聽 = 閒家在**前 8 張打出之內**宣告
+     ⚠ 門檻用「牌河張數」而不是 firstGo:firstGo 是一巡(4 家各一張),
+       而查到的規則寫的是 8 張 —— 照規則走,不要自己收緊。 */
+  const DI_TING_MAX = 8;
+  function tingTypeOf(st, seat){
+    const anyMeld = st.melds.some(m=>m.length>0);
+    if(anyMeld) return "normal";
+    if(seat===st.dealer && st.discards.length===0) return "tian";
+    return st.discards.length < DI_TING_MAX ? "di" : "normal";
+  }
+
+  /* 宣告聽牌並打出 tile。回傳新 state 或 null(不合法)。 */
+  function declareTing(st, seat, tile){
+    if(!canDeclareTing(st, seat)) return null;
+    if(!tenpaiAfter(st, seat, tile).length) return null;  // 打了它並不會聽牌
+    const type = tingTypeOf(st, seat);
+    const s = discard(st, seat, tile);                    // 這時 ting 還是 null → 不受摸切限制
+    if(!s) return null;
+    s.ting = (st.ting || new Array(st.seats).fill(null)).slice();
+    s.ting[seat] = type;
+    return s;
+  }
+
+  /* ==========================================================================
      自己回合的動作:暗槓 / 加槓 / 自摸
      ========================================================================== */
   /* 暗槓:手上自己就有 4 張。⚠ 條件用 toPlay() 不是 drawn>=0 —— 吃 / 碰之後手上
@@ -334,6 +407,7 @@ const MJT = (function(){
       lastTile: R.isExhausted(st.wall, st.pos, rs),
       robKong: !!(st.claim && st.claim.rob),
       firstTurn: !!st.firstGo,
+      ting: tingOf(st, seat),                 // 宣告聽牌:"normal" / "di" / "tian"(v1.67.0)
       base: (typeof st.base==="number") ? st.base : 1
     });
     if(!res.ok) return null;
@@ -421,14 +495,27 @@ const MJT = (function(){
       handNo:st.handNo, dealerStreak:st.dealerStreak,
       claim:st.claim?JSON.stringify(st.claim):null,
       over:st.over?JSON.stringify(st.over):null,
-      firstGo:!!st.firstGo, kongDraw:!!st.kongDraw, robbable:st.robbable
+      firstGo:!!st.firstGo, kongDraw:!!st.kongDraw, robbable:st.robbable,
+      /* 宣告聽牌:每家一格,空字串 = 沒宣告(例 "normal,,di," )。
+         ⚠ 一定要用逗號串而不是 JSON:RTDB 的稀疏陣列很難纏(同 wall / hands 那幾個)。 */
+      ting:(st.ting||[]).map(x=>x||"").join(",")
     };
   }
   const nums = s => (s==="" || s==null) ? [] : String(s).split(",").map(Number);
+  /* 宣告聽牌那一格。⚠ 一定要補齊到 seats 長度:v1.67.0 之前的房間沒有這個欄位,
+     解出來會是空陣列 → `st.ting[seat]` 讀到 undefined 還好,但 `.slice()` 之後
+     長度不對就會在 declareTing 時把別家的格子吃掉。 */
+  function tings(s, seats){
+    const a = (s==null || s==="") ? [] : String(s).split(",").map(x=>x||null);
+    while(a.length < seats) a.push(null);
+    return a.slice(0, seats);
+  }
   function dec(g){
     if(!g || !g.wall) return null;
+    const seats = g.seats||4;
     return {
-      rs:g.rs||"p4", seats:g.seats||4,
+      rs:g.rs||"p4", seats:seats,
+      ting:tings(g.ting, seats),
       wall:nums(g.wall), pos:g.pos||0,
       hands:String(g.hands||"").split("|").map(nums),
       melds:g.melds?JSON.parse(g.melds):[],
@@ -448,6 +535,8 @@ const MJT = (function(){
   return {
     newRound, autoDraw, discard, bid, allBidsIn, resolveClaim,
     concealedKong, addKong, selfDrawWin, settleWin,
+    // 宣告聽牌(v1.67.0)
+    declareTing, canDeclareTing, tingTiles, tingTypeOf, tingOf, DI_TING_MAX,
     ownActions, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft,
     seatWind, leftOf, nextOf, needOf, toPlay, holding, allTiles, enc, dec
   };

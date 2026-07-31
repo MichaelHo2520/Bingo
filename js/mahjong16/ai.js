@@ -214,7 +214,10 @@ const MJ16AI = (function(){
         melds: st.melds[s].map(m=>({ k:m.k, t:m.t, c:!!m.c })),
         left: st.hands[s].length,                       // 手上幾張(張數,不是牌)
         wind: seatWindOf(s, st.dealer, st.seats),
-        pool: st.discards.filter(d=>d.seat === s).map(d=>d.t)
+        pool: st.discards.filter(d=>d.seat === s).map(d=>d.t),
+        /* 他宣告聽牌了沒(v1.67.0)。★ 這是**公開資訊** —— 宣告是喊出來的,
+           所以放進 view 完全不違反「AI 不作弊」那條(對手的**牌值**永遠不在 view 裡)。 */
+        ting: (st.ting && st.ting[s]) || null
       });
     }
 
@@ -231,7 +234,10 @@ const MJ16AI = (function(){
       seen: seen, foes: foes,
       wallLeft: st.wall.length - st.pos,
       wallTotal: st.wall.length,
-      firstGo: !!st.firstGo
+      firstGo: !!st.firstGo,
+      ting: (st.ting && st.ting[seat]) || null,   // 我自己宣告了沒(宣告後只能摸切)
+      discarded: st.discards.length,              // 牌河張數 —— 天聽 / 地聽的門檻要用
+      isFirstDiscard: st.discards.length === 0
     };
   }
 
@@ -303,6 +309,11 @@ const MJ16AI = (function(){
       f.melds.forEach(m=>{
         if(m.k !== "chow" && (DRAGONS.indexOf(m.t) >= 0 || m.t === f.wind || m.t === v.roundWind)) t += 0.14;
       });
+      /* ★ 有人**宣告聽牌**(v1.67.0)→ 那是牌桌上最明確的威脅訊號:他自己說了他只差一張。
+         這是唯一一個「對方主動公告」的資訊,不必靠明牌去推,所以直接給一個高底值。
+         ⚠ 只是提高 threat 而不是「一律閃牌」—— 押退還是走 pickDiscard 那套
+           (自己一向聽以內照樣押到底),否則有人一宣告,高手就整局不敢打牌了。 */
+      if(f.ting) t = Math.max(t, 0.72);
       if(t > th) th = t;
     });
     const prog = v.wallTotal ? (1 - v.wallLeft / v.wallTotal) : 0;
@@ -365,19 +376,19 @@ const MJ16AI = (function(){
   const LEVELS = {
     easy: {
       key:"easy", name:"新手", emoji:"🙂",
-      uke:false, seen:false, wUke:0, wShape:0.5, wVal:0, wDef:0, noise:4,
+      uke:false, seen:false, wUke:0, wShape:0.5, wVal:0, wDef:0, noise:4, ting:false,
       claim:"greedy", think:[420,780], claimThink:[500,900],
       desc:"看得懂牌、不會亂拆組合,但不算進張也完全不防守 —— 有得吃碰就跟著吃碰"
     },
     normal: {
       key:"normal", name:"普通", emoji:"🤔",
-      uke:true, seen:false, wUke:0, wShape:2.4, wVal:0.4, wDef:0, noise:2.2,
+      uke:true, seen:false, wUke:0, wShape:2.4, wVal:0.4, wDef:0, noise:2.2, ting:true,
       claim:"gain", think:[520,950], claimThink:[600,1100],
       desc:"會算進張、留有台的牌,吃碰要真的有進展才吃,但不數場上剩幾張、也不防守"
     },
     hard: {
       key:"hard", name:"高手", emoji:"😈",
-      uke:true, seen:true, wUke:1, wShape:0.9, wVal:0.5, wDef:3, noise:0,
+      uke:true, seen:true, wUke:1, wShape:0.9, wVal:0.5, wDef:3, noise:0, ting:true,
       claim:"value", think:[640,1200], claimThink:[700,1300],
       desc:"進張連場上剩幾張都算,自己牌爛又有人攤牌時會收手 —— 認真打才贏得了"
     }
@@ -577,7 +588,65 @@ const MJ16AI = (function(){
         return { act:"akong", t:t };
       }
     }
+
+    /* ★ 已經宣告聽牌 → **只能摸切**(v1.67.0)。
+       規則層(MJT.discard)本來就擋得住,但一定要讓 AI 自己選對的那一張:
+       不然每一手都要靠呼叫端的 fallback 去一張一張試,而它試出來的順序不保證是摸的那張
+       (solo.js 的 applyAI 是 `for(all) discard(all[i])`,第一張過得了就用它)。 */
+    if(v.ting) return { act:"discard", t:(v.drawn>=0 ? v.drawn : v.hand[v.hand.length-1]) };
+
+    /* ★ 要不要宣告聽牌 */
+    const tt = pickTing(v, lvKey);
+    if(tt !== null) return { act:"ting", t:tt };
+
     return { act:"discard", t:pickDiscard(v, lvKey, rng) };
+  }
+
+  /* ==========================================================================
+     要不要宣告聽牌(v1.67.0)
+     ──────────────────────────────────────────────────────────────────────────
+     代價:手牌鎖死(只能摸切、不能吃碰);收益:聽牌 1 台,天聽 8 台 / 地聽 4 台。
+     所以判準是「這個聽牌值不值得鎖死」,三個難度差在**懂不懂算那件事**:
+       · easy   不宣告 —— 新手根本不會想到這一步(它的 desc 就是「完全不防守」)
+       · normal 聽牌就宣告(挑「聽的種類最多」的那一打)
+       · hard   還要求聽的牌**至少剩一張沒現身**(數場上剩幾張是熟練度,同 pickDiscard
+                 那條 lv.seen);而且天聽 / 地聽的門檻內一律宣告(8 台 / 4 台太值錢)
+     ★ 只吃 view —— 對手的手牌不在裡面,所以這支和其他決策一樣**結構上不可能作弊**。
+     ⚠ 回傳「要打出去的那一張」或 null(不宣告)。
+     ========================================================================== */
+  function pickTing(v, lvKey){
+    const lv = levelOf(lvKey);
+    if(!lv.ting || v.ting) return null;
+    const c = v.counts;
+    /* 手上不是「該打一張」的張數就不可能宣告(吃碰之後也算,但宣告後不能吃碰,
+       所以到得了這裡的都是正常狀態)。用張數擋掉可以省下 34 次 shanten。 */
+    if(R.countsTotal(c) !== v.need*3 + 2) return null;
+    if(shanten(c, v.need) > 0) return null;              // 連一張都還不聽 → 免談
+
+    /* 天聽 / 地聽的門檻:全桌都還沒有人吃碰槓(自己有明牌就一定不算)。
+       ⚠ 只看得到「對手有幾組明牌」—— 那正好就是判準本身,不需要偷看任何牌值。 */
+    const virgin = v.melds.length===0 && v.foes.every(f=>f.melds.length===0);
+    const bonus  = virgin && (v.isDealer ? v.isFirstDiscard : v.discarded < 8);
+
+    let best = null;
+    for(let t=0;t<34;t++){
+      if(!c[t]) continue;
+      c[t]--;
+      const w = (shanten(c, v.need)===0) ? R.winningTiles(c, v.need) : [];
+      c[t]++;
+      if(!w.length) continue;
+      /* 「還剩幾張沒現身」:seen 只含公開資訊(自己的手牌 + 全部明牌 + 整條牌河),
+         同 pickDiscard 的 seenFor —— 高手才數這個。 */
+      let live = 0;
+      w.forEach(x=>{ live += Math.max(0, 4 - (v.seen[x]||0)); });
+      const score = (lv.seen ? live*4 : 0) + w.length;
+      if(!best || score > best.score) best = { t:t, score:score, live:live };
+    }
+    if(!best) return null;
+    /* 天聽 / 地聽值 8 / 4 台 —— 那種局面連「聽的牌被打光了」都值得賭一把 */
+    if(bonus) return best.t;
+    if(lv.seen && best.live <= 0) return null;           // 鎖死了也等不到 → 不宣告
+    return best.t;
   }
 
   /* 給 UI 用:這一家現在幾向聽 / 聽哪幾張(單機的「電腦在想什麼」與測試都用得到) */
@@ -591,7 +660,7 @@ const MJ16AI = (function(){
     shanten, ukeire, isTenpai, viewOf, status,
     handValue, tableThreat, flushSuits, dangerOf, claimOptions,
     // 決策
-    pickDiscard, pickClaim, pickTurn,
+    pickDiscard, pickClaim, pickTurn, pickTing,
     // 難度
     LEVELS, LEVEL_KEYS, levelOf, thinkMs,
     // 給測試用:清掉 memo 才量得準
