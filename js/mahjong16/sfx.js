@@ -30,44 +30,56 @@ const M16Sfx = (function(){
   /* ---------- 合成音樂句 ----------
      ★ 音色是「聽得出是哪一個」而不是「好聽」:碰 / 吃 / 槓 都是把牌拍到桌上,差別在
        力道與張數 —— 吃 2 張(輕、兩音上行)、碰 3 張(和弦齊鳴 + 拍擊)、槓 4 張
-       (加一顆低音鋪底、最重)。全部經過 Sound 的總音量節點。 */
+       (和弦更厚、更長、加亮尾)。全部經過 Sound 的總音量節點。
+
+     ⚠⚠ **能量一定要落在 500Hz ~ 2kHz**,這是 v1.61.0 上線後第一個回報(「試玩了一下,
+       沒有聽到」)的唯一原因。第一版把「牌落桌」照真實木頭寫成 190Hz→120Hz 的敲擊,
+       數位波形很漂亮 —— 但**手機與筆電的小喇叭在 300Hz 以下幾乎沒有輸出**,
+       那一聲在真機上等於無聲,而它是一局要響三十幾次、最常聽到的那一個。
+       (當時可聽的成分只有一顆 1250Hz、0.02 秒、vol 0.05 的點擊,等於沒有。)
+       低頻可以留一點當「厚度」,但**絕不能讓它當主體**。
+     ⚠ 音量也要夠:vol < 0.12 的成分在有背景音樂時聽不出來(補花第一版是 0.10 / 0.07)。
+     ⚠ 同時響的和弦會疊加,峰值要留在 0.75 以下(要更多聲部就靠 delay 錯開,見 synthHu)。
+     ⚠ 這三條有守門:tools/t-mj16-sfx.html?t=1 攔 AudioContext,逐一檢查每種音都有
+       「≥350Hz / ≥60ms / vol≥0.12」的成分 —— 改音色後一定要重跑那一頁。 */
   const T = (f,o)=>Sound.tone(f,o);
 
-  function synthDiscard(){                       // 打牌:牌落桌的木質「嗒」
-    T(190,{ type:"triangle", dur:0.07, vol:0.22, slideTo:120 });
-    T(1250,{ type:"square", dur:0.02, vol:0.05 });
+  function synthDiscard(){                       // 打牌:牌落桌的「嗒」(主體在中頻,低頻只當厚度)
+    T(520,{ type:"triangle", dur:0.09, vol:0.30, slideTo:330 });
+    T(1400,{ type:"square", dur:0.05, vol:0.12 });
+    T(180,{ type:"triangle", dur:0.08, vol:0.16, slideTo:120 });
   }
   function synthDraw(){                          // 摸牌(只有自己會聽到,兼「換你了」)
-    T(880,{ type:"sine", dur:0.06, vol:0.13 });
-    T(1320,{ type:"sine", dur:0.09, vol:0.09, delay:0.05 });
+    T(760,{ type:"sine", dur:0.08, vol:0.22 });
+    T(1140,{ type:"sine", dur:0.11, vol:0.15, delay:0.05 });
   }
   function synthChow(){                          // 吃:兩音上行,最輕
-    T(587,{ type:"triangle", dur:0.10, vol:0.18 });
-    T(784,{ type:"triangle", dur:0.15, vol:0.18, delay:0.09 });
+    T(660,{ type:"triangle", dur:0.11, vol:0.26 });
+    T(880,{ type:"triangle", dur:0.16, vol:0.26, delay:0.09 });
   }
   function synthPong(){                          // 碰:三音和弦齊鳴 + 一下拍擊
-    [440,554,659].forEach(f=>T(f,{ type:"triangle", dur:0.17, vol:0.15 }));
-    T(150,{ type:"triangle", dur:0.09, vol:0.20, slideTo:90 });
+    [523,659,784].forEach(f=>T(f,{ type:"triangle", dur:0.18, vol:0.16 }));
+    T(392,{ type:"triangle", dur:0.10, vol:0.24, slideTo:262 });
   }
-  function synthKong(){                          // 槓:低音鋪底 + 四音和弦 + 亮尾
-    T(110,{ type:"triangle", dur:0.14, vol:0.22, slideTo:80 });
-    [349,440,523,698].forEach(f=>T(f,{ type:"triangle", dur:0.20, vol:0.13 }));
-    T(1047,{ type:"sine", dur:0.22, vol:0.12, delay:0.13 });
+  function synthKong(){                          // 槓:四音厚和弦 + 拍擊 + 亮尾(最重)
+    [440,554,659,880].forEach(f=>T(f,{ type:"triangle", dur:0.22, vol:0.14 }));
+    T(330,{ type:"triangle", dur:0.12, vol:0.22, slideTo:220 });
+    T(1319,{ type:"sine", dur:0.24, vol:0.18, delay:0.14 });
   }
-  function synthFlower(){                        // 補花:清亮小鈴
-    T(1568,{ type:"sine", dur:0.09, vol:0.10 });
-    T(2093,{ type:"sine", dur:0.13, vol:0.07, delay:0.07 });
+  function synthFlower(){                        // 補花:清亮小鈴(頻率刻意不再拉到 2kHz —— 小喇叭放不好又刺耳)
+    T(1245,{ type:"sine", dur:0.10, vol:0.22 });
+    T(1661,{ type:"sine", dur:0.15, vol:0.16, delay:0.07 });
   }
   /* 胡:華麗上行三連 + 亮頂。
      ⚠ 一定要短(這裡約 0.5s)—— 結果卡隨後還會播 win.wav / lose.wav,
        這一段是「喊胡」那一聲,不是勝利音樂,拖長會和音檔糊成一團。 */
   function synthHu(){
-    [523,659,880].forEach((f,i)=>T(f,{ type:"triangle", dur:0.14, vol:0.22, delay:i*0.07 }));
-    T(1175,{ type:"sine", dur:0.30, vol:0.14, delay:0.21 });
+    [659,880,1175].forEach((f,i)=>T(f,{ type:"triangle", dur:0.16, vol:0.26, delay:i*0.07 }));
+    T(1568,{ type:"sine", dur:0.32, vol:0.18, delay:0.21 });
   }
-  function synthWashout(){                       // 流局:兩音下行的收攤感
-    T(330,{ type:"triangle", dur:0.18, vol:0.15, slideTo:280 });
-    T(220,{ type:"triangle", dur:0.30, vol:0.13, delay:0.16, slideTo:165 });
+  function synthWashout(){                       // 流局:兩音下行的收攤感(整體上移一個八度才聽得到)
+    T(587,{ type:"triangle", dur:0.20, vol:0.22, slideTo:440 });
+    T(392,{ type:"triangle", dur:0.34, vol:0.20, delay:0.16, slideTo:294 });
   }
 
   /* ---------- 事件表 ----------
@@ -84,9 +96,17 @@ const M16Sfx = (function(){
   ];
   const ORDER = EV.map(e=>e.k);
 
+  /* ⚠ 發聲前一定要確認 Sound 這一版**有**音效槽那組 API。理由是混合快取:sw.js 是
+     network-first,但裝置有可能拿到新的 sfx.js 卻還吃著舊的 audio.js(沒有 def / sfx)——
+     那時直接呼叫會 TypeError,而這支是從 render() / applyGame() 裡叫的,
+     一路炸上去等於**整個盤面停止重畫**。音效不見是小事,牌桌壞掉是大事。 */
+  function ready(){
+    return typeof Sound !== "undefined" &&
+           typeof Sound.sfx === "function" && typeof Sound.tone === "function";
+  }
   let defed = false;
   function ensureDefs(){
-    if(defed || typeof Sound === "undefined" || !Sound.def) return;
+    if(defed || !ready() || !Sound.def) return;
     defed = true;
     EV.forEach(e=>Sound.def("m16"+e.k, ["mp3/m16-"+e.k+".mp3", "mp3/m16-"+e.k+".wav"], e.synth));
   }
@@ -137,18 +157,18 @@ const M16Sfx = (function(){
      ========================================================================== */
   function play(before, after, me){
     const ev = eventsOf(before, after, me);
-    if(!ev.length || typeof Sound === "undefined") return;
+    if(!ev.length || !ready()) return ev;
     ensureDefs();
     ev.forEach((k,i)=>{
       if(i === 0) Sound.sfx("m16"+k);
-      else setTimeout(()=>Sound.sfx("m16"+k), i*90);
+      else setTimeout(()=>{ if(ready()) Sound.sfx("m16"+k); }, i*90);
     });
     return ev;
   }
 
-  /* 單獨播一個事件(給不是靠 diff 的地方用,例如測試頁) */
+  /* 單獨播一個事件(給不是靠 diff 的地方用,例如 tools/t-mj16-sfx.html 試聽頁) */
   function one(k){
-    if(typeof Sound === "undefined") return;
+    if(!ready()) return;
     ensureDefs(); Sound.sfx("m16"+k);
   }
 
