@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.70.3 -->
-<meta name="version" content="1.70.3">
+<!-- 台灣 16 張麻將 · v1.71.0 -->
+<meta name="version" content="1.71.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -325,10 +325,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
             <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
           </div>
-          <!-- 這一頁專屬:喊牌語音(碰 / 吃 / 槓 / 胡 / 流局)。偏好存在 mahjong16.prefs.v1,
+          <!-- 這一頁專屬:喊牌語音(碰 / 吃 / 槓 / 胡 / 流局 / 聽牌)+ 打出字牌時報的牌名(v1.71.0)。
+               ★ 兩者共用這一顆開關(都是語音層);偏好存在 mahjong16.prefs.v1,
                綁定與同步在 js/mahjong16/main.js(ui-kit 的 syncSettingsUI 是共用的,不管這一列) -->
           <div class="set-row">
-            <span class="set-lbl">喊牌語音<span class="set-sub">(碰 / 吃 / 槓 / 胡 唸出來)</span></span>
+            <span class="set-lbl">喊牌語音<span class="set-sub">(碰 / 吃 / 槓 / 胡,打字牌報牌名)</span></span>
             <button class="switch" id="m16SwVoice" role="switch" aria-checked="true" aria-label="喊牌語音"><span class="knob"></span></button>
           </div>
         </div>

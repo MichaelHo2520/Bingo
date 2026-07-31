@@ -13,9 +13,13 @@
        所以 Sound 只能在 play() / 樂句裡碰,不可以在頂層執行(註冊也是懶的)。
 
    ── ★ 音檔優先、合成音墊底 ────────────────────────────────────────────────
-     每個事件都註冊成一格 Sound.def() 音效槽,候選檔案是 mp3/m16-<事件>.mp3|.wav。
+     每個事件都註冊成一格 Sound.def() 音效槽,候選檔案是 mp3/mj16/<事件>.mp3|.wav。
      檔案還沒放進去(現在就是)→ 自動退回這裡寫的合成音;之後把錄好的喊牌(「碰!」
-     「胡!」)丟進 mp3/ 就直接生效,**程式一行都不用改**。
+     「胡!」)丟進 mp3/mj16/ 就直接生效,**程式一行都不用改**。
+     ⚠ v1.71.0 起這一頁的音檔全部收在 **mp3/mj16/** 底下(舊路徑是散在 mp3/ 根目錄的
+       `m16-voice-*.wav`):mp3/ 根目錄留給五個遊戲共用的東西(bgm / win / lose / 語音短訊)。
+       改路徑要**三個地方一起改** —— 這裡的 ensureDefs、sw.js 的快取清單、兩支產生器
+       (tools/gen-mj16-voice-edge.py 與 .ps1)。漏掉 sw.js 那份會離線變成沒聲音。
 
    ── ★ 刻意不做的兩件事 ────────────────────────────────────────────────────
      ① **宣告視窗沒有提示音**。親友聚會是坐在一起玩的 —— 你手機一響,鄰座就知道你手上
@@ -33,6 +37,22 @@
        ②不必再算牌型 → 這一支回到**零依賴**(v1.66.0 為了偵測聽牌相依過 MJT,現在不用了)
        ③沒有洩漏問題:宣告本身就是公開資訊,不需要像宣告視窗那樣藏
      ⚠ 因此它也**沒有自己的開關** —— 照吃 / 碰 / 槓那樣,是規則動作的聲音,不是輔助提示。
+
+   ── ★ 字牌報牌名(v1.71.0)──────────────────────────────────────────────────
+     使用者:「我要做的音效是東南西北,還有紅中,發財,白皮這幾個先加進去吧」——
+     打出**東南西北中發白**這七張時,牌落桌那一聲之後跟一句牌名,**全桌都聽到**
+     (真牌桌上打字牌本來就會報一聲)。
+
+     ★ 沒有洩漏問題,所以不受 v1.59.0 那條紅線管:打出去的牌**已經攤在牌河上給大家看**,
+       報牌名不多給任何資訊。要藏的是「誰在考慮吃碰」(還沒發生的事),不是「剛才打了什麼」。
+     ★ **只給七張字牌**。數字牌一局要打三十幾張,每張都唸會變成報帳機 —— 而字牌是牌桌上
+       真的會喊出來的那幾張(要湊三元 / 四喜的人正在等它)。
+     ★ 它**不是一個新的「事件」**,而是「剛才那張是什麼」→ 只有語音一格、**沒有動作聲**
+       (拍牌那一下是 discard 那格,兩者疊起來剛好就是「嗒 —— 紅中」)。
+       所以它進的是 VOICE 表而不是 EV 表,而排序上緊跟在 discard 後面(見 rank)。
+     ⚠ 判定一律看**牌河最後那張**,不可以用「我剛才點了哪張」:連線是等交易回來才換手,
+       那時本地已經沒有那個記憶(而且這一支要單機 / 連線共用同一份判斷)。
+     ⚠ 與喊牌**共用同一個開關**(設定裡那一列):兩者都是語音層。真的覺得字牌太吵再拆。
    ============================================================================ */
 
 const M16Sfx = (function(){
@@ -125,6 +145,15 @@ const M16Sfx = (function(){
     { k:"ready",   synth:synthReady }
   ];
   const ORDER = EV.map(e=>e.k);
+  const isAct = k => ORDER.indexOf(k) >= 0;        // 有動作聲的那些(牌名只有語音,不在裡面)
+
+  /* 排序名次。★ 牌名(tile-*)**緊跟在 discard 後面** —— 先聽到牌落桌、再聽到那是什麼牌。
+     ⚠ 不可以直接用 ORDER.indexOf():牌名不在 EV 表裡,indexOf 回 -1 會把它排到**最前面**
+       (症狀是先聽到「紅中」才聽到牌落桌,因果顛倒)。名次乘 2 就是為了留出這個插空位。 */
+  function rank(k){
+    const t = k.indexOf("tile-") === 0;
+    return ORDER.indexOf(t ? "discard" : k) * 2 + (t ? 1 : 0);
+  }
 
   /* ---------- 喊牌語音層(v1.62.0) ----------
      使用者:「你的吃碰這些,我是可以聽到文字的聲音嗎?目前我試起來是沒有」——
@@ -143,10 +172,20 @@ const M16Sfx = (function(){
        音效總音量。換成音檔之後這三個問題全部消失,而且離線也能用。
      ⚠ 語音槽**沒有合成音後備**(synth 傳 null):音檔取不到就是不講話。拿音階去墊會變成
        同一個事件響兩次很像的聲音。 */
-  const VOICE = { pong:"碰", chow:"吃", kong:"槓", hu:"胡", zimo:"自摸", washout:"流局",
-                  /* 「聽牌」和碰 / 吃 / 槓一樣是**喊出來的宣告**(v1.67.0 起是玩家自己按的),
-                     所以它本來就該唸出來給全桌聽 —— 這一格從此與其他喊牌完全同級。 */
-                  ready:"聽牌" };
+  const CALL = { pong:"碰", chow:"吃", kong:"槓", hu:"胡", zimo:"自摸", washout:"流局",
+                 /* 「聽牌」和碰 / 吃 / 槓一樣是**喊出來的宣告**(v1.67.0 起是玩家自己按的),
+                    所以它本來就該唸出來給全桌聽 —— 這一格從此與其他喊牌完全同級。 */
+                 ready:"聽牌" };
+  /* 字牌報牌名(v1.71.0,見檔頭)。key 是 "tile-" + rules.js 的代號
+     → 音檔就是 mp3/mj16/voice-tile-fe.wav 這一組。 */
+  const TILE = { "tile-fe":"東",  "tile-fs":"南",  "tile-fw":"西", "tile-fn":"北",
+                 "tile-jz":"紅中", "tile-jf":"發財", "tile-jb":"白板" };
+  /* 牌索引 → 代號。★ 27..33 是字牌(rules.js 的編碼:0..8 萬 / 9..17 條 / 18..26 筒 / 27..33 字)。
+     ⚠ 刻意寫死數字而**不去相依 MJ16** —— eventsOf 的「零依賴」是它能在 node 單獨測的前提
+       (見檔頭)。代價是這張表和 rules.js 的 HONORS 順序綁死,所以 tools/test-mj16-sfx.js
+       有一條**逐一拿 MJ16.codeOf(t) 對答案**的斷言守著:哪天編碼變了,那裡一定紅。 */
+  const TILE_AT = { 27:"fe", 28:"fs", 29:"fw", 30:"fn", 31:"jz", 32:"jf", 33:"jb" };
+  const VOICE = Object.assign({}, CALL, TILE);     // play() 只看這一張(喊牌 + 報牌名同一層)
   let vOn = true;                                  // 偏好存在 mahjong16.prefs.v1(adapter 的 ownPrefs)
 
   /* ⚠ 發聲前一定要確認 Sound 這一版**有**音效槽那組 API。理由是混合快取:sw.js 是
@@ -163,10 +202,10 @@ const M16Sfx = (function(){
     defed = true;
     /* 動作聲:候選音檔**現在還不存在**(等使用者放),所以刻意**不開 HTMLAudio 後備** ——
        那一層對不存在的檔案會「假成功」,合成音就再也不播了(見 audio.js 的 playClipEl)。 */
-    EV.forEach(e=>Sound.def("m16"+e.k, ["mp3/m16-"+e.k+".mp3", "mp3/m16-"+e.k+".wav"], e.synth));
-    /* 語音層:沒有合成音後備(見上面那段註解),但音檔是**跟程式一起發佈**的 →
-       開 HTMLAudio 後備,這樣用 file:// 直接開網頁(fetch 被擋)時照樣喊得出來。 */
-    Object.keys(VOICE).forEach(k=>Sound.def("m16v"+k, ["mp3/m16-voice-"+k+".wav"], null, { el:true }));
+    EV.forEach(e=>Sound.def("m16"+e.k, ["mp3/mj16/"+e.k+".mp3", "mp3/mj16/"+e.k+".wav"], e.synth));
+    /* 語音層(喊牌 + 字牌牌名):沒有合成音後備(見上面那段註解),但音檔是**跟程式一起發佈**
+       的 → 開 HTMLAudio 後備,這樣用 file:// 直接開網頁(fetch 被擋)時照樣喊得出來。 */
+    Object.keys(VOICE).forEach(k=>Sound.def("m16v"+k, ["mp3/mj16/voice-"+k+".wav"], null, { el:true }));
   }
 
   /* ==========================================================================
@@ -195,7 +234,16 @@ const M16Sfx = (function(){
       if((after.flowers[s] || []).length > (before.flowers[s] || []).length) add("flower");
     }
 
-    if(after.discards.length > before.discards.length) add("discard");
+    /* 打牌。★ 順手看「打出去的是不是字牌」→ 多報一格牌名(v1.71.0,見檔頭)。
+       ⚠ 一律看**牌河最後那張**:單機是本地換 state、連線是等交易回來,只有牌河是共同的真相。
+       ⚠ 牌河沒變長就不報 —— 吃 / 碰 / 明槓會把最後那張**拿走**(table.js 的 claimTo 有
+         discards.pop()),那時最後一張換成了前一手打的牌,照報就會把舊的那張再唸一次。 */
+    if(after.discards.length > before.discards.length){
+      add("discard");
+      const d = after.discards[after.discards.length-1];
+      const code = d ? TILE_AT[d.t] : null;
+      if(code) add("tile-"+code);
+    }
 
     /* 摸牌只報自己那一家(見檔頭)。「剛摸進來」= 之前沒有輪到我拿著一張摸牌。
        ⚠ 吃 / 碰之後 drawn 是 -1(不摸牌),所以碰完不會多一聲摸牌;槓之後補摸一張會有,
@@ -212,7 +260,7 @@ const M16Sfx = (function(){
     const tb = before.ting || [], ta = after.ting || [];
     for(let s=0;s<after.seats;s++) if(!tb[s] && ta[s]){ add("ready"); break; }
 
-    out.sort((x,y)=>ORDER.indexOf(x) - ORDER.indexOf(y));
+    out.sort((x,y)=>rank(x) - rank(y));
     return out;
   }
 
@@ -232,9 +280,11 @@ const M16Sfx = (function(){
     ensureDefs();
     ev.forEach((k,i)=>{
       const t = i*90;
-      at("m16"+k, t);                              // 動作聲(拍牌 / 摸牌…)
-      /* 喊牌壓在動作聲後面 60ms:兩者相隔太近人耳會融成一團,太遠又像回音。
-         ★ 只有宣告動作有語音,其它事件 VOICE 裡沒有就自然跳過。 */
+      if(isAct(k)) at("m16"+k, t);                 // 動作聲(拍牌 / 摸牌…);牌名沒有這一層
+      /* 喊牌 / 牌名壓在動作聲後面 60ms:兩者相隔太近人耳會融成一團,太遠又像回音。
+         ★ 沒有語音的事件(打牌 / 摸牌 / 補花)VOICE 裡查不到就自然跳過。
+         ★ 牌名自己佔一個 90ms 名次(它排在 discard 後面),所以聽起來是「嗒 —— 紅中」,
+           兩聲隔 150ms:比喊牌那 60ms 鬆一點,因為它前面那一下不是同一件事的一部分。 */
       if(vOn && VOICE[k]) at("m16v"+k, t+60);
     });
     return ev;
@@ -244,7 +294,7 @@ const M16Sfx = (function(){
   function one(k, withVoice){
     if(!ready()) return;
     ensureDefs();
-    Sound.sfx("m16"+k);
+    if(isAct(k)) Sound.sfx("m16"+k);               // 牌名(tile-*)沒有動作聲那一層
     if(withVoice !== false && vOn && VOICE[k]) at("m16v"+k, 60);
   }
   /* 只播喊牌那一聲(試聽頁要能單獨聽) */
@@ -252,7 +302,7 @@ const M16Sfx = (function(){
     if(!ready() || !VOICE[k]) return;
     ensureDefs(); Sound.sfx("m16v"+k);
   }
-  /* 進牌桌時把喊牌音檔先載好(五個檔共約 65KB)。
+  /* 進牌桌時把語音音檔先載好(喊牌 7 + 字牌牌名 7,共十幾個小檔約 150KB)。
      ⚠ 這不是效能優化,是**正確性**:音效槽是懶載入的,而語音層沒有合成音可以墊 ——
        不預載的話「一局裡第一次碰」永遠是沒聲音的(音檔那時才開始飛),
        使用者只會覺得「有時候有、有時候沒有」。 */
@@ -265,7 +315,12 @@ const M16Sfx = (function(){
   return {
     eventsOf, play, one, say, preload,
     KEYS:ORDER,
-    VOICE_KEYS: Object.keys(VOICE),
+    VOICE_KEYS: Object.keys(VOICE),                 // 喊牌 + 牌名:play() 真的會播的全部語音格
+    CALL_KEYS: Object.keys(CALL),                   // 只有喊牌(宣告動作)
+    TILE_KEYS: Object.keys(TILE),                   // 只有字牌牌名(v1.71.0)
+    /* 牌索引 → 語音格。給測試拿 MJ16.codeOf() 對答案用(TILE_AT 是寫死的,見那裡的註解);
+       非字牌回 null。 */
+    tileKeyOf(t){ return TILE_AT[t] ? "tile-"+TILE_AT[t] : null; },
     wordOf(k){ return VOICE[k] || ""; },
     setVoice(v){ vOn = !!v; },
     voiceOn(){ return vOn; }
