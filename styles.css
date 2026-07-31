@@ -685,7 +685,10 @@
   :root[data-theme="ebook"] .cell.callable{box-shadow:0 0 0 3px #000 inset}
   /* ---------- 好友互動表情 ---------- */
   /* 互動鈕已改放右上工具列(.tools),不再用浮動鈕,盤面數字不會被蓋到 */
-  .emote-card{max-width:340px;position:relative;overscroll-behavior:contain;touch-action:pan-y}  /* 只有卡片內部可上下捲,不外溢到背景 */
+  /* 寬度依解析度放大(v1.70.2):窄螢幕維持原本的「填滿扣掉 .veil 那 20px 邊」,寬螢幕才放到 460px
+     —— 一句話 / 語音短訊的膠囊少換行一兩排,面板不用捲那麼多。min 仍留 340px(= 舊值)是安全的:
+     .set-card 的 width:100% 先被 .veil 的 grid area 夾住,max-width 比它大時不會撐出橫向捲動。 */
+  .emote-card{max-width:clamp(340px,44vw,460px);position:relative;overscroll-behavior:contain;touch-action:pan-y}  /* 只有卡片內部可上下捲,不外溢到背景 */
   #emoteVeil{touch-action:none}   /* 手指在卡片外(背景)滑動時,不捲動背景頁 */
   /* 右上角關閉 ✕:sticky 固定在卡片可視區右上,卡片內部捲動時也不會捲走 */
   .card-x{position:sticky;top:0;margin:-6px -4px -32px auto;z-index:4;
@@ -707,7 +710,8 @@
   :root[data-theme="ebook"] .emote-to-btn.on{background:#000;color:#fff}
   .emote-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
   .emote-btn{aspect-ratio:1;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);
-    border-radius:12px;font-size:26px;line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .1s,background .15s}
+    border-radius:12px;font-size:clamp(26px,3vw,36px);line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .1s,background .15s}
+  /* ↑ 表情格是 aspect-ratio:1,卡片變寬 → 6 格跟著變大;字級不跟著長就會變成「大方框裝小 emoji」 */
   .emote-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .emote-btn:active{transform:scale(.9)}
   :root[data-theme="ebook"] .emote-btn{background:#fff;border:1px solid #000}
