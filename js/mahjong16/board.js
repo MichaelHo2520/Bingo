@@ -404,6 +404,10 @@ const M16B = (function(){
     const co = claimOpts();                              // 宣告視窗:可吃 / 碰 / 槓的組合
     if(co.length) copt = Math.min(copt, co.length-1);
 
+    /* ⚠ 這道量測的前提是「scrollHeight 講的是**內容**有多高」,所以橫向那邊的空白
+       只能用 `align-content` 去擺位置,**不可以**放一條 1fr 的彈性列去吸收
+       (吸收 = scrollHeight 恆等於 clientHeight = 下面兩點量測拿到同一個值,S 變垃圾;
+        v1.73.1 試過,連「量測時暫時把它收成 0」都救不回來)。詳見 styles.css 那一段。 */
     let cur = tw;
     const draw = t => { cur = t; host.innerHTML = paint(plan, t, hasDraw, canAct, co); return host.scrollHeight; };
     let h1 = draw(tw);

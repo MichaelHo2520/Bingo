@@ -2419,11 +2419,21 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      設定面板一律不受影響。`.m16-*` 開頭的那幾條不必限定,那個前綴本來就只有這一頁。
    ========================================================================== */
 @media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
-  /* ① 頂列讓出 44px。
+  /* ① 頂列讓出 44px —— 但**不可以 display:none**(v1.73.1 上手回報:「少了全螢幕」)。
+     `⛶` 與 `⚙️` 都住在頂列裡,整條收掉等於橫向進不了全螢幕、也開不了設定。
+     ★ 改成**浮在右上角**:position:fixed 讓它脫離流(垂直空間照樣省下 44px),
+       只留兩顆鈕、品牌字隱藏。
+     ⚠ 房間框要讓出右上那一角(padding-right),否則浮動鈕會壓在晶片列上。
+     ⚠ z-index 41 < .veil 的 50:結果卡 / 設定蓋板 / 離開確認**仍然蓋得住它**,
+       不會出現「對話框上面浮著兩顆鈕」(同 v1.56.0 那條 stacking context 的教訓)。
      ⚠ 刻意**不**去擴充上面那條既有的 `(max-height:780px) and (pointer:coarse)`
        (數獨 / 五子棋在用):780 這個門檻連**直向**的小手機(667 高)都會命中,
        把麻將掛進去等於連直向都收頂列 —— 那就影響到正常佈局了。 */
-  body.m16-mp .topbar,body.m16-solo .topbar{display:none}
+  body.m16-mp .topbar,body.m16-solo .topbar{
+    position:fixed;top:5px;right:8px;z-index:41;width:auto;gap:6px}
+  body.m16-mp .topbar .brand,body.m16-solo .topbar .brand{display:none}
+  body.m16-mp .topbar .icon-btn,body.m16-solo .topbar .icon-btn{
+    width:28px;height:28px;border-radius:9px;font-size:14px}
 
   /* ①-b 邊界與間距也收一號。全域那條 `@media (max-height:560px)` 已經把 body 壓到
      10px / gap 8,這裡再收 —— 只掛在對局中的麻將身上,消消樂與各頁選單不受影響。 */
@@ -2438,7 +2448,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ .mj-room 本身是 .panel(有底色圓角),改 display:flex 不影響外觀;
        三個子元素本來就是上下堆疊的三個 block,並排之後 foot 吃掉剩下的寬度。 */
   body.m16-mp .mj-room,body.m16-solo .mj-room{
-    padding:4px 10px;display:flex;align-items:center;gap:8px}
+    padding:4px 72px 4px 10px;display:flex;align-items:center;gap:8px}
   body.m16-mp .mj-room .mj-room-top,body.m16-solo .mj-room .mj-room-top{flex:none}
   body.m16-mp .mj-room .mp-subrow{flex:none;margin-top:0;font-size:10px;max-width:6em;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2457,12 +2467,29 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ★ 這個重排**不需要動 board.js 的 paint()** —— 它產生的本來就是
        .m16-foes / .m16-pool / .m16-mine 三個平行區塊,原本靠 flex column 疊起來,
        這裡只是換成 grid 重新配位置。單機與連線共用同一份盤面,所以兩邊一起生效。
-     ⚠ align-content:start:內容比格子矮時不要平均撐開(撐開 = 牌河與手牌之間
-       出現一條會變動的空隙 → 又回到「總高度一變牌就換一次大小」)。 */
+     ★★ `align-content:safe end` —— 整組內容**貼著底邊**(v1.73.1 上手回報:
+       「全螢幕時牌會往上靠,下面留一段空白」)。牌寬的上限是**寬度**決定的
+       (844px 寬 → 44px),進了全螢幕多出來的高度**沒有人吃得掉**,一定會有一截空白;
+       能決定的只是它放在哪裡。放頂部(房間框下方)比放底部好:手牌貼著螢幕下緣,
+       拇指按得到,而頂部那條縫在漸層背景上幾乎看不出來。
+     ⚠⚠ `safe` 這個關鍵字不可省。純 `end` 在**內容溢出時**會把頭部推出容器的起始邊
+       (捲都捲不回去 —— CSS 規格說的 data loss);`safe end` 一溢出就自動退回 start。
+     ⚠⚠ 前面那條 `align-content:start` 是**降級用的,不可以刪**:不認得 `safe` 的瀏覽器
+       (Safari 16 以前)會把整條丟掉 → 退回預設的 `normal`,而 grid 的 normal 會**拉伸**
+       auto 列填滿容器 → scrollHeight 恆等於 clientHeight → 又是上面那個死結。
+       先寫 start 的話,舊瀏覽器拿到的是「空白留在底部」= 這個版本改之前的樣子,壞不到哪去。
+     ⚠⚠ 這裡曾經改用「一條 `minmax(0,1fr)` 的空列」去吸收剩餘空間 —— **行不通**:
+       那條列一吸收,`scrollHeight` 就永遠等於 `clientHeight`,而 board.js 是靠
+       「量 tw 與 0.7×tw 兩點解一條直線」算牌寬的 —— 兩個點被鉗在同一個值上,S 變垃圾,
+       牌寬開始跳(實測 844×390 從穩定 38px 變成 30/36/38 三段)。
+       就算在量測時用一個暫時 class 把它收成 0,實測仍然跳三次。
+       `align-content` 完全不參與高度計算,所以才是這裡唯一安全的做法。 */
   .m16-stage{display:grid;
     grid-template-columns:minmax(0,1fr) auto;
     grid-template-areas:"pool foes" "melds melds" "hand hand";
-    align-content:start;gap:4px 8px;padding:4px 8px}
+    align-content:start;
+    align-content:safe end;
+    gap:4px 8px;padding:4px 8px}
   .m16-pool{grid-area:pool;min-width:0}
   .m16-foes{grid-area:foes;max-width:34vw}
   /* ★★ display:contents —— 這一行是「不改 board.js 的 paint() 就重排」的關鍵。
