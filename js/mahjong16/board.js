@@ -504,10 +504,23 @@ const M16B = (function(){
     const prows = poolRows();
     const poolH = Math.round(pw*1.32)*(prows-1) + Math.round(pwL*1.32)
                   + 2*(prows-1) + 10;
+    /* ★★ 被拿走時**一律預留那一格**(v1.73.2 的第二半,同手牌的 .m16-slot 那條)——
+       不預留的話:牌河是 flex-wrap + align-content:flex-start,而牌高 = --m16w × 1.32,
+       放大那張一消失,**那一排的行高**就從 pwL×1.32 掉到 pw×1.32,而 .m16-pt 是
+       align-self:flex-end → 整排牌往上跳(tw=40 時約 17px),下一張打出來又跳回來。
+       使用者:「原本那一列的牌整個往上移,然後下一隻牌打出來,又被移回來,看起來很奇怪」。
+       ★ 佔位格的寬高**剛好等於被拿走那張**(pwL)→ 幾何與 pop 之前**逐字相同**
+         (少了 gap+pwL 的牌、多了 gap+pwL 的空格),所以碰的那一瞬間整條牌河零重排。
+       ⚠ 刻意**不掛 .m16-pt** —— 那個 class 有 opacity 與 .last 的紅框語彙,而這一格
+         只是空間;也讓「數 .m16-pt.last 有幾個」「所有 .m16-pt 都是小的」這兩條斷言
+         不必為它開例外。 */
+    const pslot = st.taken
+      ? '<div class="m16-pslot" style="--m16w:'+pwL+'px" aria-hidden="true"></div>' : '';
     html += '<div class="m16-pool" id="m16Pool" style="--m16w:'+pw+'px;--m16ph:'+poolH+'px">'+
       st.discards.map((d,i)=>tileHTML(codeOf(d.t),
         "m16-pt"+(i===last?" last":""),
         ' data-seat="'+d.seat+'"'+(i===last?' style="--m16w:'+pwL+'px"':''))).join("")+
+      pslot+
       '</div>';
 
     /* --- 我這一邊(攤出去的 → 手牌)-----------------------------------------

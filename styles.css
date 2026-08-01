@@ -2172,6 +2172,15 @@ body.m16-mp .mj-room{width:min(92vw,960px)}
   flex:none;overflow-y:auto;scrollbar-gutter:stable}
 .m16-pt{opacity:.8;align-self:flex-end}
 .m16-pt.last{outline:2px solid var(--mj-jz);outline-offset:1px;opacity:1}
+/* ★ 最新那張被吃 / 碰走時的透明佔位(v1.73.2)—— 同手牌 .m16-slot 的道理:
+   那一格**一律預留**。不預留的話這一排的行高會從 pwL×1.32 掉到 pw×1.32,
+   而 .m16-pt 是 align-self:flex-end → 整排牌往上跳一次、下一張打出來又跳回來。
+   寬高與 .m16-tile 同一條算式(board.js 給它 --m16w = 被拿走那張的 pwL),
+   ⚠ 但**一個可見的樣式都不給**(無底色 / 無框 / 無陰影 / 無圓角)——
+     否則就是牌河上多一張空白牌,比位移更難解釋。 */
+.m16-pslot{flex:none;align-self:flex-end;
+  width:var(--m16w,36px);
+  height:calc(var(--m16w,36px) * 1.32)}
 
 /* ---------- 對手 ---------- */
 .m16-foes{display:flex;flex-direction:column;gap:4px;flex:none}

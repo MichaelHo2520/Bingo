@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.73.2 -->
-<meta name="version" content="1.73.2">
+<!-- 數獨 · v1.73.3 -->
+<meta name="version" content="1.73.3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -307,7 +307,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           </div>
           <div class="set-row" id="sfxVolRow">
             <span class="set-lbl">音量</span>
-            <input class="rng" id="sfxVol" type="range" min="0" max="100" value="100" aria-label="音效音量">
+            <input class="rng" id="sfxVol" type="range" min="0" max="100" value="100" aria-label="音效音量(含勝敗音效)">
           </div>
           <div class="set-row" id="vibrateRow">
             <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
@@ -335,7 +335,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="set-group-title">語音（連線）</div>
           <div class="set-row">
             <span class="set-lbl">收到語音音量</span>
-            <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量">
+            <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
           </div>
           <div class="set-row">
             <span class="set-lbl">我的語音<span class="set-sub">(自己錄 · 連線可送)</span></span>
