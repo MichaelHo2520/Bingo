@@ -493,7 +493,13 @@ const M16B = (function(){
            滿了就捲(render() 收尾會捲到底,最新那張一定看得見)。 */
     const pw   = Math.max(14, Math.round(tw*0.46));      // 舊牌:小
     const pwL  = Math.max(20, Math.round(tw*0.78));      // 最新那張:大
-    const last = st.discards.length-1;
+    /* ★ v1.73.2:被吃 / 碰 / 明槓 / 食胡拿走時(st.taken)**整條牌河都不標最新那張**。
+       那一張已經從 discards 裡 pop 掉,照舊算 length-1 的話紅框大牌會退回到**上一張** ——
+       而上一張早就過了宣告視窗,看起來卻像現在可以吃 / 碰(使用者:「很容易會以為
+       又可以再碰或吃」)。沒有 last 時全部牌一律 opacity:.8,剛好就是「現在沒有活牌」。
+       ⚠ poolH 底下照舊**永遠預留一張大牌的高度**,不可以跟著 taken 變 ——
+         牌河高度變一點,整副牌就會跟著換一次大小(v1.58.3 那條規矩)。 */
+    const last = st.taken ? -1 : st.discards.length-1;
     // 最後一排要留給放大的那張(它永遠在最後);+2 是列距、+10 是內距
     const prows = poolRows();
     const poolH = Math.round(pw*1.32)*(prows-1) + Math.round(pwL*1.32)

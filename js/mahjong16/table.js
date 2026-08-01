@@ -82,6 +82,15 @@ const MJT = (function(){
       firstGo: true,          // 還在第一巡(天 / 地 / 人胡)
       kongDraw: false,        // 這一摸是槓上補的
       robbable: null,         // 正在加槓、可被搶槓的那張
+      /* ★ 牌河最後那張是不是**剛被拿走**(吃 / 碰 / 明槓 / 食胡)(v1.73.2)。
+         為什麼要記:被拿走時那張會從 discards 裡 pop 掉,盤面的「最新那張」
+         (放大 + 紅框)就自動退回到**上一張** —— 而上一張早就過了宣告視窗,
+         看起來卻像現在可以吃 / 碰的那張。使用者回報:「很容易會以為又可以再碰或吃」。
+         ⚠ 這件事**推不出來**:吃 / 碰之後的狀態(turn=宣告者、drawn=-1)要和暗槓、
+           搶槓退回那幾條路徑分辨開來,得跨四支函式反推;照 robbable / kongDraw /
+           over.rob 的同一條慣例留明確記號(不留記號就再也問不到)。
+         打出下一張時由 discard() 歸回 false。 */
+      taken: false,
       /* ★ 宣告聽牌(v1.67.0):ting[seat] = null | "normal" | "di" | "tian"。
          **公開資訊** —— 宣告是喊出來的動作,全桌都該看得到(與「誰在考慮吃碰」相反)。
          宣告之後那一家只能摸切,而且不能吃 / 碰(見 discard 與 eligibleFor)。 */
@@ -145,6 +154,7 @@ const MJT = (function(){
     s.discards.push({ seat:seat, t:tile });
     s.kongDraw = false;
     s.robbable = null;
+    s.taken = false;                                   // 牌河又有「最新那張」了(見 newRound 的 taken)
 
     // 誰有資格宣告?**每台裝置都算得出同一個答案**(手牌明碼),所以不需要房主裁決
     const elig = eligibleFor(s, seat, tile);
@@ -242,8 +252,10 @@ const MJT = (function(){
   function takeMeld(st, seat, type, tile, from, tiles){
     const s = { ...st, hands:st.hands.map(h=>h.slice()), melds:st.melds.map(m=>m.slice()),
                 discards:st.discards.slice() };
-    // 牌河最後那張被拿走了
-    if(s.discards.length && s.discards[s.discards.length-1].t===tile) s.discards.pop();
+    /* 牌河最後那張被拿走了。★ 一定要同時掛 taken —— pop 之後 discards 的最後一張
+       變成**上一張**,盤面若照舊把它畫成「最新那張」(放大 + 紅框)就等於在說
+       「這張現在可以吃 / 碰」(見 newRound 的 taken)。 */
+    if(s.discards.length && s.discards[s.discards.length-1].t===tile){ s.discards.pop(); s.taken = true; }
 
     let h = s.hands[seat];
     let need;
@@ -433,8 +445,9 @@ const MJT = (function(){
       if(mi>=0) s.melds[o.from][mi] = { ...s.melds[o.from][mi], k:"pung" };
       s.hands[seat] = sortHand(s.hands[seat].concat([o.tile]));
     }else{
-      // 食胡:那張從牌河拿走
-      if(s.discards.length && s.discards[s.discards.length-1].t===o.tile) s.discards.pop();
+      // 食胡:那張從牌河拿走(taken 同 takeMeld —— 結果卡可以被「偷看牌面」收起來,
+      // 那時盤面照樣要正確,不能把上一張畫成最新那張)
+      if(s.discards.length && s.discards[s.discards.length-1].t===o.tile){ s.discards.pop(); s.taken = true; }
       s.hands[seat] = sortHand(s.hands[seat].concat([o.tile]));
     }
     s.claim = null; s.drawn = -1; s.robbable = null;
@@ -500,6 +513,11 @@ const MJT = (function(){
       claim:st.claim?JSON.stringify(st.claim):null,
       over:st.over?JSON.stringify(st.over):null,
       firstGo:!!st.firstGo, kongDraw:!!st.kongDraw, robbable:st.robbable,
+      /* 牌河最後那張剛被拿走(v1.73.2)。⚠ 一定要進序列化:少了它,吃 / 碰之後
+         **別人那幾台**(與斷線重連的那台)會把上一張畫成「最新那張」——
+         盤面真相在 state,不在本地記憶。舊房間沒這個欄位 → dec 解成 false,
+         那一手退回舊行為(不會壞,下一次打牌就回到正軌)。 */
+      taken:!!st.taken,
       /* 宣告聽牌:每家一格,空字串 = 沒宣告(例 "normal,,di," )。
          ⚠ 一定要用逗號串而不是 JSON:RTDB 的稀疏陣列很難纏(同 wall / hands 那幾個)。 */
       ting:(st.ting||[]).map(x=>x||"").join(",")
@@ -532,7 +550,8 @@ const MJT = (function(){
       claim:g.claim?JSON.parse(g.claim):null,
       over:g.over?JSON.parse(g.over):null,
       firstGo:!!g.firstGo, kongDraw:!!g.kongDraw,
-      robbable:(typeof g.robbable==="number")?g.robbable:null
+      robbable:(typeof g.robbable==="number")?g.robbable:null,
+      taken:!!g.taken
     };
   }
 
