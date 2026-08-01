@@ -64,6 +64,16 @@
        「吃碰成立」「我表態完」也會被叫到(solo.js 四處),清掉等於每次宣告結束都
        允許再放大一次 —— 縮下去卡住、宣告完彈回來,就是回報裡那個「又放大回來」。
        換局 / 離開牌桌才該重新量,那時請叫 resetFit()。
+
+   ── ★ ⑥ 手機橫向版面(v1.73.0)────────────────────────────────────────────
+     橫向手機**原本不能玩**:實測 844×390(可視 814×295)盤面只有 95px 高、內容要 243px
+     → 溢出 148px,**整排手牌被推到可視範圍外**,牌寬同時被夾到 TILE_MIN。
+     而同一個畫面寬度**浪費了近六成**。所以橫向缺的只有高度:
+       · `styles.css` 把盤面改成**左右分欄**(牌河在左、對手直排靠右、手牌橫跨底部)
+       · 這一支把**牌河讓一排**出來(POOL_ROWS_LAND)
+       · 地板加一段**暖身期**,免得鎖在牌桌剛顯示那幾幀的暫時高度上
+     ⚠ 判準 `LAND` 的字串**必須與 styles.css 那條 @media 逐字相同**(同 FINE 的規矩),
+       而且三個條件缺一不可 —— 少了 `pointer:coarse`,桌機把視窗拉矮就會中。
    ========================================================================== */
 
 const M16B = (function(){
@@ -75,6 +85,7 @@ const M16B = (function(){
   const TILE_MIN = 20, TILE_MAX = 64;
   const DRAW_GAP = 0.45;       // 摸進來那張與手牌之間的間隔(幾張牌寬)
   const POOL_ROWS = 3;         // 牌河固定留幾排(見檔頭②;超過就捲)
+  const POOL_ROWS_LAND = 2;    // 橫向手機:高度是唯一稀缺資源,牌河讓一排出來(見檔頭⑥)
 
   let host=null, cb={}, st=null, me=0, sel="", lastSig="";
   /* 宣告聽牌的選牌模式(v1.67.0):按了動作列那顆「宣告聽牌」之後為 true,
@@ -93,11 +104,51 @@ const M16B = (function(){
        比忽大忽小好,而且動作列有 min-height:38px 撐著,正常不會長高。 */
   let fitTw = 0;
 
+  /* ★★ 地板的「暖身期」(v1.73.0,只有橫向啟用)——────────────────────────────
+     做橫向版面的預覽時發現:同一份 CSS、同一個視窗,兩次執行量到的牌寬是 44 與 28,
+     而兩次的盤面高度**都是 158、都沒有溢出** —— 空間明明夠,第二次卻只用了 28。
+     原因是牌桌剛顯示的那幾幀,房間框 / 動作列 / 字型都還沒穩定,盤面一度比較矮,
+     render() 算出一個偏小的牌寬就**記成地板**,之後空間長回來也放不大,卡一整局。
+     resetFit() 掛在換局 / 離房 / resize,但「剛顯示出來」這一段沒有人放它。
+
+     修法:resetFit() 之後給一段暖身期,期間**只畫不記地板**,過了才鎖定。
+       · 是「原因驅動」的延伸(換局 / 進場 / 轉向 才有暖身),不是回到 v1.70.1
+         拿掉的那個「尺寸一變就重量」—— 暖身期一過,地板照舊只縮不放。
+       · 尾巴排一次 render():暖身期內不一定還有事件進來,不補這一下會鎖在
+         最後一次 render 的值上,等於沒改。
+     ⚠ **刻意只在橫向啟用**(landscape() 為假時 warmUntil 歸零)。直向很可能有同一條
+       毛病,但這次改動的界線是「不碰正常佈局」,直向要不要一起吃另外評估。
+       → notes/plan/eval-20260801-台灣麻將橫向版面.md 第九節。 */
+  /* 1200ms 是「牌桌整個安定下來」的量級(房間框畫完 + 字型換好 + 動作列第一次有內容 +
+     開局補花)。拉太短會鎖在補花前的暫時值,太長則是使用者盯著看的時間變久 ——
+     實測 844×390 一整局在 700ms 下還會變一次(32→38),1200 之後才穩。 */
+  const WARM_MS = 1200;
+  let warmUntil = 0, warmTimer = 0;
+
+  /* 把地板放掉,下一次 render() 從頭量一次;橫向另外開一段暖身期(見上)。
+     ★ 只有**換局 / 離開牌桌 / 視窗真的變了**該叫 —— 盤面自己的 ResizeObserver 不可以。 */
+  function resetFit(){
+    fitTw = 0;
+    if(!landscape()){ warmUntil = 0; return; }
+    warmUntil = Date.now() + WARM_MS;
+    if(!warmTimer && typeof setTimeout === "function")
+      warmTimer = setTimeout(function(){ warmTimer = 0; render(); }, WARM_MS + 60);
+  }
+
   /* 有滑鼠 = 一段式(hover 已經給了「是哪一張」的回饋);觸控 = 兩段式。
      ⚠ 一定要跟 styles.css 那條 @media 用同一個字串,否則會出現「牌浮起來卻要點兩次」。 */
   const FINE = (typeof matchMedia==="function")
     ? matchMedia("(hover:hover) and (pointer:fine)") : null;
   function oneTap(){ return !!(FINE && FINE.matches); }
+
+  /* ★ 手機橫向版面(v1.73.0,見檔頭⑥)。同 FINE 那條規矩:
+     **字串必須與 styles.css 那條 @media 逐字相同** —— CSS 負責把盤面改成左右分欄,
+     這裡負責把牌河讓一排出來,對不上就會出現「預留 3 排的高度、只畫 2 排」的空白。
+     ⚠ pointer:coarse 是「只有手機」的關鍵:桌機把視窗拉到又矮又寬也不會命中。 */
+  const LAND = (typeof matchMedia==="function")
+    ? matchMedia("(orientation:landscape) and (max-height:560px) and (pointer:coarse)") : null;
+  function landscape(){ return !!(LAND && LAND.matches); }
+  function poolRows(){ return landscape() ? POOL_ROWS_LAND : POOL_ROWS; }
 
   /* ---------- 小工具 ---------- */
   /* inner:牌面之後再疊上去的東西(目前只有宣告視窗的候選小點)。
@@ -236,7 +287,11 @@ const M16B = (function(){
        17 掉回 16,反而更明顯;而張數要主動去數才看得出來(見 adapter.js renderActs)。 */
     const cnt  = st.hands[seat].length + ((st.turn===seat && st.drawn>=0)?1:0);
     const fl   = st.flowers[seat];
-    const mtw  = Math.round(tw*0.52);
+    /* ★ 橫向的對手明牌再縮一號(v1.73.0):分欄之後對手三家是**直排在右側窄欄**裡,
+       0.52 倍的明牌會把那一欄撐到換行 → 右欄比牌河還高 → 整副手牌反而被夾得更小
+       (實測 844×390 卡在 TILE_MIN)。對手明牌本來就只是「他攤了什麼」的提示,
+       縮到 0.40 仍分得出筒條萬,換來手牌從 20px 回到 40px 以上,這筆交易很划算。 */
+    const mtw  = Math.round(tw*(landscape() ? 0.40 : 0.52));
     /* ★ 宣告聽牌是**公開**的(v1.67.0):誰宣告了全桌都要看得到 —— 不然玩家不知道
        該不該小心放槍,那一台就變成偷襲而不是宣告。⚠ 與「誰在考慮吃碰」剛好相反。 */
     const tk = (typeof MJT !== "undefined" && MJT.tingOf) ? MJT.tingOf(st, seat) : null;
@@ -382,8 +437,29 @@ const M16B = (function(){
         nt = Math.max(TILE_MIN, Math.floor(nt * 0.92));
         draw(nt);
       }
+      /* ★ 往回撿(v1.73.0)—— 上面那條直線在**分欄**的橫向版面下會低估。
+         橫向的總高是 `max(左欄, 右欄) + 明牌 + 手牌` 的**階梯**,不是一條直線:
+         實測 915×412 只超出 11px,卻被外推一路砍到 31px(而 44 明明塞得下)。
+         所以在「已確定塞得下的 nt」與「原本想要的 tw」之間二分最多三次,把砍過頭的撿回來。
+         ⚠ 這是**同一次 render 內**的收斂,跟「只縮不放」的地板是兩回事:
+           地板管的是跨 render 不准變大,這裡是「這一次到底畫多大」還沒定案。
+         ⚠⚠ **只有橫向走這一段**。直向與桌機空間夠時根本進不到外層那個 if(內容沒溢出),
+           但把視窗拉到又矮又寬(例如 e2e 的 750×485)還是會進來 —— 那裡的階梯沒有橫向陡,
+           線性外推本來就夠準,而多跑二分會讓牌寬在一局裡**多縮兩次**(L 段實測 1 → 3 次)。
+           「只縮不放」仍然成立,但縮的次數本身就是使用者看得到的變化,不該去動它。
+           實測前後不變:390×844 = 50px、1280×900 = 54px、750×485 縮 1 次。 */
+      if(landscape()){
+        let lo = nt, hi = tw, g2 = 0;
+        while(hi - lo > 1 && g2++ < 3){
+          const mid = lo + Math.floor((hi - lo) / 2);
+          if(draw(mid) <= hh + 2) lo = mid; else hi = mid;
+        }
+        if(cur !== lo) draw(lo);
+      }
     }
-    if(hh > 80) fitTw = cur;        // 記住這個容器尺寸下的牌寬(只縮不放的地板)
+    /* 記住這個容器尺寸下的牌寬(只縮不放的地板)。
+       ⚠ 暖身期內只畫不記 —— 那幾幀量到的高度還不可信(見上面 WARM_MS 那段)。 */
+    if(hh > 80 && !(warmUntil && Date.now() < warmUntil)) fitTw = cur;
 
     /* 牌河高度寫死成 POOL_ROWS 排 → 打超過就要捲,而**最新那張永遠得看得見** */
     const pool = host.querySelector(".m16-pool");
@@ -415,8 +491,9 @@ const M16B = (function(){
     const pwL  = Math.max(20, Math.round(tw*0.78));      // 最新那張:大
     const last = st.discards.length-1;
     // 最後一排要留給放大的那張(它永遠在最後);+2 是列距、+10 是內距
-    const poolH = Math.round(pw*1.32)*(POOL_ROWS-1) + Math.round(pwL*1.32)
-                  + 2*(POOL_ROWS-1) + 10;
+    const prows = poolRows();
+    const poolH = Math.round(pw*1.32)*(prows-1) + Math.round(pwL*1.32)
+                  + 2*(prows-1) + 10;
     html += '<div class="m16-pool" id="m16Pool" style="--m16w:'+pw+'px;--m16ph:'+poolH+'px">'+
       st.discards.map((d,i)=>tileHTML(codeOf(d.t),
         "m16-pt"+(i===last?" last":""),
@@ -435,7 +512,12 @@ const M16B = (function(){
     const shown = [];
     if((st.flowers[me]||[]).length) shown.push(flowerHTML(st.flowers[me], mtw));
     (st.melds[me]||[]).forEach(m=>shown.push(meldHTML(m, mtw)));
-    if(shown.length) html += '<div class="m16-mymelds">'+shown.join("")+'</div>';
+    /* ★ 橫向:這一列**一律畫出來**(空的也畫),CSS 用 --m16w 給它一個預留高度。
+       理由與檔頭①「摸進來那一格一律預留」完全相同 —— 橫向盤面只有 200px 出頭,
+       「有沒有明牌」差 48px,不預留的話補一張花、碰一組,整副牌就得重算一次大小
+       (實測會在 30 / 36 / 38 之間跳三次)。直向空間夠、地板吃得住,維持原樣不畫。 */
+    if(shown.length || landscape())
+      html += '<div class="m16-mymelds" style="--m16w:'+mtw+'px">'+shown.join("")+'</div>';
 
     /* --- 我的手牌 --- */
     const inClaim = co.length>0;
@@ -622,9 +704,11 @@ const M16B = (function(){
        「動作列長高一格」都會叫,拿它當重量的觸發就是那個忽大忽小的來回。 */
     if(window.ResizeObserver) new ResizeObserver(()=>render()).observe(host);
     /* 視窗真的變了 → 放掉地板重新量(轉向 / 縮放 / 手機工具列收放)。
-       ⚠ 只認 window 層級的事件,理由同上面那條。 */
-    addEventListener("orientationchange", ()=>setTimeout(()=>{ fitTw=0; render(); },180));
-    addEventListener("resize", ()=>{ fitTw=0; });
+       ⚠ 只認 window 層級的事件,理由同上面那條。
+       ★ v1.73.0 改成走 resetFit():轉向的那一刻**版面整個換一套**(直向堆疊 ↔ 橫向分欄),
+         正是最需要暖身期的時機 —— 直接寫 fitTw=0 會鎖在轉向動畫途中的那個高度上。 */
+    addEventListener("orientationchange", ()=>setTimeout(()=>{ resetFit(); render(); },180));
+    addEventListener("resize", ()=>{ resetFit(); });
   }
 
   /* ==========================================================================
@@ -682,10 +766,10 @@ const M16B = (function(){
          都允許整副牌再放大一次 —— 回報裡「下一把摸牌之後又放大回來」就是它。
          要重新量牌寬請叫 resetFit()。 */
     clearSel(){ sel=""; opts=null; copt=0; lastSig=""; tingPick=false; },
-    /* 把「只縮不放」的地板放掉,下一次 render() 從頭量一次。
+    /* 把「只縮不放」的地板放掉,下一次 render() 從頭量一次(橫向另加暖身期)。
        ★ 只有**換局 / 離開牌桌**該叫:新的一局明牌清空、手牌回到 16 張,
          上一局縮下去的牌寬不該背著走。(視窗 resize / 轉向由 mount() 自己接。) */
-    resetFit(){ fitTw = 0; },
+    resetFit,
     /* 宣告聽牌的選牌模式。動作列那顆鈕開 / 關它,宣告成立或取消都要關掉。 */
     setTingPick(v){ tingPick = !!v; sel=""; render(); },
     tingPicking(){ return tingPick; },

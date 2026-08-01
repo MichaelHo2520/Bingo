@@ -2391,3 +2391,111 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 @media (min-width:400px){
   .m16-vrow .m16-vseg{flex:0 1 auto}
 }
+
+/* ==========================================================================
+   台灣 16 張麻將 — 手機橫向版面(v1.73.0)
+   ── 為什麼要有這一段 ──────────────────────────────────────────────────────
+     橫向手機**不是「牌小一點」而是不能玩**。實測(headless 844×390,可視 814×295):
+     盤面只有 95px 高、內容要 243px → **溢出 148px,整排手牌被推到可視範圍外**,
+     牌寬同時被夾到 TILE_MIN(20px)—— 夾取演算法已經無路可退。
+     而同一個畫面**寬度浪費了近六成**:手牌一排只佔 41%,右邊三分之一全是留白。
+     所以橫向缺的只有高度,解法是把垂直堆疊改成左右分欄,不是再去調夾取。
+     (完整量測與四個方案的比較:notes/plan/eval-20260801-台灣麻將橫向版面.md)
+
+   ── ★★ 判準的三個條件,一個都不能少 ────────────────────────────────────────
+     `(orientation:landscape) and (max-height:560px) and (pointer:coarse)`
+       · landscape  —— 橫向才重排
+       · max-height —— 排除 iPad 橫向(768 高,空間本來就夠,重排反而變醜)
+       · **pointer:coarse —— 手機才套用**。桌機滑鼠是 pointer:fine,把視窗拉到
+         又矮又寬也永遠不命中 → 正常佈局一個像素都不會動。
+     ⚠ 這條字串 `js/mahjong16/board.js` 的 LAND 也有一份,**必須逐字相同**:
+       CSS 負責分欄、JS 負責把牌河讓一排出來,對不上就會出現「預留 3 排的高度、
+       只畫 2 排」的空白(同 board.js 的 FINE 與兩段式打牌那條老規矩)。
+
+   ── ⚠ 為什麼每一條都掛 body.m16-mp / body.m16-solo ──────────────────────────
+     `.topbar` / `.mj-room` / `.mp-chip` 都是**跨頁共用**的(消消樂的房間框也是
+     `.mj-room`)。不限定的話,橫向的消消樂會跟著被壓矮 —— 那不在這次的範圍裡。
+     兩個 class 只在**對局中**掛上(main.js 的 showScreen),所以連線大廳、進場選單、
+     設定面板一律不受影響。`.m16-*` 開頭的那幾條不必限定,那個前綴本來就只有這一頁。
+   ========================================================================== */
+@media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
+  /* ① 頂列讓出 44px。
+     ⚠ 刻意**不**去擴充上面那條既有的 `(max-height:780px) and (pointer:coarse)`
+       (數獨 / 五子棋在用):780 這個門檻連**直向**的小手機(667 高)都會命中,
+       把麻將掛進去等於連直向都收頂列 —— 那就影響到正常佈局了。 */
+  body.m16-mp .topbar,body.m16-solo .topbar{display:none}
+
+  /* ①-b 邊界與間距也收一號。全域那條 `@media (max-height:560px)` 已經把 body 壓到
+     10px / gap 8,這裡再收 —— 只掛在對局中的麻將身上,消消樂與各頁選單不受影響。 */
+  body.m16-mp,body.m16-solo{padding:6px;gap:4px}
+
+  /* ② 房間框 / 單機列**改成一行**(單機那條列的 class 也是 .mj-room,見 mahjong16.html)。
+     ★★ 這是整段裡最值錢的一條。fit 診斷器量出來:橫向的盤面只有 161px,
+       而房間框自己就吃掉 68px(標題列 + 狀態字 + 名單列**三層堆疊**)。
+       橫向的寬度用不完,把三層並排成一行 → 房間框 68 → 約 37,**盤面多 31px**,
+       牌寬跟著從 25 級距往上跳一級。
+     ★ 名單列**不收掉** —— 台數 / 風 / 輪到誰都在晶片上,橫向照樣要看得到,只壓小。
+     ⚠ .mj-room 本身是 .panel(有底色圓角),改 display:flex 不影響外觀;
+       三個子元素本來就是上下堆疊的三個 block,並排之後 foot 吃掉剩下的寬度。 */
+  body.m16-mp .mj-room,body.m16-solo .mj-room{
+    padding:4px 10px;display:flex;align-items:center;gap:8px}
+  body.m16-mp .mj-room .mj-room-top,body.m16-solo .mj-room .mj-room-top{flex:none}
+  body.m16-mp .mj-room .mp-subrow{flex:none;margin-top:0;font-size:10px;max-width:6em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  body.m16-mp .mj-room-foot,body.m16-solo .mj-room-foot{flex:1;min-width:0;margin-top:0}
+  body.m16-mp .mj-room .icon-btn,body.m16-solo .mj-room .icon-btn{
+    width:28px;height:28px;border-radius:9px;font-size:14px}
+  body.m16-mp .mj-room .quick-voice,body.m16-mp .mj-room .mp-act-btn{
+    width:28px;height:28px;font-size:15px}
+  body.m16-mp .mj-room .quick-voice .qv-ico{font-size:15px}
+  body.m16-mp .mj-room .mj-room-title,body.m16-solo .mj-room .mj-room-title{font-size:12px}
+  body.m16-mp .mj-room .mj-room-title b,body.m16-solo .mj-room .mj-room-title b{font-size:13px}
+  body.m16-mp .mp-chip,body.m16-solo .mp-chip{padding:2px 7px;font-size:11px}
+  body.m16-mp .mj-play,body.m16-solo .mj-play{gap:4px}
+
+  /* ③ 盤面分欄:牌河在左吃滿剩餘寬、對手三家直排靠右、手牌橫跨底部整寬。
+     ★ 這個重排**不需要動 board.js 的 paint()** —— 它產生的本來就是
+       .m16-foes / .m16-pool / .m16-mine 三個平行區塊,原本靠 flex column 疊起來,
+       這裡只是換成 grid 重新配位置。單機與連線共用同一份盤面,所以兩邊一起生效。
+     ⚠ align-content:start:內容比格子矮時不要平均撐開(撐開 = 牌河與手牌之間
+       出現一條會變動的空隙 → 又回到「總高度一變牌就換一次大小」)。 */
+  .m16-stage{display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+    grid-template-areas:"pool foes" "melds melds" "hand hand";
+    align-content:start;gap:4px 8px;padding:4px 8px}
+  .m16-pool{grid-area:pool;min-width:0}
+  .m16-foes{grid-area:foes;max-width:34vw}
+  /* ★★ display:contents —— 這一行是「不改 board.js 的 paint() 就重排」的關鍵。
+     `.m16-mine` 是「我的明牌 + 我的手牌」的外框(直向靠它 margin-top:auto 整組貼底)。
+     橫向要的是**明牌自己一列、手牌自己一列**:明牌若跟著手牌擠在同一格,
+     碰一組就多 48px 疊在手牌上方 → 整副牌立刻縮一級(實測從 44 掉到 29)。
+     display:contents 讓這個外框在版面上「不存在」,它的兩個子元素直接變成 grid item,
+     各自去認自己的 grid-area —— DOM 一個字都不用動。
+     ⚠ 明牌那一列刻意**跨滿兩欄**而不是塞進右欄:右欄只有 34vw,碰到第三組就換行,
+       又回到「右欄比牌河高」那個死結。跨欄之後 16 張明牌也排得下。
+     ⚠ 沒有明牌時 `.m16-mymelds` 根本不會被畫出來 → 那一列自動塌成 0,不留空隙。 */
+  .m16-mine{display:contents}
+  /* ★ min-height = 一排明牌的高度,**一律預留**(board.js 在橫向會把這一列畫出來,
+     即使一組明牌都還沒有)。同「摸進來那一格一律預留」那條:不預留的話補一張花、
+     碰一組就多 48px,整副牌得重算一次大小 —— 實測會在 30 / 36 / 38 之間跳。 */
+  .m16-mymelds{grid-area:melds;justify-content:center;gap:6px;
+    min-height:calc(var(--m16w,20px) * 1.32)}
+  .m16-hand{grid-area:hand}
+  /* ★★ 對手那一欄是這個版面真正的瓶頸,不是牌河 ——────────────────────────────
+     盤面總高只有 ~161px,而分欄之後那一列的高度是 `max(牌河, 對手欄)`:
+     對手三家直排,只要**每家多一行**就是 +30px,右欄立刻比牌河高,手牌跟著被夾小。
+     第一版只寫了 flex-wrap:wrap,實測 844×390 牌寬還是卡在 TILE_MIN(20px)——
+     換行「不溢出」了,代價是整欄長高,等於沒解。所以這裡把每一家壓成**一行**:
+       · 名字 6em → 4em(暱稱長的截斷,晶片列上還有完整的)
+       · 字級 / 內距 / 風圈各收一號
+       · 明牌另外由 board.js 縮成 0.40 倍(CSS 蓋不掉 inline 的 --m16w)
+     ⚠ 明牌還是留 wrap:碰 / 槓 / 花攤到三四組時**寧可讓那一家長高**,
+       也不可以把整欄撐寬 —— 撐寬會反過來擠窄牌河 → 牌河換排 → 整副牌又縮一次。 */
+  .m16-foes{gap:3px}
+  .m16-foe{flex-wrap:wrap;padding:2px 6px;gap:4px;font-size:10.5px}
+  .m16-foe .m16-wind{width:17px;height:17px;font-size:10px;line-height:17px}
+  .m16-foe .m16-dz{min-width:16px;height:15px;font-size:10px}
+  .m16-foe .m16-foename{max-width:4em}
+  .m16-fmelds{display:flex;flex-wrap:wrap;gap:2px}
+  .m16-acts{min-height:34px;padding:2px 0}
+}
