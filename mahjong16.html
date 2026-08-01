@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.71.0 -->
-<meta name="version" content="1.71.0">
+<!-- 台灣 16 張麻將 · v1.72.0 -->
+<meta name="version" content="1.72.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -325,12 +325,21 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
             <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
           </div>
-          <!-- 這一頁專屬:喊牌語音(碰 / 吃 / 槓 / 胡 / 流局 / 聽牌)+ 打出字牌時報的牌名(v1.71.0)。
-               ★ 兩者共用這一顆開關(都是語音層);偏好存在 mahjong16.prefs.v1,
-               綁定與同步在 js/mahjong16/main.js(ui-kit 的 syncSettingsUI 是共用的,不管這一列) -->
+          <!-- 這一頁專屬的兩列(v1.72.0 從一列拆開)。偏好都存在 mahjong16.prefs.v1,
+               綁定與同步在 js/mahjong16/main.js(ui-kit 的 syncSettingsUI 是共用的,不管這兩列)。
+               ★ 刻意分成兩件事:一顆管「有人碰了要不要喊出來」、一段管「打出去的牌要不要報」——
+               混成同一條軸的話「只有字牌」會被讀成「只有字牌會喊碰」(見 js/mahjong16/sfx.js 檔頭) -->
           <div class="set-row">
-            <span class="set-lbl">喊牌語音<span class="set-sub">(碰 / 吃 / 槓 / 胡,打字牌報牌名)</span></span>
+            <span class="set-lbl">喊牌語音<span class="set-sub">(碰 / 吃 / 槓 / 胡 / 補花)</span></span>
             <button class="switch" id="m16SwVoice" role="switch" aria-checked="true" aria-label="喊牌語音"><span class="knob"></span></button>
+          </div>
+          <div class="set-row m16-vrow">
+            <span class="set-lbl">報牌名<span class="set-sub">(打出的牌)</span></span>
+            <div class="seg m16-vseg" id="m16TileSeg" aria-label="報牌名">
+              <button data-tv="off">關掉</button>
+              <button class="on" data-tv="honor">只有字牌</button>
+              <button data-tv="all">全部牌</button>
+            </div>
           </div>
         </div>
 

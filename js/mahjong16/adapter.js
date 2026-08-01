@@ -796,13 +796,22 @@ const MP = MPCore.create((function(){
                msg: esc(w.name||"對手")+" "+how+"<br>"+line+(last?"<br>"+seasonMsg():"") };
     },
 
-    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, voice:M16Sfx.voiceOn() }; },
+    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec,
+                         voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
       if(o.claimSec!==undefined && secOK(+o.claimSec)) claimSec = +o.claimSec;
       /* 喊牌語音預設**開**:舊偏好裡沒有這個欄位(undefined),要當成開,
          寫成 `=== true` 的話所有老玩家升上來都會是關的,而他們根本不知道有這個開關。 */
-      M16Sfx.setVoice(o.voice !== false);
+      const call = o.voice !== false;
+      M16Sfx.setVoice(call);
+      /* 報牌名的範圍(v1.72.0 拆出來的第二列)。⚠ 舊偏好沒有 tileVoice,而 fallback **不能**
+         一律給預設值:
+           · v1.71.0 的人 —— 那時牌名與喊牌是**同一顆開關**,所以「把喊牌關掉」的人升上來
+             必須連牌名一起關,否則升級之後反而多出聲音,而他翻設定只會看到喊牌是關的。
+           · 更早的人 —— voice 也讀不到 → call 為 true → 拿到 honor,剛好等於 v1.71.0 的行為。
+         ⚠ 這裡不會觸發音檔預載(sfx 的 setTileMode 只在已預載過時才補),啟動時沒有手勢。 */
+      M16Sfx.setTileMode(o.tileVoice || (call ? "honor" : "off"));
       /* ⚠ 舊偏好裡殘留的 `ready`(v1.66.0 的聽牌提醒)與 `hint`(v1.66.0~v1.67.2 的
          聽牌提示)沒有人讀了 —— 兩顆開關都已經拿掉,讀不到就忽略,無害。 */
     },

@@ -2379,3 +2379,15 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
      單機沒有房間框,混用只會讓兩件事日後互相絆倒。 */
 body.m16-solo .mj-play{width:min(98vw,960px)}
 body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(v1.68.1) */
+
+/* ---------- 設定面板:「報牌名」那一列的三段(v1.72.0) ----------
+   這一列比其它設定列擠 —— 標籤 + 三顆中文按鈕(關掉 / 只有字牌 / 全部牌)。窄機排不下就讓它
+   自己折成上下兩行(標籤一行、三段滿版一行);≥400px 才回到「標籤左、控制項右」的一般樣子。
+   ⚠ 只掛在這一列的專屬 class 上,**不要動 .set-row 本身** —— 五個遊戲的設定面板共用它。
+   ⚠ `.m16-vrow .m16-vseg` 是兩個 class(0,2,0),壓得過 `.seg` 的 flex 設定;
+     媒體查詢那條同權重但在後面,所以桌機會贏(styles.css 只追加,順序就是勝負)。 */
+.set-row.m16-vrow{flex-wrap:wrap}
+.m16-vrow .m16-vseg{flex:1 1 100%}
+@media (min-width:400px){
+  .m16-vrow .m16-vseg{flex:0 1 auto}
+}

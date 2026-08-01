@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.71.0";
+const VERSION = "1.72.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -56,7 +56,7 @@ const CORE = [
   "./mp3/win.wav",
   "./mp3/lose.wav",
   /* 台灣麻將的語音(v1.62.0;v1.64.0 起由 tools/gen-mj16-voice-edge.py 產生)。
-     ⚠ v1.71.0 起全部收在 **mp3/mj16/** 底下(舊路徑是 mp3/m16-voice-*.wav):mp3/ 根留給
+     ⚠ v1.72.0 起全部收在 **mp3/mj16/** 底下(舊路徑是 mp3/m16-voice-*.wav):mp3/ 根留給
      五個遊戲共用的東西。改路徑要連 js/mahjong16/sfx.js 的 ensureDefs 與兩支產生器一起改。
      ⚠ 這幾個**確實存在**才列進來 —— addAll() 是全有全無的,清單裡有一個 404
      整批快取就失敗(離線變成整個不能玩)。所以刪音檔的時候一定要一起把這幾行拿掉。
@@ -69,8 +69,10 @@ const CORE = [
   "./mp3/mj16/voice-zimo.wav",
   "./mp3/mj16/voice-washout.wav",
   "./mp3/mj16/voice-ready.wav",      // 聽牌(v1.66.0)
-  /* 打出字牌時報的牌名(v1.71.0)。★ 這七個一定要進清單:語音層**沒有合成音後備**,
-     離線又抓不到檔的話就是整組默默不出聲(見 sfx.js 的 VOICE 那段)。 */
+  "./mp3/mj16/voice-flower.wav",     // 補花(v1.72.0:花牌不報花名,統一唸「補花」)
+  /* 打出的牌報的牌名。★ 這些一定要進清單:語音層**沒有合成音後備**,
+     離線又抓不到檔的話就是整組默默不出聲(見 sfx.js 的 VOICE 那段)。
+     ⚠ 七張字牌(v1.72.0)列在這裡,27 張筒條萬(v1.72.0)在陣列後面用算式接上去。 */
   "./mp3/mj16/voice-tile-fe.wav",
   "./mp3/mj16/voice-tile-fs.wav",
   "./mp3/mj16/voice-tile-fw.wav",
@@ -87,6 +89,13 @@ const CORE = [
   "./manifest.json",
   "./icon.svg"
 ];
+/* 筒條萬的牌名語音(v1.72.0,27 個)。★ 用算式接上去而**不是手列 27 行** —— 規律與
+   js/mahjong16/sfx.js 的編碼一致(0..8 萬 w / 9..17 條 b / 18..26 筒 d)。
+   ⚠ 手列遲早會抄錯或漏一個,而**錯一個就是 addAll() 整批失敗**(全有全無)→ 離線整個不能玩。
+   ⚠ 這 27 個檔加起來約 780KB(整包 mp3/mj16/ 約 1.2MB):即使使用者把「報牌名」設成
+     「只有字牌」也照樣快取 —— 快取是裝置層的,而他隨時可能改成「全部牌」,
+     那時如果剛好離線就會整組沒聲音(語音層沒有合成音可以墊)。 */
+["w","b","d"].forEach(s => { for (let v = 1; v <= 9; v++) CORE.push("./mp3/mj16/voice-tile-" + s + v + ".wav"); });
 
 self.addEventListener("install", e => {
   self.skipWaiting();

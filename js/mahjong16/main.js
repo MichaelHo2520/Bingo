@@ -136,14 +136,16 @@ $("resetScoreBtn").addEventListener("click",()=>MP.resetScores());
    ⚠ 規則層的 `MJT.tenpaiAfter()` / `tenpaiNow()` 不可以跟著刪 —— 宣告聽牌要靠它們
      算「哪幾張打掉會聽牌」與驗證宣告資格。 */
 
-/* ---------- 設定:喊牌語音(這一頁專屬,v1.62.0) ----------
-   碰 / 吃 / 槓 / 胡 / 流局 / 聽牌會用 zh-TW 語音唸出來,**打出東南西北中發白時也會報牌名**
-   (v1.71.0;音檔在 mp3/mj16/voice-*.wav)。
-   ★ 牌名與喊牌共用這一顆開關 —— 兩者都是語音層(理由見 js/mahjong16/sfx.js 檔頭)。
-   ★ 打開的當下順手播一聲「碰」試聽 —— 這種開關看不出效果,不試聽的話使用者
-     還要真的打到有人碰才知道有沒有生效(而且點開關本身就是手勢,順便解鎖音訊)。 */
+/* ---------- 設定:語音(這一頁專屬,兩列) ----------
+   ① **喊牌語音**(v1.62.0):碰 / 吃 / 槓 / 胡 / 自摸 / 流局 / 聽牌 / 補花唸出來
+   ② **報牌名**(v1.71.0 只有字牌 → v1.72.0 三段):打出去的牌唸出來,關掉 / 只有字牌 / 全部牌
+   音檔都在 mp3/mj16/voice-*.wav。★ 刻意拆成兩件事(理由見 js/mahjong16/sfx.js 檔頭)。
+   ★ 兩邊改完都**順手播一聲試聽** —— 這種設定看不出效果,不試聽的話使用者要真的打到那一手
+     才知道有沒有生效(而且點擊本身就是使用者手勢,順便解鎖音訊)。 */
 function syncM16Voice(){
   const b=$("m16SwVoice"); if(b) b.setAttribute("aria-checked", M16Sfx.voiceOn()?"true":"false");
+  const seg=$("m16TileSeg");
+  if(seg) [...seg.children].forEach(x=>x.classList.toggle("on", x.dataset.tv===M16Sfx.tileMode()));
 }
 $("m16SwVoice").addEventListener("click",()=>{
   M16Sfx.setVoice(!M16Sfx.voiceOn());
@@ -151,6 +153,25 @@ $("m16SwVoice").addEventListener("click",()=>{
   const on = M16Sfx.voiceOn();
   if(on){ markAudioArmed(); Sound.wake(); M16Sfx.say("pong"); }
   showToast(on?"喊牌語音:開":"喊牌語音:關",1200);
+});
+$("m16TileSeg").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  M16Sfx.setTileMode(b.dataset.tv);
+  savePrefs(); syncM16Voice();
+  const m = M16Sfx.tileMode();
+  if(m !== "off"){
+    markAudioArmed(); Sound.wake();
+    /* ★ 這裡是使用者手勢,可以放心載 —— 而且**在大廳改設定時非載不可**:
+       sfx 的 setTileMode 只在「已經預載過」時才自己補載(理由見那裡的註解),
+       還沒進過牌桌的話這一段就是唯一會載音檔的地方,不載下面那句試聽會是無聲。 */
+    M16Sfx.preload();
+    /* ★ 試聽「全部牌」時故意唸**五筒**而不是字牌:只有數字牌聽得出這一段與「只有字牌」的差別
+         (選了全部牌卻聽到「紅中」,根本不知道筒條萬到底有沒有生效)。
+       ⚠ 而且要**晚一點**唸 —— 切到全部牌的那一刻 27 個筒條萬才開始載(setTileMode 會 preload),
+         立刻 say 的話音檔還在飛、聽到的是無聲,使用者只會以為沒生效。 */
+    setTimeout(()=>M16Sfx.say(m==="all" ? "tile-d5" : "tile-jz"), 400);
+  }
+  showToast(m==="off" ? "報牌名:關" : (m==="all" ? "報牌名:全部牌" : "報牌名:只有字牌"), 1200);
 });
 
 /* (v1.58.2:比分列 #m16Hud 已移除 —— 台數改顯示在房間框的玩家晶片上,

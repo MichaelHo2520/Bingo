@@ -38,21 +38,33 @@
        ③沒有洩漏問題:宣告本身就是公開資訊,不需要像宣告視窗那樣藏
      ⚠ 因此它也**沒有自己的開關** —— 照吃 / 碰 / 槓那樣,是規則動作的聲音,不是輔助提示。
 
-   ── ★ 字牌報牌名(v1.71.0)──────────────────────────────────────────────────
-     使用者:「我要做的音效是東南西北,還有紅中,發財,白皮這幾個先加進去吧」——
-     打出**東南西北中發白**這七張時,牌落桌那一聲之後跟一句牌名,**全桌都聽到**
-     (真牌桌上打字牌本來就會報一聲)。
+   ── ★ 打出的牌會報牌名(v1.71.0 七張字牌 → v1.72.0 全部 34 張)──────────────
+     使用者:「我要做的音效是東南西北,還有紅中,發財,白皮這幾個先加進去吧」,接著
+     「接下來我想把其他的音效也都做起來,筒條萬,花牌」。牌落桌那一聲之後跟一句牌名,
+     **全桌都聽到**(真牌桌上打牌本來就會報一聲)。
 
      ★ 沒有洩漏問題,所以不受 v1.59.0 那條紅線管:打出去的牌**已經攤在牌河上給大家看**,
        報牌名不多給任何資訊。要藏的是「誰在考慮吃碰」(還沒發生的事),不是「剛才打了什麼」。
-     ★ **只給七張字牌**。數字牌一局要打三十幾張,每張都唸會變成報帳機 —— 而字牌是牌桌上
-       真的會喊出來的那幾張(要湊三元 / 四喜的人正在等它)。
      ★ 它**不是一個新的「事件」**,而是「剛才那張是什麼」→ 只有語音一格、**沒有動作聲**
        (拍牌那一下是 discard 那格,兩者疊起來剛好就是「嗒 —— 紅中」)。
        所以它進的是 VOICE 表而不是 EV 表,而排序上緊跟在 discard 後面(見 rank)。
      ⚠ 判定一律看**牌河最後那張**,不可以用「我剛才點了哪張」:連線是等交易回來才換手,
        那時本地已經沒有那個記憶(而且這一支要單機 / 連線共用同一份判斷)。
-     ⚠ 與喊牌**共用同一個開關**(設定裡那一列):兩者都是語音層。真的覺得字牌太吵再拆。
+
+     ── 花牌不報花名,統一唸「補花」(v1.72.0,問過使用者定案)────────────────
+       花牌不是「打出」而是**摸到就攤出來補花**,所以它不走牌名那條路,而是 EV 表裡本來就有的
+       `flower` 事件多掛一格語音 → 聽起來是「叮(小鈴)…補花」。因此它歸在**喊牌那一組**:
+       不分是哪一張,而且只要語音沒關就唸,不受下面那段「字牌 / 全部牌」影響。
+
+     ── ★ 設定分成兩列(v1.72.0):喊牌一顆開關 + 報牌名三段 ────────────────────
+       v1.71.0 只做字牌的理由是「數字牌一局要打三十幾張,每張都唸會變成報帳機」;使用者要把
+       筒條萬也做起來,所以那個顧慮**交給現場自己決定**:報牌名有「關掉 / 只有字牌 / 全部牌」
+       三段,覺得吵就退回「只有字牌」,**不必連碰吃槓胡一起關掉**(那是另一顆)。
+       **預設是「只有字牌」= v1.71.0 的行為**,老玩家升上來聽到的東西不會突然變吵。
+       ⚠ 兩件事刻意**不混成同一條軸**:「有人碰了要不要喊出來」與「打出去的牌要不要報」語意不同,
+         混在一起的話「只有字牌」會被讀成「只有字牌會喊碰」。
+       ⚠ 偏好只在**發聲層**(`sayable()`)判斷 —— `eventsOf` 照舊把事件全部算出來,
+         純函式不該知道使用者的偏好(而且測試要分開驗「事件算對了嗎」與「這一格該不該唸」)。
    ============================================================================ */
 
 const M16Sfx = (function(){
@@ -175,18 +187,62 @@ const M16Sfx = (function(){
   const CALL = { pong:"碰", chow:"吃", kong:"槓", hu:"胡", zimo:"自摸", washout:"流局",
                  /* 「聽牌」和碰 / 吃 / 槓一樣是**喊出來的宣告**(v1.67.0 起是玩家自己按的),
                     所以它本來就該唸出來給全桌聽 —— 這一格從此與其他喊牌完全同級。 */
-                 ready:"聽牌" };
-  /* 字牌報牌名(v1.71.0,見檔頭)。key 是 "tile-" + rules.js 的代號
-     → 音檔就是 mp3/mj16/voice-tile-fe.wav 這一組。 */
+                 ready:"聽牌",
+                 /* 補花(v1.72.0):花牌不報花名、統一唸「補花」(見檔頭)。歸在喊牌這一組 ——
+                    不分是哪一張,而且只要語音沒關就唸,不受「字牌 / 全部牌」那一段影響。 */
+                 flower:"補花" };
+
+  /* ---------- 牌名(v1.71.0 七張字牌 → v1.72.0 全部 34 張)----------
+     key 是 `tile-` + rules.js 的牌代號 → 音檔就是 mp3/mj16/voice-tile-d3.wav 這一組。
+     索引 → 代號直接照 rules.js 的編碼**算**:0..8 萬(w) / 9..17 條(b) / 18..26 筒(d) / 27..33 字。
+     ★ 刻意寫算式而**不是列 34 行**:編碼本身是規律的,手列容易抄錯一格 —— 而抄錯的症狀是
+       「打三筒唸成四筒」,不會炸、只會一直唸錯,沒有人會發現。
+     ★ 依然**零依賴**(不去 require MJ16)—— `eventsOf` 能在 node 單獨測的前提(見檔頭)。
+       代價是這裡與 rules.js 的編碼綁死,所以 tools/test-mj16-sfx.js 有一條**拿 MJ16.codeOf()
+       把 0..41 逐一對答案**的斷言守著:哪天編碼變了,那裡一定紅。
+     ⚠ 花牌(34..41)刻意回 null —— 它們走上面 CALL 的 flower 那一格。 */
+  const SUITS = ["w","b","d"];
+  const SUIT_WORD = { w:"萬", b:"條", d:"筒" };
+  const NUM_WORD = ["一","二","三","四","五","六","七","八","九"];
+  const HONOR_AT = { 27:"fe", 28:"fs", 29:"fw", 30:"fn", 31:"jz", 32:"jf", 33:"jb" };
+  function codeAt(t){
+    if(t >= 0 && t < 27) return SUITS[Math.floor(t/9)] + (t%9 + 1);
+    return HONOR_AT[t] || null;
+  }
   const TILE = { "tile-fe":"東",  "tile-fs":"南",  "tile-fw":"西", "tile-fn":"北",
                  "tile-jz":"紅中", "tile-jf":"發財", "tile-jb":"白板" };
-  /* 牌索引 → 代號。★ 27..33 是字牌(rules.js 的編碼:0..8 萬 / 9..17 條 / 18..26 筒 / 27..33 字)。
-     ⚠ 刻意寫死數字而**不去相依 MJ16** —— eventsOf 的「零依賴」是它能在 node 單獨測的前提
-       (見檔頭)。代價是這張表和 rules.js 的 HONORS 順序綁死,所以 tools/test-mj16-sfx.js
-       有一條**逐一拿 MJ16.codeOf(t) 對答案**的斷言守著:哪天編碼變了,那裡一定紅。 */
-  const TILE_AT = { 27:"fe", 28:"fs", 29:"fw", 30:"fn", 31:"jz", 32:"jf", 33:"jb" };
+  SUITS.forEach(s=>{ for(let v=1;v<=9;v++) TILE["tile-"+s+v] = NUM_WORD[v-1] + SUIT_WORD[s]; });
+  /* 這一格牌名是不是**字牌** —— 三段開關的中間那段(只有字牌)要靠它分。 */
+  const HONOR_KEYS = Object.keys(HONOR_AT).map(t=>"tile-"+HONOR_AT[t]);
+  const isHonorKey = k => HONOR_KEYS.indexOf(k) >= 0;
+
   const VOICE = Object.assign({}, CALL, TILE);     // play() 只看這一張(喊牌 + 報牌名同一層)
-  let vOn = true;                                  // 偏好存在 mahjong16.prefs.v1(adapter 的 ownPrefs)
+
+  /* ---------- 兩個獨立的偏好(v1.72.0;都存在 mahjong16.prefs.v1)----------
+       vCall  喊牌(碰 / 吃 / 槓 / 胡 / 自摸 / 流局 / 聽牌 / 補花)—— 一顆開關,預設開
+       vTile  報牌名的**範圍**,三段:
+                off    不報
+                honor  只有東南西北中發白 ← 預設(= v1.71.0 的行為)
+                all    再加上筒條萬 —— 一局會唸六七十次,熱鬧但很密
+
+     ★ 為什麼是「一顆 + 三段」而不是單一個四段:兩件事的語意本來就不同(一個是「有人碰了要不要
+       喊出來」、一個是「打出去的牌要不要報」),混成一條軸的話「只有字牌」會被讀成
+       「只有字牌會喊碰」。設定面板照這個分成兩列。
+     ★ 這樣**跨版本相容也不必動手腳**:舊偏好的 `voice` 欄位語意一個字都沒變(還是喊牌開關),
+       新的 `tileVoice` 舊版讀不到就忽略。唯一要補的是「v1.71.0 把喊牌關掉的人」——
+       那時牌名跟喊牌是同一顆,所以升上來要一起是 off(在 adapter 的 usePrefs 處理)。 */
+  const TILE_MODES = ["off","honor","all"];
+  let vCall = true;
+  let vTile = "honor";
+  const tileModeOK = m => TILE_MODES.indexOf(m) >= 0;
+
+  /* 這一格現在該不該唸(只有發聲層看得到偏好,見檔頭)。 */
+  function sayable(k){
+    if(!VOICE[k]) return false;
+    if(k.indexOf("tile-") !== 0) return vCall;     // 喊牌 / 補花
+    if(vTile === "off") return false;
+    return vTile === "all" || isHonorKey(k);       // 牌名:字牌一律報,筒條萬要 all
+  }
 
   /* ⚠ 發聲前一定要確認 Sound 這一版**有**音效槽那組 API。理由是混合快取:sw.js 是
      network-first,但裝置有可能拿到新的 sfx.js 卻還吃著舊的 audio.js(沒有 def / sfx)——
@@ -241,7 +297,7 @@ const M16Sfx = (function(){
     if(after.discards.length > before.discards.length){
       add("discard");
       const d = after.discards[after.discards.length-1];
-      const code = d ? TILE_AT[d.t] : null;
+      const code = d ? codeAt(d.t) : null;
       if(code) add("tile-"+code);
     }
 
@@ -285,7 +341,7 @@ const M16Sfx = (function(){
          ★ 沒有語音的事件(打牌 / 摸牌 / 補花)VOICE 裡查不到就自然跳過。
          ★ 牌名自己佔一個 90ms 名次(它排在 discard 後面),所以聽起來是「嗒 —— 紅中」,
            兩聲隔 150ms:比喊牌那 60ms 鬆一點,因為它前面那一下不是同一件事的一部分。 */
-      if(vOn && VOICE[k]) at("m16v"+k, t+60);
+      if(sayable(k)) at("m16v"+k, t+60);
     });
     return ev;
   }
@@ -295,35 +351,52 @@ const M16Sfx = (function(){
     if(!ready()) return;
     ensureDefs();
     if(isAct(k)) Sound.sfx("m16"+k);               // 牌名(tile-*)沒有動作聲那一層
-    if(withVoice !== false && vOn && VOICE[k]) at("m16v"+k, 60);
+    if(withVoice !== false && sayable(k)) at("m16v"+k, 60);
   }
   /* 只播喊牌那一聲(試聽頁要能單獨聽) */
   function say(k){
     if(!ready() || !VOICE[k]) return;
     ensureDefs(); Sound.sfx("m16v"+k);
   }
-  /* 進牌桌時把語音音檔先載好(喊牌 7 + 字牌牌名 7,共十幾個小檔約 150KB)。
+  /* 進牌桌時把語音音檔先載好。★ 只載**這個模式真的會播**的那些(v1.72.0):
+       honor(預設)喊牌 8 + 字牌 7 = 15 個,約 260KB
+       all        再加筒條萬 27 個 = 42 個,約 1.2MB
      ⚠ 這不是效能優化,是**正確性**:音效槽是懶載入的,而語音層沒有合成音可以墊 ——
        不預載的話「一局裡第一次碰」永遠是沒聲音的(音檔那時才開始飛),
-       使用者只會覺得「有時候有、有時候沒有」。 */
+       使用者只會覺得「有時候有、有時候沒有」。
+     ⚠ 所以**換模式之後一定要再叫一次**(setVoiceMode 自己會叫):從 honor 切到 all 的那一刻,
+       27 個筒條萬還一個都沒載 —— 不補載的話「換成全部牌」之後第一輪仍然只有字牌出聲。 */
+  let primed = false;
   function preload(){
     if(!ready() || !Sound.prime) return;
     ensureDefs();
-    Object.keys(VOICE).forEach(k=>Sound.prime("m16v"+k));
+    primed = true;
+    Object.keys(VOICE).forEach(k=>{ if(sayable(k)) Sound.prime("m16v"+k); });
   }
 
   return {
     eventsOf, play, one, say, preload,
+    sayable,                                        // 這一格在目前模式下該不該唸(三段開關)
     KEYS:ORDER,
-    VOICE_KEYS: Object.keys(VOICE),                 // 喊牌 + 牌名:play() 真的會播的全部語音格
-    CALL_KEYS: Object.keys(CALL),                   // 只有喊牌(宣告動作)
-    TILE_KEYS: Object.keys(TILE),                   // 只有字牌牌名(v1.71.0)
-    /* 牌索引 → 語音格。給測試拿 MJ16.codeOf() 對答案用(TILE_AT 是寫死的,見那裡的註解);
-       非字牌回 null。 */
-    tileKeyOf(t){ return TILE_AT[t] ? "tile-"+TILE_AT[t] : null; },
+    VOICE_KEYS: Object.keys(VOICE),                 // 喊牌 + 牌名:play() 可能會播的全部語音格
+    CALL_KEYS: Object.keys(CALL),                   // 喊牌(宣告動作)+ 補花
+    TILE_KEYS: Object.keys(TILE),                   // 全部 34 張牌名(v1.72.0)
+    HONOR_KEYS,                                     // 其中的七張字牌 —— 三段裡「只有字牌」的範圍
+    TILE_MODES,
+    /* 牌索引 → 語音格。給測試拿 MJ16.codeOf() 對答案用(codeAt 是算出來的,見那裡的註解);
+       花牌回 null —— 它們走 flower 那一格。 */
+    tileKeyOf(t){ const c = codeAt(t); return c ? "tile-"+c : null; },
     wordOf(k){ return VOICE[k] || ""; },
-    setVoice(v){ vOn = !!v; },
-    voiceOn(){ return vOn; }
+    /* 喊牌那一顆(名字沿用 v1.62.0 的 setVoice / voiceOn —— 偏好欄位與呼叫點都還在用)。 */
+    setVoice(v){ vCall = !!v; },
+    voiceOn(){ return vCall; },
+    /* 報牌名的範圍。★ 換過之後要補載音檔:從 honor 切到 all 的那一刻 27 個筒條萬一個都還沒載
+       (見 preload 的註解)。
+       ⚠ 但**只在已經預載過的情況下**才補 —— 啟動時讀偏好也會走到這裡,那時還沒有任何使用者
+         手勢,直接 preload 等於白白建立 AudioContext 並抓十幾個檔(有些裝置根本還解不開)。
+         真正的入口是進牌桌時的 preload(),以及設定面板那一列(那裡有手勢,自己會叫一次)。 */
+    setTileMode(m){ if(tileModeOK(m)){ vTile = m; if(primed) preload(); } },
+    tileMode(){ return vTile; }
   };
 })();
 
