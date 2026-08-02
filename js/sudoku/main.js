@@ -24,6 +24,7 @@ function showScreen(which){
   }
   document.body.classList.toggle("solo-on", which==="solo");
   // 對局中把頂列的 ⛶ / ⚙️ 收進那條列(數獨與五子棋吃同一條「手機玩時收頂列」的規則)。見 ui-kit 的 dockTools。
+  // ★ v1.75.10 起由 dockTools 自己判斷頂列在不在:桌機(媒體查詢不命中)不搬。
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("sdkSoloBar");
   else undockTools();

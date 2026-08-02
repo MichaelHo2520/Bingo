@@ -27,8 +27,10 @@ function showScreen(which){
   document.body.classList.toggle("solo-on", which==="solo");
   // 單機的工具列(悔棋/暫停)不該出現在連線;連線的重洗兩邊都要
   document.body.classList.toggle("mj-mp", which==="play");
-  // 對局中把頂列的 ⛶ / ⚙️ 收進那條列(四頁同一套,見 ui-kit 的 dockTools)。
-  // 消消樂目前沒有「收頂列」的規則,接上是為了四頁一致 —— 對局中鈕的位置到哪一頁都一樣。
+  /* 對局中鈕該住哪(見 ui-kit 的 dockTools)。★ v1.75.10 起**只有頂列真的被收掉才搬** ——
+     消消樂沒有「收頂列」的規則,所以實際上永遠不搬。舊版是「為了四頁一致」無條件搬,
+     換來的是每一頁的房間框都被兩顆鈕擠掉 80px(使用者在排七回報)。
+     這裡照舊告訴它「如果要搬,搬去哪」:哪天加了收頂列的規則就自動接上。 */
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("mjSoloBar");
   else undockTools();

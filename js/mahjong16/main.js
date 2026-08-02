@@ -32,6 +32,8 @@ function showScreen(which){
   document.body.classList.toggle("m16-solo", which==="solo");
   // 對局中把頂列的 ⛶ / ⚙️ 收進那條列 —— 橫向原本讓它們浮在右上角,浮在房間框外面又沒對齊
   // 那條列的中線(回報「看起來好奇怪,一點都不協調」)。見 ui-kit 的 dockTools。
+  // ★ v1.75.10 起由 dockTools 自己判斷頂列在不在:台灣麻將收頂列那條也掛在媒體查詢裡
+  //   (landscape + max-height:560 + pointer:coarse),所以**只有手機橫向**才會搬。
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("m16SoloBar");
   else undockTools();

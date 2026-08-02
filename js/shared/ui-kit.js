@@ -851,21 +851,52 @@ function saveMyVoicePending(){
    ⚠ 靠右不必寫 margin-left:auto:那條列的標題(.gmk-room-title / .mj-lvtag …)都是
      flex:1,會自己把後面的元素推到最右邊(.mp-actions 就是這樣靠右的)。
    ⚠ Bingo 不載入這一支 —— 它的頂列在對局中不會被收掉,沒有這個問題,也不必補一份
-     (CLAUDE.md 那條「刻意各留一份」的清單不用加這個)。 */
-let toolsHome = null;   // .tools 原本的家(頂列);第一次 dock 時記下來,undock 放回去
-function dockTools(panelId){
+     (CLAUDE.md 那條「刻意各留一份」的清單不用加這個)。
+
+   ── ★★ 只有「頂列真的不見了」才搬(v1.75.10)────────────────────────────────
+   使用者:「連線對戰時,開始遊戲後,全螢幕跟設定的按鈕,不應該跑進房間框裡面」。
+   對的 —— 因為 dockTools 被五頁**無條件**接上了,而真正會收頂列的**只有三頁、而且都掛在
+   媒體查詢裡**(收頂列本來就是為了「手機空間不夠」才做的):
+
+     | 頁 | 對局中頂列什麼時候被收掉 |
+     |---|---|
+     | 數獨 `#sdkPlay` / 五子棋 `#gmkStage` | `(max-height:780px) and (pointer:coarse)` |
+     | 台灣麻將 `body.m16-mp/-solo` | `(orientation:landscape) and (max-height:560px) and (pointer:coarse)` |
+     | **排七 / 消消樂** | **從來不會**(styles.css 裡沒有這兩頁的 `.topbar{display:none}`) |
+
+   所以在排七與消消樂,鈕是從一條**還好端端在畫面上、右半邊空著**的頂列被搬進房間框,
+   把那條列擠到房名要 ellipsis(當初接上的理由寫在 mahjong/main.js:「為了四頁一致」——
+   那個一致換來的是每一頁都變擠,不划算)。另外三頁**只要條件沒命中**(桌機、直向的麻將、
+   夠高的手機)也一樣白搬一次 —— `pointer:coarse` 讓桌機永遠不命中,所以桌機從來沒有理由搬。
+
+   改成由這裡自己判斷:`.topbar` 的 computed display 是不是 none。
+   是 → 搬(那才是這個機制存在的理由);不是 → 待在頂列別動。
+   ⚠ 判斷的是**當下**的 computed style,所以呼叫點一定要在 `showScreen()` **切完
+     class / hidden 之後** —— 五頁現在都是這個順序(dockTools 是那一段的最後幾行)。
+   ⚠ 媒體查詢吃視窗高度 → **轉螢幕 / 網址列縮放時答案會變**,所以記下「這一相位要搬去哪」
+     (`toolsPanelId`)並掛 resize 重算一次;只 dock 一次的話轉個方向鈕就跑錯地方。 */
+let toolsHome = null;      // .tools 原本的家(頂列);第一次同步時記下來
+let toolsPanelId = null;   // 這一相位「如果要搬,搬去哪」;不在對局中就是 null
+function topbarGone(){
+  const bar = document.querySelector(".topbar");
+  return !!bar && getComputedStyle(bar).display === "none";
+}
+function dockTools(panelId){ toolsPanelId = panelId || null; syncTools(); }
+function undockTools(){ toolsPanelId = null; syncTools(); }
+function syncTools(){
   const tools = document.querySelector(".tools");
-  const panel = panelId && $(panelId);
-  const row = panel && panel.querySelector(".row");   // 房間框 / 單機列的第一列
-  if(!tools || !row) return;
+  if(!tools) return;
   if(!toolsHome) toolsHome = tools.parentNode;
-  if(tools.parentNode !== row){ row.appendChild(tools); tools.classList.add("tools-docked"); }
+  const panel = toolsPanelId && $(toolsPanelId);
+  const row = panel && panel.querySelector(".row");   // 房間框 / 單機列的第一列
+  if(row && topbarGone()){
+    if(tools.parentNode !== row){ row.appendChild(tools); tools.classList.add("tools-docked"); }
+    return;
+  }
+  if(tools.parentNode !== toolsHome) toolsHome.appendChild(tools);
+  tools.classList.remove("tools-docked");
 }
-function undockTools(){
-  const tools = document.querySelector(".tools");
-  if(!tools || !toolsHome) return;
-  if(tools.parentNode !== toolsHome){ toolsHome.appendChild(tools); tools.classList.remove("tools-docked"); }
-}
+addEventListener("resize", syncTools);
 
 /* ---------- 共用啟動樣板(各遊戲 main.js 的重複部分) ---------- */
 // 版號:單一來源是 <meta name="version">
