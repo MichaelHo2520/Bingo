@@ -216,13 +216,19 @@ const Solo = (function(){
     if(card){ card.classList.remove("win", "lose", "draw"); card.classList.add(iWon ? "win" : "lose"); }
     $("winWord").textContent = iWon ? "你贏了!" : ("第 " + mine.rank + " 名");
     const lv = SVAI.levelOf(level);
-    $("winMsg").innerHTML =
-      (mine.cnt ? ("你蓋掉 " + mine.cnt + " 張 · 罰分 <b>" + mine.pts + "</b>")
-                : "你一張都沒蓋掉,滿分過關 ✨") +
-      '<br><span class="sv-solomsg">' + seats + " 人 · " + lv.emoji + lv.name + " · 戰績 " + recText(level) + "</span>";
+    /* ★ 結果卡整合(v1.75.3):大字底下只留**一句**「這局誰贏、我幾分」,
+       「人數 · 難度 · 戰績」那些局外資訊降級到排名表尾巴(第三個參數)。
+       舊版是大字 + 兩行小字 + 排名表,而排名表的「我那一列」本來就寫著同一組數字 ——
+       同一件事講三次正是使用者說的「資訊相當得亂」。
+       ⚠ 這句的措辭與連線那份(adapter 的 outcome())刻意寫成同一個格式。 */
+    $("winMsg").innerHTML = iWon
+      ? (mine.cnt ? ("罰分 <b>" + mine.pts + "</b> · 全場最少 🎉") : "你一張都沒蓋掉,滿分過關 ✨")
+      // ⚠ 並列第一要全部列出來(三層 tie-break 都同分時 winners 不只一個)
+      : (sc.winners.map(s => esc(seatName(s))).join("、") + " 罰分最少 · 你 <b>" + mine.pts + "</b> 分");
     const box = $("svResult");
     if(box){
-      box.innerHTML = SVB.resultHTML(st, names, ME);
+      box.innerHTML = SVB.resultHTML(st, names, ME,
+        seats + " 人 · " + lv.emoji + lv.name + " · 戰績 " + recText(level));
       box.classList.remove("hidden");
     }
     if(iWon){ Sound.win(); burst(); }

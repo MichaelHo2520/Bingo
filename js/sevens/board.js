@@ -65,11 +65,30 @@ const SVB = (function(){
     return '<svg class="sv-sv" viewBox="0 0 100 100" aria-hidden="true">' + SUIT_SVG[s] + '</svg>';
   }
 
+  /* ★★ 牌面照**標準撲克牌**的結構畫(v1.75.3)。
+     使用者:「牌面我不想要這樣顯示,請幫我找標準的牌是怎麼顯示」。
+     查證:1870 年代之後的法式標準牌,正面固定是三件事 ——
+       ① **角落 index**:左上角「點數在上、花色在下」縱向疊一組(右下角再一組轉 180°,
+          這樣扇形持牌時哪個方向都讀得到)
+       ② **牌面中央的 pip**:A 是一個大花色,2~10 是固定排法,J/Q/K 是人像
+       ③ 長寬比 63×88mm ≈ .72
+     舊版是「大數字置中 + 花色墊在下面」,那是**貼紙的排法不是牌的排法** ——
+     一張牌之所以看起來像牌,關鍵就在左上角那組 index。
+
+     這一頁的牌只有 27~40px 寬,所以照小尺寸的取捨落地:
+     - index 走**大字版**(jumbo index —— 那也是標準牌的一種正式規格,德州撲克桌上用的
+       就是它,理由同樣是「要遠看」),字級跟舊版的置中大字一樣大,可讀性不退。
+     - 中央的 pip 只畫**一個大花色**(A 的畫法):2~10 的 pip 陣列在 30px 上必糊成一團。
+     - 右下角那組倒轉 index **不畫**:27px 寬塞三組會互相壓到,而它在螢幕上的用途
+       (反向持牌)本來就不存在。
+     ⚠ 「10」是唯一的兩位數,要另外壓字級 —— 標準牌上的 10 index 本來也是壓縮過的。 */
   function cardHTML(c, cls){
     const red = R.isRed(c) ? " red" : "";
+    const rk = R.rankOf(c), s = suitSVG(R.suitOf(c));
     return '<span class="sv-card' + red + (cls ? " " + cls : "") + '" data-c="' + c + '">' +
-             '<span class="sv-cr">' + R.rankTxt(R.rankOf(c)) + '</span>' +
-             '<span class="sv-cs">' + suitSVG(R.suitOf(c)) + '</span>' +
+             '<span class="sv-ix"><b' + (rk === 10 ? ' class="t10"' : "") + '>' +
+               R.rankTxt(rk) + '</b>' + s + '</span>' +
+             '<span class="sv-pipc">' + s + '</span>' +
            '</span>';
   }
 
@@ -222,22 +241,41 @@ const SVB = (function(){
        · 框 + 「你」徽章  → 這一列是我
        · 金色名次圈 + 🏆  → 這一列是第一名
      ⚠ 並列第一時(三層 tie-break 都同分)每一列都會拿到金圈,那是對的。 */
-  function resultHTML(st, names, mySeat){
+  /* ★★ 一列拆成**兩層**(v1.75.3)。使用者:「最後結算的頁面…看起來資訊相當得亂,
+     我覺得應該要整合,但是要能清楚」。
+     亂的來源是**一列裡塞了五種東西**(名次圈 / 名字 / 徽章 / 一整排蓋牌 / 罰分),
+     而其中「一整排蓋牌」的寬度**每個人都不一樣** —— 名字與分數因此每一列都對不齊,
+     四列疊起來就是一團。拆成:
+       第一層 = 名次 · 名字 · 徽章 · 罰分   ← 欄位固定,四列對得整整齊齊
+       第二層 = 他蓋掉的那些牌(縮排)        ← 想細看才看,不跟名字搶寬度
+     沒蓋過牌的人第二層直接換成一句「一張都沒蓋 ✨」,不留空行。
+     ⚠ foot 是當 **HTML** 接在排名表下面的(給單機放「人數 · 難度 · 戰績」那行小字)——
+       要放進使用者輸入的東西時,呼叫端自己 esc()(同 outcome().msg,notes/07 踩坑 #9)。 */
+  function resultHTML(st, names, mySeat, foot){
     const sc = R.score(st);
     return '<div class="sv-rank">' + sc.sorted.map(r => {
       const pile = st.piles[r.seat].slice().sort((a, b) => a - b);
       const me = r.seat === mySeat, first = r.rank === 1;
+      const nm = names[r.seat] || ("玩家" + (r.seat + 1));
       return '<div class="sv-rrow' + (me ? " me" : "") + (first ? " win" : "") + '">' +
-        '<span class="sv-rno">' + r.rank + '</span>' +
-        '<span class="sv-rname">' + esc(names[r.seat] || ("玩家" + (r.seat + 1))) + '</span>' +
-        (me ? '<span class="you-badge">你</span>' : "") +
-        (first ? '<span class="sv-rcrown" title="第一名">🏆</span>' : "") +
-        '<span class="sv-rcards">' +
-          (pile.length ? pile.map(c => cardHTML(c, "tiny")).join("") : '<span class="sv-clean">全部出完</span>') +
-        '</span>' +
-        '<span class="sv-rpts">' + r.pts + ' 分</span>' +
+        '<div class="sv-rmain">' +
+          '<span class="sv-rno">' + r.rank + '</span>' +
+          '<span class="sv-rname">' + esc(nm) + '</span>' +
+          // ⚠ 名字本身就叫「你」時(單機的 0 號位)不再掛徽章 —— 「你 你」是純雜訊,
+          //   而「這一列是我」還有框在標,訊號沒少
+          (me && nm !== "你" ? '<span class="you-badge">你</span>' : "") +
+          (first ? '<span class="sv-rcrown" title="第一名">🏆</span>' : "") +
+          '<span class="sv-rpts"><b>' + r.pts + '</b> 分</span>' +
+        '</div>' +
+        '<div class="sv-rcards">' +
+          (pile.length
+            ? '<span class="sv-rcn">蓋 ' + pile.length + ' 張</span>' +
+              pile.map(c => cardHTML(c, "tiny")).join("")
+            : '<span class="sv-clean">一張都沒蓋 ✨</span>') +
+        '</div>' +
       '</div>';
-    }).join("") + '</div>';
+    }).join("") + '</div>' +
+    (foot ? '<div class="sv-rfoot">' + foot + '</div>' : "");
   }
 
   /* ==========================================================================

@@ -336,15 +336,20 @@ const MP = MPCore.create((function(){
       paint();
       const me = mySeat();
       const row = (st && st.over) ? SV.score(st).rows[me] : null;
-      // ★ 名字要自己 esc() —— outcome().msg 是當 HTML 塞進 #winMsg 的(notes/07 踩坑 #9)
-      const tail = row
-        ? (row.cnt ? ("你蓋掉 " + row.cnt + " 張 · 罰分 <b>" + row.pts + "</b>")
-                   : "你一張都沒蓋掉,滿分過關 ✨")
-        : "";
-      if(iWon) return { word: "你贏了!", msg: "罰分最少,這局你拿下 🎉<br>" + tail };
+      /* ★ 一行(v1.75.3):底下的排名表已經逐列寫著「誰第幾名 / 蓋了什麼 / 幾分」,
+         這一句只負責「這局誰贏、我幾分」。舊版是兩行(還帶 <br>),
+         與排名表講同一件事三次 —— 使用者:「資訊相當得亂,應該要整合」。
+         ⚠ 名字要自己 esc() —— msg 是當 HTML 塞進 #winMsg 的(notes/07 踩坑 #9)。
+         ⚠ 措辭與單機那份(solo.js 的 finish())刻意寫成同一個格式。 */
+      if(iWon){
+        return { word: "你贏了!",
+                 msg: (row && !row.cnt) ? "你一張都沒蓋掉,滿分過關 ✨"
+                    : (row ? ("罰分 <b>" + row.pts + "</b> · 全場最少 🎉") : "罰分最少,這局你拿下 🎉") };
+      }
       const ws = (w && w.ids || []).map(id => esc(ctx.dispName(id))).join("、");
       return { word: row ? ("第 " + row.rank + " 名") : "這局結束",
-               msg: (ws ? (ws + " 的罰分最少") : "這局結束") + "<br>" + tail };
+               msg: (ws ? (ws + " 罰分最少") : "這局結束") +
+                    (row ? (" · 你 <b>" + row.pts + "</b> 分") : "") };
     },
 
     /* ---------- 偏好 ---------- */
