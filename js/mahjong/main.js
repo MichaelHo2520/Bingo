@@ -27,6 +27,11 @@ function showScreen(which){
   document.body.classList.toggle("solo-on", which==="solo");
   // 單機的工具列(悔棋/暫停)不該出現在連線;連線的重洗兩邊都要
   document.body.classList.toggle("mj-mp", which==="play");
+  // 對局中把頂列的 ⛶ / ⚙️ 收進那條列(四頁同一套,見 ui-kit 的 dockTools)。
+  // 消消樂目前沒有「收頂列」的規則,接上是為了四頁一致 —— 對局中鈕的位置到哪一頁都一樣。
+  if(which==="play") dockTools("mpBar");
+  else if(which==="solo") dockTools("mjSoloBar");
+  else undockTools();
   if(which==="home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始
   // 盤面大小綁容器高度:剛切過來時容器才剛拿到尺寸,補量一次
   if(which==="play"||which==="solo") setTimeout(()=>MB.fit(),0);

@@ -30,6 +30,11 @@ function showScreen(which){
      m16-solo 只負責把 .mj-play 放寬到 960(真麻將的桌面比消消樂需要更多橫向空間)。 */
   document.body.classList.toggle("m16-mp", which==="play");
   document.body.classList.toggle("m16-solo", which==="solo");
+  // 對局中把頂列的 ⛶ / ⚙️ 收進那條列 —— 橫向原本讓它們浮在右上角,浮在房間框外面又沒對齊
+  // 那條列的中線(回報「看起來好奇怪,一點都不協調」)。見 ui-kit 的 dockTools。
+  if(which==="play") dockTools("mpBar");
+  else if(which==="solo") dockTools("m16SoloBar");
+  else undockTools();
   if(which==="home") showHomeLayer("pick");    // 回主選單一律從「選玩法」開始
 }
 

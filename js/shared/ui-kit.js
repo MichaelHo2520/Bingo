@@ -799,6 +799,42 @@ function saveMyVoicePending(){
   showToast("已加入「"+label+"」⭐");
 }
 
+/* ---------- 對局中把頂列的 ⛶ / ⚙️ 收進遊戲自己那條列(v1.74.0) ----------
+   ── 為什麼要有這個 ──────────────────────────────────────────────────────
+   兩份回報其實是同一個病根:
+     · 五子棋「開始對戰後全螢幕的按鈕不見了」—— 手機玩的時候頂列整條 display:none
+       讓給盤面(styles.css 那條 `(max-height:780px) and (pointer:coarse)`,數獨同款),
+       ⛶ 與 ⚙️ 住在頂列裡 → 跟著一起消失,對局中進不了全螢幕也開不了設定。
+     · 台灣麻將橫向「全螢幕跟設定的按鈕看起來好奇怪,一點都不協調」—— v1.73.1 為了
+       不讓它們消失,把頂列改成 position:fixed 浮在右上角;但它浮在房間框**外面**、
+       垂直也沒對齊那條列的中線,看起來像兩張貼紙掛在角落。
+   病根是這兩顆鈕**沒有「對局中」的家**。房間框那條列本來就住著 .icon-btn(離開房間 /
+   回選單),把它們搬進去就對了:尺寸自動吃 `.gmk-room .icon-btn` / `.mj-room .icon-btn`
+   那幾條既有規則(34px、橫向再壓到 28px),天然對齊、天然協調,頂列要收就放心收。
+
+   ── 為什麼是「搬 DOM」而不是在房間框各放一份 ────────────────────────────
+   全螢幕鈕的狀態(`.active`)與事件都綁在**同一顆**鈕上(bindCommonUI 綁 #fsBtn),
+   複製第二顆就有兩個真相 —— 同 notes/13 那條「五個遊戲共用元件」的鐵則。
+   搬動 DOM 不會解綁事件,所以搬完什麼都不用重接。
+   ⚠ 靠右不必寫 margin-left:auto:那條列的標題(.gmk-room-title / .mj-lvtag …)都是
+     flex:1,會自己把後面的元素推到最右邊(.mp-actions 就是這樣靠右的)。
+   ⚠ Bingo 不載入這一支 —— 它的頂列在對局中不會被收掉,沒有這個問題,也不必補一份
+     (CLAUDE.md 那條「刻意各留一份」的清單不用加這個)。 */
+let toolsHome = null;   // .tools 原本的家(頂列);第一次 dock 時記下來,undock 放回去
+function dockTools(panelId){
+  const tools = document.querySelector(".tools");
+  const panel = panelId && $(panelId);
+  const row = panel && panel.querySelector(".row");   // 房間框 / 單機列的第一列
+  if(!tools || !row) return;
+  if(!toolsHome) toolsHome = tools.parentNode;
+  if(tools.parentNode !== row){ row.appendChild(tools); tools.classList.add("tools-docked"); }
+}
+function undockTools(){
+  const tools = document.querySelector(".tools");
+  if(!tools || !toolsHome) return;
+  if(tools.parentNode !== toolsHome){ toolsHome.appendChild(tools); tools.classList.remove("tools-docked"); }
+}
+
 /* ---------- 共用啟動樣板(各遊戲 main.js 的重複部分) ---------- */
 // 版號:單一來源是 <meta name="version">
 function paintVersion(){

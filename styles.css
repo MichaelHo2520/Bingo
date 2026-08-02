@@ -137,6 +137,20 @@
     transform:translateY(-2px);
   }
   .tools{display:flex;gap:8px}
+  /* 對局中 .tools(⛶ / ⚙️)被搬進房間框那一列 —— 見 js/shared/ui-kit.js 的 dockTools。
+     ★★ 為什麼要脫離 flex 流(position:absolute)而不是老老實實排在列尾:
+       那幾條列一律 `flex-wrap:nowrap`,而列內有一票**不可壓縮**的元素(戰績 / 局數 /
+       語音 + 表情)。手機直向本來就已經在溢出邊緣,再排兩顆 34px 進去,被頂出容器的
+       正好是最後面的它們自己 —— 實測 390 寬的五子棋單機列就是這樣,鈕搬了卻看不到,
+       等於白搬。脫離流之後,鈕永遠在框內右緣、永遠對齊那條列的中線,列的內容也不動。
+     ⚠ 錨點刻意掛在 `.row` 而不是外層 .panel:panel 有兩三列(第一列 + 狀態列 + 名單列),
+       相對 panel 的 top:50% 會掉到名單列去;相對 .row 才永遠是「那條列」的中線,
+       而且 padding 在各 media query 怎麼變都不用重算。
+     ⚠ 尺寸不必寫:各遊戲既有的 `.gmk-room .icon-btn` / `.mj-room .icon-btn`(34px、
+       橫向再壓到 28px)會接手 → 跟列內原本那顆返回鈕一樣大,這是「協調」的來源。
+     ⚠ padding-right 是給鈕讓位的,否則列尾的文字會被鈕蓋住。 */
+  .row:has(> .tools-docked){position:relative;padding-right:80px}
+  .tools.tools-docked{position:absolute;right:0;top:50%;transform:translateY(-50%);flex:none}
   .icon-btn{
     width:42px;height:42px;border-radius:13px;border:1px solid var(--panel-line);
     background:var(--panel);color:var(--text);font-size:19px;cursor:pointer;
@@ -2428,21 +2442,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      設定面板一律不受影響。`.m16-*` 開頭的那幾條不必限定,那個前綴本來就只有這一頁。
    ========================================================================== */
 @media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
-  /* ① 頂列讓出 44px —— 但**不可以 display:none**(v1.73.1 上手回報:「少了全螢幕」)。
-     `⛶` 與 `⚙️` 都住在頂列裡,整條收掉等於橫向進不了全螢幕、也開不了設定。
-     ★ 改成**浮在右上角**:position:fixed 讓它脫離流(垂直空間照樣省下 44px),
-       只留兩顆鈕、品牌字隱藏。
-     ⚠ 房間框要讓出右上那一角(padding-right),否則浮動鈕會壓在晶片列上。
-     ⚠ z-index 41 < .veil 的 50:結果卡 / 設定蓋板 / 離開確認**仍然蓋得住它**,
-       不會出現「對話框上面浮著兩顆鈕」(同 v1.56.0 那條 stacking context 的教訓)。
+  /* ① 頂列整條讓出 44px。v1.73.1 曾經**不敢** display:none(上手回報「少了全螢幕」)——
+     因為 `⛶` 與 `⚙️` 住在裡面,收掉就等於橫向進不了全螢幕、也開不了設定;
+     當時的折衷是把整條頂列改成 position:fixed 浮在右上角。
+     ★ v1.74.0 拆掉那個折衷:兩顆鈕改由 ui-kit 的 dockTools() **搬進房間框那一列**,
+       頂列裡再沒有非它不可的東西 → 大方收掉,44px 全給盤面,而且不再有
+       「兩顆鈕浮在房間框外面、又沒對齊那條列的中線」的怪樣子(回報:「一點都不協調」)。
      ⚠ 刻意**不**去擴充上面那條既有的 `(max-height:780px) and (pointer:coarse)`
        (數獨 / 五子棋在用):780 這個門檻連**直向**的小手機(667 高)都會命中,
        把麻將掛進去等於連直向都收頂列 —— 那就影響到正常佈局了。 */
-  body.m16-mp .topbar,body.m16-solo .topbar{
-    position:fixed;top:5px;right:8px;z-index:41;width:auto;gap:6px}
-  body.m16-mp .topbar .brand,body.m16-solo .topbar .brand{display:none}
-  body.m16-mp .topbar .icon-btn,body.m16-solo .topbar .icon-btn{
-    width:28px;height:28px;border-radius:9px;font-size:14px}
+  body.m16-mp .topbar,body.m16-solo .topbar{display:none}
 
   /* ①-b 邊界與間距也收一號。全域那條 `@media (max-height:560px)` 已經把 body 壓到
      10px / gap 8,這裡再收 —— 只掛在對局中的麻將身上,消消樂與各頁選單不受影響。 */
@@ -2457,7 +2466,23 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ .mj-room 本身是 .panel(有底色圓角),改 display:flex 不影響外觀;
        三個子元素本來就是上下堆疊的三個 block,並排之後 foot 吃掉剩下的寬度。 */
   body.m16-mp .mj-room,body.m16-solo .mj-room{
+    position:relative;   /* ★ 給下面 .tools-docked 的 absolute 當定位錨點 */
     padding:4px 72px 4px 10px;display:flex;align-items:center;gap:8px}
+  /* ★ 橫向的 ⛶ / ⚙️ 要貼**整條列**的右緣,所以這裡把它從流裡拉出來:
+     橫向的 .mj-room 是「三層並排成一行」,而 .tools 是被 dockTools 掛在第一層
+     (.mj-room-top)的尾端 → 留在流裡會落在「局數」與晶片列之間,也就是整條列的中間。
+     改成相對房間框 absolute 貼右緣 + 垂直居中 → 位置永遠對齊那條列的中線
+     (比 v1.73.1 的 position:fixed 穩:fixed 是相對視窗,房間框高度一變就錯位)。
+     右邊那 72px 的 padding 就是留給它的位置:28×2 + gap 6 + right 8 = 70。 */
+  body.m16-mp .mj-room .tools-docked,body.m16-solo .mj-room .tools-docked{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);gap:6px}
+  /* ⚠⚠ 錨點要**還原**成外層的 .mj-room。通用那條把 `.row:has(> .tools-docked)` 設成
+     position:relative(相對「那一列」貼右緣,直向要的就是這個);但橫向的 .mj-room 是
+     三層並排成一行,第一層 .mj-room-top 只佔左邊一小段 —— 相對它貼右緣的話,鈕會落在
+     「局數」與晶片列之間的**中間**。改回 static,上面那條才吃得到 .mj-room。
+     padding-right 也要歸零:讓位的責任已經交給 .mj-room 自己那 72px。 */
+  body.m16-mp .mj-room .row:has(> .tools-docked),
+  body.m16-solo .mj-room .row:has(> .tools-docked){position:static;padding-right:0}
   body.m16-mp .mj-room .mj-room-top,body.m16-solo .mj-room .mj-room-top{flex:none}
   body.m16-mp .mj-room .mp-subrow{flex:none;margin-top:0;font-size:10px;max-width:6em;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

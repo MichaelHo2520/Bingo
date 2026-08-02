@@ -144,7 +144,18 @@
         if(!val)cell.classList.add("empty-cell");
         cell.addEventListener("click",()=>manualTap(i));
       }else{ // auto preview
-        cell.disabled=true;cell.style.cursor="default";
+        cell.style.cursor="default";
+        /* ⚠ 連線中這一格**不可以** disabled(v1.74.0)。
+           disabled 的 button 連 click 事件都不會觸發 —— 一旦盤面因為任何原因還沒進 play 模式
+           (而玩家晶片已經照 order/turnIndex 高亮成「輪到你」了,那是 renderPlayers() 畫的,
+           跟 state.mode 無關),就會變成「明明輪到你、格子也在,卻怎麼點都沒反應、
+           連『還沒輪到你』都不跳」的假死 —— 使用者回報的正是這個。
+           這與 v1.27.3 拿掉 play 分支 disabled 是同一個理由,那一次只改了 play 分支、
+           漏掉這裡,所以「靜默吃掉點擊」這條路徑一直還開著。
+           改成一律交給 MP.tap():輪到你就叫號(它會先把盤面補進 play 模式,見 online.js),
+           沒輪到你就跳提示。單機沒有這個問題(沒有「別人推進相位」這件事),維持 disabled。 */
+        if(state.online) cell.addEventListener("click",()=>MP.tap(i));
+        else cell.disabled=true;
       }
       grid.appendChild(cell);
     }

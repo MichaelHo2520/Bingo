@@ -24,6 +24,11 @@ function showScreen(which){
     ["mpConnect","mpBar","primaryBar","scrollArea"].forEach(id=>{ const el=$(id); if(el) el.classList.add("hidden"); });
   }
   document.body.classList.toggle("solo-on", which==="solo");
+  // 對局中把頂列的 ⛶ / ⚙️ 收進那條列 —— 手機玩的時候頂列整條被收掉讓給棋盤,
+  // 鈕住在裡面就會跟著消失(回報「開始對戰後全螢幕的按鈕不見了」)。見 ui-kit 的 dockTools。
+  if(which==="play") dockTools("mpBar");
+  else if(which==="solo") dockTools("gmkSoloBar");
+  else undockTools();
   if(which==="home") showHomeLayer("pick");   // 回選單一律從「選玩法」開始
 }
 

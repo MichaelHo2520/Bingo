@@ -431,8 +431,7 @@
         if(curPhase==="rps"){ renderRps(); if(isHost)rpsHostResolve(); }
         else if(curPhase==="ordering") renderOrderPanel();
         else if(curPhase==="playing"){
-          // 輪到的人暫時不見:不在寬限期內才跳過他(避免卡住);寬限中先等他回來,不亂動出手順序
-          if(isHost && order.length && !players[order[turnIndex]] && !graceTimer) txGame(g=>{ if(g.status!=="playing"||g.winner)return false; g.turnIndex=nextTurn(g.turnIndex||0, g.order||[]); });
+          skipMissingTurn();   // 輪到的人暫時不見 → 跳過他(見該函式:另一處呼叫在 enterPlaying)
           updateTurnUI();
           if(winner) showOutcome();   // 補算平手(對手的 winAt 可能晚一步才傳到)
         }
@@ -911,6 +910,7 @@
       setLock(false);
       resetMarquee(); render(); applyCalledMarks(); updateTurnUI(); refreshLines();
       maybeAnnounceOrder();
+      skipMissingTurn();   // 開局那一刻若 order[0] 已經離開,這裡是唯一還會檢查的地方(見該函式 ②)
       // (舊版此處有「order 停在 [] 就主動重讀 DB」的補救,因應舊拆分寫入被 coalesce 吃掉 order 事件。
       //  改用單一 game 節點 + rev 後,order 與 status 一定在同一快照原子到齊,補救不再需要,已移除。)
     }
@@ -930,6 +930,21 @@
     }
     function isMyTurn(){ return status==="playing" && !winner && !abandoned && order.length>0 && order[turnIndex]===meId; }
     function isCalled(v){ return calledList.indexOf(v)>=0; }
+    /* 輪到的人暫時不見 → 跳過他,免得整局卡死。不在斷線寬限期內才跳(寬限中先等他重連歸位,
+       不亂動出手順序);只有房主推進,用 txGame 交易避免與別人的叫號互相覆蓋。
+       ★ 要在**兩處**呼叫(v1.74.0 補的是第二處):
+         ① players 快照變動時 —— 遊戲中有人離開。
+         ② 剛進 playing 時 —— startGame() 是拿 `Object.keys(players)` 洗牌的,若洗牌那一刻
+            有人已經關掉分頁/切到別的 App,他照樣被洗進 order、甚至洗到第一位;而他的
+            onDisconnect 移除事件若在「本端 curPhase 還沒變成 playing」之前就到了,
+            那一次 players 事件走的是 lobby 分支、不會檢查 → 之後 players 再也不變動,
+            **沒有任何地方會再檢查**,order[0] 指著一個不存在的玩家 → 全房誰都輪不到。
+            隨機順序特別容易中:它從 lobby 直接跳 playing,中間沒有 rps/reveal 那幾秒過場。 */
+    function skipMissingTurn(){
+      if(!isHost || !order.length || graceTimer) return;
+      if(players[order[turnIndex]]) return;            // 輪到的人還在 → 什麼都不用做
+      txGame(g=>{ if(g.status!=="playing"||g.winner)return false; g.turnIndex=nextTurn(g.turnIndex||0, g.order||[]); });
+    }
     // 下一位仍在線的玩家索引。ord 可傳入(txGame 交易內用交易當下的 g.order,避免與模組值不一致);省略則用模組 order。
     function nextTurn(from, ord){
       ord = ord || order;
@@ -958,6 +973,13 @@
       wasMyTurn=mine;
     }
     function tap(i){
+      /* 相位自我修復(v1.74.0):DB 說已經在 playing、盤面卻還沒進 play 模式。
+         這種不一致時,玩家晶片照 order/turnIndex 高亮成「輪到你」(renderPlayers 不看 state.mode),
+         但號碼格還是大廳的預覽格 → 使用者看到的就是「輪到我卻點不動」。
+         onStatus() 的條件(curPhase!=="playing" || state.mode!=="play")理應涵蓋這種情況,
+         這裡是**最後一道**:既然點得到這一格,就趁這個手勢把盤面補進遊戲再判斷這一手,
+         而不是靜靜地什麼都不做。(與 game.js auto preview 分支不再 disabled 是一組的。) */
+      if(status==="playing" && state.mode!=="play"){ enterPlaying(); }
       if(!isMyTurn()){ showToast("還沒輪到你"); return; }
       const n=state.card[i]; if(!n)return;
       if(isCalled(n))return;

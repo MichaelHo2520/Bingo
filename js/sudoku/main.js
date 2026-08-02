@@ -23,6 +23,10 @@ function showScreen(which){
     ["mpConnect","mpBar","primaryBar","scrollArea"].forEach(id=>{ const el=$(id); if(el) el.classList.add("hidden"); });
   }
   document.body.classList.toggle("solo-on", which==="solo");
+  // 對局中把頂列的 ⛶ / ⚙️ 收進那條列(數獨與五子棋吃同一條「手機玩時收頂列」的規則)。見 ui-kit 的 dockTools。
+  if(which==="play") dockTools("mpBar");
+  else if(which==="solo") dockTools("sdkSoloBar");
+  else undockTools();
   if(which==="home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始(比照 Bingo 的 enterHome)
 }
 
