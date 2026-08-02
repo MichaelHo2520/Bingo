@@ -31,10 +31,13 @@ function showScreen(which){
   document.body.classList.toggle("sv-mp", which==="play");
   document.body.classList.toggle("sv-solo", which==="solo");
   /* 對局中鈕該住哪 —— ★ 決定權在 ui-kit 的 dockTools:**只有頂列真的被收掉才搬**。
-     排七的頂列從來不會被收掉(styles.css 沒有 `body.sv-mp .topbar{display:none}`),
-     所以這一頁實際上永遠不搬 —— v1.75.10 之前照搬,把房名擠到要 ellipsis
-     (使用者:「全螢幕跟設定的按鈕,不應該跑進房間框裡面」)。
-     這裡照舊把「如果要搬,搬去哪」告訴它:哪天真的加了收頂列的規則就自動接上。 */
+     v1.75.10 之前是「對局中就搬」,而排七當時根本不收頂列 → 鈕從一條還好端端在畫面上的
+     頂列被搬進房間框,把房名擠到要 ellipsis(使用者:「全螢幕跟設定的按鈕,不應該跑進
+     房間框裡面」)。
+     ★ v1.75.12 起排七**橫置手機時真的會收頂列**了(styles.css 的
+       `(orientation:landscape) and (max-height:560px) and (pointer:coarse)`),
+       所以這兩行從此是有作用的:橫置 → 鈕搬進房間框;直向 / 桌機 → 留在頂列。
+       兩種情形都不必也不可以在這裡判斷,條件只准有一份(就在 dockTools 裡面)。 */
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("svSoloBar");
   else undockTools();

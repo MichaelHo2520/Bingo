@@ -2684,7 +2684,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      .open 是現在接得上的兩個位置:那是公開資訊(軌道上本來就看得出來),
      標出來只是省去數格子,不是替玩家算牌。 */
   /* ⚠ 左右內距吃 --sv-tpad:格子寬度是從「容器寬 - 內距 - gap」推回來的(見檔頭三支變數) */
-  .sv-tracks{display:flex;flex-direction:column;gap:3px;flex:none;
+  /* ★★ 軌道是盤面裡**唯一可壓縮**的一塊(v1.75.12)。
+     高度不夠時要犧牲誰,答案很明確:**手牌要按得到、軌道只是拿來查的**。
+     舊版三塊都是 flex:none,於是高度不夠時由 .sv-stage 整個捲 —— 而手牌在最底下,
+     橫置手機(870×335)實測**掉出可視區 181px**,玩家看到的是「輪到我了,但畫面上沒有牌」。
+     ⚠ min-height:0 不可省:column flex item 的 min-height 預設是 auto(= 內容高),
+       不歸零的話 flex-shrink 根本不會發生,這條寫了等於沒寫。
+     ⚠ 空間夠時(直向手機)flex-shrink 不作用 —— 一個像素都不會變,
+       v1.75.2 驗收過的「26 張不用捲就看得完」原封不動。 */
+  .sv-tracks{display:flex;flex-direction:column;gap:3px;flex:0 1 auto;min-height:0;overflow-y:auto;
     background:rgba(0,0,0,.16);border-radius:12px;padding:6px var(--sv-tpad)}
   :root[data-theme="ebook"] .sv-tracks{background:#fff;border:1px solid #000}
   .sv-track{display:flex;align-items:center}
@@ -2974,13 +2982,30 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠⚠ 牌寬只准動 --sv-cw,**不要**在這裡改 .sv-card 的 --svw ——
        舊版就是那樣寫的,結果手牌縮成 34px 而軌道格子還是 40px,「格子比手牌大」。
        同理 padding 改的是 --sv-tpad(格子寬度的算式吃它)。 */
+  /* ★★★ 矮視窗把四條龍改成 **2×2**(v1.75.12)—— 這一頁矮視窗的病灶在**高度**,
+     而矮視窗幾乎一定同時很寬(橫置手機 870×335、小筆電視窗),寬的那一半原本整片空著。
+     直向:4 列 × 13 = 高 203px、寬只用掉 700 的一半多。
+     橫向:2 列 × 26 = 高**腰斬到約 100px**,而寬度正好吃掉本來浪費的那一半。
+     ⚠⚠ `--sv-cellw` **一定要跟著換成半寬的算式** —— 它只被拿去算格子裡的字級,
+       算式吃的是「一整列 13 格」,不換的話字會照 700/13 去算而**比格子還大**
+       (單機 e2e C 段「點數與花色都待在格子裡」會紅)。這正是檔頭那三支變數存在的理由。
+     ⚠ --sv-tw 一起放寬到 940:2×2 之後寬度才是瓶頸,停在 700 等於自己把格子壓小。 */
   @media (max-height:600px){
-    :root{--sv-cw:clamp(24px,6.8vw,34px); --sv-tpad:7px}
+    :root{--sv-cw:clamp(24px,6.8vw,34px); --sv-tpad:7px; --sv-tw:min(98vw,940px);
+      --sv-cellw:min(var(--sv-cw),
+        calc((var(--sv-tw) / 2 - var(--sv-tpad) * 2 - var(--sv-cgap) * 12) / 13))}
     .sv-hero{margin:6px 0 2px}
     .sv-art{width:66px;height:66px}
     .sv-play{gap:5px}
     .sv-room{padding:6px 10px}
-    .sv-tracks{gap:2px;padding:4px var(--sv-tpad)}
+    .sv-tracks{gap:2px;padding:4px var(--sv-tpad);
+      flex-direction:row;flex-wrap:wrap;align-content:flex-start;column-gap:8px}
+    .sv-track{width:calc(50% - 4px)}
+    /* 盤面裡三塊之間的 gap 與蓋牌堆各收一號 —— 省下來的每一像素都直接進軌道
+       (它是唯一可壓縮的一塊,見上面 .sv-tracks 那段) */
+    .sv-stage{gap:4px}
+    .sv-mypile{padding:3px 8px;font-size:11px}
+    .sv-mypile .sv-card.tiny{--svw:17px}
     .sv-hand{gap:4px}
     /* 蓋牌模式整組跟著縮:框 + 橫幅 + 罰分那一列在矮視窗約多吃 68px,不縮就把手牌推得更遠。
        ⚠ 橫幅改**併成一行**(直排 → 橫排)最省 —— 矮視窗通常也很寬(橫置手機 900×430),
@@ -2991,4 +3016,23 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .sv-cvt{flex-direction:row;align-items:baseline;gap:7px}
     .sv-cvt b{font-size:12.5px}
     .sv-cvt i{font-size:11px}
+  }
+
+  /* ---------- ★★ 橫置手機:把頂列讓給牌桌(v1.75.12) ----------
+     照抄台灣麻將那條的條件(`.m16-*` 那段第①條),連數字都一樣 ——
+     870×335 實測 `.sv-play` 只分到 178px,而頂列 + 房間框吃掉 157px。
+     頂列收掉直接還回約 60px,是這一頁橫置能拿到的最大一塊。
+     · pointer:coarse → 桌機把視窗拉到又矮又寬也**永遠不命中**,正常佈局零影響
+     · 掛 body.sv-mp / body.sv-solo → 只有**對局中**收,大廳 / 進場選單 / 設定面板照舊
+     · 刻意不去擴充數獨 / 五子棋那條 `(max-height:780px)`:780 連直向小手機(667 高)
+       都會命中,那就影響到正常佈局了(同 m16 那條的理由)
+     ★ 收掉頂列之後,ui-kit 的 dockTools() 會**自動**把 ⛶ / ⚙️ 搬進房間框那一列 ——
+       那正是 v1.75.10 立的規矩(「只有頂列真的被收掉才搬」),不必也不可以另外寫程式。
+       在此之前排七從來不收頂列,所以那支 dockTools 在這一頁一直沒有作用過。 */
+  @media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
+    body.sv-mp .topbar,body.sv-solo .topbar{display:none}
+    body.sv-mp,body.sv-solo{padding:6px;gap:4px}
+    /* 房間框 / 單機列也收一號:它是第二大的固定開銷(約 90px) */
+    body.sv-mp .sv-room,body.sv-solo .sv-room{padding:5px 9px}
+    .sv-room .mp-subrow,.sv-room-foot{margin-top:3px}
   }
