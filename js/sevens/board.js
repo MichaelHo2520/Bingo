@@ -59,6 +59,11 @@ const SVB = (function(){
        接口(lo-1 / hi+1)畫成 `.open`:那是**公開資訊**(軌道上本來就看得出來),
        標出來只是省去數格子,不是替玩家算牌。
      ========================================================================== */
+  /* ★ 每一格都畫「點數 + 花色」,像一排攤開的牌位 —— 不是只在行首標一次花色。
+     使用者的話:「我希望中間的牌可以畫出是什麼花色,而不是在最左邊顯示,這樣好沒有感覺」。
+     只有數字的格子看起來是表格,不是牌;而**花色本來就是牌的一半**。
+     ⚠ 行首那顆 `.sv-suit` 標籤因此**整個拿掉**了(每格都有花色之後它純屬重複),
+       連帶 `.sv-track.off` 也不必了 —— 「這條龍還沒開」看得出來:一格白的都沒有。 */
   function trackHTML(tracks, s){
     const t = tracks[s], ends = R.endsOf(tracks, s);
     let cells = "";
@@ -66,10 +71,11 @@ const SVB = (function(){
       const on = t && r >= t.lo && r <= t.hi;
       const cls = "sv-cell" + (on ? " on" : "") + (r === 7 ? " seven" : "") +
                   (ends.indexOf(r) >= 0 ? " open" : "");
-      cells += '<span class="' + cls + '">' + (on || r === 7 ? R.rankTxt(r) : "·") + '</span>';
+      // 還沒出的也照畫,只是暗的 —— 「♠J 還沒出」一眼看得到,不必數格子
+      cells += '<span class="' + cls + '"><b>' + R.rankTxt(r) + '</b>' +
+               '<i>' + R.suitCh(s) + '</i></span>';
     }
-    return '<div class="sv-track' + (R.isRed(R.cardOf(s, 1)) ? " red" : "") + (t ? "" : " off") + '">' +
-             '<span class="sv-suit">' + R.suitCh(s) + '</span>' +
+    return '<div class="sv-track' + (R.isRed(R.cardOf(s, 1)) ? " red" : "") + '">' +
              '<div class="sv-cells">' + cells + '</div>' +
            '</div>';
   }

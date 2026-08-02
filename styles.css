@@ -2657,37 +2657,39 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .sv-tracks{display:flex;flex-direction:column;gap:3px;flex:none;
     background:rgba(0,0,0,.16);border-radius:12px;padding:6px 8px}
   :root[data-theme="ebook"] .sv-tracks{background:#fff;border:1px solid #000}
-  .sv-track{display:flex;align-items:center;gap:6px}
-  /* ⚠ 「這條龍還沒開」只淡化**花色標籤**,不可以整行 opacity ——
-     整行淡化會連那格 .open(出 7 就能開這條龍)一起淡掉,而那是全盤最重要的提示之一。
-     opacity 建立的是一整層,子元素再怎麼設也還原不回來。截圖才看得出來。 */
-  .sv-track.off .sv-suit{opacity:.5}
-  /* ⚠ 這一格畫在**深色桌面**上,不是牌面上 → 一律用 --text / --sv-redlit。
-     用牌面那支 --sv-blk 的話 ♠ 與 ♣ 在深紫底上會整個消失(截圖才發現)。 */
-  .sv-suit{flex:none;width:17px;text-align:center;color:var(--text);
-    font:800 15px/1 'Nunito',sans-serif}
-  .sv-track.red .sv-suit{color:var(--sv-redlit)}
+  .sv-track{display:flex;align-items:center}
   /* ⚠⚠ `1fr` 的隱含最小值是 `auto`(= min-content),格子有 aspect-ratio 時那個
      min-content 會把 13 欄一起撐開 → **整條軌道橫向溢出,J/Q/K 直接被切掉**。
      斷言完全看不出來(格子數還是 52),只有截圖才發現。一律 minmax(0,1fr)。 */
   .sv-cells{flex:1;min-width:0;display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:2px}
-  .sv-cell{min-height:20px;aspect-ratio:.76;display:grid;place-items:center;border-radius:4px;
-    background:rgba(255,255,255,.05);color:rgba(255,255,255,.30);
+  /* ★ 每一格都是一張**小牌**:上面點數、下面花色。
+     使用者:「我希望中間的牌可以畫出是什麼花色,而不是在最左邊顯示,這樣好沒有感覺」——
+     只有數字的格子看起來是表格不是牌,而花色本來就是牌的一半。
+     ⚠ 兩行內容,所以 aspect-ratio 要比單行高一些(.72),min-height 也要跟著放大。 */
+  .sv-cell{min-height:26px;aspect-ratio:.72;border-radius:4px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+    background:rgba(255,255,255,.05);color:rgba(255,255,255,.34);
     font:700 clamp(8.5px,2.3vw,12.5px)/1 'Nunito',sans-serif}
+  .sv-cell b{font-weight:800;font-size:1.02em;line-height:1}
+  .sv-cell i{font-style:normal;font-weight:700;font-size:.86em;line-height:1}
+  /* 還沒出的那些花色也上色(暗版),整行是紅是黑一眼就分得出來 —— 行首標籤因此可以拿掉 */
+  .sv-cell i{color:rgba(255,255,255,.38)}
+  .sv-track.red .sv-cell i{color:rgba(255,123,123,.52)}
+  /* 出過的那格翻成象牙白牌面。⚠ 這裡的紅要用 --sv-red(深紅,畫在白底上),
+     不是深色桌面那支 --sv-redlit —— 兩支的界線見本段開頭的變數註解。 */
   .sv-cell.on{background:var(--sv-face);color:var(--sv-blk);box-shadow:0 1px 0 rgba(0,0,0,.24)}
-  .sv-track.red .sv-cell.on{color:var(--sv-red)}
-  /* 起手的那格(7)就算還沒出也畫得出來 —— 四條龍都從它長出去,是整個盤面的原點 */
-  .sv-cell.seven{color:var(--muted);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
-  /* ⚠ 這兩條**一定要寫成兩層**(.seven.on)。`.sv-cell.seven` 與 `.sv-cell.on` 同權重
-     (0,2,0),後寫的 .seven 會贏 → 已經出過的那張 7 字色被拉回灰的,看起來像「還沒出」。
-     紅色那兩門躲過是因為 `.sv-track.red .sv-cell.on` 有 4 個 class(權重較高)——
-     所以症狀只出現在 ♠ 與 ♣,更難發現。同 notes/10 萬子漢字那個坑:
-     **名字乾淨、權重卻被同級的既有規則蓋掉**,只有截圖看得出來。 */
-  .sv-cell.seven.on{color:var(--sv-blk);box-shadow:0 1px 0 rgba(0,0,0,.24)}
-  .sv-track.red .sv-cell.seven.on{color:var(--sv-red)}
+  .sv-cell.on i{color:var(--sv-blk)}
+  .sv-track.red .sv-cell.on,.sv-track.red .sv-cell.on i{color:var(--sv-red)}
+  /* 起手那格(7):四條龍都從它長出去,還沒開的龍靠它指出「從這裡開」 */
+  .sv-cell.seven{box-shadow:inset 0 0 0 1px rgba(255,255,255,.20)}
+  .sv-cell.seven.on{box-shadow:0 1px 0 rgba(0,0,0,.24)}
   .sv-cell.open{background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 1.6px var(--accent)}
   :root[data-theme="ebook"] .sv-cell{background:#fff;border:1px solid #bbb;color:#999}
+  :root[data-theme="ebook"] .sv-cell i,
+  :root[data-theme="ebook"] .sv-track.red .sv-cell i{color:#999}
   :root[data-theme="ebook"] .sv-cell.on{background:#fff;border-color:#000;color:#000}
+  :root[data-theme="ebook"] .sv-cell.on i,
+  :root[data-theme="ebook"] .sv-track.red .sv-cell.on i{color:#000}
   :root[data-theme="ebook"] .sv-cell.open{border:2px solid #000}
 
   /* ---------- 對手列 ----------
