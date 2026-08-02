@@ -2587,8 +2587,34 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      `--sv-redlit` 是**畫在深色桌面上**的紅(軌道左邊的花色標籤、罰分、蓋牌張數)。
      ⚠ 第一版兩邊共用一支,結果 ♠ 與 ♣ 的花色標籤用 --sv-blk 畫在深紫底上
        **整個消失**,而 ♥ ♦ 只是偏暗 —— 斷言完全測不到,只有截圖看得出來。 */
+  /* ★★ 尺寸的三支變數(v1.75.7)。使用者要的是「軌道跟手上的牌一樣大」,
+     那就只能有**一個**牌寬 —— 各寫一份遲早走鐘,而走鐘了兩邊各自都不會壞、
+     沒有東西抓得到(同 SV.whyNot() 放在規則層的理由)。
+       --sv-tw   牌桌容器的寬(`.sv-play` 吃它)
+       --sv-cw   牌寬:手牌的寬 = 軌道格子的**寬度上限**
+       --sv-cellw 軌道格子**實際**多寬 —— 桌機停在 --sv-cw,窄機被 13 等分壓得更小。
+                 給格子裡的點數與花色當字級基準,才能與手牌維持同一組比例(.50 / .42)。
+       --sv-tpad / --sv-cgap  軌道的左右內距與格子間距(算 --sv-cellw 要用到,所以也得是變數)
+     ⚠ **`@media (max-height:600px)` 只准改這幾支變數,不可以再去改 `.sv-card` 的 `--svw`** ——
+       施工時就是踩這個:那條 media 把手牌縮成 34px、軌道沒跟著,於是矮視窗下
+       「格子比手牌大」(40 vs 34)。牌寬只能有一個數字,誰想縮就縮 --sv-cw。
+       守門是 e2e 那條「軌道格子不比手牌寬」+「字級比例與手牌相同」(直接量渲染結果)。
+     ⚠⚠ 施工時先用 container query(`container-type:inline-size` + `cqw`)寫過一版,爆掉了。
+       **根因不是 containment,是 cqw 的作用域**:`cqw` 一律相對於「**祖先**的 container」,
+       元素自己身上的 `cqw` **不會**相對於自己(那會循環)—— 沒有祖先 container 就
+       退回**視窗**。於是寫在 .sv-cell 自己身上的 `gap:3cqw` 變成 3% × 1250px = **37.5px**,
+       內容總高衝到 74px > 格子 55.5px,flex 置中把點數頂出上緣、花色掉出下緣。
+       ⚠ 子元素(b / svg)的 cqw 是**對的**(20px / 16.8px),連 aspect-ratio 與格子高度都正常
+         —— 所以 `getBoundingClientRect()` 那組診斷全綠,只有截圖看得出來。
+       ⚠ 突變測試證實過:單獨加回 `container-type` 不會紅,把 gap 換成 `3cqw` 才紅。
+       這裡改用算式而不是修好那個 gap,是因為算式讓「格子多寬」只有**一個**來源(--sv-cellw),
+       字級與寬度不可能各自算出不同答案。 */
   :root{ --sv-face:#fdfaf3; --sv-line:#c3ae90; --sv-blk:#22303f; --sv-red:#c92c2c;
-         --sv-redlit:#ff7b7b; --sv-bk:#3f5896; }
+         --sv-redlit:#ff7b7b; --sv-bk:#3f5896;
+         --sv-tw:min(98vw,700px); --sv-cw:clamp(27px,7.6vw,40px);
+         --sv-tpad:8px; --sv-cgap:2px;
+         --sv-cellw:min(var(--sv-cw),
+           calc((var(--sv-tw) - var(--sv-tpad) * 2 - var(--sv-cgap) * 12) / 13)); }
   :root[data-theme="ebook"]{ --sv-face:#ffffff; --sv-line:#000000; --sv-blk:#000000; --sv-red:#000000;
          --sv-redlit:#000000; --sv-bk:#666666; }
 
@@ -2641,7 +2667,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ .sv-acts 一定要 flex:none —— .sv-play 底下只能有一個可壓縮的兄弟,
        兩個都可壓縮時可視高度不足會按內容高度分攤,盤面高度反過來取決於自己的內容
        (台灣麻將 v1.58.4 的 ResizeObserver 迴圈,見 notes/11 第六節)。 */
-  .sv-play{flex:1 1 auto;min-height:0;width:min(98vw,700px);
+  /* ⚠ 寬度吃 --sv-tw:軌道格子的字級是從**同一支變數**推回來的(見檔頭那三支變數),
+     在這裡直接寫死一個 min() 的話,格子裡的字就會跟著算錯。 */
+  .sv-play{flex:1 1 auto;min-height:0;width:var(--sv-tw);
     display:flex;flex-direction:column;align-items:stretch;gap:8px}
   /* z-index:0 讓盤面自成一個 stacking context。這一頁沒有動態 z-index,
      但覆蓋層(結果卡 / 設定蓋板)不該有任何機會被盤面內容穿過去 —— 消消樂 v1.56.0
@@ -2655,30 +2683,47 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      出過的格子亮起、沒出的留暗格 —— 「還缺哪幾張」正是排七要算的東西。
      .open 是現在接得上的兩個位置:那是公開資訊(軌道上本來就看得出來),
      標出來只是省去數格子,不是替玩家算牌。 */
+  /* ⚠ 左右內距吃 --sv-tpad:格子寬度是從「容器寬 - 內距 - gap」推回來的(見檔頭三支變數) */
   .sv-tracks{display:flex;flex-direction:column;gap:3px;flex:none;
-    background:rgba(0,0,0,.16);border-radius:12px;padding:6px 8px}
+    background:rgba(0,0,0,.16);border-radius:12px;padding:6px var(--sv-tpad)}
   :root[data-theme="ebook"] .sv-tracks{background:#fff;border:1px solid #000}
   .sv-track{display:flex;align-items:center}
   /* ⚠⚠ `1fr` 的隱含最小值是 `auto`(= min-content),格子有 aspect-ratio 時那個
      min-content 會把 13 欄一起撐開 → **整條軌道橫向溢出,J/Q/K 直接被切掉**。
      斷言完全看不出來(格子數還是 52),只有截圖才發現。一律 minmax(0,1fr)。 */
-  .sv-cells{flex:1;min-width:0;display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:2px}
+  /* ★★ 格子的**寬度上限 = 手牌的牌寬**(v1.75.7)。使用者:「中間牌面,梅花這樣好難看,
+     請改成跟手上牌面一樣的大小跟樣式」。
+     舊版是 13 等分吃滿容器 → 桌機(容器 700px)算出來一格 **50.8px,比手牌的 40px 還大**,
+     而格子裡的字級是寫死的 clamp,於是「格子越大、花色看起來越小越糊」。
+     `minmax(0, var(--sv-cw))` 是關鍵:空間夠時停在牌寬、空間不夠時照樣縮得下去
+     (手機 390px 下一格 26px,不會溢出)—— 比 max-width 精準,因為夾的是**每一格**。
+     配 justify-content:center 讓軌道置中,寬度也就與底下那排手牌對齊了。 */
+  .sv-cells{flex:1;min-width:0;display:grid;justify-content:center;
+    grid-template-columns:repeat(13,minmax(0,var(--sv-cw)));gap:var(--sv-cgap)}
   /* ★ 每一格都是一張**小牌**:上面點數、下面花色。
      使用者:「我希望中間的牌可以畫出是什麼花色,而不是在最左邊顯示,這樣好沒有感覺」——
      只有數字的格子看起來是表格不是牌,而花色本來就是牌的一半。
      ⚠ 兩行內容,所以 aspect-ratio 要比單行高一些(.72),min-height 也要跟著放大。 */
+  /* ★★ 格子裡的點數與花色**與手牌同一組比例**(.50 / .42,v1.75.7)。
+     使用者:「中間牌面,梅花這樣好難看,請改成跟手上牌面一樣的大小跟樣式」。
+     舊版寫死 `clamp(8.5px,2.3vw,12.5px)` —— 那是**與格子大小無關**的一個絕對值,
+     桌機上格子 50.8px 而字只有 12.5px(佔 25%,手牌是 50%),於是花色小得糊成一團。
+     ⚠ 基準要用 --sv-cellw(格子**實際**寬)而不是 --sv-cw(牌寬):窄機上格子會被
+       13 等分壓得比牌寬小(26.3 vs 29.6),照牌寬算出來的字會偏大一成。
+     ⚠ 字級寫在 .sv-cell 上、子元素一律用 em —— 兩件事才會一起變(花色 .84em = .42/.50)。 */
   .sv-cell{min-height:26px;aspect-ratio:.72;border-radius:4px;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:calc(var(--sv-cellw) * .03);
     background:rgba(255,255,255,.05);color:rgba(255,255,255,.34);
-    font:700 clamp(8.5px,2.3vw,12.5px)/1 'Nunito',sans-serif}
-  .sv-cell b{font-weight:800;font-size:1.02em;line-height:1}
+    font:700 calc(var(--sv-cellw) * .50)/1 'Nunito',sans-serif}
+  .sv-cell b{font-weight:800;letter-spacing:-.02em}
   .sv-cell i{display:block;line-height:0}
   /* ★ 花色是**自繪 SVG**(board.js 的 suitSVG),不是 Unicode 字元 ——
      `♣` 長什麼樣完全看字型,而標準牌面的梅花是三葉草(三個圓 + 短莖),縮小更是糊成一團。
      尺寸跟著格子的字級走(em),顏色靠 fill:currentColor 沿用下面那幾條既有的 color 規則
      → 「牌面上用深紅、深色桌面上用亮紅」那兩支變數一行都不用改。 */
   .sv-sv{display:block;width:1em;height:1em;fill:currentColor}
-  .sv-cell .sv-sv{width:.95em;height:.95em}
+  .sv-cell .sv-sv{width:.84em;height:.84em}   /* .42 / .50 —— 與手牌的 .sv-cs 同一個比例 */
   /* 還沒出的那些花色也上色(暗版),整行是紅是黑一眼就分得出來 —— 行首標籤因此可以拿掉 */
   .sv-cell i{color:rgba(255,255,255,.38)}
   .sv-track.red .sv-cell i{color:rgba(255,123,123,.52)}
@@ -2727,7 +2772,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ★ v1.75.2 縮一級(46 → 40 / 30 → 27)。使用者:「我很重視遊戲體驗,可能需要適當的
      縮小一下目前牌的大小,因為我希望可以不用一直滑動,就能看到全部的牌」——
      2 人局一手 26 張是最壞情況,配上拿掉對手列省下的那一列,390×844 剛好排得完不必捲。 */
-  .sv-card{--svw:clamp(27px,7.6vw,40px);
+  /* ★ v1.75.2 縮一級的那個 clamp 現在住在 :root 的 --sv-cw(軌道格子也吃同一支);
+     .tiny 仍然自己覆寫 --svw(結果卡與蓋牌堆的縮圖不跟著牌桌變)。 */
+  .sv-card{--svw:var(--sv-cw);
     flex:none;width:var(--svw);height:calc(var(--svw) * 1.42);
     border-radius:calc(var(--svw) * .13);border:1px solid var(--sv-line);
     background:linear-gradient(155deg,#fff,var(--sv-face) 58%);
@@ -2840,12 +2887,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        overflow:hidden 削掉看得見的一角(台灣麻將 v1.68.1 踩過)。 */
   body.sv-mp .sv-room,body.sv-solo .sv-room{width:min(92vw,700px)}
 
+  /* 矮視窗(橫置手機 / 小筆電)整體縮一級。
+     ⚠⚠ 牌寬只准動 --sv-cw,**不要**在這裡改 .sv-card 的 --svw ——
+       舊版就是那樣寫的,結果手牌縮成 34px 而軌道格子還是 40px,「格子比手牌大」。
+       同理 padding 改的是 --sv-tpad(格子寬度的算式吃它)。 */
   @media (max-height:600px){
+    :root{--sv-cw:clamp(24px,6.8vw,34px); --sv-tpad:7px}
     .sv-hero{margin:6px 0 2px}
     .sv-art{width:66px;height:66px}
     .sv-play{gap:5px}
     .sv-room{padding:6px 10px}
-    .sv-tracks{gap:2px;padding:4px 7px}
+    .sv-tracks{gap:2px;padding:4px var(--sv-tpad)}
     .sv-hand{gap:4px}
-    .sv-card{--svw:clamp(24px,6.8vw,34px)}
   }
