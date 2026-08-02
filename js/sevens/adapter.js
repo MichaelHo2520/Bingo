@@ -35,6 +35,12 @@ const MP = MPCore.create((function(){
   let curRound = null;                 // ★ 新局判定一律用 roundId(不可以看 deal 變沒變)
   let lastLen = -1, turnAt = 0;        // 這一手的錨點(本地時鐘;各台差幾百毫秒無妨)
   let turnT = null;
+  /* ★ 開局那一刻每個人的累積勝場快照(v1.75.9,結果卡的「N 勝」欄用)。
+     為什麼不當場讀 scores:那個節點是**結算之後**每台各自寫自己的 +1,而結果卡是
+     **結算當下**就要畫出來 —— 直接讀會少一分,等分數同步回來也沒有人會重畫這張卡
+     (核心的 scores 監聽只重畫它自己的 #winScores)。
+     用「開局時的值 + 這局有沒有得分」算就沒有時間差,而且重畫幾次都是同一個數(冪等)。 */
+  let baseWins = {};
 
   const seatOf = id => ctx.order().indexOf(id);
   const mySeat = () => seatOf(ctx.me());
@@ -278,11 +284,15 @@ const MP = MPCore.create((function(){
     enterPlaying(){
       showScreen("play");
       SVB.clearSel();
+      // ★ 這一局開打前大家各幾勝(結果卡的「N 勝」欄要拿它 +1;見宣告處)
+      baseWins = {};
+      ctx.order().forEach(id => { baseWins[id] = ctx.scoreOf(id); });
       paint();
     },
     onLeave(){
       clearTurnT();
       deal = ""; moves = []; st = null; curRound = null; lastLen = -1;
+      baseWins = {};
       SVB.clearSel(); SVB.stopCd();
     },
 
@@ -324,13 +334,23 @@ const MP = MPCore.create((function(){
     refresh(){ if(st) paint(); },
 
     /* ---------- 結果 ---------- */
-    outcome(w, { iWon }){
+    outcome(w, { iWon, ids }){
       clearTurnT();
       SVB.stopCd();
       const box = $("svResult");
       if(box && st && st.over){
-        const names = ctx.order().map(id => ctx.dispName(id));
-        box.innerHTML = SVB.resultHTML(st, names, mySeat());
+        const ord = ctx.order();
+        const names = ord.map(id => ctx.dispName(id));
+        /* ★ 累積勝場併進排名表(v1.75.9)—— 連線的結果卡從此只有**一張表**。
+           得分名單直接用核心給的 ids(它就是等一下要 +1 的那些人),
+           底數用開局快照,所以不必等 scores 節點同步回來。 */
+        const gained = ids || [];
+        const wins = ord.map(id => {
+          const plus = gained.indexOf(id) >= 0;
+          const base = (typeof baseWins[id] === "number") ? baseWins[id] : ctx.scoreOf(id);
+          return { n: base + (plus ? 1 : 0), plus: plus };
+        });
+        box.innerHTML = SVB.resultHTML(st, names, mySeat(), "", wins);
         box.classList.remove("hidden");
       }
       paint();

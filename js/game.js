@@ -895,7 +895,7 @@
     if(c.state==="suspended") c.resume().then(start).catch(start); else start();
   }
   // 語音播放佇列:多則語音「依收到先後」排隊逐一播、不重疊;整個佇列播放期間停背景音樂,全部播完再恢復
-  const voiceQueue=[]; let voiceBusy=false, voiceSafety=null;
+  const voiceQueue=[]; let voiceBusy=false, voiceSafety=null, voicePrune=null;
   // audioArmed =「使用者手勢已解鎖音訊、且之後沒切到背景」。iOS 有個惡名昭彰的狀況:切到別的 App 再回來,
   // AudioContext 的 state 仍是 "running" 卻其實不出聲——只看 Sound.running() 會被騙,把語音「靜音播掉」(使用者只看到 🎤 飛一下就沒了、沒聲音)。
   // 因此在觸控裝置(iOS/Android)上,收到語音要不要自動播,除了 context 在跑,還要求「這回合有真的手勢解鎖過」;否則一律改顯示可點的播放膠囊。
@@ -903,10 +903,40 @@
   let audioArmed=false;
   function markAudioArmed(){ audioArmed=true; }      // 由真實手勢(點播放膠囊 / 按麥克風 / 首次互動解鎖)呼叫
   function markAudioStale(){ audioArmed=false; }     // 切到背景 → 下次回前景要重新用手勢解鎖才自動播
+  /* ★★ 語音有「賞味期限」(v1.75.9)。★ 與 js/shared/ui-kit.js 那份是雙胞胎,改一邊要改另一邊。
+     使用者(在排七連線)回報:「別人發的語音我都到了最後結束頁面時,才一直連續的播放出來」。
+     病灶不在佇列本身,而在**膠囊會一直等下去**:手機在等別人的回合時螢幕暗掉 / 切去別的 App,
+     visibilitychange 就把 audioArmed 打回 false(iOS 回前景後 state 仍是 running 卻不出聲,
+     所以這個保守是對的)。之後收到的語音**不丟棄、留在佇列裡**等一個手勢 —— 一整局累積十幾則,
+     結算時使用者拿起手機隨手一點就一次全放完。
+     語音是**現場即時**的東西(即時語音上限 6 秒,發送端 15 秒就把 DB 記錄刪掉了),
+     過了半分鐘再放只剩噪音,而且會蓋掉結算當下真的想說的話 → **逾時就丟,不補播**。
+     ⚠ 佇列被膠囊擋住時沒有任何人會再呼叫 pumpVoice(它只由「收到語音」與「手勢」驅動),
+       所以要額外掛一支 prune 心跳讓膠囊自己過期收起來,否則畫面上會一直掛著
+       「🔊 12 則語音 · 點我播放」引人去點一堆舊的,等於沒修。 */
+  const VOICE_TTL_MS=30000;      // 進佇列超過這麼久還沒播出去 → 丟掉
+  const VOICE_MAX_Q=6;           // 同時最多壓幾則(超過丟最舊的),避免一次爆量
+  const VOICE_PRUNE_MS=2000;     // 膠囊掛著時的過期心跳
+  function pruneVoice(){
+    const now=Date.now();
+    for(let i=voiceQueue.length-1;i>=0;i--){ if(now-voiceQueue[i].at>VOICE_TTL_MS) voiceQueue.splice(i,1); }
+    if(voiceQueue.length>VOICE_MAX_Q) voiceQueue.splice(0,voiceQueue.length-VOICE_MAX_Q);
+  }
+  function startVoicePrune(){
+    if(voicePrune)return;
+    voicePrune=setInterval(()=>{
+      if(voiceBusy)return;
+      pruneVoice();
+      if(!voiceQueue.length){ stopVoicePrune(); hideVoiceGate(); refreshBgmDuck(); }
+      else showVoiceGate();
+    },VOICE_PRUNE_MS);
+  }
+  function stopVoicePrune(){ if(voicePrune){ clearInterval(voicePrune); voicePrune=null; } }
   function enqueueVoice(src){
     if(!src)return;
     if(Sound.isMuted&&Sound.isMuted())return;   // 靜音:不播也不排隊
-    voiceQueue.push(src);
+    voiceQueue.push({ src:src, at:Date.now() });
+    pruneVoice();
     if(!voiceBusy) pumpVoice();
   }
   // 語音短訊:依代號找本地預錄檔,丟進同一條語音佇列播放(未知代號=跨版本沒有此檔 → 安全略過,不出聲)
@@ -916,18 +946,20 @@
   }
   function pumpVoice(){
     if(voiceBusy)return;
-    if(!voiceQueue.length){ hideVoiceGate(); refreshBgmDuck(); return; }   // 佇列清空 → 收起膠囊 + 恢復背景音樂
+    pruneVoice();                                                          // 先丟掉過期的(見上面的 VOICE_TTL_MS)
+    if(!voiceQueue.length){ stopVoicePrune(); hideVoiceGate(); refreshBgmDuck(); return; }   // 佇列清空 → 收起膠囊 + 恢復背景音樂
     // iOS 切背景/鎖屏會把 AudioContext 打回 suspended,非手勢情境下 resume() 會被忽略;更麻煩的是回前景後
     // state 常仍顯示 "running" 卻不出聲。此時「不硬播、也不丟棄」——語音留在佇列裡,改顯示可點的「🔊 點擊播放」膠囊,
     // 等使用者手勢再播(順手根治舊版「9 秒 timeout 把播不出來的語音丟出佇列、永久遺失」的 bug)。
     // 觸控裝置額外要求 audioArmed(這回合手勢解鎖過);桌機維持原本只看 context 是否在跑,不因切分頁就退回膠囊。
-    if((IS_TOUCH && !audioArmed) || !(Sound.running && Sound.running())){ showVoiceGate(); return; }
+    if((IS_TOUCH && !audioArmed) || !(Sound.running && Sound.running())){ showVoiceGate(); startVoicePrune(); return; }
+    stopVoicePrune();
     hideVoiceGate();
     const next=voiceQueue.shift();
     voiceBusy=true; refreshBgmDuck();                    // 開播 → 停背景音樂
     const advance=()=>{ if(!voiceBusy)return; if(voiceSafety){ clearTimeout(voiceSafety); voiceSafety=null; } voiceBusy=false; pumpVoice(); };
     voiceSafety=setTimeout(advance,15000);              // 保險:即時語音上限 6 秒、語音短訊通常也短,15 秒沒收到結束事件就強制接續,避免佇列卡住
-    playVoiceOnce(next,advance);
+    playVoiceOnce(next.src,advance);
   }
   // 「🔊 點擊播放」膠囊:收到語音但 AudioContext 未解鎖(iOS 切背景回來/尚未手勢)時顯示,數字為待播則數
   function showVoiceGate(){

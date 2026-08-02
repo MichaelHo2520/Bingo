@@ -2881,6 +2881,21 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* 罰分:數字大、單位小 —— 一眼掃下來比的就是這一欄 */
   .sv-rpts{flex:none;margin-left:auto;font-weight:700;font-size:11px;color:var(--muted)}
   .sv-rpts b{font:800 15px/1 'Fredoka','Nunito',sans-serif;color:var(--sv-redlit);margin-right:1px}
+  /* ★★ 連線才有的「累積勝場」欄(v1.75.9)—— 把共用連線層的第二張表併進來。
+     使用者:「連線對戰的勝負頁面…訊息太雜亂了,需要整合」。兩張「一列一個人」的表
+     疊在一起最難讀,合成一張、勝場當一個安靜的小藥丸掛在罰分左邊。
+     ⚠ 靠右的 auto 邊界要**搬家**:`.sv-rpts` 原本自己吃 margin-left:auto,
+       多一個欄位後如果兩個都是 auto,剩餘空間會被**平分** → 勝場飄到列中間。
+       所以有勝場欄時把 auto 交給它、罰分改回 0,兩欄才會成對貼在最右邊。
+     ⚠ min-width 是為了讓四~六列的兩欄數字對得齊(不是為了好看,是為了掃得快)。 */
+  .sv-rmain.has-win .sv-rwin{margin-left:auto}
+  .sv-rmain.has-win .sv-rpts{margin-left:0;min-width:46px;text-align:right}
+  .sv-rwin{flex:none;min-width:38px;display:inline-flex;align-items:center;justify-content:flex-end;gap:3px;
+    padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.10);
+    font:800 10.5px/1.35 'Nunito',sans-serif;color:var(--muted)}
+  .sv-rwin i{font-style:normal;font-weight:800;color:var(--accent)}
+  :root[data-theme="ebook"] .sv-rwin{background:#eee;color:#000;border:1px solid #ccc}
+  :root[data-theme="ebook"] .sv-rwin i{color:#000}
   /* 第二層:縮排到與名字切齊(19px 的名次圈 + 6px gap),看起來才是「這個人的牌」 */
   .sv-rcards{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding-left:25px}
   .sv-rcn{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
@@ -2891,6 +2906,18 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   :root[data-theme="ebook"] .sv-rrow{background:#fff;border:1px solid #ccc}
   :root[data-theme="ebook"] .sv-rrow.me{border:2px solid #000;box-shadow:none}
   :root[data-theme="ebook"] .sv-rrow.win .sv-rno{background:#000;color:#fff}
+  /* ★★ 連線:共用勝場表 `#winScores` 的**列**收掉(v1.75.9)。
+     那些列的內容已經併進上面的排名表(`.sv-rwin`),留著就是同一份資料兩張表 ——
+     使用者說的「訊息太雜亂,需要整合」指的正是這個。
+     ⚠ 只收「列」,**保留 `.ws-goal`** 的「🎯 搶 N 勝」:那行在別的地方沒有出口
+       (排七的 #mpBarGoal 被出牌倒數佔走了),收掉就真的看不到這局在拼幾勝。
+     ⚠ 容器的 gap/margin 要一起歸零 —— 積分模式以外只剩全部 display:none 的列,
+       不歸零會在排名表與表情列之間留一條 20px 的空帶。
+     ⚠ 這條**不是**新的共用規則:選擇器整條鎖在 `.win-card.sv-win` 裡面,
+       另外五頁的結果卡一個字都不受影響(CLAUDE.md 的前綴規矩,這裡靠 sv-win 當籬笆)。 */
+  .win-card.sv-win .win-scores{gap:0;margin:0}
+  .win-card.sv-win .win-scores .ws-row{display:none}
+  .win-card.sv-win .win-scores .ws-goal{margin:0 0 12px}
 
   /* ---------- 結果卡的表情列 ----------
      #winScores / #winChamp / #mpWinBtns / #soloWinBtns 的顯隱由數獨那段既有的

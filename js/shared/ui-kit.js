@@ -560,15 +560,45 @@ function playVoiceOnce(src,onEnd){
   };
   if(c.state==="suspended") c.resume().then(start).catch(start); else start();
 }
-const voiceQueue=[]; let voiceBusy=false, voiceSafety=null;
+const voiceQueue=[]; let voiceBusy=false, voiceSafety=null, voicePrune=null;
 const IS_TOUCH=("ontouchstart" in window) || (navigator.maxTouchPoints>0);
 let audioArmed=false;
 function markAudioArmed(){ audioArmed=true; }
 function markAudioStale(){ audioArmed=false; }
+/* ★★ 語音有「賞味期限」(v1.75.9)。使用者:「連線對戰模式,別人發的語音我都到了最後
+   結束頁面時,才一直連續的播放出來」。
+   病灶不在佇列本身,而在**膠囊會一直等下去**:手機在等別人出牌時螢幕暗掉 / 切去別的 App,
+   visibilitychange 就把 audioArmed 打回 false(iOS 回前景後 state 仍是 running 卻不出聲,
+   所以這個保守是對的)。之後收到的語音**不丟棄、留在佇列裡**等一個手勢 —— 一整局累積十幾則,
+   結算時使用者拿起手機隨手一點,unlockAudioOnce 一次 kick,全部連珠炮放完。
+   語音是**現場即時**的東西(即時語音上限 6 秒,發送端 15 秒就把 DB 記錄刪掉了),
+   過了半分鐘再放只剩噪音,而且會蓋掉結算當下真的想說的話 → **逾時就丟,不補播**。
+   ⚠ 佇列被膠囊擋住時沒有任何人會再呼叫 pumpVoice(它只由「收到語音」與「手勢」驅動),
+     所以要額外掛一支 prune 心跳,讓膠囊自己過期收起來 ——
+     否則畫面上會一直掛著「🔊 12 則語音 · 點我播放」引人去點一堆舊的,等於沒修。 */
+const VOICE_TTL_MS=30000;      // 進佇列超過這麼久還沒播出去 → 丟掉
+const VOICE_MAX_Q=6;           // 同時最多壓幾則(超過丟最舊的),避免一次爆量
+const VOICE_PRUNE_MS=2000;     // 膠囊掛著時的過期心跳
+function pruneVoice(){
+  const now=Date.now();
+  for(let i=voiceQueue.length-1;i>=0;i--){ if(now-voiceQueue[i].at>VOICE_TTL_MS) voiceQueue.splice(i,1); }
+  if(voiceQueue.length>VOICE_MAX_Q) voiceQueue.splice(0,voiceQueue.length-VOICE_MAX_Q);
+}
+function startVoicePrune(){
+  if(voicePrune)return;
+  voicePrune=setInterval(()=>{
+    if(voiceBusy)return;
+    pruneVoice();
+    if(!voiceQueue.length){ stopVoicePrune(); hideVoiceGate(); refreshBgmDuck(); }
+    else showVoiceGate();
+  },VOICE_PRUNE_MS);
+}
+function stopVoicePrune(){ if(voicePrune){ clearInterval(voicePrune); voicePrune=null; } }
 function enqueueVoice(src){
   if(!src)return;
   if(Sound.isMuted&&Sound.isMuted())return;
-  voiceQueue.push(src);
+  voiceQueue.push({ src:src, at:Date.now() });
+  pruneVoice();
   if(!voiceBusy) pumpVoice();
 }
 function enqueueClip(id){
@@ -577,16 +607,18 @@ function enqueueClip(id){
 }
 function pumpVoice(){
   if(voiceBusy)return;
-  if(!voiceQueue.length){ hideVoiceGate(); refreshBgmDuck(); return; }
+  pruneVoice();
+  if(!voiceQueue.length){ stopVoicePrune(); hideVoiceGate(); refreshBgmDuck(); return; }
   // iOS 回前景後 state 常仍是 "running" 卻不出聲 → 觸控裝置額外要求「這回合手勢解鎖過」,
-  // 否則不硬播也不丟棄:留在佇列裡,改顯示可點的播放膠囊
-  if((IS_TOUCH && !audioArmed) || !(Sound.running && Sound.running())){ showVoiceGate(); return; }
+  // 否則不硬播也不丟棄:留在佇列裡,改顯示可點的播放膠囊(但會照上面的 TTL 過期)
+  if((IS_TOUCH && !audioArmed) || !(Sound.running && Sound.running())){ showVoiceGate(); startVoicePrune(); return; }
+  stopVoicePrune();
   hideVoiceGate();
   const next=voiceQueue.shift();
   voiceBusy=true; refreshBgmDuck();
   const advance=()=>{ if(!voiceBusy)return; if(voiceSafety){ clearTimeout(voiceSafety); voiceSafety=null; } voiceBusy=false; pumpVoice(); };
   voiceSafety=setTimeout(advance,15000);
-  playVoiceOnce(next,advance);
+  playVoiceOnce(next.src,advance);
 }
 function showVoiceGate(){
   const g=$("voiceGate"); if(!g)return;

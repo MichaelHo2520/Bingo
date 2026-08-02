@@ -245,20 +245,35 @@ const SVB = (function(){
      沒蓋過牌的人第二層直接換成一句「一張都沒蓋 ✨」,不留空行。
      ⚠ foot 是當 **HTML** 接在排名表下面的(給單機放「人數 · 難度 · 戰績」那行小字)——
        要放進使用者輸入的東西時,呼叫端自己 esc()(同 outcome().msg,notes/07 踩坑 #9)。 */
-  function resultHTML(st, names, mySeat, foot){
+  /* ★★ 連線多一個「累積勝場」欄(v1.75.9)。使用者:「連線對戰的勝負頁面,沒有修改到
+     前幾版我們調整的,我那時候是說訊息太雜亂了,需要整合」。
+     v1.75.3 只整合了**單機與連線共用的那一段**(大字 + 一句 + 排名表),但連線的結果卡
+     底下還壓著共用連線層的**第二張表** `#winScores`(累積勝場)—— 兩張表都是
+     「一列一個人、有名次有數字」,長得像卻講不同的事,疊在一起正是使用者說的那種亂。
+     現在把勝場併成排名表的一欄,`#winScores` 的列由 CSS 收掉(只留「🎯 搶 N 勝」那行)。
+     ⚠ 傳 null(單機)時**一個字元都不會變** —— 單機那版是使用者驗收過的,不動它。
+     ⚠ 這一欄的數字不可以直接讀 scores 節點:那是**結算後**才寫進去的,
+       結果卡是**結算當下**畫的 → 由 adapter 用「開局時的快照 + 這局有沒有 +1」算,
+       見 adapter.js 的 baseWins。 */
+  function resultHTML(st, names, mySeat, foot, wins){
     const sc = R.score(st);
     return '<div class="sv-rank">' + sc.sorted.map(r => {
       const pile = st.piles[r.seat].slice().sort((a, b) => a - b);
       const me = r.seat === mySeat, first = r.rank === 1;
       const nm = names[r.seat] || ("玩家" + (r.seat + 1));
+      const w = wins ? wins[r.seat] : null;
       return '<div class="sv-rrow' + (me ? " me" : "") + (first ? " win" : "") + '">' +
-        '<div class="sv-rmain">' +
+        '<div class="sv-rmain' + (w ? " has-win" : "") + '">' +
           '<span class="sv-rno">' + r.rank + '</span>' +
           '<span class="sv-rname">' + esc(nm) + '</span>' +
           // ⚠ 名字本身就叫「你」時(單機的 0 號位)不再掛徽章 —— 「你 你」是純雜訊,
           //   而「這一列是我」還有框在標,訊號沒少
           (me && nm !== "你" ? '<span class="you-badge">你</span>' : "") +
           (first ? '<span class="sv-rcrown" title="第一名">🏆</span>' : "") +
+          // ⚠ 這裡刻意**不用 🏆** —— 同一列的 🏆 已經是「這局第一名」了,
+          //   同一個符號兩個意思會比兩張表還難懂
+          (w ? '<span class="sv-rwin" title="累積勝場">' + w.n + ' 勝' +
+               (w.plus ? '<i>+1</i>' : '') + '</span>' : "") +
           '<span class="sv-rpts"><b>' + r.pts + '</b> 分</span>' +
         '</div>' +
         '<div class="sv-rcards">' +
