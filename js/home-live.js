@@ -28,7 +28,9 @@ const HomeLive = (function(){
     { key:"mahjong", index:"mahjong_index", name:"麻將",   icon:"🀄", badge:"hlBadgeMahjong", max:6, href:"mahjong.html" },
     // ★ max 必須與 js/mahjong16/adapter.js 的 maxPlayers 一致(4)——
     //   不一致的話首頁會把滿房列成「可加入」,點進去才被 claimSeat 交易擋下
-    { key:"mj16",    index:"mj16_index",    name:"台灣麻將", icon:"🀄", badge:"hlBadgeMj16", max:4, href:"mahjong16.html" }
+    { key:"mj16",    index:"mj16_index",    name:"台灣麻將", icon:"🀄", badge:"hlBadgeMj16", max:4, href:"mahjong16.html" },
+    // ★ max 必須與 js/sevens/adapter.js 的 maxPlayers 一致(6)
+    { key:"sevens",  index:"sevens_index",  name:"排七", icon:"🎴", badge:"hlBadgeSevens", max:6, href:"sevens.html" }
   ];
 
   let refs=[];            // 掛著監聽的 firebase ref(stop 時逐一 off)

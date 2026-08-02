@@ -2560,3 +2560,251 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .m16-fmelds{display:flex;flex-wrap:wrap;gap:2px}
   .m16-acts{min-height:34px;padding:2px 0}
 }
+
+/* ==========================================================================
+   排七(sevens.html)— .sv-* / .pk-*                        第六個遊戲 v1.75.0
+   ──────────────────────────────────────────────────────────────────────────
+   ★ 這一段**沒有任何尺寸是 JS 算的**。台灣麻將的牌寬要靠 board.js 量高度再夾
+     (為此長出地板 / 暖身期 / 二分回檢一整套,見 notes/11 第六節),因為那副牌的
+     張數每一手都在變。排七的軌道**永遠是 13 格 × 4 行**、手牌只會變少,
+     所以整份交給 grid + clamp —— 那一整類「忽大忽小」的 bug 結構上不存在。
+     ⚠ 不要為了「手牌少的時候放大一點」改成 JS 算,那正是忽大忽小的來源。
+
+   ★ 撲克牌 Unicode(U+1F0A0 那一段)一個都不准用 —— 多數字型沒有,會變豆腐方框
+     (同麻將牌那條禁令)。所以「剩幾張 / 蓋幾張」的小牌形是 .sv-pip 用 CSS 畫的。
+   ★ 花色符號一律由 JS 帶 U+FE0E 送進來(見 rules.js 的 suitCh),
+     不加變體選擇子的話 Android 會把紅心與方塊渲染成彩色 emoji。
+
+   沿用不重寫:.panel / .btn / .seg / .field / .veil / .win-card / .mp-* /
+   表情蓋板 / 設定蓋板 / #soloWinBtns 與 #mpWinBtns 的 body.solo-on 切換。
+   ========================================================================== */
+
+  /* ---------- 牌面配色 ----------
+     ★ 牌面在所有彩色主題下都維持象牙白,只有桌面跟著主題變(同麻將那條):
+       紅黑是撲克牌唯一的辨識線索,牌面一變色 30px 的牌就讀不出來了。 */
+  /* ★★ 紅色有**兩支**,界線與麻將那條同一個道理(notes/10「牌面配色 vs 我們自己配的
+     辨識色」):`--sv-red` 是**畫在象牙白牌面上**的紅(要夠深才讀得出來);
+     `--sv-redlit` 是**畫在深色桌面上**的紅(軌道左邊的花色標籤、罰分、蓋牌張數)。
+     ⚠ 第一版兩邊共用一支,結果 ♠ 與 ♣ 的花色標籤用 --sv-blk 畫在深紫底上
+       **整個消失**,而 ♥ ♦ 只是偏暗 —— 斷言完全測不到,只有截圖看得出來。 */
+  :root{ --sv-face:#fdfaf3; --sv-line:#c3ae90; --sv-blk:#22303f; --sv-red:#c92c2c;
+         --sv-redlit:#ff7b7b; --sv-bk:#3f5896; }
+  :root[data-theme="ebook"]{ --sv-face:#ffffff; --sv-line:#000000; --sv-blk:#000000; --sv-red:#000000;
+         --sv-redlit:#000000; --sv-bk:#666666; }
+
+  .sv-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+    line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+  :root[data-theme="ebook"] .sv-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+  .sv-scroll{flex:1 1 auto}
+  .sv-hero{text-align:center;margin:14px 0 4px}
+  .sv-art{width:96px;height:96px;display:block;margin:0 auto 8px}
+  /* 撲克牌小圖示:index.html 的第六張遊戲卡與本頁進場插圖共用同一組
+     (比照 .mk-* 在首頁卡與麻將進場兩邊共用) */
+  .pk-bd{fill:var(--sv-face);stroke:var(--sv-line);stroke-width:2}
+  .pk-k{fill:var(--sv-blk);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
+  .pk-r{fill:var(--sv-red);font-size:18px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
+  :root[data-theme="ebook"] .pk-bd{fill:#fff;stroke:#000}
+  .sv-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
+  .sv-solomsg{display:inline-block;margin-top:4px;font-size:12px;color:var(--muted)}
+
+  /* ---------- 房間框 / 單機列 ---------- */
+  .sv-room{padding:9px 12px}
+  .sv-room .row{margin-top:0}
+  .sv-room-top{flex-wrap:nowrap;gap:8px}
+  .sv-room .sv-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13px;font-weight:700;color:var(--muted)}
+  .sv-room .sv-room-title b{font-size:15px;color:var(--text)}
+  /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
+     不寫這條的話它們會是 42px,跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
+  .sv-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .sv-room .quick-voice,.sv-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .sv-room .quick-voice .qv-ico{font-size:18px}
+  .sv-room .mp-subrow{margin-top:5px}
+  .sv-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .sv-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  /* 晶片上的「剩幾張 / 蓋幾張」 */
+  .sv-seat{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+  .sv-seat.p0{background:#ff6b8a}.sv-seat.p1{background:#4fc3f7}.sv-seat.p2{background:#ffd54f}
+  .sv-seat.p3{background:#81c784}.sv-seat.p4{background:#ba9cff}.sv-seat.p5{background:#ffab6b}
+  :root[data-theme="ebook"] .sv-seat{background:#000}
+  .sv-chn,.sv-chp{display:inline-flex;align-items:center;gap:1px;
+    font:800 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
+  .sv-chp{color:var(--sv-redlit)}
+  /* ★ 小牌形:代替 U+1F0A0 那一段的撲克牌字元(它們多數字型沒有,會變豆腐方框) */
+  .sv-pip{display:inline-block;width:7px;height:10px;border-radius:2px;
+    background:var(--sv-face);border:1px solid var(--sv-line);margin-right:2px}
+  .sv-pip.back{background:var(--sv-bk);border-color:var(--sv-bk)}
+
+  /* ---------- 牌桌 ----------
+     ⚠ .sv-acts 一定要 flex:none —— .sv-play 底下只能有一個可壓縮的兄弟,
+       兩個都可壓縮時可視高度不足會按內容高度分攤,盤面高度反過來取決於自己的內容
+       (台灣麻將 v1.58.4 的 ResizeObserver 迴圈,見 notes/11 第六節)。 */
+  .sv-play{flex:1 1 auto;min-height:0;width:min(98vw,700px);
+    display:flex;flex-direction:column;align-items:stretch;gap:8px}
+  /* z-index:0 讓盤面自成一個 stacking context。這一頁沒有動態 z-index,
+     但覆蓋層(結果卡 / 設定蓋板)不該有任何機會被盤面內容穿過去 —— 消消樂 v1.56.0
+     就是少了這一行,「按離開房間,確認框上面浮著幾張牌」。 */
+  .sv-stage{flex:1 1 auto;min-height:0;position:relative;z-index:0;
+    display:flex;flex-direction:column;gap:7px;overflow-y:auto;overflow-x:hidden}
+  .sv-acts{flex:none;min-height:40px;display:flex;align-items:center;justify-content:center;
+    gap:12px;flex-wrap:wrap;padding:2px 0}
+
+  /* ---------- 四條龍的軌道 ----------
+     出過的格子亮起、沒出的留暗格 —— 「還缺哪幾張」正是排七要算的東西。
+     .open 是現在接得上的兩個位置:那是公開資訊(軌道上本來就看得出來),
+     標出來只是省去數格子,不是替玩家算牌。 */
+  .sv-tracks{display:flex;flex-direction:column;gap:3px;flex:none;
+    background:rgba(0,0,0,.16);border-radius:12px;padding:6px 8px}
+  :root[data-theme="ebook"] .sv-tracks{background:#fff;border:1px solid #000}
+  .sv-track{display:flex;align-items:center;gap:6px}
+  /* ⚠ 「這條龍還沒開」只淡化**花色標籤**,不可以整行 opacity ——
+     整行淡化會連那格 .open(出 7 就能開這條龍)一起淡掉,而那是全盤最重要的提示之一。
+     opacity 建立的是一整層,子元素再怎麼設也還原不回來。截圖才看得出來。 */
+  .sv-track.off .sv-suit{opacity:.5}
+  /* ⚠ 這一格畫在**深色桌面**上,不是牌面上 → 一律用 --text / --sv-redlit。
+     用牌面那支 --sv-blk 的話 ♠ 與 ♣ 在深紫底上會整個消失(截圖才發現)。 */
+  .sv-suit{flex:none;width:17px;text-align:center;color:var(--text);
+    font:800 15px/1 'Nunito',sans-serif}
+  .sv-track.red .sv-suit{color:var(--sv-redlit)}
+  /* ⚠⚠ `1fr` 的隱含最小值是 `auto`(= min-content),格子有 aspect-ratio 時那個
+     min-content 會把 13 欄一起撐開 → **整條軌道橫向溢出,J/Q/K 直接被切掉**。
+     斷言完全看不出來(格子數還是 52),只有截圖才發現。一律 minmax(0,1fr)。 */
+  .sv-cells{flex:1;min-width:0;display:grid;grid-template-columns:repeat(13,minmax(0,1fr));gap:2px}
+  .sv-cell{min-height:20px;aspect-ratio:.76;display:grid;place-items:center;border-radius:4px;
+    background:rgba(255,255,255,.05);color:rgba(255,255,255,.30);
+    font:700 clamp(8.5px,2.3vw,12.5px)/1 'Nunito',sans-serif}
+  .sv-cell.on{background:var(--sv-face);color:var(--sv-blk);box-shadow:0 1px 0 rgba(0,0,0,.24)}
+  .sv-track.red .sv-cell.on{color:var(--sv-red)}
+  /* 起手的那格(7)就算還沒出也畫得出來 —— 四條龍都從它長出去,是整個盤面的原點 */
+  .sv-cell.seven{color:var(--muted);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+  /* ⚠ 這兩條**一定要寫成兩層**(.seven.on)。`.sv-cell.seven` 與 `.sv-cell.on` 同權重
+     (0,2,0),後寫的 .seven 會贏 → 已經出過的那張 7 字色被拉回灰的,看起來像「還沒出」。
+     紅色那兩門躲過是因為 `.sv-track.red .sv-cell.on` 有 4 個 class(權重較高)——
+     所以症狀只出現在 ♠ 與 ♣,更難發現。同 notes/10 萬子漢字那個坑:
+     **名字乾淨、權重卻被同級的既有規則蓋掉**,只有截圖看得出來。 */
+  .sv-cell.seven.on{color:var(--sv-blk);box-shadow:0 1px 0 rgba(0,0,0,.24)}
+  .sv-track.red .sv-cell.seven.on{color:var(--sv-red)}
+  .sv-cell.open{background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 1.6px var(--accent)}
+  :root[data-theme="ebook"] .sv-cell{background:#fff;border:1px solid #bbb;color:#999}
+  :root[data-theme="ebook"] .sv-cell.on{background:#fff;border-color:#000;color:#000}
+  :root[data-theme="ebook"] .sv-cell.open{border:2px solid #000}
+
+  /* ---------- 對手列 ----------
+     ★ 蓋牌一律只畫張數(.sv-fp)—— 這一頁唯一的牌情紅線,牌值要等結果卡才翻開。 */
+  .sv-foes{flex:none;display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+  .sv-foe{display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:9px;
+    background:rgba(255,255,255,.07);font:700 11.5px/1.4 'Nunito',sans-serif}
+  .sv-foe.on{background:rgba(255,255,255,.18);box-shadow:inset 0 0 0 1.5px var(--accent)}
+  .sv-foe.me{color:var(--accent-2)}
+  .sv-foe.done{opacity:.55}
+  .sv-fname{max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sv-fn,.sv-fp{display:inline-flex;align-items:center;font:800 11px/1 'Nunito',sans-serif;color:var(--muted)}
+  .sv-fp{color:var(--sv-redlit)}
+  :root[data-theme="ebook"] .sv-foe{background:#fff;border:1px solid #ccc}
+  :root[data-theme="ebook"] .sv-foe.on{border:2px solid #000}
+
+  /* ---------- 我蓋掉的牌(自己看得到自己的) ---------- */
+  .sv-mypile{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:3px;
+    padding:5px 9px;border-radius:10px;background:rgba(0,0,0,.14);
+    font:700 11.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
+  .sv-mypile.empty{opacity:.85}
+  .sv-plbl{margin-right:3px}
+  .sv-pts{margin-left:5px;font-weight:800;color:var(--sv-redlit)}
+  .sv-pts.none{color:var(--accent)}
+  :root[data-theme="ebook"] .sv-mypile{background:#fff;border:1px solid #ccc}
+
+  /* ---------- 手牌 ----------
+     ★ 不可出的牌壓暗但**仍然可點**(CLAUDE.md 的紅線:不用 disabled 讓牌靜默吃掉
+       點擊)。點下去由 solo / adapter 回一句 SV.whyNot() —— 壓暗是提示,不是禁令。 */
+  /* ★ margin-top:auto 把手牌推到盤面**底部** —— 牌寬由寬度決定,高的螢幕一定會多出
+     一截空白,能決定的只是它放在哪。空白留在軌道與手牌之間,手牌貼著動作列上方,
+     拇指按得到(同台灣麻將 v1.73.1 的 align-content:safe end 那個結論)。 */
+  .sv-hand{flex:0 0 auto;margin-top:auto;display:flex;flex-wrap:wrap;justify-content:center;
+    align-content:flex-start;gap:5px;padding:3px 2px 6px}
+  .sv-card{--svw:clamp(30px,8.6vw,46px);
+    flex:none;width:var(--svw);height:calc(var(--svw) * 1.42);
+    border-radius:calc(var(--svw) * .13);border:1px solid var(--sv-line);
+    background:linear-gradient(155deg,#fff,var(--sv-face) 58%);
+    color:var(--sv-blk);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    line-height:1;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,.28);
+    transition:transform .12s,box-shadow .12s,filter .15s}
+  .sv-card.red{color:var(--sv-red)}
+  .sv-cr{font:800 calc(var(--svw) * .42)/1 'Nunito',sans-serif}
+  .sv-cs{font:700 calc(var(--svw) * .34)/1 'Nunito',sans-serif;margin-top:2px}
+  .sv-hand .sv-card{cursor:pointer}
+  .sv-hand .sv-card.can{box-shadow:0 1px 2px rgba(0,0,0,.28),0 0 0 2px var(--accent)}
+  .sv-hand .sv-card.can:hover{transform:translateY(-4px)}
+  .sv-hand .sv-card.no{filter:grayscale(.6) brightness(.68)}
+  .sv-hand .sv-card:active{transform:scale(.94)}
+  .sv-hand.cover .sv-card{filter:none;box-shadow:0 1px 2px rgba(0,0,0,.28)}
+  .sv-hand.cover .sv-card:hover{transform:translateY(-4px)}
+  .sv-hand .sv-card.sel{transform:translateY(-9px);
+    box-shadow:0 4px 8px rgba(0,0,0,.36),0 0 0 3px #e0533f}
+  .sv-card.tiny{--svw:21px;cursor:default;box-shadow:0 1px 1px rgba(0,0,0,.22)}
+  .sv-empty{font:800 13px/1 'Nunito',sans-serif;color:var(--accent);padding:12px 0}
+  :root[data-theme="ebook"] .sv-card{background:#fff;border-color:#000;box-shadow:none}
+  :root[data-theme="ebook"] .sv-hand .sv-card.no{filter:none;opacity:.42}
+  :root[data-theme="ebook"] .sv-hand .sv-card.can{box-shadow:0 0 0 2px #000}
+
+  /* ---------- 動作列 + 出牌倒數 ----------
+     ★ 倒數條**全桌都看得到** —— 「輪到誰、還剩幾秒」是公開資訊(晶片上就有 .turn),
+       讓大家知道為什麼卡著。台灣麻將藏起來的是宣告視窗那顆,排七沒有宣告階段。
+     ⚠ 用 scaleX 而不是 conic-gradient:後者要 @property 才插值得了,
+       而這裡只需要一條會縮的橫條。負的 animation-delay 用來接續播放
+       (見 board.js 的 syncCd —— duration 永遠是那一段的總長,e2e 才量得到設定值)。 */
+  .sv-actrow{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:center}
+  .sv-atxt{font:700 13px/1.4 'Nunito',sans-serif;color:var(--muted)}
+  .sv-atxt b{color:var(--text)}
+  .sv-atxt.mine{color:var(--text)}
+  .sv-atxt.warn{color:var(--accent-2)}
+  .sv-atip{font:800 12px/1 'Nunito',sans-serif;color:var(--accent)}
+  .sv-act{padding:6px 14px;font-size:13px;border-radius:11px}
+  .sv-cdwrap{display:flex;align-items:center}
+  .sv-cd{display:inline-flex;align-items:center;gap:7px}
+  .sv-cd i{position:relative;display:block;width:56px;height:6px;border-radius:3px;
+    background:rgba(255,255,255,.16);overflow:hidden}
+  .sv-cd i::after{content:"";position:absolute;inset:0;transform-origin:left center;
+    background:var(--accent);
+    animation:svCdRun var(--cd-dur,30s) linear var(--cd-delay,0s) 1 forwards}
+  @keyframes svCdRun{ from{transform:scaleX(1)} to{transform:scaleX(0)} }
+  .sv-cd b{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);min-width:1.5em;text-align:right}
+
+  /* ---------- 結果卡的排名表 ----------
+     ★ 這裡是唯一會翻開別人蓋牌的地方(對局中一律只顯示張數)。 */
+  .sv-result{margin:2px 0 12px}
+  .sv-rank{display:flex;flex-direction:column;gap:4px}
+  .sv-rrow{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:9px;
+    background:rgba(255,255,255,.06);font:700 12px/1.3 'Nunito',sans-serif}
+  .sv-rrow.win{background:rgba(255,255,255,.15);box-shadow:inset 0 0 0 1.5px var(--accent)}
+  .sv-rrow.me .sv-rname{color:var(--accent-2)}
+  .sv-rno{flex:none;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
+    background:rgba(255,255,255,.14);font:800 11px/1 'Nunito',sans-serif}
+  .sv-rrow.win .sv-rno{background:var(--accent);color:#1c1008}
+  .sv-rname{flex:none;max-width:5.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sv-rcards{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end}
+  .sv-rpts{flex:none;min-width:3.4em;text-align:right;font-weight:800;color:var(--sv-redlit)}
+  .sv-clean{font-size:11px;font-weight:800;color:var(--accent)}
+  :root[data-theme="ebook"] .sv-rrow{background:#fff;border:1px solid #ccc}
+  :root[data-theme="ebook"] .sv-rrow.win{border:2px solid #000}
+
+  /* ---------- 結果卡的表情列 ----------
+     #winScores / #winChamp / #mpWinBtns / #soloWinBtns 的顯隱由數獨那段既有的
+     body.solo-on 規則一併處理(那些選擇器不帶遊戲前綴,五頁通用),這裡只補自己這塊 */
+  .sv-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  body.solo-on .sv-react-row{display:none}
+
+  /* 對局中才放寬(大廳與選單維持 .panel 原本的 520,不然會一塊寬一塊窄)。
+     ⚠ 房間框用 92vw 不是 98vw:它有底色與圓角,98vw 超出 body 的 padding 會被
+       overflow:hidden 削掉看得見的一角(台灣麻將 v1.68.1 踩過)。 */
+  body.sv-mp .sv-room,body.sv-solo .sv-room{width:min(92vw,700px)}
+
+  @media (max-height:600px){
+    .sv-hero{margin:6px 0 2px}
+    .sv-art{width:66px;height:66px}
+    .sv-play{gap:5px}
+    .sv-room{padding:6px 10px}
+    .sv-tracks{gap:2px;padding:4px 7px}
+    .sv-hand{gap:4px}
+    .sv-card{--svw:clamp(26px,7.4vw,40px)}
+  }

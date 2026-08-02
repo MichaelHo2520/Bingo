@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.74.0";
+const VERSION = "1.75.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -51,6 +51,14 @@ const CORE = [
   "./js/mahjong/solo.js",
   "./js/mahjong/adapter.js",
   "./js/mahjong/main.js",
+  // 排七(第六個遊戲,v1.75.0;獨立頁面,共用 styles.css 與 js/audio.js)
+  "./sevens.html",
+  "./js/sevens/rules.js",
+  "./js/sevens/ai.js",
+  "./js/sevens/board.js",
+  "./js/sevens/solo.js",
+  "./js/sevens/adapter.js",
+  "./js/sevens/main.js",
   "./mp3/bgm.mp3",
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",

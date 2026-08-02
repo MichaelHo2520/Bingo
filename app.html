@@ -18,8 +18,8 @@
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v1.74.0 -->
-<meta name="version" content="1.74.0">
+<!-- 外殼(shell)· v1.75.0 -->
+<meta name="version" content="1.75.0">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
@@ -49,7 +49,7 @@
 (function(){
   "use strict";
   // 只認得這四個 key —— hash 是外面來的字串,不可以直接拿去當 src
-  var PAGES = { bingo:"index.html", gomoku:"gomoku.html", sudoku:"sudoku.html", mahjong:"mahjong.html", mahjong16:"mahjong16.html" };
+  var PAGES = { bingo:"index.html", gomoku:"gomoku.html", sudoku:"sudoku.html", mahjong:"mahjong.html", mahjong16:"mahjong16.html", sevens:"sevens.html" };
   var stage = document.getElementById("stage");
 
   function keyOfHash(){
