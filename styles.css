@@ -2727,34 +2727,23 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ★ v1.75.2 縮一級(46 → 40 / 30 → 27)。使用者:「我很重視遊戲體驗,可能需要適當的
      縮小一下目前牌的大小,因為我希望可以不用一直滑動,就能看到全部的牌」——
      2 人局一手 26 張是最壞情況,配上拿掉對手列省下的那一列,390×844 剛好排得完不必捲。 */
-  /* ★★ 牌面 = **標準撲克牌**的結構(v1.75.3):左上角 index(點數上 / 花色下)
-     + 牌面中央一個大花色。舊版是「大數字置中、花色墊底」—— 那是貼紙的排法,
-     一張牌之所以看起來像牌,關鍵就在左上角那組 index(理由與取捨見 board.js 的 cardHTML)。
-     ⚠ 兩個子元素都是**絕對定位**,所以 .sv-card 從 flex 改回 block、加 position:relative。
-       (定位錨點是 .sv-card 本身 —— 手牌 .sel 那條會動 transform,絕對定位跟著走沒問題。) */
   .sv-card{--svw:clamp(27px,7.6vw,40px);
-    flex:none;position:relative;display:block;
-    width:var(--svw);height:calc(var(--svw) * 1.42);
+    flex:none;width:var(--svw);height:calc(var(--svw) * 1.42);
     border-radius:calc(var(--svw) * .13);border:1px solid var(--sv-line);
     background:linear-gradient(155deg,#fff,var(--sv-face) 58%);
-    color:var(--sv-blk);
+    color:var(--sv-blk);display:flex;flex-direction:column;align-items:center;justify-content:center;
     line-height:1;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,.28);
     transition:transform .12s,box-shadow .12s,filter .15s}
   .sv-card.red{color:var(--sv-red)}
-  /* 角落 index:大字版(jumbo index)—— 字級與舊版的置中大字同級,縮到 27px 仍讀得出來 */
-  .sv-ix{position:absolute;left:calc(var(--svw) * .10);top:calc(var(--svw) * .06);
-    display:flex;flex-direction:column;align-items:center;line-height:1}
-  .sv-ix b{font:800 calc(var(--svw) * .40)/.92 'Nunito',sans-serif;letter-spacing:-.02em}
-  .sv-ix b.t10{font-size:calc(var(--svw) * .31);letter-spacing:-.06em}  /* 唯一的兩位數 */
-  .sv-ix .sv-sv{width:calc(var(--svw) * .27);height:calc(var(--svw) * .27);
-    margin-top:calc(var(--svw) * .03)}
-  /* 牌面的大 pip(標準牌上 A 的畫法)。★ 放在**下半部偏右**而不是正中央:
-     正中央會與左上 index 的花色**角碰角**(算過:pip .44w 置中時,方塊的左尖端
-     正好頂到 index 花色的右下緣)—— 兩個花色黏在一起比偏一點難看得多。
-     ⚠ 2~10 的 pip 陣列不畫:30px 寬上一定糊成一團。 */
-  .sv-pipc{position:absolute;right:calc(var(--svw) * .11);bottom:calc(var(--svw) * .12);
-    display:block;line-height:0}
-  .sv-pipc .sv-sv{width:calc(var(--svw) * .46);height:calc(var(--svw) * .46)}
+  /* ★★ 點數與花色都**置中直排、而且畫得大**(v1.75.4:.42 → .50 / .34 → .42)。
+     v1.75.3 曾經照標準撲克牌改成「左上角 index + 牌面一個大 pip」,使用者要求**改回置中、
+     再放大一點**。想通的關鍵:**螢幕上的牌不是扇形握在手上的** —— 角落 index 當初要解決的
+     問題(只露左上角也要讀得出來)在這裡不存在,它換來的只是同一個牌寬要塞兩組東西,
+     於是兩件都被迫縮小。置中版可以把整張牌的寬度都給這兩件事。
+     ⚠ 放大有天花板:內容總高 ≈ (.50 + .42 + gap) × --svw ≈ .96,而牌高是 1.42 ——
+       再往上加就會頂到上下邊框(牌寬 27px 時只剩約 6px 餘裕)。 */
+  .sv-cr{font:800 calc(var(--svw) * .50)/1 'Nunito',sans-serif}
+  .sv-cs{font:700 calc(var(--svw) * .42)/1 'Nunito',sans-serif;margin-top:calc(var(--svw) * .04)}
   .sv-hand .sv-card{cursor:pointer}
   .sv-hand .sv-card.can{box-shadow:0 1px 2px rgba(0,0,0,.28),0 0 0 2px var(--accent)}
   .sv-hand .sv-card.can:hover{transform:translateY(-4px)}
