@@ -2837,7 +2837,23 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 權重要 (0,3,0) 才壓得過 .win-card .word 的 (0,2,0) —— 只寫 .sv-win .word 是同級,
        靠「誰在後面」贏,以後有人搬動段落順序就會回彈(同 .win-card.mj-win 那條)。 */
   .win-card.sv-win .word{font-size:clamp(28px,7.2vw,40px)}
-  .sv-win{padding:26px 20px}     /* 左右內距收窄:排名表那兩層才有地方站 */
+  /* ★★ 這張卡要**給明確寬度**(v1.75.8)。使用者:「最後結算勝負的頁面寬度太小了,
+     整個變得非常的瘦長,看起來好難看」。
+     ⚠ 病灶是共用的 `.win-card` **只有 max-width、沒有 width**,而 `.veil` 是 grid
+       place-items:center → 卡片是 **shrink-to-fit**,寬度由**內容**撐出來。
+       v1.75.3 把排名表從「一列一行」拆成「一列兩層」之後,**每一層都變窄了**
+       → max-content 掉到 174px(4 人)/ 182px(6 人),而卡高 378 / 470,
+       瘦長比 2.17 / 2.58。這是那一版的副作用,不是原本就這樣。
+     ⚠⚠ **這裡一個百分比都不能用**。`.veil` 的 grid 是隱含單欄、寬度 auto(由 item 撐),
+       item 的百分比寬度因此**循環** → 瀏覽器把它當成 max-content。實測兩種寫法都只長到
+       **364px**(照樣瘦長,而且四種視窗寬量到的是同一個數字 —— 那就是「它在跟著內容跑」的指紋):
+         width:min(100%,520px)      ✗
+         width:520px + max-width:100%  ✗(max-width 的 % 一樣循環,把 520 夾回 max-content)
+       改用 **vw**(相對視窗,不循環)。88vw 是為了留住 `.veil` 的左右 padding:
+       390px 機 → 343px < 可用的 350,不溢出;桌機 → 被 520 夾住。
+     ⚠ `max-width` 一定要顯式解除 —— 共用的 `.win-card` 有 `max-width:380px`,不解除的話
+       width 再大也被夾在 380。 */
+  .win-card.sv-win{width:min(88vw,520px);max-width:none;padding:26px 24px}
   .sv-win p{margin:7px 0 14px}
   .sv-result{margin:2px 0 12px}
   .sv-rank{display:flex;flex-direction:column;gap:5px}
