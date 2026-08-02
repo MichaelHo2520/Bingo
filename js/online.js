@@ -299,6 +299,7 @@
       render(); applyFillUI(); updateReadyBtn();
       listen();
       watchConn();   // 開始監看連線狀態,支援斷線後自動歸位
+      armBackGuard(onBackKey);   // 返回鍵:進房後一律先問(冪等,整段房內生命週期只墊一筆歷史)
     }
     // 訪客:確認過房主與玩家名單後,若房主(或整個房間)消失 → 自動退出連線
     function hostGone(){
@@ -397,6 +398,9 @@
     }
     function closeLeaveAsk(){ pendingLeaveAct=null; $("leaveVeil").classList.remove("show"); }
     function confirmLeave(){ const act=pendingLeaveAct; closeLeaveAsk(); if(act)act(); }
+    /* 手機返回鍵在房間裡的行為:有浮層開著就先關浮層(含把離開確認卡本身當「取消」關掉),
+       否則跳離開確認 —— 誤按一下就斷線退出、房主還會把整房關掉,太痛。見 game.js 的 armBackGuard */
+    function onBackKey(){ if(dismissTopLayer())return; askLeave(); }
     // 房主:把某位玩家移出房間(僅大廳階段,遊戲進行中不動出手順序)
     function kick(id){
       if(!isHost||!roomRef||id===meId)return;
@@ -1193,6 +1197,7 @@
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();
       closeLeaveAsk(); closeKick();   // 離開/被踢/房主關房都可能在確認卡開著時發生 → 一併收掉,不留孤兒蓋板
+      disarmBackGuard();   // 已經不在房裡:守衛連同它墊的那一筆歷史一起收掉(不然返回鍵要多按一次)
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();   // 離線:重置快速語音鈕狀態
       closeWin();
       $("mpBar").classList.add("hidden");

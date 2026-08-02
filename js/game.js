@@ -575,6 +575,55 @@
   function openSettings(){ Sound.wake(); syncSettingsUI(); $("setVeil").classList.add("show"); }
   function closeSettings(){ $("setVeil").classList.remove("show"); }
 
+  /* ---------- 返回鍵守衛(v1.75.13) ----------
+     手機的返回鍵 = history.back(),而網頁**沒有**「攔住返回鍵」這種 API。連線中誤按一下的代價
+     最大:訪客這局不算成績,房主更是整間房直接關掉、全部人一起被踢。唯一可行的做法是
+     **先在歷史裡墊一筆**:進房時 pushState 一筆守衛,返回鍵於是走到那一筆(同文件、不換頁)→
+     收到 popstate 就跳確認卡。
+     ⚠ 四個坑:
+       1. pushState **不可以帶 url** —— 帶了就是「改網址」,file:// 直接 SecurityError(origin 是
+          "null"),而在外殼(app.html)裡帶 hash 還會踩到它的 hashchange 監聽。不帶 url 就只多一筆歷史。
+       2. 攔到之後要**立刻再墊回去**,否則第二下返回就真的走掉了。
+       3. 確認要離開時,墊的那一筆還在歷史裡 → 自己 history.back() 吃掉(bgEat 讓那一發 popstate
+          不算使用者按的),否則使用者得多按一次返回才回得到首頁。
+       4. arm 必須**冪等**:進房 → 開局 → 回大廳 → 再開局全都在同一筆守衛底下;一個相位墊一筆的話
+          返回鍵要按好幾下才有反應。
+     ★ 這一組在 js/shared/ui-kit.js 另有一份(Bingo 不載入那支)—— 改一邊記得改另一邊。 */
+  let bgArmed=false, bgAct=null, bgEat=false, bgBound=false;
+  function armBackGuard(act){
+    bgAct=act||null;
+    if(!bgBound){ bgBound=true; addEventListener("popstate",onBackGuard); }
+    if(bgArmed)return;
+    try{ history.pushState({bingoGuard:1},""); bgArmed=true; }catch(e){}
+  }
+  function onBackGuard(){
+    if(bgEat){ bgEat=false; return; }   // 這一發是 disarm 自己吃掉守衛時發出來的,不是使用者按的
+    if(!bgArmed)return;                 // 沒在守 → 讓瀏覽器照常返回(選單畫面按返回就該回上一頁)
+    bgArmed=false;                      // 墊的那一筆已經被這一下返回消耗掉
+    const act=bgAct;
+    armBackGuard(act);                  // 立刻補一筆,下一下返回照樣攔得到
+    if(act)act();
+  }
+  function disarmBackGuard(){
+    bgAct=null;
+    if(!bgArmed)return;
+    bgArmed=false; bgEat=true;
+    try{ history.back(); }catch(e){ bgEat=false; }
+  }
+  /* 返回鍵先關掉最上層的浮層(手機上的直覺),沒有浮層開著才回傳 false 交給呼叫端處理。
+     ⚠ 結果卡(#veil)刻意不列 —— 它是強制回應視窗,要離開只能按卡片上的按鈕(見各頁 main.js)。
+       順序 = 疊在上面的先關;這一頁沒有的 id(投降只有五子棋、猜拳只有 Bingo)自動跳過。 */
+  const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettings()],
+                     ["emoteVeil",()=>closeEmote()],["kickVeil",()=>MP.cancelKick()],
+                     ["resignVeil",()=>MP.cancelResign()],["leaveVeil",()=>MP.cancelLeave()]];
+  function dismissTopLayer(){
+    for(let i=0;i<BACK_LAYERS.length;i++){
+      const el=$(BACK_LAYERS[i][0]);
+      if(el&&el.classList.contains("show")){ BACK_LAYERS[i][1](); return true; }
+    }
+    return false;
+  }
+
   function setEbook(on,silent){
     const root=document.documentElement;
     if(on){

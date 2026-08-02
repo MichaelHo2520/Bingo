@@ -278,7 +278,11 @@ const MPCore = (function(){
       A.enterLobby && A.enterLobby();
       syncSubrow(); syncSetup(); updateReadyBtn(); updateGoal();
       listen(); watchConn();
+      armBackGuard(onBackKey);   // 返回鍵:進房後一律先問(冪等,整段房內生命週期只墊一筆歷史)
     }
+    /* 手機返回鍵在房間裡的行為:有浮層開著就先關浮層(含把離開確認卡本身當「取消」關掉),
+       否則跳離開確認 —— 誤按一下就斷線退出、房主還會把整房關掉,太痛。見 ui-kit.js 的 armBackGuard */
+    function onBackKey(){ if(dismissTopLayer())return; askLeave(); }
     // 回大廳續玩(本局結束 / 作廢):只重設本地,不動別人
     function backToLobby(){
       ready=false; curPhase="lobby"; order=[]; winner=null;
@@ -769,6 +773,7 @@ const MPCore = (function(){
       gameRev=0; lastIndexSig=null; outcomeShown=false; abandoned=false;
       scoredThisRound=false; myRoundWin=false; autoStarting=false; emotesReady=false;
       closeLeaveAsk(); closeKick(); closeResign(); closeEmote(); closeWin();
+      disarmBackGuard();   // 已經不在房裡:守衛連同它墊的那一筆歷史一起收掉(不然返回鍵要多按一次)
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();
       A.onLeave && A.onLeave();
       setActionHint("");
