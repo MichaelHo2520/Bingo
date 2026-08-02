@@ -30,6 +30,7 @@ const SVB = (function(){
   let hCard = null, hAct = null;          // 點手牌 / 按動作鈕的回呼
   let sel = -1;                            // 蓋牌模式選中的那張
   let cdKey = "", cdT = null;              // 倒數環:用 key 去重,不看 timer(見下)
+  let lastCover = false;                   // 上一次畫的是不是蓋牌模式(進場那一刻要給提示,見 render)
 
   /* ==========================================================================
      一、牌面
@@ -144,16 +145,60 @@ const SVB = (function(){
     // 手牌。★ 不可出的壓暗但**仍然可點** —— 點下去由 solo / adapter 給回饋,
     //   不用 disabled 讓牌靜默吃掉點擊(CLAUDE.md 的紅線,Bingo v1.27.3 的「假死」教訓)
     const cover = v.mode === "cover";
-    h += '<div class="sv-hand' + (cover ? " cover" : "") + '">' +
+    // ★ 進入蓋牌模式那一刻要**看得到也聽得到**(見下方 coverBarHTML / coverCue 的註解):
+    //   `.just` 只掛在切進去的那一次重畫上,之後點牌重畫就不再脈動(否則每點一張閃一次是雜訊)。
+    const just = cover && !lastCover;
+    if(just) coverCue();
+    lastCover = cover;
+
+    h += '<div class="sv-hand' + (cover ? " cover" : "") + (just ? " just" : "") + '">' +
+      (cover ? coverBarHTML() : "") +
       v.hand.map(c => {
         const can = v.can.indexOf(c) >= 0;
         let cls = cover ? "pick" : (can ? "can" : "no");
         if(c === sel) cls += " sel";
-        return cardHTML(c, cls);
+        const card = cardHTML(c, cls);
+        // 蓋牌模式:牌底下掛一個「+N」—— A / J / Q / K 不必自己換算成 1 / 11 / 12 / 13
+        return cover
+          ? '<span class="sv-pickw' + (c === sel ? " sel" : "") + '">' + card +
+              '<i class="sv-cost">+' + R.rankOf(c) + '</i></span>'
+          : card;
       }).join("") +
       (v.hand.length ? "" : '<span class="sv-empty">手牌出完了 ✨</span>') +
       '</div>';
     stage.innerHTML = h;
+  }
+
+  /* ==========================================================================
+     四、蓋牌模式的招呼 —— ★ 「換了一種模式」要看得出來,不能只換一行字
+     ──────────────────────────────────────────────────────────────────────────
+       使用者(v1.75.11):「沒牌可出的時候要蓋牌,但目前這個用文字提醒的設計,
+       突然間很難理解」。說得對 —— 舊版切進蓋牌模式時畫面上只有兩處變化:
+         ① 動作列那行 13px 的字換了                      ← 在畫面另一頭,視線不在那
+         ② 出不了的牌不再壓暗                            ← **反效果**,看起來更像可以出了
+       所以整組重來:手牌區包成紅框(狀態)、框頂一條橫幅(為什麼 + 做什麼)、
+       每張牌標罰分(代價),再加一個提示音。四件都指向同一件事,漏看一件還有三件。
+
+       ⚠ 橫幅刻意住在**手牌區裡面**而不是動作列:視線在牌上,提示就要貼著牌。
+         動作列那一行改成只講「接下來按什麼」,兩件事分開才不會又變成一長串文字。
+     ========================================================================== */
+  function coverBarHTML(){
+    return '<div class="sv-cvbar">' +
+             '<span class="sv-cvi">🚫</span>' +
+             '<span class="sv-cvt"><b>沒有牌接得上,這一手只能蓋牌</b>' +
+               '<i>點一張蓋掉 —— 牌上的點數就是罰分</i></span>' +
+           '</div>';
+  }
+
+  /* 提示音:低沉的**下行**兩音,與「輪到你」那組清亮的上行剛好相反 ——
+     排七的音效全部走 Sound 的合成音,沒有語音檔,兩件事只能靠走向與音域分辨。
+     ⚠ 一定要 delay:輪到我的那一刻 `Sound.turn()` 才剛響(單機與連線都是先 turn() 再 paint()),
+       不錯開就會與它疊在一起糊成一坨,聽起來只是「輪到你」多了個尾巴。 */
+  function coverCue(){
+    try{
+      Sound.tone(392, { type:"triangle", dur:0.15, vol:0.20, delay:0.30 });
+      Sound.tone(262, { type:"triangle", dur:0.30, vol:0.18, delay:0.46 });
+    }catch(e){}
   }
 
   /* ==========================================================================
@@ -171,11 +216,11 @@ const SVB = (function(){
     if(info.canPlay){
       return '<span class="sv-atxt mine">輪到你 · 挑一張<b>接得上</b>的牌打出去</span>';
     }
-    // 沒牌可出 → 蓋牌模式
-    const s = sel >= 0
-      ? '<button class="btn danger sv-act" data-act="cover">蓋掉 ' + R.nameOf(sel) + '（+' + R.rankOf(sel) + ' 分）</button>'
-      : '<span class="sv-atip">↓ 點一張要蓋的牌</span>';
-    return '<span class="sv-atxt warn">⚠ 你沒有牌可以出,必須蓋掉一張</span>' + s;
+    // 沒牌可出 → 蓋牌模式。★ 「為什麼會這樣」由手牌區頂上的橫幅講(coverBarHTML,貼著牌),
+    //   這一列只講「接下來按什麼」—— 兩件擠在同一行正是使用者說的「突然間很難理解」。
+    if(sel < 0) return '<span class="sv-atip">☝ 在上面挑一張要蓋掉的牌</span>';
+    return '<button class="btn danger sv-act" data-act="cover">確定蓋掉 ' + R.nameOf(sel) +
+           '（罰 ' + R.rankOf(sel) + ' 分）</button>';
   }
 
   function renderActs(info){

@@ -30,8 +30,11 @@ function showScreen(which){
   // 不然會變成「一塊寬一塊窄」)。同台灣麻將 v1.68.1。
   document.body.classList.toggle("sv-mp", which==="play");
   document.body.classList.toggle("sv-solo", which==="solo");
-  // 對局中把頂列的 ⛶ / ⚙️ 收進那條列 —— 手機玩的時候頂列整條被收掉讓給牌桌,
-  // 鈕住在裡面就會跟著消失。見 ui-kit 的 dockTools。
+  /* 對局中鈕該住哪 —— ★ 決定權在 ui-kit 的 dockTools:**只有頂列真的被收掉才搬**。
+     排七的頂列從來不會被收掉(styles.css 沒有 `body.sv-mp .topbar{display:none}`),
+     所以這一頁實際上永遠不搬 —— v1.75.10 之前照搬,把房名擠到要 ellipsis
+     (使用者:「全螢幕跟設定的按鈕,不應該跑進房間框裡面」)。
+     這裡照舊把「如果要搬,搬去哪」告訴它:哪天真的加了收頂列的規則就自動接上。 */
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("svSoloBar");
   else undockTools();
