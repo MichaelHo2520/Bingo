@@ -59,6 +59,14 @@ const MP = MPCore.create((function(){
   let myBid = false;                // 這一輪我表態過了沒(只擋自己重複點)
   let turnT = null, turnKey = "";   // 出牌倒數的計時器與「這一手」的身分(v1.63.0)
   let handAt = 0;                   // ★ v1.65.0:「這一手」的錨點(本地 performance.now())
+  /* ★ 這一局開打那一刻每個人的累積勝場快照(v1.75.14,排名表的「N 勝」欄用)。
+     為什麼不當場讀 scores:那個節點是**結算之後**每台各自寫自己的 +1,而結果卡是
+     **結算當下**就要畫出來 —— 直接讀會少一分,而且等分數同步回來也沒有人會重畫這張卡
+     (核心的 scores 監聽只重畫它自己的 #winScores)。
+     用「開局時的值 + 這局有沒有得分」算就沒有時間差,重畫幾次都是同一個數(冪等)。
+     ⚠ 與排七的 baseWins 是同一套(notes/15)—— 那邊踩過,這邊直接照抄。 */
+  let baseWins = {};
+  let lastGained = [];              // 核心在 outcome() 給的得分名單(這一局誰 +1)
 
   const secOn   = () => claimSec > 0;                     // 操作倒數有沒有開
   const budgetMs = () => claimSec * 1000;                 // 一手的總預算(從 handAt 起算)
@@ -125,6 +133,11 @@ const MP = MPCore.create((function(){
   }
   function taiOf(id){ return (typeof tai[id]==="number") ? tai[id] : 0; }
   function handsDone(){ return tai._r ? Object.keys(tai._r).length : 0; }
+  /* 這一局的交易記進去了沒(冪等記號)。★ 結果卡是**結算當下**畫的,而 commitTai 是
+     交易 —— 本地樂觀套用通常會搶先一步,但不保證。沒記進去的話台數與局數都要自己補上
+     這一局,否則「我明明自摸 24 台,表上卻沒加」與「最後一局沒寫本場結束」都會偶發。 */
+  function taiCounted(){ return !!(tai._r && curRound && tai._r[curRound]); }
+  function handsDoneNow(){ return handsDone() + ((!taiCounted() && st && st.over) ? 1 : 0); }
 
   /* ---------- 比分列 ----------
      ★ v1.58.2 拿掉了獨立的 .m16-hud 大卡片,改成走**房間框裡的玩家晶片**
@@ -689,10 +702,14 @@ const MP = MPCore.create((function(){
       showScreen("play");
       $("mpBar").classList.add("playing");
       Sound.start();
+      // ★ 這一局開打前大家各幾勝(排名表的「N 勝」欄要拿它 +1;見宣告處)
+      baseWins = {}; lastGained = [];
+      ctx.order().forEach(id => { baseWins[id] = ctx.scoreOf(id); });
       M16Sfx.preload();          // 喊牌音檔先載好,第一次碰才有聲音(見 sfx.js 的 preload)
     },
     onLeave(){
       clearClaimT(); clearTurnT(); st=null; curRound=null; tai={}; myBid=false; handAt=0;
+      baseWins = {}; lastGained = [];
       wipeActs();
     },
 
@@ -762,11 +779,13 @@ const MP = MPCore.create((function(){
     refresh(){ renderHud(); },
 
     /* ---------- 結果 ---------- */
-    outcome(w, { iWon, isDraw, mine }){
+    outcome(w, { iWon, isDraw, mine, ids }){
       clearClaimT(); clearTurnT();
       M16B.clearSel();
       renderHud(); renderActs();
-      const done = handsDone();
+      // 得分名單直接用核心給的 ids(它就是等一下要 +1 的那些人)—— 排名表的「N 勝」欄要
+      lastGained = ids || [];
+      const done = handsDoneNow();
       const last = done >= handsGoal;
       paintTaiTable(last);
       paintWinTiles();                 // 胡的人攤什麼牌(流局時自己收起來)
@@ -787,13 +806,15 @@ const MP = MPCore.create((function(){
       const o = st.over;
       const tag = o.list.map(x=>esc(x.name)+" "+x.tai).join("、");
       const how = (o.from===null) ? "自摸" : ("胡 "+esc(nameOfSeat(o.from))+" 打的牌");
-      const line = "底 "+o.base+" + 台 "+o.tai+" = <b>"+o.total+"</b> 台("+(tag||"無台")+")";
-      /* ★ 最後一局仍是「本場結束」(與單機同步):那張卡的主角是總結算,
-         這一手怎麼輸的 msg 那行寫得清清楚楚。 */
-      if(iWon) return { word: last?"本場結束":ow.word,
-                        msg: how+"<br>"+line+(last?"<br>"+seasonMsg():"") };
-      return { word: last?"本場結束":ow.word,
-               msg: esc(w.name||"對手")+" "+how+"<br>"+line+(last?"<br>"+seasonMsg():"") };
+      /* ★ v1.75.14 併成**一行**(原本是「誰怎麼胡」+「底台算式」兩行)。
+         「誰胡了誰放槍」下面那張排名表已經逐列寫著(這局 · 自摸 / 放槍 −6),
+         再用兩行散文講一次正是使用者說的「要再想一會」——同一件事講三次最難讀
+         (排七 v1.75.3 的同一條結論)。留下來的是表上沒有的那一半:台數怎麼來的。
+         ⚠ msg 這一半仍然是兩份(solo.js 的 paintResult),改一邊一定要改另一邊。 */
+      const line = (iWon ? how : (esc(w.name||"對手")+" "+how)) +
+                   " · 底 "+o.base+" + 台 "+o.tai+" = <b>"+o.total+"</b> 台("+(tag||"無台")+")";
+      /* ★ 最後一局仍是「本場結束」(與單機同步):那張卡的主角是總結算。 */
+      return { word: last?"本場結束":ow.word, msg: line+(last?"<br>"+seasonMsg():"") };
     },
 
     ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec,
@@ -869,17 +890,32 @@ const MP = MPCore.create((function(){
       M16B.revealHTML(st, o.seat, tw, o.tile);
   }
 
-  /* ---------- 結果卡的台數表 ---------- */
+  /* ---------- 結果卡的排名表(v1.75.14 起是「一張表」) ----------
+     版面與四個病灶見 board.js 的 rankHTML —— 這裡只負責把資料湊齊:
+       · 累積台數 = tai 節點 +(這一局還沒記進去的話)這一局的增減 → 沒有時間差
+       · 這一局的增減直接用 st.over.deltas(權威,不必等任何節點)
+       · 勝場 = 開局快照 baseWins + 核心給的得分名單 */
   function paintTaiTable(final){
     const box = $("m16Tai"); if(!box) return;
     const ord = ctx.order();
     if(!ord.length){ box.classList.add("hidden"); return; }
     box.classList.remove("hidden");
-    const rows = ord.map(id=>({ id, t:taiOf(id) })).sort((a,b)=>b.t-a.t);
-    box.innerHTML = '<div class="m16-taih">'+(final?"總結算":"目前台數")+
-      '(全桌相加必為 0)</div>'+
-      rows.map(r=>'<div class="m16-tair"><span>'+esc(ctx.dispName(r.id))+ctx.youTag(r.id)+
-        '</span><b class="'+(r.t<0?"neg":"")+'">'+(r.t>0?"+":"")+r.t+' 台</b></div>').join("");
+    const over = (st && st.over) || null;
+    const dz = (over && over.type==="win" && over.deltas) || null;
+    const counted = taiCounted();
+    const names = ord.map(id=>ctx.dispName(id));
+    const me = ctx.me();
+    const rows = ord.map((id, s)=>{
+      const d = dz ? (dz[s]||0) : 0;
+      const plus = lastGained.indexOf(id) >= 0;
+      const base = (typeof baseWins[id]==="number") ? baseWins[id] : ctx.scoreOf(id);
+      return { name:names[s], me:id===me,
+               total: taiOf(id) + (counted ? 0 : d),
+               delta: d,
+               role: M16B.roleOf(over, s),
+               wins: { n: base + (plus?1:0), plus: plus } };
+    });
+    box.innerHTML = M16B.rankHTML(rows, { done:handsDoneNow(), goal:handsGoal, final:final });
   }
   function seasonMsg(){
     const ord = ctx.order();

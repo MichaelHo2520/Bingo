@@ -526,12 +526,13 @@ const Solo = (function(){
     }else{
       const tags = o.list.map(function(x){ return esc(x.name)+" "+x.tai; }).join("、");
       const how = (o.from === null) ? "自摸" : ("胡 " + esc(seatName(o.from)) + " 打的牌");
-      const line = "底 " + o.base + " + 台 " + o.tai + " = <b>" + o.total + "</b> 台(" + (tags||"無台") + ")";
-      /* ★ 最後一局仍然是「本場結束」(單機 e2e 在斷言這句):那一張卡的主角是總結算,
-         不是這一手怎麼輸的 —— 誰胡誰放槍 msg 那一行本來就寫得清清楚楚。 */
+      /* ★ v1.75.14 併成**一行**(原本「誰怎麼胡」與「底台算式」各一行)——
+         誰胡誰放槍下面那張排名表已經逐列寫著,理由與連線那份同一條(adapter.js outcome)。 */
+      const line = (iWon ? how : (esc(seatName(o.seat)) + " " + how)) +
+                   " · 底 " + o.base + " + 台 " + o.tai + " = <b>" + o.total + "</b> 台(" + (tags||"無台") + ")";
+      /* ★ 最後一局仍然是「本場結束」(單機 e2e 在斷言這句):那一張卡的主角是總結算。 */
       word = last ? "本場結束" : ow.word;
-      msg = (iWon ? how : (esc(seatName(o.seat)) + " " + how)) + "<br>" + line +
-            (last ? "<br>" + seasonMsg() : "");
+      msg = line + (last ? "<br>" + seasonMsg() : "");
     }
     $("winWord").textContent = word;
     $("winMsg").innerHTML = msg;
@@ -542,20 +543,25 @@ const Solo = (function(){
     else if(o.type === "win") Sound.lose();
     showResult();
   }
+  /* 排名表(v1.75.14 起與連線**共用** M16B.rankHTML —— 名次 / 這一局 / 累積合成一張)。
+     ⚠ 單機沒有「累積勝場」那回事,wins 一律傳 null → 那一欄整個消失。
+     ⚠ tai[] 在呼叫進來之前已經把這一局加好了(finish() 裡 `tai[s] += d`),
+       所以這裡不必像連線那樣補「交易還沒回來」的那一份。 */
   function paintTai(last){
     const box = $("m16Tai");
     if(!box) return;
     box.classList.remove("hidden");
+    const over = st && st.over;
+    const dz = (over && over.type === "win" && over.deltas) || null;
+    const names = [];
+    for(let s=0;s<seats;s++) names.push(seatName(s));
     const rows = [];
-    for(let s=0;s<seats;s++) rows.push({ s:s, t:tai[s]||0 });
-    rows.sort(function(a,b){ return b.t - a.t; });
-    box.innerHTML = '<div class="m16-taih">' + (last ? "總結算" : "目前台數") +
-      '(全桌相加必為 0)</div>' +
-      rows.map(function(r){
-        return '<div class="m16-tair"><span>' + esc(seatName(r.s)) +
-          (r.s===ME?'<span class="you-badge">你</span>':"") + '</span><b class="' +
-          (r.t<0?"neg":"") + '">' + (r.t>0?"+":"") + r.t + ' 台</b></div>';
-      }).join("");
+    for(let s=0;s<seats;s++){
+      rows.push({ name:names[s], me:s===ME, total:tai[s]||0,
+                  delta: dz ? (dz[s]||0) : 0,
+                  role: M16B.roleOf(over, s), wins:null });
+    }
+    box.innerHTML = M16B.rankHTML(rows, { done:handNo, goal:goal, final:last });
   }
   function seasonMsg(){
     let best = -Infinity, top = [];

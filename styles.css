@@ -2379,14 +2379,75 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 /* 胡的那張:紅框 —— 沿用牌河「最新那張」的同一組語彙,不另發明一種標記 */
 .m16-mt.m16-wt{outline:2px solid var(--mj-jz);outline-offset:1px}
 
-/* 結果卡的收付表 */
-.m16-tai{margin:8px 0 4px;padding:8px 10px;border-radius:11px;
+/* ---------- 結果卡的排名表(v1.75.14 起是「一張表」) ----------
+   使用者:「連線對戰最後的統計頁面,每次在看時候往往都要再想一會」。
+   四個病灶(兩張長得一樣的表 / 沒有名次 / 看不到我這一局 / 看不到第幾局)與取捨
+   全部寫在 js/mahjong16/board.js 的 rankHTML,這裡只講版面上的三個坑。
+   ★ 一列**兩層**(同排七 .sv-rrow):上層是對得齊的欄位(名次 · 名字 · 勝場 · 累積台數),
+     下層才是「這一局」。擠在同一行的話,長度每列都不一樣的角色字串會把數字推得參差不齊。 */
+.m16-tai{margin:8px 0 14px;padding:9px 10px 8px;border-radius:11px;
   background:rgba(0,0,0,.16);text-align:left}
-.m16-taih{font:700 11px/1.5 'Nunito',sans-serif;opacity:.7;margin-bottom:3px}
-.m16-tair{display:flex;justify-content:space-between;align-items:baseline;gap:10px;
-  font:700 13px/1.7 'Nunito',sans-serif}
-.m16-tair b{font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--mj-jf)}
+.m16-taih{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  font:700 11px/1.5 'Nunito',sans-serif;opacity:.8;margin-bottom:5px}
+.m16-taih b{font-weight:800;opacity:1}
+.m16-taiz{flex:none;font-size:10px;opacity:.62}
+.m16-tair{display:flex;flex-direction:column;gap:2px;padding:5px 8px;border-radius:10px;
+  background:rgba(255,255,255,.06);font:700 12px/1.3 'Nunito',sans-serif}
+.m16-tair + .m16-tair{margin-top:5px}
+.m16-rmain{display:flex;align-items:center;gap:6px}
+/* ★★ **框起來的是「自己」,不是第一名**(排七 v1.75.2 的教訓):一張排名表上被框住的
+   那一列,第一直覺就是「我」,拿它去表示名次是每個人都會看錯的方向(誰都會先找自己)。
+   兩個訊號完全分開 —— 框 + 「你」徽章 = 這一列是我;金色名次圈 + 🏆 = 台數第一。 */
+.m16-tair.me{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent-2)}
+.m16-rno{flex:none;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(255,255,255,.14);font:800 11px/1 'Nunito',sans-serif}
+.m16-tair.win .m16-rno{background:var(--accent);color:#1c1008}
+.m16-rcrown{flex:none;font-size:12px;line-height:1}
+/* ⚠ 名字**不可以** flex:1 —— 那會把「你」徽章與 🏆 一路推到數字旁邊,兩個標記離
+   它們正在標的那個名字十萬八千里。要可縮不可長:flex:0 1 auto。 */
+.m16-rname{flex:0 1 auto;min-width:0;text-align:left;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m16-tair b{margin-left:auto;flex:none;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--mj-jf)}
 .m16-tair b.neg{color:var(--mj-jz)}
+.m16-tair b.zero{color:var(--muted)}
+/* 連線才有的「累積勝場」欄。⚠ 靠右的 auto 邊界要**搬家**:兩欄都吃 margin-left:auto
+   的話剩餘空間會被平分 → 勝場飄到列中間。min-width 是為了讓各列的數字對得齊。 */
+.m16-rmain.has-win .m16-rwin{margin-left:auto}
+.m16-rmain.has-win b{margin-left:0;min-width:52px;text-align:right}
+.m16-rwin{flex:none;min-width:38px;display:inline-flex;align-items:center;justify-content:flex-end;gap:3px;
+  padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.10);
+  font:800 10.5px/1.35 'Nunito',sans-serif;color:var(--muted)}
+.m16-rwin i{font-style:normal;font-weight:800;color:var(--accent)}
+/* 第二層「這一局」:縮排到與名字切齊(19px 的名次圈 + 6px gap),看起來才是「這個人的事」 */
+.m16-rsub{display:flex;align-items:baseline;gap:5px;padding-left:25px;
+  font:700 11px/1.45 'Nunito',sans-serif;color:var(--muted)}
+.m16-rlab{flex:none;padding:1px 5px;border-radius:6px;background:rgba(255,255,255,.10);
+  font:800 9.5px/1.5 'Nunito',sans-serif;opacity:.85}
+.m16-rrole{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ⚠ **不可以** margin-left:auto —— 推到右邊就會和上層的累積台數變成同一欄、上下兩個
+   同單位的數字,一眼分不出哪個是哪個(這一版要修的正是這個)。貼著角色走。 */
+.m16-rd{flex:none;font:800 12px/1 'Fredoka','Nunito',sans-serif;color:var(--muted)}
+.m16-rd.pos{color:var(--mj-jf)}
+.m16-rd.neg{color:var(--mj-jz)}
+:root[data-theme="ebook"] .m16-tair{background:#fff;border:1px solid #ccc}
+:root[data-theme="ebook"] .m16-tair.me{border:2px solid #000;box-shadow:none}
+:root[data-theme="ebook"] .m16-tair.win .m16-rno{background:#000;color:#fff}
+:root[data-theme="ebook"] .m16-rwin{background:#eee;color:#000;border:1px solid #ccc}
+:root[data-theme="ebook"] .m16-rwin i{color:#000}
+/* ★★ 卡片寬度要**寫死**(v1.75.14)。共用的 .win-card 只有 max-width、沒有 width,
+   而 .veil 是 grid place-items:center → 卡片是 shrink-to-fit、寬度由內容撐出來。
+   排名表拆成兩層之後每一層都變窄,流局那一局又沒有攤牌撐著 → 整張卡會縮成瘦長條
+   (排七 v1.75.8 踩過同一個)。⚠ 百分比在這裡會循環(item 撐容器、容器又撐 item),
+   一定要用 vw;⚠ max-width 也要顯式解除,否則再寬也被夾在 380。
+   ⚠ 只鎖 .m16-win —— .mj-win 是消消樂與這一頁共用的,不可以掛在它身上。 */
+.win-card.m16-win{width:min(88vw,380px);max-width:none}
+/* ★★ 共用勝場表 #winScores 的**列**收掉:內容已經併進上面的排名表(.m16-rwin),
+   留著就是同一份資料兩張表 —— 使用者說「要再想一會」的最大來源正是這個。
+   ⚠ 只收「列」,**保留 .ws-goal** 的「🎯 搶 N 勝」:房間框那顆徽章寫的是「第 n/N 局」,
+     搶幾勝在別的地方沒有出口。⚠ 容器的 gap/margin 要一起歸零,否則會留一條空帶。 */
+.win-card.m16-win .win-scores{gap:0;margin:0}
+.win-card.m16-win .win-scores .ws-row{display:none}
+.win-card.m16-win .win-scores .ws-goal{margin:0 0 12px}
 
 /* 「不防作弊」那句提醒:刻意不做成警告色的大框 —— 它是說明,不是錯誤 */
 .m16-warn{display:inline-block;margin-top:4px;opacity:.75;font-size:11px}

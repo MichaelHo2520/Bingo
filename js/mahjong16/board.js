@@ -781,8 +781,99 @@ const M16B = (function(){
     return { word:pickWord(OVER_WORDS.bystand, seed), tone:"draw" };
   }
 
+  /* ==========================================================================
+     結果卡的排名表(v1.75.14)—— ★ 單機與連線**共用同一支**
+     ── 為什麼要改 ────────────────────────────────────────────────────────────
+       使用者:「連線對戰最後的統計頁面,每次在看時候往往都要再想一會,代表這個
+       設計其實沒有很直覺」。照排七 v1.75.2 / .3 / .9 那三版的結論改,舊版難讀的
+       原因有四個,一個一個對:
+
+         ① **一張卡上兩張長得一樣的表** —— 收付表(一列一人 + 一個數字)與共用連線層
+            的勝場表 `#winScores`(一列一人 + 一個數字)講的是不同的事,卻長同一個樣。
+            → 勝場併成這張表的一欄(安靜的小藥丸),`#winScores` 的列由 CSS 收掉。
+         ② **沒有名次** —— 表是照台數排的,但要自己從上往下數才知道自己第幾。
+            → 補金色名次圈,第一名再加 🏆。
+         ③ **看不到「我這一局」** —— 表上只有累積台數,這一手到底賺賠多少要自己從
+            「底 1 + 台 5 = 6 台」那行散文回推,而且還得先想清楚自己是不是放槍的那個。
+            這就是「要再想一會」的主因。→ 每列補第二層「這局 · 放槍 −6」。
+         ④ **第幾局看不到** —— 那個徽章在房間框上,而結果卡正好蓋住它。→ 併進表頭。
+
+     ── ★ 框起來的是「自己」,金圈 + 🏆 才是第一名(排七 v1.75.2 的教訓)─────────
+       一張排名表上被框住的那一列,第一直覺就是「我」,拿它去表示名次是**每個人都會
+       看錯的方向**(誰都會先找自己)。兩個訊號分開,自己拿第一時兩個都亮。
+       ⚠ 並列第一(台數同分)時每一列都拿金圈,那是對的。
+
+     ⚠ 列的 class **保留 `.m16-tair`**:單機 e2e 的 `taiRows()` 用
+       `#m16Tai .m16-tair b` 取每列的累積台數斷言「全桌相加為 0」—— 那是這張表
+       唯一自動守得住的正確性,不要為了改名把它弄丟。同理**一列只能有一個 `<b>`**
+       (這一局的增減用 `<span class="m16-rd">`,不可以也寫成 `<b>`)。
+     ⚠ 名字是玩家輸入的,這裡自己 esc()(同 overWord 之外的每一支;notes/07 踩坑 #9)。
+     ========================================================================== */
+  const sgn = n => (n > 0 ? "+" : "") + n;
+  /* 這一局這個座位做了什麼。**回空字串 = 這一列不畫第二層** ——
+     流局時四列都寫「不收付」是純粹的重複(大字與那一句已經講過了)。
+     ⚠ 胡的那一列只寫「自摸 / 胡牌」,**不寫是誰放的** —— 那句話結果卡上面那一行
+       (「小明 胡 阿弟 打的牌 · 底 1 + 台 2 = 3 台」)已經講了,寫兩次就又回到
+       「同一件事講三遍」的老問題;而「誰放的」在放槍那一列也標著。 */
+  function roleOf(over, seat){
+    if(!over || over.type !== "win") return "";
+    if(over.seat === seat) return (over.from == null) ? "自摸" : "胡牌";
+    if(over.from === seat) return over.rob ? "槓被搶胡" : "放槍";
+    if(over.from == null)  return "被自摸";
+    return "沒有收付";                       // 別人放槍給別人胡:我一毛都不用付
+  }
+  /* rows:[{ name, me, total, delta, role, wins }] —— 順序不拘,這裡自己照台數排
+       total 累積台數 · delta 這一局的增減 · role 上面那支算的 ·
+       wins { n, plus } 或 **null(單機沒有勝場,整欄消失)**
+     opts:{ done 打完幾局, goal 這一場幾局, final 是不是最後一局 } */
+  function rankHTML(rows, opts){
+    const o = opts || {};
+    const hasWin = rows.some(r => r.wins);
+    const sorted = rows.slice().sort((a, b) => b.total - a.total);
+    /* ⚠ 表頭要留住「目前台數」/「總結算」這兩個詞:單機 e2e 拿它們認這張表的狀態
+       (`#m16Tai` 的 textContent),而它們本來就是最準的說法。 */
+    const head = '<span>' +
+      (o.final ? '<b>總結算</b> · ' + o.goal + ' 局打完'
+               : '<b>目前台數</b> · 第 ' + o.done + ' / ' + o.goal + ' 局結束') +
+      '</span><span class="m16-taiz">收付相加為 0</span>';
+    let rank = 0, prev = 0;
+    return '<div class="m16-taih">' + head + '</div>' +
+      sorted.map((r, i) => {
+        if(i === 0 || r.total !== prev){ rank = i + 1; prev = r.total; }
+        const first = rank === 1;
+        return '<div class="m16-tair' + (r.me ? " me" : "") + (first ? " win" : "") + '">' +
+          '<div class="m16-rmain' + (hasWin ? " has-win" : "") + '">' +
+            '<span class="m16-rno">' + rank + '</span>' +
+            '<span class="m16-rname">' + esc(r.name) + '</span>' +
+            // ⚠ 名字本身就叫「你」時(單機的 0 號位)不再掛徽章 —— 「你 你」是純雜訊,
+            //   而「這一列是我」還有框在標,訊號沒少(同排七 resultHTML)
+            (r.me && r.name !== "你" ? '<span class="you-badge">你</span>' : "") +
+            (first ? '<span class="m16-rcrown" title="台數第一">🏆</span>' : "") +
+            // ⚠ 這裡刻意**不用 🏆** —— 同一列的 🏆 已經是「台數第一」了,
+            //   同一個符號兩個意思會比兩張表還難懂
+            (r.wins ? '<span class="m16-rwin" title="累積勝場(胡了幾局)">' + r.wins.n + ' 勝' +
+                      (r.wins.plus ? '<i>+1</i>' : "") + '</span>' : "") +
+            // ⚠ 0 要自己一個顏色:進帳綠是「我贏了幾台」的意思,0 染成綠的會被讀成小賺
+            '<b class="' + (r.total < 0 ? "neg" : (r.total > 0 ? "" : "zero")) + '">' +
+              sgn(r.total) + ' 台</b>' +
+          '</div>' +
+          /* ⚠ 這一局的增減要**貼著角色**放,不可以像上層那樣推到最右邊:
+             推到右邊的話「累積台數」與「這一局」就變成同一欄上下兩個同單位的數字,
+             一眼掃過去分不出哪個是哪個 —— 那正是這一版要修掉的東西。
+             ⚠ 0 的時候不印「±0」:角色本身已經寫著「沒有收付」了。 */
+          (r.role
+            ? '<div class="m16-rsub"><span class="m16-rlab">這局</span>' +
+                '<span class="m16-rrole">' + r.role + '</span>' +
+                (r.delta ? '<span class="m16-rd' + (r.delta < 0 ? " neg" : " pos") + '">' +
+                             sgn(r.delta) + ' 台</span>' : "") +
+              '</div>'
+            : "") +
+        '</div>';
+      }).join("");
+  }
+
   return {
-    mount, render, revealHTML, readyHTML, overWord,
+    mount, render, revealHTML, readyHTML, overWord, roleOf, rankHTML,
     /* 只清「選取 / 宣告選項」那一組狀態。
        ⚠⚠ **不動牌寬的地板 fitTw**(v1.70.1,見檔頭⑤下面那條):這一支在
          「吃碰成立」「我表態完」也會被叫到,順手清掉地板就等於每次宣告結束
