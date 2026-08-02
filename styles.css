@@ -2671,7 +2671,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     background:rgba(255,255,255,.05);color:rgba(255,255,255,.34);
     font:700 clamp(8.5px,2.3vw,12.5px)/1 'Nunito',sans-serif}
   .sv-cell b{font-weight:800;font-size:1.02em;line-height:1}
-  .sv-cell i{font-style:normal;font-weight:700;font-size:.86em;line-height:1}
+  .sv-cell i{display:block;line-height:0}
+  /* ★ 花色是**自繪 SVG**(board.js 的 suitSVG),不是 Unicode 字元 ——
+     `♣` 長什麼樣完全看字型,而標準牌面的梅花是三葉草(三個圓 + 短莖),縮小更是糊成一團。
+     尺寸跟著格子的字級走(em),顏色靠 fill:currentColor 沿用下面那幾條既有的 color 規則
+     → 「牌面上用深紅、深色桌面上用亮紅」那兩支變數一行都不用改。 */
+  .sv-sv{display:block;width:1em;height:1em;fill:currentColor}
+  .sv-cell .sv-sv{width:.95em;height:.95em}
   /* 還沒出的那些花色也上色(暗版),整行是紅是黑一眼就分得出來 —— 行首標籤因此可以拿掉 */
   .sv-cell i{color:rgba(255,255,255,.38)}
   .sv-track.red .sv-cell i{color:rgba(255,123,123,.52)}
@@ -2692,19 +2698,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   :root[data-theme="ebook"] .sv-track.red .sv-cell.on i{color:#000}
   :root[data-theme="ebook"] .sv-cell.open{border:2px solid #000}
 
-  /* ---------- 對手列 ----------
-     ★ 蓋牌一律只畫張數(.sv-fp)—— 這一頁唯一的牌情紅線,牌值要等結果卡才翻開。 */
-  .sv-foes{flex:none;display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
-  .sv-foe{display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:9px;
-    background:rgba(255,255,255,.07);font:700 11.5px/1.4 'Nunito',sans-serif}
-  .sv-foe.on{background:rgba(255,255,255,.18);box-shadow:inset 0 0 0 1.5px var(--accent)}
-  .sv-foe.me{color:var(--accent-2)}
-  .sv-foe.done{opacity:.55}
-  .sv-fname{max-width:6em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .sv-fn,.sv-fp{display:inline-flex;align-items:center;font:800 11px/1 'Nunito',sans-serif;color:var(--muted)}
-  .sv-fp{color:var(--sv-redlit)}
-  :root[data-theme="ebook"] .sv-foe{background:#fff;border:1px solid #ccc}
-  :root[data-theme="ebook"] .sv-foe.on{border:2px solid #000}
+  /* ⚠ 盤面**沒有對手列**(v1.75.2 拿掉)。使用者:「在人物的框框裡一定有說了現在的牌狀況,
+     但是你在牌池裡下面又再一次的顯示這個資訊」—— 「誰 / 輪到誰 / 剩幾張 / 蓋幾張」
+     四樣在房間框與單機列的**玩家晶片**上全都有了,盤面再畫一次是 100% 重複,
+     而且吃掉的正是手牌需要的垂直空間。
+     ★ 晶片那一份是上面的 .sv-pip / .sv-chn / .sv-chp(連線走 adapter 的 chipTail、
+       單機走 solo.js 的 paintBar)—— **別跟著刪**。 */
 
   /* ---------- 我蓋掉的牌(自己看得到自己的) ---------- */
   .sv-mypile{flex:none;display:flex;flex-wrap:wrap;align-items:center;gap:3px;
@@ -2724,7 +2723,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      拇指按得到(同台灣麻將 v1.73.1 的 align-content:safe end 那個結論)。 */
   .sv-hand{flex:0 0 auto;margin-top:auto;display:flex;flex-wrap:wrap;justify-content:center;
     align-content:flex-start;gap:5px;padding:3px 2px 6px}
-  .sv-card{--svw:clamp(30px,8.6vw,46px);
+  /* ★ v1.75.2 縮一級(46 → 40 / 30 → 27)。使用者:「我很重視遊戲體驗,可能需要適當的
+     縮小一下目前牌的大小,因為我希望可以不用一直滑動,就能看到全部的牌」——
+     2 人局一手 26 張是最壞情況,配上拿掉對手列省下的那一列,390×844 剛好排得完不必捲。 */
+  .sv-card{--svw:clamp(27px,7.6vw,40px);
     flex:none;width:var(--svw);height:calc(var(--svw) * 1.42);
     border-radius:calc(var(--svw) * .13);border:1px solid var(--sv-line);
     background:linear-gradient(155deg,#fff,var(--sv-face) 58%);
@@ -2776,19 +2778,25 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ★ 這裡是唯一會翻開別人蓋牌的地方(對局中一律只顯示張數)。 */
   .sv-result{margin:2px 0 12px}
   .sv-rank{display:flex;flex-direction:column;gap:4px}
-  .sv-rrow{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:9px;
+  .sv-rrow{display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:9px;
     background:rgba(255,255,255,.06);font:700 12px/1.3 'Nunito',sans-serif}
-  .sv-rrow.win{background:rgba(255,255,255,.15);box-shadow:inset 0 0 0 1.5px var(--accent)}
-  .sv-rrow.me .sv-rname{color:var(--accent-2)}
+  /* ★★ **框起來的是「自己」,不是第一名**(v1.75.2)。使用者:「你會把第一名特別框起來,
+     這樣很容易讓大家以為自己是第一名」—— 一張排名表上被框住的那一列,第一直覺就是「我」,
+     拿它去表示名次是**每個人都會看錯的方向**(誰都會先找自己)。
+     兩個訊號現在完全分開,自己拿第一時兩個都亮:
+       框 + 「你」徽章 → 這一列是我      金色名次圈 + 🏆 → 這一列是第一名 */
+  .sv-rrow.me{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent-2)}
   .sv-rno{flex:none;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
     background:rgba(255,255,255,.14);font:800 11px/1 'Nunito',sans-serif}
   .sv-rrow.win .sv-rno{background:var(--accent);color:#1c1008}
+  .sv-rcrown{flex:none;font-size:12px;line-height:1}
   .sv-rname{flex:none;max-width:5.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .sv-rcards{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end}
   .sv-rpts{flex:none;min-width:3.4em;text-align:right;font-weight:800;color:var(--sv-redlit)}
   .sv-clean{font-size:11px;font-weight:800;color:var(--accent)}
   :root[data-theme="ebook"] .sv-rrow{background:#fff;border:1px solid #ccc}
-  :root[data-theme="ebook"] .sv-rrow.win{border:2px solid #000}
+  :root[data-theme="ebook"] .sv-rrow.me{border:2px solid #000;box-shadow:none}
+  :root[data-theme="ebook"] .sv-rrow.win .sv-rno{background:#000;color:#fff}
 
   /* ---------- 結果卡的表情列 ----------
      #winScores / #winChamp / #mpWinBtns / #soloWinBtns 的顯隱由數獨那段既有的
@@ -2808,5 +2816,5 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .sv-room{padding:6px 10px}
     .sv-tracks{gap:2px;padding:4px 7px}
     .sv-hand{gap:4px}
-    .sv-card{--svw:clamp(26px,7.4vw,40px)}
+    .sv-card{--svw:clamp(24px,6.8vw,34px)}
   }

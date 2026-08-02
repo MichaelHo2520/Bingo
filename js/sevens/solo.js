@@ -93,16 +93,10 @@ const Solo = (function(){
     if(!st) return;
     paintBar();
     const can = (st.turn === ME && !over) ? SV.legal(st.hands[ME], st.tracks) : [];
-    const rows = [];
-    for(let s = 0; s < seats; s++){
-      rows.push({
-        name: seatName(s), n: st.hands[s].length, piles: st.piles[s].length,
-        turn: !over && st.turn === s, me: s === ME, done: !st.hands[s].length
-      });
-    }
+    // ★ 不再傳 seats —— 盤面沒有對手列了,那些資訊只住在 paintBar() 的晶片上(見 board.js)
     SVB.render({
       tracks: st.tracks, hand: st.hands[ME].slice(), can: can,
-      myPile: st.piles[ME], seats: rows,
+      myPile: st.piles[ME],
       mode: (st.turn === ME && !over && !can.length) ? "cover" : "play"
     });
     SVB.renderActs({

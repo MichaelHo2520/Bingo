@@ -17,7 +17,8 @@
      代價是「算得出來」不等於「可以顯示」。這一頁只有**一條**牌情紅線
      (台灣麻將有六條,因為它有宣告視窗;排七沒有):
          ★ 別人蓋掉的牌,在結算前只能顯示張數。
-     落地點在 board.js 的 foeRow()(只畫 backHTML)與 resultHTML()(唯一翻開的地方)。
+     落地點在 adapter 的 chipTail()(晶片上只給張數)與 board.js 的 resultHTML()
+     (結果卡的排名表,唯一翻開的地方)。
 
    ── ★ 決定勝負的交易一定要帶 { local:false } ─────────────────────────────
      notes/07 踩坑 #8:Firebase 交易會先在本地樂觀套用,搶最後一手時搶輸的那台會
@@ -62,16 +63,10 @@ const MP = MPCore.create((function(){
     const me = mySeat();
     if(me < 0) return;
     const can = isMyTurn() ? SV.legal(st.hands[me], st.tracks) : [];
-    const rows = [];
-    for(let s = 0; s < st.n; s++){
-      rows.push({
-        name: nameOfSeat(s), n: st.hands[s].length, piles: st.piles[s].length,
-        turn: !st.over && st.turn === s, me: s === me, done: !st.hands[s].length
-      });
-    }
+    // ★ 不再傳 seats —— 盤面沒有對手列了,那些資訊只住在房間框的晶片上(chipTail,見 board.js)
     SVB.render({
       tracks: st.tracks, hand: st.hands[me].slice(), can: can,
-      myPile: st.piles[me], seats: rows,
+      myPile: st.piles[me],
       mode: (isMyTurn() && !can.length) ? "cover" : "play"
     });
     SVB.renderActs({
