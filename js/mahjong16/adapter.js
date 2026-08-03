@@ -47,10 +47,17 @@ const MP = MPCore.create((function(){
      可選的值寫在 mahjong16.html 的 #m16SecSeg(關 / 8 / 12 / 20 / 30),這裡只守範圍。 */
   const SEC_DEF = 12;
   const secOK = n => n === 0 || (n >= 5 && n <= 60);      // 守門用範圍,舊房間 / 手改 DB 的值也要能用
+  /* 底幾台(v1.75.15,使用者:「底幾台要能被設定,預設為 2 台」)。
+     ★ 一定是**房間層級設定**:底台是算收付用的,各人一份的話同一局四台會算出不同的錢
+       (而且收付相加照樣是 0,零和斷言抓不到)。可選的值寫在 mahjong16.html 的 #m16BaseSeg。
+     ⚠ 真正生效的地方是開局時寫進 state 的 st.base(見 newGame)—— 對局中改不到已開的局。 */
+  const BASE_DEF = 2;
+  const baseOK = n => n >= 1 && n <= 10;
 
   let ctx = null;
   let handsGoal = 4;                // 打幾局(房間設定)
   let claimSec = SEC_DEF;           // 宣告視窗幾秒(房間設定)
+  let baseTai = BASE_DEF;           // 底幾台(房間設定)
   let st = null;                    // 目前這一局的 MJT state(解碼後)
   let curRound = null;
   let tai = {};                     // tai 節點快照
@@ -571,7 +578,7 @@ const MP = MPCore.create((function(){
     el.innerHTML =
       "<b>台灣 16 張</b>:摸打吃碰槓,湊「5 組面子 + 1 對將」就胡。<br>"+
       "<b>4 人</b>用整副 144 張;<b>2~3 人</b>去掉萬子(108 張),<b>3 人不能吃</b>。<br>"+
-      "<b>相互算台</b>:自摸三家付、放槍一家付。<br>"+
+      "<b>相互算台</b>:自摸三家付、放槍一家付,<b>底 "+baseTai+" 台</b>。<br>"+
       (secOn()
         ? ("每打出一張牌起算 <b>"+claimSec+" 秒</b>,吃碰與接著的出牌共用這段時間;"+
            "沒表態算過,輪到出牌沒動作就摸切。<br>")
@@ -595,7 +602,7 @@ const MP = MPCore.create((function(){
     init(c){ ctx = c; },
 
     /* ---------- 房間設定 ---------- */
-    roomFields(){ return { handsGoal:handsGoal, claimSec:claimSec }; },
+    roomFields(){ return { handsGoal:handsGoal, claimSec:claimSec, baseTai:baseTai }; },
     onRoomField(k,v){
       const n = +v;
       if(k==="handsGoal"){
@@ -609,11 +616,21 @@ const MP = MPCore.create((function(){
         if(!secOK(n) || n===claimSec) return;
         claimSec = n;
         ctx.unreadyOnFieldChange(); ctx.syncSetup(); ruleHint();
+        return;
+      }
+      if(k==="baseTai"){
+        if(!baseOK(n) || n===baseTai) return;
+        baseTai = n;
+        ctx.unreadyOnFieldChange(); ctx.syncSetup(); ruleHint();
       }
     },
     readRoom(r){
       if(+r.handsGoal>0) handsGoal = +r.handsGoal;
       if(r.claimSec!==undefined && secOK(+r.claimSec)) claimSec = +r.claimSec;
+      /* ⚠ 舊房間沒有 baseTai → 維持 1 台(= v1.75.14 以前的行為),不要套用新預設值:
+         那些人開房時看到的規則說明寫的是「底 1 台」。 */
+      if(r.baseTai!==undefined && baseOK(+r.baseTai)) baseTai = +r.baseTai;
+      else if(r.baseTai===undefined) baseTai = 1;
     },
 
     listen(){
@@ -639,7 +656,8 @@ const MP = MPCore.create((function(){
         rs: "p"+n,
         dealer: done % n,                        // 每局換莊(連莊預設不做,局數才可預測)
         roundWind: MJ16.idxOf("fe"),
-        handNo: done+1
+        handNo: done+1,
+        base: baseTai
       });
       return Object.assign({ order:ord }, MJT.enc(s));
     },
@@ -730,6 +748,13 @@ const MP = MPCore.create((function(){
       }
       const L2 = $("m16SecLabel");
       if(L2) L2.textContent = isHost ? "操作倒數" : "操作倒數(房主決定)";
+      const seg3 = $("m16BaseSeg");
+      if(seg3){
+        seg3.classList.toggle("readonly", !isHost);
+        [...seg3.children].forEach(b=>b.classList.toggle("on", +b.dataset.base===baseTai));
+      }
+      const L3 = $("m16BaseLabel");
+      if(L3) L3.textContent = isHost ? "底幾台" : "底幾台(房主決定)";
       ruleHint();
     },
     /* 房間框那顆徽章(麥克風左邊)。
@@ -788,7 +813,6 @@ const MP = MPCore.create((function(){
       const done = handsDoneNow();
       const last = done >= handsGoal;
       paintTaiTable(last);
-      paintWinTiles();                 // 胡的人攤什麼牌(流局時自己收起來)
 
       /* 大字:四種輸法分開講(v1.70.0)。文案表與挑選規則在 M16B.overWord() —— 單機那份
          叫的是同一支,所以這裡**不再是「兩份要一起改」**的其中一份。
@@ -800,8 +824,12 @@ const MP = MPCore.create((function(){
 
       /* ⚠ 句尾不要放 Unicode 麻將字元 —— 理由與 solo.js 那份同一條(U+1F02B 會畫成空心
          方框,看起來就是豆腐)。msg 這一半仍然是兩份,改一邊一定要改另一邊。 */
+      /* ★ 「誰奪冠」要**接在大字下面第一行**(v1.75.15,使用者:「本場結束的下一行
+         應該要接誰奪冠」)—— 大字寫「本場結束」而下一行卻在講這一手怎麼胡的,
+         最重要的那件事被擠到第三行去了。 */
       if(!st || !st.over || st.over.type==="draw")
-        return { word: last ? "本場結束" : ow.word, msg: last ? seasonMsg() : "牌山見底,這一局不收付" };
+        return { word: last ? "本場結束" : ow.word,
+                 msg: (last ? seasonMsg()+"<br>" : "") + "牌山見底,這一局不收付" };
 
       const o = st.over;
       const tag = o.list.map(x=>esc(x.name)+" "+x.tai).join("、");
@@ -813,15 +841,19 @@ const MP = MPCore.create((function(){
          ⚠ msg 這一半仍然是兩份(solo.js 的 paintResult),改一邊一定要改另一邊。 */
       const line = (iWon ? how : (esc(w.name||"對手")+" "+how)) +
                    " · 底 "+o.base+" + 台 "+o.tai+" = <b>"+o.total+"</b> 台("+(tag||"無台")+")";
-      /* ★ 最後一局仍是「本場結束」(與單機同步):那張卡的主角是總結算。 */
-      return { word: last?"本場結束":ow.word, msg: line+(last?"<br>"+seasonMsg():"") };
+      /* ★ 最後一局仍是「本場結束」(與單機同步):那張卡的主角是總結算,
+         所以「誰奪冠」排在這一手的細節**前面**(見上面那條)。 */
+      return { word: last?"本場結束":ow.word, msg: (last?seasonMsg()+"<br>":"")+line };
     },
 
-    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec,
+    ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, baseTai:baseTai,
                          voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
       if(o.claimSec!==undefined && secOK(+o.claimSec)) claimSec = +o.claimSec;
+      /* ⚠ 舊偏好沒有 baseTai → 用**新預設值 2**(這裡與 readRoom 相反:那邊是別人已經
+         開好的房間,規則說明寫的是舊的;這裡是我自己下次開房要用的值)。 */
+      if(o.baseTai!==undefined && baseOK(+o.baseTai)) baseTai = +o.baseTai;
       /* 喊牌語音預設**開**:舊偏好裡沒有這個欄位(undefined),要當成開,
          寫成 `=== true` 的話所有老玩家升上來都會是關的,而他們根本不知道有這個開關。 */
       const call = o.voice !== false;
@@ -853,7 +885,14 @@ const MP = MPCore.create((function(){
         if(!ctx.setRoomField("claimSec", v, { lobbyOnly:true, denyMsg:"只有房主能改操作倒數", busyMsg:"對戰中不能改操作倒數" })) return;
         claimSec = v; ctx.syncSetup(); savePrefs();
       },
-      taiOf, handsDone, goal:()=>handsGoal, sec:()=>claimSec,
+      /* 底幾台。lobbyOnly:底台是開局時寫進 st.base 的,對局中改只會讓下一局變、
+         而畫面上的規則說明先變 —— 看起來像這一局的收付算錯了。 */
+      setBase(v){
+        v = +v; if(!baseOK(v)) return;
+        if(!ctx.setRoomField("baseTai", v, { lobbyOnly:true, denyMsg:"只有房主能改底台", busyMsg:"對戰中不能改底台" })) return;
+        baseTai = v; ctx.syncSetup(); savePrefs();
+      },
+      taiOf, handsDone, goal:()=>handsGoal, sec:()=>claimSec, base:()=>baseTai,
       state:()=>st, seat:mySeat,
       // 盤面切換「要吃哪一組」之後,✔ 按鈕上的字要跟著換 → 回頭叫這支重畫動作列
       refreshActs: renderActs,
@@ -872,23 +911,8 @@ const MP = MPCore.create((function(){
         · 第 n / N 局    → 搬到房間框的 #mpBarGoal(麥克風左邊,見 updateGoal)
         · 莊 某某        → 搬到每一家自己那一列 / 玩家晶片(board.foeHTML + chipLead)) */
 
-  /* ---------- 結果卡:胡牌那家的攤牌(v1.58.4) ----------
-     使用者:「如果別人胡了,我覺得應該要顯示出胡的人是什麼牌」。
-     ★ 手牌明碼那個架構決策在這裡再拿一次紅利:攤牌不必等誰上傳,每台裝置本來就有
-       完整的 state,自己畫就是。
-     ⚠ 牌大小照張數算 —— 結果卡內容寬只有約 300px,清一色 17 張硬塞會爆出去;
-       有明牌時手牌短很多,反而可以畫大一點。 */
-  function paintWinTiles(){
-    const box = $("m16Win"); if(!box) return;
-    if(!st || !st.over || st.over.type!=="win"){ box.classList.add("hidden"); box.innerHTML=""; return; }
-    const o = st.over;
-    const n = (st.hands[o.seat]||[]).length;
-    const tw = Math.max(17, Math.min(28, Math.floor(300 / Math.max(1,n))));
-    box.classList.remove("hidden");
-    box.innerHTML =
-      '<div class="m16-showh">'+esc(nameOfSeat(o.seat))+' 的牌 · <em>紅框</em>是胡的那張</div>'+
-      M16B.revealHTML(st, o.seat, tw, o.tile);
-  }
+  /* (v1.75.15:結果卡的 paintWinTiles() 整支拿掉 —— 攤牌改在牌桌上、而且每一家都攤,
+      見 board.js 的 foeHTML。同一件事不要在兩個地方各畫一次。) */
 
   /* ---------- 結果卡的排名表(v1.75.14 起是「一張表」) ----------
      版面與四個病灶見 board.js 的 rankHTML —— 這裡只負責把資料湊齊:
@@ -922,6 +946,7 @@ const MP = MPCore.create((function(){
     if(!ord.length) return "";
     let best = -Infinity, who = [];
     ord.forEach(id=>{ const t=taiOf(id); if(t>best){ best=t; who=[id]; } else if(t===best) who.push(id); });
-    return "🏆 "+who.map(id=>esc(ctx.dispName(id))).join("、")+" 以 "+best+" 台奪冠";
+    return '<span class="m16-champline">🏆 '+who.map(id=>esc(ctx.dispName(id))).join("、")+
+           " 以 "+best+" 台奪冠</span>";
   }
 })());

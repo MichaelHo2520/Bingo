@@ -295,15 +295,31 @@ const M16B = (function(){
     /* ★ 宣告聽牌是**公開**的(v1.67.0):誰宣告了全桌都要看得到 —— 不然玩家不知道
        該不該小心放槍,那一台就變成偷襲而不是宣告。⚠ 與「誰在考慮吃碰」剛好相反。 */
     const tk = (typeof MJT !== "undefined" && MJT.tingOf) ? MJT.tingOf(st, seat) : null;
-    return '<div class="m16-foe'+(shownTurn()===seat?" on":"")+(tk?" ting":"")+'" data-seat="'+seat+'">'+
+    /* ★★ 一局結束就**把每一家的手牌翻開**(v1.75.15)。使用者:「每一局結束的時候,
+       我希望能把全部人的牌都顯示出來,不是在勝負頁顯示,而是在牌桌顯示,這樣還可以
+       回去看牌桌,看看到底牌在誰那裡」。
+       ★ 這是牌情紅線的**唯一**豁免點,而它安全的理由只有一個:`st.over` 有值 =
+         這一局已經結束、不會再有任何動作。**判斷式一個字都不能放寬**(不可以改成
+         「有人胡了」或「輪次停住」之類的近似條件)。
+       ★ 攤開之後結果卡就不再另外畫一次胡牌那家的牌(#m16Win 整塊在這一版拿掉)——
+         同一件事在兩個地方畫,正是這一輪在收掉的東西。
+       ⚠ 用 revealHTML() 而不是自己拼:胡的那張要標紅框、明牌 / 暗槓 / 花牌的排法
+         都在那一支裡,拼第二份一定走鐘(它原本就是為結果卡寫的,現在換這裡用)。 */
+    const over = st.over;
+    const shown = !!over;
+    const winT = (over && over.type==="win" && over.seat===seat) ? over.tile : undefined;
+    return '<div class="m16-foe'+(shownTurn()===seat?" on":"")+(tk?" ting":"")+
+             (shown?" shown":"")+'" data-seat="'+seat+'">'+
       '<span class="m16-wind">'+F.info(wind).glyph+'</span>'+
       (seat===st.dealer?'<span class="m16-dz">莊</span>':'')+
       (tk?'<span class="m16-tg">'+(TING_LBL[tk]||"聽")+'</span>':'')+
       '<span class="m16-foename" data-seat="'+seat+'"></span>'+
-      '<span class="m16-cnt">'+cntBack()+cnt+'</span>'+
+      // 攤開之後不再寫「🀫 N」:牌就在旁邊,而牌背的圖示反而像「還是蓋著的」
+      (shown ? "" : '<span class="m16-cnt">'+cntBack()+cnt+'</span>')+
       '<span class="m16-fmelds">'+
-        (fl.length?flowerHTML(fl, mtw):"")+
-        st.melds[seat].map(m=>meldHTML(m, mtw)).join("")+
+        (shown
+          ? revealHTML(st, seat, mtw, winT)
+          : (fl.length?flowerHTML(fl, mtw):"")+st.melds[seat].map(m=>meldHTML(m, mtw)).join(""))+
       '</span>'+
     '</div>';
   }
@@ -423,7 +439,11 @@ const M16B = (function(){
        ⚠ 直線只是近似(明牌 / 對手列會換行,是階梯不是直線),所以後面再收兩次保險。
        ⚠ clientHeight 太小(面板還沒顯示)時整段不做,否則會一路縮到 TILE_MIN;
          顯示出來時 ResizeObserver 會再叫一次 render()。 */
-    if(hh > 80 && h1 > hh + 2 && tw > TILE_MIN){
+    /* ⚠ 一局結束就**不再重新夾牌寬**(v1.75.15):那一刻對手列會整排翻開手牌,
+       總高度暴增 → 這一段會把整副牌狠狠縮一次,而使用者看到的是「結算時牌忽然變小」
+       (檔頭④那條紅線的反面)。盤面本來就是 overflow-y:auto,長高就捲,不必縮。
+       下一局的 resetFit() 會重新量,所以也不會把這個凍結的值背著走。 */
+    if(!st.over && hh > 80 && h1 > hh + 2 && tw > TILE_MIN){
       const t2 = Math.max(TILE_MIN, Math.round(tw * 0.7));
       let nt = t2;
       if(t2 < tw){
@@ -463,7 +483,7 @@ const M16B = (function(){
     }
     /* 記住這個容器尺寸下的牌寬(只縮不放的地板)。
        ⚠ 暖身期內只畫不記 —— 那幾幀量到的高度還不可信(見上面 WARM_MS 那段)。 */
-    if(hh > 80 && !(warmUntil && Date.now() < warmUntil)) fitTw = cur;
+    if(!st.over && hh > 80 && !(warmUntil && Date.now() < warmUntil)) fitTw = cur;
 
     /* 牌河高度寫死成 POOL_ROWS 排 → 打超過就要捲,而**最新那張永遠得看得見** */
     const pool = host.querySelector(".m16-pool");
@@ -832,10 +852,10 @@ const M16B = (function(){
     const sorted = rows.slice().sort((a, b) => b.total - a.total);
     /* ⚠ 表頭要留住「目前台數」/「總結算」這兩個詞:單機 e2e 拿它們認這張表的狀態
        (`#m16Tai` 的 textContent),而它們本來就是最準的說法。 */
-    const head = '<span>' +
-      (o.final ? '<b>總結算</b> · ' + o.goal + ' 局打完'
-               : '<b>目前台數</b> · 第 ' + o.done + ' / ' + o.goal + ' 局結束') +
-      '</span><span class="m16-taiz">收付相加為 0</span>';
+    /* ⚠ 這裡曾經還掛一句「收付相加為 0」(v1.75.15 拿掉)——
+       使用者:「對使用者沒有用」。那是**開發時的不變量**(零和斷言),不是玩家要看的。 */
+    const head = o.final ? '<b>總結算</b> · ' + o.goal + ' 局打完'
+                         : '<b>目前台數</b> · 第 ' + o.done + ' / ' + o.goal + ' 局結束';
     let rank = 0, prev = 0;
     return '<div class="m16-taih">' + head + '</div>' +
       sorted.map((r, i) => {
@@ -851,8 +871,10 @@ const M16B = (function(){
             (first ? '<span class="m16-rcrown" title="台數第一">🏆</span>' : "") +
             // ⚠ 這裡刻意**不用 🏆** —— 同一列的 🏆 已經是「台數第一」了,
             //   同一個符號兩個意思會比兩張表還難懂
-            (r.wins ? '<span class="m16-rwin" title="累積勝場(胡了幾局)">' + r.wins.n + ' 勝' +
-                      (r.wins.plus ? '<i>+1</i>' : "") + '</span>' : "") +
+            /* ⚠ **不可以**在這裡再掛一個「+1」(v1.75.15 拿掉)。使用者:「1勝+1,
+               這樣會不會很容易覺得是不是 2 勝?」—— 會,而且那個 +1 完全是多的:
+               `n` 本來就已經含這一局,而「這一局是誰胡的」下面那一層寫得清清楚楚。 */
+            (r.wins ? '<span class="m16-rwin" title="累積勝場(胡了幾局)">' + r.wins.n + ' 勝</span>' : "") +
             // ⚠ 0 要自己一個顏色:進帳綠是「我贏了幾台」的意思,0 染成綠的會被讀成小賺
             '<b class="' + (r.total < 0 ? "neg" : (r.total > 0 ? "" : "zero")) + '">' +
               sgn(r.total) + ' 台</b>' +

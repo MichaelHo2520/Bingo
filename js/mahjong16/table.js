@@ -77,6 +77,13 @@ const MJT = (function(){
       roundWind: (typeof o.roundWind==="number") ? o.roundWind : 27,
       handNo: o.handNo || 1,
       dealerStreak: o.dealerStreak || 0,
+      /* 底幾台(v1.75.15,使用者:「底幾台要能被設定,預設為 2 台」)。
+         ★ 這一層**不給預設值**,沿用 settleWin 的 fallback 1 —— 預設值是「一場的設定」,
+           歸 solo.js / adapter.js 的 BASE_DEF 管(同 handsGoal / claimSec 的分工)。
+           在這裡塞 2 會讓 node 那幾支純函式測試的台數整組位移,而它們驗的是規則不是設定。
+         ⚠ 一定要進 enc/dec:底台是**開局就定的**,少了它別台裝置與重連的那台會用 1 台
+           算收付 —— 而收付相加仍然是 0,零和斷言抓不到,只有「他算出來跟我不一樣」。 */
+      base: (typeof o.base === "number" && o.base > 0) ? (o.base | 0) : 1,
       claim: null,
       over: null,
       firstGo: true,          // 還在第一巡(天 / 地 / 人胡)
@@ -509,7 +516,7 @@ const MJT = (function(){
       flowers:st.flowers.map(f=>f.join(",")).join("|"),
       discards:st.discards.map(d=>d.seat+":"+d.t).join(","),
       turn:st.turn, drawn:st.drawn, dealer:st.dealer, roundWind:st.roundWind,
-      handNo:st.handNo, dealerStreak:st.dealerStreak,
+      handNo:st.handNo, dealerStreak:st.dealerStreak, base:st.base,
       claim:st.claim?JSON.stringify(st.claim):null,
       over:st.over?JSON.stringify(st.over):null,
       firstGo:!!st.firstGo, kongDraw:!!st.kongDraw, robbable:st.robbable,
@@ -547,6 +554,8 @@ const MJT = (function(){
       turn:g.turn||0, drawn:(typeof g.drawn==="number")?g.drawn:-1,
       dealer:g.dealer||0, roundWind:g.roundWind||27,
       handNo:g.handNo||1, dealerStreak:g.dealerStreak||0,
+      // 舊房間沒有 base → 解成 1(= v1.75.14 以前的行為),不會壞
+      base:(typeof g.base==="number" && g.base>0)?g.base:1,
       claim:g.claim?JSON.parse(g.claim):null,
       over:g.over?JSON.parse(g.over):null,
       firstGo:!!g.firstGo, kongDraw:!!g.kongDraw,

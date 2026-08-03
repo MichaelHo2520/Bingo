@@ -35,8 +35,13 @@ const Solo = (function(){
   const AI_NAMES = ["小碰", "阿槓", "老胡"];
   const SEATS_OK = [2,3,4];
   const GOALS = [1,4,8,16];
+  /* 底幾台(v1.75.15,使用者:「底幾台要能被設定,預設為 2 台」)。
+     ★ 預設值放在這裡而不是 MJT.newRound:那一層是規則,底台是**一場的設定**
+       (同 goal / seats)。連線那份是房間設定,見 adapter.js 的 BASE_DEF。 */
+  const BASES = [1,2,3,5];
+  const BASE_DEF = 2;
 
-  let level = "normal", seats = 4, goal = 4;
+  let level = "normal", seats = 4, goal = 4, base = BASE_DEF;
   let rec = {};                                   // 各難度戰績 { easy:{g,w,best}, … }
 
   let st = null;                                  // 這一局的 MJT state
@@ -73,12 +78,13 @@ const Solo = (function(){
       if(MJ16AI.LEVELS[o.level]) level = o.level;
       if(SEATS_OK.indexOf(+o.seats) >= 0) seats = +o.seats;
       if(GOALS.indexOf(+o.goal) >= 0) goal = +o.goal;
+      if(BASES.indexOf(+o.base) >= 0) base = +o.base;
       rec = (o.rec && typeof o.rec === "object") ? o.rec : {};
     }catch(e){}
     MJ16AI.LEVEL_KEYS.forEach(function(k){ if(!rec[k]) rec[k] = blank(); });
   }
   function saveOwn(){
-    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level:level, seats:seats, goal:goal, rec:rec })); }catch(e){}
+    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level:level, seats:seats, goal:goal, base:base, rec:rec })); }catch(e){}
   }
   function recOf(k){ return rec[k] || blank(); }
   function recText(k){
@@ -133,7 +139,8 @@ const Solo = (function(){
       rs: "p" + seats,
       dealer: handNo % seats,                     // 每局換莊(同連線:局數才可預測)
       roundWind: MJ16.idxOf("fe"),
-      handNo: handNo + 1
+      handNo: handNo + 1,
+      base: base
     });
     if(!st){ showToast("發牌失敗,回選單"); quit(); return; }
     step();
@@ -500,17 +507,7 @@ const Solo = (function(){
     const card = $("m16WinCard");
     if(card){ card.classList.remove("win","lose","draw"); card.classList.add(ow.tone); }
 
-    // 攤出胡牌那家的牌
-    const box = $("m16Win");
-    if(box){
-      if(o.type === "win"){
-        const n = (st.hands[o.seat] || []).length;
-        const tw = Math.max(17, Math.min(28, Math.floor(300 / Math.max(1,n))));
-        box.classList.remove("hidden");
-        box.innerHTML = '<div class="m16-showh">' + esc(seatName(o.seat)) +
-          ' 的牌 · <em>紅框</em>是胡的那張</div>' + M16B.revealHTML(st, o.seat, tw, o.tile);
-      }else{ box.classList.add("hidden"); box.innerHTML = ""; }
-    }
+    // (v1.75.15:結果卡不再攤牌 —— 牌桌上每一家都攤開了,見 board.js 的 foeHTML)
     paintTai(last);
 
     let word, msg;
@@ -522,7 +519,8 @@ const Solo = (function(){
          (styles.css 的牌面段落、js/mahjong/board.js 檔頭):那 43 個字元只有 🀄 有
          emoji 呈現,其餘一律文字呈現、各家字型畫出來的東西都不一樣。
          ★ 這裡是**散文句尾的裝飾**,拿掉就好(要放圖一律用 MJFace 自繪的牌)。 */
-      msg = "牌山見底,這一局不收付" + (last ? "<br>" + seasonMsg() : "");
+      // ★ 「誰奪冠」接在大字下面第一行(v1.75.15,理由與連線那份同一條)
+      msg = (last ? seasonMsg() + "<br>" : "") + "牌山見底,這一局不收付";
     }else{
       const tags = o.list.map(function(x){ return esc(x.name)+" "+x.tai; }).join("、");
       const how = (o.from === null) ? "自摸" : ("胡 " + esc(seatName(o.from)) + " 打的牌");
@@ -532,7 +530,7 @@ const Solo = (function(){
                    " · 底 " + o.base + " + 台 " + o.tai + " = <b>" + o.total + "</b> 台(" + (tags||"無台") + ")";
       /* ★ 最後一局仍然是「本場結束」(單機 e2e 在斷言這句):那一張卡的主角是總結算。 */
       word = last ? "本場結束" : ow.word;
-      msg = line + (last ? "<br>" + seasonMsg() : "");
+      msg = (last ? seasonMsg() + "<br>" : "") + line;
     }
     $("winWord").textContent = word;
     $("winMsg").innerHTML = msg;
@@ -570,7 +568,9 @@ const Solo = (function(){
       if(t > best){ best = t; top = [s]; } else if(t === best) top.push(s);
     }
     const who = top.map(seatName).join("、");
-    return (top.indexOf(ME) >= 0 ? "🏆 你以 " : "🏆 " + esc(who) + " 以 ") + best + " 台奪冠";
+    return '<span class="m16-champline">' +
+           (top.indexOf(ME) >= 0 ? "🏆 你以 " : "🏆 " + esc(who) + " 以 ") +
+           best + ' 台奪冠</span>';
   }
 
   /* 點對手那一列:報一下他是誰、什麼難度、攤了幾組(連線版那裡是傳表情,單機沒有對象) */
@@ -596,8 +596,10 @@ const Solo = (function(){
     level: function(){ return level; },
     seats: function(){ return seats; },
     goal:  function(){ return goal; },
+    base:  function(){ return base; },
     setLevel(v){ if(MJ16AI.LEVELS[v]){ level = v; saveOwn(); } },
     setSeats(v){ v=+v; if(SEATS_OK.indexOf(v)>=0){ seats = v; saveOwn(); } },
-    setGoal(v){ v=+v; if(GOALS.indexOf(v)>=0){ goal = v; saveOwn(); } }
+    setGoal(v){ v=+v; if(GOALS.indexOf(v)>=0){ goal = v; saveOwn(); } },
+    setBase(v){ v=+v; if(BASES.indexOf(v)>=0){ base = v; saveOwn(); } }
   };
 })();

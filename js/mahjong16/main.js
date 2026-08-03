@@ -56,6 +56,7 @@ function paintSoloHint(){
   el.innerHTML = "<b>"+L.emoji+" "+L.name+"</b>:"+esc(L.desc)+"<br>"+
     (n===4 ? "4 家用整副 <b>144 張</b>" : (n+" 家<b>去掉萬子</b>(108 張)"+(n===3?",而且<b>不能吃</b>":"")))+
     " · 你固定坐第一家,莊家每局輪一位。<br>"+
+    "相互算台,<b>底 "+Solo.base()+" 台</b>。<br>"+
     "<span class=\"m16-warn\">🀄 "+esc(Solo.recText(Solo.level()))+"</span>";
 }
 /* 三段選擇列共用的「點一下亮起來」 */
@@ -76,6 +77,7 @@ function syncSoloSeg(){
   set("m16LvSeg","lv",Solo.level());
   set("m16SeatSeg","seats",Solo.seats());
   set("m16SoloGoalSeg","goal",Solo.goal());
+  set("m16SoloBaseSeg","base",Solo.base());
 }
 
 /* ---------- 盤面 ----------
@@ -105,6 +107,7 @@ $("m16SoloCfgBack").addEventListener("click",()=>showHomeLayer("pick"));
 segPick("m16LvSeg","lv",v=>Solo.setLevel(v));
 segPick("m16SeatSeg","seats",v=>Solo.setSeats(v));
 segPick("m16SoloGoalSeg","goal",v=>Solo.setGoal(v));
+segPick("m16SoloBaseSeg","base",v=>Solo.setBase(v));
 $("m16StartSolo").addEventListener("click",()=>{ markAudioArmed(); Sound.wake(); Solo.start(); });
 
 /* ---------- 單機牌桌 ---------- */
@@ -125,6 +128,9 @@ function closeSoloQuit(){ $("leaveVeil").classList.remove("show"); }
 /* ---------- 大廳設定 ---------- */
 $("m16GoalSeg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(b) MP.setGoal(b.dataset.goal);
+});
+$("m16BaseSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(b) MP.setBase(b.dataset.base);
 });
 $("m16SecSeg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(b) MP.setSec(b.dataset.sec);
