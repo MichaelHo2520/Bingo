@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>大老二 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 大老二 · v1.80.0 -->
-<meta name="version" content="1.80.0">
+<!-- 大老二 · v1.81.0 -->
+<meta name="version" content="1.81.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -71,7 +71,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         可出 <b>1 張(單張)· 2 張(對子)· 5 張</b>;五張只有<b>順子 · 葫蘆 · 鐵支 · 同花順</b>。<br>
         <b>同牌型才能互壓</b>(順子只壓順子、葫蘆只壓葫蘆),而<b>鐵支與同花順壓得過任何牌型</b>,
         同花順又比鐵支大。壓不過就喊「不要」。<br>
-        出完的人退出、牌局繼續,打到只剩一家。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。
+        出完的人退出、牌局繼續,打到只剩一家。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。<br>
+        <!-- ★ v1.81.0:「拉」。⚠ 一定要寫「不管幾張」與「3/4 張永遠不算」——
+             網路上最常見的說法是「剩一張才喊」(錯的),而這一版三條不能單出,
+             所以剩 3 張比標準大老二更晚才進入「最後一手」。見 notes/16 第六之六節。 -->
+        誰<b>剩最後一手</b>(不管幾張)時,系統會自動報一聲「<b>拉</b>」讓全桌知道 ——
+        這一版三條不能單出,所以<b>剩 3 張或 4 張永遠不算最後一手</b>。
       </div>
     </div>
 

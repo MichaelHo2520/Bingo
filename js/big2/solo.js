@@ -75,6 +75,10 @@ const Solo = (function(){
     const box = $("b2SoloPlayers");
     if(box){
       box.className = "mp-players oneline";
+      /* ★ 「拉」= 剩最後一手(v1.81.0)。判斷在規則層(B2.laSeats),記號的 HTML 在
+         board.js(B2B.laChipHTML)—— 連線的 chipTail() 吃的是**同兩支**,
+         這一對雙胞胎因此只差「去哪裡拿座位」。 */
+      const la = st ? B2.laSeats(st) : [];
       let h = "";
       for(let s = 0; s < seats; s++){
         const isTurn = !!(st && !st.over && !over && st.turn === s);
@@ -87,7 +91,8 @@ const Solo = (function(){
                (s === ME ? '<span class="you-badge">你</span>' : "") +
                (n === 0 && fin >= 0
                  ? '<span class="b2-chf" title="已經出完">第 ' + (fin + 1) + ' 名</span>'
-                 : '<span class="b2-chn" title="手上剩幾張"><i class="b2-pip"></i>' + n + '</span>') +
+                 : B2B.laChipHTML(la[s], s === ME) +
+                   '<span class="b2-chn" title="手上剩幾張"><i class="b2-pip"></i>' + n + '</span>') +
              '</div>';
       }
       box.innerHTML = h;
@@ -107,6 +112,11 @@ const Solo = (function(){
     const mine = st.turn === ME && !over && !busy;
     const nms = [];
     for(let s = 0; s < seats; s++) nms.push(seatName(s));
+    /* ★ 「拉」的公告(v1.81.0)。走 diff 而不是在出牌那一點插一行 ——
+       ① 同一個理由與音效那條規矩一樣(台灣麻將 notes/11 第三節)
+       ② 這一份與連線共用,而連線那邊只有 diff 拿得到「剛剛才變成拉」。
+       ⚠ key 要與 render() 那個 key 同一個字串:換局時它負責把上一局的記錄清掉。 */
+    B2B.announceLa({ st: st, names: nms, me: ME, key: "solo:" + round });
     /* ★ 手牌要亮哪幾張 / 有沒有牌可出:規則層算(B2.playable),連線那份逐字一樣。
        ⚠ 只在**輪到我**時算 —— 輪到對手時亮暗沒有意義,而且那是每次重畫都要跑的
          枚舉(26 張手牌約 2ms),沒必要白跑。 */

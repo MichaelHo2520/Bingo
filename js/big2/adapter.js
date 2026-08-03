@@ -108,6 +108,12 @@ const MP = MPCore.create((function(){
       cdEnd: secOn() ? turnAt + turnSec * 1000 : 0
     });
     ctx.renderPlayers();
+    /* ★ 「拉」的公告(v1.81.0)—— 與單機那份**共用 board.js 的同一支**,
+       所以這裡只有一行。⚠ 要放在 renderPlayers() **之後**:記號是它畫上去的,
+       公告(音 + toast)排在畫面之後才不會出現「先聽到聲音、記號慢一拍」。
+       ⚠ key 一律用 roundId(同 render 那個);批次同步 / 斷線重連不會亂響的理由
+         在 board.js 四之二那段(laPrev === null 就只記不響)。 */
+    B2B.announceLa({ st: st, names: nms, me: me, key: ctx.roundId() });
   }
 
   /* ==========================================================================
@@ -375,7 +381,12 @@ const MP = MPCore.create((function(){
       const fin = st.finished.indexOf(s);
       if(!st.hands[s].length && fin >= 0)
         return '<span class="b2-chf" title="已經出完">第 ' + (fin + 1) + ' 名</span>';
-      return '<span class="b2-chn" title="手上剩幾張"><i class="b2-pip"></i>' + st.hands[s].length + '</span>';
+      /* ★ 「拉」= 剩最後一手(v1.81.0)。判斷 B2.isLast、記號 B2B.laChipHTML ——
+         單機的 paintBar() 吃的是**同兩支**(這一頁那組雙胞胎只差「去哪裡拿座位」)。
+         ⚠ 這是牌情紅線唯一的第二個豁免點:只公開「他剩最後一手」**一個 bit**,
+           牌型 / 牌值一律不准(理由與範圍寫在 board.js 四之二)。 */
+      return B2B.laChipHTML(B2.isLast(st.hands[s]), s === mySeat()) +
+             '<span class="b2-chn" title="手上剩幾張"><i class="b2-pip"></i>' + st.hands[s].length + '</span>';
     },
     lobbyStatusText(ids){ return ids.length < 2 ? "等待其他人加入…" : "等待大家準備…"; },
     readyHint(ids, ready){

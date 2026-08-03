@@ -3217,6 +3217,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     background:rgba(255,255,255,.16);font:800 10px/1.4 'Nunito',sans-serif;color:var(--accent)}
   .mp-chip.out{opacity:.72}
   :root[data-theme="ebook"] .b2-chf{background:#eee;color:#000;border:1px solid #ccc}
+  /* ★★ 「拉」= 他剩最後一手了(v1.81.0)。真人規則要求喊出來,所以這是牌情紅線的
+     第二個豁免點(第一個是結果卡)—— 但只公開**一個 bit**:牌型 / 牌值一律不准進來。
+     ⚠ 一定要 nowrap:4 人局 + 長名字時晶片列本來就很擠,「拉」被折成兩行會把整列撐高。
+     ⚠ 用紅(224,83,63 = 這一頁既有的「注意」色)而不是 --accent —— 名次徽章 .b2-chf
+       已經用掉 accent 了,同色會讀成同一類東西,而這兩件事完全不同。 */
+  .b2-chla{display:inline-flex;align-items:center;white-space:nowrap;
+    padding:1px 5px;margin-right:3px;border-radius:7px;
+    background:rgba(224,83,63,.26);box-shadow:0 0 0 1px rgba(224,83,63,.55) inset;
+    font:900 10px/1.4 'Nunito',sans-serif;color:#ffd7cf;letter-spacing:.5px}
+  :root[data-theme="ebook"] .b2-chla{background:#fff;color:#000;border:2px solid #000;box-shadow:none}
   /* ★ 小牌形:代替 U+1F0A0 那一段的撲克牌字元(它們多數字型沒有,會變豆腐方框) */
   .b2-pip{display:inline-block;width:7px;height:10px;border-radius:2px;
     background:var(--b2-face);border:1px solid var(--b2-line);margin-right:2px}

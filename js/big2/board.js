@@ -414,6 +414,87 @@ const B2B = (function(){
   }
 
   /* ==========================================================================
+     四之二、★★ 「拉」的公告(v1.81.0)—— 單機與連線**共用這一份**
+     ──────────────────────────────────────────────────────────────────────────
+       真人規則:剩最後一手(不管幾張)必須喊「拉」,用意是**強制資訊揭露**。
+       使用者拍板**由系統自動公告**(玩家零操作、不做「漏喊罰 0 分」)。
+
+       ★ 為什麼共用一份而不是照這一頁的慣例各寫一份:
+         這是**純衍生**的東西(從 st.hands 算出來),沒有任何「連線才有 / 單機才有」的
+         成分,而 diff + 去重那一段一旦有兩份,走鐘了兩邊各自都不會壞、沒有東西抓得到
+         —— 那正是這個專案最痛的一類。呼叫端各一行。
+
+       ★★ 種子(seed)那一條是這一段的心臟:`laPrev === null` 或**換局**時
+          **只記住、不出聲**。它一次擋掉四種會亂響的情形:
+            ① 第一次進牌桌 ② 斷線重連(replay 一次把整局重算出來)
+            ③ 批次同步(一次套好幾手)④ 換局
+          少了它,重連的那一瞬間會把「目前所有在拉的人」全部重播一次。
+       ⚠ 這裡刻意**不吃 adapter 的 fresh 旗** —— 那條旗只認得「連線的第一次同步」,
+         而上面四種情形單機也會遇到(換局)。用 `laPrev === null` 兩邊都對。
+
+       ⚠ 拉會**退回去**:剩一條順子(拉)拆一張出去就變 4 張(不是拉)。
+         那是「不做**喊拉後不能拆牌**」的自然結果,而且退回去之後再回到拉會**再響一次**
+         —— 真人牌桌也是這樣(他又只剩一手了,本來就該再喊)。
+     ========================================================================== */
+  let laPrev = null, laKey = "";
+
+  /* 「拉~」的聲音。★ 照台灣麻將 sfx.js 的做法註冊成一格 Sound 音效槽:
+     mp3/big2/la.mp3|.wav 有檔就播檔、沒檔就用合成音墊 ——
+     所以之後把真人錄的「拉~」丟進 mp3/big2/ 就自動生效,**程式一行都不用改**。
+     ⚠ 真的放實體檔案時要順手補 sw.js 的 CORE(CLAUDE.md:改 mp3 路徑四處一起改);
+       現在只有合成音,所以刻意不動 sw.js。 */
+  let laDefed = false;
+  function laSynth(){
+    /* 兩段上揚 + 尾音再滑上去 = 聽起來像喊出來的一聲。
+       ⚠ 用 tone() 自己的 delay / slideTo,不要用 setTimeout —— 那會脫離 AudioContext
+         的時間軸,在背景頁籤被節流時整句會散掉。 */
+    Sound.tone(440, { type: "triangle", dur: 0.10, vol: 0.22 });
+    Sound.tone(587, { type: "triangle", dur: 0.28, vol: 0.24, delay: 0.09, slideTo: 880 });
+  }
+  function la(){
+    if(typeof Sound === "undefined") return;
+    if(!laDefed){ laDefed = true; Sound.def("b2la", ["mp3/big2/la.mp3", "mp3/big2/la.wav"], laSynth); }
+    Sound.sfx("b2la");
+  }
+
+  /* 每次重畫都叫一次(單機 solo.paint() / 連線 adapter.paint() 各一行)。
+     v = { st, names[], me, key } —— key 就是 render() 那個「這是哪一局」。 */
+  function announceLa(v){
+    const st = v && v.st;
+    if(!st || !st.hands){ laPrev = null; return; }
+    const now = B2.laSeats(st);
+    /* ★ 換局 / 第一次 / 重連 → 只記住不出聲(見上面那段的四種情形)。
+       ★ 這一局已經結束也不出聲:那時該說話的是結果卡。 */
+    if(laPrev === null || v.key !== laKey || st.over){
+      laKey = v.key; laPrev = now; return;
+    }
+    let hit = false;
+    for(let s = 0; s < now.length; s++){
+      if(!now[s] || laPrev[s]) continue;
+      hit = true;
+      /* ⚠⚠ 牌情紅線([16] 第五節):這裡**只准說「剩最後一手」**這一件事。
+         絕對不可以帶牌型(「剩一個順子」)或張數以外的任何東西 ——
+         「拉」公開的是**一個 bit**,那是規則要求的揭露,不是把手牌攤開。 */
+      const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
+      showToast(s === v.me ? "你剩最後一手了 —— 大家都看得到"
+                           : (nm + " 剩最後一手了 —— 拉!"), 2200);
+    }
+    laPrev = now;
+    /* ★ 一次重畫只響一聲:批次同步時有可能兩家同時進拉,響兩聲會疊成噪音。 */
+    if(hit) la();
+  }
+
+  /* 晶片上的「拉」記號 —— 連線的 chipTail() 與單機的 paintBar() **共用這一份**
+     (這一頁本來就有那組雙胞胎,新東西不要再加一對)。
+     ⚠ 文字**恰好只有一個「拉」字**:牌型、張數、牌值一個都不准進來,連 title 也不行
+       (title 跟畫出來沒兩樣)。e2e 有一條在掃 T_NAME 的六個字串。 */
+  function laChipHTML(on, mine){
+    if(!on) return "";
+    return '<span class="b2-chla" title="' +
+             (mine ? "你剩最後一手了(大家都看得到)" : "他剩最後一手了") + '">拉</span>';
+  }
+
+  /* ==========================================================================
      五、結果卡的排名表 —— ★ 唯一會翻開別人手牌的地方
      ==========================================================================
        ★ 兩個訊號**完全分開**(排七 v1.75.2 的教訓,使用者:「你會把第一名特別框起來,
@@ -678,6 +759,8 @@ const B2B = (function(){
   return {
     mount, render, renderActs, resultHTML, stopCd, selInfoOf,
     cardHTML,
+    // 「拉」(v1.81.0):公告 · 晶片記號 · 單獨播那一聲(單機與連線共用)
+    announceLa, laChipHTML, la,
     sel: () => sel.slice(),
     toggleSel(c){
       const i = sel.indexOf(c);
