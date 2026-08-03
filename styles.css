@@ -3127,3 +3127,297 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     body.sv-mp .sv-room,body.sv-solo .sv-room{padding:5px 9px}
     .sv-room .mp-subrow,.sv-room-foot{margin-top:3px}
   }
+
+  /* ==========================================================================
+     大老二(big2.html · js/big2/*)—— 第七個遊戲,v1.76.0
+     ==========================================================================
+     ★ 這一段的骨架照排七(.sv-*)抄,但**這一頁沒有軌道** ——
+       盤面只有「牌河(上一手)」+「我的手牌」兩塊,所以垂直預算比排七寬鬆得多。
+
+     ★★ 這一頁一樣**沒有 JS 算尺寸**:手牌只會變少、牌河永遠最多 5 張,
+        尺寸整份交給 CSS(flex wrap + clamp)。台灣麻將那一整類「忽大忽小」的 bug
+        在這裡結構上不存在 —— ⚠ 不要為了「手牌少的時候放大一點」改回 JS 算。
+
+     ★ 紅色有兩支(排七 notes/15 第六節那條界線,這裡照抄):
+         --b2-red     畫在**象牙白牌面**上(要夠深才看得清)
+         --b2-redlit  畫在**深色桌面**上(名次分、無敵記號)
+       共用一支的話深色底上的紅會偏暗到看不出是紅的。
+     ========================================================================== */
+  :root{ --b2-face:#fdfaf3; --b2-line:#c3ae90; --b2-blk:#22303f; --b2-red:#c92c2c;
+         --b2-redlit:#ff7b7b; --b2-bk:#3f5896;
+         --b2-tw:min(98vw,700px); --b2-cw:clamp(27px,7.6vw,40px); }
+  :root[data-theme="ebook"]{ --b2-face:#ffffff; --b2-line:#000000; --b2-blk:#000000;
+         --b2-red:#000000; --b2-redlit:#000000; --b2-bk:#666666; }
+
+  .b2-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+    line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+  :root[data-theme="ebook"] .b2-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+  .b2-scroll{flex:1 1 auto}
+  .b2-hero{text-align:center;margin:14px 0 4px}
+  .b2-art{width:96px;height:96px;display:block;margin:0 auto 8px}
+  /* ⚠ 撲克牌小圖示的 .pk-* 是**排七那一段定義的**(index.html 的遊戲卡也共用同一組)。
+     這一頁只是沿用,刻意不再定義一份 —— 同一副撲克牌本來就該長一樣。 */
+  .b2-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
+
+  /* ---------- 房間框 / 單機列(照排七的 .sv-room) ---------- */
+  .b2-room{padding:9px 12px}
+  .b2-room .row{margin-top:0}
+  .b2-room-top{flex-wrap:nowrap;gap:8px}
+  .b2-room .b2-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13px;font-weight:700;color:var(--muted)}
+  .b2-room .b2-room-title b{font-size:15px;color:var(--text)}
+  /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
+     不寫這條的話它們會是 42px,跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
+  .b2-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .b2-room .quick-voice,.b2-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .b2-room .quick-voice .qv-ico{font-size:18px}
+  .b2-room .mp-subrow{margin-top:5px}
+  .b2-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .b2-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  /* 晶片上的「剩幾張 / 第幾名」。★★ 牌情紅線:對手**只給張數**,牌值要等結算 */
+  .b2-seat{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+  .b2-seat.p0{background:#ff6b8a}.b2-seat.p1{background:#4fc3f7}
+  .b2-seat.p2{background:#ffd54f}.b2-seat.p3{background:#81c784}
+  :root[data-theme="ebook"] .b2-seat{background:#000}
+  .b2-chn{display:inline-flex;align-items:center;gap:1px;
+    font:800 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
+  /* 出完的人:改顯示名次(公開資訊 —— 大家都看到他打完了) */
+  .b2-chf{display:inline-flex;align-items:center;padding:1px 5px;border-radius:7px;
+    background:rgba(255,255,255,.16);font:800 10px/1.4 'Nunito',sans-serif;color:var(--accent)}
+  .mp-chip.out{opacity:.72}
+  :root[data-theme="ebook"] .b2-chf{background:#eee;color:#000;border:1px solid #ccc}
+  /* ★ 小牌形:代替 U+1F0A0 那一段的撲克牌字元(它們多數字型沒有,會變豆腐方框) */
+  .b2-pip{display:inline-block;width:7px;height:10px;border-radius:2px;
+    background:var(--b2-face);border:1px solid var(--b2-line);margin-right:2px}
+
+  /* ---------- 牌桌 ----------
+     ⚠ .b2-acts 一定要 flex:none —— .b2-play 底下只能有一個可壓縮的兄弟,
+       兩個都可壓縮時可視高度不足會按內容高度分攤,盤面高度反過來取決於自己的內容
+       (台灣麻將 v1.58.4 的 ResizeObserver 迴圈,見 notes/11 第六節)。 */
+  .b2-play{flex:1 1 auto;min-height:0;width:var(--b2-tw);
+    display:flex;flex-direction:column;align-items:stretch;gap:8px}
+  /* z-index:0 讓盤面自成一個 stacking context。這一頁沒有動態 z-index,
+     但覆蓋層(結果卡 / 設定蓋板)不該有任何機會被盤面內容穿過去 —— 消消樂 v1.56.0
+     就是少了這一行,「按離開房間,確認框上面浮著幾張牌」。 */
+  .b2-stage{flex:1 1 auto;min-height:0;position:relative;z-index:0;
+    display:flex;flex-direction:column;gap:7px;overflow-y:auto;overflow-x:hidden}
+  .b2-acts{flex:none;min-height:44px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;padding:2px 0}
+
+  /* ---------- 牌河:上一手是什麼 ----------
+     ★★ 牌河是盤面裡**唯一可壓縮**的一塊(照排七 v1.75.12 對軌道下的同一個判斷)。
+        高度不夠時要犧牲誰,答案很明確:**手牌要按得到、牌河只是拿來看的**。
+        ⚠ min-height:0 不可省:column flex item 的 min-height 預設是 auto(= 內容高),
+          不歸零的話 flex-shrink 根本不會發生,這條寫了等於沒寫。
+        ⚠ 空間夠時(直向手機)flex-shrink 不作用 —— 一個像素都不會變。 */
+  /* ★★ flex:1 1 auto(不是 0 1 auto)—— 讓牌河把**剩下的垂直空間全部吃掉**,
+     內容靠 justify-content:center 停在中央。
+     ⚠ 這一條是**看圖才發現**的(斷言全綠、每個寬高都正常):第一版寫 flex:0 1 auto,
+       牌河只有一小條、手牌 margin-top:auto 貼底 → 桌機上中間空了 **400px**,
+       看起來像畫面沒載完。排七不會這樣是因為它有四條軌道填著那塊空間。
+     ★ 順帶讓視覺變對:牌打在**桌子中央**才像牌桌,貼在頂上像個通知欄。
+     ⚠ min-height:0 + overflow-y:auto 一定要留:矮視窗 / 橫置時它仍然是盤面裡
+       唯一可壓縮的一塊(手牌要按得到、牌河只是拿來看的)。 */
+  .b2-river{flex:1 1 auto;min-height:0;overflow-y:auto;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+    background:rgba(0,0,0,.16);border-radius:12px;padding:8px 10px}
+  .b2-river.lead{background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1.6px var(--accent)}
+  :root[data-theme="ebook"] .b2-river{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .b2-river.lead{box-shadow:none;border:2px solid #000}
+  .b2-rlbl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;
+    font:700 12px/1.3 'Nunito',sans-serif;color:var(--muted)}
+  .b2-rtype{padding:1px 7px;border-radius:8px;background:rgba(255,255,255,.14);
+    font-weight:800;color:var(--text)}
+  /* 無敵牌型的記號:鐵支 / 同花順壓得過任何牌型,那件事一定要看得出來 */
+  .b2-rbomb{padding:1px 7px;border-radius:8px;background:var(--b2-redlit);
+    font:800 10.5px/1.5 'Nunito',sans-serif;color:#2a0d0d}
+  :root[data-theme="ebook"] .b2-rtype{background:#eee;color:#000;border:1px solid #ccc}
+  :root[data-theme="ebook"] .b2-rbomb{background:#000;color:#fff}
+  .b2-rhint{font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--muted);text-align:center}
+  .b2-rhint b{color:var(--accent)}
+  /* ⚠ 牌河那一排叫 .b2-rivc,**不可以**與結果卡的 .b2-rcards 同名(見 board.js 那段註解) */
+  .b2-rivc{display:flex;flex-wrap:wrap;justify-content:center;gap:4px}
+  .b2-tally{flex:none;text-align:center;font:700 11px/1.3 'Nunito',sans-serif;color:var(--muted)}
+  .b2-tally b{color:var(--text)}
+
+  /* ---------- 手牌 ----------
+     ★ 這一頁**沒有**「這張能不能出」的壓暗 —— 大老二出的是組合,單看一張牌無法回答
+       (♣5 單張壓不過 ♦7,但 ♣5+♦5 可能壓得過一對 4)。硬把 legal 攤到每張牌上
+       只會給出騙人的壓暗,所以全部點得動,由動作列回答「這組行不行」。
+       這仍然守著 CLAUDE.md 那條紅線:不用 disabled 讓牌靜默吃掉點擊。
+     ★ margin-top:auto 把手牌推到盤面**底部** —— 牌寬由寬度決定,高的螢幕一定會多出
+       一截空白,能決定的只是它放在哪。空白留在牌河與手牌之間,手牌貼著動作列上方,
+       拇指按得到(同排七 / 台灣麻將 v1.73.1 的結論)。 */
+  .b2-hand{flex:0 0 auto;margin-top:auto;display:flex;flex-wrap:wrap;justify-content:center;
+    align-content:flex-start;gap:5px;padding:3px 2px 6px}
+  .b2-card{--b2w:var(--b2-cw);
+    flex:none;width:var(--b2w);height:calc(var(--b2w) * 1.42);
+    border-radius:calc(var(--b2w) * .13);border:1px solid var(--b2-line);
+    background:linear-gradient(155deg,#fff,var(--b2-face) 58%);
+    color:var(--b2-blk);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    line-height:1;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,.28);
+    transition:transform .12s,box-shadow .12s,filter .15s}
+  .b2-card.red{color:var(--b2-red)}
+  /* ★★ 點數與花色都置中直排、而且畫得大(.50 / .42)—— 與排七同一組比例。
+     理由在 js/shared/pk-faces.js 的檔頭:**螢幕上的牌不是扇形握在手上的**,
+     角落 index 當初要解決的問題在這裡不存在,置中版可以把整張牌的寬度都給這兩件事。
+     ⚠ 放大有天花板:內容總高 ≈ (.50 + .42 + gap) × --b2w ≈ .96,而牌高是 1.42。 */
+  .b2-cr{font:800 calc(var(--b2w) * .50)/1 'Nunito',sans-serif}
+  .b2-cs{font:700 calc(var(--b2w) * .42)/1 'Nunito',sans-serif;margin-top:calc(var(--b2w) * .04)}
+  /* 花色是自繪 SVG(js/shared/pk-faces.js),fill:currentColor 讓它沿用上面那幾條 color */
+  .b2-sv{display:block;width:1em;height:1em;fill:currentColor}
+  .b2-hand .b2-card{cursor:pointer}
+  .b2-hand .b2-card:hover{transform:translateY(-4px)}
+  .b2-hand .b2-card:active{transform:scale(.94)}
+  /* ★ 選中要非常明顯:大老二一手可能選 5 張,而「我到底選了哪幾張」是這一頁最重要的狀態。
+     站起來 + 亮框 + 換底色三個訊號一起給(漏看一個還有兩個)。 */
+  .b2-hand .b2-card.sel{transform:translateY(-10px);
+    box-shadow:0 6px 12px rgba(0,0,0,.34),0 0 0 2.5px var(--accent-2);
+    background:linear-gradient(155deg,#fff,#fff5d8 58%)}
+  .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
+  .b2-card.tiny{--b2w:21px;cursor:default;box-shadow:0 1px 1px rgba(0,0,0,.22)}
+  .b2-empty{font:800 13px/1 'Nunito',sans-serif;color:var(--accent);padding:12px 0}
+  :root[data-theme="ebook"] .b2-card{background:#fff;border-color:#000;box-shadow:none}
+  :root[data-theme="ebook"] .b2-hand .b2-card.sel{background:#fff;box-shadow:0 0 0 3px #000}
+
+  /* ---------- 動作列 ----------
+     ★ 只有一份(單機與連線共用)—— 大老二沒有宣告階段,所以它吃的是純資料。 */
+  .b2-actrow{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+  .b2-atxt{font:700 13px/1.4 'Nunito',sans-serif;color:var(--muted)}
+  .b2-atxt b{color:var(--text)}
+  .b2-atip{font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--accent-2);text-align:center}
+  /* 選取狀態列:綠 = 這組出得掉、紅 = 出不掉(而且寫出為什麼)、灰 = 還沒選 */
+  .b2-selbar{display:flex;align-items:center;gap:7px;max-width:100%;
+    padding:5px 10px;border-radius:11px;background:rgba(255,255,255,.08);
+    font:700 12px/1.35 'Nunito',sans-serif;color:var(--muted)}
+  .b2-selbar.ok{background:rgba(129,199,132,.20);color:var(--text)}
+  .b2-selbar.bad{background:rgba(224,83,63,.20);color:var(--text)}
+  .b2-selico{flex:none;font-size:14px;line-height:1}
+  .b2-seltxt{min-width:0}
+  :root[data-theme="ebook"] .b2-selbar{background:#fff;border:1px solid #ccc;color:#000}
+  :root[data-theme="ebook"] .b2-selbar.ok{border:2px solid #000}
+  :root[data-theme="ebook"] .b2-selbar.bad{border:2px dashed #000}
+  .b2-btns{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
+  .b2-btns .btn{padding:8px 14px;font-size:13.5px}
+  /* ★ 「出牌」在選取不合法時只是**變暗**,不是 disabled —— 按下去要說得出原因
+     (CLAUDE.md 的紅線;Bingo v1.27.3 的「假死」教訓)。
+     ⚠ 一定要留 pointer-events:auto,否則變暗就等於靜默吃掉點擊。 */
+  .b2-btns .btn.dim{opacity:.62;pointer-events:auto}
+
+  /* 倒數環。★ 全桌都看得到(「輪到誰、還剩幾秒」是公開資訊,大家才知道為什麼卡著)。
+     ⚠ 用**負的 animation-delay** 接續播放,duration 永遠是那一段的總長 —— e2e 才量得到設定值。
+     ⚠ 動畫關鍵影格 svCd 是排七那一段定義的,這裡刻意沿用同一個(不再定義一份同名的)。 */
+  .b2-cdwrap{display:flex;align-items:center}
+  .b2-cd{display:inline-flex;align-items:center;gap:7px}
+  .b2-cd i{position:relative;display:block;width:56px;height:6px;border-radius:3px;
+    background:rgba(255,255,255,.16);overflow:hidden}
+  .b2-cd i::after{content:"";position:absolute;inset:0;transform-origin:left center;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    animation:svCd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .b2-cd b{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);min-width:1.5em;text-align:right}
+
+  /* ==========================================================================
+     結果卡(.win-card.b2-win)
+     ==========================================================================
+     ★★ 一定要給**明確寬度**(排七 v1.75.8 的教訓):共用的 .win-card 只有 max-width、
+        沒有 width,而 .veil 是 grid + place-items:center → 卡片是 shrink-to-fit,
+        寬度由內容撐。排名表拆成兩層之後每一層都變窄,整張卡會莫名其妙變成瘦長條。
+        ⚠⚠ 這裡**一個百分比都不能用**:.veil 的 grid 是隱含單欄、寬度 auto(由 item 撐),
+           所以 item 的百分比寬度會循環。只有 vw 不循環;而 max-width 一定要顯式解除
+           (共用的 .win-card 有 max-width:380px,不解除的話 width 再大也被夾在 380)。
+     ⚠ 大字壓小那條要寫成 .win-card.b2-win .word(權重 0,3,0)才壓得過共用的
+       .win-card .word(0,2,0)—— 只寫 .b2-win .word 是同級,靠「誰在後面」贏,
+       以後有人搬動段落順序就會回彈。 */
+  .win-card.b2-win{width:min(88vw,520px);max-width:none;padding:26px 24px}
+  .win-card.b2-win .word{font-size:clamp(28px,7.2vw,40px)}
+  .b2-win p{margin:7px 0 14px}
+  .b2-result{margin:2px 0 12px}
+  .b2-rank{display:flex;flex-direction:column;gap:5px}
+  /* ★ 兩個訊號完全分開(排七 v1.75.2 的教訓 —— 使用者:「你會把第一名特別框起來,
+     這樣很容易讓大家以為自己是第一名」):框 + 「你」徽章 = 這一列是我;
+     金圈 + 🏆 = 這一列是第一名。自己拿第一時兩個都亮。 */
+  .b2-rrow{display:flex;flex-direction:column;gap:3px;padding:6px 9px;border-radius:11px;
+    background:rgba(255,255,255,.07)}
+  .b2-rmain{display:flex;align-items:center;gap:6px}
+  .b2-rrow.me{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent-2)}
+  .b2-rno{flex:none;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
+    background:rgba(255,255,255,.18);font:800 11px/1 'Nunito',sans-serif;color:var(--text)}
+  .b2-rrow.win .b2-rno{background:var(--accent);color:#1c1008}
+  .b2-rcrown{flex:none;font-size:12px;line-height:1}
+  /* ⚠ .b2-rname 不可以 flex:1 —— 那會把「你」徽章與 🏆 一路推到分數旁邊,
+     而它們標的正是這個名字。另外 .win-card 是 text-align:center,這格要自己寫死 left。 */
+  .b2-rname{flex:0 1 auto;min-width:0;text-align:left;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font:800 13.5px/1.2 'Nunito',sans-serif;color:var(--text)}
+  .b2-rpts{flex:none;margin-left:auto;font-weight:700;font-size:11px;color:var(--muted)}
+  .b2-rpts b{font:800 15px/1 'Fredoka','Nunito',sans-serif;color:var(--accent);margin-right:1px}
+  /* 連線才有的「累積分」欄。
+     ⚠ 靠右的 auto 邊界要**搬家**:.b2-rpts 原本自己吃 margin-left:auto,多一欄之後
+       兩個都是 auto 會把剩餘空間**平分** → 累積分飄到列中間。 */
+  .b2-rmain.has-win .b2-rwin{margin-left:auto}
+  .b2-rmain.has-win .b2-rpts{margin-left:0;min-width:46px;text-align:right}
+  .b2-rwin{flex:none;min-width:38px;display:inline-flex;align-items:center;justify-content:flex-end;gap:3px;
+    padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.14);
+    font:700 10.5px/1.6 'Nunito',sans-serif;color:var(--muted)}
+  .b2-rwin i{font-style:normal;font-weight:800;color:var(--accent)}
+  :root[data-theme="ebook"] .b2-rwin{background:#eee;color:#000;border:1px solid #ccc}
+  :root[data-theme="ebook"] .b2-rwin i{color:#000}
+  /* 第二層:他手上還剩什麼(★ 唯一會翻開別人手牌的地方)。縮排對齊名次圈右緣 */
+  .b2-rcards{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding-left:25px}
+  .b2-rcn{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
+  .b2-clean{font-size:11px;font-weight:800;color:var(--accent)}
+  .b2-rfoot{margin-top:9px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--muted);text-align:center}
+  :root[data-theme="ebook"] .b2-rrow{background:#fff;border:1px solid #ccc}
+  :root[data-theme="ebook"] .b2-rrow.me{border:2px solid #000;box-shadow:none}
+  :root[data-theme="ebook"] .b2-rrow.win .b2-rno{background:#000;color:#fff}
+  /* ★★ 共用連線層自己畫的累積分表(#winScores)那些列要收掉(排七 v1.75.9 的教訓):
+     它的內容已經併進上面的排名表(.b2-rwin),留著就是同一份資料兩張表 ——
+     兩張都「一列一個人、有名次有名字有數字」,疊在一起正是使用者說的那種亂。
+     ⚠ 只留 .ws-goal 的「🎯 搶 N 分」:那句在這一頁沒有別的出口(#mpBarGoal 被倒數佔走了)。
+     ⚠ 容器的 gap / margin 要一起歸零,否則積分模式以外只剩全部 display:none 的列,
+       會在排名表與表情列之間留一條空帶。
+     ⚠ 這條**不是**新的共用規則:選擇器整條鎖在 .win-card.b2-win 裡面,
+       另外六頁的結果卡一個字都不受影響(CLAUDE.md 的前綴規矩,這裡靠 b2-win 當籬笆)。 */
+  .win-card.b2-win .win-scores{gap:0;margin:0}
+  .win-card.b2-win .win-scores .ws-row{display:none}
+  .win-card.b2-win .win-scores .ws-goal{margin:0 0 12px}
+
+  /* 賽後表情列(單機沒有對手可以送 → 整列收起來) */
+  .b2-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  body.solo-on .b2-react-row{display:none}
+
+  /* ---------- 對局中把牌桌放寬(大廳與選單維持 .panel 原本的 520)---------- */
+  body.b2-mp .b2-room,body.b2-solo .b2-room{width:min(92vw,700px)}
+
+  /* ---------- 矮視窗:每一塊都收一號 ----------
+     ⚠⚠ 牌寬只准動 --b2-cw,**不要**在這裡改 .b2-card 的 --b2w ——
+        排七踩過:只縮手牌、軌道沒跟著,結果「格子比手牌大」。
+        這一頁沒有軌道,但牌河的 .b2-card.sm 是從 --b2-cw 推回來的,一起變才對。 */
+  @media (max-height:600px){
+    :root{--b2-cw:clamp(24px,6.8vw,34px)}
+    .b2-hero{margin:6px 0 2px}
+    .b2-art{width:66px;height:66px}
+    .b2-play{gap:5px}
+    .b2-room{padding:6px 10px}
+    .b2-stage{gap:4px}
+    .b2-river{padding:5px 8px;gap:3px}
+    .b2-hand{gap:4px;padding:2px 2px 4px}
+    .b2-acts{min-height:38px;gap:4px}
+    .b2-btns .btn{padding:6px 11px;font-size:12.5px}
+    .b2-selbar{padding:4px 8px;font-size:11.5px}
+  }
+
+  /* ---------- ★★ 橫置手機:把頂列讓給牌桌 ----------
+     條件與排七 / 台灣麻將那條**逐字相同**(連數字都一樣)。
+     · pointer:coarse → 桌機把視窗拉到又矮又寬也**永遠不命中**,正常佈局零影響
+     · 掛 body.b2-mp / body.b2-solo → 只有**對局中**收,大廳 / 進場選單 / 設定面板照舊
+     ★ 收掉頂列之後,ui-kit 的 dockTools() 會**自動**把 ⛶ / ⚙️ 搬進房間框那一列 ——
+       那是 v1.75.10 立的規矩(「只有頂列真的被收掉才搬」),不必也不可以另外寫程式。 */
+  @media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
+    body.b2-mp .topbar,body.b2-solo .topbar{display:none}
+    body.b2-mp,body.b2-solo{padding:6px;gap:4px}
+    /* 房間框 / 單機列也收一號:它是第二大的固定開銷(約 90px) */
+    body.b2-mp .b2-room,body.b2-solo .b2-room{padding:5px 9px}
+    .b2-room .mp-subrow,.b2-room-foot{margin-top:3px}
+  }

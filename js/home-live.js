@@ -30,7 +30,12 @@ const HomeLive = (function(){
     //   不一致的話首頁會把滿房列成「可加入」,點進去才被 claimSeat 交易擋下
     { key:"mj16",    index:"mj16_index",    name:"台灣麻將", icon:"🀄", badge:"hlBadgeMj16", max:4, href:"mahjong16.html" },
     // ★ max 必須與 js/sevens/adapter.js 的 maxPlayers 一致(6)
-    { key:"sevens",  index:"sevens_index",  name:"排七", icon:"🎴", badge:"hlBadgeSevens", max:6, href:"sevens.html" }
+    { key:"sevens",  index:"sevens_index",  name:"排七", icon:"🎴", badge:"hlBadgeSevens", max:6, href:"sevens.html" },
+    // ★ max 必須與 js/big2/adapter.js 的 maxPlayers 一致(4)—— 大老二每人 13 張,4 人剛好用完 52 張
+    // ⚠ icon 用 🎴(U+1F3B4),**不是**小丑牌那顆(U+1F0CF)—— 後者落在
+    //   U+1F0A0–U+1F0FF 那段撲克牌字元裡,多數字型沒有會變豆腐方框(CLAUDE.md 的禁令)。
+    //   與排七同一個圖示是刻意的 —— 同一副撲克牌,而消消樂與台灣麻將本來也共用 🀄。
+    { key:"big2",    index:"big2_index",    name:"大老二", icon:"🎴", badge:"hlBadgeBig2", max:4, href:"big2.html" }
   ];
 
   let refs=[];            // 掛著監聽的 firebase ref(stop 時逐一 off)

@@ -26,6 +26,13 @@ const MPCore = (function(){
     const ROOMS = A.ns.rooms, INDEX = A.ns.index;
     const MAX_PLAYERS = A.maxPlayers || 2;
     const MIN_PLAYERS = A.minPlayers || 2;
+    /* ★ 計分的單位與目標值(v1.76.0 為大老二加,**三個都有預設值 → 舊的五個遊戲行為不變**)。
+       大老二一局發 5/3/1/0 的名次分,所以它的單位是「分」、目標值要拉高;
+       其餘遊戲一局就是 +1 勝,照舊 "勝" / 3 / 20。 */
+    const SCORE_UNIT = A.scoreUnit || "勝";
+    const GOAL_DEF   = A.goalDefault || 3;
+    const GOAL_MAX   = A.goalMax || 20;
+    const clampGoal = v => Math.max(2, Math.min(GOAL_MAX, v|0));
 
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false, roomName="";
     let online=false;
@@ -33,7 +40,7 @@ const MPCore = (function(){
     let players={}, scores={}, status="lobby", curPhase="lobby", ready=false;
     let order=[], winner=null, roundId=null;
     let gameRev=0;                          // 本地已套用的最新 game 版本(見上 #1)
-    let scoreMode="rank", winGoal=3, scoredThisRound=false, myRoundWin=false;
+    let scoreMode="rank", winGoal=GOAL_DEF, scoredThisRound=false, myRoundWin=false;
     let outcomeShown=false, abandoned=false, autoStarting=false;
     let prevIds=null, sawPlayers=false, sawMe=false, hostId=null, sawHost=false;
     let connRef=null, connected=null, resyncing=false, resyncTimer=null;
@@ -338,7 +345,7 @@ const MPCore = (function(){
         roomRef.child(k).on("value",s=>{ A.onRoomField && A.onRoomField(k,s.val()); });
       });
       roomRef.child("scoreMode").on("value",s=>{ scoreMode=(s.val()==="match")?"match":"rank"; syncSetup(); renderPlayers(); });
-      roomRef.child("winGoal").on("value",s=>{ const v=s.val(); winGoal=(typeof v==="number"&&v>=2)?Math.min(20,v):3; syncSetup(); });
+      roomRef.child("winGoal").on("value",s=>{ const v=s.val(); winGoal=(typeof v==="number"&&v>=2)?Math.min(GOAL_MAX,v):GOAL_DEF; syncSetup(); });
       // 分數:獨立節點,刻意不掛 onDisconnect(見檔頭 #2)
       roomRef.child("scores").on("value",s=>{
         scores=s.val()||{};
@@ -460,6 +467,19 @@ const MPCore = (function(){
       if(winner.id) return [winner.id];
       return Object.keys(players);
     }
+    /* ★ 這一局某個人該得幾分(v1.76.0)。
+       • 一般:得分名單裡的人各 +1(五子棋和局全員、數獨並列同分只有並列者)
+       • adapter 在 winner 裡帶了 pts 表時(大老二的名次分 5/3/1/0):依他自己那一格
+       ★★ **不帶 pts 時回的一律是 0 或 1,與 v1.75.18 之前逐字等價** ——
+          這是整段名次分改動能安全上線的關鍵,五個舊遊戲的 e2e 就是它的回歸測試。
+       ⚠ winner.ids 仍然只放「第一名」:大字 / 彩帶 / 卡片配色全部吃 winnerIds(),
+         第三名拿了 1 分但沒有贏,不該放彩帶。 */
+    function ptsFor(id){
+      if(!winner || !id) return 0;
+      if(winner.pts && typeof winner.pts[id]==="number") return Math.max(0, winner.pts[id]|0);
+      return winnerIds().indexOf(id)>=0 ? 1 : 0;
+    }
+    const myPts = () => ptsFor(meId);
     function showOutcome(){
       if(!winner)return;
       const isDraw=winner.by==="draw";
@@ -467,12 +487,16 @@ const MPCore = (function(){
       const iWon=!isDraw && wids.indexOf(meId)>=0;
       myRoundWin=wids.indexOf(meId)>=0;
 
-      // 計分:贏家(和局全員)幫自己 +1,一局只計一次(roundId 冪等 + 交易內再驗一次)
-      if(myRoundWin && meId && roomRef && roundId && !scoredThisRound && scoredRoundOf(meId)!==roundId){
+      /* 計分:得分的人幫自己加分,一局只計一次(roundId 冪等 + 交易內再驗一次)。
+         ★ 一般是「贏家 +1」;帶了名次分就加自己那一格(見 ptsFor)。
+         ★ `d` 記下這一局實際加了多少 —— 下面的反向修正要靠它才收得回**正確的數**
+           (寫死 -1 的話,名次分模式下收回來的金額會是錯的)。 */
+      const myAdd = myPts();
+      if(myAdd>0 && meId && roomRef && roundId && !scoredThisRound && scoredRoundOf(meId)!==roundId){
         scoredThisRound=true;
         roomRef.child("scores/"+meId).transaction(s=>{
           if(s && s.round===roundId) return;
-          return { n:((s&&s.n)||0)+1, round:roundId };
+          return { n:((s&&s.n)||0)+myAdd, round:roundId, d:myAdd };
         },()=>{ if(winner) renderScoreboard(); });
       }
       /* ★ 反向修正:這一局先前判給我、後來的真值改判別人 → 把那一分收回來(v1.56.0 修)。
@@ -483,11 +507,13 @@ const MPCore = (function(){
          症狀就是「明明對手贏了,我的勝場卻也多一分」。
          寫回去時把 round 標成 "void":一局只收回一次,而且如果真值又改回我贏(理論上
          不會,伺服器值是終局),上面那條看到 round 不等於 roundId 會再補一次 → 自我收斂。 */
-      else if(!myRoundWin && meId && roomRef && roundId && scoredRoundOf(meId)===roundId){
+      else if(myAdd<=0 && meId && roomRef && roundId && scoredRoundOf(meId)===roundId){
         scoredThisRound=false;
         roomRef.child("scores/"+meId).transaction(s=>{
           if(!s || s.round!==roundId) return;      // 不是這一局記的 → 別亂動
-          return { n:Math.max(0,(s.n||0)-1), round:"void" };
+          // ⚠ 舊資料沒有 d(v1.76.0 之前寫的)→ 退回 1,與舊行為完全一致
+          const back=(typeof s.d==="number") ? s.d : 1;
+          return { n:Math.max(0,(s.n||0)-back), round:"void" };
         },()=>{ if(winner) renderScoreboard(); });
       }
 
@@ -519,7 +545,8 @@ const MPCore = (function(){
       if(!sb)return;
       const rows=Object.keys(players).map(id=>{
         let score=scoreOf(id);
-        if(id===meId && myRoundWin && roundId && scoredRoundOf(id)!==roundId) score+=1;   // 樂觀 +1
+        // 樂觀加分(分數還沒同步回來就先顯示);沒得分的人 myPts() 是 0 → 與舊行為一致
+        if(id===meId && roundId && scoredRoundOf(id)!==roundId) score+=myPts();
         return { id, score, name:dispName(id) };
       }).sort((a,b)=> b.score-a.score || (a.id<b.id?-1:1));
       const top=rows.length?rows[0].score:0;
@@ -528,20 +555,20 @@ const MPCore = (function(){
         if(champs.length){
           champEl.innerHTML='<span class="champ-label">🏆 總冠軍</span>'+
             '<span class="champ-name">'+champs.map(c=>esc(c.name)).join("、")+'</span>'+
-            '<span class="champ-goal">先達 '+winGoal+' 勝</span>';
+            '<span class="champ-goal">先達 '+winGoal+' '+SCORE_UNIT+'</span>';
           champEl.classList.remove("hidden");
         }else champEl.classList.add("hidden");
       }
       if(top>0 || scoreMode==="match"){
-        const goalCap=(scoreMode==="match" && !champs.length) ? '<div class="ws-goal">🎯 搶 '+winGoal+' 勝</div>' : '';
-        // 本局 +1 的人:總數之外把「分數是怎麼變的」也講出來,才看得出這局誰得手
-        const gained=winnerIds();
+        const goalCap=(scoreMode==="match" && !champs.length) ? '<div class="ws-goal">🎯 搶 '+winGoal+' '+SCORE_UNIT+'</div>' : '';
+        // 本局得分的人:總數之外把「分數是怎麼變的」也講出來,才看得出這局誰得手
         sb.innerHTML=goalCap+rows.map((r,i)=>{
           const lead=r.score===top && top>0;
           const cls="ws-row"+(lead?" lead":"")+(r.id===meId?" me":"");
-          const plus=gained.indexOf(r.id)>=0 ? '<span class="gw-plus">+1</span>' : '';
+          const add=ptsFor(r.id);
+          const plus=add>0 ? '<span class="gw-plus">+'+add+'</span>' : '';
           return '<div class="'+cls+'"><span class="ws-rank">'+(lead?"🏆":(i+1)+".")+'</span>'+
-                 '<span class="ws-name">'+esc(r.name)+'</span>'+plus+'<span class="ws-pts">'+r.score+' 勝</span></div>';
+                 '<span class="ws-name">'+esc(r.name)+'</span>'+plus+'<span class="ws-pts">'+r.score+' '+SCORE_UNIT+'</span></div>';
         }).join("");
         sb.classList.remove("hidden");
       }else{ sb.innerHTML=""; sb.classList.add("hidden"); }
@@ -624,7 +651,7 @@ const MPCore = (function(){
     }
     function setWinGoal(v){
       if(!isHost||!roomRef||seasonInProgress())return;
-      winGoal=Math.max(2,Math.min(20,v|0)); roomRef.child("winGoal").set(winGoal); syncSetup(); savePrefs();
+      winGoal=clampGoal(v); roomRef.child("winGoal").set(winGoal); syncSetup(); savePrefs();
     }
     function resetScores(){
       if(!isHost||!roomRef)return;
@@ -859,7 +886,7 @@ const MPCore = (function(){
       usePrefs(o){
         o=o||{};
         if(o.scoreMode==="match"||o.scoreMode==="rank") scoreMode=o.scoreMode;
-        if(typeof o.winGoal==="number"&&o.winGoal>=2) winGoal=Math.min(20,o.winGoal);
+        if(typeof o.winGoal==="number"&&o.winGoal>=2) winGoal=Math.min(GOAL_MAX,o.winGoal);
         A.usePrefs && A.usePrefs(o);
       }
     };
