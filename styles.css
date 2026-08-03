@@ -3451,7 +3451,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 選擇器寫成 `.b2-hand .b2-card.b2-drag`(而不是 `.b2-card.b2-drag`)是為了
        跟 .cold / .hot / .sel 站在同一個權重上 —— 而且**刻意不寫 filter**:
        壓暗的牌被拖著走時照樣是暗的(亮暗講的是「用不用得到」,拖曳不改變那件事)。 */
-  .b2-hand .b2-card.b2-drag{position:relative;z-index:6;cursor:grabbing;
+  .b2-hand .b2-card.b2-drag{transition:none;position:relative;z-index:6;cursor:grabbing;
     box-shadow:0 12px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent)}
   :root[data-theme="ebook"] .b2-hand .b2-card.b2-drag{box-shadow:0 6px 12px rgba(0,0,0,.35),0 0 0 3px #000}
   .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
