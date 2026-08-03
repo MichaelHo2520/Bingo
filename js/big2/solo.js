@@ -25,6 +25,10 @@ const Solo = (function(){
   let st = null, names = [];
   let active = false, over = false, busy = false;
   let gen = 0;                                   // 世代記號:離場 / 換局後,舊的 timer 一律不執行
+  /* 第幾局。★ 只在 start() 進位,**刻意不共用 gen** —— gen 在 quit() 與 finish() 也會進,
+     而那兩個時機把玩家自己拖好的手牌順序重排一次(結算時整副牌會跳一下)是沒有理由的。
+     用途只有一個:讓盤面知道「換局了,自訂順序丟掉」(見 board.js 第八節)。 */
+  let round = 0;
   let rec = {};
 
   /* ---------- 偏好與戰績 ----------
@@ -114,7 +118,8 @@ const Solo = (function(){
       mine: mine,
       turnName: st.over ? "" : seatName(st.turn),
       over: over,
-      hot: po ? po.cards : null
+      hot: po ? po.cards : null,
+      key: "solo:" + round          // ★ 換局才變 → 盤面照它丟掉玩家自訂的手牌順序
     });
     B2B.renderActs({
       mine: mine,
@@ -132,6 +137,7 @@ const Solo = (function(){
   /* ---------- 一局的生命週期 ---------- */
   function start(){
     bumpGen();
+    round++;                                   // ★ 新的一局 → 手牌回到照牌力排(見上)
     st = B2.replay(B2.newDeal(), seats, []);
     names = [];
     for(let s = 0; s < seats; s++) names.push(NAMES[s]);

@@ -106,6 +106,32 @@ const B2 = (function(){
     return cards.slice().sort(cmpCard);
   }
 
+  /* ★★ 「玩家自己排的手牌順序」(v1.80.0)。使用者的原話:
+       「我們有沒有辦法可以拖曳自己的手牌順序,有時候這樣可以幫助思考」
+     ord = 玩家拖出來的牌 id 順序;回傳「照 ord 排好的 hand」。
+
+     ★★ 這一支是**顯示層的東西**,放在規則層只因為它是純函式、要在 node 裡驗
+        (同 sortShow)。**ord 從來不進 DB、不影響任何判定** ——
+        出的是「哪幾張牌」而不是「第幾格」,`encMove()` 自己還會再排一次。
+        ⚠ 絕對不可以拿它去算牌力或判合法:classify / beats / playable
+          一律吃原始的集合,順序對它們沒有意義。
+
+     兩條容錯,都是刻意的:
+       · ord 裡已經**不在手上**的牌(出掉了)自動消失 → 剩下的相對順序原封不動
+         (這正是「出掉的牌右邊的往前補、左邊的一格都不動」在自訂順序下的版本)
+       · hand 裡 ord **沒提到**的牌一律照 cmpCard 補在**後面**,不會靜靜地不見 ——
+         正常流程到不了(換局會把 ord 丟掉,而手牌只會變少),
+         但「一張牌從畫面上消失」是這一頁最不能發生的事,寧可排在奇怪的位置。 */
+  function applyOrder(hand, ord){
+    if(!Array.isArray(ord) || !ord.length) return hand.slice().sort(cmpCard);
+    const at = {};
+    ord.forEach((c, i) => { if(at[c] === undefined) at[c] = i; });   // 重複的以第一次為準
+    const known = [], rest = [];
+    hand.forEach(c => { (at[c] === undefined ? rest : known).push(c); });
+    known.sort((a, b) => at[a] - at[b]);
+    return known.concat(rest.sort(cmpCard));
+  }
+
   /* deal 是 52 個字元的字串,一張牌一個字元(A~Z + a~z 剛好 52 個)。 */
   function chr(c){ return String.fromCharCode(c < 26 ? 65 + c : 97 + c - 26); }
   function unchr(ch){
@@ -634,7 +660,7 @@ const B2 = (function(){
     T_SINGLE, T_PAIR, T_STRAIGHT, T_FULL, T_QUADS, T_SFLUSH, T_NAME,
     // 編碼
     suitOf, rankOf, cardOf, isRed, suitCh, rankTxt, nameOf, longName,
-    rkOrder, rkFromOrder, cardKey, cmpCard, sortShow,
+    rkOrder, rkFromOrder, cardKey, cmpCard, sortShow, applyOrder,
     chr, unchr, encodeDeal, decodeDeal, encMove, decMove, isPass,
     // 發牌
     shuffled, newDeal, handsOf, dealCounts,

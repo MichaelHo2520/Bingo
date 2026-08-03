@@ -49,6 +49,16 @@
           「選了一組永遠湊不出牌型的牌」變成到不了的狀態,動作列那一格因此改講
           「還要再選幾張」(見第六節 selInfoOf)。
      ⚠ 一手都出不了時(can === false)動作列只留 Pass —— 見第四節。
+
+   ── ★★ 手牌可以自己拖著排(v1.80.0)────────────────────────────────────────
+     使用者:「我們有沒有辦法可以拖曳自己的手牌順序,有時候這樣可以幫助思考」。
+     整段實作與「為什麼不那樣做」寫在**第八節**;這裡只留三句一定要先知道的:
+       · 順序是**純本地的顯示** —— 不進 DB、不進 moves、不影響任何判定,
+         所以連線時新舊版可以同房,而且**不是自己的回合也拖得動**
+       · **拖曳中不重畫**(render() 開頭那道閘門)—— 否則連線時對手一出牌,
+         手指底下那個節點就被 innerHTML 銷毀,手勢當場斷掉
+       · 選牌一律**保留 click 監聽**:四支 e2e 都用 `el.click()` 驅動,
+         而合成的 click 不會產生 pointer 事件(所以不可以照五子棋搬進 pointerup)
    ========================================================================== */
 
 const B2B = (function(){
@@ -58,6 +68,9 @@ const B2B = (function(){
   let hCard = null, hAct = null;          // 點手牌 / 按動作鈕的回呼
   let sel = [];                            // 目前選了哪幾張(牌 id;順序不重要)
   let cdKey = "", cdT = null;              // 倒數環:用 key 去重,不看 timer(見 syncCd)
+  let ord = null, ordKey = null;            // ★ 玩家自己拖出來的顯示順序 / 它屬於哪一局(第八節)
+  let drag = null, noClick = false;         // 拖曳中的狀態 / 這一下的 click 要不要吃掉
+  let lastV = null;                         // 最後一次 render 收到的 v(拖曳中延後重畫用)
 
   /* ==========================================================================
      一、牌面
@@ -224,7 +237,10 @@ const B2B = (function(){
   /* ==========================================================================
      三、整個舞台
      ──────────────────────────────────────────────────────────────────────────
-       v = { hand, slots, trick[], names[], mine, turnName, over, opened, hot[] }
+       v = { hand, slots, trick[], names[], mine, turnName, over, opened, hot[], key }
+       ★ key = 「這是哪一局」(單機 = 第幾局、連線 = roundId)。它只有一個用途:
+         **換局時把玩家自訂的手牌順序丟掉**(第八節)。⚠ 不可以改成比對手牌有沒有變 ——
+         那會把「出掉一手」誤判成新局,把玩家排好的順序打散(而且只有真的玩才看得出來)。
        ★ hot = 要亮起來的牌(B2.playable().cards);傳 null / 不傳 = **一張都不壓暗**
          (輪到對手時就該這樣 —— 那時亮暗沒有意義,只是在畫面上多一種變化)。
        ★ 盤面裡**沒有對手列**:「誰 / 輪到誰 / 剩幾張」三樣在玩家晶片上全都有了
@@ -242,6 +258,22 @@ const B2B = (function(){
      ========================================================================== */
   function render(v){
     if(!stage) return;
+    lastV = v;
+
+    /* ★ 換局 → 丟掉玩家自訂的順序(新的一手牌沿用上一局的順序沒有意義)。
+       判準是呼叫端傳進來的 key,理由見上面 v 的說明。 */
+    if(v.key !== ordKey){ ordKey = v.key; ord = null; if(drag) endDrag(true); }
+
+    /* ★★ 拖曳中一律**不重畫**(v1.80.0,見第八節)。stage.innerHTML 一換,
+       手指底下那個節點就被銷毀,手勢當場斷掉(連線時對手出牌隨時會走到這裡)。
+       延後是安全的,而理由要記住:**我的手牌只可能因為我自己出牌而改變**,
+       而我出牌不可能發生在拖曳途中 —— 所以這裡不會顯示過期的手牌,
+       最多讓中間那塊晚幾百毫秒更新。
+       ⚠ 倒數環在 #b2Acts(走 renderActs),不吃這道閘門,秒數照跑。
+       ⚠ 誰哪天在 render() 裡加進「手牌以外也會即時變動、而且不能晚」的東西,
+         這道閘門會一起延後它 —— 那時要改的是那個東西的位置,不是拿掉閘門。 */
+    if(drag){ drag.dirty = true; return; }
+
     // 選取的牌若已經不在手上(換局 / 出牌之後)就丟掉,不然會殘留一個選不掉的框
     sel = sel.filter(c => v.hand.indexOf(c) >= 0);
 
@@ -253,8 +285,11 @@ const B2B = (function(){
     const hot = v.hot ? {} : null;
     if(hot) v.hot.forEach(c => { hot[c] = 1; });
     const slots = Math.max(v.slots || 0, v.hand.length, 1);
+    /* ★ 畫的順序走 applyOrder(玩家沒拖過的話它就是照牌力排;見 rules.js)。
+       ⚠ 只有這一行吃 ord —— 送去規則層的一律是原始的集合。 */
+    const hand = R.applyOrder(v.hand, ord);
     h += '<div class="b2-hand' + (v.mine ? " mine" : "") + '" style="--b2-slots:' + slots + '">' +
-      v.hand.map(c => cardHTML(c,
+      hand.map(c => cardHTML(c,
         sel.indexOf(c) >= 0 ? "sel" : (hot ? (hot[c] ? "hot" : "cold") : ""))).join("") +
       (v.hand.length ? "" : '<span class="b2-empty">手牌出完了 ✨</span>') +
       '</div>';
@@ -467,8 +502,12 @@ const B2B = (function(){
         if(!el || !hCard) return;
         // 手牌區以外的牌(牌河、結果卡縮圖)不吃點擊
         if(!el.closest(".b2-hand")) return;
+        /* ★ 剛剛那一下是拖曳(而且真的換到別的位置)→ 這一下不算點擊。
+           旗標在 pointerdown 一律會被清掉,所以它不可能漏到下一次點擊(第八節)。 */
+        if(noClick){ noClick = false; return; }
         hCard(+el.dataset.c);
       });
+      bindDrag();
     }
     if(acts){
       acts.addEventListener("click", e => {
@@ -476,6 +515,164 @@ const B2B = (function(){
         if(b && hAct) hAct(b.dataset.act);
       });
     }
+  }
+
+  /* ==========================================================================
+     八、★★ 拖曳排序 —— 玩家自己排手牌(v1.80.0)
+     ==========================================================================
+       使用者:「我們有沒有辦法可以拖曳自己的手牌順序,有時候這樣可以幫助思考」
+
+       ★★ 順序是**純本地的顯示**:不進 DB、不進 moves、不影響任何判定
+          (見 rules.js 的 applyOrder)。三個直接的後果:
+            · 連線時新舊版可以同房 —— 兩台各自顯示自己想看的順序,moves 一模一樣
+            · **不是自己的回合也拖得動**(「幫助思考」大半發生在等對手出牌那段時間)
+              → 所以這裡刻意**不經過** Solo.tap / MP.tap,那兩支有「還沒輪到你」的守衛
+            · 不持久化:換局就回到照牌力排(存下來沒有意義,手牌整副換了)
+
+       ── ★★ 為什麼保留 click、把拖曳疊在上面 ────────────────────────────────
+         既有四支 e2e **全部用 `el.click()` 驅動選牌**(gen-big2-solo-e2e.js 的 handEl),
+         而合成的 .click() **不會產生 pointer 事件**。所以不可以照五子棋
+         (js/gomoku/board.js 的 bindGestures)把 tap 判定搬進 pointerup ——
+         一搬,那些選牌斷言會整批變紅。拖曳只負責排序,
+         「這一下算不算點擊」用 noClick 這個旗標交接:
+           · pointerdown **一律先清掉**旗標 → 它絕對不會漏到下一次點擊
+           · 放手時**位置真的變了**才設旗標
+             ⚠ 只是手抖十幾 px 而沒換到別的位置 → 照樣算點擊。
+               手機上手抖比「刻意拖回原位」常見得多,而「按了沒反應」是使用者會
+               直接判定成壞掉的那一種。
+
+       ── ★ 三個實作上的選擇,都有替代方案被否決 ──────────────────────────────
+         ① 跟著手指走用 **inline style 的 transform**
+            —— .b2-card 有四條規則在搶 transform(:hover / :active / .sel / .sel:active),
+               inline 一律壓得過它們,不必打權重戰(CLAUDE.md「CSS 會撞的第二類」)。
+         ② 換位一律 **insertBefore,排版交給 flex**,不自己算座標
+            —— 手牌是 flex-wrap,窄螢幕會折成兩行;自己算座標要處理換行,
+               而 insertBefore 在兩行之間天然就對,也天然守住 --b2-slots 的固定格位。
+         ③ 命中判定用**幾何**(逐張量 rect),不用 document.elementFromPoint
+            —— 被拖的那張自己就蓋在手指底下,elementFromPoint 一律只打到它;
+               改成 pointer-events:none 又會讓 pointer capture 的行為依賴瀏覽器實作。
+               手牌只有 13~26 張,逐張量最穩。
+
+       ⚠ 觸控要靠 CSS 的 `touch-action:none`(styles.css 的 .b2-hand .b2-card):
+         .b2-stage 是 overflow-y:auto 的捲動容器,不關掉的話手指往下滑會被捲動搶走
+         (瀏覽器會發 pointercancel,拖曳當場斷掉)。代價是手指按在**牌上**時捲不動盤面
+         —— 牌河那一大塊與牌的縫隙都還按得到,而「拖到一半忽然變成捲動」是壞掉。
+     ========================================================================== */
+  const DRAG_SLOP = 11;                     // 位移超過這麼多 px 才算拖曳(不到就是一般點擊)
+
+  function cardsIn(box){
+    return [...box.children].filter(el => el.classList.contains("b2-card"));
+  }
+
+  /* 這張牌**沒有 inline transform 時**在哪一格。
+     ⚠ 每一次移動都要重量:insertBefore 之後它的格位就換了,拿舊的算會讓牌從手指下面跑掉。 */
+  function slotRect(el){
+    const t = el.style.transform;
+    el.style.transform = "";
+    const r = el.getBoundingClientRect();
+    el.style.transform = t;
+    return r;
+  }
+  /* 讓牌停在「手指按下去時抓的那個點」上 —— 不是置中到手指,不然一開始拖會彈一下。
+
+     ⚠⚠ 位置要**夾在盤面裡**(v1.80.0,看圖才發現的):`.b2-stage` 是
+       `overflow-y:auto; overflow-x:hidden` 的捲動容器,牌一旦被拖出它的邊界就會
+       **被裁掉一角、甚至整張消失** —— 而消失的那一張正是手指按著的那一張,
+       看起來就是「牌被我弄丟了」。(截圖 tools/shot/big2-dragedge.png 抓到的;
+       CLAUDE.md「CSS 會撞的四類」的第四類:捲動容器的裁切邊。)
+     ★ 夾的只有**畫**:命中判定(dropAt)照樣吃原始的手指座標,
+       所以「手指推出左緣 → 目標是第一格」這件事完全不受影響 ——
+       牌停在邊上、順序照樣換得過去。 */
+  function follow(x, y){
+    const r = slotRect(drag.el);
+    const sc = stage.getBoundingClientRect();
+    const nx = Math.max(sc.left, Math.min(x - drag.gx, sc.right - r.width));
+    const ny = Math.max(sc.top, Math.min(y - drag.gy, sc.bottom - r.height));
+    drag.el.style.transform =
+      "translate(" + (nx - r.left) + "px," + (ny - r.top) + "px)";
+  }
+
+  /* 指標下方是哪一張**別的**牌 → 插在它前面還是後面。
+     ★ 換完位之後手指底下那一格就是被拖的那張自己(它被跳過)→ 不會來回震盪。 */
+  function dropAt(x, y){
+    const kids = cardsIn(drag.box);
+    for(let i = 0; i < kids.length; i++){
+      const el = kids[i];
+      if(el === drag.el) continue;
+      const r = el.getBoundingClientRect();
+      if(x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+        return { el: el, before: (x < r.left + r.width / 2) };
+    }
+    return null;
+  }
+
+  function endDrag(cancel){
+    if(!drag) return;
+    const d = drag;
+    drag = null;                            // ★ 先清掉:下面的 render() 才進得去
+    d.el.classList.remove("b2-drag");
+    d.el.style.transform = "";
+    try{ d.el.releasePointerCapture(d.id); }catch(e){}
+    /* 順序直接**從 DOM 讀回來** —— 拖曳過程中 DOM 就是唯一的真相(一路 insertBefore)。
+       ⚠ 這裡刻意**不重畫**:DOM 已經是想要的樣子,而重畫會把手指剛放開的那個節點銷毀,
+         click 就不一定發得出來 → noClick 旗標會漏到下一次點擊。 */
+    if(!cancel && d.on && stage.contains(d.el)){
+      const now = cardsIn(d.box).map(el => +el.dataset.c);
+      if(now.join(",") !== d.was.join(",")){ ord = now; noClick = true; }
+    }
+    // 拖曳中被擋掉的那次重畫要補回來 ⚠ 要等 click 發完,所以是 setTimeout 而不是直接呼叫
+    if(d.dirty && lastV) setTimeout(() => render(lastV), 0);
+  }
+
+  function bindDrag(){
+    stage.addEventListener("pointerdown", e => {
+      noClick = false;                      // ★ 一律先清:旗標絕不會漏到下一次點擊
+      if(drag) return;                      // 已經在拖了(第二根手指)→ 不理它
+      if(e.button > 0) return;               // 只吃主鍵
+      const el = e.target.closest(".b2-card");
+      if(!el) return;
+      const box = el.closest(".b2-hand");
+      if(!box) return;                       // 牌河 / 結果卡縮圖的牌不拖
+      const r = el.getBoundingClientRect();
+      drag = { id: e.pointerId, el: el, box: box,
+               x0: e.clientX, y0: e.clientY,
+               gx: e.clientX - r.left, gy: e.clientY - r.top,
+               was: cardsIn(box).map(k => +k.dataset.c),
+               on: false, dirty: false };
+      /* 捕獲指標:手指滑出那張牌之後還要收得到 move / up。
+         ★ 包 try 是**純防禦**:規格上 pointerId 不是活著的指標時要丟 NotFoundError,
+           而 e2e 餵的是合成事件 —— 一丟出來,整條拖曳就變成「靜靜地不存在」。
+         ⚠ 但**實測 headless Edge 不會丟**(合成 pointerId 照樣捕獲得到),
+           所以這一行**殺不掉的突變**刻意沒有放進 mut-big2-e2e.js ——
+           一條永遠存活的突變會讓那份清單失去意義。
+           別的引擎會不會丟沒有驗過,而丟了的代價很高,所以 try 留著。 */
+      try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    });
+
+    stage.addEventListener("pointermove", e => {
+      if(!drag || e.pointerId !== drag.id) return;
+      if(!stage.contains(drag.el)){ endDrag(true); return; }   // 保險:節點被抽掉了
+      if(!drag.on){
+        if(Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < DRAG_SLOP) return;
+        drag.on = true;
+        drag.el.classList.add("b2-drag");
+      }
+      const t = dropAt(e.clientX, e.clientY);
+      if(t) drag.box.insertBefore(drag.el, t.before ? t.el : t.el.nextSibling);
+      follow(e.clientX, e.clientY);
+    });
+
+    stage.addEventListener("pointerup", e => {
+      if(drag && e.pointerId === drag.id) endDrag(false);
+    });
+    stage.addEventListener("pointercancel", e => {
+      if(drag && e.pointerId === drag.id) endDrag(true);
+    });
+    /* 瀏覽器把捕獲收回去(節點被移走 / 手勢被別人接手)→ 當成取消,不要留半套。
+       ⚠ 自己 releasePointerCapture() 也會觸發它,但那時 drag 已經是 null 了。 */
+    stage.addEventListener("lostpointercapture", e => {
+      if(drag && e.pointerId === drag.id) endDrag(true);
+    });
   }
 
   return {
@@ -487,6 +684,8 @@ const B2B = (function(){
       if(i >= 0) sel.splice(i, 1); else sel.push(c);
     },
     setSel(arr){ sel = (arr || []).slice(); },
-    clearSel(){ sel = []; }
+    clearSel(){ sel = []; },
+    // 給 e2e 用:玩家自訂的顯示順序(沒拖過 = null)
+    _ord: () => (ord ? ord.slice() : null)
   };
 })();

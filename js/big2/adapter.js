@@ -88,7 +88,11 @@ const MP = MPCore.create((function(){
       mine: mine,
       turnName: st.over ? "" : nameOfSeat(st.turn),
       over: !!ctx.winner() || st.over,
-      hot: po ? po.cards : null
+      hot: po ? po.cards : null,
+      /* ★ 換局才變 → 盤面照它丟掉玩家自訂的手牌順序(見 board.js 第八節)。
+         ⚠ 用 roundId 而不是 deal / moves.length:同消消樂那條「新局判定一律用
+           roundId」,拿手牌或手數去推會把「出掉一手」誤判成新局。 */
+      key: ctx.roundId()
     });
     B2B.renderActs({
       mine: mine,

@@ -3413,7 +3413,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-cs{font:700 calc(var(--b2w) * .42)/1 'Nunito',sans-serif;margin-top:calc(var(--b2w) * .04)}
   /* 花色是自繪 SVG(js/shared/pk-faces.js),fill:currentColor 讓它沿用上面那幾條 color */
   .b2-sv{display:block;width:1em;height:1em;fill:currentColor}
-  .b2-hand .b2-card{cursor:pointer}
+  /* ★★ touch-action:none 是**拖曳排序的必要條件**(v1.80.0,見 board.js 第八節):
+     .b2-stage 是 overflow-y:auto 的捲動容器,不關掉的話手指在牌上往下滑會被捲動搶走
+     (瀏覽器發 pointercancel,拖曳當場斷掉),而窄螢幕手牌會折成兩行、
+     跨行拖曳一定要垂直移動。
+     ⚠ 代價是手指按在**牌上**時捲不動盤面 —— 牌河那一大塊與牌的縫隙都還按得到,
+       而「拖到一半忽然變成捲動」是使用者會直接判定成壞掉的那一種。
+     ⚠ 這一條只給**手牌**:牌河 / 結果卡縮圖的牌不拖,也不該擋捲動。 */
+  .b2-hand .b2-card{cursor:pointer;touch-action:none;-webkit-user-drag:none}
   .b2-hand .b2-card:hover{transform:translateY(-4px)}
   .b2-hand .b2-card:active{transform:scale(.94)}
   /* ★★ 「亮起來」= 綠框 + 綠光(v1.79.0)。綠色是這一頁既有的「這組可以出」
@@ -3435,6 +3442,18 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* 「再按一下就跑回去」要按得出手感:選中那張自己也要有 :active
      (少了這條,已選的牌按下去畫面完全沒動,像沒吃到那一下) */
   .b2-hand .b2-card.sel:active{transform:translateY(-14px) scale(.94)}
+  /* ★★ 正在被拖著走的那一張(v1.80.0,見 board.js 第八節)。
+     ⚠⚠ 這一條裡面**故意沒有 transform** —— 位移由 board.js 寫成 **inline style**,
+        因為上面那四條(:hover / :active / .sel / .sel:active)全都在搶 transform,
+        inline 才壓得過它們而不必打權重戰(CLAUDE.md「CSS 會撞的第二類」)。
+     ⚠ transition 一定要關掉:.b2-card 有 `transition:transform .12s`,
+       留著的話牌會慢半拍跟著手指,手感立刻不對。
+     ⚠ 選擇器寫成 `.b2-hand .b2-card.b2-drag`(而不是 `.b2-card.b2-drag`)是為了
+       跟 .cold / .hot / .sel 站在同一個權重上 —— 而且**刻意不寫 filter**:
+       壓暗的牌被拖著走時照樣是暗的(亮暗講的是「用不用得到」,拖曳不改變那件事)。 */
+  .b2-hand .b2-card.b2-drag{position:relative;z-index:6;cursor:grabbing;
+    box-shadow:0 12px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent)}
+  :root[data-theme="ebook"] .b2-hand .b2-card.b2-drag{box-shadow:0 6px 12px rgba(0,0,0,.35),0 0 0 3px #000}
   .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
   /* 這一輪的記錄用的尺寸(v1.77.0)。★ 為什麼比 .sm 再小一級:一輪可能有 4 手,
      .sm(牌高 40px)四列就 300px,一定捲;.mid 之後常見的 3~4 手放得下不必捲。
