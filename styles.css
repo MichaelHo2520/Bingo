@@ -3147,13 +3147,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
          --b2-redlit:#ff7b7b; --b2-bk:#3f5896;
          --b2-tw:min(98vw,700px); --b2-cw:clamp(27px,7.6vw,40px); --b2-hgap:5px;
          /* ★★ 這兩個數字是「手牌位置固定」的全部(v1.78.0)——
-            --b2-trh 中間那塊(四列剛好)· --b2-acth 動作列(最高的那一組內容)。
-            兩塊都固定 → 手牌貼在動作列上方的位置就再也不會動。 */
-         /* ★ 下限 208 =「四列剛好」(4 × 42 + 標題 24 + padding 16);
-              高螢幕給它長到 22vh(上限 300)—— 那塊多出來的空間與其全留白,
-              不如讓牌桌看起來大一點。⚠ 用 vh 而**不是** flex:1:vh 不隨內容變,
-              所以「四種狀態下高度一樣」那條斷言照樣成立(手牌才不會跳)。 */
-         --b2-trh:clamp(208px,22vh,300px); --b2-acth:96px; }
+            --b2-trh 中間那塊的**下限**(四列剛好)· --b2-acth 動作列(最高的那一組內容)。
+            動作列固定 + 手牌貼底 → 手牌的位置再也不會動。
+          ★★ v1.79.0 起 --b2-trh 只是 min-height:中間那塊改成**吃掉剩下的垂直空間**
+             (`.b2-trick{flex:1 1 auto}`)。使用者:「中間的出牌局怎麼靠下了,
+             導致上面有一堆的空白區」—— 高螢幕上 v1.78 那塊固定高度的框被推到最下面,
+             玩家晶片列底下空了將近 500px。理由與量法見 .b2-trick。
+          ★ 下限 212 =「四列剛好」(4 × 47 + 標題 24 + padding 16 + 捲動留白);
+            一列 47 = 牌高 37.5 + padding 6 + 亮框的 border 4(v1.79.0 加,見 .b2-tmv)。 */
+         --b2-trh:212px; --b2-acth:96px; }
   /* 連線多一圈出牌倒數(.b2-cdwrap 在動作列裡面)→ 預留它的高度。
      ⚠ 房主把倒數設成 0(關掉)時那一圈不出現,那時會多留 32px 空白 ——
        **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次。 */
@@ -3212,17 +3214,17 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* z-index:0 讓盤面自成一個 stacking context。這一頁沒有動態 z-index,
      但覆蓋層(結果卡 / 設定蓋板)不該有任何機會被盤面內容穿過去 —— 消消樂 v1.56.0
      就是少了這一行,「按離開房間,確認框上面浮著幾張牌」。 */
-  /* ★★ justify-content:flex-end(v1.78.0)—— 高視窗下多出來的垂直空間**全部放在上面**。
-     中間那塊改成固定高度之後,那塊多出來的空間總得有個去處,三種都試過看圖比較:
-       ① 手牌 margin-top:auto 貼底 → 空白落在**中間框與手牌之間**(大螢幕 400px 以上,
-          比 v1.76.0 那個「空 400px」更難看)
+  /* ★★ 高視窗下多出來的垂直空間往哪裡去 —— 四種都試過看圖比較(v1.79.0 定案 ④):
+       ① 手牌 margin-top:auto 貼底 → 空白落在**中間框與手牌之間**(大螢幕 400px 以上)
        ② 整組垂直居中 → 上下各空一半,**手牌浮在畫面中央**、離動作列很遠
-       ③ 整組靠下(這一版)→ 手牌貼著動作列(拇指按得到,同 v1.73.1 的結論)、
-          中間框緊貼手牌上方(「桌上的牌就在我手牌上方」),空白落在**玩家晶片列下面**
-          —— 那裡本來就是桌面中央,沒有框線,空著就只是桌布。
-     ⚠ 手牌因此**不再** margin-top:auto(見 .b2-hand);兩者是一組,不要只改一邊。
-     ⚠ 手牌位置仍然是固定的:盤面高度由固定的動作列決定 → 靠下的結果每次都一樣
-       (單機 e2e 的四狀態斷言在守)。 */
+       ③ 整組靠下(v1.78)→ 手牌貼著動作列,但空白全部堆在**玩家晶片列下面**;
+          當時的判斷是「那裡是桌面中央,空著只是桌布」,使用者實際看到的是
+          「中間的出牌局怎麼靠下了,導致上面有一堆的空白區」
+       ④ **手牌貼底 + 中間那塊長高把空白吃掉**(這一版)—— 空白不再是空白,
+          它變成牌桌本身;桌上的牌置中在那塊裡(見 .b2-trick 的 justify-content)。
+     ⚠ justify-content:flex-end 留著:中間那塊在矮視窗會被 min-height 撐到吃滿,
+       那時靠下才能保證手牌貼在動作列上方(而不是被推出盤面)。
+     ⚠ 手牌**不要** margin-top:auto —— 空白由 .b2-trick 的 flex:1 吸掉,兩者是一組。 */
   .b2-stage{flex:1 1 auto;min-height:0;position:relative;z-index:0;
     display:flex;flex-direction:column;justify-content:flex-end;gap:7px;
     overflow-y:auto;overflow-x:hidden}
@@ -3236,28 +3238,35 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-acts{flex:none;min-height:var(--b2-acth);display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:6px;padding:2px 0}
 
-  /* ---------- 牌河 = 這一輪大家出的牌(v1.77.0;v1.78.0 改成固定高度)----------
-     ★★ **固定高度**(v1.78.0)。使用者的原話:「中間那大家是不是就可以被固定下來,
-        不用太高了,因為最下方的按鈕跟提示,會在出完牌後就變了,這樣我的手牌又會
-        上上下下的,看起來很不舒服」。
-        它固定得起來的前提是 v1.78.0 那條「一輪之內每個人只留最後一個動作」——
-        列數因此有上限(= 人數),不必再靠彈性高度去吸收。
-        ⚠ 高度是「四列剛好」算出來的:4 × 42 + 標題 24 + padding 16 ≈ 208。
-          改牌大小(.b2-card.mid)或 gap 就要重算這個數字,不然又會捲。
+  /* ---------- 牌河 = 這一輪大家出的牌(v1.77.0)----------
+     ★★ 高度**不隨自己的內容變**,但會**吃掉盤面剩下的空間**(v1.79.0)。
+        兩句使用者原話合起來才是這一條:
+          v1.78「中間那大家是不是就可以被固定下來,不用太高了,因為最下方的按鈕跟提示,
+                 會在出完牌後就變了,這樣我的手牌又會上上下下的」
+          v1.79「中間的出牌局怎麼靠下了,導致上面有一堆的空白區」
+        → 要的不是「固定 208px」,是「**別跟著內容跳**」。所以:
+            flex:1 1 auto + min-height:--b2-trh
+          高度 = 盤面高 − 手牌高(與列數無關)→ 手牌照樣一格都不動,
+          而高視窗上那塊空白變成牌桌本身。
+        ⚠ 這一塊**絕對不可以**改回 height:auto / flex:none 之外的「跟著列數長」——
+          那就回到 v1.77 的「手牌上上下下」。守門是單機 e2e D3 的四狀態斷言
+          (四種列數下 .b2-trick 的高度必須完全一樣)。
+        ⚠ min-height 存在的理由是矮視窗:算出來比四列還矮時寧可讓盤面自己捲。
      ★ 手牌位置固定的**兩個條件**,少一個都不成立:
-        ① 這一塊高度固定(不隨列數變)
+        ① 這一塊高度不隨列數變(= 上面那條)
         ② 動作列高度固定(不隨提示 / 按鈕組變)—— 見 .b2-acts
-     ★ 內容置中靠 .b2-tlist 的 margin-block:auto,**不是** justify-content:center ——
-       flex 容器用 justify-content:center 的東西一旦超出高度,開頭那幾筆會被裁掉
-       而且捲不回去(那是 flex + overflow 的老坑)。margin:auto 在沒有剩餘空間時
-       自動變 0,兩種情況都對。 */
-  .b2-trick{flex:none;height:var(--b2-trh);overflow:hidden;
-    display:flex;flex-direction:column;align-items:center;gap:6px;
+     ★ 內容置中改用 justify-content:center(v1.79.0;原本是 .b2-tlist 的 margin-block:auto)
+       —— 框長高之後 margin:auto 會把「標題」與「那幾列牌」拉開到框的兩端,
+       中間空一大片。整組一起置中才讀得出是一疊牌。
+       ⚠ flex + justify-content:center 的老坑(內容超出時開頭被裁掉又捲不回去)在這裡
+         碰不到:.b2-tlist 自己 min-height:0 + overflow-y:auto,它會先縮再捲,
+         整組永遠不會超出框。 */
+  .b2-trick{flex:1 1 auto;min-height:var(--b2-trh);overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
     background:rgba(0,0,0,.16);border-radius:12px;padding:8px 10px}
-  /* 這一輪還沒有人出牌時只剩一行字 —— 讓它停在框的**中央**。
-     ⚠ 不可以改成「空的時候把框縮小」:那會讓手牌在「空的一輪 / 有牌」之間跳一次,
-       正是 v1.78.0 要修掉的那件事(高度固定的代價就是空的時候也占位)。 */
-  .b2-trick.empty{justify-content:center}
+  /* 這一輪還沒有人出牌 → 桌面淡一點(框還在,它是「桌子」;高度也一格都不變 ——
+     ⚠ 不可以改成「空的時候把框縮小」,那會讓手牌在空的一輪與有牌之間跳一次) */
+  .b2-trick.empty{background:rgba(0,0,0,.10)}
   :root[data-theme="ebook"] .b2-trick{background:#fff;border:1px solid #000}
   .b2-tlbl{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
     font:700 11.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
@@ -3271,18 +3280,32 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        board.js 每次 render 都把 scrollTop 推到底(同台灣麻將牌河
        「最新那張永遠得看得見」)。 */
   /* ⚠ 頂部那 7px 漸層是**看圖才加的**:放不下時捲到底之後最上面那一列會被切一半,
-     看起來像畫面壞了。淡出之後同一件事讀起來是「上面還有,捲得上去」。 */
-  .b2-tlist{flex:0 1 auto;min-height:0;overflow-y:auto;width:100%;margin-block:auto;
+     看起來像畫面壞了。淡出之後同一件事讀起來是「上面還有,捲得上去」。
+     ⚠ padding-block 是給那道漸層用的(v1.79.0):mask 蓋的是**border box**,
+       沒有 padding 的話沒捲動時第一列也會被淡掉一角(亮框的上緣正好在那裡)。
+       捲動容器的 padding 會跟著內容捲,所以真的捲起來時漸層照樣淡在列上。
+     ⚠ margin-block:auto 在 v1.79.0 拿掉了 —— 置中改由 .b2-trick 的
+       justify-content:center 做(理由見那條:框長高之後 margin:auto 會把標題與牌拉開)。 */
+  .b2-tlist{flex:0 1 auto;min-height:0;overflow-y:auto;width:100%;padding:6px 0 2px;
     display:flex;flex-direction:column;align-items:center;gap:4px;
-    mask-image:linear-gradient(to bottom,transparent 0,#000 7px,#000 100%)}
+    mask-image:linear-gradient(to bottom,transparent 0,#000 6px,#000 100%)}
+  /* ⚠⚠ border 是 2px **透明**的(不是「沒有 border」):亮框(.top)只換顏色,
+     所以標不標「目前最大」都不會讓這一列的高度差 4px —— 差了的話中間那塊的
+     四狀態高度就對不上,手牌會跳。 */
   .b2-tmv{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;
-    padding:3px 8px;border-radius:10px;background:rgba(255,255,255,.05)}
+    padding:3px 8px;border:2px solid transparent;border-radius:10px;
+    background:rgba(255,255,255,.05)}
   /* ★ 目前最大的那一手要一眼認得出來 —— 玩家要判斷的就是「我壓不壓得過它」。
-     ⚠⚠ 這個框**不可以用 inset box-shadow**:inset 畫在元素自己的背景上,
-        會被裡面那幾張牌(有自己的白底、又幾乎占滿容器內高)**蓋掉上下兩段** ——
-        症狀就是使用者說的「黃色框上層沒畫好」(v1.78.0 修)。
-        外擴的 box-shadow 畫在子元素之上,而且不占版面(不會把列撐高)。 */
-  .b2-tmv.top{background:rgba(255,255,255,.12);box-shadow:0 0 0 2px var(--accent)}
+     ⚠⚠ 這個框畫過三種,前兩種都畫不完整(使用者兩次回饋「黃色框都沒辦法完整」):
+        ① inset box-shadow(v1.77)→ 畫在元素自己的背景上,被裡面那幾張牌
+           (有白底、又幾乎占滿容器內高)**蓋掉上下兩段**
+        ② 外擴 box-shadow(v1.78)→ 不占版面,所以整條線落在 .b2-tlist 的
+           **內容框外面**,被那個捲動容器(overflow-y:auto)裁掉;第一列的上緣
+           還會再被 mask 淡一次。放大截圖看就是「上邊那條線整條不見」。
+        ③ **border**(v1.79,這一版)→ 占版面、畫在自己的 border box 上,
+           子元素只住在 padding box 裡蓋不到它,捲動容器也裁不到 —— 四邊必定完整。
+        ⚠ 所以這裡**不要**再改回任何一種 box-shadow 畫法。 */
+  .b2-tmv.top{background:rgba(255,255,255,.12);border-color:var(--accent)}
   .b2-tmv.pass{opacity:.72}
   .b2-tnm{font:800 11.5px/1.3 'Nunito',sans-serif;color:var(--text);
     max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3290,8 +3313,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     font:800 11px/1.5 'Nunito',sans-serif;color:var(--text)}
   .b2-tpass{font:800 11px/1.5 'Nunito',sans-serif;color:var(--muted)}
   .b2-tcs{display:flex;flex-wrap:wrap;gap:3px}
-  :root[data-theme="ebook"] .b2-tmv{background:#fff;border:1px solid #bbb}
-  :root[data-theme="ebook"] .b2-tmv.top{background:#fff;box-shadow:none;border:2px solid #000}
+  /* ⚠ ebook 只換**顏色**,不換寬度(換了就等於讓亮框改變列高,見上) */
+  :root[data-theme="ebook"] .b2-tmv{background:#fff;border-color:#bbb}
+  :root[data-theme="ebook"] .b2-tmv.top{background:#fff;border-color:#000}
   :root[data-theme="ebook"] .b2-tct{background:#eee;color:#000;border:1px solid #ccc}
   /* 無敵牌型的記號:鐵支 / 同花順壓得過任何牌型,那件事一定要看得出來 */
   .b2-rbomb{padding:1px 7px;border-radius:8px;background:var(--b2-redlit);
@@ -3303,16 +3327,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      要復活的話連同 board.js 那條紅線一起看(只准標已經出過的)。 */
 
   /* ---------- 手牌 ----------
-     ★ 這一頁**沒有**「這張能不能出」的壓暗 —— 大老二出的是組合,單看一張牌無法回答
-       (♣5 單張壓不過 ♦7,但 ♣5+♦5 可能壓得過一對 4)。硬把 legal 攤到每張牌上
-       只會給出騙人的壓暗,所以全部點得動,由動作列回答「這組行不行」。
-       這仍然守著 CLAUDE.md 那條紅線:不用 disabled 讓牌靜默吃掉點擊。
-     ★ 高的螢幕一定會多出一截空白,能決定的只是它放在哪。
-       ⚠ v1.77.0 之前是 `margin-top:auto`(手牌貼底、空白全在牌河與手牌之間)——
-         v1.78.0 中間那塊改成固定高度之後,那塊空白在大螢幕上超過 400px,
-         比 v1.76.0 那個「空 400px」更難看。現在**整組垂直居中**
-         (`.b2-stage{justify-content:center}`),空白平分上下,所以這裡**不再** margin-top:auto。
-       ⚠ 兩者是一組:要改回貼底就得同時拿掉 stage 的 justify-content。
+     ★★ 亮暗問的是「**用得到嗎**」,不是「這張能不能出」(v1.79.0,見 board.js 檔頭):
+        .hot  = 存在一種合法出法用得到它(選了牌之後會收窄成「配得上目前選取」)
+        .cold = 目前湊不出任何合法出法 —— **仍然點得動**,壓暗只是提示
+        兩個 class 都不加 = 不是我的回合(那時亮暗沒有意義)
+        ⚠ 不可以改成 disabled / pointer-events:none(CLAUDE.md:不用 disabled
+          讓牌靜默吃掉點擊;按下去要由動作列說得出 B2.whyNot)。
+     ★ 高視窗多出來的空白由 .b2-trick 吃掉(v1.79.0),所以手牌這裡**不要**
+       margin-top:auto —— 兩者是一組,見 .b2-stage 的四種方案比較。
 
      ★★ 格位是**固定的**(v1.77.0)。使用者:「我不喜歡我們的手牌,位置會一直變來變去」。
         舊版是 justify-content:center → 出掉 5 張之後剩下的 8 張整排往中間收,
@@ -3350,11 +3372,25 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-hand .b2-card{cursor:pointer}
   .b2-hand .b2-card:hover{transform:translateY(-4px)}
   .b2-hand .b2-card:active{transform:scale(.94)}
+  /* ★★ 「亮起來」= 綠框 + 綠光(v1.79.0)。綠色是這一頁既有的「這組可以出」
+     (.b2-selbar.ok 用同一個 129,199,132),沿用同一支顏色才讀得出是同一件事;
+     選中用的是 --accent-2(黃),兩種狀態不會混。 */
+  .b2-hand .b2-card.hot{box-shadow:0 2px 8px rgba(129,199,132,.45),0 0 0 1.5px rgba(129,199,132,.9)}
+  /* 壓暗:灰掉 + 壓低亮度。⚠ 不要用 opacity 一路壓到看不見點數 ——
+     它還是要認得出是哪張牌(玩家得看得出「我手上有沒有 2」)。 */
+  .b2-hand .b2-card.cold{filter:grayscale(.62) brightness(.72)}
   /* ★ 選中要非常明顯:大老二一手可能選 5 張,而「我到底選了哪幾張」是這一頁最重要的狀態。
-     站起來 + 亮框 + 換底色三個訊號一起給(漏看一個還有兩個)。 */
-  .b2-hand .b2-card.sel{transform:translateY(-10px);
-    box-shadow:0 6px 12px rgba(0,0,0,.34),0 0 0 2.5px var(--accent-2);
+     ★★ 「站起來」(v1.79.0 從 10px 加到 14px)。使用者:「選了就站起來,
+        用這麼方式,站起來的牌,再按一下就跑回去」—— 站得高一點,一整排掃過去
+        才看得出哪幾張是站著的。⚠ 往上長不會被裁到:手牌是盤面最下面那一塊,
+        它上面是中間那塊與 7px 的 gap。
+     ★ 站起來 + 亮框 + 換底色三個訊號一起給(漏看一個還有兩個)。 */
+  .b2-hand .b2-card.sel{transform:translateY(-14px);
+    box-shadow:0 8px 14px rgba(0,0,0,.36),0 0 0 2.5px var(--accent-2);
     background:linear-gradient(155deg,#fff,#fff5d8 58%)}
+  /* 「再按一下就跑回去」要按得出手感:選中那張自己也要有 :active
+     (少了這條,已選的牌按下去畫面完全沒動,像沒吃到那一下) */
+  .b2-hand .b2-card.sel:active{transform:translateY(-14px) scale(.94)}
   .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
   /* 這一輪的記錄用的尺寸(v1.77.0)。★ 為什麼比 .sm 再小一級:一輪可能有 4 手,
      .sm(牌高 40px)四列就 300px,一定捲;.mid 之後常見的 3~4 手放得下不必捲。
@@ -3364,6 +3400,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-empty{font:800 13px/1 'Nunito',sans-serif;color:var(--accent);padding:12px 0}
   :root[data-theme="ebook"] .b2-card{background:#fff;border-color:#000;box-shadow:none}
   :root[data-theme="ebook"] .b2-hand .b2-card.sel{background:#fff;box-shadow:0 0 0 3px #000}
+  /* 黑白模式沒有顏色可用:亮的給一圈灰框、暗的直接淡掉(灰階濾鏡在這裡是白忙) */
+  :root[data-theme="ebook"] .b2-hand .b2-card.hot{box-shadow:0 0 0 2px #666}
+  :root[data-theme="ebook"] .b2-hand .b2-card.cold{filter:none;opacity:.42}
 
   /* ---------- 動作列 ----------
      ★ 只有一份(單機與連線共用)—— 大老二沒有宣告階段,所以它吃的是純資料。 */
@@ -3480,8 +3519,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         排七踩過:只縮手牌、軌道沒跟著,結果「格子比手牌大」。
         這一頁沒有軌道,但牌河的 .b2-card.sm 是從 --b2-cw 推回來的,一起變才對。 */
   @media (max-height:600px){
-    /* ⚠ 中間那塊與動作列的固定高度也要跟著收 —— 不收的話矮視窗會被這兩塊吃光,
-       手牌反而被擠出畫面(那比「手牌會跳」嚴重得多)。 */
+    /* ⚠ 中間那塊的**下限**與動作列的固定高度也要跟著收 —— 不收的話矮視窗會被這兩塊
+       吃光,手牌反而被擠出畫面(那比「手牌會跳」嚴重得多)。
+       ⚠ --b2-trh 在 v1.79.0 起是 min-height:矮視窗算得出來的高度通常就是這個下限,
+         那時中間那塊自己捲(.b2-tlist),手牌照樣貼著動作列。 */
     :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:150px; --b2-acth:74px}
     body.b2-mp{--b2-acth:106px}
     .b2-hero{margin:6px 0 2px}

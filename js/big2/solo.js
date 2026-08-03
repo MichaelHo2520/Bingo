@@ -103,13 +103,18 @@ const Solo = (function(){
     const mine = st.turn === ME && !over && !busy;
     const nms = [];
     for(let s = 0; s < seats; s++) nms.push(seatName(s));
+    /* ★ 手牌要亮哪幾張 / 有沒有牌可出:規則層算(B2.playable),連線那份逐字一樣。
+       ⚠ 只在**輪到我**時算 —— 輪到對手時亮暗沒有意義,而且那是每次重畫都要跑的
+         枚舉(26 張手牌約 2ms),沒必要白跑。 */
+    const po = mine ? B2.playable(st.hands[ME], st, B2B.sel()) : null;
     B2B.render({
       hand: st.hands[ME].slice(),
       slots: B2.dealCounts(seats)[ME],      // ★ 固定格位吃**開局張數**(見 board.js 第三節)
       trick: st.trick, names: nms, opened: st.opened,
       mine: mine,
       turnName: st.over ? "" : seatName(st.turn),
-      over: over
+      over: over,
+      hot: po ? po.cards : null
     });
     B2B.renderActs({
       mine: mine,
@@ -117,6 +122,7 @@ const Solo = (function(){
       turnName: st.over ? "" : seatName(st.turn),
       lead: !st.cur,
       canPass: !!st.cur,
+      noPlay: !!(po && !po.can),
       selInfo: mine ? B2B.selInfoOf(st) : null
       // 單機不做倒數 —— 卡多久是自己的節奏(同排七 / 消消樂的僵局時鐘不套單機)
     });

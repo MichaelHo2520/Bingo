@@ -79,13 +79,16 @@ const MP = MPCore.create((function(){
     const mine = isMyTurn();
     const nms = [];
     for(let s = 0; s < nPlayers(); s++) nms.push(nameOfSeat(s));
+    // ★ 手牌亮暗 / 有沒有牌可出:與單機那份逐字一樣(solo.js 的 paint 同一段)
+    const po = mine ? B2.playable(st.hands[me], st, B2B.sel()) : null;
     B2B.render({
       hand: st.hands[me].slice(),
       slots: B2.dealCounts(nPlayers())[me],   // ★ 固定格位吃**開局張數**(見 board.js 第三節)
       trick: st.trick, names: nms, opened: st.opened,
       mine: mine,
       turnName: st.over ? "" : nameOfSeat(st.turn),
-      over: !!ctx.winner() || st.over
+      over: !!ctx.winner() || st.over,
+      hot: po ? po.cards : null
     });
     B2B.renderActs({
       mine: mine,
@@ -93,6 +96,7 @@ const MP = MPCore.create((function(){
       turnName: st.over ? "" : nameOfSeat(st.turn),
       lead: !st.cur,
       canPass: !!st.cur,
+      noPlay: !!(po && !po.can),
       selInfo: mine ? B2B.selInfoOf(st) : null,
       // 環給全桌看(誰還剩幾秒是公開資訊,大家才知道為什麼卡著)
       cdMs: secOn() ? turnSec * 1000 : 0,

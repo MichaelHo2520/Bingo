@@ -32,13 +32,18 @@
      (「畫出來的」= 每個座位最後一個動作,見 lastPerSeat)。
      誰哪天讓盤面畫出別人的手牌,這個數字立刻對不上。
 
-   ── ★ 為什麼手牌**不做**「這張能不能出」的壓暗 ────────────────────────────
-     排七是一張一張出,所以每張牌都有明確的「出得掉 / 出不掉」。
-     大老二出的是**組合** —— 單看一張牌無法回答「它能不能出」
+   ── ★★ 手牌亮暗:問的是「用得到嗎」,不是「這張能不能出」(v1.79.0)──────────
+     使用者:「如果我能出牌,請幫我把可以出的牌亮起來,然後選了就站起來」。
+     v1.78.1 之前這一頁刻意**一張都不壓暗**,理由是「單看一張牌無法回答它能不能出」
      (♣5 單張壓不過 ♦7,但 ♣5+♦5 的對子可能壓得過一對 4)。
-     硬把 legal 攤到每張牌上只會給出**騙人的**壓暗,所以:
-       每張牌都點得動 → 選好之後由動作列回答「這組行不行、為什麼不行」(B2.whyNot)。
-     這仍然守著 CLAUDE.md 那條紅線:不用 disabled 讓牌靜默吃掉點擊。
+     ★ 那句話仍然成立 —— 所以這一版問的是**另一個問題**,由 `B2.playable()` 回答:
+           「**存在**一種合法出法用得到這張牌嗎?」
+       單張回答得出來,而且不騙人。舊版把 ♣5 壓暗才是騙人的那一邊。
+     ★ 選了牌之後那份清單會**跟著收窄**(只留「配得上目前選取」的牌),
+       所以亮著的一直是「下一張點哪裡有用」。
+     ⚠ 壓暗的牌**仍然點得動**(CLAUDE.md 紅線:不用 disabled 靜默吃掉點擊),
+       按下去照樣由動作列回答 B2.whyNot。
+     ⚠ 一手都出不了時(can === false)動作列只留 Pass —— 見第四節。
    ========================================================================== */
 
 const B2B = (function(){
@@ -190,7 +195,9 @@ const B2B = (function(){
   /* ==========================================================================
      三、整個舞台
      ──────────────────────────────────────────────────────────────────────────
-       v = { hand, slots, trick[], names[], mine, turnName, over, opened }
+       v = { hand, slots, trick[], names[], mine, turnName, over, opened, hot[] }
+       ★ hot = 要亮起來的牌(B2.playable().cards);傳 null / 不傳 = **一張都不壓暗**
+         (輪到對手時就該這樣 —— 那時亮暗沒有意義,只是在畫面上多一種變化)。
        ★ 盤面裡**沒有對手列**:「誰 / 輪到誰 / 剩幾張」三樣在玩家晶片上全都有了
          (連線走 chipTail、單機走 paintBar),盤面再畫一次是 100% 重複。
 
@@ -211,10 +218,15 @@ const B2B = (function(){
 
     let h = trickHTML(v);
 
-    // 手牌。★ 全部點得動(見檔頭:大老二沒有「單張能不能出」這回事)
+    /* 手牌。★ 亮起「配得出組合」的那幾張(見檔頭)——
+       ⚠ 壓暗的牌**仍然點得動**,壓暗只是提示,不是 disabled。
+       ⚠ v.hot 沒給時 hot 是 null → 一張都不加 class(輪到對手 / 結算) */
+    const hot = v.hot ? {} : null;
+    if(hot) v.hot.forEach(c => { hot[c] = 1; });
     const slots = Math.max(v.slots || 0, v.hand.length, 1);
     h += '<div class="b2-hand' + (v.mine ? " mine" : "") + '" style="--b2-slots:' + slots + '">' +
-      v.hand.map(c => cardHTML(c, sel.indexOf(c) >= 0 ? "sel" : "")).join("") +
+      v.hand.map(c => cardHTML(c,
+        sel.indexOf(c) >= 0 ? "sel" : (hot ? (hot[c] ? "hot" : "cold") : ""))).join("") +
       (v.hand.length ? "" : '<span class="b2-empty">手牌出完了 ✨</span>') +
       '</div>';
     stage.innerHTML = h;
@@ -234,7 +246,7 @@ const B2B = (function(){
   /* ==========================================================================
      四、動作列(單機與連線共用這一份)
      ──────────────────────────────────────────────────────────────────────────
-       info = { mine, over, turnName, lead, selInfo:{ok,txt,type}, canPass, cdMs, cdEnd }
+       info = { mine, over, turnName, lead, selInfo:{ok,txt,type}, canPass, noPlay, cdMs, cdEnd }
        ★ 只有一份:大老二沒有宣告階段,所以動作列吃的是**純資料**
          (台灣麻將的 renderActs 有兩份,是因為連線那份要管宣告視窗)。
        ⚠ 想加「只有連線才有」的東西時,先想能不能表達成 info 的一個欄位。
@@ -242,6 +254,25 @@ const B2B = (function(){
   function actsHTML(info){
     if(info.over) return '<span class="b2-atxt">這局結束</span>';
     if(!info.mine) return '<span class="b2-atxt">輪到 <b>' + esc(info.turnName || "對手") + '</b>…</span>';
+
+    /* ★★ 一手都出不了 → **只留 Pass**(v1.79.0)。使用者:
+         「如果我沒辦法出牌的時候,請直接剩下 pass 按鈕」
+       畫一顆「出牌」在那裡等於要玩家自己試到死心,而答案是規則層算得出來的
+       (B2.playable().can)。
+       ⚠ 這條路只在 canPass 時走:領出的人手上只要有牌就一定出得出來
+         (任何一張單張都合法),所以 noPlay && !canPass 到不了 —— 但真的到了
+         就會變成「一顆鈕都沒有」的死畫面,所以這裡要求兩個條件同時成立。
+       ⚠ 「清除」還是要留:壓暗的牌照樣點得動,玩家有可能已經選了幾張。 */
+    if(info.noPlay && info.canPass){
+      return '<div class="b2-selbar bad">' +
+               '<span class="b2-selico">🙅</span>' +
+               '<span class="b2-seltxt">你手上沒有一手壓得過現在桌上這一手 —— 只能不要(Pass)</span>' +
+             '</div>' +
+             '<div class="b2-btns">' +
+               (sel.length ? '<button class="btn ghost b2-act" data-act="clear">清除</button>' : "") +
+               '<button class="btn primary b2-act" data-act="pass">不要(Pass)</button>' +
+             '</div>';
+    }
 
     const s = info.selInfo || {};
     /* ★ 領出的人不能 pass(規則)。那句提示 v1.78.0 起**併進這一行**,不再多一行 ——

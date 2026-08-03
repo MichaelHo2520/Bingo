@@ -33,6 +33,7 @@
      • replay():從 deal + moves 重算一整局的真相   ★ 唯一的真相入口
      • score():名次與名次分
      • enumPlays():這副手牌能組出哪些牌型(給 AI 與提示用)
+     • playable():現在配得出哪些組合 → 手牌亮哪幾張 / 有沒有牌可出(v1.79.0)
    不負責:AI(ai.js)、畫面(board.js)、輪次驅動(solo.js / adapter.js)。
 
    ── ★ 為什麼一切都走 replay() ─────────────────────────────────────────────
@@ -426,7 +427,11 @@ const B2 = (function(){
          最多只是少一個選項,不會讓 AI 卡住。
        ⚠ 也因此**不可以**拿它來判「這一手合不合法」—— 那是 classify() + beats() 的事。
      ========================================================================== */
-  const STRAIGHT_CAP = 16;               // 每個點數窗最多列幾種花色組合
+  const STRAIGHT_CAP = 16;               // 每個點數窗最多列幾種花色組合(AI 用)
+  /* 4^5 = 一個點數窗理論上的花色組合上限 → 帶這個 cap 就等於**窮舉**。
+     只有 playable() 用它(見第六之二節):那一支要回答「有沒有任何一手」,
+     漏一種花色組合就會答錯,而 AI 那邊漏一個候選只是少一個選項。 */
+  const FULL_CAP = 1024;
 
   // 10 個合法的順子點數窗(由小到大;等級見 straightOf)
   function straightWindows(){
@@ -451,7 +456,8 @@ const B2 = (function(){
     return out;
   }
 
-  function enumPlays(hand){
+  function enumPlays(hand, cap){
+    const lim = cap > 0 ? cap : STRAIGHT_CAP;
     const out = [];
     const push = cs => { const cl = classify(cs); if(cl) out.push({ cards: cs.slice().sort(cmpCard), cls: cl }); };
     const by = {};
@@ -486,8 +492,8 @@ const B2 = (function(){
       let acc = [[]];
       for(let i = 0; i < cols.length; i++){
         const next = [];
-        for(let a = 0; a < acc.length && next.length < STRAIGHT_CAP; a++)
-          for(let b = 0; b < cols[i].length && next.length < STRAIGHT_CAP; b++)
+        for(let a = 0; a < acc.length && next.length < lim; a++)
+          for(let b = 0; b < cols[i].length && next.length < lim; b++)
             next.push(acc[a].concat([cols[i][b]]));
         acc = next;
       }
@@ -514,6 +520,55 @@ const B2 = (function(){
       (isBomb(a.cls.t) ? bombLv(a.cls.t) - bombLv(b.cls.t) : a.cls.t - b.cls.t) ||
       a.cls.k - b.cls.k
     );
+  }
+
+  /* ==========================================================================
+     六之二、★★ 「我現在配得出哪些組合」(v1.79.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者的要求有兩句:
+         「如果我沒辦法出牌的時候,請直接剩下 pass 按鈕」
+         「如果我能出牌,請幫我把可以出的牌亮起來」
+
+       ★★ 這一支**推翻了**舊版那條「大老二不做單張壓暗」的判斷,但推翻的方式很重要:
+          舊版的理由是「單看一張牌無法回答它能不能出」—— 那句話是對的,
+          所以這裡回答的**不是**那個問題,而是:
+              「**存在**一種合法出法用得到這張牌嗎?」
+          這個問題單張回答得出來、而且不騙人。♣5 單張壓不過 ♦7,但只要
+          ♣5+♦5 壓得過,♣5 就該亮 —— 舊版把這張壓暗才是騙人的那一邊。
+
+       ★ sel(已經選好的那幾張)會**收窄**這份清單:回傳的 cards 只留「還在某個
+         合法出法裡、而且那個出法包含目前選的每一張」的牌。
+         所以點了一張 5 之後,亮著的就是「還配得上去的牌」,不是全部重來一遍。
+         ⚠ 選了一組配不出合法牌型的牌時 cards 會是空的 —— 那正是要傳達的事
+           (「這樣選下去沒有出路」),不是 bug。
+
+       回傳 { can, n, fit, cards }:
+         can   有沒有任何一手可以出(**不看 sel**)→ 假時動作列只留 Pass
+         n     合法出法共幾種 · fit 其中符合目前 sel 的有幾種
+         cards 要亮起來的牌(已含 sel 自己)
+
+       ⚠ 這一支吃 FULL_CAP 而不是 STRAIGHT_CAP:`can === false` 會把「出牌」那顆鈕
+         整顆收掉,一旦誤判成「不能出」玩家就再也出不了那一手 ——
+         那比 AI 少一個候選嚴重得多,所以順子一律窮舉。
+       ⚠ 純函式:吃 hand / st 的兩個欄位(cur、opened),不碰 DOM。
+     ========================================================================== */
+  function playable(hand, st, sel){
+    const cur = (st && st.cur) ? st.cur.cls : null;
+    const opened = !st || st.opened !== false;
+    const need = Array.isArray(sel) ? sel : [];
+    const legal = enumPlays(hand, FULL_CAP).filter(p => {
+      if(!opened && p.cards.indexOf(CLUB3) < 0) return false;   // 第一手一定要帶 ♣3
+      return beats(p.cls, cur);
+    });
+    const hot = {};
+    let fit = 0;
+    legal.forEach(p => {
+      for(let i = 0; i < need.length; i++) if(p.cards.indexOf(need[i]) < 0) return;
+      fit++;
+      p.cards.forEach(c => { hot[c] = 1; });
+    });
+    return { can: legal.length > 0, n: legal.length, fit: fit,
+             cards: Object.keys(hot).map(Number) };
   }
 
   /* ==========================================================================
@@ -563,7 +618,7 @@ const B2 = (function(){
     // 結算
     RANK_PTS_FOR: ptsForRank, score,
     // 候選手 / 提示
-    WINDOWS, enumPlays, playsBeating, whyNot
+    WINDOWS, enumPlays, playsBeating, playable, whyNot
   };
 })();
 
