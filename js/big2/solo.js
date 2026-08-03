@@ -101,14 +101,16 @@ const Solo = (function(){
     if(!st) return;
     paintBar();
     const mine = st.turn === ME && !over && !busy;
+    const nms = [];
+    for(let s = 0; s < seats; s++) nms.push(seatName(s));
     B2B.render({
       hand: st.hands[ME].slice(),
-      cur: st.cur ? { t: st.cur.cls.t, k: st.cur.cls.k, cards: st.cur.cards.slice(),
-                      name: seatName(st.cur.seat) } : null,
+      slots: B2.dealCounts(seats)[ME],      // ★ 固定格位吃**開局張數**(見 board.js 第三節)
+      trick: st.trick, prevTrick: st.prevTrick, names: nms,
+      played: st.played,
       mine: mine,
       turnName: st.over ? "" : seatName(st.turn),
-      over: over,
-      playedCount: st.played.length
+      over: over
     });
     B2B.renderActs({
       mine: mine,
@@ -171,7 +173,6 @@ const Solo = (function(){
     if(!active || over) return;
     if(busy || st.turn !== ME){ showToast("還沒輪到你"); return; }
     if(a === "clear"){ B2B.clearSel(); paint(); return; }
-    if(a === "hint"){ hint(); return; }
     if(a === "pass"){
       // ★ 領出的人不能 pass —— 規則層也擋,這裡先給得出原因
       if(!st.cur){ showToast("這一輪由你開始,一定要出牌"); return; }
@@ -186,20 +187,10 @@ const Solo = (function(){
     commit(B2.encMove(cs));
   }
 
-  /* ★ 「幫我挑」:從規則層算出來的候選手裡挑最便宜的一組幫他選上(**只選不出**)。
-     為什麼要有它:13 張手牌裡有沒有一條順子,人眼要找很久 —— 而這是親友聚會的現場遊戲,
-     卡在「找不到能出的牌」上最傷體驗。刻意只選不出,決定權還在玩家手上。 */
-  function hint(){
-    const cs = B2.playsBeating(st.hands[ME], st.cur ? st.cur.cls : null);
-    const ok = st.opened ? cs : cs.filter(p => p.cards.indexOf(B2.CLUB3) >= 0);
-    if(!ok.length){
-      showToast(st.cur ? "這一手你壓不過,只能 Pass" : "算不出能出的組合(理論上不會發生)");
-      B2B.clearSel(); paint(); return;
-    }
-    B2B.setSel(ok[0].cards);
-    paint();
-    showToast("幫你挑了「" + B2.T_NAME[ok[0].cls.t] + "」,確認就按出牌", 1800);
-  }
+  /* ⚠ v1.77.0 拿掉了「幫我挑」(舊版從 B2.playsBeating() 挑一組幫他選上、只選不出)。
+     使用者:「幫我選那個功能拿掉,我覺得很奇怪」—— 它既不是提示也不是代打,定位尷尬。
+     ★ 托管明確**先不做**;要補的話請整支做成托管,不要把那顆鈕加回來。
+     ★ B2.playsBeating() 本身留著 —— AI 與到期代打(B2AI.autoMove)都靠它。 */
 
   /* ---------- 電腦這一手 ----------
      ⚠ 一定要有可見的思考時間:算完只花 1ms 的話,三家會在同一格瞬間打完,

@@ -77,14 +77,16 @@ const MP = MPCore.create((function(){
     const me = mySeat();
     if(me < 0) return;
     const mine = isMyTurn();
+    const nms = [];
+    for(let s = 0; s < nPlayers(); s++) nms.push(nameOfSeat(s));
     B2B.render({
       hand: st.hands[me].slice(),
-      cur: st.cur ? { t: st.cur.cls.t, k: st.cur.cls.k, cards: st.cur.cards.slice(),
-                      name: nameOfSeat(st.cur.seat) } : null,
+      slots: B2.dealCounts(nPlayers())[me],   // ★ 固定格位吃**開局張數**(見 board.js 第三節)
+      trick: st.trick, prevTrick: st.prevTrick, names: nms,
+      played: st.played,
       mine: mine,
       turnName: st.over ? "" : nameOfSeat(st.turn),
-      over: !!ctx.winner() || st.over,
-      playedCount: st.played.length
+      over: !!ctx.winner() || st.over
     });
     B2B.renderActs({
       mine: mine,
@@ -136,7 +138,6 @@ const MP = MPCore.create((function(){
       return;
     }
     if(a === "clear"){ B2B.clearSel(); paint(); return; }
-    if(a === "hint"){ hint(); return; }
     if(a === "pass"){
       if(!st.cur){ showToast("這一輪由你開始,一定要出牌"); return; }
       send(B2.PASS);
@@ -150,19 +151,8 @@ const MP = MPCore.create((function(){
     send(B2.encMove(cs));
   }
 
-  /* ★ 「幫我挑」與單機刻意走**同一支規則層** —— 兩邊各寫一份選法遲早走鐘 */
-  function hint(){
-    const me = mySeat();
-    const cs = B2.playsBeating(st.hands[me], st.cur ? st.cur.cls : null);
-    const ok = st.opened ? cs : cs.filter(p => p.cards.indexOf(B2.CLUB3) >= 0);
-    if(!ok.length){
-      showToast(st.cur ? "這一手你壓不過,只能 Pass" : "算不出能出的組合(理論上不會發生)");
-      B2B.clearSel(); paint(); return;
-    }
-    B2B.setSel(ok[0].cards);
-    paint();
-    showToast("幫你挑了「" + B2.T_NAME[ok[0].cls.t] + "」,確認就按出牌", 1800);
-  }
+  /* ⚠ v1.77.0 拿掉了「幫我挑」(單機那支也一起拿掉,見 solo.js 同一位置)。
+     ★ B2.playsBeating() 留著 —— 到期代打 B2AI.autoMove() 與 AI 都靠它。 */
 
   /* ==========================================================================
      三、出牌倒數 —— 到期幫他出一手

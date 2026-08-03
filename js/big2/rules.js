@@ -267,7 +267,22 @@ const B2 = (function(){
        回傳:
          n, hands[], turn(-1 = 結束), cur(這一輪目前最大的那手 / null = 領出),
          passes(自 cur 之後連續幾個 pass)、played[](已公開出過的牌)、
-         finished[](出完的先後,存座位)、opened(第一手出過了沒)、over、last、bad */
+         finished[](出完的先後,存座位)、opened(第一手出過了沒)、over、last、bad
+         trick[] / prevTrick[](這一輪 / 上一輪的完整動作記錄,見下)
+
+     ── ★ trick / prevTrick:為什麼真相層要記「這一輪發生過什麼」(v1.77.0)──────
+       `cur` 只留得住**這一輪目前最大的那一手**,前面被壓掉的、以及每一個「不要」
+       全部就地消失。使用者的原話:「中間那一塊應該要用來顯示這一輪大家出的牌,
+       才不會因為跳太快,導致你根本不知道出過什麼牌了」——
+       三家電腦連續出牌只花幾百毫秒,只留最大那手的話,人根本來不及看。
+
+       · trick[]     = 這一輪從領出到現在的每一手 { seat, cards[], pass }(含 pass)
+       · prevTrick[] = 上一輪的同一份記錄 —— 一輪結束後畫面**還要看得到**剛才那一輪
+                       (否則「新的一輪」那一瞬間中間會整片空掉,正是舊版的樣子)
+
+       ⚠ 放在規則層而不是畫面層:單機與連線都要用,而連線是 replay(deal, n, moves)
+         重算出來的 —— 畫面自己記的話,一斷線重連就整段消失。
+       ⚠ **不含任何隱藏資訊**:出過的牌本來就是公開的,pass 也是公開動作。 */
   function startSeat(hands){
     for(let s = 0; s < hands.length; s++) if(hands[s].indexOf(CLUB3) >= 0) return s;
     return 0;      // 到不了(52 張全發,♣3 一定在某人手上)
@@ -286,6 +301,7 @@ const B2 = (function(){
     return {
       n: n, hands: hands, turn: startSeat(hands),
       cur: null, passes: 0, played: [], finished: [],
+      trick: [], prevTrick: [],
       opened: false, over: false, last: null, bad: -1
     };
   }
@@ -310,6 +326,7 @@ const B2 = (function(){
       if(!st.cur) return false;                       // ★ 領出的人不能 pass
       st.passes++;
       st.last = { seat: seat, cards: [], pass: true };
+      st.trick.push({ seat: seat, cards: [], pass: true });
     }else{
       const cards = decMove(mv);
       if(!cards || !cards.length) return false;
@@ -327,6 +344,7 @@ const B2 = (function(){
       st.opened = true;
       cards.forEach(c => st.played.push(c));
       st.last = { seat: seat, cards: cards.slice(), pass: false };
+      st.trick.push({ seat: seat, cards: cards.slice(), pass: false, t: cls.t });
       if(!hand.length && st.finished.indexOf(seat) < 0) st.finished.push(seat);
     }
 
@@ -336,6 +354,9 @@ const B2 = (function(){
     if(trickDone(st)){
       const from = st.cur.seat;
       st.cur = null; st.passes = 0;
+      /* ★ 這一輪的記錄要**留到下一輪有人出牌為止** —— 直接清空的話,「新的一輪」
+         那一瞬間中間會整片空掉,而剛才那三家出了什麼就此消失(v1.77.0 要修的正是這個)。 */
+      st.prevTrick = st.trick; st.trick = [];
       // ★ 領出權回到最後出牌的人;他若剛好出完就順延給下一個還有牌的人
       st.turn = st.hands[from].length ? from : nextActive(st, from);
     }else{

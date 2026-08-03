@@ -13,13 +13,18 @@
 
    ── ★ 唯一的牌情紅線 ──────────────────────────────────────────────────────
      > **對手手上有什麼,結算前只能顯示張數。**
-     已經打出去的牌是**公開的**(它們就攤在桌上),所以牌河照實畫。
+     已經打出去的牌是**公開的**(它們就攤在桌上),所以本輪記錄與算牌表照實畫。
      落地點只有兩個:
        • 對手的張數 → 房間框 / 單機列的玩家晶片(adapter 的 chipTail / solo 的 paintBar)
        • 唯一翻開的地方 → 結果卡的排名表(resultHTML)
      守門用一條**精確的不變量**(不是關鍵字比對):
-         盤面上的 .b2-card 張數  ===  我的手牌 + 牌河那一手
+         盤面上的 .b2-card 張數  ===  我的手牌 + 這一輪(或上一輪)記錄裡的牌
      誰哪天讓盤面畫出別人的手牌,這個數字立刻對不上。
+
+     ⚠⚠ 算牌表(seenHTML)只准標「**已經出過的**」,**絕對不可以**標「還沒出現的」
+        或順手把我自己的手牌也標掉 —— 52 − 已出 − 我的手牌 = **對手手牌的聯集**,
+        兩人局那就等於把對手的牌整副攤開。這條的守門也是一條精確不變量:
+            .b2-spip.on 的個數  ===  st.played.length
 
    ── ★ 為什麼手牌**不做**「這張能不能出」的壓暗 ────────────────────────────
      排七是一張一張出,所以每張牌都有明確的「出得掉 / 出不掉」。
@@ -54,60 +59,173 @@ const B2B = (function(){
   }
 
   /* ==========================================================================
-     二、牌河:上一手是什麼
+     二、牌河 = **這一輪大家出的牌**(v1.77.0 從「只留上一手」改過來)
      ──────────────────────────────────────────────────────────────────────────
-       ★ 只放「這一輪目前最大的那一手」,不堆歷史。
-         大老二要判斷的就是「我壓不壓得過眼前這一手」,把整局出過的牌全排出來
-         只會把手牌需要的垂直空間吃掉(同排七 v1.75.2 拿掉對手列的理由)。
-         「已經出過幾張」用一行小字帶過就夠了。
+       ★ 舊版只畫 st.cur(這一輪目前最大的那一手),理由是「堆歷史會吃掉手牌的
+         垂直空間」。**那個理由在這一頁不成立** —— 版面截圖顯示桌機 700×293 的
+         中間區只放了一張牌,空了一大片(手牌是 CSS clamp 算的,從來沒被擠到)。
+         而代價很實際,使用者的原話:
+           「中間那一塊應該要用來顯示這一輪大家出的牌,才不會因為跳太快,
+             導致你根本不知道出過什麼牌了」
+         三家電腦連續出完只花幾百毫秒,只留最大那一手的話,被壓掉的與「不要」
+         全部就地消失,人來不及看。
+
+       ★ 一輪結束後**繼續顯示上一輪**(st.prevTrick),標題換成「上一輪」並淡化。
+         直接清空的話「新的一輪」那一瞬間中間會整片空掉 —— 那正是舊版的樣子。
+
+       ★ 這仍然守著牌情紅線:出過的牌是公開的、pass 也是公開動作。
+       ⚠ 「目前最大」只在**進行中的那一輪**標(上一輪已經結束,再標一個「最大」
+         只會讓人以為還要壓它)。
      ========================================================================== */
-  function riverHTML(v){
-    if(!v.cur){
-      return '<div class="b2-river lead">' +
-               '<div class="b2-rlbl">新的一輪</div>' +
-               '<div class="b2-rhint">' +
-                 (v.mine ? '你先出 —— <b>任何合法牌型都可以</b>' : esc(v.turnName || "對手") + ' 要先出') +
-               '</div>' +
-             '</div>';
+  /* ★ **連續的「不要」併成一列**。理由有兩個,而且都是看圖才確定的:
+       ① 牌桌上「其他三家都不要」是**一件事**,不是三件
+       ② 4 人局一輪很容易是「1 手 + 3 個不要」= 4 列,矮一點的視窗塞不下 →
+          最上面那一列會被裁掉一半(版面截圖 shot=sel 當場抓到)。併起來之後
+          同一輪最多 2~3 列。
+     ⚠ 併的是**連續**的 pass:中間有人出牌就要斷開,不然順序讀起來會是錯的。 */
+  function foldPasses(list){
+    const rows = [];
+    list.forEach((m, i) => {
+      const last = rows[rows.length - 1];
+      if(m.pass && last && last.pass){ last.seats.push(m.seat); return; }
+      if(m.pass){ rows.push({ pass: true, seats: [m.seat] }); return; }
+      rows.push({ pass: false, seat: m.seat, cards: m.cards, t: m.t, idx: i });
+    });
+    return rows;
+  }
+
+  function moveHTML(row, nameOf, topIdx){
+    if(row.pass){
+      return '<div class="b2-tmv pass"><span class="b2-tnm">' +
+               row.seats.map(s => esc(nameOf(s))).join(" · ") + '</span>' +
+             '<span class="b2-tpass">✕ 不要</span></div>';
     }
-    const t = R.T_NAME[v.cur.t] || "";
-    /* ⚠ 牌河那一排是 `.b2-rivc`,**不是** `.b2-rcards` —— 後者是結果卡排名表第二層用的。
-       第一版兩邊都叫 .b2-rcards,那是 CLAUDE.md「CSS 會撞的四類」的第一類(名字撞),
-       而前綴防不了自己撞自己:命名前要把整支檔的 class 掃一遍。 */
-    return '<div class="b2-river">' +
-             '<div class="b2-rlbl">' + esc(v.cur.name || "對手") + ' 出了' +
-               '<span class="b2-rtype">' + t + '</span>' +
-               (R.isBomb(v.cur.t) ? '<span class="b2-rbomb" title="無敵牌型:只有更大的鐵支或同花順壓得過">無敵</span>' : "") +
-             '</div>' +
-             '<div class="b2-rivc">' +
-               v.cur.cards.slice().sort(R.cmpCard).map(c => cardHTML(c, "sm")).join("") +
-             '</div>' +
+    const top = (row.idx === topIdx);
+    return '<div class="b2-tmv' + (top ? " top" : "") + '">' +
+             '<span class="b2-tnm">' + esc(nameOf(row.seat)) + '</span>' +
+             '<span class="b2-tct">' + (R.T_NAME[row.t] || "") + '</span>' +
+             (R.isBomb(row.t) ? '<span class="b2-rbomb" title="無敵牌型:只有更大的鐵支或同花順壓得過">無敵</span>' : "") +
+             '<span class="b2-tcs">' +
+               row.cards.slice().sort(R.cmpCard).map(c => cardHTML(c, "mid")).join("") +
+             '</span>' +
            '</div>';
+  }
+
+  /* ⚠ 這一整塊是 `.b2-trick`;裡面那一排是 `.b2-tlist`。
+     **不可以**叫 .b2-rcards —— 那是結果卡排名表第二層用的(CLAUDE.md「CSS 會撞的
+     四類」的第一類:名字撞,而前綴防不了自己撞自己;第一版真的撞過一次)。 */
+  function trickHTML(v){
+    const live = (v.trick && v.trick.length) ? v.trick : null;
+    const list = live || (v.prevTrick || []);
+    const nameOf = s => (v.names && v.names[s]) || ("玩家" + (s + 1));
+
+    // 進行中那一輪:最後一個「有出牌」的就是目前最大的那一手
+    let topIdx = -1;
+    if(live) for(let i = list.length - 1; i >= 0; i--) if(!list[i].pass){ topIdx = i; break; }
+
+    let lbl, hint = "";
+    if(live){
+      lbl = "這一輪";
+    }else if(list.length){
+      lbl = "上一輪";
+      hint = v.over ? "" : (v.mine ? '換<b>你</b>先出 —— 任何合法牌型都可以'
+                                   : '換 <b>' + esc(v.turnName || "對手") + '</b> 先出');
+    }else{
+      lbl = "這一局剛開始";
+      hint = v.over ? "" : (v.mine ? '<b>你</b>先出 —— 第一手一定要帶 ' + R.nameOf(R.CLUB3)
+                                   : '<b>' + esc(v.turnName || "對手") + '</b> 先出');
+    }
+
+    return '<div class="b2-trick' + (live ? "" : " prev") + (list.length ? "" : " empty") + '">' +
+             '<div class="b2-tlbl"><span class="b2-tttl">' + lbl + '</span>' +
+               (hint ? '<span class="b2-thint">' + hint + '</span>' : "") + '</div>' +
+             (list.length
+               ? '<div class="b2-tlist">' +
+                   foldPasses(list).map(row => moveHTML(row, nameOf, topIdx)).join("") +
+                 '</div>'
+               : "") +
+           '</div>';
+  }
+
+  /* ==========================================================================
+     二之二、算牌表:**已經出過的牌**
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 「♠2 出了沒、A 剩幾張」是大老二的核心技巧,舊版完全靠玩家記憶,
+         而中間那塊空著沒用。13 個點數各一欄、欄內四個花色記號,出過的亮起。
+       ⚠⚠ **只准標「已經出過的」**(見檔頭那條紅線):標「還沒出現的」或順手把
+          我自己的手牌也標掉,等於把對手手牌的聯集算給玩家看 ——
+          兩人局那就是對手的整副牌。這裡的迴圈只讀 v.played,不碰 v.hand。
+     ========================================================================== */
+  const SEEN_ORDER = [0,1,2,3,4,5,6,7,8,9,10,11,12];      // rkOrder:3 最小 … 2 最大
+  function rankOfOrder(o){ return o <= 10 ? o + 3 : (o === 11 ? 1 : 2); }
+
+  function seenHTML(v){
+    const seen = {};
+    (v.played || []).forEach(c => { seen[c] = 1; });
+    let h = '<div class="b2-seen"><div class="b2-slbl">出過的牌 <b>' +
+            (v.played ? v.played.length : 0) + '</b> / 52</div><div class="b2-sgrid">';
+    SEEN_ORDER.forEach(o => {
+      const r = rankOfOrder(o);
+      h += '<div class="b2-scol"><span class="b2-srk">' + R.rankTxt(r) + '</span><span class="b2-spips">';
+      for(let s = 0; s < R.NSUIT; s++){
+        const c = R.cardOf(s, r);
+        /* data-c 讓 e2e 定位得到某一張(那條不變量要逐張比對)。
+           ⚠ 這不是牌情:52 張牌各自存在是常識,**有沒有 .on** 才是資訊。
+           ⚠ 花色一律用**自繪 SVG**(PKFace),不可以用 ♣♦♥♠ 文字 ——
+             盤面「一個花色 Unicode 都沒有」是這一頁既有的規矩(連線 e2e B 節在守),
+             理由是字型渲染差太多:9px 的文字花色在 Android 上根本認不出是哪一門。 */
+        h += '<i class="b2-spip s' + s + (seen[c] ? " on" : "") + '" data-c="' + c + '"' +
+             (seen[c] ? ' title="' + R.longName(c) + ' 已經出過"' : "") + '>' +
+             PKFace.suitSVG(R.SUIT_KEY[s], "b2-sv") + '</i>';
+      }
+      h += '</span></div>';
+    });
+    return h + '</div></div>';
   }
 
   /* ==========================================================================
      三、整個舞台
      ──────────────────────────────────────────────────────────────────────────
-       v = { hand, cur:{t,k,cards,name}|null, mine, turnName, over, playedCount }
+       v = { hand, slots, trick[], prevTrick[], names[], played[],
+             mine, turnName, over }
        ★ 盤面裡**沒有對手列**:「誰 / 輪到誰 / 剩幾張」三樣在玩家晶片上全都有了
-         (連線走 chipTail、單機走 paintBar),盤面再畫一次是 100% 重複 ——
-         而且吃掉的正是手牌需要的垂直空間(排七 v1.75.2 的結論)。
+         (連線走 chipTail、單機走 paintBar),盤面再畫一次是 100% 重複。
+
+       ★★ 手牌的格位是**固定的**(v1.77.0)。使用者的原話:「我不喜歡我們的手牌,
+          位置會一直變來變去」—— 舊版 .b2-hand 是 justify-content:center,
+          出掉 5 張之後剩下的 8 張會整排往中間收,**每一張牌的位置都平移**,
+          下一手要重新找牌。台灣麻將 v1.58.2 踩過同一個坑(牌河置中 → 每打一張
+          整條就左右挪一次),那邊的結論也是靠左。
+          做法:容器寬度固定成「**開局張數** × 一格」、整組置中、牌一律靠左填。
+          出掉的牌右邊的往前補、左邊的一格都不動 —— 像真人收攏手牌。
+          ⚠ slots 要用**開局張數**(B2.dealCounts),不可以用目前手牌張數:
+            用目前張數的話容器會跟著縮,那就等於沒改。
      ========================================================================== */
   function render(v){
     if(!stage) return;
     // 選取的牌若已經不在手上(換局 / 出牌之後)就丟掉,不然會殘留一個選不掉的框
     sel = sel.filter(c => v.hand.indexOf(c) >= 0);
 
-    let h = riverHTML(v);
-    h += '<div class="b2-tally">已經打出去 <b>' + (v.playedCount || 0) + '</b> 張 · 你手上 <b>' +
-         v.hand.length + '</b> 張</div>';
+    let h = trickHTML(v) + seenHTML(v);
 
     // 手牌。★ 全部點得動(見檔頭:大老二沒有「單張能不能出」這回事)
-    h += '<div class="b2-hand' + (v.mine ? " mine" : "") + '">' +
+    const slots = Math.max(v.slots || 0, v.hand.length, 1);
+    h += '<div class="b2-hand' + (v.mine ? " mine" : "") + '" style="--b2-slots:' + slots + '">' +
       v.hand.map(c => cardHTML(c, sel.indexOf(c) >= 0 ? "sel" : "")).join("") +
       (v.hand.length ? "" : '<span class="b2-empty">手牌出完了 ✨</span>') +
       '</div>';
     stage.innerHTML = h;
+
+    /* 這一輪很長時(四家互壓好幾手)**最新那一手一定要看得見** ——
+       同台灣麻將牌河「打超過就要捲,而最新那張永遠得看得見」。
+       ⚠ 要補一次 rAF:innerHTML 之後馬上設 scrollTop,量到的高度有時還不是最終值
+         (字型載入、外層 flex 還在算),那一次就白設了 —— 症狀是最新那一手被切一半
+         卡在底部,而**橫置手機**(空間最小)每次都中。兩次都推到底,重複設無害。 */
+    const tl = stage.querySelector(".b2-tlist");
+    if(tl){
+      tl.scrollTop = tl.scrollHeight;
+      requestAnimationFrame(() => { tl.scrollTop = tl.scrollHeight; });
+    }
   }
 
   /* ==========================================================================
@@ -131,7 +249,10 @@ const B2B = (function(){
     // ★ 「出牌」永遠按得動 —— 選錯了要說得出原因,不用 disabled 靜默吃掉點擊
     h += '<button class="btn primary b2-act' + (s.ok ? "" : " dim") + '" data-act="play">出牌</button>';
     if(sel.length) h += '<button class="btn ghost b2-act" data-act="clear">清除</button>';
-    h += '<button class="btn ghost b2-act" data-act="hint" title="幫我挑一組出得掉的">💡 幫我挑</button>';
+    /* ⚠ v1.77.0 拿掉了「💡 幫我挑」(從手牌裡挑一組合法的幫他選上)。使用者:
+       「幫我選那個功能拿掉,我覺得很奇怪,如果是要這樣的話,應該要做個電腦托管功能」——
+       只選不出這件事的定位確實尷尬:它既不是提示(直接給答案)也不是代打(還要自己按)。
+       ★ **托管明確先不做**。要補回來的話請整支做成托管,不要把這顆鈕加回來。 */
     /* ★ 領出的人不能 pass(規則)。刻意**不畫**那顆鈕而改成一句話 ——
        畫一顆按了會被拒絕的鈕,比沒有那顆鈕更讓人困惑。 */
     if(info.canPass) h += '<button class="btn ghost b2-act" data-act="pass">不要(Pass)</button>';

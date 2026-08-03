@@ -3145,7 +3145,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ========================================================================== */
   :root{ --b2-face:#fdfaf3; --b2-line:#c3ae90; --b2-blk:#22303f; --b2-red:#c92c2c;
          --b2-redlit:#ff7b7b; --b2-bk:#3f5896;
-         --b2-tw:min(98vw,700px); --b2-cw:clamp(27px,7.6vw,40px); }
+         --b2-tw:min(98vw,700px); --b2-cw:clamp(27px,7.6vw,40px); --b2-hgap:5px; }
   :root[data-theme="ebook"]{ --b2-face:#ffffff; --b2-line:#000000; --b2-blk:#000000;
          --b2-red:#000000; --b2-redlit:#000000; --b2-bk:#666666; }
 
@@ -3205,41 +3205,90 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-acts{flex:none;min-height:44px;display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:6px;padding:2px 0}
 
-  /* ---------- 牌河:上一手是什麼 ----------
-     ★★ 牌河是盤面裡**唯一可壓縮**的一塊(照排七 v1.75.12 對軌道下的同一個判斷)。
+  /* ---------- 牌河 = 這一輪大家出的牌(v1.77.0)----------
+     ★★ 這一塊是盤面裡**唯一可壓縮**的一塊(照排七 v1.75.12 對軌道下的同一個判斷)。
         高度不夠時要犧牲誰,答案很明確:**手牌要按得到、牌河只是拿來看的**。
         ⚠ min-height:0 不可省:column flex item 的 min-height 預設是 auto(= 內容高),
           不歸零的話 flex-shrink 根本不會發生,這條寫了等於沒寫。
-        ⚠ 空間夠時(直向手機)flex-shrink 不作用 —— 一個像素都不會變。 */
-  /* ★★ flex:1 1 auto(不是 0 1 auto)—— 讓牌河把**剩下的垂直空間全部吃掉**,
-     內容靠 justify-content:center 停在中央。
-     ⚠ 這一條是**看圖才發現**的(斷言全綠、每個寬高都正常):第一版寫 flex:0 1 auto,
-       牌河只有一小條、手牌 margin-top:auto 貼底 → 桌機上中間空了 **400px**,
-       看起來像畫面沒載完。排七不會這樣是因為它有四條軌道填著那塊空間。
-     ★ 順帶讓視覺變對:牌打在**桌子中央**才像牌桌,貼在頂上像個通知欄。
-     ⚠ min-height:0 + overflow-y:auto 一定要留:矮視窗 / 橫置時它仍然是盤面裡
-       唯一可壓縮的一塊(手牌要按得到、牌河只是拿來看的)。 */
-  .b2-river{flex:1 1 auto;min-height:0;overflow-y:auto;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+     ★★ flex:1 1 auto(不是 0 1 auto)—— 讓它把**剩下的垂直空間全部吃掉**。
+        v1.76.0 是看圖才發現的:寫 flex:0 1 auto 的話桌機上中間會空 400px,
+        看起來像畫面沒載完(排七不會,因為它有四條軌道填著)。
+     ⚠ v1.77.0 起裡面是**一整輪的記錄**(可能好幾手),所以捲動交給裡面那一排
+       (.b2-tlist),這一層只負責吃掉剩下的高度。
+     ★ 內容置中靠 .b2-tlist 的 margin-block:auto,**不是** justify-content:center ——
+       flex 容器用 justify-content:center 的東西一旦超出高度,開頭那幾筆會被裁掉
+       而且捲不回去(那是 flex + overflow 的老坑)。margin:auto 在沒有剩餘空間時
+       自動變 0,兩種情況都對。 */
+  .b2-trick{flex:1 1 auto;min-height:0;overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;gap:6px;
     background:rgba(0,0,0,.16);border-radius:12px;padding:8px 10px}
-  .b2-river.lead{background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1.6px var(--accent)}
-  :root[data-theme="ebook"] .b2-river{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .b2-river.lead{box-shadow:none;border:2px solid #000}
-  .b2-rlbl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;
-    font:700 12px/1.3 'Nunito',sans-serif;color:var(--muted)}
-  .b2-rtype{padding:1px 7px;border-radius:8px;background:rgba(255,255,255,.14);
+  .b2-trick.prev{background:rgba(0,0,0,.10)}
+  .b2-trick.prev .b2-tlist{opacity:.74}         /* 上一輪:看得到但明顯退到背景 */
+  :root[data-theme="ebook"] .b2-trick{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .b2-trick.prev .b2-tlist{opacity:.55}
+  .b2-tlbl{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
+    font:700 11.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
+  .b2-tttl{padding:1px 9px;border-radius:9px;background:rgba(255,255,255,.13);
     font-weight:800;color:var(--text)}
+  .b2-trick.prev .b2-tttl{background:rgba(255,255,255,.07)}
+  .b2-thint b{color:var(--accent)}
+  :root[data-theme="ebook"] .b2-tttl{background:#eee;color:#000;border:1px solid #ccc}
+
+  /* 這一輪的每一手排成一列列:**靠上、由舊到新**,最新那一手在最下面。
+     ⚠ 一輪可能很長(四家互壓好幾圈)→ 這一排自己捲,board.js 每次 render 都把
+       scrollTop 推到底(同台灣麻將牌河「最新那張永遠得看得見」)。 */
+  /* ⚠ 頂部那 7px 漸層是**看圖才加的**:一輪四手時放不下,捲到底之後最上面那一列
+     會被切一半,看起來像畫面壞了。淡出之後同一件事讀起來是「上面還有,捲得上去」。
+     (內容沒有超出時第一列頂端也淡 7px —— 那是刻意的取捨,幾乎看不出來。) */
+  .b2-tlist{flex:0 1 auto;min-height:0;overflow-y:auto;width:100%;margin-block:auto;
+    display:flex;flex-direction:column;align-items:center;gap:4px;
+    mask-image:linear-gradient(to bottom,transparent 0,#000 7px,#000 100%)}
+  .b2-tmv{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;
+    padding:3px 8px;border-radius:10px;background:rgba(255,255,255,.05)}
+  /* ★ 目前最大的那一手要一眼認得出來 —— 玩家要判斷的就是「我壓不壓得過它」。
+     ⚠ 只有**進行中**的那一輪才會有 .top(上一輪已經結束,再標最大只會誤導)。 */
+  .b2-tmv.top{background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1.6px var(--accent)}
+  .b2-tmv.pass{opacity:.72}
+  .b2-tnm{font:800 11.5px/1.3 'Nunito',sans-serif;color:var(--text);
+    max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .b2-tct{padding:1px 7px;border-radius:8px;background:rgba(255,255,255,.14);
+    font:800 11px/1.5 'Nunito',sans-serif;color:var(--text)}
+  .b2-tpass{font:800 11px/1.5 'Nunito',sans-serif;color:var(--muted)}
+  .b2-tcs{display:flex;flex-wrap:wrap;gap:3px}
+  :root[data-theme="ebook"] .b2-tmv{background:#fff;border:1px solid #bbb}
+  :root[data-theme="ebook"] .b2-tmv.top{background:#fff;box-shadow:none;border:2px solid #000}
+  :root[data-theme="ebook"] .b2-tct{background:#eee;color:#000;border:1px solid #ccc}
   /* 無敵牌型的記號:鐵支 / 同花順壓得過任何牌型,那件事一定要看得出來 */
   .b2-rbomb{padding:1px 7px;border-radius:8px;background:var(--b2-redlit);
     font:800 10.5px/1.5 'Nunito',sans-serif;color:#2a0d0d}
-  :root[data-theme="ebook"] .b2-rtype{background:#eee;color:#000;border:1px solid #ccc}
   :root[data-theme="ebook"] .b2-rbomb{background:#000;color:#fff}
-  .b2-rhint{font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--muted);text-align:center}
-  .b2-rhint b{color:var(--accent)}
-  /* ⚠ 牌河那一排叫 .b2-rivc,**不可以**與結果卡的 .b2-rcards 同名(見 board.js 那段註解) */
-  .b2-rivc{display:flex;flex-wrap:wrap;justify-content:center;gap:4px}
-  .b2-tally{flex:none;text-align:center;font:700 11px/1.3 'Nunito',sans-serif;color:var(--muted)}
-  .b2-tally b{color:var(--text)}
+
+  /* ---------- 算牌表:出過的牌(v1.77.0)----------
+     ★ 「♠2 出了沒、A 剩幾張」是大老二的核心技巧。13 個點數各一欄,欄內四個花色。
+     ⚠⚠ 只標**已經出過的**(.on)。空的那些不是「還沒出現的牌」的清單 ——
+        board.js 檔頭那條紅線寫得很清楚,誰想把自己的手牌也標掉就是在洩對手的牌。
+     ★ flex:none:它是固定開銷,要壓縮就壓上面那塊(手牌與動作列一格都不讓)。 */
+  .b2-seen{flex:none;display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:5px 6px;border-radius:10px;background:rgba(0,0,0,.13)}
+  :root[data-theme="ebook"] .b2-seen{background:#fff;border:1px solid #000}
+  .b2-slbl{font:700 10.5px/1.2 'Nunito',sans-serif;color:var(--muted)}
+  .b2-slbl b{color:var(--text)}
+  /* max-width:攤滿 700px 的話 13 欄之間空得太開,一眼掃不成一條線 */
+  .b2-sgrid{display:grid;grid-template-columns:repeat(13,1fr);gap:2px;width:100%;max-width:520px}
+  .b2-scol{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
+  .b2-srk{font:800 10px/1.1 'Nunito',sans-serif;color:var(--muted)}
+  /* 四個花色排 2×2:13 欄 × 4 個橫排的話,直向手機每個記號只剩 5px(認不出來)。
+     2×2 高度多一排,但那一排比「看不清楚」便宜太多。 */
+  .b2-spips{display:grid;grid-template-columns:repeat(2,1fr);gap:1px}
+  /* ⚠ 花色是自繪 SVG(.b2-sv 吃 1em)—— font-size 就是這顆記號的大小 */
+  .b2-spip{display:flex;align-items:center;justify-content:center;
+    font-size:clamp(8px,1.5vw,12px);color:var(--muted);opacity:.26}
+  .b2-spip.on{opacity:1}
+  .b2-spip.s0.on,.b2-spip.s3.on{color:var(--text)}          /* ♣ ♠ */
+  .b2-spip.s1.on,.b2-spip.s2.on{color:var(--b2-redlit)}     /* ♦ ♥ */
+  :root[data-theme="ebook"] .b2-spip{color:#000}
+  :root[data-theme="ebook"] .b2-spip.on{color:#000;opacity:1}
+  :root[data-theme="ebook"] .b2-spip{opacity:.22}
 
   /* ---------- 手牌 ----------
      ★ 這一頁**沒有**「這張能不能出」的壓暗 —— 大老二出的是組合,單看一張牌無法回答
@@ -3248,9 +3297,25 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        這仍然守著 CLAUDE.md 那條紅線:不用 disabled 讓牌靜默吃掉點擊。
      ★ margin-top:auto 把手牌推到盤面**底部** —— 牌寬由寬度決定,高的螢幕一定會多出
        一截空白,能決定的只是它放在哪。空白留在牌河與手牌之間,手牌貼著動作列上方,
-       拇指按得到(同排七 / 台灣麻將 v1.73.1 的結論)。 */
-  .b2-hand{flex:0 0 auto;margin-top:auto;display:flex;flex-wrap:wrap;justify-content:center;
-    align-content:flex-start;gap:5px;padding:3px 2px 6px}
+       拇指按得到(同排七 / 台灣麻將 v1.73.1 的結論)。
+
+     ★★ 格位是**固定的**(v1.77.0)。使用者:「我不喜歡我們的手牌,位置會一直變來變去」。
+        舊版是 justify-content:center → 出掉 5 張之後剩下的 8 張整排往中間收,
+        **每一張的位置都平移**,下一手要重新找牌
+        (台灣麻將 v1.58.2 的牌河是同一個坑,那邊的結論也是靠左)。
+        做法只有三行:
+          ① width 固定成「**開局張數** × 一格」(--b2-slots 由 board.js 寫在 style 上)
+          ② margin-inline:auto —— 整組還是置中,視覺不偏一邊
+          ③ justify-content:flex-start —— 牌一律靠左填,出掉的牌只讓**右邊的**往前補
+        ⚠ min() 那一層不可省:窄螢幕放不下 13 格時容器收成 100%,
+          每行幾格因此只跟**視窗寬**有關、與手上剩幾張無關 —— 換行點才不會跟著跳。
+        ⚠ --b2-slots 一定要是開局張數(B2.dealCounts),不可以用目前手牌張數:
+          用目前張數的話容器會跟著縮,那就等於沒改。 */
+  .b2-hand{flex:0 0 auto;margin-top:auto;display:flex;flex-wrap:wrap;justify-content:flex-start;
+    align-content:flex-start;gap:var(--b2-hgap);padding:3px 2px 6px;
+    width:min(100%,calc(var(--b2-slots,13) * (var(--b2-cw) + var(--b2-hgap))));margin-inline:auto}
+  /* 手牌出完那一刻容器裡只剩一句話 —— 那一句要置中,不然它會孤零零貼在左邊 */
+  .b2-hand:has(.b2-empty){justify-content:center}
   .b2-card{--b2w:var(--b2-cw);
     flex:none;width:var(--b2w);height:calc(var(--b2w) * 1.42);
     border-radius:calc(var(--b2w) * .13);border:1px solid var(--b2-line);
@@ -3276,6 +3341,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     box-shadow:0 6px 12px rgba(0,0,0,.34),0 0 0 2.5px var(--accent-2);
     background:linear-gradient(155deg,#fff,#fff5d8 58%)}
   .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
+  /* 這一輪的記錄用的尺寸(v1.77.0)。★ 為什麼比 .sm 再小一級:一輪可能有 4 手,
+     .sm(牌高 40px)四列就 300px,一定捲;.mid 之後常見的 3~4 手放得下不必捲。
+     ⚠ 不要再往下調 —— 21px(.tiny)是「認得出點數」的下限,那是結果卡縮圖用的。 */
+  .b2-card.mid{--b2w:calc(var(--b2-cw) * .66);cursor:default}
   .b2-card.tiny{--b2w:21px;cursor:default;box-shadow:0 1px 1px rgba(0,0,0,.22)}
   .b2-empty{font:800 13px/1 'Nunito',sans-serif;color:var(--accent);padding:12px 0}
   :root[data-theme="ebook"] .b2-card{background:#fff;border-color:#000;box-shadow:none}
@@ -3395,14 +3464,18 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         排七踩過:只縮手牌、軌道沒跟著,結果「格子比手牌大」。
         這一頁沒有軌道,但牌河的 .b2-card.sm 是從 --b2-cw 推回來的,一起變才對。 */
   @media (max-height:600px){
-    :root{--b2-cw:clamp(24px,6.8vw,34px)}
+    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px}
     .b2-hero{margin:6px 0 2px}
     .b2-art{width:66px;height:66px}
     .b2-play{gap:5px}
     .b2-room{padding:6px 10px}
     .b2-stage{gap:4px}
-    .b2-river{padding:5px 8px;gap:3px}
-    .b2-hand{gap:4px;padding:2px 2px 4px}
+    .b2-trick{padding:5px 8px;gap:4px}
+    .b2-seen{padding:3px 5px;gap:2px}
+    /* ⚠ 這裡**不要**再寫 gap —— 手牌的 gap 與容器寬度是同一個 --b2-hgap 算出來的
+       (上面 :root 已經改成 4px)。在這裡另外寫一次 gap 就會有兩處真相,
+       而症狀是「矮視窗時整組手牌偏左一點點」,沒有人會查到這一行。 */
+    .b2-hand{padding:2px 2px 4px}
     .b2-acts{min-height:38px;gap:4px}
     .b2-btns .btn{padding:6px 11px;font-size:12.5px}
     .b2-selbar{padding:4px 8px;font-size:11.5px}
