@@ -35,7 +35,14 @@ const HomeLive = (function(){
     // ⚠ icon 用 🎴(U+1F3B4),**不是**小丑牌那顆(U+1F0CF)—— 後者落在
     //   U+1F0A0–U+1F0FF 那段撲克牌字元裡,多數字型沒有會變豆腐方框(CLAUDE.md 的禁令)。
     //   與排七同一個圖示是刻意的 —— 同一副撲克牌,而消消樂與台灣麻將本來也共用 🀄。
-    { key:"big2",    index:"big2_index",    name:"大老二", icon:"🎴", badge:"hlBadgeBig2", max:4, href:"big2.html" }
+    { key:"big2",    index:"big2_index",    name:"大老二", icon:"🎴", badge:"hlBadgeBig2", max:4, href:"big2.html" },
+    /* ★ max 必須與 js/blackjack/adapter.js 的 maxPlayers 一致(5)。
+       ★★ joinMid:true 是這張表的**第一個遊戲專屬能力旗標**(v1.84.0)——
+          21 點一場 = 很多局,對戰中也可以加入(新人下一局進場),
+          所以「可加入」的判定與其他七個不同。
+          ⚠ 它必須與 adapter 的 joinMidGame 一致:不一致的話首頁會把進得去的房間
+            列成「對戰中」(反過來則是列成可加入、點進去被擋)。 */
+    { key:"bj",      index:"bj_index",      name:"21點",   icon:"🎴", badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true }
   ];
 
   let refs=[];            // 掛著監聽的 firebase ref(stop 時逐一 off)
@@ -46,8 +53,14 @@ const HomeLive = (function(){
   let lastSig=null;       // 內容沒變就不重畫(房內叫號會讓索引偶爾回寫)
 
   /* ---------- 資料整形 ---------- */
-  // 與各遊戲大廳同一套判定:還在大廳 且 未滿(max=0 表示無上限)
-  function joinable(g,r){ return r.status==="lobby" && (!g.max || r.count<g.max); }
+  /* 與各遊戲大廳同一套判定:還在大廳 且 未滿(max=0 表示無上限)。
+     ★ g.joinMid 的遊戲(21 點)連「對戰中」也算可加入 —— 見 GAMES 那一列的說明。
+     ⚠ 這一份與 js/shared/mp-core.js 的 joinable() 是**同一條判定的兩份**:
+       改一邊要改另一邊(首頁不載入 js/shared/,所以去不掉這一份)。 */
+  function joinable(g,r){
+    const ok = r.status==="lobby" || (g.joinMid && r.status==="playing");
+    return ok && (!g.max || r.count<g.max);
+  }
   function itemsOf(idx){
     return Object.keys(idx||{}).map(c=>{
       const r=idx[c]||{};

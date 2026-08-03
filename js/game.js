@@ -614,8 +614,11 @@
      ⚠ 結果卡(#veil)刻意不列 —— 它是強制回應視窗,要離開只能按卡片上的按鈕(見各頁 main.js)。
        順序 = 疊在上面的先關;這一頁沒有的 id(投降只有五子棋、猜拳只有 Bingo)自動跳過。 */
   const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettings()],
-                     ["emoteVeil",()=>closeEmote()],["kickVeil",()=>MP.cancelKick()],
-                     ["resignVeil",()=>MP.cancelResign()],["leaveVeil",()=>MP.cancelLeave()]];
+                   ["emoteVeil",()=>closeEmote()],["kickVeil",()=>MP.cancelKick()],
+                   // ★ 21 點的房規蓋板(v1.84.0)。只有 blackjack.html 有這個 id,
+                   //   其他六頁自動跳過(見上面那條註解)—— 漏掉的話按返回會跳成「離開房間?」
+                   ["bjRulesVeil",()=>closeRules()],
+                   ["resignVeil",()=>MP.cancelResign()],["leaveVeil",()=>MP.cancelLeave()]];
   function dismissTopLayer(){
     for(let i=0;i<BACK_LAYERS.length;i++){
       const el=$(BACK_LAYERS[i][0]);

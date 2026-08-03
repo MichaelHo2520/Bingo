@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.83.0";
+const VERSION = "1.84.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -68,6 +68,14 @@ const CORE = [
   "./js/big2/solo.js",
   "./js/big2/adapter.js",
   "./js/big2/main.js",
+  // 21 點(第八個遊戲,v1.84.0;獨立頁面,牌面與排七 / 大老二共用 js/shared/pk-faces.js)
+  "./blackjack.html",
+  "./js/blackjack/rules.js",
+  "./js/blackjack/ai.js",
+  "./js/blackjack/board.js",
+  "./js/blackjack/solo.js",
+  "./js/blackjack/adapter.js",
+  "./js/blackjack/main.js",
   "./mp3/bgm.mp3",
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",

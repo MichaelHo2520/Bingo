@@ -3727,3 +3727,471 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .b2-tseats{grid-template-areas:"l t r" "b b b";gap:4px}
     .b2-tmid{display:none}
   }
+
+  /* ==========================================================================
+     21 點(blackjack.html · js/blackjack/*)—— 第八個遊戲,v1.84.0
+     ==========================================================================
+     ★ 骨架照大老二(.b2-*)抄,但**版型完全不同** ——
+       21 點的桌子不是「大家往中間丟牌」,而是「所有人面對莊家」:
+           上   莊家(★ 第二張是蓋著的牌背)
+           中   其他閒家,一列一人
+           下   我的手牌(大牌)
+       所以這裡沒有座位十字,只有三段直向堆疊。
+
+     ★★ 這一頁一樣**沒有 JS 算尺寸**:一手最多 5 張、列數 = 人數(一整局不變),
+        整份交給 CSS(flex + clamp)。⚠ 不要為了「牌少的時候放大一點」改回 JS 算。
+
+     ★★ 「位置不准跳」的三個數字(照大老二 v1.78.0 那一組):
+          --bj-trh  牌桌那一塊的**下限**(莊家一格 + 四列閒家剛好)
+          --bj-acth 動作列(最高的那一組內容:選取列 + 一排鈕)
+          --bj-mh   我的手牌那一塊(頭列 + 一排大牌)★ 寫死,不隨張數變
+        牌桌 `flex:1 1 auto` 把盤面剩下的空間吃掉,手牌貼底 → 補一張牌不會推走任何東西。
+        ⚠ 改任何一塊的牌大小 / padding 就要回頭重算這三個數字。
+
+     ★ 紅色有兩支(排七 notes/15 第六節那條界線,這裡照抄):
+         --bj-red     畫在**象牙白牌面**上(要夠深才看得清)
+         --bj-redlit  畫在**深色桌面**上(爆掉的點數、負的籌碼)
+       共用一支的話深色底上的紅會偏暗到看不出是紅的。
+     ========================================================================== */
+  :root{ --bj-face:#fdfaf3; --bj-line:#c3ae90; --bj-blk:#22303f; --bj-red:#c92c2c;
+         --bj-redlit:#ff7b7b; --bj-grn:#81c784; --bj-bk:#3f5896;
+         --bj-tw:min(98vw,700px);
+         /* 三種牌寬:我的手牌(大)· 莊家(中)· 其他閒家(小)。
+            ⚠ 三個都從 --bj-cw 推回來 —— 只改一個會變成「莊家的牌比我的還大」。 */
+         --bj-cw:clamp(44px,12.5vw,62px); --bj-hgap:6px;
+         --bj-trh:236px; --bj-acth:104px;
+         /* 我的手牌那一塊:頭列 22 + gap 3 + 牌高(--bj-cw × 1.42)+ padding 8 */
+         --bj-mh:calc(var(--bj-cw) * 1.42 + 33px); }
+  /* 連線多一圈倒數(.bj-cdwrap 在動作列裡面)→ 預留它的高度。
+     ⚠ 房規把倒數設成 0(關掉)時那一圈不出現,那時會多留 30px 空白 ——
+       **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次(同大老二)。 */
+  body.bj-mp{ --bj-acth:134px; }
+  :root[data-theme="ebook"]{ --bj-face:#ffffff; --bj-line:#000000; --bj-blk:#000000;
+         --bj-red:#000000; --bj-redlit:#000000; --bj-grn:#000000; --bj-bk:#666666; }
+
+  .bj-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+    line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+  :root[data-theme="ebook"] .bj-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+  .bj-scroll{flex:1 1 auto}
+  .bj-hero{text-align:center;margin:14px 0 4px}
+  .bj-art{width:96px;height:96px;display:block;margin:0 auto 8px}
+  /* ⚠ 撲克牌小圖示的 .pk-* 是**排七那一段定義的**(index.html 的遊戲卡也共用同一組)。
+     這一頁只是沿用,刻意不再定義一份 —— 同一副撲克牌本來就該長一樣。
+     ★ 但 21 點的中間那張要放「21」兩個字 → 字級要小一號,否則會溢出牌框。 */
+  .bj-art .pk-r{font-size:11px}
+  .bj-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
+
+  /* ---------- 規則清單 ----------
+     ★★ 使用者的要求:「規則一條一條的線,不要全部規則擠在一起」——
+        所以規則一律是 <ul><li>,一條一行、每行只講一件事。
+        ⚠ 不要為了「省高度」改回一段文字:那正是他要求改掉的東西。 */
+  .bj-rules{margin:6px 0 0;padding:0 0 0 4px;list-style:none;text-align:left}
+  .bj-rules li{position:relative;padding:3px 0 3px 15px;line-height:1.5}
+  .bj-rules li::before{content:"";position:absolute;left:2px;top:11px;
+    width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:.75}
+  .bj-rules li b{color:var(--accent-2)}
+  :root[data-theme="ebook"] .bj-rules li::before{background:#000}
+  :root[data-theme="ebook"] .bj-rules li b{color:#000;text-decoration:underline}
+
+  /* ---------- 房規蓋板 ----------
+     ★★ 單機與連線**共用這一組 DOM**(見 js/blackjack/main.js 檔頭)。
+     ⚠ .set-row.col 是這一頁新加的:九項設定每一項都是「標籤一行 + 選擇列一行」,
+       共用的 .set-row 是橫排的(標籤左、控制右),四顆鈕橫排會擠爆。 */
+  .set-card.bj-rules-card{width:min(92vw,480px);max-width:none}
+  .bj-rules-who{margin:-4px 0 8px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--accent-2)}
+  .bj-rules-card .set-row.col{flex-direction:column;align-items:stretch;gap:5px}
+  .bj-rules-card .set-row.col .set-lbl{text-align:left}
+  .bj-rules-card .set-row.col .seg{width:100%}
+  .bj-rules-card .set-row.col .seg button{flex:1 1 0;min-width:0;font-size:12.5px;padding:6px 4px}
+  /* 訪客:看得到但改不動。⚠ **不用 disabled / pointer-events:none** ——
+     CLAUDE.md 的紅線是「不用 disabled 讓點擊靜默消失」,按下去要跳
+     「只有房主能改規則」(擋在 MP.setRule,不是擋在 CSS)。 */
+  .bj-rules-card .seg.readonly{opacity:.78}
+  .bj-rules-sum{text-align:left;font:600 11.5px/1.5 'Nunito',sans-serif;color:var(--muted)}
+  .bj-rules-sum .bj-rules li{padding:2px 0 2px 14px;font-size:11.5px}
+  .bj-rules-sum .bj-rules li::before{top:9px;width:4px;height:4px}
+
+  /* ---------- 房間框 / 單機列(照大老二的 .b2-room)---------- */
+  .bj-room{padding:9px 12px}
+  .bj-room .row{margin-top:0}
+  .bj-room-top{flex-wrap:nowrap;gap:8px}
+  .bj-room .bj-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13px;font-weight:700;color:var(--muted)}
+  .bj-room .bj-room-title b{font-size:15px;color:var(--text)}
+  /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
+     不寫這條的話它們會是 42px,跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
+  .bj-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .bj-room .quick-voice,.bj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .bj-room .quick-voice .qv-ico{font-size:18px}
+  .bj-room .mp-subrow{margin-top:5px}
+  .bj-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .bj-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  /* 座位色點(五個人 → 五個顏色) */
+  .bj-dot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+  .bj-dot.p0{background:#ff6b8a}.bj-dot.p1{background:#4fc3f7}.bj-dot.p2{background:#ffd54f}
+  .bj-dot.p3{background:#81c784}.bj-dot.p4{background:#ba9cff}
+  :root[data-theme="ebook"] .bj-dot{background:#000}
+  /* 晶片上的「莊」與籌碼 —— ★ 兩樣都是公開資訊
+     (誰當莊全場都看得到,籌碼是結算過的歷史)。
+     ⚠ 這一頁唯一藏起來的是莊家那張暗牌,而它在盤面上,與晶片無關。 */
+  .bj-chd{display:inline-flex;align-items:center;white-space:nowrap;
+    padding:1px 5px;margin-right:3px;border-radius:7px;
+    background:rgba(255,210,74,.24);box-shadow:0 0 0 1px rgba(255,210,74,.5) inset;
+    font:900 10px/1.4 'Nunito',sans-serif;color:#ffe9a8}
+  :root[data-theme="ebook"] .bj-chd{background:#fff;color:#000;border:2px solid #000;box-shadow:none}
+  .bj-chc{display:inline-flex;align-items:center;gap:2px;white-space:nowrap;
+    font:800 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
+  .bj-chc i{font-style:normal;font-weight:900;font-size:9.5px}
+  .bj-chc i.up{color:var(--bj-grn)}
+  .bj-chc i.down{color:var(--bj-redlit)}
+  :root[data-theme="ebook"] .bj-chc i{color:#000}
+
+  /* ---------- 牌桌 ----------
+     ⚠ .bj-acts 一定要 flex:none —— .bj-play 底下只能有一個可壓縮的兄弟,
+       兩個都可壓縮時可視高度不足會按內容高度分攤,盤面高度反過來取決於自己的內容
+       (台灣麻將 v1.58.4 的 ResizeObserver 迴圈,見 notes/11 第六節)。 */
+  .bj-play{flex:1 1 auto;min-height:0;width:var(--bj-tw);
+    display:flex;flex-direction:column;align-items:stretch;gap:8px}
+  /* z-index:0 讓盤面自成一個 stacking context —— 覆蓋層(結果卡 / 設定蓋板)不該有
+     任何機會被盤面內容穿過去(消消樂 v1.56.0 就是少了這一行)。
+     ★ 手牌貼底 + 牌桌把剩下的空間吃掉(大老二 v1.79.0 的結論 ④)。 */
+  .bj-stage{flex:1 1 auto;min-height:0;position:relative;z-index:0;
+    display:flex;flex-direction:column;justify-content:flex-end;gap:7px;
+    overflow-y:auto;overflow-x:hidden}
+  /* ★★ 動作列**固定高度**。它的內容在一局裡會換好幾種:
+       下注三四顆鈕 → 「等其他人」一行字 → 要牌/停/加倍 → 結算摘要 → 連線還多一圈倒數。
+       高度跟著內容變的話,**手牌會被推得上上下下**(大老二 v1.78.0 的教訓)。
+     ⚠ 用 min-height 而不是 height:很長的提示在窄螢幕會 wrap 成三行,
+       那時寧可撐開也不要把原因裁掉。 */
+  .bj-acts{flex:none;min-height:var(--bj-acth);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;padding:2px 0}
+
+  /* ★★ 牌桌那一塊:高度**不隨自己的內容變**,但會**吃掉盤面剩下的空間**
+     (大老二 v1.79.0 那條的同一個結論)。
+     列數 = 人數(莊家一格 + n-1 列閒家),一整局不變 → 手牌一格都不會被推。
+     ⚠ 絕對不可以改回「跟著內容長」——那就回到「手牌上上下下」。 */
+  .bj-table{flex:1 1 auto;min-height:var(--bj-trh);overflow:hidden;
+    display:flex;flex-direction:column;justify-content:center;gap:7px;
+    background:rgba(0,0,0,.16);border-radius:12px;padding:9px 10px}
+  :root[data-theme="ebook"] .bj-table{background:#fff;border:1px solid #000}
+
+  /* ---------- 莊家那一格 ----------
+     ⚠⚠ border 是 2px **透明**的(不是「沒有 border」):輪到莊家時只換顏色,
+       所以標不標「他在動」都不會讓那一格高 4px —— 差了的話整桌高度就跟著相位變。 */
+  .bj-dealer{flex:none;display:flex;flex-direction:column;gap:3px;
+    padding:5px 8px;border:2px solid transparent;border-radius:10px;
+    background:rgba(255,255,255,.07)}
+  .bj-dealer.me{background:rgba(255,255,255,.11)}
+  /* 輪到莊家補牌 —— ★ 亮框一定要用 **border**(占版面 → 四邊必定畫得完整)。
+     ⚠ 不可以改用 box-shadow:大老二 v1.77 / v1.78 各錯一次 —— inset 會被裡面的牌蓋掉,
+       外擴會被捲動容器裁掉(放大截圖看就是「上邊那條線整條不見」)。 */
+  .bj-dealer.act{border-color:var(--accent)}
+  .bj-dhd{display:flex;align-items:center;gap:5px;min-width:0;height:20px}
+  .bj-crown{flex:none;font-size:13px;line-height:1}
+  .bj-dnm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font:800 12.5px/1.3 'Nunito',sans-serif;color:var(--text)}
+  .bj-dtag{flex:none;padding:0 5px;border-radius:6px;background:rgba(255,210,74,.22);
+    font:900 9.5px/1.6 'Nunito',sans-serif;color:#ffe9a8}
+  :root[data-theme="ebook"] .bj-dtag{background:#000;color:#fff}
+  .bj-you{flex:none;padding:0 4px;border-radius:6px;background:var(--accent-2);
+    font:900 9.5px/1.5 'Nunito',sans-serif;color:#2a1c00}
+  :root[data-theme="ebook"] .bj-you{background:#000;color:#fff}
+  /* 那一格的牌:★ 固定高度(中牌一排),不換行 */
+  .bj-dcs{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;
+    min-height:calc(var(--bj-cw) * 0.72 * 1.42);overflow:hidden}
+  /* ★★ 放不下時**擠窄**而不是被裁掉(大老二 v1.83.0 的雙保險):
+     .bj-card 是寫死寬度的,預設 flex-shrink:1 對它無效(基準是 width)——
+     所以這裡明寫 flex:0 1 auto + min-width:0 讓它縮得動。
+     ⚠ 只給**桌上**那幾排:我的手牌一縮就等於格位變了。 */
+  .bj-dcs .bj-card,.bj-scs .bj-card{flex:0 1 auto;min-width:0}
+  .bj-dme,.bj-dwait{font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted)}
+  .bj-dme{color:var(--accent-2)}
+
+  /* ---------- 其他閒家(一列一人,★ 單行)----------
+     ★★ 一列**只有一行**:名字 · 押注 · 狀態 · 牌 · 點數 全部橫排。
+        第一版是兩行(頭列 + 牌列),一列 67px → 5 人局第三列以下**整個被裁掉**,
+        而 DOM 量出來完全正常(.bj-seats 是 overflow-y:auto,它靜靜地捲、不報錯)。
+        看圖才發現的那一類 —— 單行 ≈ 43px,4 列放得下。
+     ★★ 列數 = 人數 − 莊家 − 我自己,**同一局之內固定**(board.js 那邊決定)
+        → 這一塊的高度與「這一局進行到哪」無關。
+        ⚠ 不可以改成「只列有牌的人」:那會讓發牌那一刻整桌撐開一次
+          (大老二一路踩的「上上下下」)。
+     ⚠ height 寫死:裡面的膠囊(押注 / 狀態 / 點數)比純文字高,不鎖的話
+       有牌的那一列會比沒牌的高幾 px → 整桌隨著「誰動過」上下移
+       (大老二 v1.83.0 量出來 59 vs 62,看不太出來但真的在動)。 */
+  .bj-seats{flex:0 1 auto;min-height:0;overflow-y:auto;
+    display:flex;flex-direction:column;gap:4px}
+  .bj-seat{flex:none;display:flex;align-items:center;gap:5px;min-width:0;
+    height:calc(var(--bj-cw) * 0.52 * 1.42 + 10px);
+    padding:0 7px;border:2px solid transparent;border-radius:9px;
+    background:rgba(255,255,255,.05)}
+  .bj-seat.act{border-color:rgba(255,255,255,.34)}
+  .bj-seat.done{opacity:.82}
+  .bj-seat.bust{opacity:.7}
+  .bj-snm{flex:0 1 auto;min-width:1.2em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font:800 11.5px/1.3 'Nunito',sans-serif;color:var(--text)}
+  /* 那一列的牌:nowrap + 可壓縮(放不下時擠窄,不換行也不裁掉整張) */
+  .bj-scs{flex:0 1 auto;min-width:0;display:flex;flex-wrap:nowrap;align-items:center;gap:3px;
+    overflow:hidden}
+  /* 押注膠囊 */
+  .bj-bet{flex:none;display:inline-flex;align-items:center;gap:1px;white-space:nowrap;
+    padding:1px 5px;border-radius:7px;background:rgba(255,255,255,.14);
+    font:800 10px/1.5 'Nunito',sans-serif;color:var(--text)}
+  .bj-bet i{font-style:normal;font-weight:700;color:var(--muted);margin-right:1px}
+  .bj-bet b{color:var(--accent-2);margin-left:1px}
+  :root[data-theme="ebook"] .bj-bet{background:#eee;color:#000;border:1px solid #ccc}
+  /* 狀態記號(下注中 / 停 / 爆 / 考慮中)—— ⚠ 一律是**公開資訊**,不准夾帶牌情 */
+  .bj-st{flex:none;white-space:nowrap;font:800 10px/1.5 'Nunito',sans-serif;color:var(--muted)}
+  .bj-st.ok{color:var(--bj-grn)}
+  .bj-st.bad{color:var(--bj-redlit)}
+  .bj-st.wait{color:var(--accent-2)}
+  :root[data-theme="ebook"] .bj-st,:root[data-theme="ebook"] .bj-st.ok,
+  :root[data-theme="ebook"] .bj-st.bad,:root[data-theme="ebook"] .bj-st.wait{color:#000}
+  /* ★ 點數膠囊(雙值「7 / 17」就長在這裡)。⚠ 一律靠右:名字長短不會讓它左右跳 */
+  .bj-pt{flex:none;margin-left:auto;white-space:nowrap;
+    padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.16);
+    font:900 11px/1.5 'Nunito',sans-serif;color:var(--text)}
+  .bj-pt i{font-style:normal;font-weight:800;font-size:9.5px;margin-left:2px}
+  .bj-pt.bust{background:rgba(224,83,63,.3);color:#ffd7cf}
+  .bj-pt.bj{background:rgba(129,199,132,.3);color:#dcffdd}
+  .bj-pt.dragon{background:var(--accent-2);color:#2a1c00}
+  /* 「4 + ?」= 這個數字只算了明牌那一張(莊家還沒翻牌)。
+     ⚠ 那個 <b>+ ?</b> 要比數字淡:它不是點數的一部分,是「還有一張不知道」 */
+  .bj-pt.part b{font-weight:800;font-size:9.5px;opacity:.7;margin-left:1px}
+  :root[data-theme="ebook"] .bj-pt{background:#eee;color:#000;border:1px solid #ccc}
+  :root[data-theme="ebook"] .bj-pt.bust{background:#fff;border:2px dashed #000}
+  :root[data-theme="ebook"] .bj-pt.bj,:root[data-theme="ebook"] .bj-pt.dragon{background:#000;color:#fff}
+
+  /* ---------- 我的手牌 ----------
+     ★★ 格位是**固定的**(照大老二 v1.77.0):容器寬 = --bj-slots × 一格、靠左填,
+        所以補一張牌只讓右邊長出來,已經在手上的牌一格都不動。
+        ⚠ slots 用**上限**(五小龍開著 = 5)而不是目前張數:用目前張數的話容器會跟著長,
+          那就等於沒固定。
+     ★ 高度寫死 --bj-mh:頭列 + 一排大牌,不隨張數變。 */
+  .bj-mine{flex:none;min-height:var(--bj-mh);display:flex;flex-direction:column;gap:3px;
+    padding:4px 8px;border:2px solid transparent;border-radius:11px;
+    background:rgba(255,255,255,.09)}
+  .bj-mine.dealer{background:rgba(255,210,74,.13)}
+  .bj-mine.bust{background:rgba(224,83,63,.14)}
+  .bj-mine.idle{opacity:.72}
+  .bj-mhd{display:flex;align-items:center;gap:5px;min-width:0;height:22px}
+  .bj-mnm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font:900 13px/1.3 'Nunito',sans-serif;color:var(--text)}
+  .bj-mhd .bj-pt{font-size:13px;padding:2px 8px}
+  /* ⚠ min() 那一層不可省:窄螢幕放不下 5 格時容器收成 100%,
+     每行幾格因此只跟**視窗寬**有關、與手上剩幾張無關 —— 換行點才不會跟著跳 */
+  .bj-mcs{display:flex;flex-wrap:wrap;justify-content:flex-start;align-content:flex-start;
+    gap:var(--bj-hgap);
+    width:min(100%,calc(var(--bj-slots,5) * (var(--bj-cw) + var(--bj-hgap))));
+    min-height:calc(var(--bj-cw) * 1.42)}
+  .bj-mwait{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);align-self:center}
+
+  /* ---------- 牌 ---------- */
+  .bj-card{--bjw:var(--bj-cw);
+    flex:none;width:var(--bjw);height:calc(var(--bjw) * 1.42);
+    border-radius:calc(var(--bjw) * .13);border:1px solid var(--bj-line);
+    background:linear-gradient(155deg,#fff,var(--bj-face) 58%);
+    color:var(--bj-blk);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    line-height:1;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,.28)}
+  .bj-card.red{color:var(--bj-red)}
+  /* ★★ 點數與花色都置中直排、而且畫得大 —— 與排七 / 大老二同一組比例。
+     理由在 js/shared/pk-faces.js 的檔頭:**螢幕上的牌不是扇形握在手上的**,
+     角落 index 當初要解決的問題在這裡不存在,置中版可以把整張牌的寬度都給這兩件事。 */
+  .bj-cr{font:800 calc(var(--bjw) * .46)/1 'Nunito',sans-serif}
+  .bj-cs{font:700 calc(var(--bjw) * .38)/1 'Nunito',sans-serif;margin-top:calc(var(--bjw) * .04)}
+  /* 花色是自繪 SVG(js/shared/pk-faces.js),fill:currentColor 讓它沿用上面那幾條 color */
+  .bj-sv{display:block;width:1em;height:1em;fill:currentColor}
+  /* 三種尺寸:預設 = 我的手牌 · .mid = 莊家 · .sm = 其他閒家 · .tiny = 結果卡縮圖
+     ⚠ 全部從 --bj-cw 推回來(只改一個會變成「莊家的牌比我的還大」)。
+     ⚠ .tiny 的 21px 是「認得出點數」的下限,不要再往下調。 */
+  .bj-card.mid{--bjw:calc(var(--bj-cw) * .72)}
+  .bj-card.sm{--bjw:calc(var(--bj-cw) * .52)}
+  .bj-card.tiny{--bjw:21px;box-shadow:0 1px 1px rgba(0,0,0,.22)}
+  :root[data-theme="ebook"] .bj-card{background:#fff;border-color:#000;box-shadow:none}
+
+  /* ★★★ 牌背 —— **這一頁唯一的牌情紅線**(莊家的第二張牌)。
+     ★ 它與前七個遊戲的隱藏性質相反:那些是「防偷看」(顯示端不畫、位置畫張數),
+       這一張是**規則本身**要求蓋著 —— 要看得出「那裡有一張牌,只是還沒翻」。
+     ⚠ 圖樣寫在 CSS 而不是 SVG 裡(見 pk-faces 的 backHTML):牌背要跟著主題換色。
+     ⚠ 尺寸與正面**完全一樣**(繼承 .bj-card):差一點的話翻牌那一刻整排會位移一次。 */
+  .bj-card.back{background:linear-gradient(155deg,#5b76c9,var(--bj-bk) 62%);
+    border-color:rgba(255,255,255,.34);padding:2px}
+  .bj-bk{display:block;width:100%;height:100%;border-radius:calc(var(--bjw) * .09);
+    background-image:
+      repeating-linear-gradient(45deg,rgba(255,255,255,.20) 0 2px,transparent 2px 6px),
+      repeating-linear-gradient(-45deg,rgba(255,255,255,.20) 0 2px,transparent 2px 6px);
+    box-shadow:0 0 0 1px rgba(255,255,255,.22) inset}
+  :root[data-theme="ebook"] .bj-card.back{background:#fff;border-color:#000}
+  :root[data-theme="ebook"] .bj-bk{background-image:
+      repeating-linear-gradient(45deg,#000 0 1px,transparent 1px 5px);box-shadow:none}
+
+  /* ---------- 動作列 ----------
+     ★ 只有一份(單機與連線共用)—— 21 點的動作集很小,兩邊的狀態都表達得成純資料。 */
+  .bj-actrow{display:flex;flex-direction:column;align-items:center;gap:6px;width:100%}
+  .bj-atxt{font:700 13px/1.4 'Nunito',sans-serif;color:var(--muted);text-align:center;padding:0 8px}
+  .bj-atxt b{color:var(--text)}
+  /* 提示列:綠 = 押好了 / 中性 = 還沒 */
+  .bj-selbar{display:flex;align-items:center;gap:7px;max-width:100%;
+    padding:5px 10px;border-radius:11px;background:rgba(255,255,255,.08);
+    font:700 12px/1.35 'Nunito',sans-serif;color:var(--muted)}
+  .bj-selbar.ok{background:rgba(129,199,132,.20);color:var(--text)}
+  .bj-selico{flex:none;font-size:14px;line-height:1}
+  .bj-seltxt{min-width:0}
+  :root[data-theme="ebook"] .bj-selbar{background:#fff;border:1px solid #ccc;color:#000}
+  :root[data-theme="ebook"] .bj-selbar.ok{border:2px solid #000}
+  .bj-btns{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
+  .bj-btns .btn{padding:8px 15px;font-size:13.5px}
+  /* ★ 不合法時只是**變暗**,不是 disabled —— 按下去要說得出原因
+     (CLAUDE.md 的紅線;Bingo v1.27.3 的「假死」教訓)。
+     ⚠ 一定要留 pointer-events:auto,否則變暗就等於靜默吃掉點擊。 */
+  .bj-btns .btn.dim{opacity:.62;pointer-events:auto}
+
+  /* 倒數環。★ 全桌都看得到(「現在在等誰、還剩幾秒」是公開資訊)。
+     ⚠ 動畫關鍵影格 svCd 是排七那一段定義的,這裡刻意沿用同一個(不再定義一份同名的)。 */
+  .bj-cdwrap{display:flex;align-items:center}
+  .bj-cd{display:inline-flex;align-items:center;gap:7px}
+  .bj-cd i{position:relative;display:block;width:56px;height:6px;border-radius:3px;
+    background:rgba(255,255,255,.16);overflow:hidden}
+  .bj-cd i::after{content:"";position:absolute;inset:0;transform-origin:left center;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    animation:svCd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .bj-cd b{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);min-width:1.5em;text-align:right}
+
+  /* ==========================================================================
+     結果卡(.win-card.bj-win)
+     ==========================================================================
+     ★★ 一定要給**明確寬度**(排七 v1.75.8 的教訓):共用的 .win-card 只有 max-width、
+        沒有 width,而 .veil 是 grid + place-items:center → 卡片是 shrink-to-fit。
+        ⚠⚠ 這裡**一個百分比都不能用**:.veil 的 grid 是隱含單欄、寬度 auto(由 item 撐),
+           所以 item 的百分比寬度會循環。只有 vw 不循環;而 max-width 一定要顯式解除。
+     ⚠ 大字壓小那條要寫成 .win-card.bj-win .word(權重 0,3,0)才壓得過共用的
+       .win-card .word(0,2,0)—— 只寫 .bj-win .word 是同級,靠「誰在後面」贏。 */
+  .win-card.bj-win{width:min(90vw,540px);max-width:none;padding:26px 24px}
+  .win-card.bj-win .word{font-size:clamp(28px,7.2vw,40px)}
+  .bj-win p{margin:7px 0 14px}
+  .bj-result{margin:2px 0 12px}
+  .bj-rank{display:flex;flex-direction:column;gap:5px}
+  .bj-rsub{margin:12px 0 6px;font:800 11.5px/1 'Nunito',sans-serif;color:var(--muted);
+    text-align:left;letter-spacing:.5px}
+  /* ★ 兩個訊號完全分開(排七 v1.75.2 的教訓 —— 使用者:「你會把第一名特別框起來,
+     這樣很容易讓大家以為自己是第一名」):框 + 「你」徽章 = 這一列是我;
+     金圈 + 🏆 = 這一列是第一名。自己拿第一時兩個都亮。 */
+  .bj-rrow{display:flex;flex-direction:column;gap:3px;padding:6px 9px;border-radius:11px;
+    background:rgba(255,255,255,.07)}
+  .bj-rrow.me{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent-2)}
+  .bj-rrow.dealer{background:rgba(255,210,74,.12)}
+  .bj-rrow.me.dealer{background:rgba(255,210,74,.2)}
+  .bj-rmain{display:flex;align-items:center;gap:6px}
+  .bj-rno{flex:none;width:19px;height:19px;border-radius:50%;display:grid;place-items:center;
+    background:rgba(255,255,255,.18);font:800 11px/1 'Nunito',sans-serif;color:var(--text)}
+  .bj-rrow.win .bj-rno{background:var(--accent);color:#1c1008}
+  .bj-rcrown{flex:none;font-size:12px;line-height:1}
+  /* ⚠ .bj-rname 不可以 flex:1 —— 那會把「你」徽章與 🏆 一路推到數字旁邊,
+     而它們標的正是這個名字。另外 .win-card 是 text-align:center,這格要自己寫死 left。 */
+  .bj-rname{flex:0 1 auto;min-width:0;text-align:left;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font:800 13.5px/1.2 'Nunito',sans-serif;color:var(--text)}
+  .bj-rtag{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font:700 10.5px/1.4 'Nunito',sans-serif;color:var(--muted)}
+  .bj-rpt{flex:none;padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.14);
+    font:800 11px/1.5 'Nunito',sans-serif;color:var(--text)}
+  /* 靠右的 auto 邊界只准有**一個**:多一個就會把剩餘空間平分,數字飄到列中間
+     (大老二 v1.75.9 的教訓) */
+  .bj-rchip{flex:none;margin-left:auto;min-width:34px;text-align:right;
+    font:700 11px/1.5 'Nunito',sans-serif;color:var(--muted)}
+  .bj-rd{flex:none;min-width:42px;text-align:right;
+    font:900 14px/1 'Fredoka','Nunito',sans-serif;color:var(--muted)}
+  .bj-rrow.up .bj-rd{color:var(--bj-grn)}
+  .bj-rrow.down .bj-rd{color:var(--bj-redlit)}
+  :root[data-theme="ebook"] .bj-rrow.up .bj-rd,:root[data-theme="ebook"] .bj-rrow.down .bj-rd{color:#000}
+  /* 第二層:他這一局的牌(★ 結算了,莊家的暗牌在這裡一定是翻開的)。縮排對齊名次圈右緣 */
+  .bj-rcards{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding-left:25px}
+  .bj-rbet{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
+  .bj-rfoot{margin-top:9px;font:700 11px/1.5 'Nunito',sans-serif;color:var(--muted);text-align:center}
+  :root[data-theme="ebook"] .bj-rrow{background:#fff;border:1px solid #ccc}
+  :root[data-theme="ebook"] .bj-rrow.me{border:2px solid #000;box-shadow:none}
+  :root[data-theme="ebook"] .bj-rrow.win .bj-rno{background:#000;color:#fff}
+  /* ★★ 共用連線層自己畫的累積分表(#winScores)那些列要收掉(排七 v1.75.9 的教訓):
+     它的內容已經併進上面的排名表,留著就是同一份資料兩張表。
+     ⚠ 只留 .ws-goal 的「🎯 搶 N 籌碼」:那句在這一頁沒有別的出口。
+     ⚠ 容器的 gap / margin 要一起歸零,否則積分模式以外只剩全部 display:none 的列,
+       會在排名表與表情列之間留一條空帶。
+     ⚠ 這條**不是**新的共用規則:選擇器整條鎖在 .win-card.bj-win 裡面,
+       另外七頁的結果卡一個字都不受影響。 */
+  .win-card.bj-win .win-scores{gap:0;margin:0}
+  .win-card.bj-win .win-scores .ws-row{display:none}
+  .win-card.bj-win .win-scores .ws-goal{margin:0 0 12px}
+
+  /* 賽後表情列(單機沒有對手可以送 → 整列收起來) */
+  .bj-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  body.solo-on .bj-react-row{display:none}
+
+  /* ---------- 對局中把牌桌放寬(大廳與選單維持 .panel 原本的 520)---------- */
+  body.bj-mp .bj-room,body.bj-solo .bj-room{width:min(92vw,700px)}
+
+  /* ---------- 矮視窗:每一塊都收一號 ----------
+     ⚠⚠ 牌寬只准動 --bj-cw,**不要**在這裡改 .bj-card 的 --bjw ——
+        排七踩過:只縮手牌、桌上沒跟著,結果「桌上的牌比手牌大」。
+        三種尺寸(mid / sm / tiny)都是從 --bj-cw 推回來的,一起變才對。 */
+  @media (max-height:600px){
+    /* ⚠ 牌桌的**下限**與動作列的固定高度也要跟著收 —— 不收的話矮視窗會被這兩塊
+       吃光,手牌反而被擠出畫面(那比「手牌會跳」嚴重得多)。 */
+    :root{--bj-cw:clamp(36px,10vw,50px); --bj-hgap:5px; --bj-trh:168px; --bj-acth:80px}
+    body.bj-mp{--bj-acth:110px}
+    .bj-hero{margin:6px 0 2px}
+    .bj-art{width:66px;height:66px}
+    .bj-play{gap:5px}
+    .bj-room{padding:6px 10px}
+    .bj-stage{gap:4px}
+    .bj-table{padding:6px 8px;gap:5px}
+    /* ⚠⚠ 這裡**絕對不要**再寫 min-height —— 那會蓋掉 --bj-acth,動作列就跟著內容
+       忽高忽低,手牌又開始上上下下(大老二 v1.78.0 的新斷言當場抓到)。
+       要調矮視窗的動作列高度請改上面 :root 的 --bj-acth。 */
+    .bj-acts{gap:4px}
+    .bj-btns .btn{padding:6px 12px;font-size:12.5px}
+    .bj-selbar{padding:4px 8px;font-size:11.5px}
+    .bj-rules li{padding:2px 0 2px 14px}
+  }
+
+  /* ---------- ★★ 橫置手機:把頂列讓給牌桌 ----------
+     條件與排七 / 大老二 / 台灣麻將那條**逐字相同**(連數字都一樣)。
+     · pointer:coarse → 桌機把視窗拉到又矮又寬也**永遠不命中**,正常佈局零影響
+     · 掛 body.bj-mp / body.bj-solo → 只有**對局中**收,大廳 / 進場選單 / 設定面板照舊
+     ★ 收掉頂列之後,ui-kit 的 dockTools() 會**自動**把 ⛶ / ⚙️ 搬進房間框那一列 ——
+       那是 v1.75.10 立的規矩(「只有頂列真的被收掉才搬」),不必也不可以另外寫程式。 */
+  @media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
+    body.bj-mp .topbar,body.bj-solo .topbar{display:none}
+    body.bj-mp,body.bj-solo{padding:6px;gap:4px}
+    /* 房間框 / 單機列也收一號:它是第二大的固定開銷(約 90px) */
+    body.bj-mp .bj-room,body.bj-solo .bj-room{padding:5px 9px}
+    .bj-room .mp-subrow,.bj-room-foot{margin-top:3px}
+    /* ★★★ 這個尺寸(430px 高 → 盤面只有 155px)**放不下直向的三段堆疊**。
+       量出來:table 168 + mine 104 + gap 7 = 279,溢出 124px ——
+       而 .bj-stage 是 justify-content:flex-end,**溢出全部跑到上緣而且捲不回去**
+       (放大截圖看就是「莊家那一格被切掉上半」;CLAUDE.md「CSS 會撞的四類」第四類)。
+       ⚠⚠ 這一格是**只量下緣就抓不到的那一類**:診斷器當時報 handOverflow=-6(手牌好好的),
+         因為被裁掉的是**上面**那一塊。診斷器已補上 topOverflow(見 gen-bj-shot.js)。
+
+       ★ 解法是把牌桌從「上下兩段」壓成**一整條橫的**:
+             [莊家] [閒家1][閒家2][閒家3][閒家4]
+         那一條約 70px,加上我的手牌 81 + gap = 157,剛好進得去 155~157 的預算。
+       ⚠ 三個數字要**一起**收(牌寬 / 動作列 / 牌桌下限),少收一個就又溢出:
+         --bj-cw 34 → 我的手牌那一塊 = 34×1.42+33 = 81
+         --bj-acth 78 → 動作列(提示一行 + 三顆鈕 + 倒數環)
+         --bj-trh 64 → 牌桌的下限(讓 flex 壓得下來;實際高度由內容決定)
+       ⚠ **不可以**為了好看把牌再放大:那會讓上面那一格再度被裁,而且裁掉的是
+         莊家的明牌 —— 那是玩家唯一能據以判斷的資訊。 */
+    :root{--bj-cw:34px; --bj-hgap:4px; --bj-trh:64px; --bj-acth:78px}
+    body.bj-mp{--bj-acth:96px}
+    .bj-table{flex-direction:row;align-items:center;justify-content:flex-start;
+      padding:4px 8px;gap:6px}
+    .bj-dealer{flex:0 0 auto;max-width:44%}
+    .bj-seats{flex:1 1 auto;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:4px}
+    /* ⚠ 一定要 flex:1 1 0(平分)而不是 0 0 auto(照內容長):照內容長的話
+       牌多的那一格會把後面的推出容器 → 最後一個人**靜靜地捲到看不見**。
+       平分之後 4 個人 × 104 = 416 < 可用寬度,一定放得下(牌自己會擠窄,見 .bj-scs)。 */
+    .bj-seat{flex:1 1 0;min-width:104px}
+    .bj-mine{padding:3px 8px}
+    .bj-mhd{height:19px}
+  }

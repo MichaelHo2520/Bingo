@@ -6,31 +6,31 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="台灣麻將">
+<meta name="apple-mobile-web-app-title" content="21點">
 <meta name="theme-color" content="#2a1136">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.84.0 -->
+<title>21 點 ｜ 輪流當莊 · 單機對電腦 + 2~5 人連線</title>
+<!-- 21 點 · v1.84.0 -->
 <meta name="version" content="1.84.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
-  location.replace("app.html#mahjong16");
+  location.replace("app.html#blackjack");
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- 共用 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
-     id 與 class;牌面與盤面是檔尾追加的 .m16-* 段落 -->
+     id 與 class;牌桌與手牌是檔尾追加的 .bj-* 段落 -->
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <div class="topbar">
     <div class="brand">
-      <div class="mj-brand display">台灣麻將</div>
+      <div class="bj-brand display">21 點</div>
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
@@ -40,11 +40,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
 
   <!-- ====== 進場選單(兩層)======
-       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度 / 人數 / 局數。
-       與消消樂 #mjHome、數獨 #sdkHome 同一套結構。 -->
-  <section class="panel" id="m16Home">
+       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度與人數。
+       與排七 #svHome、大老二 #b2Home 同一套結構。 -->
+  <section class="panel" id="bjHome">
     <!-- 回 index.html 的返回列。只在第一層顯示 —— 第二層有自己的返回(回第一層) -->
-    <div class="mp-head" id="m16HomeHead">
+    <div class="mp-head" id="bjHomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
@@ -52,70 +52,77 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
 
     <!-- 第一層:選怎麼玩 -->
-    <div id="m16PickMode">
-      <div class="mj-hero">
-        <svg class="mj-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌">
-          <rect class="mk-bd" x="3.5" y="9" width="23" height="31" rx="4.5"/>
-          <rect class="mk-bd" x="29.5" y="16" width="23" height="31" rx="4.5"/>
-          <text class="mk-r" x="15" y="31">中</text>
-          <text class="mk-g" x="41" y="38">發</text>
+    <div id="bjPickMode">
+      <div class="bj-hero">
+        <!-- ⚠ 插圖只用數字與字母,不用撲克牌 Unicode(U+1F0A0 那一段)——
+             多數字型沒有,會變豆腐方框(見 notes/13 的禁令)
+             ★ 沿用排七 / 大老二那組 .pk-* 撲克牌圖示(同一副牌本來就該長一樣) -->
+        <svg class="bj-art pk-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 21 點">
+          <rect class="pk-bd" x="4" y="13" width="16" height="24" rx="3"/>
+          <rect class="pk-bd" x="21.5" y="9" width="16" height="24" rx="3"/>
+          <rect class="pk-bd" x="36" y="13" width="16" height="24" rx="3"/>
+          <text class="pk-k" x="12" y="29">A</text>
+          <text class="pk-r" x="29.5" y="26">21</text>
+          <text class="pk-k" x="44" y="29">K</text>
         </svg>
-        <div class="home-tagline">真的打麻將:摸打吃碰槓,湊 5 組面子 + 1 對將</div>
+        <div class="home-tagline">輪流當莊,湊到最接近 21 點</div>
       </div>
-      <button class="btn primary block-btn home-btn" id="m16GoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="m16GoSolo">🤖 單機對電腦</button>
+      <button class="btn primary block-btn home-btn" id="bjGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="bjGoSolo">🤖 電腦對決</button>
+
+      <!-- ★★ 規則說明:使用者的要求是「一條一條的線,不要全部規則擠在一起」——
+           所以這裡是一條一行的清單,而不是一大段文字。
+           ⚠ 這一份是**進場前**的入門版(講「這個遊戲是什麼」);
+             跟著房規變的那一份在 BJB.rulesHTML(蓋板與大廳都吃它)。 -->
       <div class="home-hint">
-        <b>2~4 人</b>都能開:4 人用整副 144 張,<b>2~3 人去掉萬子</b>(108 張),3 人不能吃。<br>
-        計分照麻將的<b>相互算台</b>——自摸三家付、放槍一家付。<br>
-        單機湊不到人也打得起來,電腦分<b>三個強度</b>。
-        <br><span class="m16-warn">⚠ 連線時手牌與牌山在資料庫是明碼,只適合親友之間玩,不防作弊。</span>
+        <ul class="bj-rules">
+          <li>目標:手上的牌加起來<b>越接近 21 越好</b>,超過就<b>爆</b>(直接輸)。</li>
+          <li><b>A 算 1 或 11</b>(哪個好用算哪個);<b>J / Q / K 都算 10</b>。</li>
+          <li>比的<b>不是誰最大,而是你有沒有打贏莊家</b> —— 每個閒家各自跟莊家算。</li>
+          <li><b>莊家輪流當</b>:每一局換一個人,一輪 = 每個人各當一次莊。</li>
+          <li>一局的順序:<b>下注 → 發牌 → 閒家補牌 → 莊家補牌 → 結算</b>。</li>
+          <li>莊家的<b>第二張牌是蓋著的</b>,要等閒家都停手了才翻開。</li>
+          <li><b>閒家可以同時補牌</b>,不必等別人 —— 每個人抽自己的牌。</li>
+          <li><b>加倍</b>:還沒補牌時可以把押注翻倍,但只能再補一張就得停。</li>
+          <li><b>21 點</b>(前兩張就 21)賠得比較多;<b>五小龍</b>(五張不爆)賠更多。</li>
+          <li><b>不會被淘汰</b> —— 籌碼可以打到負的,比的是誰賺得多。</li>
+          <li>其他細節(平手誰贏、莊家要不要補到 17、賠幾倍…)全部<b>由房主決定</b>。</li>
+        </ul>
       </div>
     </div>
 
     <!-- 第二層:單機設定 -->
-    <div id="m16PickSolo" class="hidden">
+    <div id="bjPickSolo" class="hidden">
       <div class="home-sub-head">
-        <button class="icon-btn" id="m16SoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+        <button class="icon-btn" id="bjSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <span class="subtitle">單機對電腦</span>
+        <span class="subtitle">電腦對決</span>
       </div>
       <div class="field">
         <span class="field-label">電腦強度</span>
-        <div class="seg" id="m16LvSeg" aria-label="電腦強度">
+        <div class="seg" id="bjLvSeg" aria-label="電腦強度">
           <button data-lv="easy">🙂 新手</button>
-          <button class="on" data-lv="normal">🤔 普通</button>
+          <button class="on" data-lv="mid">🤔 普通</button>
           <button data-lv="hard">😈 高手</button>
         </div>
       </div>
       <div class="field">
-        <span class="field-label">幾家</span>
-        <div class="seg" id="m16SeatSeg" aria-label="幾家">
+        <span class="field-label">幾個人玩</span>
+        <div class="seg" id="bjSeatSeg" aria-label="幾個人玩">
           <button data-seats="2">2 人</button>
           <button data-seats="3">3 人</button>
           <button class="on" data-seats="4">4 人</button>
+          <button data-seats="5">5 人</button>
         </div>
       </div>
+      <!-- ★ 房規:與連線**共用同一個蓋板**(#bjRulesVeil)。單機時「我就是房主」 -->
       <div class="field">
-        <span class="field-label">打幾局</span>
-        <div class="seg" id="m16SoloGoalSeg" aria-label="打幾局">
-          <button data-goal="1">1 局</button>
-          <button class="on" data-goal="4">一圈 4 局</button>
-          <button data-goal="8">8 局</button>
-          <button data-goal="16">一將 16 局</button>
-        </div>
+        <span class="field-label">房規</span>
+        <button class="btn ghost block-btn" id="bjSoloRules" type="button">⚙ 改規則</button>
       </div>
-      <div class="field">
-        <span class="field-label">底幾台</span>
-        <div class="seg" id="m16SoloBaseSeg" aria-label="底幾台">
-          <button data-base="1">底 1 台</button>
-          <button class="on" data-base="2">底 2 台</button>
-          <button data-base="3">底 3 台</button>
-          <button data-base="5">底 5 台</button>
-        </div>
-      </div>
-      <button class="btn primary block-btn home-btn" id="m16StartSolo">開始 ▸</button>
-      <div class="home-hint" id="m16SoloHint"></div>
+      <button class="btn primary block-btn home-btn" id="bjStartSolo">開始這一場 ▸</button>
+      <div class="home-hint" id="bjSoloHint"></div>
     </div>
   </section>
 
@@ -137,6 +144,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
     <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
     <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
+    <!-- ★ 這一頁**對戰中也可以加入**(adapter 的 joinMidGame)——
+         新人下一局就能當閒家,下一輪才排進輪莊表。 -->
     <div class="mp-detect-row">
       <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
         <span class="dot" aria-hidden="true"></span><span id="mpLiveTxt">偵測目前房間中…</span>
@@ -148,13 +157,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </section>
 
   <!-- ====== 房間橫幅 ====== -->
-  <div class="panel mj-room hidden" id="mpBar">
-    <div class="row mj-room-top">
+  <div class="panel bj-room hidden" id="mpBar">
+    <div class="row bj-room-top">
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label mj-room-title">房間 <b id="mpRoomTitle" class="display">–</b></span>
-      <span class="mp-goal" id="mpBarGoal" aria-label="局數"></span>
+      <span class="label bj-room-title">房間 <b id="mpRoomTitle" class="display">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
@@ -165,70 +174,39 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
     </div>
-    <div class="mj-room-foot">
+    <div class="bj-room-foot">
       <div id="mpPlayers" class="mp-players"></div>
     </div>
   </div>
 
   <!-- ====== 單機的牌桌列 ======
-       刻意沿用房間橫幅同一組 .mj-room / .mp-chip 外觀:連線與單機長得一樣才有一致感
-       (同 v1.58.2 把台數搬進房間框的理由)。晶片由 js/mahjong16/solo.js 自己畫 ——
-       mp-core 的 renderPlayers() 是連線專屬的,單機不經過它。 -->
-  <div class="panel mj-room hidden" id="m16SoloBar">
-    <div class="row mj-room-top">
-      <button class="icon-btn mp-leave-btn" id="m16SoloExit" title="離開牌桌" aria-label="離開牌桌">
+       刻意沿用房間橫幅同一組 .bj-room / .mp-chip 外觀:連線與單機長得一樣才有一致感。
+       晶片由 js/blackjack/solo.js 自己畫 —— mp-core 的 renderPlayers() 是連線專屬的。 -->
+  <div class="panel bj-room hidden" id="bjSoloBar">
+    <div class="row bj-room-top">
+      <button class="icon-btn mp-leave-btn" id="bjSoloExit" title="離開牌桌" aria-label="離開牌桌">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label mj-room-title">單機 <b id="m16SoloLv" class="display">普通</b></span>
-      <span class="mp-goal" id="m16SoloGoal" aria-label="局數"></span>
+      <span class="label bj-room-title">電腦對決 <b id="bjSoloLv" class="display">普通</b></span>
+      <span class="mp-goal" id="bjSoloRec" aria-label="進度"></span>
     </div>
-    <div class="mj-room-foot">
-      <div id="m16SoloPlayers" class="mp-players"></div>
+    <div class="bj-room-foot">
+      <div id="bjSoloPlayers" class="mp-players"></div>
     </div>
   </div>
 
   <!-- ====== 大廳設定 ====== -->
-  <div class="scroll-area mj-scroll hidden" id="scrollArea">
-    <section class="panel hidden" id="m16Setup">
+  <div class="scroll-area bj-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="bjSetup">
       <div class="subtitle">對戰設定</div>
+      <!-- ★★ 房規:整包由房主開局前決定,**開局後一個字都不能改** ——
+           改了會讓已經打完的局重算出不同結果(重連的人算出來的籌碼跟現場不一樣)。
+           ⚠ 面板本體是共用蓋板 #bjRulesVeil(單機也是它);這裡只有一顆入口鈕 + 摘要。 -->
       <div class="field">
-        <span class="field-label" id="m16GoalLabel">打幾局</span>
-        <div class="seg" id="m16GoalSeg" aria-label="打幾局">
-          <button data-goal="1">1 局</button>
-          <button class="on" data-goal="4">一圈 4 局</button>
-          <button data-goal="8">8 局</button>
-          <button data-goal="16">一將 16 局</button>
-        </div>
+        <span class="field-label" id="bjRulesLabel">房規</span>
+        <button class="btn ghost block-btn" id="bjRulesOpen" type="button">⚙ 改規則</button>
       </div>
-      <!-- 底幾台(v1.75.18)。★ 一定是房間設定:底台是算收付用的,各人一份的話
-           同一局四台會算出不同的錢(而且相加照樣是 0,零和斷言抓不到)。 -->
-      <div class="field">
-        <span class="field-label" id="m16BaseLabel">底幾台</span>
-        <div class="seg" id="m16BaseSeg" aria-label="底幾台">
-          <button data-base="1">底 1 台</button>
-          <button class="on" data-base="2">底 2 台</button>
-          <button data-base="3">底 3 台</button>
-          <button data-base="5">底 5 台</button>
-        </div>
-      </div>
-      <!-- 吃碰思考時間(v1.59.0):別人打出的牌你吃得下時,有幾秒可以決定。
-           ★ 一定是**房間設定**不是各人偏好 —— 到期補「過」是「誰的 timer 先響誰結算」,
-             各自設定的話全房會被最短的那台決定(見 js/mahjong16/adapter.js 檔頭常數)。 -->
-      <div class="field">
-        <span class="field-label" id="m16SecLabel">操作倒數</span>
-        <!-- v1.63.0:同一個秒數同時管「吃碰要不要」與「輪到你出牌」——
-             使用者的話是「後續的出牌也沒秒數限制,這樣不是很奇怪,應該是要倒數秒數
-             是做為這次的完全操作倒數」。0 = 關掉(兩邊都不限時,見 adapter 的 secOn)
-             v1.65.0:這個秒數是**一手的總預算**(從有人打出一張牌起算),不是兩段各給一份
-             —— 兩段各起算的話,那一手拖了兩倍長就等於告訴出牌的人「有人吃得下你這張」 -->
-        <div class="seg" id="m16SecSeg" aria-label="操作倒數">
-          <button data-sec="0">關</button>
-          <button data-sec="8">8 秒</button>
-          <button class="on" data-sec="12">12 秒</button>
-          <button data-sec="20">20 秒</button>
-          <button data-sec="30">30 秒</button>
-        </div>
-      </div>
+      <div class="hint" id="bjRuleHint"></div>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">
@@ -239,31 +217,28 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="wg-group hidden" id="wgGroup">
             <span class="wg-lbl">先到</span>
             <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
-              <span class="target-val display" id="winGoalVal">3</span>
-              <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+              <button class="mini" id="wgMinus" aria-label="減少目標籌碼">−</button>
+              <span class="target-val display" id="winGoalVal">30</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標籌碼">＋</button>
             </div>
-            <span class="wg-lbl">勝奪冠</span>
+            <!-- ⚠ 這一頁的計分單位是**淨籌碼**(可以是負的),所以不是「勝」。
+                 mp-core 的 A.scoreUnit 讓 JS 產出的那幾句(🎯 搶 N 籌碼)跟著換。 -->
+            <span class="wg-lbl">籌碼奪冠</span>
           </div>
           <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
           <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
         </div>
       </div>
-      <div class="hint" id="m16RuleHint"></div>
     </section>
   </div>
 
-  <!-- ====== 牌桌 ====== -->
-  <!-- ⚠ v1.58.2 拿掉了獨立的比分列 #m16Hud:台數 / 風 / 輪到誰全部改顯示在**房間框**
-       的玩家晶片上(adapter 的 chipLead / chipTail / turnId),與其他三個遊戲一致。
-       ⚠ v1.58.3 又拿掉了盤面頂端的資訊列 #m16Bar:第幾局搬到房間框的徽章
-       (#mpBarGoal,麥克風左邊)、莊搬到每一家自己那一列,可吃 / 牌山直接刪掉。 -->
-  <!-- 單機與連線**共用這一整塊**(盤面 M16B + 動作列),差別只在上面那條列與
-       結果卡的按鈕組 —— 靠 body.solo-on 切換(同五子棋 / 數獨 / 消消樂)。 -->
-  <div class="mj-play hidden" id="m16Play">
-    <!-- 盤面:對手列 / 牌河 / 我的明牌 / 我的手牌,全部由 M16B.render() 畫 -->
-    <div class="m16-stage" id="m16Stage"></div>
-    <div class="m16-acts hidden" id="m16Acts"></div>
+  <!-- ====== 牌桌 ======
+       單機與連線**共用這一整塊**(莊家 + 其他閒家 + 我的手牌 BJB + 動作列),
+       差別只在上面那條列與結果卡的按鈕組 —— 靠 body.solo-on 切換(同其他七個遊戲)。 -->
+  <div class="bj-play hidden" id="bjPlay">
+    <!-- 莊家 / 其他閒家 / 我的手牌,全部由 BJB.render() 畫 -->
+    <div class="bj-stage" id="bjStage"></div>
+    <div class="bj-acts hidden" id="bjActs"></div>
   </div>
 
   <!-- ====== 主要動作列 ====== -->
@@ -274,22 +249,131 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
+  <!-- ====== 房規蓋板 ======
+       ★★ **單機與連線共用這一組 DOM**(見 js/blackjack/main.js 檔頭)——
+          塞在大廳與單機設定兩處就是兩份 id、兩份走鐘的機會。
+       ⚠ 這個蓋板已經列進 ui-kit 的 BACK_LAYERS(手機按返回先關它,不會跳成「離開房間?」)。
+       ⚠ 訪客看得到但改不動 → .seg 掛 .readonly。**不用 disabled**:
+          CLAUDE.md 的紅線是「不用 disabled 讓點擊靜默消失」,按下去要看得到原因。 -->
+  <div class="veil" id="bjRulesVeil">
+    <div class="set-card bj-rules-card">
+      <button class="card-x" id="bjRulesClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">房規</div>
+      <div class="bj-rules-who" id="bjRulesWho"></div>
+      <div class="set-body" id="bjRulesBody">
+
+        <div class="set-group">
+          <div class="set-group-title">一場多長</div>
+          <div class="set-row col">
+            <span class="set-lbl">打幾輪<span class="set-sub">一輪 = 每個人各當一次莊</span></span>
+            <div class="seg" aria-label="打幾輪">
+              <button data-rk="rounds" data-rv="1">1 輪</button>
+              <button data-rk="rounds" data-rv="2">2 輪</button>
+              <button data-rk="rounds" data-rv="3">3 輪</button>
+            </div>
+          </div>
+          <div class="set-row col">
+            <span class="set-lbl">每一段倒數<span class="set-sub">時間到系統幫他決定</span></span>
+            <div class="seg" aria-label="每一段倒數">
+              <button data-rk="sec" data-rv="0">關</button>
+              <button data-rk="sec" data-rv="20">20 秒</button>
+              <button data-rk="sec" data-rv="30">30 秒</button>
+              <button data-rk="sec" data-rv="45">45 秒</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">籌碼</div>
+          <div class="set-row col">
+            <span class="set-lbl">起始籌碼<span class="set-sub">不會被淘汰,可以打到負的</span></span>
+            <div class="seg" aria-label="起始籌碼">
+              <button data-rk="start" data-rv="50">50</button>
+              <button data-rk="start" data-rv="100">100</button>
+              <button data-rk="start" data-rv="200">200</button>
+            </div>
+          </div>
+          <div class="set-row col">
+            <span class="set-lbl">每局下注上限</span>
+            <div class="seg" aria-label="每局下注上限">
+              <button data-rk="betMax" data-rv="5">5</button>
+              <button data-rk="betMax" data-rv="10">10</button>
+              <button data-rk="betMax" data-rv="20">20</button>
+              <button data-rk="betMax" data-rv="50">50</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">莊家</div>
+          <div class="set-row col">
+            <!-- ★★ 這一項是個「張力開關」而不是一條規則:
+                 設了補牌線 → 當莊變成純機械、沒有決策空間(但快,系統直接幫他補完);
+                 自由 → 當莊那個人要自己判斷,全場盯著他 —— 那才是輪莊的樂趣所在。
+                 所以預設是**自由**(見 notes/17 的 3-2)。 -->
+            <span class="set-lbl">補牌線<span class="set-sub">「自由」= 莊家自己決定(全場看他)</span></span>
+            <div class="seg" aria-label="莊家補牌線">
+              <button data-rk="line" data-rv="0">自由</button>
+              <button data-rk="line" data-rv="16">補到 16</button>
+              <button data-rk="line" data-rv="17">補到 17</button>
+            </div>
+          </div>
+          <div class="set-row col">
+            <span class="set-lbl">同點數(平手)</span>
+            <div class="seg" aria-label="同點數誰贏">
+              <button data-rk="pushDealer" data-rv="1">莊家吃</button>
+              <button data-rk="pushDealer" data-rv="0">退注</button>
+            </div>
+          </div>
+          <div class="set-row col">
+            <!-- ⚠ 關掉的話莊家幾乎沒有優勢 → 沒人想當莊,而輪莊制下這會讓整場垮掉 -->
+            <span class="set-lbl">閒家先爆就先輸<span class="set-sub">莊家優勢的唯一來源,建議開著</span></span>
+            <div class="seg" aria-label="閒家先爆就先輸">
+              <button data-rk="bustFirst" data-rv="1">開</button>
+              <button data-rk="bustFirst" data-rv="0">關</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">賠率</div>
+          <div class="set-row col">
+            <!-- ⚠ 2 倍的籌碼永遠是整數;1.5 倍會四捨五入(押 1 贏 2、押 3 贏 5) -->
+            <span class="set-lbl">21 點賠率<span class="set-sub">2 倍時籌碼永遠是整數</span></span>
+            <div class="seg" aria-label="21 點賠率">
+              <button data-rk="bjPay" data-rv="1.5">1.5 倍</button>
+              <button data-rk="bjPay" data-rv="2">2 倍</button>
+            </div>
+          </div>
+          <div class="set-row col">
+            <span class="set-lbl">五小龍<span class="set-sub">五張不爆賠 2 倍,莊家也能報</span></span>
+            <div class="seg" aria-label="五小龍">
+              <button data-rk="dragon" data-rv="1">開</button>
+              <button data-rk="dragon" data-rv="0">關</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 目前這一套規則長什麼樣(一條一行,跟著上面的選擇即時變) -->
+        <div class="set-group">
+          <div class="set-group-title">目前的規則</div>
+          <div class="bj-rules-sum" id="bjRulesSum"></div>
+        </div>
+      </div>
+      <button class="btn primary" id="bjRulesClose2" type="button">完成</button>
+    </div>
+  </div>
+
   <!-- ====== 結果卡 ====== -->
   <div class="veil" id="veil">
-    <!-- ⚠ .mj-win 是**消消樂與這一頁共用**的 class(兩頁的結果卡都掛它),所以這一頁
-         專屬的樣式一律掛 .m16-win(v1.75.18 新增)—— 排名表的寬度與「收掉共用勝場表」
-         那兩條要是寫在 .mj-win 上,消消樂會跟著一起變。 -->
-    <div class="win-card mj-win m16-win" id="m16WinCard">
-      <div class="word display" id="winWord">本局結束</div>
+    <div class="win-card bj-win" id="bjWinCard">
+      <div class="word display" id="winWord">這場結束</div>
       <p id="winMsg"></p>
-      <!-- (v1.75.18 拿掉 #m16Win)攤牌改在**牌桌**上、而且是**每一家都攤** ——
-           使用者:「每一局結束的時候…不是在勝負頁顯示,而是在牌桌顯示,這樣還可以
-           回去看牌桌,看看到底牌在誰那裡」。落地點是 board.js 的 foeHTML。 -->
-      <!-- 相互算台的收付表:全桌相加必為 0 -->
-      <div class="m16-tai hidden" id="m16Tai"></div>
+      <!-- 籌碼排名 + 最後一局的結算表(★ 那裡莊家的暗牌一定是翻開的) -->
+      <div class="bj-result hidden" id="bjResult"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
-      <div class="mj-react-row" id="m16ReactRow">
+      <div class="bj-react-row" id="bjReactRow">
         <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
         <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
         <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
@@ -298,14 +382,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </div>
       <div class="actions" id="mpWinBtns">
         <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
-        <button class="btn primary" id="mpAgain">下一局 ▸</button>
+        <button class="btn primary" id="mpAgain">再開一場 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
-           id 刻意與數獨 / 消消樂同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
+           id 刻意與其他六頁同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
       <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="m16SoloAgain">下一局 ▸</button>
-        <button class="btn ghost" id="m16SoloHome">回選單</button>
+        <button class="btn primary" id="bjSoloAgain">再來一場 ▸</button>
+        <button class="btn ghost" id="bjSoloHome">回選單</button>
       </div>
       <button class="peek-link" id="winPeek">先看看牌桌 👀</button>
     </div>
@@ -329,11 +413,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           </div>
         </div>
 
-        <!-- ⚠ 「玩法輔助」整組已經拿掉(v1.68.0):兩顆開關都是替玩家算牌 ——
-             聽牌提醒(v1.66.0,系統偵測到就提示)在 v1.67.0 改成主動宣告時先拿掉,
-             聽牌提示(每張牌角落顯示打掉它之後聽幾張)v1.68.0 也拿掉。
-             這一頁的賣點是「真的打麻將」,算牌是玩家自己的事。理由見 notes/11。 -->
-
         <div class="set-group">
           <div class="set-group-title">音效</div>
           <div class="set-row">
@@ -347,22 +426,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="set-row" id="vibrateRow">
             <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
             <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
-          </div>
-          <!-- 這一頁專屬的兩列(v1.72.0 從一列拆開)。偏好都存在 mahjong16.prefs.v1,
-               綁定與同步在 js/mahjong16/main.js(ui-kit 的 syncSettingsUI 是共用的,不管這兩列)。
-               ★ 刻意分成兩件事:一顆管「有人碰了要不要喊出來」、一段管「打出去的牌要不要報」——
-               混成同一條軸的話「只有字牌」會被讀成「只有字牌會喊碰」(見 js/mahjong16/sfx.js 檔頭) -->
-          <div class="set-row">
-            <span class="set-lbl">喊牌語音<span class="set-sub">(碰 / 吃 / 槓 / 胡 / 補花)</span></span>
-            <button class="switch" id="m16SwVoice" role="switch" aria-checked="true" aria-label="喊牌語音"><span class="knob"></span></button>
-          </div>
-          <div class="set-row m16-vrow">
-            <span class="set-lbl">報牌名<span class="set-sub">(打出的牌)</span></span>
-            <div class="seg m16-vseg" id="m16TileSeg" aria-label="報牌名">
-              <button data-tv="off">關掉</button>
-              <button class="on" data-tv="honor">只有字牌</button>
-              <button data-tv="all">全部牌</button>
-            </div>
           </div>
         </div>
 
@@ -395,7 +458,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
       <button class="btn primary" id="setClose">完成</button>
-      <div class="set-foot">台灣 16 張麻將 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+      <div class="set-foot">21 點 · <span id="setVer"></span> · 開發者 Michael Ho</div>
     </div>
   </div>
 
@@ -465,7 +528,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
 <script>
 /* ============================================================
-   與其他四個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 mj16_rooms / mj16_index。
+   與其他七個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 bj_rooms / bj_index。
    ⚠ 需在資料庫規則開放那兩段 —— 整份規則在 notes/firebase-rules.json,可直接複製貼上。
    ============================================================ */
 const FIREBASE_CONFIG = {
@@ -479,22 +542,19 @@ const FIREBASE_CONFIG = {
 };
 </script>
 
-<!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)→ mj-faces(牌面,與消消樂共用)
-     → rules(規則)→ scoring(台數)→ table(輪次狀態機)→ ai(電腦對手,只相依 rules)
+<!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)→ pk-faces(與排七 / 大老二共用的牌面)
+     → rules(規則,純函式)→ ai(電腦對手,只相依 rules)
      → board(盤面)→ solo(單機,要 board 與 ai)
      → adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <script src="js/shared/mp-core.js"></script>
-<script src="js/shared/mj-faces.js"></script>
-<script src="js/mahjong16/rules.js"></script>
-<script src="js/mahjong16/scoring.js"></script>
-<script src="js/mahjong16/table.js"></script>
-<script src="js/mahjong16/ai.js"></script>
-<script src="js/mahjong16/sfx.js"></script>
-<script src="js/mahjong16/board.js"></script>
-<script src="js/mahjong16/solo.js"></script>
-<script src="js/mahjong16/adapter.js"></script>
-<script src="js/mahjong16/main.js"></script>
+<script src="js/shared/pk-faces.js"></script>
+<script src="js/blackjack/rules.js"></script>
+<script src="js/blackjack/ai.js"></script>
+<script src="js/blackjack/board.js"></script>
+<script src="js/blackjack/solo.js"></script>
+<script src="js/blackjack/adapter.js"></script>
+<script src="js/blackjack/main.js"></script>
 </body>
 </html>

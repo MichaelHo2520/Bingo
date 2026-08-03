@@ -33,6 +33,24 @@ const MPCore = (function(){
     const GOAL_DEF   = A.goalDefault || 3;
     const GOAL_MAX   = A.goalMax || 20;
     const clampGoal = v => Math.max(2, Math.min(GOAL_MAX, v|0));
+    /* ★★ 分數是**有正負的量**(v1.84.0 為 21 點加,**不帶就是舊行為 → 七個舊遊戲一個字都不受影響**)。
+       21 點記的是「淨籌碼變化」:輸了會是負的,而一場結束時每個座位各加減任意數。
+       這一個旗標一次改五件事(全部集中在下面五處,每一處都寫著 SIGNED):
+         ① ptsFor() 不再夾成 ≥ 0     ② 反向修正回收時不再夾成 ≥ 0
+         ③ 積分表在 top ≤ 0 時照樣顯示  ④ 領先記號不要求 top > 0
+         ⑤ 晶片上那顆 🏆N 徽章收掉(有正負的數字不是「勝場」,而 adapter 的 chipTail 自己畫)
+       ⚠ 不可以改成「所有遊戲都有正負」—— 舊的七個遊戲一局就是 +1,
+         而它們的 e2e 正是這一整段改動的回歸測試。 */
+    const SIGNED = !!A.scoreSigned;
+    const clampScore = v => SIGNED ? v : Math.max(0, v);
+    /* ★★ 允許**對局中加入**(v1.84.0 為 21 點加,同樣不帶就是舊行為)。
+       21 點一場 = 很多局,新人下一局就能當閒家(見 js/blackjack/adapter.js 的
+       「排隊不是插入」),所以「對戰中不可加入」對它是錯的。
+       ⚠ 這是核心的第二個遊戲專屬能力旗標(第一個是名次分)——
+         加的是**能力**不是遊戲名字,CLAUDE.md 那條「不要往核心塞 if(game==="sudoku")」仍然成立。
+       ⚠ 一共擋在四處:下面兩處 + join() 的硬擋 + **js/home-live.js 的 joinable()**。
+         漏掉 home-live 那一份的症狀是「首頁把對戰中的房間列成不可加入」。 */
+    const JOIN_MID = !!A.joinMidGame;
 
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false, roomName="";
     let online=false;
@@ -128,8 +146,11 @@ const MPCore = (function(){
       else if(open>0) setLive("open","現在有 "+open+" 間房間可加入"+(items.length>open?" · 另 "+(items.length-open)+" 間不可加入":""));
       else setLive("busy",items.length+" 間房間都在對戰中 / 已滿");
     }
-    // 可加入 = 還在大廳 且 未滿
-    function joinable(r){ return r.status==="lobby" && r.count<MAX_PLAYERS; }
+    /* 可加入 = 還在大廳 且 未滿。
+       ★ JOIN_MID 的遊戲(21 點)連「對戰中」也算可加入 —— 新人下一局進場。
+       ⚠ 這一份與 js/home-live.js 的 joinable() 是**同一條判定的兩份**:改一邊要改另一邊
+         (CLAUDE.md 已有一條同型的紅線在講 max 必須一致)。 */
+    function joinable(r){ return (r.status==="lobby" || (JOIN_MID && r.status==="playing")) && r.count<MAX_PLAYERS; }
     function startRoomWatch(){
       if(!init()){ setLive("none","連線未啟用"); return; }
       stopRoomWatch();
@@ -161,8 +182,10 @@ const MPCore = (function(){
         it.type="button"; it.className="room-item"+(ok?" joinable":" busy"); it.disabled=!ok;
         const hostTag=r.host?'<span class="host">👑 '+esc(r.host)+'</span> · ':'';
         const nm=r.name||("房間 "+r.code);
+        /* ⚠ JOIN_MID 的遊戲進不去只有一個理由(滿了)—— 標「對戰中」會讓人以為
+           等一下就能進,而它其實永遠不會空出來(直到有人離開)。 */
         const cta=ok ? '<span class="join-cta">加入 ▸</span>'
-                     : '<span class="busy-tag">'+(r.count>=MAX_PLAYERS&&r.status==="lobby"?"🔒 已滿":"🔒 對戰中")+'</span>';
+                     : '<span class="busy-tag">'+((r.count>=MAX_PLAYERS&&(JOIN_MID||r.status==="lobby"))?"🔒 已滿":"🔒 對戰中")+'</span>';
         it.innerHTML='<span class="room-main"><span class="rn">🏠 '+esc(nm)+'</span>'+
           '<span class="meta">'+hostTag+'👥 '+r.count+' / '+MAX_PLAYERS+' 人</span></span>'+cta;
         if(ok) it.addEventListener("click",()=>join(r.code,$("mpName").value,r.name));
@@ -217,7 +240,8 @@ const MPCore = (function(){
       roomRef.once("value").then(snap=>{
         const r=snap.val();
         if(!r||!r.host){ setMsg("這個房間已經關閉了,請重新選擇。"); return; }
-        if(r.game && r.game.status && r.game.status!=="lobby"){ setMsg("這間正在對戰中,無法加入。"); return; }
+        // ★ JOIN_MID 的遊戲(21 點)對戰中也進得去 —— 座位表由 adapter 在換局時重建
+        if(!JOIN_MID && r.game && r.game.status && r.game.status!=="lobby"){ setMsg("這間正在對戰中,無法加入。"); return; }
         roomName=inName||r.roomName||("房間 "+code);
         A.readRoom && A.readRoom(r);      // 先把房主的設定套上,免得大廳閃一下預設值
         claimSeat(okSeat=>{
@@ -474,9 +498,11 @@ const MPCore = (function(){
           這是整段名次分改動能安全上線的關鍵,五個舊遊戲的 e2e 就是它的回歸測試。
        ⚠ winner.ids 仍然只放「第一名」:大字 / 彩帶 / 卡片配色全部吃 winnerIds(),
          第三名拿了 1 分但沒有贏,不該放彩帶。 */
+    /* ★ SIGNED 的遊戲(21 點)這裡**不夾**成 ≥ 0:它的 pts 是淨籌碼變化,負的才對。
+       ⚠ 不帶 scoreSigned 的七個舊遊戲走的是 Math.max(0, …),與 v1.83.0 逐字相同。 */
     function ptsFor(id){
       if(!winner || !id) return 0;
-      if(winner.pts && typeof winner.pts[id]==="number") return Math.max(0, winner.pts[id]|0);
+      if(winner.pts && typeof winner.pts[id]==="number") return clampScore(winner.pts[id]|0);
       return winnerIds().indexOf(id)>=0 ? 1 : 0;
     }
     const myPts = () => ptsFor(meId);
@@ -491,8 +517,10 @@ const MPCore = (function(){
          ★ 一般是「贏家 +1」;帶了名次分就加自己那一格(見 ptsFor)。
          ★ `d` 記下這一局實際加了多少 —— 下面的反向修正要靠它才收得回**正確的數**
            (寫死 -1 的話,名次分模式下收回來的金額會是錯的)。 */
+      /* ⚠ 條件是 `!== 0` 而不是 `> 0`(v1.84.0 改):21 點會加負數。
+         ★ 舊的七個遊戲 myAdd ∈ {0, 1} → 兩種寫法**逐字等價**,行為一個字都沒變。 */
       const myAdd = myPts();
-      if(myAdd>0 && meId && roomRef && roundId && !scoredThisRound && scoredRoundOf(meId)!==roundId){
+      if(myAdd!==0 && meId && roomRef && roundId && !scoredThisRound && scoredRoundOf(meId)!==roundId){
         scoredThisRound=true;
         roomRef.child("scores/"+meId).transaction(s=>{
           if(s && s.round===roundId) return;
@@ -507,13 +535,16 @@ const MPCore = (function(){
          症狀就是「明明對手贏了,我的勝場卻也多一分」。
          寫回去時把 round 標成 "void":一局只收回一次,而且如果真值又改回我贏(理論上
          不會,伺服器值是終局),上面那條看到 round 不等於 roundId 會再補一次 → 自我收斂。 */
-      else if(myAdd<=0 && meId && roomRef && roundId && scoredRoundOf(meId)===roundId){
+      /* ⚠ 對稱地改成 `=== 0`(上面那條是 `!== 0`)—— 舊遊戲 myAdd ∈ {0,1} 時
+         與原本的 `<= 0` 逐字等價。 */
+      else if(myAdd===0 && meId && roomRef && roundId && scoredRoundOf(meId)===roundId){
         scoredThisRound=false;
         roomRef.child("scores/"+meId).transaction(s=>{
           if(!s || s.round!==roundId) return;      // 不是這一局記的 → 別亂動
           // ⚠ 舊資料沒有 d(v1.76.0 之前寫的)→ 退回 1,與舊行為完全一致
           const back=(typeof s.d==="number") ? s.d : 1;
-          return { n:Math.max(0,(s.n||0)-back), round:"void" };
+          // ★ SIGNED 的遊戲不夾成 ≥ 0(見 clampScore);舊遊戲照樣 Math.max(0, …)
+          return { n:clampScore((s.n||0)-back), round:"void" };
         },()=>{ if(winner) renderScoreboard(); });
       }
 
@@ -559,14 +590,17 @@ const MPCore = (function(){
           champEl.classList.remove("hidden");
         }else champEl.classList.add("hidden");
       }
-      if(top>0 || scoreMode==="match"){
+      /* ★ SIGNED 的遊戲(21 點)一律顯示:淨籌碼很可能是 0 或負的,
+         而「大家都還沒賺到」不代表這張表沒有資訊。 */
+      if(top>0 || scoreMode==="match" || SIGNED){
         const goalCap=(scoreMode==="match" && !champs.length) ? '<div class="ws-goal">🎯 搶 '+winGoal+' '+SCORE_UNIT+'</div>' : '';
         // 本局得分的人:總數之外把「分數是怎麼變的」也講出來,才看得出這局誰得手
         sb.innerHTML=goalCap+rows.map((r,i)=>{
-          const lead=r.score===top && top>0;
+          const lead=r.score===top && (top>0 || SIGNED);
           const cls="ws-row"+(lead?" lead":"")+(r.id===meId?" me":"");
           const add=ptsFor(r.id);
-          const plus=add>0 ? '<span class="gw-plus">+'+add+'</span>' : '';
+          // ★ SIGNED 的負數要看得出是負的(+ 只加在正數前面)
+          const plus=(SIGNED ? add!==0 : add>0) ? '<span class="gw-plus">'+(add>0?"+":"")+add+'</span>' : '';
           return '<div class="'+cls+'"><span class="ws-rank">'+(lead?"🏆":(i+1)+".")+'</span>'+
                  '<span class="ws-name">'+esc(r.name)+'</span>'+plus+'<span class="ws-pts">'+r.score+' '+SCORE_UNIT+'</span></div>';
         }).join("");
@@ -600,7 +634,9 @@ const MPCore = (function(){
         const lead=(curPhase==="playing" && A.chipLead) ? A.chipLead(id) : null;
         const side=lead!=null ? lead : '<span class="dot"></span>';
         const sc=scoreOf(id);
-        const scoreBadge=sc>0?'<span class="score-badge" title="累積勝場">🏆'+sc+'</span>':'';
+        /* ★ SIGNED 的遊戲不畫這顆 🏆N —— 有正負的數字不是「累積勝場」,
+           而且 21 點的 chipTail 自己已經畫了籌碼(同一格位置兩個數字會讀不出誰是誰)。 */
+        const scoreBadge=(!SIGNED && sc>0)?'<span class="score-badge" title="累積勝場">🏆'+sc+'</span>':'';
         const extra=(curPhase==="playing" && A.chipTail) ? (A.chipTail(id)||"") : "";
         chip.innerHTML=side+'<span class="gmk-nm">'+esc(dispName(id))+'</span>'+youTag(id)+extra+scoreBadge;
         if(isHost && status==="lobby" && id!==meId){
@@ -908,6 +944,11 @@ const MPCore = (function(){
 
    可選:
      minPlayers/maxPlayers(預設 2/2)、hasResign、winCardId
+     scoreUnit/goalDefault/goalMax  計分的單位與目標值(v1.76.0 為大老二的名次分加)
+     scoreSigned      ★ 分數是有正負的量(v1.84.0 為 21 點的淨籌碼加)——
+                        不帶就是舊行為,七個舊遊戲一個字都不受影響。grep SIGNED 看落地的五處。
+     joinMidGame      ★ 允許對局中加入(v1.84.0 為 21 點加)——
+                        同樣不帶就是舊行為。⚠ 要一起改 js/home-live.js 的 joinable()
      init(ctx)          接住核心給的執行環境(見上方 ctx)
      api:{...}          要額外暴露給 main.js 的方法(tap / setBoardSize / …)
      roomFields()       房間層級設定欄位的預設值 {key:val};核心負責建房寫入與監聽

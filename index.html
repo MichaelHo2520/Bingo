@@ -17,8 +17,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.83.0 -->
-<meta name="version" content="1.83.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.84.0 -->
+<meta name="version" content="1.84.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -198,6 +198,28 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <span class="gc-name display">大老二</span>
           <span class="gc-desc">2 最大 · 搶先出完手牌 · 單機對電腦 / 2~4 人連線</span>
           <span class="hl-badge hidden" id="hlBadgeBig2"></span>
+        </span>
+        <span class="gc-go" aria-hidden="true">▸</span>
+      </a>
+
+      <!-- 第八個遊戲(v1.84.0):21 點。
+           ⚠ 插圖同樣只用數字與字母,不用撲克牌 Unicode(U+1F0A0 那一段)——
+              多數字型沒有,會變豆腐方框(同麻將牌那條禁令,見 notes/13)
+           ★ 沿用排七 / 大老二那組 .pk-* 撲克牌圖示(同一副牌本來就該長一樣)
+           ⚠ 中間那張要放「21」兩個字 → 字級小一號(.bj-art .pk-r 在 styles.css) -->
+      <a class="game-card as-link" href="blackjack.html">
+        <svg class="gc-art pk-art bj-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 21 點">
+          <rect class="pk-bd" x="4" y="13" width="16" height="24" rx="3"/>
+          <rect class="pk-bd" x="21.5" y="9" width="16" height="24" rx="3"/>
+          <rect class="pk-bd" x="36" y="13" width="16" height="24" rx="3"/>
+          <text class="pk-k" x="12" y="29">A</text>
+          <text class="pk-r" x="29.5" y="26">21</text>
+          <text class="pk-k" x="44" y="29">K</text>
+        </svg>
+        <span class="gc-body">
+          <span class="gc-name display">21 點</span>
+          <span class="gc-desc">輪流當莊 · 湊到最接近 21 · 單機對電腦 / 2~5 人連線</span>
+          <span class="hl-badge hidden" id="hlBadgeBj"></span>
         </span>
         <span class="gc-go" aria-hidden="true">▸</span>
       </a>

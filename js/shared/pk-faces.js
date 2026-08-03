@@ -91,7 +91,28 @@ const PKFace = (function(){
            '</span>';
   }
 
-  return { SUIT_KEYS, PATHS, suitSVG, cardHTML };
+  /* ★★ 一張**蓋著的牌**(牌背,v1.84.0 為 21 點加)。
+       o = { prefix, cls }
+
+     ── 為什麼到第八個遊戲才需要它 ──────────────────────────────────────────
+       前七個遊戲的隱藏資訊都是「**防偷看**」:牌在 DB 是明碼,靠顯示端不畫
+       (大老二對手的手牌、排七別人蓋掉的牌 —— 那些位置畫的是**張數**,不是牌)。
+       21 點的莊家暗牌是**規則本身的一部分** —— 它有一個固定的位置、要看得出
+       「那裡有一張牌,只是還沒翻」,所以必須畫得出來。
+
+     ⚠ 圖樣一律交給 CSS(`.<prefix>-bk`)—— 不要在這裡塞 SVG 花紋:
+       牌背要跟著主題換色(ebook 模式是純白 + 黑框),寫在 SVG 裡就換不動了。
+     ⚠ data-c 刻意給 "?" 而不是真正的牌 id:那個屬性會被點擊處理讀去當牌用
+       (`+el.dataset.c`),寫真值等於**把暗牌洩漏在 DOM 屬性裡**。 */
+  function backHTML(o){
+    const p = (o && o.prefix) || "pk";
+    const cls = (o && o.cls) ? " " + o.cls : "";
+    return '<span class="' + p + '-card back' + cls + '" data-c="?" aria-label="蓋著的牌">' +
+             '<span class="' + p + '-bk" aria-hidden="true"></span>' +
+           '</span>';
+  }
+
+  return { SUIT_KEYS, PATHS, suitSVG, cardHTML, backHTML };
 })();
 
 /* node 測試用(瀏覽器不會有 module) */
