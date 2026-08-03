@@ -332,17 +332,34 @@ const M16B = (function(){
      ★ 做成 M16B 的一支 export、而不是在 adapter 裡拼字串:牌面、明牌的排法
        (吃到的那張排中間、暗槓中間兩張蓋著)、花牌的外框全部在這裡,
        兩個地方各寫一份一定會走鐘。
-     ⚠ 胡的那張用**索引**標記不是牌值 —— 手上有一對時拿牌值比會兩張都亮
-       (v1.58.0 那個「一對牌一起站起來」的同一個坑)。 */
+     ⚠ 胡的那張用**索引**抽出來、不是用牌值過濾 —— 手上有一對時整對都會被抽走
+       (v1.58.0 那個「一對牌一起站起來」的同一個坑,只是換了個死法)。
+
+     ── ★★ v1.75.16:胡的那張**離開手牌、單獨擺在右邊** ──────────────────────
+       使用者:「你看你最後胡的牌,用紅色的框起來那裡,是不是有點怪怪的」。三個原因:
+         ① 牌與牌的間距只有 1px,而紅框是 `outline` + `outline-offset:1px` ——
+            它剛好畫在**縫隙上、壓到左右兩張牌**,看起來像貼歪的貼紙而不是框住一張牌。
+         ② 排序之後胡的那張常常卡在整排中間,要找一下才知道在標什麼。
+         ③ v1.75.15 把結果卡那塊攤牌拿掉時,「紅框是胡的那張」那句說明**跟著沒了**,
+            而同一個紅框在牌河是「最新打出的那張」—— 同一個符號兩個意思。
+       改成照真牌桌的慣例:自成一組 + 一個「胡」的小標。紅框留著(現在有自己的內距,
+       不會再壓到別人),但已經不是唯一的訊號了。 */
   function revealHTML(state, seat, tw, winTile){
     const s = state || st;
     if(!s || !s.hands || !s.hands[seat]) return "";
     const hand = s.hands[seat].slice().sort((a,b)=>a-b);
-    const mark = (typeof winTile==="number") ? hand.indexOf(winTile) : -1;
+    let win = -1;
+    if(typeof winTile==="number"){
+      const i = hand.indexOf(winTile);
+      if(i>=0){ win = winTile; hand.splice(i,1); }
+    }
     const parts = [];
     if(hand.length)
       parts.push('<span class="m16-meld m16-hg">'+
-        hand.map((t,i)=>tileHTML(codeOf(t), "m16-mt"+(i===mark?" m16-wt":""))).join("")+'</span>');
+        hand.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+'</span>');
+    if(win>=0)
+      parts.push('<span class="m16-meld m16-wg"><i class="m16-wgl">胡</i>'+
+        tileHTML(codeOf(win), "m16-mt m16-wt")+'</span>');
     (s.melds[seat]||[]).forEach(m=>parts.push(meldHTML(m, tw)));
     if((s.flowers[seat]||[]).length) parts.push(flowerHTML(s.flowers[seat], tw));
     return '<div class="m16-reveal" style="--m16w:'+tw+'px">'+parts.join("")+'</div>';
