@@ -6,7 +6,7 @@
    ── ★★ 這一頁與前七個遊戲最不一樣的三件事 ──────────────────────────────────
      ① **一場 = 很多局**。前七個遊戲「一局 = 一場」,21 點一局只有 30 秒,
         所以核心的 roundId 對應的是**一整場**,而場裡面的局由這裡自己推進。
-     ② **規則由房主設定**,而且進了真相層:結算會用到平手誰贏 / 賠率 / 五小龍 /
+     ② **規則由房主設定**,而且進了真相層:結算會用到平手誰贏 / 賠率 / 過五關 /
         先爆先輸,所以 rules 在**開局那一刻凍結進 game.rules**,之後一個字都不能改
         (改了會讓已經打完的局重算出不同結果 → 重連的人算出來的籌碼跟現場不一樣)。
      ③ **人數在對局中會變**(允許中途加入)—— 見下面「排隊不是插入」。
@@ -51,7 +51,6 @@
 const MP = MPCore.create((function(){
 
   const SETTLE_MS = 3200;                 // 一局結算後停多久再開下一局(全桌都要看得到結果)
-  const AUTO_MS = 700;                    // 「算得出來就不必等人按」的短延遲(莊家補牌線)
   let ctx = null;
 
   let rules = BJ.defRules();              // 大廳的房規(房主可改;開局後看的是 game.rules)
@@ -112,7 +111,7 @@ const MP = MPCore.create((function(){
       betDone[i] = (bj.bets && bj.bets[id] !== undefined);
     });
 
-    /* ★ 公告(爆 / 21 點 / 五小龍)—— 與單機**共用 board.js 的同一支**,所以這裡只有一行。
+    /* ★ 公告(爆 / 21 點 / 過五關)—— 與單機**共用 board.js 的同一支**,所以這裡只有一行。
        ⚠ key 一律用 roundId + seq:換場**與**換局都要把上一份記錄清掉,
          而 seed 那條(prev === null 就只記不響)擋掉進場 / 重連 / 批次同步的亂響。 */
     const key = ctx.roundId() + ":" + bj.seq;
@@ -129,7 +128,7 @@ const MP = MPCore.create((function(){
       betPhase: betting(),
       mine: betting() ? (me >= 0 && seatsOf()[me] !== dealerPid())
                       : !!(playing() && (lg.hit || lg.stand)),
-      betTiers: BJ.betTiers(gRules ? gRules.betMax : rules.betMax),
+      betMax: (gRules ? gRules.betMax : rules.betMax),
       myBet: (me >= 0 && bets[me]) || 0,
       legal: lg,
       turnName: st ? (st.phase === "dealer" ? nameOfSeat(dealerIdx()) : "其他人") : "",
@@ -166,8 +165,10 @@ const MP = MPCore.create((function(){
       return "要牌還是停?";
     }
     if(ph === "dealer"){
+      /* ★★ v1.85.0:當莊的人**自己按**(有補牌線也一樣,那只是限制哪一顆按得動)。
+         ⚠ 措辭與單機那份(solo.js hintOf)刻意寫成同一句。 */
       if(iAmD) return gRules.line
-        ? ("你是莊家,規則要求補到 " + gRules.line + " —— 系統幫你補")
+        ? ("翻牌了 —— 規則要求補到 " + gRules.line + ",你自己按")
         : "翻牌了 —— 你要補嗎?(莊家自由決定)";
       return "莊家在補牌…";
     }
@@ -249,15 +250,11 @@ const MP = MPCore.create((function(){
     if(ph === "bet"){ showToast("先押注"); return; }
     if(ph === "over"){ showToast("本局結算中,等一下就開下一局"); return; }
     if(!st) return;
-    const lg = BJ.legal(st, me);
-    if(!lg.hit && !lg.stand){
-      // ★ 說得出原因 —— 不用 disabled 讓點擊靜默消失(CLAUDE.md 的紅線)
-      if(st.done[me]) showToast(BJ.valueOf(st.hands[me]).bust ? "你已經爆了" : "你已經停手了");
-      else showToast(seatsOf()[me] === dealerPid() ? "你是莊家,等閒家先補完" : "還沒輪到你");
-      return;
-    }
-    if(a === "d" && !lg.dbl){ showToast("加倍只能在還沒補牌的時候"); return; }
-    if(a !== "h" && a !== "s" && a !== "d") return;
+    if(a !== "h" && a !== "s") return;
+    /* ★ 說得出原因 —— 不用 disabled 讓點擊靜默消失(CLAUDE.md 的紅線)。
+       ★★ 文案走 BJ.denyTxt(與單機同一份;它也負責莊家補牌線那兩句)。 */
+    const why = BJ.denyTxt(st, me, a);
+    if(why){ showToast(why); return; }
     sendAct(a);
   }
 
@@ -269,11 +266,16 @@ const MP = MPCore.create((function(){
        ⚠ 下限 1200ms 兜底 —— 錨點是本地時鐘,慢半拍收到快照的那台會算出「已經過期」
          而一收到就結算(台灣麻將踩過)。
      ========================================================================== */
-  // 這一段的窗口有多長。★ 結算展示與「算得出來的莊家」各有自己的長度
+  /* 這一段的窗口有多長。★ 只有「結算展示」有自己的長度,其餘一律吃房規的倒數。
+     ★★ v1.85.0 拿掉了「有補牌線就 700ms 自動幫莊家補完」那一條 ——
+        當莊的是**人**,他要自己按(使用者:「電腦幫我自動會很沒感覺」)。
+        補牌線改成限制哪一顆鈕按得動(BJ.legal),所以規則一個字都沒鬆;
+        真的沒人按時照樣有到期代打(forceDealer → BJ.autoDealer)接手。
+     ⚠ 倒數關掉(sec=0)時莊家那一段就真的沒人催 —— 與其他三段一致
+       (房規那一行本來就寫著「不限時:有人離開牌桌全桌會一直等」)。 */
   function winMs(){
     const ph = phaseName();
     if(ph === "over") return SETTLE_MS;
-    if(ph === "dealer" && gRules && gRules.line) return AUTO_MS;
     return secOn() ? gRules.sec * 1000 : 0;
   }
   function clearPhaseT(){ if(phaseT){ clearTimeout(phaseT); phaseT = null; } }
@@ -590,17 +592,15 @@ const MP = MPCore.create((function(){
       if(st.phase !== "dealer") return null;
       return dealerPid();
     },
-    /* 晶片尾巴:莊記號 + 這一場的籌碼。★ 兩樣都是**公開資訊**
-       (誰當莊全場都看得到,籌碼是結算過的歷史)。
+    /* 晶片尾巴:莊記號 + 這一場的籌碼。★★ 那一小段 HTML 走 BJB.chipHTML ——
+       v1.85.0 起與單機的 paintBar **同一份**(配色要一起改才會一致)。
+       ★ 兩樣都是**公開資訊**(誰當莊全場都看得到,籌碼是結算過的歷史)。
        ⚠ 這裡一個字都不准提牌 —— 這一頁唯一藏起來的是莊家那張暗牌,而它在盤面上。 */
     chipTail(id){
       if(!bj) return "";
       const net = (bj.nets && bj.nets[id]) || 0;
       const chip = (gRules ? gRules.start : rules.start) + net;
-      return (id === dealerPid() ? '<span class="bj-chd" title="這一局的莊家">🎩 莊</span>' : "") +
-             '<span class="bj-chc" title="手上的籌碼">' + chip +
-               (net ? '<i class="' + (net > 0 ? "up" : "down") + '">' + (net > 0 ? "+" : "") + net + '</i>' : "") +
-             '</span>';
+      return BJB.chipHTML(chip, net, id === dealerPid());
     },
     lobbyStatusText(ids){ return ids.length < 2 ? "等待其他人加入…" : "等待大家準備…"; },
     readyHint(ids, ready){

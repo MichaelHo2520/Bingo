@@ -92,7 +92,8 @@ const Solo = (function(){
      ========================================================================== */
   /* 單機的玩家列。★ 沿用房間框那組 .mp-chip / .bj-room 的外觀 ——
      連線與單機長得一樣才有一致感。
-     ★ 晶片上放的是**籌碼**(= 起始 + 淨變化)與「莊」記號:兩樣都是公開資訊。
+     ★ 晶片上放的是**籌碼**(= 起始 + 淨變化)與「莊」記號:兩樣都是公開資訊,
+       而那一小段 HTML 走 BJB.chipHTML(v1.85.0 起與連線的 chipTail **同一份**)。
      ⚠ 牌情紅線與這裡無關 —— 21 點唯一藏起來的是莊家那張暗牌,而那在盤面上。 */
   function paintBar(){
     const box = $("bjSoloPlayers");
@@ -109,10 +110,7 @@ const Solo = (function(){
                '<span class="bj-dot p' + s + '"></span>' +
                '<span class="gmk-nm">' + esc(seatName(s)) + '</span>' +
                (s === ME ? '<span class="you-badge">你</span>' : "") +
-               (s === d ? '<span class="bj-chd" title="這一局的莊家">🎩 莊</span>' : "") +
-               '<span class="bj-chc" title="手上的籌碼">' + chip +
-                 (net ? '<i class="' + (net > 0 ? "up" : "down") + '">' +
-                        (net > 0 ? "+" : "") + net + '</i>' : "") + '</span>' +
+               BJB.chipHTML(chip, net, s === d) +
              '</div>';
       }
       box.innerHTML = h;
@@ -144,8 +142,10 @@ const Solo = (function(){
       return "要牌還是停?";
     }
     if(st.phase === "dealer"){
+      /* ★★ v1.85.0:我當莊時**一律自己按**(使用者:「電腦幫我自動會很沒感覺」)。
+         有補牌線的話只是「哪一顆按得動」不同,那一句話要講得出線在哪。 */
       if(iAmDealer()) return rules.line
-        ? ("你是莊家,規則要求補到 " + rules.line + " —— 系統幫你補")
+        ? ("翻牌了 —— 規則要求補到 " + rules.line + ",你自己按")
         : "翻牌了 —— 你要補嗎?(莊家自由決定)";
       return "莊家在補牌…";
     }
@@ -156,7 +156,7 @@ const Solo = (function(){
     paintBar();
     const d = dealer();
     const nms = names();
-    /* ★ 公告(爆 / 21 點 / 五小龍)—— 與連線**共用 board.js 的同一支**,所以這裡只有一行。
+    /* ★ 公告(爆 / 21 點 / 過五關)—— 與連線**共用 board.js 的同一支**,所以這裡只有一行。
        ⚠ key 一律用「這是哪一局」:換局時它負責把上一局的記錄清掉,
          而 seed 那條(prev === null 就只記不響)擋掉進場 / 換局的亂響。 */
     BJB.announce({ st: betting ? null : st, names: nms, me: ME, key: "solo:" + round });
@@ -174,7 +174,7 @@ const Solo = (function(){
       betPhase: betting,
       // 我是莊家時 mine 明確給 false → 動作列會講「這一局你當莊,不用下注」
       mine: betting ? !iAmDealer() : myTurn,
-      betTiers: BJ.betTiers(rules.betMax),
+      betMax: rules.betMax,
       myBet: bets[ME] || 0,
       legal: lg,
       turnName: st ? (st.phase === "dealer" ? seatName(d) : "其他人") : "",
@@ -323,8 +323,13 @@ const Solo = (function(){
 
     if(st.phase === "dealer"){
       const d = dealer();
-      /* ★ 房規有補牌線 → 莊家沒有決策空間,整段算得出來(連等他點都不必)。
-         ⚠ 我當莊時也走這條:規則要求的就不該讓我自己按(按了只會有一個合法答案)。 */
+      /* ★★★ 我當莊 → **一律等我按**,不管房規有沒有補牌線(v1.85.0)。
+         使用者的原話:「當莊家時,我希望可以自己選擇補牌,而不是電腦幫我自動,
+         這樣會很沒感覺」。補牌線改成「哪一顆鈕按得動」(BJ.legal),
+         所以規則一個字都沒鬆,但每一張牌都是自己按出來的。
+         ⚠ 這一行**要在 rules.line 那條之前** —— 順序反了就又變成系統幫我補完。 */
+      if(d === ME){ busy = false; paint(); return; }
+      /* 電腦當莊 + 房規有補牌線 → 他沒有決策空間,整段算得出來(連一步一步演都不必)。 */
       if(rules.line){
         busy = true; paint();
         later(() => {
@@ -336,7 +341,6 @@ const Solo = (function(){
         }, 620);
         return;
       }
-      if(d === ME){ busy = false; paint(); return; }    // 自由補牌 + 我當莊 → 等我按
       busy = true; paint();
       later(() => {
         let mv = null;
@@ -349,7 +353,7 @@ const Solo = (function(){
     }
   }
 
-  /* 我按了要牌 / 停 / 加倍 */
+  /* 我按了下注 / 要牌 / 停(★ v1.85.0 起沒有加倍了) */
   function act(a, betVal){
     if(!active) return;
     if(a === "bet"){ myBet(betVal); return; }
@@ -358,15 +362,12 @@ const Solo = (function(){
     if(settled){ showToast("本局結算中,等一下就開下一局"); return; }
     if(busy){ showToast("等其他人動完"); return; }
     if(!st) return;
-    const lg = BJ.legal(st, ME);
-    if(!lg.hit && !lg.stand){
-      // ★ 說得出原因 —— 不用 disabled 讓點擊靜默消失(CLAUDE.md 的紅線)
-      if(st.done[ME]) showToast(BJ.valueOf(st.hands[ME]).bust ? "你已經爆了" : "你已經停手了");
-      else showToast(iAmDealer() ? "你是莊家,等閒家先補完" : "還沒輪到你");
-      return;
-    }
-    if(a === "d" && !lg.dbl){ showToast("加倍只能在還沒補牌的時候"); return; }
-    if(a !== "h" && a !== "s" && a !== "d") return;
+    if(a !== "h" && a !== "s") return;
+    /* ★ 說得出原因 —— 不用 disabled 讓點擊靜默消失(CLAUDE.md 的紅線)。
+       ★★ 文案走 BJ.denyTxt(單機與連線同一份):它也負責莊家補牌線那兩句
+          (「還不能停」/「到了就不能再補」)。 */
+    const why = BJ.denyTxt(st, ME, a);
+    if(why){ showToast(why); return; }
     if(!apply(ME, a)){ showToast("這個動作現在不行"); return; }
     paint();
     drive();

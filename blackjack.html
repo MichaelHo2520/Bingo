@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>21 點 ｜ 輪流當莊 · 單機對電腦 + 2~5 人連線</title>
-<!-- 21 點 · v1.84.0 -->
-<meta name="version" content="1.84.0">
+<!-- 21 點 · v1.85.0 -->
+<meta name="version" content="1.85.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -83,8 +83,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <li>一局的順序:<b>下注 → 發牌 → 閒家補牌 → 莊家補牌 → 結算</b>。</li>
           <li>莊家的<b>第二張牌是蓋著的</b>,要等閒家都停手了才翻開。</li>
           <li><b>閒家可以同時補牌</b>,不必等別人 —— 每個人抽自己的牌。</li>
-          <li><b>加倍</b>:還沒補牌時可以把押注翻倍,但只能再補一張就得停。</li>
-          <li><b>21 點</b>(前兩張就 21)賠得比較多;<b>五小龍</b>(五張不爆)賠更多。</li>
+          <li>下注用<b>加減鈕</b>(±1 / ±5 / ±10)自己調,上限由房主決定。</li>
+          <li><b>21 點</b>(前兩張就 21)賠得比較多;<b>過五關</b>(五張不爆)賠更多。</li>
           <li><b>不會被淘汰</b> —— 籌碼可以打到負的,比的是誰賺得多。</li>
           <li>其他細節(平手誰贏、莊家要不要補到 17、賠幾倍…)全部<b>由房主決定</b>。</li>
         </ul>
@@ -294,7 +294,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             </div>
           </div>
           <div class="set-row col">
-            <span class="set-lbl">每局下注上限</span>
+            <!-- ★ v1.85.0:下注是「1 ~ 上限之間任何一個整數」(加減鈕),不再是四個檔位 -->
+            <span class="set-lbl">每局下注上限<span class="set-sub">實際押多少用加減鈕自己調(最少 1)</span></span>
             <div class="seg" aria-label="每局下注上限">
               <button data-rk="betMax" data-rv="5">5</button>
               <button data-rk="betMax" data-rv="10">10</button>
@@ -308,10 +309,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="set-group-title">莊家</div>
           <div class="set-row col">
             <!-- ★★ 這一項是個「張力開關」而不是一條規則:
-                 設了補牌線 → 當莊變成純機械、沒有決策空間(但快,系統直接幫他補完);
+                 設了補牌線 → 當莊的人沒有決策空間(該補的一定得補、到線了不能再補);
                  自由 → 當莊那個人要自己判斷,全場盯著他 —— 那才是輪莊的樂趣所在。
-                 所以預設是**自由**(見 notes/17 的 3-2)。 -->
-            <span class="set-lbl">補牌線<span class="set-sub">「自由」= 莊家自己決定(全場看他)</span></span>
+                 所以預設是**自由**(見 notes/17 的 3-2)。
+                 ⚠ v1.85.0 起**兩種都是他自己按**:補牌線只決定「哪一顆鈕按得動」。
+                 ⚠ 標題明寫「只管莊家」—— 使用者問過「這個選項是只有莊家才有嗎」。 -->
+            <span class="set-lbl">莊家的補牌線<span class="set-sub">只管莊家,閒家永遠自己決定;莊家一律自己按</span></span>
             <div class="seg" aria-label="莊家補牌線">
               <button data-rk="line" data-rv="0">自由</button>
               <button data-rk="line" data-rv="16">補到 16</button>
@@ -346,8 +349,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             </div>
           </div>
           <div class="set-row col">
-            <span class="set-lbl">五小龍<span class="set-sub">五張不爆賠 2 倍,莊家也能報</span></span>
-            <div class="seg" aria-label="五小龍">
+            <span class="set-lbl">過五關<span class="set-sub">五張不爆賠 2 倍,莊家也能報</span></span>
+            <div class="seg" aria-label="過五關">
               <button data-rk="dragon" data-rv="1">開</button>
               <button data-rk="dragon" data-rv="0">關</button>
             </div>

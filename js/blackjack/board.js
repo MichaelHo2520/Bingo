@@ -4,7 +4,7 @@
    21 點 — 盤面(BJB)。牌桌 / 莊家 / 其他閒家 / 我的手牌 / 動作列 / 結果卡都在這裡畫。
 
    ── ★ 這一頁**沒有** JS 算尺寸(照排七與大老二的結論)────────────────────────
-     一手最多 5 張(五小龍開著時)、列數 = 人數(一整局不變),
+     一手最多 5 張(過五關開著時)、列數 = 人數(一整局不變),
      所以尺寸整份交給 CSS(flex + clamp)。JS 只寫兩個**資料**性質的數字:
        `--bj-slots`(我的手牌格位)· `.bj-seats` 的列數由人數決定。
      ⚠ 不要為了「牌少的時候放大一點」改回 JS 算 —— 那正是台灣麻將那一整類
@@ -42,6 +42,14 @@ const BJB = (function(){
   let stage = null, acts = null;
   let hAct = null;                          // 按動作鈕的回呼(這一頁沒有點牌,只有按鈕)
   let cdKey = "", cdT = null;               // 倒數環:用 key 去重,不看 timer(見 syncCd)
+  /* ★★ 「還沒送出去的押注金額」住在這裡(v1.85.0 的加減鈕)。
+     ★ 它是**純畫面狀態** —— 不進 DB、不進 st、不影響任何判定,所以放在盤面這一層
+       就只有一份;放進 solo.js 與 adapter.js 就是兩份(這個專案最痛的那類走鐘)。
+     ★ 刻意**跨局保留**(黏著上一局押的數字):每一局都彈回 1 的話,
+       想固定押 5 的人每一局都要重按四次。
+     ⚠ 一定要在畫的時候夾一次 [1, betMax] —— 房規的上限改小時舊的數字會超出範圍。 */
+  let betPend = R.MIN_BET;
+  let lastInfo = null;                      // 加減鈕只動 betPend → 用它原地重畫一次動作列
 
   /* ==========================================================================
      一、牌面
@@ -85,7 +93,7 @@ const BJB = (function(){
     return '<span class="' + cls + (partial ? " part" : "") + '">' + txt +
              (partial ? ' <b>+ ?</b>' : "") +
              (bust ? ' <i>爆</i>' : (tier === R.T_BJ ? ' <i>21點</i>' :
-              (tier === R.T_DRAGON ? ' <i>五小龍</i>' : ''))) +
+              (tier === R.T_DRAGON ? ' <i>過五關</i>' : ''))) +
            '</span>';
   }
 
@@ -98,6 +106,22 @@ const BJB = (function(){
     if(st.done[s]) return '<span class="bj-st ok">✋ 停</span>';
     const turn = (s === st.dealer) ? st.phase === "dealer" : st.phase === "play";
     return turn ? '<span class="bj-st wait">考慮中…</span>' : '<span class="bj-st">等待…</span>';
+  }
+
+  /* ★ 玩家晶片尾巴:「莊」記號 + 手上的籌碼 —— ★★ 單機與連線**共用這一份**。
+     ★★ v1.85.0 把它收成一支的理由(使用者:「顯示每個人剩下多少籌碼,
+        這部分的配色需要可以讓籌碼看的明顯一點」):
+        籌碼那一格原本在 solo.js 的 paintBar 與 adapter.js 的 chipTail **各寫一份**,
+        兩份的配色要一起改才會一致 —— 那正是這個專案最痛的那類走鐘,所以先併起來再改色。
+     ★ 兩樣都是**公開資訊**(誰當莊全場都看得到;籌碼是結算過的歷史)。
+     ⚠ 這一格一個字都不准提牌 —— 這一頁唯一藏起來的是莊家那張暗牌,而它在盤面上。
+     · chip 手上的籌碼(= 起始 + 淨變化)· net 這一場的淨變化(可以是負的) */
+  function chipHTML(chip, net, isDealer){
+    return (isDealer ? '<span class="bj-chd" title="這一局的莊家">🎩 莊</span>' : "") +
+           '<span class="bj-chc" title="手上的籌碼">💰<b>' + chip + '</b>' +
+             (net ? '<i class="' + (net > 0 ? "up" : "down") + '">' +
+                    (net > 0 ? "+" : "") + net + '</i>' : "") +
+           '</span>';
   }
 
   /* ==========================================================================
@@ -201,7 +225,7 @@ const BJB = (function(){
        ★ 我自己的牌**一律全部畫出來**(不看 reveal)—— 我是莊家時那張暗牌也是我的。
        ★ 格位固定:容器寬 = `--bj-slots` × 一格、靠左填(照大老二 v1.77.0)。
          補牌只讓右邊長出一張,已經在手上的牌一格都不動。
-       ⚠ slots 用**上限**(五小龍開著 = 5,關掉 = 2 + maxDraw)而不是目前張數:
+       ⚠ slots 用**上限**(過五關開著 = 5,關掉 = 2 + maxDraw)而不是目前張數:
          用目前張數的話容器會跟著長,那就等於沒固定。
      ========================================================================== */
   function slotsOf(v){
@@ -257,14 +281,28 @@ const BJB = (function(){
   /* ==========================================================================
      六、動作列(單機與連線共用這一份)
      ──────────────────────────────────────────────────────────────────────────
-       info = { phase, mine, betPhase, betTiers[], myBet, legal:{hit,stand,dbl},
+       info = { phase, mine, betPhase, betMax, myBet, legal:{hit,stand},
                 turnName, over, hint, cdMs, cdEnd }
-       ★ 只有一份:21 點的動作集很小(下注三四顆鈕 + 要牌 / 停 / 加倍),
+       ★ 只有一份:21 點的動作集很小(下注的加減鈕 + 要牌 / 停),
          而且兩邊的狀態都表達得成純資料。
        ⚠ 想加「只有連線才有」的東西時,先想能不能表達成 info 的一個欄位。
 
        ★★ 每一顆鈕都**按得動**,不合法時只是變暗 + 說得出原因
           (CLAUDE.md 的紅線:不用 disabled 讓點擊靜默消失)。
+
+     ── ★★ 下注改成加減鈕(v1.85.0)──────────────────────────────────────────
+       使用者:「我希望可以下注的籌碼是比較彈性的,可以搞個一次加減一或加減 5
+       或加減 10 的方式」→ 四個檔位鈕換成 ±1 / ±5 / ±10 + 一顆「押 N ▸」。
+       ★ 兩列的高度刻意與「要牌 / 停」那一組**一樣**(提示列 + 一排鈕):
+         動作列是寫死高度的(--bj-acth),下注那一段變高就等於手牌被推
+         (大老二 v1.78.0 一路在修的「上上下下」)。
+         ⚠ 所以「押 N ▸」是塞在**提示列右邊**而不是自己一列。
+       ★ 級距由 BJ.betSteps(betMax) 篩過:上限 5 的時候不畫 ±10(按了也沒用)。
+
+     ── ★★ 加倍拿掉了(v1.85.0)─────────────────────────────────────────────
+       使用者:「開始後不要再有兩倍的選項可以按」。
+       ⚠ 這裡**不必**判斷 —— BJ.legal().dbl 永遠 false,所以只是把那一行刪掉;
+         真正的閘門在 rules.js(見那邊 legal() 的註解)。
      ========================================================================== */
   function actsHTML(info){
     if(info.over) return '<span class="bj-atxt">' + esc(info.hint || "這一局結束") + '</span>';
@@ -273,18 +311,30 @@ const BJB = (function(){
     if(info.betPhase){
       if(info.mine === false)
         return '<span class="bj-atxt">' + esc(info.hint || "這一局你當莊,不用下注") + '</span>';
-      const tiers = info.betTiers || [1];
-      let h = '<div class="bj-selbar' + (info.myBet ? " ok" : "") + '">' +
-                '<span class="bj-selico">' + (info.myBet ? "✅" : "💰") + '</span>' +
+      const max = (info.betMax > 0) ? info.betMax : R.RULES_DEF.betMax;
+      const done = info.myBet > 0;
+      // ⚠ 一定要在這裡夾一次:房規的上限被改小時 betPend 可能還留著上一局的大數字
+      betPend = Math.max(R.MIN_BET, Math.min(max, betPend || R.MIN_BET));
+      const amt = done ? info.myBet : betPend;
+      let h = '<div class="bj-selbar bet' + (done ? " ok" : "") + '">' +
+                '<span class="bj-selico">' + (done ? "✅" : "💰") + '</span>' +
                 '<span class="bj-seltxt">' +
-                  esc(info.myBet ? ("你押了 " + info.myBet + " —— 等其他人下注")
-                                 : (info.hint || "先押注,再發牌")) +
-                '</span></div>';
-      h += '<div class="bj-btns">';
-      tiers.forEach(t => {
-        h += '<button class="btn ' + (info.myBet === t ? "primary" : "ghost") +
-             ' bj-act" data-act="bet" data-bet="' + t + '">' + t + '</button>';
+                  esc(done ? ("你押了 " + amt + " —— 等其他人下注")
+                           : (info.hint || "先押注,再發牌")) +
+                '</span>' +
+                /* ★ 押注金額**一律畫出來**(押好之後也留著,而且位置不變)——
+                   不然「我押了多少」在最需要看的那一刻反而消失。 */
+                '<span class="bj-bamt' + (done ? " ok" : "") + '"><i>押</i><b>' + amt + '</b></span>' +
+                (done ? "" : '<button class="btn primary bj-bok bj-act" data-act="bet" data-bet="' +
+                             betPend + '">押注 ▸</button>') +
+              '</div>';
+      h += '<div class="bj-btns bj-bsteps' + (done ? " locked" : "") + '">';
+      const steps = R.betSteps(max);
+      // 減:大的在左(−10 −5 −1),加:小的在左(+1 +5 +10)—— 兩邊對稱,手指找得到
+      steps.slice().reverse().forEach(s => {
+        h += stepBtn(-s, amt <= R.MIN_BET || done);
       });
+      steps.forEach(s => { h += stepBtn(s, amt >= max || done); });
       h += '</div>';
       return h;
     }
@@ -295,7 +345,7 @@ const BJB = (function(){
         ? esc(info.hint)
         : ('輪到 <b>' + esc(info.turnName || "對手") + '</b>…')) + '</span>';
 
-    /* ---------- 我要牌 / 停 / 加倍 ---------- */
+    /* ---------- 我要牌 / 停 ---------- */
     const lg = info.legal || {};
     let h = '<div class="bj-selbar">' +
               '<span class="bj-selico">☝</span>' +
@@ -304,19 +354,43 @@ const BJB = (function(){
     h += '<div class="bj-btns">';
     h += '<button class="btn primary bj-act' + (lg.hit ? "" : " dim") + '" data-act="h">要牌</button>';
     h += '<button class="btn ghost bj-act' + (lg.stand ? "" : " dim") + '" data-act="s">停</button>';
-    /* ★ 加倍只在**還沒補牌**時畫出來 —— 畫一顆按了一定被拒絕的鈕比沒有那顆鈕更困惑
-       (同大老二「領出時不畫 Pass」那條)。 */
-    if(lg.dbl) h += '<button class="btn ghost bj-act" data-act="d">加倍 ×2</button>';
     h += '</div>';
     return h;
+  }
+  /* 一顆加減鈕。★ 到底了只是**變暗**(照樣按得動 → 跳「已經是上限了」),
+     不是 disabled(CLAUDE.md 的紅線)。 */
+  function stepBtn(d, dim){
+    return '<button class="btn ghost bj-bstep bj-act' + (dim ? " dim" : "") +
+           '" data-act="bstep" data-d="' + d + '">' +
+           (d > 0 ? "＋" : "−") + Math.abs(d) + '</button>';
   }
 
   function renderActs(info){
     if(!acts) return;
+    lastInfo = info;                        // 加減鈕要原地重畫一次(見 mount 的 bstep)
     acts.classList.remove("hidden");
     acts.innerHTML = '<div class="bj-actrow">' + actsHTML(info) + '</div>' +
                      '<div class="bj-cdwrap" id="bjCdWrap"></div>';
     syncCd(info);
+  }
+  /* 加減鈕:只動「還沒送出去的金額」,不碰 st、不碰 DB、不通知呼叫端。
+     ★ 所以它整條路都留在盤面這一層 —— 呼叫端(solo / adapter)一行都不必改。
+     ⚠ 押好之後鎖住:DB 那一格是冪等的(押過了就不收),按了要說得出原因。 */
+  function bumpBet(d){
+    if(!lastInfo || !lastInfo.betPhase) return;
+    if(lastInfo.myBet > 0){ showToast("這一局已經押 " + lastInfo.myBet + " 了,下一局才能改"); return; }
+    const max = (lastInfo.betMax > 0) ? lastInfo.betMax : R.RULES_DEF.betMax;
+    const next = Math.max(R.MIN_BET, Math.min(max, betPend + d));
+    if(next === betPend){
+      showToast(d > 0 ? ("已經是上限 " + max + " 了(房規定的)") : ("最少要押 " + R.MIN_BET));
+      return;
+    }
+    betPend = next;
+    /* 很輕的一聲,加高減低 —— 不看螢幕也知道剛才那一下有沒有吃到。
+       ⚠ 音量刻意壓到 .10:調到想要的數字可能連按七八下,大聲一點就變吵。 */
+    if(typeof Sound !== "undefined")
+      Sound.tone(d > 0 ? 880 : 560, { type: "sine", dur: 0.05, vol: 0.10 });
+    renderActs(lastInfo);
   }
 
   /* 倒數環。★ **全桌都看得到**(「現在在等誰、還剩幾秒」是公開資訊,
@@ -359,7 +433,7 @@ const BJB = (function(){
   /* ==========================================================================
      七、★ 公告 —— 單機與連線**共用這一份**
      ──────────────────────────────────────────────────────────────────────────
-       21 點的公開事件只有三種:有人爆了 / 有人 21 點 / 有人五小龍。
+       21 點的公開事件只有三種:有人爆了 / 有人 21 點 / 有人過五關。
        這三件事**都是公開的**(他的牌就攤在桌上),所以喊出來不違反牌情紅線。
 
        ★ 走「前後兩份 state 的 diff」而不是在動作點插一行 Sound.xxx() ——
@@ -398,7 +472,7 @@ const BJB = (function(){
   }
   function dragonSfx(){
     if(typeof Sound === "undefined") return;
-    // 五小龍比 21 點更誇張一階(它更難、賠得更多)
+    // 過五關比 21 點更誇張一階(它更難、賠得更多)
     Sound.tone(587, { type: "triangle", dur: 0.09, vol: 0.28 });
     Sound.tone(784, { type: "triangle", dur: 0.09, vol: 0.28, delay: 0.08 });
     Sound.tone(988, { type: "triangle", dur: 0.09, vol: 0.28, delay: 0.16 });
@@ -434,12 +508,12 @@ const BJB = (function(){
       const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
       const who = (s === v.me) ? "你" : nm;
       if(now[s] === 1){ showToast(who + " 爆了 💥", 1800); snd = snd || bustSfx; }
-      else if(now[s] === R.T_DRAGON + 2){ showToast(who + " 五小龍!五張不爆 🐉", 2400); snd = dragonSfx; }
+      else if(now[s] === R.T_DRAGON + 2){ showToast(who + " 過五關!五張不爆 🐉", 2400); snd = dragonSfx; }
       else if(now[s] === R.T_BJ + 2){ showToast(who + " 21 點! 🎯", 2000); if(snd !== dragonSfx) snd = bjSfx; }
     }
     anPrev = now;
     /* ★ 一次重畫只響一聲:批次同步時有可能兩家同時爆,響兩聲會疊成噪音。
-       ⚠ 優先權是「五小龍 > 21 點 > 爆」(上面那三行的 snd 賦值就是在做這件事)。 */
+       ⚠ 優先權是「過五關 > 21 點 > 爆」(上面那三行的 snd 賦值就是在做這件事)。 */
     if(snd) snd();
   }
   // 換局 / 離場:把 diff 的種子清掉(下一次只記不響)
@@ -543,24 +617,27 @@ const BJB = (function(){
      ========================================================================== */
   function rulesHTML(rules){
     const r = R.normRules(rules);
-    const tiers = R.betTiers(r.betMax).join(" / ");
     const L = [];
     L.push("<b>輪流當莊</b> —— 每一局換一個人當莊。");
     L.push("一輪 = 每個人各當一次莊;這一場打 <b>" + r.rounds + " 輪</b>(所以當莊次數一樣,公平)。");
     L.push("一副 52 張、<b>每一局重新洗牌</b> —— 算牌沒有意義,不必記。");
-    L.push("起始籌碼 <b>" + r.start + "</b>,每一局可以押 <b>" + tiers + "</b>。");
+    L.push("起始籌碼 <b>" + r.start + "</b>;每一局押 <b>1 ~ " + r.betMax +
+           "</b> 之間任何一個數字(用加減鈕調)。");
     L.push("<b>不會被淘汰</b> —— 籌碼可以打到負的,排名看的是「賺賠多少」。");
     L.push("<b>閒家同時補牌</b>,不必等別人;莊家最後才動。");
     L.push("A 算 <b>1 或 11</b>(畫面會同時顯示兩種點數);超過 21 就爆。");
     L.push("<b>21 點</b> = 前兩張就湊到 21,賠 <b>" + r.bjPay + " 倍</b>。");
     L.push(r.dragon
-      ? "<b>五小龍</b> = 五張牌不爆,賠 <b>2 倍</b>(莊家也能報,那就通吃全場)。"
-      : "<b>五小龍關掉了</b> —— 五張不爆只是普通手,照點數比大小。");
-    L.push("<b>加倍</b> = 還沒補牌時把押注翻倍,但只能再補一張就得停。");
-    L.push("<b>不做</b>分牌 / 保險 / 投降。");
+      ? "<b>過五關</b> = 五張牌不爆,賠 <b>2 倍</b>(莊家也能報,那就通吃全場)。"
+      : "<b>過五關關掉了</b> —— 五張不爆只是普通手,照點數比大小。");
+    L.push("<b>不做</b>加倍 / 分牌 / 保險 / 投降 —— 想賭大一點就在下注那一段押多一點。");
+    /* ★ 補牌線只管莊家(使用者問過「這個選項是只有莊家才有嗎」)——
+       所以這一行明講「閒家不受限」,免得有人以為自己也得補到 17。 */
     L.push(r.line
-      ? ("莊家<b>必須補到 " + r.line + "</b> —— 他沒有選擇,系統直接幫他補完。")
+      ? ("莊家<b>必須補到 " + r.line + "</b>(<b>只有莊家</b>受這條限制)—— 但還是他自己按:" +
+         "沒到 " + r.line + " 不能停、到了就不能再補。")
       : "莊家<b>可以自由決定</b>補不補 —— 當莊的人要自己判斷(全場都在看他)。");
+    L.push("<b>閒家永遠自己決定</b>要不要補牌,沒有任何點數限制。");
     L.push(r.pushDealer
       ? "同點數(平手)<b>莊家吃</b>。"
       : "同點數(平手)<b>退注</b>,誰都不賺不賠。");
@@ -588,16 +665,20 @@ const BJB = (function(){
     if(acts){
       acts.addEventListener("click", e => {
         const b = e.target.closest(".bj-act");
-        if(!b || !hAct) return;
+        if(!b) return;
+        /* ★ 加減鈕**不往上送** —— 它只改「還沒送出去的金額」,是純畫面的事
+           (真的下注是後面那顆「押注 ▸」,它才帶 data-act="bet")。 */
+        if(b.dataset.act === "bstep"){ bumpBet(+b.dataset.d || 0); return; }
+        if(!hAct) return;
         hAct(b.dataset.act, b.dataset.bet ? +b.dataset.bet : 0);
       });
     }
   }
 
   return {
-    mount, render, renderActs, resultHTML, matchHTML, rulesHTML, stopCd,
+    mount, render, renderActs, resultHTML, matchHTML, rulesHTML, chipHTML, stopCd,
     cardHTML, backCard, cardsHTML, pipHTML,
-    // 公告(單機與連線共用):爆 / 21 點 / 五小龍
+    // 公告(單機與連線共用):爆 / 21 點 / 過五關
     announce, resetAnnounce,
     // 一個動作的聲音(四個呼叫點共用)
     moveSfx, bustSfx, bjSfx, dragonSfx
