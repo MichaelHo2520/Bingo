@@ -314,7 +314,7 @@ const B2 = (function(){
          trick[](這一輪的完整動作記錄,見下)
 
      ── ★ trick:為什麼真相層要記「這一輪發生過什麼」(v1.77.0)─────────────────
-       `cur` 只留得住**這一輪目前最大的那一手**,前面被壓掉的、以及每一個「不要」
+       `cur` 只留得住**這一輪目前最大的那一手**,前面被壓掉的、以及每一個 Pass
        全部就地消失。使用者的原話:「中間那一塊應該要用來顯示這一輪大家出的牌,
        才不會因為跳太快,導致你根本不知道出過什麼牌了」——
        三家電腦連續出牌只花幾百毫秒,只留最大那手的話,人根本來不及看。
@@ -568,16 +568,21 @@ const B2 = (function(){
     return uniq;
   }
 
-  /* 能壓過 cur 的候選手,由「最便宜」排到「最貴」。
+  /* 「最便宜」到「最貴」的比較器。
      ⚠ 排序鍵不可以只用 cls.k —— k 只在同一個牌型內部可比,而這份清單在**領出**時
        (cur = null)會同時含單張 / 對子 / 五張。排序是 (是不是無敵型, 牌型, 型內強度):
-       無敵型一律排最後,因為「能壓但要拆掉鐵支」幾乎永遠不是最便宜的選擇。 */
+       無敵型一律排最後,因為「能壓但要拆掉鐵支」幾乎永遠不是最便宜的選擇。
+     ★ playsBeating() 與 playsWith() **共用這一份**(v1.83.0 抽出來)——
+       智慧選取靠「最便宜的那一手」決定要選幾張(見第六之三節),
+       兩邊各排一次序遲早走鐘,而走鐘了兩邊各自都不會壞。 */
+  function cmpPlay(a, b){
+    return (isBomb(a.cls.t) ? 1 : 0) - (isBomb(b.cls.t) ? 1 : 0) ||
+           (isBomb(a.cls.t) ? bombLv(a.cls.t) - bombLv(b.cls.t) : a.cls.t - b.cls.t) ||
+           a.cls.k - b.cls.k;
+  }
+  // 能壓過 cur 的候選手,由「最便宜」排到「最貴」
   function playsBeating(hand, cur){
-    return enumPlays(hand).filter(p => beats(p.cls, cur)).sort((a, b) =>
-      (isBomb(a.cls.t) ? 1 : 0) - (isBomb(b.cls.t) ? 1 : 0) ||
-      (isBomb(a.cls.t) ? bombLv(a.cls.t) - bombLv(b.cls.t) : a.cls.t - b.cls.t) ||
-      a.cls.k - b.cls.k
-    );
+    return enumPlays(hand).filter(p => beats(p.cls, cur)).sort(cmpPlay);
   }
 
   /* ==========================================================================
@@ -651,9 +656,90 @@ const B2 = (function(){
     if(hand.indexOf(card) < 0) return "";              // 不是我的手牌 → 不管它
     const po = playable(hand, st, cur);
     if(po.cards.indexOf(card) >= 0) return "";
-    if(!po.can) return "你手上沒有一手壓得過現在桌上這一手 —— 只能不要(Pass)";
+    if(!po.can) return "你手上沒有一手壓得過現在桌上這一手 —— 只能 Pass";
     if(cur.length) return "這張配不上你已經選的那幾張(要換一組請先按「清除」)";
     return "這張湊不出壓得過現在桌上這一手的牌型";
+  }
+
+  /* ==========================================================================
+     六之三、★★ 智慧選取:點一張牌 = 選「一整個同點數的群組」(v1.83.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者的原話:
+         「例如有人出五張牌的時候,假如是葫蘆時,應該要先選擇三張牌亮起來,然後選
+           一張就自動全選,之後再亮兩張牌的…取消也是一樣,如果後面兩張牌我隨便按
+           一張,就會取消兩張牌,但如果是直接去按三張牌,就全部一起取消」
+         「我希望選牌可以輕鬆簡單」
+
+       ★★ 為什麼**這一版**做得到:這一版「同牌型才能互壓」(CLAUDE.md 紅線①),
+          所以桌上有牌時「我要湊的是什麼形狀」是確定的 ——
+          葫蘆 3+2 · 鐵支 4+1 · 順子 / 同花順 1×5 · 對子 2 · 單張 1。
+
+       ★★★ 但算法刻意**不寫死那張形狀表**,而是問候選手一句話:
+              「**最便宜**的那個合法出法(含這一張)用到幾張同點數的牌?」
+            那個 k 就是這一下該選幾張,而且**跟牌與領出共用同一句**:
+              · 桌上是葫蘆、手上三張 5 → 最便宜的是 555+對 → k=3(先選三張 ✔)
+              · 桌上是對子、手上四張 5 → 最便宜的是「一對 5」而**不是**鐵支
+                (cmpPlay 把無敵型排最後)→ k=2 ✔
+                ⚠ 這一格是「取最大的 k」會壞掉的地方:那會變成點一下就把鐵支
+                  攤開來、還要玩家再挑一張副牌,而他只想出一對。
+              · **領出**、手上三張 5 → 最便宜的是單張 5 → k=1 ✔
+                (領出取最大的話玩家再也選不出單張)
+              · 第一手(還沒 opened)、手上 ♣3 與 ♦3 → 含 ♣3 的最便宜出法就是那一對
+                → 點 ♦3 直接選好兩張 ✔
+            寫死形狀表在領出那一側一定會走鐘(1/2/5 張都合法,形狀不確定),
+            而問候選手兩側是同一行程式。
+
+       ★ 同一個點數有好幾種組合時(手上三張 5 要出對子)拿**最弱的那一組** ——
+         cands 已經由弱到強排好,取第一個就是「壓得過就好,強的留著下一手」。
+
+       ⚠ 純函式(吃 hand / st 的兩個欄位,不碰 DOM);回傳兩種:
+           { sel:[...] }  這一下之後的選取(呼叫端整份換上去)
+           { why:"…" }    不給選 —— **那句話一定要說出去**(CLAUDE.md 的紅線:
+                          不用 disabled 讓牌**靜默**吃掉點擊)
+     ========================================================================== */
+  /* 「含 want 這幾張的合法出法」,由弱到強。
+     ⚠ 吃 FULL_CAP 而不是 STRAIGHT_CAP:理由同 playable() —— 這一支的答案會直接變成
+       玩家點下去的結果,漏一種花色組合就變成「點了沒反應」。 */
+  function playsWith(hand, st, want){
+    const cur = (st && st.cur) ? st.cur.cls : null;
+    const opened = !st || st.opened !== false;
+    const need = want || [];
+    return enumPlays(hand, FULL_CAP).filter(p => {
+      // ⚠ 這兩條與 playable() 逐字相同,但**註解刻意不一樣** ——
+      //   突變測試的錨點是字串比對,一模一樣的兩行會變成「出現 2 次」而整條過期。
+      if(!opened && p.cards.indexOf(CLUB3) < 0) return false;   // 第一手要帶 ♣3(同 playable)
+      if(!beats(p.cls, cur)) return false;
+      for(let i = 0; i < need.length; i++) if(p.cards.indexOf(need[i]) < 0) return false;
+      return true;
+    }).sort(cmpPlay);
+  }
+
+  function pickGroup(hand, st, sel, card){
+    const cur = Array.isArray(sel) ? sel.slice() : [];
+    if(!hand || hand.indexOf(card) < 0) return { sel: cur };    // 不是我的手牌 → 不管它
+    const r = rankOf(card);
+
+    /* ① 點到**已經選起來**的那張 → 整個同點數群組一起取消(使用者:「後面兩張牌
+         我隨便按一張,就會取消兩張牌…直接去按三張牌,就全部一起取消」)。
+       ⚠ 取消一律**不問合法性**:「已經選起來的一律點得掉」是既有的紅線,
+         而且只減不加 → sel 仍然是原本那一手的子集(不變量沒破)。 */
+    if(cur.indexOf(card) >= 0) return { sel: cur.filter(c => rankOf(c) !== r) };
+
+    // ② 沒亮的牌不給選,但一定說得出原因(整份契約在 whyNotPick)
+    const why = whyNotPick(hand, st, cur, card);
+    if(why) return { why: why };
+
+    /* ③ 這個點數**已經選了別張** → 只加這一張。
+       ★ 刻意不再自動補滿:玩家正在手動長這一組(對子 → 三條那類),
+         再跳一次會把控制權搶走。 */
+    if(cur.some(c => rankOf(c) === r)) return { sel: cur.concat([card]) };
+
+    /* ④ 這個點數第一次選 → 照「最便宜的那一手」自動選滿同點數的那幾張。
+       ⚠ 算不出候選(理論上到不了:②已經驗過這張用得到)時退回只選這一張 ——
+         那時的行為與 v1.82.0 逐字相同,不會變成「點了沒反應」。 */
+    const p = playsWith(hand, st, cur.concat([card]))[0];
+    const grp = p ? p.cards.filter(c => rankOf(c) === r) : [card];
+    return { sel: cur.concat(grp.indexOf(card) >= 0 ? grp : [card]) };
   }
 
   /* ==========================================================================
@@ -705,7 +791,9 @@ const B2 = (function(){
     // 「拉」(剩最後一手)
     isLast, laSeats,
     // 候選手 / 提示
-    WINDOWS, enumPlays, playsBeating, playable, whyNotPick, whyNot
+    WINDOWS, enumPlays, cmpPlay, playsBeating, playsWith, playable, whyNotPick, whyNot,
+    // 智慧選取(v1.83.0):點一張 = 選一整個同點數的群組
+    pickGroup
   };
 })();
 

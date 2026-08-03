@@ -85,6 +85,8 @@ const MP = MPCore.create((function(){
       hand: st.hands[me].slice(),
       slots: B2.dealCounts(nPlayers())[me],   // ★ 固定格位吃**開局張數**(見 board.js 第三節)
       trick: st.trick, names: nms, opened: st.opened,
+      // ★ 座位式牌桌(v1.83.0):與單機那份逐字一樣(見 solo.js 的 paint)
+      me: me, turn: (st.over || !!ctx.winner()) ? -1 : st.turn,
       mine: mine,
       turnName: st.over ? "" : nameOfSeat(st.turn),
       over: !!ctx.winner() || st.over,
@@ -141,10 +143,11 @@ const MP = MPCore.create((function(){
     if(ctx.winner() || ctx.abandoned()) return;
     if(!st || st.over) return;
     if(!isMyTurn()){ showToast("還沒輪到你"); return; }
-    // ★★ 沒亮的牌不給選,但一定說得出原因(與單機那支逐字一樣,見 solo.js 的 tap)
-    const why = B2.whyNotPick(st.hands[mySeat()], st, B2B.sel(), card);
-    if(why){ showToast(why, 2000); return; }
-    B2B.toggleSel(card);
+    /* ★★ 群組選取 + 沒亮的牌不給選(但一定說得出原因)——
+       與單機那支**逐字一樣**,見 solo.js 的 tap。 */
+    const pk = B2.pickGroup(st.hands[mySeat()], st, B2B.sel(), card);
+    if(pk.why){ showToast(pk.why, 2000); return; }
+    B2B.setSel(pk.sel);
     paint();
   }
 
@@ -312,7 +315,7 @@ const MP = MPCore.create((function(){
          ⚠ 批次同步(重連歸位)也不連播,不然一口氣響幾十聲。 */
       if(!fresh && moves.length === prevLen + 1){
         const one = moves[moves.length - 1];
-        // ★ 走 B2B.moveSfx(v1.81.1):動作聲 + pass 的「不要」語音,與單機那兩個點共用一份
+        // ★ 走 B2B.moveSfx(v1.81.1):動作聲 + pass 的 Pass 語音,與單機那兩個點共用一份
         B2B.moveSfx(B2.isPass(one));
       }
       // 這一手的錨點:手數變了就重新起算(公開動作,全桌看得到)

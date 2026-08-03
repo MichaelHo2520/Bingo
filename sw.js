@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.82.0";
+const VERSION = "1.83.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -97,7 +97,9 @@ const CORE = [
   "./mp3/mj16/voice-tile-jz.wav",
   "./mp3/mj16/voice-tile-jf.wav",
   "./mp3/mj16/voice-tile-jb.wav",
-  /* 大老二的喊牌語音(「拉」與「不要」,v1.81.1;tools/gen-big2-voice.ps1 產生)。
+  /* 大老二的喊牌語音(「拉」與 Pass,v1.81.1;v1.83.0 起 pass.wav 唸的是 Pass。
+     ⚠ 換字**檔名不變** → 這兩行不必動,但檔案內容變了的那一版一定要一起 commit
+       (不然離線的人會聽到舊字)。tools/gen-big2-voice.ps1 產生)。
      ⚠ 與台灣麻將那組不同,這兩格**有合成音後備**(board.js 的 laSynth / passSynth),
        所以離線抓不到也不會啞掉 —— 但照樣列進來:合成音只是「墊著」,
        使用者聽慣的是人聲,離線忽然換成兩個音會被當成壞掉。

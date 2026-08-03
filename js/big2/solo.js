@@ -125,6 +125,9 @@ const Solo = (function(){
       hand: st.hands[ME].slice(),
       slots: B2.dealCounts(seats)[ME],      // ★ 固定格位吃**開局張數**(見 board.js 第三節)
       trick: st.trick, names: nms, opened: st.opened,
+      /* ★ 座位式牌桌(v1.83.0):me 決定桌面怎麼轉(我永遠在下面)、
+         turn 只用來畫那一格「思考中…」。⚠ 連線那份逐字一樣(只差座位怎麼查)。 */
+      me: ME, turn: (over || st.over) ? -1 : st.turn,
       mine: mine,
       turnName: st.over ? "" : seatName(st.turn),
       over: over,
@@ -175,7 +178,7 @@ const Solo = (function(){
   function commit(mv){
     if(!B2.step(st, mv)) return false;
     B2B.clearSel();
-    /* ★ 一手的聲音走 B2B.moveSfx(v1.81.1):動作聲 + pass 的「不要」語音,三個呼叫點共用。
+    /* ★ 一手的聲音走 B2B.moveSfx(v1.81.1):動作聲 + pass 的 Pass 語音,三個呼叫點共用。
        ⚠ 那句尾註解**不要拿掉**:aiTurn 裡有一模一樣的呼叫,兩行只差縮排,
          而突變測試的錨點是字串比對 → 沒有它兩個呼叫點分不開(真的踩到過)。 */
     B2B.moveSfx(B2.isPass(mv));   // ← 我自己這一手
@@ -190,12 +193,15 @@ const Solo = (function(){
     if(!active) return;
     if(over){ showToast("這局已經結束了"); return; }
     if(busy || st.turn !== ME){ showToast("還沒輪到你"); return; }
-    /* ★★ 沒亮的牌不給選(v1.79.1)。使用者:「沒亮的就不應該讓人選」。
+    /* ★★ 一次點擊 = 選 / 取消**一整個同點數的群組**(v1.83.0 的智慧選取)+
+         「沒亮的牌不給選」(v1.79.1)—— 兩件事併在規則層的 B2.pickGroup 裡。
        ⚠ 但**一定要說出原因** —— CLAUDE.md 的紅線是「不用 disabled 讓牌**靜默**
-         吃掉點擊」:不給選可以,靜默不行。判斷放規則層(連線那支逐字一樣)。 */
-    const why = B2.whyNotPick(st.hands[ME], st, B2B.sel(), card);
-    if(why){ showToast(why, 2000); return; }
-    B2B.toggleSel(card);
+         吃掉點擊」:不給選可以,靜默不行。
+       ⚠ 連線那支(adapter 的 tap)**逐字一樣**:兩邊各寫一份遲早走鐘,
+         而走鐘了兩邊各自都不會壞、沒有東西抓得到。 */
+    const pk = B2.pickGroup(st.hands[ME], st, B2B.sel(), card);
+    if(pk.why){ showToast(pk.why, 2000); return; }
+    B2B.setSel(pk.sel);
     paint();
   }
 
@@ -244,7 +250,7 @@ const Solo = (function(){
       }
       B2B.moveSfx(B2.isPass(mv));            // ★ 同上:電腦這一手也走同一份
       if(B2.isPass(mv)){
-        showToast(seatName(seat) + " 不要(Pass)", 1000);
+        showToast(seatName(seat) + " Pass", 1000);
       }else{
         const cls = B2.classify(B2.decMove(mv));
         if(cls && B2.isBomb(cls.t)) showToast(seatName(seat) + " 出了" + B2.T_NAME[cls.t] + "!", 1600);

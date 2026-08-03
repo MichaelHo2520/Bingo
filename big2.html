@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>大老二 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 大老二 · v1.82.0 -->
-<meta name="version" content="1.82.0">
+<!-- 大老二 · v1.83.0 -->
+<meta name="version" content="1.83.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -70,8 +70,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         52 張全發給 <b>2~4 人</b>。<b>拿到 ♣︎3 的人先出,第一手一定要帶 ♣︎3</b>。<br>
         可出 <b>1 張(單張)· 2 張(對子)· 5 張</b>;五張只有<b>順子 · 葫蘆 · 鐵支 · 同花順</b>。<br>
         <b>同牌型才能互壓</b>(順子只壓順子、葫蘆只壓葫蘆),而<b>鐵支與同花順壓得過任何牌型</b>,
-        同花順又比鐵支大。壓不過就喊「不要」。<br>
+        同花順又比鐵支大。壓不過就 <b>Pass</b>。<br>
         出完的人退出、牌局繼續,打到只剩一家。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。<br>
+        <!-- ★ v1.83.0:智慧選取。⚠ 這兩句是「為什麼點一下會選好幾張」的唯一說明,
+             不寫的話玩家第一次點到葫蘆的三條會以為選錯了。見 notes/16 第六之七節。 -->
+        點牌會<b>整組一起選</b>(桌上是葫蘆時,點一張就自動選滿三條、再點一張補對子),
+        <b>再點一下整組取消</b>。<br>
         <!-- ★ v1.81.1:「拉」。⚠ 一定要寫「不管幾張」與「3/4 張永遠不算」——
              網路上最常見的說法是「剩一張才喊」(錯的),而這一版三條不能單出,
              所以剩 3 張比標準大老二更晚才進入「最後一手」。見 notes/16 第六之六節。 -->
