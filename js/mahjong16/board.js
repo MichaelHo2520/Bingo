@@ -403,8 +403,23 @@ const M16B = (function(){
 
     const box = host.clientWidth || 360;
     const avail = Math.max(200, box - 16);
-    const hand = st.hands[me] || [];
-    const hasDraw = (st.turn===me && st.drawn>=0);
+    /* ★★ 我自己胡的那張:**不併進手牌,擺回「摸進來那一格」**(最右邊,v1.75.18)。
+       使用者:「這把是我胡了…沒有顯示出來我胡那張牌,如果是自己胡的,請不要把牌
+       放進去,放在最右邊就好了,然後還是要用紅色框給包起來」。
+       ★ 為什麼這裡的處理與對手那一列**相反**(那邊是留在原位加框):打牌的時候
+         摸進來那張本來就單獨站在最右邊,胡的那一張正是它 —— 放回原本的位置才是
+         「一路看下來沒有跳掉」。對手那一列從來沒有這一格,抽出來反而變陌生。
+       ⚠ `settleWin()` 會把胡的那張**收進 `st.hands[seat]` 並排序**(牌張守恆),
+         所以這裡要自己撿回來,而且一定要用**索引**移除 —— 手上有一對時
+         `filter(t => t !== win)` 會整對消失。 */
+    const rawHand = st.hands[me] || [];
+    let hand = rawHand, myWin = -1;
+    if(st.over && st.over.type==="win" && st.over.seat===me && typeof st.over.tile==="number"){
+      const wi = rawHand.indexOf(st.over.tile);
+      if(wi >= 0){ hand = rawHand.slice(); hand.splice(wi,1); myWin = st.over.tile; }
+    }
+    // 摸進來那一格:平常是 drawn,結算時換成我胡的那張(兩者不會同時存在)
+    const hasDraw = (st.turn===me && st.drawn>=0) || myWin>=0;
     const plan = planHand(hand, hasDraw, avail);
 
     /* ---- 只縮不放(見檔頭④)----
@@ -435,7 +450,7 @@ const M16B = (function(){
        (吸收 = scrollHeight 恆等於 clientHeight = 下面兩點量測拿到同一個值,S 變垃圾;
         v1.73.1 試過,連「量測時暫時把它收成 0」都救不回來)。詳見 styles.css 那一段。 */
     let cur = tw;
-    const draw = t => { cur = t; host.innerHTML = paint(plan, t, hasDraw, canAct, co); return host.scrollHeight; };
+    const draw = t => { cur = t; host.innerHTML = paint(plan, t, hasDraw, canAct, co, myWin); return host.scrollHeight; };
     let h1 = draw(tw);
 
     /* ★★ 高度也要夾(v1.58.2)——「碰完牌就消失了」的真正機制在這裡。
@@ -506,7 +521,7 @@ const M16B = (function(){
 
   /* 把整個盤面畫成 HTML 字串。抽出來是為了上面那道「量高度 → 縮小 → 再畫一次」——
      兩次畫的差別只有 tw,排法(幾排、摸的那張放哪排)刻意不重算,免得縮一下就跳版。 */
-  function paint(plan, tw, hasDraw, canAct, co){
+  function paint(plan, tw, hasDraw, canAct, co, myWin){
     /* --- 對手 --- */
     let html = '<div class="m16-foes">';
     for(let k=1;k<st.seats;k++) html += foeHTML((me+k)%st.seats, tw);
@@ -589,8 +604,10 @@ const M16B = (function(){
        原本每排各自居中,兩排長度不同就錯開幾十 px,看起來歪歪的
        (使用者要的「整齊的感覺」不只是牌河)。 */
     const hw = Math.round(unitsOf(plan.rows, plan.drawRow) * tw);
+    /* ⚠ `locked` 是**宣告聽牌**的鎖(只能摸切 → 手牌壓暗點不動),一局結束就沒有意義了。
+       不解除的話結算時整副牌是灰的 —— 使用者:「另外牌要顯示成亮的狀態」。 */
     html += '<div class="m16-hand'+(canAct?" live":"")+(inClaim?" claim":"")+
-            (iTing?" locked":"")+(tt?" tingpick":"")+
+            (iTing && !st.over ? " locked":"")+(tt?" tingpick":"")+
             '" style="--m16w:'+tw+'px;--m16hw:'+hw+'px">';
     /* planHand() 保證 rows 串起來就是 hand 的原順序(切點只切在花色邊界),
        所以一路數下去的 hi 就是這張牌在 hand 裡的索引 —— 拿它當格位鍵。 */
@@ -605,7 +622,12 @@ const M16B = (function(){
          planHand() 已經一律把這一格算進寬度,這裡若不畫,同一副手牌會在
          「我摸了一張 / 我打掉一張」之間左右挪半張牌,看起來就是整副牌在跳。 */
       if(ri===plan.drawRow){
-        if(hasDraw){
+        /* ★ 我胡的那張:站在摸進來那一格(最右邊)+ 紅框。
+           ⚠ 刻意**不給 data-k** —— 它不是可以點的牌,一局已經結束了。 */
+        if(myWin>=0){
+          html += tileHTML(codeOf(myWin), "m16-ht m16-draw m16-wt",
+                           ' data-t="'+myWin+'"');
+        }else if(hasDraw){
           /* 宣告模式下,摸進來那張也可能是「打了它就聽牌」的選項之一(通常就是摸切) */
           const tk = tt ? (tt.indexOf(st.drawn)>=0 ? " tingok" : " tingno") : "";
           html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+tk,

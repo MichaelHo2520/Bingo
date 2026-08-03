@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.75.17 -->
-<meta name="version" content="1.75.17">
+<!-- 台灣 16 張麻將 · v1.75.18 -->
+<meta name="version" content="1.75.18">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -200,7 +200,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-goal="16">一將 16 局</button>
         </div>
       </div>
-      <!-- 底幾台(v1.75.17)。★ 一定是房間設定:底台是算收付用的,各人一份的話
+      <!-- 底幾台(v1.75.18)。★ 一定是房間設定:底台是算收付用的,各人一份的話
            同一局四台會算出不同的錢(而且相加照樣是 0,零和斷言抓不到)。 -->
       <div class="field">
         <span class="field-label" id="m16BaseLabel">底幾台</span>
@@ -277,12 +277,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   <!-- ====== 結果卡 ====== -->
   <div class="veil" id="veil">
     <!-- ⚠ .mj-win 是**消消樂與這一頁共用**的 class(兩頁的結果卡都掛它),所以這一頁
-         專屬的樣式一律掛 .m16-win(v1.75.17 新增)—— 排名表的寬度與「收掉共用勝場表」
+         專屬的樣式一律掛 .m16-win(v1.75.18 新增)—— 排名表的寬度與「收掉共用勝場表」
          那兩條要是寫在 .mj-win 上,消消樂會跟著一起變。 -->
     <div class="win-card mj-win m16-win" id="m16WinCard">
       <div class="word display" id="winWord">本局結束</div>
       <p id="winMsg"></p>
-      <!-- (v1.75.17 拿掉 #m16Win)攤牌改在**牌桌**上、而且是**每一家都攤** ——
+      <!-- (v1.75.18 拿掉 #m16Win)攤牌改在**牌桌**上、而且是**每一家都攤** ——
            使用者:「每一局結束的時候…不是在勝負頁顯示,而是在牌桌顯示,這樣還可以
            回去看牌桌,看看到底牌在誰那裡」。落地點是 board.js 的 foeHTML。 -->
       <!-- 相互算台的收付表:全桌相加必為 0 -->

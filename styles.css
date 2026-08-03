@@ -2386,6 +2386,12 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
    ⚠ 這三條是一組的,不要只留一條。 */
 .m16-mt.m16-wt{position:relative;z-index:2;margin:0 3px;
   outline:2px solid var(--mj-jz);outline-offset:1px}
+/* ★ 同一個紅框,但畫在**我自己手牌**那一排的「摸進來那一格」上(v1.75.18)——
+   我胡的那張擺在最右邊(見 board.js 的 render)。⚠ 選擇器一定要另寫一條:
+   那張牌的 class 是 `.m16-ht` 不是 `.m16-mt`,上面那條 `.m16-mt.m16-wt` 命不中它。
+   ⚠ 這裡不必 `margin` —— `.m16-draw` 本來就有 0.45 張牌的左邊距,右邊又是整排的盡頭。 */
+.m16-ht.m16-wt{position:relative;z-index:2;
+  outline:2.5px solid var(--mj-jz);outline-offset:2px}
 
 /* ---------- 一局結束:牌桌上每一家都攤開(v1.75.15) ----------
    使用者:「每一局結束的時候,我希望能把全部人的牌都顯示出來,不是在勝負頁顯示,
