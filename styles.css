@@ -2373,18 +2373,19 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
    ⚠ 底色寫成兩層 .m16-meld.m16-hg(同 .m16-flg 那條的理由)。 */
 .m16-meld.m16-hg{flex-wrap:wrap;max-width:100%;justify-content:center;
   background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
-/* ★★ 胡的那張:**自成一組擺在手牌右邊**(v1.75.16),不再只是原位加一圈紅框。
-   使用者:「你看你最後胡的牌,用紅色的框起來那裡,是不是有點怪怪的」——
-   牌距只有 1px,而紅框是 outline + outline-offset:1px,**剛好畫在縫隙上、壓到左右兩張牌**,
-   看起來像貼歪的貼紙。理由與另外兩個(找不到、沒人說那是什麼)見 board.js 的 revealHTML。
-   ⚠ 這一組要有自己的內距,紅框才有地方可畫 —— 這正是「怪怪的」的解法本身,不要拿掉。 */
-.m16-meld.m16-wg{gap:3px;align-items:center;padding:3px 5px;
-  background:rgba(214,74,74,.16);box-shadow:inset 0 0 0 1px rgba(214,74,74,.35)}
-.m16-wgl{flex:none;font:800 9.5px/1 'Nunito',sans-serif;font-style:normal;color:var(--mj-jz)}
-:root[data-theme="ebook"] .m16-meld.m16-wg{background:#eee;box-shadow:inset 0 0 0 1px #000}
-:root[data-theme="ebook"] .m16-wgl{color:#000}
-/* 紅框本身留著 —— 沿用牌河「最新那張」的同一組語彙,不另發明一種顏色 */
-.m16-mt.m16-wt{outline:2px solid var(--mj-jz);outline-offset:1px}
+/* ★★ 胡的那張:紅框(沿用牌河「最新那張」的同一組語彙,不另發明一種標記)。
+   使用者 v1.75.16:「你看你最後胡的牌,用紅色的框起來那裡,是不是有點怪怪的」;
+   v1.75.17:「我是希望你把那個紅框畫清楚就可以了」。
+   ★ 病灶**在這裡、不在排法**(v1.75.16 曾經把那張牌抽出來自成一組,使用者說更糟)。
+     一排牌的間距只有 1px,而這個框往外畫 **3px**(`outline:2px` + `offset:1px`)——
+     結果是:①橫向壓在左右兩張牌上 ②`.m16-mt` 沒有堆疊順序,**後畫的鄰居會蓋掉它一角**
+     → 四個邊粗細不一致,看起來像貼歪的貼紙。所以三件事一起做,少一件框就不乾淨:
+       · `margin:0 3px`  → 左右讓出位置,框畫在**空白**上而不是鄰居身上
+       · `z-index:2`(要配 `position:relative`)→ 疊到鄰居上層,四個邊都畫得完整
+       · 外層 `.m16-hg` 的內距 ≥ 3px → 上下也有地方可畫,不會被群組的背景邊切掉
+   ⚠ 這三條是一組的,不要只留一條。 */
+.m16-mt.m16-wt{position:relative;z-index:2;margin:0 3px;
+  outline:2px solid var(--mj-jz);outline-offset:1px}
 
 /* ---------- 一局結束:牌桌上每一家都攤開(v1.75.15) ----------
    使用者:「每一局結束的時候,我希望能把全部人的牌都顯示出來,不是在勝負頁顯示,
@@ -2395,7 +2396,9 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
      (board.js 的 render() 在 st.over 時已經把夾取整段停掉了,兩邊是一組的)。 */
 .m16-foe.shown{align-items:flex-start}
 .m16-foe .m16-reveal{gap:3px;justify-content:flex-start;flex:1 1 auto;min-width:0}
-.m16-foe .m16-meld.m16-hg{gap:1px;padding:2px;justify-content:flex-start}
+/* ⚠ 內距不可以低於 3px:胡的那張的紅框往外畫 3px,padding 收太緊上下兩邊會被
+   群組的背景邊切掉(見 `.m16-mt.m16-wt` 那三條)。 */
+.m16-foe .m16-meld.m16-hg{gap:1px;padding:3px;justify-content:flex-start}
 
 /* 「🏆 ○○ 以 N 台奪冠」——最後一局才有,而且排在大字下面第一行(v1.75.15)。
    使用者:「本場結束的下一行應該要接誰奪冠」。既然是那一行,就要看起來像那一行。 */
