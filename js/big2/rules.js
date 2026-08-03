@@ -542,10 +542,14 @@ const B2 = (function(){
          ⚠ 選了一組配不出合法牌型的牌時 cards 會是空的 —— 那正是要傳達的事
            (「這樣選下去沒有出路」),不是 bug。
 
-       回傳 { can, n, fit, cards }:
+       回傳 { can, n, fit, cards, need }:
          can   有沒有任何一手可以出(**不看 sel**)→ 假時動作列只留 Pass
          n     合法出法共幾種 · fit 其中符合目前 sel 的有幾種
          cards 要亮起來的牌(已含 sel 自己)
+         need  還要再選幾張才湊得成一手(可能有兩個答案:例如「再 1 張湊對子 /
+               再 4 張湊五張牌型」)。★ v1.79.1 起沒亮的牌**點不起來**,
+               所以 sel 永遠是某一手的子集 —— 那時該講的是「還要再選幾張」,
+               而不是 whyNot 的「兩張要同點數才是對子」(玩家在湊順子時那句是錯的)。
 
        ⚠ 這一支吃 FULL_CAP 而不是 STRAIGHT_CAP:`can === false` 會把「出牌」那顆鈕
          整顆收掉,一旦誤判成「不能出」玩家就再也出不了那一手 ——
@@ -560,15 +564,38 @@ const B2 = (function(){
       if(!opened && p.cards.indexOf(CLUB3) < 0) return false;   // 第一手一定要帶 ♣3
       return beats(p.cls, cur);
     });
-    const hot = {};
+    const hot = {}, more = {};
     let fit = 0;
     legal.forEach(p => {
       for(let i = 0; i < need.length; i++) if(p.cards.indexOf(need[i]) < 0) return;
       fit++;
       p.cards.forEach(c => { hot[c] = 1; });
+      if(p.cards.length > need.length) more[p.cards.length - need.length] = 1;
     });
     return { can: legal.length > 0, n: legal.length, fit: fit,
-             cards: Object.keys(hot).map(Number) };
+             cards: Object.keys(hot).map(Number),
+             need: Object.keys(more).map(Number).sort((a, b) => a - b) };
+  }
+
+  /* ★★ 「這張牌現在點不點得起來」(v1.79.1)。使用者的原話:
+       「如果沒亮起來的牌,我去點它還是能選起來,這樣是很奇怪的事情,
+         麻煩沒亮的就不應該讓人選」
+     回 "" = 點得起來;回一句話 = 不給選,而且**那句話一定要說出去**
+     (CLAUDE.md 的紅線是「不用 disabled 讓牌**靜默**吃掉點擊」——
+      不給選可以,靜默不行。呼叫端負責 showToast)。
+     ★ 已經選起來的一律點得掉:使用者上一輪才要求「站起來的牌再按一下就跑回去」,
+       而選取收窄之後那張牌自己也可能不在清單裡(它是清單的**條件**)。
+     ★ 這一層擋掉之後 sel 永遠是某一手合法出法的子集(每一次點擊都驗過),
+       所以「選了一組永遠湊不出牌型的牌」在畫面上變成**到不了的狀態**。 */
+  function whyNotPick(hand, st, sel, card){
+    const cur = (sel || []);
+    if(cur.indexOf(card) >= 0) return "";
+    if(hand.indexOf(card) < 0) return "";              // 不是我的手牌 → 不管它
+    const po = playable(hand, st, cur);
+    if(po.cards.indexOf(card) >= 0) return "";
+    if(!po.can) return "你手上沒有一手壓得過現在桌上這一手 —— 只能不要(Pass)";
+    if(cur.length) return "這張配不上你已經選的那幾張(要換一組請先按「清除」)";
+    return "這張湊不出壓得過現在桌上這一手的牌型";
   }
 
   /* ==========================================================================
@@ -618,7 +645,7 @@ const B2 = (function(){
     // 結算
     RANK_PTS_FOR: ptsForRank, score,
     // 候選手 / 提示
-    WINDOWS, enumPlays, playsBeating, playable, whyNot
+    WINDOWS, enumPlays, playsBeating, playable, whyNotPick, whyNot
   };
 })();
 

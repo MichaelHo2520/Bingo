@@ -3155,7 +3155,23 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
              玩家晶片列底下空了將近 500px。理由與量法見 .b2-trick。
           ★ 下限 212 =「四列剛好」(4 × 47 + 標題 24 + padding 16 + 捲動留白);
             一列 47 = 牌高 37.5 + padding 6 + 亮框的 border 4(v1.79.0 加,見 .b2-tmv)。 */
-         --b2-trh:212px; --b2-acth:96px; }
+         --b2-trh:212px; --b2-acth:96px;
+         /* ★★★ 中間那塊「一格都不准動」的四個數字(v1.79.1)。使用者的兩句話:
+              「我希望這個區域的牌,能夠對齊左邊第一張,看起來會比較舒服」
+              「我希望顯示不要的時候,也可以固定高度,不要上上下下的」
+            --b2-tnw 名字欄 · --b2-ttw 牌型欄 → **兩欄都固定寬**,所以每一列的牌
+                     都從同一個 x 開始(欄寬不固定的話「你」那一列會往左跑)
+            --b2-trow 一列的高度 → 「不要」那一列也吃它,所以 pass 與出牌**一樣高**
+            --b2-tlw 那一排的固定寬度 → 5 張牌 + 無敵記號的最壞情況都放得下,
+                     所以「這一輪有人出 5 張」不會讓整排左右跳一次
+            ⚠ 後兩個是從 --b2-cw 推回來的(牌寬是 clamp,會隨視窗變):
+              牌高 = --b2-cw × .66 × 1.42 ≈ ×.937;+10 = padding 6 + border 4。
+              --b2-tlw = 名字欄 + 牌型欄 + 5 張牌(×.66×5 = ×3.3)+ 96
+              (96 = padding 16 + border 4 + 三個 gap 18 + 牌間距 12 + 無敵記號 46)。
+            ⚠ 改牌大小 / 列的 padding / gap 就要重算這兩個係數,不然列會捲或會擠。 */
+         --b2-tnw:52px; --b2-ttw:47px;
+         --b2-trow:calc(var(--b2-cw) * 0.937 + 10px);
+         --b2-tlw:calc(var(--b2-tnw) + var(--b2-ttw) + var(--b2-cw) * 3.3 + 96px); }
   /* 連線多一圈出牌倒數(.b2-cdwrap 在動作列裡面)→ 預留它的高度。
      ⚠ 房主把倒數設成 0(關掉)時那一圈不出現,那時會多留 32px 空白 ——
        **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次。 */
@@ -3286,13 +3302,30 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        捲動容器的 padding 會跟著內容捲,所以真的捲起來時漸層照樣淡在列上。
      ⚠ margin-block:auto 在 v1.79.0 拿掉了 —— 置中改由 .b2-trick 的
        justify-content:center 做(理由見那條:框長高之後 margin:auto 會把標題與牌拉開)。 */
-  .b2-tlist{flex:0 1 auto;min-height:0;overflow-y:auto;width:100%;padding:6px 0 2px;
-    display:flex;flex-direction:column;align-items:center;gap:4px;
+  /* ★★★ 這一排的三件事全部寫死(v1.79.1)——「每一列的位置一格都不准動」:
+       ① **高度** = 人數 × 一列(--b2-rows 由 board.js 寫在 .b2-trick 的 style 上)
+          → 這一輪從 0 列長到 4 列,**已經在畫面上的那幾列一格都不動**
+          (列是從**上面**往下疊的:align-items 管左右、預設的 flex-start 管上下)。
+          ⚠ 高度不留的話整組會跟著列數重新置中,每多一列所有列都往上跳半列 ——
+            那正是使用者說的「上上下下」。
+       ② **寬度**寫死成最壞情況(--b2-tlw:5 張牌 + 無敵記號)
+          → 有人出 5 張時整排不會左右跳一次。
+       ③ **靠左**(align-items:flex-start)+ 兩個固定欄寬 → 每一列的第一張牌
+          都在同一個 x(使用者:「能夠對齊左邊第一張」)。
+     ⚠ 這三件事與「.b2-trick 的高度不隨列數變」是**兩層**:那一層管的是手牌會不會跳,
+       這一層管的是**列自己**會不會跳。兩層都要。 */
+  .b2-tlist{flex:0 1 auto;min-height:0;overflow-y:auto;padding:6px 0 2px;
+    width:min(100%,var(--b2-tlw));
+    height:calc(var(--b2-rows,4) * (var(--b2-trow) + 4px) + 4px);
+    display:flex;flex-direction:column;align-items:flex-start;gap:4px;
     mask-image:linear-gradient(to bottom,transparent 0,#000 6px,#000 100%)}
   /* ⚠⚠ border 是 2px **透明**的(不是「沒有 border」):亮框(.top)只換顏色,
      所以標不標「目前最大」都不會讓這一列的高度差 4px —— 差了的話中間那塊的
-     四狀態高度就對不上,手牌會跳。 */
-  .b2-tmv{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;
+     四狀態高度就對不上,手牌會跳。
+     ⚠ min-height 讓「不要」那一列與出牌那一列**一樣高**(v1.79.1):
+       不一樣高的話同一個人從「不要」變成出牌、或反過來,下面幾列就整批位移。 */
+  .b2-tmv{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-start;
+    min-height:var(--b2-trow);
     padding:3px 8px;border:2px solid transparent;border-radius:10px;
     background:rgba(255,255,255,.05)}
   /* ★ 目前最大的那一手要一眼認得出來 —— 玩家要判斷的就是「我壓不壓得過它」。
@@ -3307,9 +3340,18 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         ⚠ 所以這裡**不要**再改回任何一種 box-shadow 畫法。 */
   .b2-tmv.top{background:rgba(255,255,255,.12);border-color:var(--accent)}
   .b2-tmv.pass{opacity:.72}
-  .b2-tnm{font:800 11.5px/1.3 'Nunito',sans-serif;color:var(--text);
-    max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .b2-tct{padding:1px 7px;border-radius:8px;background:rgba(255,255,255,.14);
+  /* ★ 名字欄與牌型欄**固定寬**:這兩欄一浮動,「你」那一列的牌就會比「小二」那一列
+     往左跑幾 px(使用者:「能夠對齊左邊第一張」)。名字太長就 ellipsis ——
+     「誰」在玩家晶片列有完整的一份,這裡對齊比多顯示兩個字重要。 */
+  .b2-tnm{flex:0 0 var(--b2-tnw);
+    font:800 11.5px/1.3 'Nunito',sans-serif;color:var(--text);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ⚠ 「不要」那一列的名字欄是**例外**:相鄰的 pass 併成一列時那一格裝的是
+     「小二 · 阿順 · 老葫」,鎖在 52px 會把後面兩個人切掉 —— 而「併起來之後每個人的
+     名字都還要在」是既有的紅線(單機 e2e D2 節在守)。那一列沒有牌要對齊,放它長。 */
+  .b2-tmv.pass .b2-tnm{flex:0 1 auto;min-width:var(--b2-tnw);max-width:100%}
+  .b2-tct{flex:none;min-width:var(--b2-ttw);text-align:center;
+    padding:1px 7px;border-radius:8px;background:rgba(255,255,255,.14);
     font:800 11px/1.5 'Nunito',sans-serif;color:var(--text)}
   .b2-tpass{font:800 11px/1.5 'Nunito',sans-serif;color:var(--muted)}
   .b2-tcs{display:flex;flex-wrap:wrap;gap:3px}
@@ -3329,10 +3371,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ---------- 手牌 ----------
      ★★ 亮暗問的是「**用得到嗎**」,不是「這張能不能出」(v1.79.0,見 board.js 檔頭):
         .hot  = 存在一種合法出法用得到它(選了牌之後會收窄成「配得上目前選取」)
-        .cold = 目前湊不出任何合法出法 —— **仍然點得動**,壓暗只是提示
+        .cold = 目前湊不出任何合法出法 —— v1.79.1 起**點了不會選起來**
         兩個 class 都不加 = 不是我的回合(那時亮暗沒有意義)
-        ⚠ 不可以改成 disabled / pointer-events:none(CLAUDE.md:不用 disabled
-          讓牌靜默吃掉點擊;按下去要由動作列說得出 B2.whyNot)。
+        ⚠⚠ 「不給選」是**JS 擋的**(`B2.whyNotPick` + 兩支 tap),這裡**絕對不可以**
+          寫 pointer-events:none / 也不可以用 disabled —— 那會讓點擊靜默消失,
+          而 CLAUDE.md 的紅線是「不用 disabled 讓牌**靜默**吃掉點擊」:
+          不給選可以,**沒有回饋不行**(點下去要跳 toast 說為什麼)。
      ★ 高視窗多出來的空白由 .b2-trick 吃掉(v1.79.0),所以手牌這裡**不要**
        margin-top:auto —— 兩者是一組,見 .b2-stage 的四種方案比較。
 

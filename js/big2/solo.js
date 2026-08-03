@@ -123,7 +123,8 @@ const Solo = (function(){
       lead: !st.cur,
       canPass: !!st.cur,
       noPlay: !!(po && !po.can),
-      selInfo: mine ? B2B.selInfoOf(st) : null
+      // ⚠ 要把手牌一起傳進去:「還要再選幾張」算得出來全靠它(見 board.js selInfoOf)
+      selInfo: mine ? B2B.selInfoOf(st, st.hands[ME]) : null
       // 單機不做倒數 —— 卡多久是自己的節奏(同排七 / 消消樂的僵局時鐘不套單機)
     });
   }
@@ -170,6 +171,11 @@ const Solo = (function(){
     if(!active) return;
     if(over){ showToast("這局已經結束了"); return; }
     if(busy || st.turn !== ME){ showToast("還沒輪到你"); return; }
+    /* ★★ 沒亮的牌不給選(v1.79.1)。使用者:「沒亮的就不應該讓人選」。
+       ⚠ 但**一定要說出原因** —— CLAUDE.md 的紅線是「不用 disabled 讓牌**靜默**
+         吃掉點擊」:不給選可以,靜默不行。判斷放規則層(連線那支逐字一樣)。 */
+    const why = B2.whyNotPick(st.hands[ME], st, B2B.sel(), card);
+    if(why){ showToast(why, 2000); return; }
     B2B.toggleSel(card);
     paint();
   }

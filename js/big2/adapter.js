@@ -97,7 +97,8 @@ const MP = MPCore.create((function(){
       lead: !st.cur,
       canPass: !!st.cur,
       noPlay: !!(po && !po.can),
-      selInfo: mine ? B2B.selInfoOf(st) : null,
+      // ⚠ 手牌要一起傳(「還要再選幾張」靠它;與單機那份一樣)
+      selInfo: mine ? B2B.selInfoOf(st, st.hands[me]) : null,
       // 環給全桌看(誰還剩幾秒是公開資訊,大家才知道為什麼卡著)
       cdMs: secOn() ? turnSec * 1000 : 0,
       cdEnd: secOn() ? turnAt + turnSec * 1000 : 0
@@ -130,6 +131,9 @@ const MP = MPCore.create((function(){
     if(ctx.winner() || ctx.abandoned()) return;
     if(!st || st.over) return;
     if(!isMyTurn()){ showToast("還沒輪到你"); return; }
+    // ★★ 沒亮的牌不給選,但一定說得出原因(與單機那支逐字一樣,見 solo.js 的 tap)
+    const why = B2.whyNotPick(st.hands[mySeat()], st, B2B.sel(), card);
+    if(why){ showToast(why, 2000); return; }
     B2B.toggleSel(card);
     paint();
   }

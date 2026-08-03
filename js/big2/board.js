@@ -41,8 +41,13 @@
        單張回答得出來,而且不騙人。舊版把 ♣5 壓暗才是騙人的那一邊。
      ★ 選了牌之後那份清單會**跟著收窄**(只留「配得上目前選取」的牌),
        所以亮著的一直是「下一張點哪裡有用」。
-     ⚠ 壓暗的牌**仍然點得動**(CLAUDE.md 紅線:不用 disabled 靜默吃掉點擊),
-       按下去照樣由動作列回答 B2.whyNot。
+     ★★ v1.79.1 起**壓暗的牌點了不會選起來**(使用者:「沒亮的就不應該讓人選」)——
+        擋在兩支 tap 裡(判斷走規則層的 `B2.whyNotPick`),而且**一定會跳 toast 說原因**。
+        ⚠ CLAUDE.md 那條紅線是「不用 disabled 讓牌**靜默**吃掉點擊」:
+          不給選可以,沒有回饋不行 —— 所以**不可以**改成 disabled / pointer-events:none。
+        ⚠ 由此得到一個好處:sel **永遠是某一手合法出法的子集**,所以
+          「選了一組永遠湊不出牌型的牌」變成到不了的狀態,動作列那一格因此改講
+          「還要再選幾張」(見第六節 selInfoOf)。
      ⚠ 一手都出不了時(can === false)動作列只留 Pass —— 見第四節。
    ========================================================================== */
 
@@ -88,6 +93,18 @@ const B2B = (function(){
            (lastPerSeat);順帶讓列數有上限 = 人數,中間那塊因此固定得起高度
 
        ★ 這仍然守著牌情紅線:出過的牌是公開的、pass 也是公開動作。
+
+     ── ★★★ v1.79.1:**這一排裡面的每一列也不准動** ────────────────────────────
+       使用者:「我希望這個區域的牌,能夠對齊左邊第一張,看起來會比較舒服」
+               「我希望顯示不要的時候,也可以固定高度,不要上上下下的」
+       這是與「手牌不准跳」不同的**第二層** —— 那一層管的是整塊框的高度,
+       這一層管的是**列自己**。四件事一起才成立(前三件在 styles.css):
+         ① 名字欄 / 牌型欄**固定寬**(`--b2-tnw` / `--b2-ttw`)→ 每一列的第一張牌同一個 x
+         ② 「不要」那一列吃**同一個列高**(`--b2-trow`)→ pass 與出牌一樣高
+         ③ 那一排的高度 = **人數** × 一列(`--b2-rows`,見 trickHTML)+ 列從上面往下疊
+            → 這一輪從 0 列長到 4 列,已經在畫面上的那幾列一格都不動
+         ④ 無敵記號擺在**牌的後面**(見 moveHTML)—— 擺前面的話只有鐵支 / 同花順
+            那一列的牌會整排右移
      ========================================================================== */
   /* ★★ 一輪之內**每個人只留最後一個動作**(v1.78.0)。使用者的原話:
        「中間出牌區,只記錄這輪,每個最後出什麼牌…如果這一輪出到第一次,
@@ -127,15 +144,18 @@ const B2B = (function(){
              '<span class="b2-tpass">✕ 不要</span></div>';
     }
     const top = (row.idx === topIdx);
+    /* ★ 欄位順序是「名字 · 牌型 · 牌 · 無敵」(v1.79.1 把無敵記號從牌**前面**搬到後面)。
+       前面兩欄的寬度是固定的(CSS 的 --b2-tnw / --b2-ttw),所以每一列的第一張牌都在
+       同一個 x;無敵記號**只有鐵支 / 同花順才有**,擺在牌前面的話那一列的牌會整排右移。 */
     return '<div class="b2-tmv' + (top ? " top" : "") + '">' +
              '<span class="b2-tnm">' + esc(nameOf(row.seat)) + '</span>' +
              '<span class="b2-tct">' + (R.T_NAME[row.t] || "") + '</span>' +
-             (R.isBomb(row.t) ? '<span class="b2-rbomb" title="無敵牌型:只有更大的鐵支或同花順壓得過">無敵</span>' : "") +
              '<span class="b2-tcs">' +
                /* ★ 排序走 R.sortShow(),不是 cmpCard —— 帶 2 的順子照牌力排會變成
                   「3 4 5 6 2」,而使用者要的是「2 3 4 5 6」(見 rules.js sortShow)。 */
                R.sortShow(row.cards).map(c => cardHTML(c, "mid")).join("") +
              '</span>' +
+             (R.isBomb(row.t) ? '<span class="b2-rbomb" title="無敵牌型:只有更大的鐵支或同花順壓得過">無敵</span>' : "") +
            '</div>';
   }
 
@@ -166,14 +186,23 @@ const B2B = (function(){
         : ('<b>' + esc(v.turnName || "對手") + '</b> 先出');
     }
 
-    return '<div class="b2-trick' + (list.length ? "" : " empty") + '">' +
+    /* ★★★ 那一排的高度 = **人數** × 一列(CSS 的 --b2-rows;v1.79.1)。使用者:
+       「我希望顯示不要的時候,也可以固定高度,不要上上下下的」
+       一輪最多幾列 = 幾個人(每人只留最後一個動作,相鄰的 pass 還會併起來 → 更少),
+       所以照人數預留就夠,而且**一整局都不變**。
+       ⚠ 用人數而不是 `rows.length`:用目前列數等於沒預留(每多一列就重新排一次)。
+       ⚠ 這是這一頁第二個寫進 JS 的數字(第一個是手牌的 --b2-slots),兩個都是**張數 /
+         人數這種資料**,不是量出來的尺寸 —— 「這一頁不用 JS 算尺寸」那條沒有破。
+       ⚠ 那一排**永遠畫出來**(這一輪還沒人出牌時也畫,只是空的):不畫的話那一輪
+         第一個動作出現的瞬間,連上面那行標題都會被推一次。 */
+    const seats = Math.max(2, Math.min(4, (v.names || []).length || 4));
+
+    return '<div class="b2-trick' + (list.length ? "" : " empty") + '" style="--b2-rows:' + seats + '">' +
              '<div class="b2-tlbl"><span class="b2-tttl">' + lbl + '</span>' +
                (hint ? '<span class="b2-thint">' + hint + '</span>' : "") + '</div>' +
-             (rows.length
-               ? '<div class="b2-tlist">' +
-                   rows.map(row => moveHTML(row, nameOf, topIdx)).join("") +
-                 '</div>'
-               : "") +
+             '<div class="b2-tlist">' +
+               rows.map(row => moveHTML(row, nameOf, topIdx)).join("") +
+             '</div>' +
            '</div>';
   }
 
@@ -278,9 +307,14 @@ const B2B = (function(){
     /* ★ 領出的人不能 pass(規則)。那句提示 v1.78.0 起**併進這一行**,不再多一行 ——
        動作列多一行就等於手牌被推走一次(見 .b2-acts 的固定高度)。
        ⚠ 已經選好牌時就不必再提醒「不能 Pass」了:那顆鈕本來就沒畫出來。 */
+    /* 三種狀態三個樣子(v1.79.1 多了中間那個):
+         ✅ 綠 = 選好了 · 👉 中性 = 選到一半(再選幾張)· 🚫 紅 = 這組不行
+       ⚠ 「選到一半」**不可以**標紅:沒亮的牌點不起來之後,選到一半是**正常過程**,
+         標紅等於每選一張就罵一次。 */
     const lead = !info.canPass ? "這一輪由你開始,一定要出牌(不能 Pass)" : "";
-    let h = '<div class="b2-selbar' + (s.ok ? " ok" : (sel.length ? " bad" : "")) + '">' +
-              '<span class="b2-selico">' + (s.ok ? "✅" : (sel.length ? "🚫" : "☝")) + '</span>' +
+    const mid = !s.ok && s.pending;
+    let h = '<div class="b2-selbar' + (s.ok ? " ok" : (sel.length && !mid ? " bad" : "")) + '">' +
+              '<span class="b2-selico">' + (s.ok ? "✅" : (mid ? "👉" : (sel.length ? "🚫" : "☝"))) + '</span>' +
               '<span class="b2-seltxt">' +
                 esc(s.txt || lead || "點牌選要出的組合(1 張 / 2 張 / 5 張)") + '</span>' +
             '</div>';
@@ -395,15 +429,29 @@ const B2B = (function(){
        ★ 選好之後「這一組行不行」由**規則層**回答(B2.classify + B2.beats + B2.whyNot),
          盤面自己不判規則 —— 單機與連線各寫一份判斷遲早走鐘,而且走鐘了
          兩邊各自都不會壞、沒有東西抓得到(排七 whyNot 那條同一個道理)。 */
-  function selInfoOf(st){
+  function selInfoOf(st, hand){
     if(!sel.length) return { ok: false, txt: "" };
     const cls = R.classify(sel);
-    if(!cls) return { ok: false, txt: R.whyNot(sel, st) };
     const why = R.whyNot(sel, st);
-    if(why) return { ok: false, txt: why, type: R.T_NAME[cls.t] };
-    return { ok: true, type: R.T_NAME[cls.t],
-             // 這一行的排序也走 sortShow —— 選好的順子在文字裡也要是「2 3 4 5 6」
-             txt: "選好了:" + R.T_NAME[cls.t] + "(" + R.sortShow(sel).map(R.nameOf).join(" ") + ")" };
+    if(cls && !why)
+      return { ok: true, type: R.T_NAME[cls.t],
+               // 這一行的排序也走 sortShow —— 選好的順子在文字裡也要是「2 3 4 5 6」
+               txt: "選好了:" + R.T_NAME[cls.t] + "(" + R.sortShow(sel).map(R.nameOf).join(" ") + ")" };
+
+    /* ★★ 還沒湊成一手 → 講「還要再選幾張」(v1.79.1)。
+       v1.79.1 起沒亮的牌點不起來,所以 sel **永遠是某一手合法出法的子集** ——
+       那時 whyNot 講的話會是錯的:玩家湊順子湊到第二張時,它會說
+       「兩張要同點數才是對子」。要講的是「再選 3 張」。
+       ⚠ 這一格拿的是**中性**的樣子(不是紅的):選到一半不是錯。 */
+    if(hand){
+      const po = R.playable(hand, st, sel);
+      if(po.need.length)
+        return { ok: false, pending: true,
+                 txt: "再選 " + po.need.join(" 或 ") + " 張就湊得成一手" };
+    }
+    /* 走到這裡代表 sel 湊不出任何一手 —— 正常操作**到不了**(每一次點擊都驗過),
+       留著是給 setSel() 那條路(工具 / 測試)與哪天守衛被繞過時還有話可說。 */
+    return { ok: false, txt: why, type: cls ? R.T_NAME[cls.t] : undefined };
   }
 
   /* ==========================================================================
