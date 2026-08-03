@@ -175,7 +175,10 @@ const Solo = (function(){
   function commit(mv){
     if(!B2.step(st, mv)) return false;
     B2B.clearSel();
-    if(B2.isPass(mv)) Sound.takeback(); else Sound.place();
+    /* ★ 一手的聲音走 B2B.moveSfx(v1.81.1):動作聲 + pass 的「不要」語音,三個呼叫點共用。
+       ⚠ 那句尾註解**不要拿掉**:aiTurn 裡有一模一樣的呼叫,兩行只差縮排,
+         而突變測試的錨點是字串比對 → 沒有它兩個呼叫點分不開(真的踩到過)。 */
+    B2B.moveSfx(B2.isPass(mv));   // ← 我自己這一手
     paint();
     if(st.over){ finish(); return true; }
     if(st.turn !== ME) aiTurn();
@@ -239,11 +242,10 @@ const Solo = (function(){
         if(!B2.step(st, fb)){ busy = false; paint(); return; }
         mv = fb;
       }
+      B2B.moveSfx(B2.isPass(mv));            // ★ 同上:電腦這一手也走同一份
       if(B2.isPass(mv)){
-        Sound.takeback();
         showToast(seatName(seat) + " 不要(Pass)", 1000);
       }else{
-        Sound.place();
         const cls = B2.classify(B2.decMove(mv));
         if(cls && B2.isBomb(cls.t)) showToast(seatName(seat) + " 出了" + B2.T_NAME[cls.t] + "!", 1600);
         if(!st.hands[seat].length) showToast(seatName(seat) + " 把牌出完了", 1600);

@@ -439,22 +439,79 @@ const B2B = (function(){
   let laPrev = null, laKey = "";
 
   /* 「拉~」的聲音。★ 照台灣麻將 sfx.js 的做法註冊成一格 Sound 音效槽:
-     mp3/big2/la.mp3|.wav 有檔就播檔、沒檔就用合成音墊 ——
-     所以之後把真人錄的「拉~」丟進 mp3/big2/ 就自動生效,**程式一行都不用改**。
-     ⚠ 真的放實體檔案時要順手補 sw.js 的 CORE(CLAUDE.md:改 mp3 路徑四處一起改);
-       現在只有合成音,所以刻意不動 sw.js。 */
+     mp3/big2/la.wav|.mp3 有檔就播檔、沒檔就用合成音墊。
+     語音檔由 `tools/gen-big2-voice.ps1` 產生(與台灣麻將的喊牌同一套:OneCore 語音
+     + 裁前後靜音 + 音量正規化),**不用瀏覽器的 speechSynthesis** —— 理由見那支檔頭。
+
+     ⚠⚠ **一定要帶 `{ el:true }`(v1.81.1 補的,第一版漏了)。**
+       使用者是**直接用瀏覽器開 index.html**(`file://`),那時 `fetch` 被瀏覽器擋掉
+       → 沒有 el:true 的音效槽**永遠載不到音檔**,只會退回合成音。
+       台灣麻將每一格語音槽都帶著它,漏掉的症狀是「我明明放了檔案卻沒聲音」,
+       而且**在 http:// 下測不出來**。守門:單機 e2e D6 ⑧ 直接量註冊時傳了什麼。
+     ⚠ 音檔進了 mp3/ 就要補 sw.js 的 CORE(CLAUDE.md:改 mp3 路徑四處一起改) ——
+       CORE 的 addAll 是全有全無,列了不存在的檔會讓離線整批失敗,所以
+       **檔案與清單一定要同一版進去**。 */
   let laDefed = false;
   function laSynth(){
-    /* 兩段上揚 + 尾音再滑上去 = 聽起來像喊出來的一聲。
+    /* 合成音後備:兩段上揚 + 尾音再滑上去,聽起來像喊出來的一聲。
+       ★ 它不是主角(主角是語音檔),但**要壓得過同一瞬間的拍牌聲** ——
+         「拉」與 place() 是同時發出的(真牌桌也是拍下去同時喊),所以音量刻意
+         比一般音效高一階、尾音也拉長,否則會被那一下 click 蓋掉
+         (使用者回報「還想要有音效」時,實際情況正是它響了但聽不出來)。
        ⚠ 用 tone() 自己的 delay / slideTo,不要用 setTimeout —— 那會脫離 AudioContext
          的時間軸,在背景頁籤被節流時整句會散掉。 */
-    Sound.tone(440, { type: "triangle", dur: 0.10, vol: 0.22 });
-    Sound.tone(587, { type: "triangle", dur: 0.28, vol: 0.24, delay: 0.09, slideTo: 880 });
+    Sound.tone(494, { type: "triangle", dur: 0.11, vol: 0.30 });
+    Sound.tone(659, { type: "triangle", dur: 0.34, vol: 0.32, delay: 0.10, slideTo: 988 });
   }
   function la(){
     if(typeof Sound === "undefined") return;
-    if(!laDefed){ laDefed = true; Sound.def("b2la", ["mp3/big2/la.mp3", "mp3/big2/la.wav"], laSynth); }
+    if(!laDefed){
+      laDefed = true;
+      Sound.def("b2la", ["mp3/big2/la.wav", "mp3/big2/la.mp3"], laSynth, { el: true });
+    }
     Sound.sfx("b2la");
+  }
+
+  /* ---------- ★ 「不要(Pass)」也喊出來(v1.81.1)----------
+     使用者:「有人 pass 的話,也加入音效吧」。
+     ⚠ pass **本來就有聲音**(共用的 `Sound.takeback()`,那顆「收回」音)——
+       使用者要的是**聽得出來是「不要」**的那一聲,所以做法與「拉」一樣:
+       動作聲之上再疊一層喊牌語音(台灣麻將「音效是動作聲、語音是喊牌」那條)。
+
+     ⚠⚠ **這一聲的頻率與「拉」差一個量級,而那是這一段唯一需要小心的事**:
+       「拉」一局最多響幾次;「不要」在 4 人局一輪常常 2~3 次,一局二三十次。
+       台灣麻將刻意只給宣告動作配語音、摸打維持合成音,理由就是「一局響三十幾次,
+       每次唸字會吵死人」。這裡的處理是**把音量壓在音檔裡**
+       (`tools/gen-big2-voice.ps1` 給 pass 一個比較低的正規化峰值)——
+       Sound 的音效槽沒有 per-slot 音量,所以只有這個位置壓得下來。
+     ★ 覺得吵的話**把 mp3/big2/pass.wav 刪掉**就自動退回合成音,程式一行都不用改
+       (音效槽的設計本來就是「有這個檔就播」)。 */
+  let passDefed = false;
+  function passSynth(){
+    /* 下行兩音 = 「不要」。刻意與「拉」的上行完全相反,不看畫面也分得出是哪一件事。
+       音量比 la 低一階(它一局要響二三十次)。 */
+    Sound.tone(392, { type: "triangle", dur: 0.09, vol: 0.16 });
+    Sound.tone(294, { type: "triangle", dur: 0.16, vol: 0.15, delay: 0.08 });
+  }
+  function passCall(){
+    if(typeof Sound === "undefined") return;
+    if(!passDefed){
+      passDefed = true;
+      Sound.def("b2pass", ["mp3/big2/pass.wav", "mp3/big2/pass.mp3"], passSynth, { el: true });
+    }
+    Sound.sfx("b2pass");
+  }
+
+  /* ★★ 一手的聲音 —— **三個呼叫點共用這一份**(v1.81.1):
+       單機我自己出牌 · 單機電腦出牌 · 連線收到別人那一手的 diff。
+     ★ 兩層:動作聲(牌拍到桌上 / 收回)+ 喊牌語音,理由與台灣麻將逐字相同 ——
+       真牌桌上兩個同時有,而且之後有人換掉音效檔時語音照樣疊上去。
+     ⚠ 收成一份的理由與 announceLa 相同:三個點各寫一份「pass 要不要喊」遲早走鐘,
+       而走鐘了三邊各自都不會壞、沒有東西抓得到。守門是三條「呼叫點忘了接」的突變。 */
+  function moveSfx(isPass){
+    if(typeof Sound === "undefined") return;
+    if(isPass){ Sound.takeback(); passCall(); }
+    else Sound.place();
   }
 
   /* 每次重畫都叫一次(單機 solo.paint() / 連線 adapter.paint() 各一行)。
@@ -761,6 +818,8 @@ const B2B = (function(){
     cardHTML,
     // 「拉」(v1.81.0):公告 · 晶片記號 · 單獨播那一聲(單機與連線共用)
     announceLa, laChipHTML, la,
+    // 一手的聲音(v1.81.1):動作聲 + 喊牌語音,三個呼叫點共用
+    moveSfx,
     sel: () => sel.slice(),
     toggleSel(c){
       const i = sel.indexOf(c);

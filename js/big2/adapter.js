@@ -312,7 +312,8 @@ const MP = MPCore.create((function(){
          ⚠ 批次同步(重連歸位)也不連播,不然一口氣響幾十聲。 */
       if(!fresh && moves.length === prevLen + 1){
         const one = moves[moves.length - 1];
-        if(B2.isPass(one)) Sound.takeback(); else Sound.place();
+        // ★ 走 B2B.moveSfx(v1.81.1):動作聲 + pass 的「不要」語音,與單機那兩個點共用一份
+        B2B.moveSfx(B2.isPass(one));
       }
       // 這一手的錨點:手數變了就重新起算(公開動作,全桌看得到)
       if(moves.length !== lastLen){
