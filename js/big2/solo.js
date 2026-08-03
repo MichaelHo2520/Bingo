@@ -106,8 +106,7 @@ const Solo = (function(){
     B2B.render({
       hand: st.hands[ME].slice(),
       slots: B2.dealCounts(seats)[ME],      // ★ 固定格位吃**開局張數**(見 board.js 第三節)
-      trick: st.trick, prevTrick: st.prevTrick, names: nms,
-      played: st.played,
+      trick: st.trick, names: nms, opened: st.opened,
       mine: mine,
       turnName: st.over ? "" : seatName(st.turn),
       over: over

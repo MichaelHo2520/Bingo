@@ -89,6 +89,22 @@ const B2 = (function(){
   const cardKey = c => rkOrder(rankOf(c)) * NSUIT + suitOf(c);
   const cmpCard = (a, b) => cardKey(a) - cardKey(b);
 
+  /* ★ 「攤在桌上給人看」的排序(v1.78.0)。
+     手牌與絕大多數地方都照**牌力**排(cmpCard),但**帶 2 的順子**照牌力排會變成
+     `3 4 5 6 2` / `3 4 5 A 2` —— 使用者的原話:「麻煩要顯示 23456」。
+     那兩種順子(A-2-3-4-5、2-3-4-5-6)在人眼裡就是從 A / 2 開始遞增的一條龍,
+     所以**只有這兩種**改用點數的自然序(A=1 < 2 < 3 …)。
+     ⚠ 只影響顯示;比大小一律還是 classify() 的 (t, k),一個字都沒動。
+     (它用到第三節的 classify / straightOf —— 那兩支是 function 宣告,呼叫時早就就緒。) */
+  function sortShow(cards){
+    const cl = classify(cards);
+    if(cl && (cl.t === T_STRAIGHT || cl.t === T_SFLUSH)){
+      const st = straightOf(cards);
+      if(st && st.lv >= 12) return cards.slice().sort((a, b) => rankOf(a) - rankOf(b));
+    }
+    return cards.slice().sort(cmpCard);
+  }
+
   /* deal 是 52 個字元的字串,一張牌一個字元(A~Z + a~z 剛好 52 個)。 */
   function chr(c){ return String.fromCharCode(c < 26 ? 65 + c : 97 + c - 26); }
   function unchr(ch){
@@ -268,18 +284,20 @@ const B2 = (function(){
          n, hands[], turn(-1 = 結束), cur(這一輪目前最大的那手 / null = 領出),
          passes(自 cur 之後連續幾個 pass)、played[](已公開出過的牌)、
          finished[](出完的先後,存座位)、opened(第一手出過了沒)、over、last、bad
-         trick[] / prevTrick[](這一輪 / 上一輪的完整動作記錄,見下)
+         trick[](這一輪的完整動作記錄,見下)
 
-     ── ★ trick / prevTrick:為什麼真相層要記「這一輪發生過什麼」(v1.77.0)──────
+     ── ★ trick:為什麼真相層要記「這一輪發生過什麼」(v1.77.0)─────────────────
        `cur` 只留得住**這一輪目前最大的那一手**,前面被壓掉的、以及每一個「不要」
        全部就地消失。使用者的原話:「中間那一塊應該要用來顯示這一輪大家出的牌,
        才不會因為跳太快,導致你根本不知道出過什麼牌了」——
        三家電腦連續出牌只花幾百毫秒,只留最大那手的話,人根本來不及看。
 
-       · trick[]     = 這一輪從領出到現在的每一手 { seat, cards[], pass }(含 pass)
-       · prevTrick[] = 上一輪的同一份記錄 —— 一輪結束後畫面**還要看得到**剛才那一輪
-                       (否則「新的一輪」那一瞬間中間會整片空掉,正是舊版的樣子)
+       · trick[] = 這一輪從領出到現在的每一手 { seat, cards[], pass }(含 pass)
 
+       ★★ **一輪結束就整份清掉**(v1.78.0 改)。v1.77.0 曾經把它搬進 `prevTrick`
+          留給畫面顯示「上一輪」,使用者看過之後要求拿掉:
+            「如果變自由牌了,就全部都清掉」
+          —— 新的一輪是乾淨的桌面,上一輪的牌留在畫面上只是雜訊。
        ⚠ 放在規則層而不是畫面層:單機與連線都要用,而連線是 replay(deal, n, moves)
          重算出來的 —— 畫面自己記的話,一斷線重連就整段消失。
        ⚠ **不含任何隱藏資訊**:出過的牌本來就是公開的,pass 也是公開動作。 */
@@ -301,7 +319,7 @@ const B2 = (function(){
     return {
       n: n, hands: hands, turn: startSeat(hands),
       cur: null, passes: 0, played: [], finished: [],
-      trick: [], prevTrick: [],
+      trick: [],
       opened: false, over: false, last: null, bad: -1
     };
   }
@@ -354,9 +372,10 @@ const B2 = (function(){
     if(trickDone(st)){
       const from = st.cur.seat;
       st.cur = null; st.passes = 0;
-      /* ★ 這一輪的記錄要**留到下一輪有人出牌為止** —— 直接清空的話,「新的一輪」
-         那一瞬間中間會整片空掉,而剛才那三家出了什麼就此消失(v1.77.0 要修的正是這個)。 */
-      st.prevTrick = st.trick; st.trick = [];
+      /* ★★ 一輪結束 → 這一輪的記錄**整份清掉**(使用者:「如果變自由牌了,就全部都清掉」)。
+         v1.77.0 曾經留一份 prevTrick 給畫面顯示「上一輪」,實際玩過之後拿掉了 ——
+         新的一輪是乾淨的桌面。 */
+      st.trick = [];
       // ★ 領出權回到最後出牌的人;他若剛好出完就順延給下一個還有牌的人
       st.turn = st.hands[from].length ? from : nextActive(st, from);
     }else{
@@ -533,7 +552,7 @@ const B2 = (function(){
     T_SINGLE, T_PAIR, T_STRAIGHT, T_FULL, T_QUADS, T_SFLUSH, T_NAME,
     // 編碼
     suitOf, rankOf, cardOf, isRed, suitCh, rankTxt, nameOf, longName,
-    rkOrder, rkFromOrder, cardKey, cmpCard,
+    rkOrder, rkFromOrder, cardKey, cmpCard, sortShow,
     chr, unchr, encodeDeal, decodeDeal, encMove, decMove, isPass,
     // 發牌
     shuffled, newDeal, handsOf, dealCounts,

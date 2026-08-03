@@ -82,8 +82,7 @@ const MP = MPCore.create((function(){
     B2B.render({
       hand: st.hands[me].slice(),
       slots: B2.dealCounts(nPlayers())[me],   // ★ 固定格位吃**開局張數**(見 board.js 第三節)
-      trick: st.trick, prevTrick: st.prevTrick, names: nms,
-      played: st.played,
+      trick: st.trick, names: nms, opened: st.opened,
       mine: mine,
       turnName: st.over ? "" : nameOfSeat(st.turn),
       over: !!ctx.winner() || st.over
