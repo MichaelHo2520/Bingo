@@ -74,6 +74,20 @@
        · 地板加一段**暖身期**,免得鎖在牌桌剛顯示那幾幀的暫時高度上
      ⚠ 判準 `LAND` 的字串**必須與 styles.css 那條 @media 逐字相同**(同 FINE 的規矩),
        而且三個條件缺一不可 —— 少了 `pointer:coarse`,桌機把視窗拉矮就會中。
+
+   ── ★★ 手牌可以自己拖著排(v1.82.0,照大老二 v1.80.0 那一套)─────────────────
+     使用者:「台灣麻將,請你參考大老二,我想增加拖曳排序功能」。
+     整段實作與「為什麼不那樣做」寫在**最後一節(拖曳排序)**;這裡只留四句
+     一定要先知道的:
+       · 順序是**純本地的顯示** —— 不進 DB、不進 state、不影響任何判定,
+         所以連線時新舊版可以同房,而且**不是自己的回合也拖得動**
+       · **拖曳中不重畫**(render() 那道閘門)—— 這一頁比大老二更需要它:
+         render() 為了夾牌寬會在**一次呼叫裡** innerHTML 重建最多七次
+       · **摸進來那一張不拖**(它不在 st.hands 裡,而且「打掉剛摸的不必瞄準」
+         是既有的版面約定);⚠ 宣告聽牌之後手牌 pointer-events:none,那時也拖不動
+       · 換局重設走呼叫端的 **resetOrder()**(同 resetFit() 的三個呼叫點),
+         **clearSel() 絕對不可以順手清順序** —— 它在「吃碰成立 / 我表態完 / 結算」
+         也會被叫到,清了等於每碰一次就把玩家排好的手牌打散
    ========================================================================== */
 
 const M16B = (function(){
@@ -88,6 +102,10 @@ const M16B = (function(){
   const POOL_ROWS_LAND = 2;    // 橫向手機:高度是唯一稀缺資源,牌河讓一排出來(見檔頭⑥)
 
   let host=null, cb={}, st=null, me=0, sel="", lastSig="";
+  /* ★ 玩家自己拖出來的顯示順序(牌值陣列;沒拖過 = null)。見最後一節。
+     ⚠ 它只在 viewHand() 一個地方被讀 —— 送去規則層 / 動作的一律是原始的手牌。 */
+  let ord = null;
+  let drag = null, noClick = false;     // 拖曳中的狀態 / 這一下的 click 要不要吃掉
   /* 宣告聽牌的選牌模式(v1.67.0):按了動作列那顆「宣告聽牌」之後為 true,
      這時點手牌 = 選要打哪一張來宣告。⚠ 換局 / 離房 / 宣告成立都要清掉(clearSel)。 */
   let tingPick = false;
@@ -173,6 +191,12 @@ const M16B = (function(){
     return F ? '<span class="m16-cntb">'+F.backHTML()+'</span>' : "";
   }
   const codeOf = t => R.codeOf(t);
+
+  /* ★★ 我的手牌**畫出來的順序**(玩家沒拖過的話就是照牌序)。
+     ⚠ 這一支是**唯一**吃 ord 的地方 —— 打牌 / 吃碰槓胡一律走牌值,順序碰不到它們。
+     ⚠ 但它有**兩個**呼叫端(render 與 claimOpts),而且兩邊一定要拿到同一份:
+       claimOpts() 算出來的 idx 是給畫面用的「第幾格」,對不上就會亮錯牌。 */
+  function viewHand(){ return R.applyOrder(st && st.hands ? (st.hands[me]||[]) : [], ord); }
 
   /* ---------- 手牌分排 ----------
      依花色邊界切,選「算出來的牌寬最大」的切點;摸進來那張放較短的那一排。
@@ -401,6 +425,21 @@ const M16B = (function(){
     if(typeof mySeat==="number") me = mySeat;
     if(!st || !host) return;
 
+    /* ★★ 拖曳中一律**不重畫**(v1.82.0,見最後一節)。這一頁比大老二更需要這道閘門:
+       下面夾牌寬那一段會在**一次 render() 裡**把 host.innerHTML 重建最多七次,
+       手指底下那個節點一被銷毀,手勢當場斷掉(連線時對手一打牌就走到這裡)。
+       ⚠ 延後是安全的,而理由要記住:**我的手牌只可能因為我自己打牌 / 吃碰槓而改變**,
+         而那三件事都不可能發生在拖曳途中 —— 這裡不會顯示過期的手牌,
+         最多讓牌河晚幾百毫秒更新。放手時由 endDrag() 補畫一次。
+       ⚠⚠ 動作列**不吃這道閘門**:宣告視窗(吃 / 碰 / 胡 / 過)與它的倒數是有時限的,
+         拖曳中把那幾顆鈕藏起來等於直接吃掉玩家的一手。onClaimUI 照舊發出去 ——
+         它只用到選項的 type / tiles / label,與畫面上的格位無關。 */
+    if(drag){
+      drag.dirty = true;
+      if(cb.onClaimUI) cb.onClaimUI(claimOpts(), copt);
+      return;
+    }
+
     const box = host.clientWidth || 360;
     const avail = Math.max(200, box - 16);
     /* ★★ 我自己胡的那張:**不併進手牌,擺回「摸進來那一格」**(最右邊,v1.75.18)。
@@ -412,11 +451,12 @@ const M16B = (function(){
        ⚠ `settleWin()` 會把胡的那張**收進 `st.hands[seat]` 並排序**(牌張守恆),
          所以這裡要自己撿回來,而且一定要用**索引**移除 —— 手上有一對時
          `filter(t => t !== win)` 會整對消失。 */
-    const rawHand = st.hands[me] || [];
-    let hand = rawHand, myWin = -1;
+    /* ★ 畫的順序走 viewHand()(玩家沒拖過的話它就是照牌序)。
+       ⚠ 只有這一行與 claimOpts() 吃 ord —— 送去規則層的一律是 st.hands[me] 本身。 */
+    let hand = viewHand(), myWin = -1;
     if(st.over && st.over.type==="win" && st.over.seat===me && typeof st.over.tile==="number"){
-      const wi = rawHand.indexOf(st.over.tile);
-      if(wi >= 0){ hand = rawHand.slice(); hand.splice(wi,1); myWin = st.over.tile; }
+      const wi = hand.indexOf(st.over.tile);
+      if(wi >= 0){ hand.splice(wi,1); myWin = st.over.tile; }   // viewHand() 已經是新陣列
     }
     // 摸進來那一格:平常是 drawn,結算時換成我胡的那張(兩者不會同時存在)
     const hasDraw = (st.turn===me && st.drawn>=0) || myWin>=0;
@@ -706,7 +746,12 @@ const M16B = (function(){
     if(!st || !st.claim || st.over) return opts;
     const types = st.claim.elig[me];
     if(!types || st.claim.bids[me]) return opts;         // 沒資格 / 已經表態過
-    const hand = st.hands[me] || [], t = st.claim.t;
+    /* ⚠⚠ 這裡一定要用 **viewHand()**(v1.82.0):idx 是「畫面上的第幾格」,
+       而 handTile() 拿到的 i 是 plan.rows 串起來的序號 = viewHand() 的索引。
+       玩家拖過之後 st.hands[me] 的順序與畫面**不一樣**,拿原始手牌算會亮錯牌
+       —— 而且亮錯的是「你可以吃哪兩張」,比排版跑掉嚴重得多。
+       ★ 送出去的是 tiles(牌值),不是 idx,所以規則層完全不受影響。 */
+    const hand = viewHand(), t = st.claim.t;
     const add = (type, values, label) => {
       const idx = pickIdx(hand, values);
       if(idx) opts.push({ type, idx, tiles:values, label });
@@ -771,10 +816,16 @@ const M16B = (function(){
     if(!host) return;
     host.addEventListener("click", e=>{
       const el = e.target.closest(".m16-ht");
-      if(el && el.dataset.t!==undefined){ tap(el.dataset.k||"", +el.dataset.t); return; }
+      if(el && el.dataset.t!==undefined){
+        /* ★ 剛剛那一下是拖曳(而且真的換到別的位置)→ 這一下不算點擊。
+           旗標在 pointerdown 一律會被清掉,所以它不可能漏到下一次點擊(見最後一節)。 */
+        if(noClick){ noClick = false; return; }
+        tap(el.dataset.k||"", +el.dataset.t); return;
+      }
       const foe = e.target.closest(".m16-foe");
       if(foe && cb.onFoe) cb.onFoe(+foe.dataset.seat);
     });
+    bindDrag();
     /* ⚠ 盤面自己的 ResizeObserver **只重畫、不放掉地板**(v1.70.1):它連
        「動作列長高一格」都會叫,拿它當重量的觸發就是那個忽大忽小的來回。 */
     if(window.ResizeObserver) new ResizeObserver(()=>render()).observe(host);
@@ -784,6 +835,197 @@ const M16B = (function(){
          正是最需要暖身期的時機 —— 直接寫 fitTw=0 會鎖在轉向動畫途中的那個高度上。 */
     addEventListener("orientationchange", ()=>setTimeout(()=>{ resetFit(); render(); },180));
     addEventListener("resize", ()=>{ resetFit(); });
+  }
+
+  /* ==========================================================================
+     ★★ 拖曳排序 —— 玩家自己排手牌(v1.82.0)
+     ==========================================================================
+       使用者:「台灣麻將,請你參考大老二,我想增加拖曳排序功能」。
+       整套照 js/big2/board.js 第八節搬過來,**四處為了麻將改掉**(下面逐條標 ▲)。
+
+       ★★ 順序是**純本地的顯示**:不進 DB、不進 state、不影響任何判定。三個後果:
+         · 連線時新舊版可以同房 —— 兩台各自顯示自己想看的順序,牌與動作一模一樣
+         · **不是自己的回合也拖得動**(整理手牌大半就發生在等別人打牌那段時間)
+           → 所以這裡刻意**不經過** tap(),那一支有「還沒輪到你」的守衛
+         · 不持久化:換局回到照牌序(手牌整副換了,沿用上一局沒有意義)
+
+       ── ▲① 牌值會重複,所以順序是**多重集合**的事(規則層 MJ16.applyOrder)────
+         大老二的牌 id 唯一,ord 可以當字典;麻將同款牌手上可能有 4 張,
+         一律走「從左往右消耗」。判斷「順序有沒有變」也因此只能比**整串牌值**,
+         不可以比集合。
+
+       ── ▲② 手牌有**兩排**(planHand 依花色邊界切)────────────────────────────
+         · 換位一律 `insertBefore` 到**目標那一張自己的那一排**(不是固定容器)
+           → 跨排拖得過去;讀回順序時 querySelectorAll 的文件順序就是視覺順序。
+         · 玩家控制的是**線性順序**;哪幾張在哪一排仍然由 planHand 決定,
+           所以放手之後靠近切點的那一張可能落到另一排 —— 那是對的(排是自動的)。
+         · ⚠ 拖曳途中某一排會暫時多一張而**超出 --m16hw**。所以拖曳中給 .m16-stage
+           掛 `m16-dragging`(CSS 只做一件事:overflow-x:hidden),否則會冒出一條
+           橫向捲軸 → clientWidth 變 → 又是「整副牌換一次大小」那條紅線。
+
+       ── ▲③ **摸進來那一張不拖、也不是落點**────────────────────────────────────
+         它不在 st.hands 裡(是 st.drawn),而且「摸進來那一格一律預留、打掉剛摸的
+         不必瞄準」是這一頁最老的版面約定(檔頭①)。判準是 data-k 的第一個字元:
+         手牌是 "h<序號>"、摸進來那張是 "d"、我胡的那張**根本沒有 data-k**。
+
+       ── ▲④ 換過位置**一定要重畫一次**(大老二刻意不重畫)──────────────────────
+         這一頁的 sel 存的是**格位鍵**、宣告選項的 idx 也是格位 —— 順序一換兩者
+         全部位移,而且兩排要重新分。所以 endDrag() 會清掉 sel / opts 並補一次
+         render()。⚠ 但一定要 setTimeout:直接叫的話手指剛放開的那個節點被 innerHTML
+         銷毀,瀏覽器補的那個 click 就發不出來 → noClick 旗標會漏到下一次點擊。
+
+       ── ★ 為什麼保留 click、把拖曳疊在上面 ────────────────────────────────────
+         既有的 e2e 全部用 `el.click()` 驅動打牌(clickAnyTile),而合成的 .click()
+         **不會產生 pointer 事件**。所以不可以照五子棋把 tap 判定搬進 pointerup。
+         「這一下算不算點擊」用 noClick 交接:
+           · pointerdown **一律先清掉**旗標 → 它絕對不會漏到下一次點擊
+           · 放手時**位置真的變了**才設旗標
+             ⚠ 手抖十幾 px 而沒換到別的位置 → 照樣算點擊(而且這一頁的觸控是兩段式,
+               第一下只是選取,誤判成拖曳的代價是「按了沒反應」)。
+
+       ── ★ 三個實作選擇(都有替代方案被否決,同大老二)────────────────────────
+         ① 跟著手指走用 **inline style 的 transform** —— .m16-ht 有三條規則在搶
+            transform(:hover / .sel / .tingpick .tingok.sel),inline 一律壓得過。
+            ▲ 而且量格位時要把 inline 設成 **"none"** 而不是清空:那三條的位移是
+              translateY(-22%)(大老二只有 4px),清空會量到「站起來」之後的位置,
+              牌一開始拖就往下掉一截。
+         ② 命中判定用**幾何**(逐張量 rect),不用 elementFromPoint —— 被拖的那張
+            自己就蓋在手指底下。手牌只有 16~17 張,逐張量最穩。
+         ③ 觸控要靠 CSS 的 `touch-action:none`(styles.css 的 .m16-hand .m16-ht):
+            .m16-stage 是 overflow-y:auto 的捲動容器,不關掉的話手指往下滑會被捲動
+            搶走(瀏覽器發 pointercancel,拖曳當場斷掉)。
+
+       ⚠ 宣告聽牌之後手牌是 `pointer-events:none`(只能摸切),那時**拖不動** ——
+         刻意不開例外:那個狀態下手牌本來就不會再變,排它沒有意義,
+         而為了拖曳去鬆動那道鎖會讓「只能打摸進來那張」多一條要守的路。
+     ========================================================================== */
+  const DRAG_SLOP = 11;                   // 位移超過這麼多 px 才算拖曳(不到就是一般點擊)
+
+  /* 手牌那幾張(跨兩排,文件順序 = 視覺順序)。★ 摸進來那張("d")與我胡的那張(沒有
+     data-k)都被排除 —— 它們不參與排序,也不是落點。 */
+  function handTiles(box){
+    return [].slice.call(box.querySelectorAll(".m16-ht[data-k]"))
+             .filter(el => el.dataset.k.charAt(0) === "h");
+  }
+
+  /* 這張牌**沒有任何位移時**在哪一格。
+     ⚠ 設 "none" 不是清空:清空會退回 CSS 的 translateY(-22%)(hover / 選取 / 聽牌選牌),
+       那樣量到的是「站起來」之後的位置,牌一開始拖就會往下掉一截。
+     ⚠ 每一次移動都要重量:insertBefore 之後它的格位就換了。 */
+  function slotRect(el){
+    const t = el.style.transform;
+    el.style.transform = "none";
+    const r = el.getBoundingClientRect();
+    el.style.transform = t;
+    return r;
+  }
+  /* 讓牌停在「手指按下去時抓的那個點」上 —— 不是置中到手指,不然一開始拖會彈一下。
+     ⚠⚠ 位置要**夾在盤面裡**:.m16-stage 是捲動容器,牌被拖出邊界會被裁掉一角、
+       甚至整張消失,而消失的那一張正是手指按著的那一張(大老二 v1.80.0 是靠截圖
+       才發現的,斷言一條都沒抓到 —— CLAUDE.md「CSS 會撞的四類」的第四類)。
+     ★ 夾的只有**畫**:命中判定(dropAt)照樣吃原始的手指座標,
+       所以「手指推出左緣 → 目標是第一格」完全不受影響。 */
+  function follow(x, y){
+    const r = slotRect(drag.el);
+    const sc = host.getBoundingClientRect();
+    const nx = Math.max(sc.left, Math.min(x - drag.gx, sc.right - r.width));
+    const ny = Math.max(sc.top,  Math.min(y - drag.gy, sc.bottom - r.height));
+    drag.el.style.transform = "translate(" + (nx - r.left) + "px," + (ny - r.top) + "px)";
+  }
+
+  /* 指標下方是哪一張**別的**手牌 → 插在它前面還是後面。
+     ★ 換完位之後手指底下那一格就是被拖的那張自己(它被跳過)→ 不會來回震盪。 */
+  function dropAt(x, y){
+    const kids = handTiles(drag.box);
+    for(let i = 0; i < kids.length; i++){
+      const el = kids[i];
+      if(el === drag.el) continue;
+      const r = el.getBoundingClientRect();
+      if(x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+        return { el: el, before: (x < r.left + r.width / 2) };
+    }
+    return null;
+  }
+
+  function endDrag(cancel){
+    if(!drag) return;
+    const d = drag;
+    drag = null;                          // ★ 先清掉:下面那次 render() 才進得去
+    d.el.classList.remove("m16-drag");
+    d.el.style.transform = "";
+    if(host) host.classList.remove("m16-dragging");
+    try{ d.el.releasePointerCapture(d.id); }catch(e){}
+
+    let moved = false;
+    if(!cancel && d.on && host && host.contains(d.el)){
+      // 順序直接**從 DOM 讀回來** —— 拖曳過程中 DOM 就是唯一的真相(一路 insertBefore)
+      const now = handTiles(d.box).map(el => +el.dataset.t);
+      if(now.join(",") !== d.was.join(",")){
+        ord = now; noClick = true; moved = true;
+        /* ▲ 順序一換,**格位鍵**(sel)與宣告選項的 idx 全部位移 → 兩份都要丟掉。
+           · `opts` **非清不可**:下面那次補畫走的是 render()(**沒有** state),
+             而 `opts = null` 只寫在 `if(state)` 裡面 → 不清就會用拖曳前的 idx
+             去標「可以吃 / 碰哪幾張」,標到別張牌上。e2e D 節 ⑤之二在守。
+           · `sel` 是**第二道防線**:sig 已經含畫面順序(見 render 的 lastSig),
+             順序一換 sig 就變、sel 本來就會被清掉 —— 所以把這一行拿掉的突變
+             **殺不掉**(實測存活)。刻意留著:sel 是「第幾格」,而
+             「兩段式的第二下打錯牌」是這一頁最不可逆的錯,不靠另一個機制的副作用。 */
+        sel = ""; opts = null;
+      }
+    }
+    /* 換過位置要重畫(兩排重新分 + 格位鍵重編);拖曳中被擋掉的那次也在這裡補回來。
+       ⚠ 一律 setTimeout —— 要等瀏覽器補的那個 click 發完(見上面 ▲④)。 */
+    if(moved || d.dirty) setTimeout(function(){ render(); }, 0);
+  }
+
+  function bindDrag(){
+    host.addEventListener("pointerdown", e => {
+      noClick = false;                    // ★ 一律先清:旗標絕不會漏到下一次點擊
+      if(drag) return;                    // 已經在拖了(第二根手指)→ 不理它
+      if(e.button > 0) return;            // 只吃主鍵
+      const el = e.target.closest(".m16-ht");
+      // ▲ 只有手牌拖得動:摸進來那張是 "d"、我胡的那張沒有 data-k、牌河 / 明牌沒有 .m16-ht
+      if(!el || !el.dataset.k || el.dataset.k.charAt(0) !== "h") return;
+      const box = el.closest(".m16-hand");
+      if(!box) return;
+      const r = slotRect(el);
+      drag = { id: e.pointerId, el: el, box: box,
+               x0: e.clientX, y0: e.clientY,
+               gx: e.clientX - r.left, gy: e.clientY - r.top,
+               was: handTiles(box).map(k => +k.dataset.t),
+               on: false, dirty: false };
+      /* 捕獲指標:手指滑出那張牌之後還要收得到 move / up。
+         ★ 包 try 是**純防禦**:規格上 pointerId 不是活著的指標時要丟 NotFoundError,
+           而 e2e 餵的是合成事件 —— 一丟出來,整條拖曳就變成「靜靜地不存在」。 */
+      try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    });
+
+    host.addEventListener("pointermove", e => {
+      if(!drag || e.pointerId !== drag.id) return;
+      if(!host.contains(drag.el)){ endDrag(true); return; }   // 保險:節點被抽掉了
+      if(!drag.on){
+        if(Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < DRAG_SLOP) return;
+        drag.on = true;
+        drag.el.classList.add("m16-drag");
+        host.classList.add("m16-dragging");                   // ▲ 見上面②:擋掉橫向捲軸
+      }
+      const t = dropAt(e.clientX, e.clientY);
+      // ▲ 插到**目標那一張自己的那一排**(手牌有兩排,跨排才拖得過去)
+      if(t) t.el.parentNode.insertBefore(drag.el, t.before ? t.el : t.el.nextSibling);
+      follow(e.clientX, e.clientY);
+    });
+
+    host.addEventListener("pointerup", e => {
+      if(drag && e.pointerId === drag.id) endDrag(false);
+    });
+    host.addEventListener("pointercancel", e => {
+      if(drag && e.pointerId === drag.id) endDrag(true);
+    });
+    /* 瀏覽器把捕獲收回去(節點被移走 / 手勢被別人接手)→ 當成取消,不要留半套。
+       ⚠ 自己 releasePointerCapture() 也會觸發它,但那時 drag 已經是 null 了。 */
+    host.addEventListener("lostpointercapture", e => {
+      if(drag && e.pointerId === drag.id) endDrag(true);
+    });
   }
 
   /* ==========================================================================
@@ -932,8 +1174,18 @@ const M16B = (function(){
        ⚠⚠ **不動牌寬的地板 fitTw**(v1.70.1,見檔頭⑤下面那條):這一支在
          「吃碰成立」「我表態完」也會被叫到,順手清掉地板就等於每次宣告結束
          都允許整副牌再放大一次 —— 回報裡「下一把摸牌之後又放大回來」就是它。
-         要重新量牌寬請叫 resetFit()。 */
+         要重新量牌寬請叫 resetFit()。
+       ⚠⚠ **也不動玩家拖出來的順序 ord**(v1.82.0,同一個理由的第二次):
+         這一支在「吃碰成立」「我表態完」「結算」都會被叫到,順手清掉等於
+         每碰一次就把玩家排好的手牌打散 —— 而那只有真的玩才看得出來。
+         換局 / 離開牌桌請叫 resetOrder()。 */
     clearSel(){ sel=""; opts=null; copt=0; lastSig=""; tingPick=false; },
+    /* 把玩家拖出來的顯示順序丟掉,回到照牌序。
+       ★ 只有**換局 / 離開牌桌**該叫(呼叫端各一行,就掛在 resetFit() 旁邊):
+         新的一局手牌整副換了,沿用上一局的順序沒有意義。
+       ⚠ 刻意**不掛在視窗 resize / 轉向**上(那是 resetFit() 的事)——
+         轉個向就把排好的手牌打散,比不重設更糟。 */
+    resetOrder(){ ord = null; },
     /* 把「只縮不放」的地板放掉,下一次 render() 從頭量一次(橫向另加暖身期)。
        ★ 只有**換局 / 離開牌桌**該叫:新的一局明牌清空、手牌回到 16 張,
          上一局縮下去的牌寬不該背著走。(視窗 resize / 轉向由 mount() 自己接。) */
@@ -946,11 +1198,21 @@ const M16B = (function(){
     claimCur(){ const co=claimOpts(); return co.length ? co[Math.min(copt,co.length-1)] : null; },
     setClaimCur(i){ const co=claimOpts(); if(i>=0&&i<co.length){ copt=i; render(); } },
     setNames(fn){ nameOf = fn || (s=>"座位 "+(s+1)); },
-    /* 操作提示由盤面出,因為只有它知道這台裝置走一段式還是兩段式 */
+    /* 操作提示由盤面出,因為只有它知道這台裝置走一段式還是兩段式。
+       ⚠⚠ **不要在這裡加「可以拖著排」**(v1.82.0 試過、當場退回來)——
+         這一行住在 .m16-acts 裡,而動作列長一點點就等於盤面矮一點點,
+         整副牌跟著縮(檔頭③那條紅線)。實測只加五個字,750×485 下牌寬就從
+         27 掉到 25,而 e2e 的 L2 段當場變紅。
+         ★ 而且它不是「忽大忽小」那種好抓的壞:牌只是**永遠小一級**,
+           斷言與眼睛都很難發現 —— 這一格的字數是版面預算的一部分,不是文案。
+         → 拖曳的說明放在**進場說明**(mahjong16.html 的 m16SoloHint / 連線那份),
+           那裡沒有版面預算。 */
     discardHint(){ return oneTap() ? "滑過選牌 · 點一下打出" : "點牌兩次打出"; },
     oneTap,
     // 給測試頁與 e2e:直接問排版決策,不必去讀 DOM
     planFor(hand, hasDraw, avail){ return planHand(hand, hasDraw, avail); },
+    // 給 e2e:玩家自訂的顯示順序(沒拖過 = null)
+    _ord(){ return ord ? ord.slice() : null; },
     ONE_ROW_MIN, TILE_MIN
   };
 })();

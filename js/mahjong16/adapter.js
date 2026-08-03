@@ -670,8 +670,10 @@ const MP = MPCore.create((function(){
       const newRnd = (rid !== curRound);
       /* ⚠ resetFit() 只掛在**換局**這一格(v1.70.1):牌寬重新量一次。
          其他路徑(吃碰成立 / 我表態完 / 結算)只清選取,不可以放掉地板 ——
-         那會讓整副牌在一局裡忽大忽小(理由見 board.js 檔頭⑤)。 */
-      if(newRnd){ curRound = rid; myBid = false; M16B.clearSel(); M16B.resetFit(); }
+         那會讓整副牌在一局裡忽大忽小(理由見 board.js 檔頭⑤)。
+         ⚠ resetOrder()(玩家拖出來的手牌順序,v1.82.0)吃**同一格**、同一個理由:
+           其他路徑清掉的話,每碰一次手牌就被打散一次。 */
+      if(newRnd){ curRound = rid; myBid = false; M16B.clearSel(); M16B.resetFit(); M16B.resetOrder(); }
 
       const before = st;
       st = s;

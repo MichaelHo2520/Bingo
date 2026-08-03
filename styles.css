@@ -2123,6 +2123,38 @@ body.m16-mp .mj-room{width:min(92vw,960px)}
    要與上面那條 margin-left 加上牌寬**完全相等**,不然「摸 / 打」之間手牌會左右挪。
    ⚠ 這是版面穩定的一半,另一半在 board.js 的 planHand()(一律把這一格算進寬度)。 */
 .m16-slot{flex:none;width:calc(var(--m16w,36px) * 1.45)}
+
+/* ---------- ★★ 拖曳排序(v1.82.0,見 js/mahjong16/board.js 最後一節)----------
+   ★ touch-action:none 是**必要條件**:.m16-stage 是 overflow-y:auto 的捲動容器,
+     不關掉的話手指在牌上往下滑會被捲動搶走(瀏覽器發 pointercancel,拖曳當場斷掉),
+     而手牌是**兩排**的,跨排拖曳一定要垂直移動。
+   ⚠ 代價是手指按在**牌上**時捲不動盤面 —— 牌河那一大塊與牌的縫隙都還按得到,
+     而「拖到一半忽然變成捲動」是使用者會直接判定成壞掉的那一種。
+   ⚠ 這一條只給**手牌**(.m16-hand 底下):牌河 / 明牌 / 攤牌的牌不拖,也不該擋捲動。 */
+.m16-hand .m16-ht{touch-action:none;-webkit-user-drag:none}
+/* 正在被拖著走的那一張。
+   ⚠⚠ 這一條裡面**故意沒有 transform** —— 位移由 board.js 寫成 **inline style**,
+      因為 .m16-ht:hover / .sel / .tingpick .tingok.sel 三條都在搶 transform,
+      inline 才壓得過它們而不必打權重戰(CLAUDE.md「CSS 會撞的第二類」)。
+   ⚠ transition 一定要關掉:.m16-ht 有 `transition:transform .12s`,
+     留著的話牌會慢半拍跟著手指,手感立刻不對。
+   ⚠ 用 inset 的框而不是 outline —— .m16-tile 是 overflow:hidden 的圓角牌面,
+     outline 會被圓角切出四個角。
+   ⚠⚠ 框的顏色**一定要與 .m16-ht.sel 分開**(第一版寫成同一個 --mj-jz,截圖才看出來)——
+     這一頁的「選取」意思是**再點一下就把這張打出去**,而打錯牌不可逆。
+     拖著走的牌長得跟「準備打出去」一模一樣,是會讓人縮手的那種嚇。
+     綠(--mj-jf)也不行:那是吃 / 碰 / 聽牌那一整套的顏色。所以用主題的 --accent
+     (同大老二的 .b2-drag),整頁只有它沒有別的意思。 */
+.m16-hand .m16-ht.m16-drag{transition:none;z-index:6;cursor:grabbing;
+  box-shadow:inset 0 0 0 2px var(--accent),0 8px 16px rgba(0,0,0,.45)}
+:root[data-theme="ebook"] .m16-hand .m16-ht.m16-drag{box-shadow:inset 0 0 0 3px #000,0 4px 10px rgba(0,0,0,.35)}
+/* ★★ 拖曳中才擋掉橫向捲軸。拖曳途中某一排會暫時多一張、超出 --m16hw,
+   不擋的話盤面會冒出一條橫向捲軸 → clientWidth 變 → 整副牌換一次大小
+   (檔頭那條「任何讓總寬變一點的東西都會讓整副牌換大小」)。
+   ⚠ 刻意**只在拖曳中**掛,不寫成永久的 overflow-x:hidden ——
+     正常打牌時的版面一格都不動,才不會為了新功能去改既有的捲動行為。
+   ⚠ 被拖的那一張自己不會被裁到:board.js 的 follow() 把它夾在盤面裡。 */
+.m16-stage.m16-dragging{overflow-x:hidden}
 /* ---------- 宣告視窗:吃 / 碰 / 槓直接畫在牌上(v1.58.2) ----------
    選擇在牌上、動作在按鈕上。一次只站起來**一組**,其他組的牌點一顆小點 ——
    這就是「重疊怎麼顯示」的答案:不同時顯示,用切換(理由見 js/mahjong16/board.js 檔頭)。

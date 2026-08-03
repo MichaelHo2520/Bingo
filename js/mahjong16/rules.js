@@ -115,6 +115,40 @@ const MJ16 = (function(){
   }
   function countsTotal(c){ let n=0; for(let i=0;i<KINDS;i++) n+=c[i]; return n; }
 
+  /* ---------- ★★ 「玩家自己排的手牌順序」(v1.82.0)----------
+     使用者:「台灣麻將,請你參考大老二,我想增加拖曳排序功能」。
+     ord = 玩家拖出來的**牌值**順序;回傳「照 ord 排好的 hand」。
+
+     ★★ 這一支是**顯示層的東西**,放在規則層只因為它是純函式、要在 node 裡驗
+        (同大老二的 B2.applyOrder)。**ord 從來不進 DB、不影響任何判定** ——
+        打的是「哪一張牌」而不是「第幾格」,MJT.discard 吃的是牌值。
+        ⚠ 絕對不可以拿它去拆牌 / 算聽 / 判宣告:decompose / claimsFor / toCounts
+          一律吃**多重集合**,順序對它們沒有意義。
+
+     ── ★★ 與大老二最大的不同:麻將的牌**會重複** ────────────────────────────
+       大老二的 52 張牌 id 唯一,ord 可以直接當「牌 → 位置」的字典;
+       這裡同一款牌手上可能有 4 張,所以比對一律走**多重集合的消耗**:
+       ord 從左往右,每個牌值只消耗掉「手上還有的那幾張裡的一張」。
+       ⚠ 寫成 `hand.filter(t => ord.indexOf(t) >= 0)` 之類的一定錯:
+         手上兩張 5 萬而 ord 只提到一張時,那種寫法會把兩張都算成「排過的」。
+
+     兩條容錯,都是刻意的(同大老二):
+       · ord 裡已經**不在手上**的牌(打掉了 / 被吃碰走了)自動消失
+         → 剩下的相對順序原封不動
+       · hand 裡 ord **沒提到**的牌(摸進來又留下的那張)一律照牌序補在**後面** ——
+         那正是真牌桌的樣子:新進來的牌先擺在右邊,要放哪裡自己再拖。 */
+  function applyOrder(hand, ord){
+    const sorted = (hand||[]).slice().sort((a,b)=>a-b);
+    if(!Array.isArray(ord) || !ord.length) return sorted;
+    const left = {};
+    sorted.forEach(t=>{ left[t] = (left[t]||0) + 1; });
+    const out = [];
+    ord.forEach(t=>{ if(left[t] > 0){ left[t]--; out.push(t); } });
+    const rest = [];
+    sorted.forEach(t=>{ if(left[t] > 0){ left[t]--; rest.push(t); } });
+    return out.concat(rest);
+  }
+
   /* ---------- 拆牌 ----------
      ★ 演算法的正確性關鍵:每一層都**必須消掉「目前還有牌的最小索引 i」**。
        理由是 i 一定屬於某一組面子,而且若那組是順子,i 必定是順子的頭
@@ -291,6 +325,8 @@ const MJ16 = (function(){
     RULESETS, rulesetFor, buildDeck, buildWall, shuffle,
     // 手牌
     newCounts, toCounts, countsTotal,
+    // 顯示順序(玩家拖出來的;純函式、不進 DB、不參與任何判定)
+    applyOrder,
     // 判定
     decompose, canWin, winningTiles, isTenpai,
     allDecompositions, winningHands,
