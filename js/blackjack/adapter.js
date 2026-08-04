@@ -16,7 +16,9 @@
        game.bj = {
          seq   這一場的第幾局(0-based,累計)  ★ 所有交易的守衛都是它
          rd    第幾輪 · k 這一輪的第幾局
-         rot[] **這一輪**的輪莊順序(pid;輪開始時凍結)→ 莊家 = rot[k]
+         rot[] **這一輪**的輪莊順序(pid;輪開始時凍結)
+               → 莊家 = BJ.dealerOf(rot, k, rules.hands) ★ v1.87.0 起「幾局換莊」可調,
+                 所以一輪的局數是 BJ.handsPerRound(rot.length, hands) 而不是 rot.length
          seats[] **這一局**在桌上的人(pid;每局開始時重建 → 新人下一局就能當閒家)
          deal  這一局的牌 · bets{pid:n} · acts{pid:"hs"}
          nets{pid:n}  這一場的累計淨籌碼變化(★ 可以是負的)
@@ -67,8 +69,15 @@ const MP = MPCore.create((function(){
   const nSeats = () => seatsOf().length;
   const seatOf = id => seatsOf().indexOf(id);
   const mySeat = () => seatOf(ctx.me());
-  const dealerPid = () => (bj && Array.isArray(bj.rot)) ? bj.rot[bj.k % bj.rot.length] : null;
+  /* ★★★ 這一局的莊家是誰 —— **只有這兩支**(v1.87.0 的「幾局換莊」落地點)。
+     ⚠⚠ 交易裡一律用 dPidIn(g, b)(讀 DB 那一份 + 凍結的 g.rules),
+       本地那一份 dealerPid() 只給畫面用。⚠ 兩支都問 BJ.dealerOf ——
+       誰都不可以自己寫 `rot[k % rot.length]`:那就是第二份輪莊真相,
+       而症狀是「同一局不同裝置算出不同的莊家」(整局從此算不出來)。 */
+  const dealerPid = () => (bj && Array.isArray(bj.rot))
+    ? BJ.dealerOf(bj.rot, bj.k, gRules ? gRules.hands : 1) : null;
   const dealerIdx = () => seatOf(dealerPid());
+  const dPidIn = (g, b) => BJ.dealerOf(b.rot || [], b.k, (g.rules && g.rules.hands) || 1);
   function nameOfSeat(s){
     const id = seatsOf()[s];
     return id ? ctx.dispName(id) : ("玩家" + (s + 1));
@@ -202,7 +211,7 @@ const MP = MPCore.create((function(){
   /* 從一份 DB 的 bj 節點重算局面(★ 交易裡一定要用它,不可以拿本地的 st) */
   function stOf(g, b){
     const seats = Array.isArray(b.seats) ? b.seats : [];
-    const d = seats.indexOf((b.rot || [])[b.k % Math.max(1, (b.rot || []).length)]);
+    const d = seats.indexOf(dPidIn(g, b));
     if(d < 0) return null;
     const acts = seats.map(id => (b.acts && b.acts[id]) || "");
     return BJ.replay(b.deal, seats.length, d, acts, g.rules);
@@ -219,7 +228,7 @@ const MP = MPCore.create((function(){
     txRound((g, b) => {
       if(b.over) return false;
       if((b.seats || []).indexOf(me) < 0) return false;
-      if(me === (b.rot || [])[b.k % Math.max(1, (b.rot || []).length)]) return false;  // 莊家不押注
+      if(me === dPidIn(g, b)) return false;         // 莊家不押注
       b.bets = b.bets || {};
       if(b.bets[me] !== undefined) return false;    // 押過了(交易層的冪等)
       b.bets[me] = amt;
@@ -243,6 +252,10 @@ const MP = MPCore.create((function(){
   }
 
   function act(a, betVal){
+    /* ★ 「抓人那一排開了 / 關了」——**純畫面**,把牌桌重畫一次讓亮框跟上
+       (v1.87.0:抓人改成點桌上那一格,而那幾格是 BJB.render() 畫的)。
+       ⚠ 擺在 playing() 那一關**前面**:它不是動作,不該被相位守門擋掉。 */
+    if(a === "grepaint"){ if(bj) paint(); return; }
     if(!playing()){ if(a) showToast("現在不能動"); return; }
     const me = mySeat();
     if(me < 0){ showToast("你會在下一局進場"); return; }
@@ -325,7 +338,7 @@ const MP = MPCore.create((function(){
     txRound((g, b) => {
       if(b.over) return false;
       const seats = Array.isArray(b.seats) ? b.seats : [];
-      const d = (b.rot || [])[b.k % Math.max(1, (b.rot || []).length)];
+      const d = dPidIn(g, b);
       const min = BJ.minBet(g.rules);
       let any = false;
       b.bets = b.bets || {};
@@ -428,19 +441,26 @@ const MP = MPCore.create((function(){
   function advance(seq){
     const ids = Object.keys(ctx.players());
     if(ids.length < 2) return;                       // 人不夠 → 交給核心的「落單回大廳」
-    // ★ 先判斷是不是整場結束 —— 那一筆要單獨走 { local:false }(見檔頭)
-    if(bj && bj.over && bj.rd + 1 >= (gRules ? gRules.rounds : 2) && bj.k + 1 >= bj.rot.length){
+    /* ★ 先判斷是不是整場結束 —— 那一筆要單獨走 { local:false }(見檔頭)。
+       ⚠ 一輪的局數是 **人數 × 幾局換莊**(v1.87.0)→ 一律問 BJ.handsPerRound,
+         寫 `bj.rot.length` 的話 hands=2 時會在半輪就把整場結束掉。 */
+    const perR = bj ? BJ.handsPerRound((bj.rot || []).length, gRules ? gRules.hands : 1) : 1;
+    if(bj && bj.over && bj.rd + 1 >= (gRules ? gRules.rounds : 2) && bj.k + 1 >= perR){
       finishMatch(seq);
       return;
     }
     txRound((g, b) => {
       if(!b.over) return false;
       const rounds = (g.rules && g.rules.rounds) || 2;
+      const hands = (g.rules && g.rules.hands) || 1;
       let rd = b.rd, k = b.k + 1;
       let rot = (b.rot || []).slice();
-      // 這一輪剩下的莊家裡,已經離開的直接跳掉
-      while(k < rot.length && ids.indexOf(rot[k]) < 0) k++;
-      if(k >= rot.length){
+      const per = BJ.handsPerRound(rot.length, hands);
+      /* 這一輪剩下的莊家裡,已經離開的直接跳掉。
+         ⚠ hands ≥ 2 時「一個莊家」占 hands 格 → 條件一定要問 BJ.dealerOf,
+           寫 rot[k] 的話只跳掉那個人的第一局,第二局又輪回給已經離開的人。 */
+      while(k < per && ids.indexOf(BJ.dealerOf(rot, k, hands)) < 0) k++;
+      if(k >= per){
         k = 0; rd++;
         if(rd >= rounds) return false;                // 整場結束 → 上面那條路處理
         rot = mergeIds(rot, ids);                     // ★ 新人下一輪進輪莊表
@@ -605,7 +625,9 @@ const MP = MPCore.create((function(){
       const el = $("mpBarGoal");
       if(!el) return;
       const r = gRules || rules;
-      el.textContent = "🎩 " + r.rounds + " 輪 · 押上限 " + r.betMax + (r.sec ? (" · ⏱ " + r.sec + "s") : " · ⏱ 不限時");
+      el.textContent = "🎩 " + r.rounds + " 輪 · " +
+        (r.hands > 1 ? (r.hands + " 局換莊 · ") : "每局換莊 · ") +
+        "押上限 " + r.betMax + (r.sec ? (" · ⏱ " + r.sec + "s") : " · ⏱ 不限時");
       el.classList.remove("hidden");
     },
 

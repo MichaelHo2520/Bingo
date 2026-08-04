@@ -81,11 +81,15 @@ const Solo = (function(){
   /* ---------- 小工具 ---------- */
   function seatName(s){ return NAMES[s] || ("玩家" + (s + 1)); }
   const names = () => { const a = []; for(let s = 0; s < seats; s++) a.push(seatName(s)); return a; };
-  const dealer = () => BJ.dealerOf(rot, k);
+  /* ★★ 莊家是誰一律問 BJ.dealerOf(rot, k, rules.hands)——「幾局換莊」的落地點只有它
+     (v1.87.0)。⚠ 這裡自己寫 `rot[k % seats]` 就是第二份輪莊真相。 */
+  const dealer = () => BJ.dealerOf(rot, k, rules.hands);
   const iAmDealer = () => dealer() === ME;
+  // 一輪有幾局 = 人數 × 幾局換莊(★ 一輪的定義沒變:每個人各當一次莊)
+  const perRound = () => BJ.handsPerRound(seats, rules.hands);
   // 一場共幾局(單機人數固定 → 算得出來;⚠ 連線那邊不行,見 adapter)
-  const totalRounds = () => rules.rounds * seats;
-  const doneRounds = () => rd * seats + k;
+  const totalRounds = () => rules.rounds * perRound();
+  const doneRounds = () => rd * perRound() + k;
 
   /* ==========================================================================
      一、畫面
@@ -364,6 +368,10 @@ const Solo = (function(){
   /* 我按了下注 / 要牌 / 停(★ v1.85.0 起沒有加倍了) */
   function act(a, betVal){
     if(!active) return;
+    /* ★ 「抓人那一排開了 / 關了」——**純畫面**,只要把牌桌重畫一次讓亮框跟上
+       (v1.87.0:抓人改成點桌上那一格,而那幾格是 BJB.render() 畫的)。
+       ⚠ 一定要在最前面:它不是動作,不該被下面那些相位守門擋掉。 */
+    if(a === "grepaint"){ paint(); return; }
     if(a === "bet"){ myBet(betVal); return; }
     if(over){ showToast("這一場已經結束了"); return; }
     if(betting){ showToast("先押注"); return; }
@@ -415,7 +423,9 @@ const Solo = (function(){
     later(() => {
       settled = null;
       k++;
-      if(k >= seats){ k = 0; rd++; }
+      // ⚠ 一輪的局數是**人數 × 幾局換莊**(v1.87.0)—— 寫死 seats 的話 hands=2 時
+      //   每個人只當得到一次莊的一半,而「當莊次數一樣」那條公平性就沒了
+      if(k >= perRound()){ k = 0; rd++; }
       if(rd >= rules.rounds){ finishMatch(); return; }
       startRound();
     }, SETTLE_MS);
@@ -485,10 +495,12 @@ const Solo = (function(){
     playing: () => active && !over,          // 給更新檢查:局中重載會把整場丟掉
     level: () => level, seats: () => seats,
     rules: () => rules, setRule,
-    recText, recLine, totalRounds,
+    recText, recLine, totalRounds, perRound,
     setLevel(v){ if(BJAI.LEVEL_INFO[v]){ level = v; saveOwn(); paintBar(); } },
     setSeats(v){ if(v >= BJ.MIN_PLAYERS && v <= BJ.MAX_PLAYERS){ seats = v; saveOwn(); } },
     // 給 e2e 用:直接讀當下的局面(不經過畫面)
+    // ★ _round / _k / _rd 是「幾局換莊」的守門要用的(要看得出同一個人連做了幾局)
+    _round: () => round, _k: () => k, _rd: () => rd,
     _st: () => st,
     _nets: () => nets.slice(),
     _bets: () => Object.assign({}, bets),

@@ -3809,7 +3809,28 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ .set-row.col 是這一頁新加的:九項設定每一項都是「標籤一行 + 選擇列一行」,
        共用的 .set-row 是橫排的(標籤左、控制右),四顆鈕橫排會擠爆。 */
   .set-card.bj-rules-card{width:min(92vw,480px);max-width:none}
-  .bj-rules-who{margin:-4px 0 8px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--accent-2)}
+  /* ★★★ v1.87.0:**只有 .set-body 捲,卡片自己不捲**(使用者:「上下滑動有問題,
+       目前滑動的範圍會讓關閉的 ✕ 重疊了」)。
+     ── 壞在哪 ────────────────────────────────────────────────────────────────
+       共用的 .set-card 是 `max-height + overflow-y:auto`(整張卡自己捲),而
+       `.card-x` 是 `position:sticky; top:0` + `margin-bottom:-32px` ——
+       設計上「✕ 黏在卡片可視區右上、標題往上疊到它旁邊」。
+       整張卡在捲的時候那個 sticky 就一路跟著往下走,**壓在第 2、3 列的設定上**
+       (圖裡它正好蓋在「每一段倒數」那一列)。
+     ── 為什麼是這樣修 ──────────────────────────────────────────────────────────
+       #setVeil 的設定卡早就是這個結構(第 394 行那兩條):卡片 flex 直排 +
+       overflow:hidden,中間那塊 .set-body 才是唯一的捲動容器 →
+       ✕ / 標題 / 底下的「完成」全部**留在原位不動**,sticky 也就沒有東西可以壓。
+     ⚠ 這裡刻意用 `.set-card.bj-rules-card` 而不是 `#bjRulesVeil .set-card`:
+       前綴 class 才不會波及另外七頁共用的那張設定卡(CLAUDE.md 的紅線)。
+     ⚠ 兩條要一起在:只給 overflow:hidden 而沒讓 .set-body 可捲的話,
+       下面幾列會**靜靜地被裁掉而且捲不到**(比 ✕ 重疊更糟)。 */
+  .set-card.bj-rules-card{display:flex;flex-direction:column;overflow:hidden}
+  .bj-rules-card .set-body{flex:1 1 auto;min-height:0;overflow-y:auto;
+    overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  /* 「完成」那顆貼在卡片底部不跟著捲(它是出口,最需要一直看得到) */
+  .bj-rules-card > .btn{flex:none}
+  .bj-rules-who{flex:none;margin:-4px 0 8px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--accent-2)}
   .bj-rules-card .set-row.col{flex-direction:column;align-items:stretch;gap:5px}
   .bj-rules-card .set-row.col .set-lbl{text-align:left}
   .bj-rules-card .set-row.col .seg{width:100%}
@@ -4382,4 +4403,97 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   @media (max-height:440px){
     :root{--bj-bxh:88px; --bj-trh:150px}
     .bj-dsub{display:none}
+  }
+
+  /* ==========================================================================
+     台式21點 v1.87.0 —— ★★★ 牌桌上每一張牌同一個尺寸,而且一張都不裁
+     ==========================================================================
+       使用者第三輪的要求③:「開始玩後,玩家的牌沒有完整顯示,我要跟莊家的牌大小一樣」。
+
+     ── ★★ v1.86.0 到底壞在哪(量出來的,不是猜的)─────────────────────────────
+       `.\tools\shot-bj.ps1 -Shots play -Seats 6` 印出來:
+           box=32/684,32/339,…   CARDW=36/46/50   CLIP=11 max36   boxesOver=17
+       三件事同時發生:
+         ① 牌有**三種寬度**(我 50 · 莊家 46 · 其他閒家 36)—— 那三個尺寸各自
+            從 --bj-cw 乘一個係數推出來(1 / .92 / .72),彼此不知道對方多大。
+         ② 一格的高度是 board.js **平分**注區算出來的(`(100% − gaps) / rows`),
+            它跟牌寬**完全沒有關係** → 視窗一矮就變成 32px,而牌高 51~71 →
+            **每一張牌上下各被切掉一大截**(量到 max36)。
+         ③ 3 列放不進去時 `.bj-boxes` 是 overflow:hidden → **靜靜地少一整列**。
+       ★ 所以這不是「調個係數」的事:牌寬與格高是**兩份真相**,一定會錯開。
+
+     ── ★★★ v1.87.0 的做法:兩個數字收成一個來源 ────────────────────────────────
+       `--bj-cardw`(牌寬)與 `--bj-bxh`(一格的高度)由 **board.js 的 fitTable() 一支**
+       算出來,寫成 inline literal 掛在 .bj-table 上:
+           格高 = 牌高 + 一格的固定裝潢(BOX_CHROME)  ← 於是**永遠裁不到牌**
+           牌寬 = min(高度給得起的, 一格塞得下 5 張的, 上限)
+       ⚠ 這**不違反**「不要用 JS 算尺寸」那條:它只吃「人數 + 視窗」——
+         人數一整局不變、視窗更不會變,所以一整局之內是常數
+         (跟 v1.86.0 那個 boxHeight(rows) 一樣性質,只是把牌寬也一起算)。
+         ⚠⚠ 真正不可以的是「跟著**牌數**變」—— 那才是台灣麻將那一整類忽大忽小。
+       ⚠ calc 不可以除以 var() → 一律由 JS 寫成 literal(v1.86.0 已經踩過)。
+
+     ── ★ 為什麼寬度那一項要拿「5 張」去算 ────────────────────────────────────
+       過五關 = 五張不爆,所以一手的實務上限就是 5 張。一格塞得下 5 張 →
+       **永遠不必換行**,而不換行才有「所有人的牌一樣大」。
+       (過五關關掉時理論上能超過 5 張 —— 那時交給 flex 擠窄,見 .bj-bcs 那條:
+        擠窄是看得見的,而換行 + 固定高度會**把牌整張裁掉**。)
+     ========================================================================== */
+  /* 預設值只是**還沒排版好時的後備**(fitTable 會用 inline 蓋掉) */
+  :root{ --bj-cardw:44px; --bj-bxh:112px; --bj-dlh:92px; }
+  /* ★★★ 牌桌上的牌一律吃 --bj-cardw:莊家台 / 我那一格 / 其他閒家**同一個數字**。
+     ⚠ 這一條要壓得過 .bj-card.mid / .sm / .dbig(它們是 (0,2,0),這一條也是,
+       靠後定義取勝)—— board.js 已經不發那幾個 class 了,留這條是雙保險。 */
+  .bj-table .bj-card{--bjw:var(--bj-cardw)}
+  /* ⚠ --bj-trh 收成很小的值:牌桌的高度現在**完全由盤面剩下的空間決定**
+     (flex:1 1 auto)。min-height 比可用高度大的話 .bj-stage 會捲,而那時
+     fitTable 量到的 stage 高度就與牌桌實際高度錯開 → 又回到「兩份真相」。 */
+  :root{ --bj-trh:120px; }
+  /* 莊家台:高度由 fitTable 給(它與注區一格同一套算法 → 牌一樣大、也裁不到) */
+  .bj-dealer{height:var(--bj-dlh)}
+  /* ⚠ 注區改成 flex-start:每一格的高度已經是算好的,再 stretch 一次就會把
+     格子拉高而牌不跟著大 → 格子裡一片空白(而且高視窗才看得出來)。 */
+  .bj-boxes{align-content:flex-start}
+  /* ⚠⚠ overflow 從 hidden 改成 **auto**(v1.86.0 那條註解在這裡被推翻):
+     hidden 是「放不下就**刪掉**最後一列」,auto 是「放不下就捲得到」——
+     兩個都不理想,但前者救不回來。守門是診斷器的 boxesOver
+     (`shot-bj.ps1` 會印 WARN-BOX-ROW-LOST),而 fitTable 的下限 CARD_MIN
+     就是在讓它幾乎不會發生。 */
+  .bj-boxes{overflow-y:auto;overflow-x:hidden}
+  /* ★★ 一排牌:**不換行**,放不下時擠窄(同 .bj-dcs 那條的理由)。
+     ⚠ .bj-card 是寫死 width 的 → 一定要明寫 flex:0 1 auto + min-width:0 才縮得動。 */
+  .bj-bcs{flex-wrap:nowrap}
+  .bj-bcs .bj-card{flex:0 1 auto;min-width:0}
+
+  /* ==========================================================================
+     台式21點 v1.87.0 —— ★★★ 抓人改成「直接點桌上那一家」
+     ==========================================================================
+       使用者要求④:「選了抓人之後,我是想要直接在牌桌上點人,而不是點名字的按鈕」。
+       ★ 於是動作列那一排名字鈕整組拿掉,只留一句提示 + 一顆「✕ 取消」;
+         抓得動的那幾格自己變成鈕(.bj-box.target,board.js 掛 data-grab)。
+       ⚠ 動作列的高度**一格都不能變**(--bj-acth 是寫死的):
+         所以還是「提示列 + 一排鈕」兩列,只是那一排只剩一顆。
+     ========================================================================== */
+  .bj-box.target{cursor:pointer;animation:bjTgt 1.1s ease-in-out infinite}
+  /* 亮框一律用 border + box-shadow 的**外圈**要小心被裁 —— .bj-boxes 現在是
+     overflow:auto,所以這裡的呼吸只動亮度(不動大小 / 不外擴),才不會被裁邊。 */
+  @keyframes bjTgt{ 0%,100%{ filter:brightness(1) } 50%{ filter:brightness(1.22) } }
+  :root[data-theme="ebook"] .bj-box.target{animation:none;border-style:dashed}
+  /* 「這一格抓得動」的記號 —— ⚠ 只准是「抓不抓得動」這件事(公開資訊),
+     一個字都不准夾帶牌情(他幾點 / 停了沒 已經各有自己的膠囊在講)。 */
+  .bj-gtip{flex:none;padding:0 4px;border-radius:6px;background:#ffc454;
+    font:900 9.5px/1.5 'Nunito',sans-serif;color:#2a1c00;white-space:nowrap}
+  :root[data-theme="ebook"] .bj-gtip{background:#000;color:#fff}
+
+  /* ---------- 矮視窗:一格的裝潢收一號(v1.87.0)----------
+     ★ 為什麼要收:一格的「頭列 + 尾列 + padding」約 57px,而 6 人局有 3 列 + 莊家台
+       → 光裝潢就吃掉 250px。視窗一矮,那 250px 就是「牌只能給 26px」的原因。
+     ⚠ 這裡**不可以**把狀態記號(.bj-st)藏起來換高度:「✋停 / 💥爆了 / 🎯已抓」
+       是這一頁唯一講得出「那一家怎麼了」的地方(點數膠囊只講數字)。
+     ★ fitTable 會**自己量**收完之後的裝潢有多高(learnChrome)→ 這裡改 padding / 字級
+       不必回頭去改 JS 的常數(那正是 v1.86.0 兩份真相的坑)。 */
+  @media (max-height:700px){
+    .bj-box{padding:4px 5px;gap:2px}
+    .bj-box .bj-bet,.bj-box .bj-pt{padding:0 5px}
+    .bj-bnm{font-size:11px}
   }

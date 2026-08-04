@@ -156,6 +156,14 @@ const BJ = (function(){
     dragon: true,
     bustFirst: true,   // 閒家先爆就先輸(莊家後來也爆照樣輸)
     rounds: 2,         // 一場幾輪(一輪 = 每個人當莊各一次)
+    /* ★★★ v1.87.0:**幾局換莊**(使用者:「現在是每一把就換莊,但我要這個是可以調整的」)。
+       1 = 每一局換(v1.86.0 的行為)· 2 / 3 = 同一個人連做 2 / 3 局才換下一位。
+       ⚠ 一輪的定義**沒有變**:一輪 = 每個人當莊各一次 —— 只是一輪的**局數**
+         變成「人數 × hands」。所以「當莊次數一樣」那條公平性照樣成立,
+         而莊優勢(平手莊吃 + 先爆先輸)也照樣被平衡掉。
+       ⚠⚠ 舊房間沒有這個欄位 → normRules 補 1 = 逐字回到 v1.86.0 的行為
+         (**加法式**,同 rounds / line 那幾格)。 */
+    hands: 1,
     /* 每一段的操作倒數(秒;0 = 關掉)。★ 它**不影響結算**,放進 rules 的理由只有一個:
        這一整包在開局那一刻凍結,少一個「要不要跟著鎖」的例外就少一條會走鐘的路。
        ⚠ 一段 = 下注 / 閒家補牌 / 莊家補牌 各自一段(閒家同時動 → 那一段是**共用**一個窗口)。
@@ -173,6 +181,7 @@ const BJ = (function(){
   const LINE_OPTS = [0, 15, 16, 17];        // ★ v1.86.0 多一格 15(使用者要求)
   const BJPAY_OPTS = [1.5, 2];
   const ROUNDS_OPTS = [1, 2, 3];
+  const HANDS_OPTS = [1, 2, 3];             // ★ v1.87.0 幾局換莊
   const SEC_OPTS = [0, 20, 30, 45];
 
   function pick(opts, v, dflt){ return opts.indexOf(v) >= 0 ? v : dflt; }
@@ -187,7 +196,8 @@ const BJ = (function(){
       bjPay:      pick(BJPAY_OPTS, +r.bjPay, RULES_DEF.bjPay),
       dragon:     (typeof r.dragon === "boolean") ? r.dragon : RULES_DEF.dragon,
       bustFirst:  (typeof r.bustFirst === "boolean") ? r.bustFirst : RULES_DEF.bustFirst,
-      rounds:     pick(ROUNDS_OPTS, +r.rounds, RULES_DEF.rounds)
+      rounds:     pick(ROUNDS_OPTS, +r.rounds, RULES_DEF.rounds),
+      hands:      pick(HANDS_OPTS, +r.hands, RULES_DEF.hands)
     };
   }
   const defRules = () => normRules(null);
@@ -675,18 +685,35 @@ const BJ = (function(){
        所以一輪 = 當下在場的每個人當莊各一次;一場 = rules.rounds 輪。
        ⚠ **整場的總局數不能預先算**:允許中途加入(第 1 輪 4 人 = 4 局,
          第 3 輪來了人變 6 人 = 6 局)→ 每一輪開始時才生成那一輪的莊家序列。
+
+     ── ★★★ v1.87.0:**幾局換莊**(rules.hands)──────────────────────────────────
+       使用者:「現在是每一把就換莊,但我要這個是可以調整的」。
+       ★ 落地點**只有這兩支**(dealerOf / handsPerRound)—— 呼叫端(solo / adapter)
+         一律問它們,絕對不可以在別的地方再寫一次 `k % rot.length`:
+         那就是兩份輪莊真相,而症狀是「重連的人算出來的莊家跟現場不一樣」。
+       ★ 一輪的**定義沒變**(每個人各當一次莊),只是一輪的**局數** = 人數 × hands
+         → 「當莊次數一樣」那條公平性照樣成立。
      ========================================================================== */
+  // 一輪有幾局(rotLen = 這一輪的輪莊人數)
+  function handsPerRound(rotLen, hands){
+    return Math.max(1, rotLen) * Math.max(1, hands || 1);
+  }
   // 這一輪還剩幾局(k = 這一輪的第幾局,0-based)
-  const leftInRound = (k, n) => Math.max(0, n - k);
-  // 這一局的莊家是誰(rot = 這一輪的輪莊順序)
-  function dealerOf(rot, k){ return (rot && rot.length) ? rot[k % rot.length] : null; }
+  const leftInRound = (k, n, hands) => Math.max(0, handsPerRound(n, hands) - k);
+  /* 這一局的莊家是誰(rot = 這一輪的輪莊順序,k = 這一輪的第幾局)。
+     ⚠ hands 不帶就是 1 = 逐字回到 v1.86.0 的行為(舊房間 / 舊呼叫端都不會壞)。 */
+  function dealerOf(rot, k, hands){
+    if(!rot || !rot.length) return null;
+    const h = Math.max(1, hands || 1);
+    return rot[Math.floor(k / h) % rot.length];
+  }
 
   return {
     // 常數
     NSUIT, NRANK, NCARD, MIN_PLAYERS, MAX_PLAYERS, VS15,
     SUIT_CH, SUIT_KEY, SUIT_NAME, RANK_TXT, DRAGON_N,
     T_BUST, T_NORM, T_BJ, T_DRAGON, T_NAME, LINE_FREE, GRAB_CH,
-    RULES_DEF, START_OPTS, BETMAX_OPTS, LINE_OPTS, BJPAY_OPTS, ROUNDS_OPTS, SEC_OPTS,
+    RULES_DEF, START_OPTS, BETMAX_OPTS, LINE_OPTS, BJPAY_OPTS, ROUNDS_OPTS, HANDS_OPTS, SEC_OPTS,
     MIN_BET, BET_STEPS,
     // 編碼
     suitOf, rankOf, cardOf, isRed, suitCh, rankTxt, nameOf, longName,
@@ -705,8 +732,8 @@ const BJ = (function(){
     replay, legal, denyTxt, push, autoTo, autoDealer,
     // 結算
     betOf, settle, tagTxt, TAG_TXT,
-    // 輪莊
-    leftInRound, dealerOf
+    // 輪莊(★ hands = 幾局換莊,v1.87.0)
+    leftInRound, dealerOf, handsPerRound
   };
 })();
 

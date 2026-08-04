@@ -11,12 +11,17 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>台式21點 ｜ 輪流當莊 · 莊家抓人 · 單機對電腦 + 2~5 人連線</title>
-<!-- 台式21點 · v1.86.0
-     ⚠ v1.86.0 只改**顯示名**(21點 → 台式21點)。資料的名字一個都沒動:
+<title>台式21點 ｜ 輪流當莊 · 莊家抓人 · 單機對電腦 + 2~6 人連線</title>
+<!-- 台式21點 · v1.87.0 -->
+<!-- ⚠ 顯示名改過兩次(21點 → 台式21點),而**資料的名字一個都沒動**:
        bj_rooms / bj_index / bjRules / bj.solo.v1 / bj.prefs.v1 / line / dragon
-       —— 那些 key 已經寫在別人裝置的 DB 與 localStorage 裡(同 v1.85.0 五小龍那條)。 -->
-<meta name="version" content="1.86.0">
+       —— 那些 key 已經寫在別人裝置的 DB 與 localStorage 裡(同 v1.85.0 五小龍那條)。
+     ⚠ 上面那一行的版號格式是 tools/test-version.js 在守的:版號要與註解的結束標記
+       **在同一行**,寫成多行它抓不到(症狀是「版號檢查紅了一項但看起來像誤報」)。
+     ⚠⚠ 註解裡**一個字都不可以出現註解的結束標記** —— v1.87.0 真的踩到:
+       那一串被當成註解結束,後面整段文字就漏到畫面最上面變成一行亂碼,
+       而它**只有截圖看得出來**(DOM 量出來完全正常)。 -->
+<meta name="version" content="1.87.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -82,9 +87,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <li>目標:手上的牌加起來<b>越接近 21 越好</b>,超過就<b>爆</b>(直接輸)。</li>
           <li><b>A 算 1 或 11</b>(哪個好用算哪個);<b>J / Q / K 都算 10</b>。</li>
           <li>比的<b>不是誰最大,而是你有沒有打贏莊家</b> —— 每個閒家各自跟莊家算。</li>
-          <li><b>莊家輪流當</b>:每一局換一個人,一輪 = 每個人各當一次莊。</li>
+          <!-- ★ v1.87.0:換莊頻率可調了 → 這一條不可以再寫死「每一局換」 -->
+          <li><b>莊家輪流當</b>:一輪 = 每個人各當一次莊,<b>幾局換莊由房主決定</b>。</li>
           <li>一局的順序:<b>下注 → 發牌 → 閒家補牌 → 莊家補牌 → 結算</b>。</li>
-          <li>莊家的<b>第二張牌是蓋著的</b>,要等閒家都停手了才翻開。</li>
+          <!-- ★★ v1.86.0 起蓋著的**不只莊家** —— 每個人的第一張都是底牌。
+               ⚠ 這一條寫錯的話玩家會以為別人的牌沒畫出來是 bug。 -->
+          <li>莊家的第二張、還有<b>每個人的第一張都是蓋著的</b>;被抓、爆掉或結算才翻開。</li>
+          <li>莊家補到規則點數之後可以<b>抓人</b> —— 指名一家先跟他比。</li>
           <li><b>閒家可以同時補牌</b>,不必等別人 —— 每個人抽自己的牌。</li>
           <li>下注用<b>加減鈕</b>(±1 / ±5 / ±10)自己調,上限由房主決定。</li>
           <li><b>21 點</b>(前兩張就 21)賠得比較多;<b>過五關</b>(五張不爆)賠更多。</li>
@@ -311,6 +320,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
         <div class="set-group">
           <div class="set-group-title">莊家</div>
+          <!-- ★★★ v1.87.0:幾局換莊(使用者:「現在是每一把就換莊,但我要這個是可以調整的」)。
+               ⚠ 一輪的**定義沒變**(每個人各當一次莊),只是一輪的局數 = 人數 × 這個數字
+                 → 「當莊次數一樣」那條公平性照樣成立(所以不必動上面那個「打幾輪」)。
+               ⚠ 舊房間沒有 hands 這個欄位 → normRules 補 1 = 逐字回到 v1.86.0 的行為。 -->
+          <div class="set-row col">
+            <span class="set-lbl">幾局換莊<span class="set-sub">同一個人連續當莊幾局;一輪還是每個人各當一次</span></span>
+            <div class="seg" aria-label="幾局換莊">
+              <button data-rk="hands" data-rv="1">每局換</button>
+              <button data-rk="hands" data-rv="2">2 局</button>
+              <button data-rk="hands" data-rv="3">3 局</button>
+            </div>
+          </div>
           <div class="set-row col">
             <!-- ★★★ v1.86.0:補牌線從「只管莊家的雙向鎖」變成「**莊閒都適用的下限**」
                  (使用者:「補牌的原則是莊家跟玩家都要一同遵守」),而且多一格 15。

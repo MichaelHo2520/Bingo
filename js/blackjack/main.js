@@ -123,6 +123,8 @@ function paintSoloHint(){
   const r = Solo.rules();
   el.innerHTML = "<b>" + L.emoji + " " + L.name + "</b>:" + esc(L.desc) + "<br>" +
     "<b>" + n + " 人</b> · 打 <b>" + r.rounds + " 輪</b>(共 " + Solo.totalRounds() + " 局)· " +
+    // ★ v1.87.0:換莊頻率可調 → 這一句不可以寫死「每一局換」
+    (r.hands > 1 ? ("<b>連做 " + r.hands + " 局才換莊</b>") : "<b>每一局換莊</b>") + "。<br>" +
     "你固定坐第一位,<b>第一局由電腦當莊</b>(每個人各當 " + r.rounds + " 次莊)。<br>" +
     // ⚠ 圖示一律 🎴(U+1F3B4);小丑牌那顆是 U+1F0CF,落在被禁的區段
     "<span class=\"bj-warn\">🎴 " + esc(Solo.recLine(Solo.level())) + "</span>";
