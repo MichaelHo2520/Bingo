@@ -4819,3 +4819,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     color:var(--muted);text-align:left;overflow:hidden;text-overflow:ellipsis}
   /* ⚠ 高度寫得比一般 .btn 矮一階:它住在過場裡,而過場的空間要留給那張表。 */
   .bj-hskip{flex:0 0 auto;padding:7px 14px;font-size:13px;white-space:nowrap}
+  /* ★★★ v1.95.0:按過了(連線在等其他人)—— 變暗但**照樣按得動**
+     (CLAUDE.md 的紅線:不用 disabled 讓點擊靜默消失;再按會跳「你已經按過了」)。 */
+  .bj-hskip.voted{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;opacity:.72}
+  :root[data-theme="ebook"] .bj-hskip.voted{background:#eee;color:#000;border:1px solid #000}

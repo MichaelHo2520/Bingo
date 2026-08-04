@@ -57,10 +57,12 @@ const BJB = (function(){
      與 betPend / grabOpen 同一類:**純畫面狀態**,不進 DB、不進 st、不影響任何判定。
      ⚠ handKey 是**去重**用的:過場開著的時候每一次 paint 都會叫 showHand 一次
        (連線一個快照一次),沒有它結算聲會一直重播。
-     ⚠ handDone 是 v1.94.0 加的:**已經被使用者點掉的那一局** —— 連線送出 advance 之後
-       要等一次交易來回,那期間 paint() 照樣會叫 showHand,沒有它過場會閃回來。
-     ⚠ hSkip 是呼叫端給的「按下去要做什麼」(單機 = 立刻換局 / 連線 = 送 advance)。 */
-  let handKey = "", handOn = false, handDone = "", hSkip = null;
+     ⚠ hSkip 是呼叫端給的「按下去要做什麼」(單機 = 立刻換局 / 連線 = 送一筆「我看完了」);
+       hVoted 是「我按過了沒」—— 只給「再按一次要說得出原因」用,**真相在呼叫端**
+       (連線是 DB 的 `bj.nx`,而 showHand 每次都會把它餵進來)。
+     ⚠ v1.94.0 的 handDone 旗標**拿掉了**:它當初擋的是「本地先收掉、advance 還在飛」
+       那一下的閃回來,而 v1.95.0 起按了**不收畫面**(要留著看還在等幾人)。 */
+  let handKey = "", handOn = false, hSkip = null, hVoted = false;
 
   /* ==========================================================================
      一、牌面
@@ -1092,7 +1094,7 @@ const BJB = (function(){
        (單機是 "solo:1"),不清的話那一局的結算聲會被去重當成「已經響過了」。 */
   function resetAnnounce(){
     anPrev = null; anKey = ""; anCaught = null; anRev = false; anBets = null;
-    grabOpen = false; handKey = ""; handDone = "";
+    grabOpen = false; handKey = ""; hVoted = false;
   }
 
   /* ==========================================================================
@@ -1215,32 +1217,43 @@ const BJB = (function(){
      ⚠ 蓋住整個 `.bj-play`(含動作列)是**刻意的**:那一段動作列只有一行字,而
        「過場」的意思就是把畫面接管一下。表情 / 麥克風在房間框上,沒有被蓋到。
 
-     ── ★★★ v1.94.0:**看完可以點掉**(使用者:「最後結算的畫面時間太短了,
+     ── ★★★ v1.94.0:**看完可以按**(使用者:「最後結算的畫面時間太短了,
         然後我希望有可以快速關掉的操作」)────────────────────────────────────────
        兩件事一起改才對:**窗口加長**(3.6 → 6 秒,6 人局那張表要讀得完)
-       + **點一下就換下一局**。只加長會變成「每一局都在等」,只給鈕又還是讀不完。
+       + **一顆「看完了」的鈕**。只加長會變成「每一局都在等」,只給鈕又還是讀不完。
+
+     ── ★★★ v1.95.0:連線改成**全部人按完才一起跳**(不是誰先按誰說了算)────────────
+       使用者:「我不希望是誰按就全桌一起跳,麻煩改一下變成**全部都按完了才一起跳**」。
+       ★★ v1.94.0 是「誰先按誰推進」(按鈕直接送 `advance`)—— 那會**把別人正在讀的
+          畫面翻掉**,而這一頁的過場正是為了「讀得完」才存在的。整個抵銷掉。
+       ★ 所以按鈕從「跳過」變成**投票**:按下去只代表「**我**看完了」,
+         **每一個還在房裡的座位都按過**才推進(連線那一側的 `maybeNext`)。
+         時間到(SETTLE_MS)照舊自動推進 —— 那是**後備**,擋掉「有人放著不管全桌乾等」。
        ★★ 「按了會發生什麼事」由**呼叫端**給(`v.onSkip`)—— 面板只有這一份:
-            單機 → 立刻跑 `nextRound()`(取消還沒響的那一次 later)
-            連線 → 送 `advance(seq)`,與**到期推進走同一支**(交易守衛一樣是 `b.over` + `seq`)
-         ⚠⚠ 所以連線**是全桌一起跳**(誰先按誰推進;那本來就是這一頁「不指定房主」的
-            設計)—— 鈕上與腳註一定要講明「全桌一起」,不然按的人不知道自己把別人的
-            畫面也翻掉了。這一版刻意接受它:受眾是坐在一起的親友,
-            「好了下一局」本來就是有人喊的。
-       ⚠ v1.92.0 那條註解(「這一頁沒有跳過鈕:連線要全桌同時看到同一段」)**已經被
-         這一版推翻**,不要照舊文件加回去。
+            單機 → 立刻跑 `nextRound()`(只有我一個人,不必等)
+            連線 → 送一筆「我看完了」(`sendNext`);湊齊了才由 `maybeNext` 叫 `advance`
+       ⚠⚠ 因此 `skipHand()` **不可以自己把過場收掉** —— 連線按完還要**留在畫面上**
+         看「還在等幾人」。收不收由呼叫端的流程決定(單機是 `startRound` 收、
+         連線是下一個快照相位變了就收)。v1.94.0 那個 `handDone` 旗標因此**拿掉了**:
+         它當初是為了擋「本地先收掉、advance 還在飛」那一下的閃回來,而現在不收了。
+       ⚠ v1.92.0 那條註解(「這一頁沒有跳過鈕」)與 v1.94.0 那條(「全桌一起跳」)
+         **都已經被推翻**,不要照舊文件加回去。
        ⚠ **能點的只有那顆鈕與卡片外面的空白**(`.bj-hcard` 本身不吃點擊)——
-         中間那張表是可以捲的,整片都能點的話「捲到一半手指離開」會誤跳。
-       ⚠ 點掉之後要記住「這一局已經點掉了」(`handDone`):連線送出 advance 之後
-         要等一次交易來回,那期間 paint() 照樣會叫 showHand → 過場會閃回來。
+         中間那張表是可以捲的,整片都能點的話「捲到一半手指離開」會誤按。
+       ⚠ 按過了再按**不用 disabled**(CLAUDE.md 的紅線):照樣按得動,只是說得出
+         「你已經按過了 —— 還在等其他人」。
      ========================================================================== */
-  /* v = { st, names[], me, sc, chips[], key, title, foot, ms, skipTxt, onSkip } */
+  /* v = { st, names[], me, sc, chips[], key, title, foot, ms,
+           skipTxt, skipDone, skipWait, onSkip }
+       skipDone 我按過了沒 · skipWait 還在等幾個人(0 = 不必等,單機一律 0)
+       ⚠ 這兩格由**呼叫端**算(只有它知道「誰還在房裡」)—— 面板只負責畫。 */
   function showHand(v){
     const box = $("bjHand");
     if(!box || !v || !v.st || !v.sc) return;
-    if(v.key === handDone) return;          // ★ 這一局已經被點掉了(見檔頭最後那條 ⚠)
     const fresh = (v.key !== handKey);
     handKey = v.key; handOn = true;
     hSkip = (typeof v.onSkip === "function") ? v.onSkip : null;
+    hVoted = !!v.skipDone;
     box.innerHTML = handHTML(v);
     box.classList.add("show");
     /* ★ 結算聲只在**第一次**開的時候響(去重就是 handKey 的存在理由),
@@ -1254,21 +1267,21 @@ const BJB = (function(){
   function hideHand(){
     if(!handOn) return;                    // ★ 每次 paint 都會叫一次 → 沒開就什麼都不做
     handOn = false;
-    hSkip = null;
+    hSkip = null; hVoted = false;
     const box = $("bjHand");
     if(!box) return;
     box.classList.remove("show");
     box.innerHTML = "";
   }
-  /* 使用者點掉過場(那顆鈕 / 卡片外面的空白)。★ 先收畫面再通知呼叫端 ——
-     連線那一側會送交易,晚一步的話那一格還亮著、看起來像沒吃到(同 grabOpen 那條)。 */
+  /* 按下「看完了」(那顆鈕 / 卡片外面的空白)。
+     ⚠⚠ **這裡不收畫面**(v1.95.0):連線按完要留著看「還在等幾人」——
+       收不收由呼叫端的流程決定(單機 startRound 收 / 連線相位變了就收)。
+     ⚠ 按過了再按不用 disabled(CLAUDE.md 的紅線),要說得出原因。 */
   function skipHand(){
     if(!handOn) return;
-    const fn = hSkip;
-    handDone = handKey;                    // ★ 記住「這一局點掉了」→ 重畫不會閃回來
-    hideHand();
-    Sound.takeback();                      // 很輕的一聲「收起來」(與停手同一顆)
-    if(fn) fn();
+    if(hVoted){ showToast("你已經按過了 —— 還在等其他人"); return; }
+    Sound.takeback();                      // 很輕的一聲「收到了」(與停手同一顆)
+    if(hSkip) hSkip();
   }
   function handHTML(v){
     const st = v.st, sc = v.sc, me = v.me;
@@ -1296,17 +1309,29 @@ const BJB = (function(){
                 而且時有時無(v1.91.0 踩過),所以守門一律看這個 inline 值。 */
              '<div class="bj-hbar" style="--bj-hdur:' +
                (Math.max(400, v.ms || 3000) / 1000) + 's"><i></i></div>' +
-             /* ★★★ v1.94.0:看完可以點掉(使用者:「我希望有可以快速關掉的操作」)。
+             /* ★★★ v1.94.0:看完可以按(使用者:「我希望有可以快速關掉的操作」)。
+                ★★★ v1.95.0:連線改成**投票** —— 按過了就換成「✓ 已看完 · 還在等 N 人」
+                (使用者:「不希望是誰按就全桌一起跳,變成全部都按完了才一起跳」)。
                 ⚠ 鈕上的字由**呼叫端**給:最後一局要寫「看結果」而不是「下一局」,
-                  而「這是不是最後一局」只有呼叫端算得出來(連線的一輪長度會變)。
+                  而「這是不是最後一局 / 還在等幾人」只有呼叫端算得出來。
+                ⚠ 按過了**不用 disabled**(CLAUDE.md 的紅線):只加 `.voted` 變暗,
+                  照樣按得動 → skipHand 會說「你已經按過了」。
                 ⚠ 這一列要**在進度條下面**:它是「不想等就按」,而進度條是「還剩多久」——
                   順序反過來讀起來像「按了才開始倒數」。 */
              '<div class="bj-hend">' +
-               '<span class="bj-hfoot">' + esc(v.foot || "準備下一局…") + '</span>' +
-               '<button class="btn primary bj-hskip" type="button">' +
-                 esc(v.skipTxt || "下一局 ▸") + '</button>' +
+               '<span class="bj-hfoot">' + esc(footTxt(v)) + '</span>' +
+               '<button class="btn primary bj-hskip' + (v.skipDone ? " voted" : "") +
+                 '" type="button">' +
+                 esc(v.skipDone ? "✓ 已看完" : (v.skipTxt || "下一局 ▸")) + '</button>' +
              '</div>' +
            '</div>';
+  }
+  /* 腳註那一句。★ 按過了就換成「還在等誰」—— 那是投票制唯一需要多講的事,
+     而「還在等幾人」只有呼叫端算得出來(它才知道誰還在房裡)。 */
+  function footTxt(v){
+    if(v.skipDone && v.skipWait > 0) return "還在等 " + v.skipWait + " 人按「看完了」…";
+    if(v.skipDone) return "大家都看完了 —— 馬上開下一局";
+    return v.foot || "準備下一局…";
   }
 
   /* ==========================================================================
@@ -1485,8 +1510,8 @@ const BJB = (function(){
     dealSfx, chipSfx, revealSfx, settleSfx, evSfx, primeVoice,
     // 給 e2e 用:抓人那一排展開了沒(純畫面狀態)
     _grabOpen: () => grabOpen,
-    // 給 e2e 用:過場開著沒 / 開的是哪一局 / 哪一局被點掉了(全是純畫面狀態)
-    _handOn: () => handOn, _handKey: () => handKey, _handDone: () => handDone,
+    // 給 e2e 用:過場開著沒 / 開的是哪一局 / 我按過「看完了」沒(全是純畫面狀態)
+    _handOn: () => handOn, _handKey: () => handKey, _handVoted: () => hVoted,
     /* 給 e2e 用:版型的算式(v1.88.1)—— **餵尺寸進去**,不吃畫面。
        ★ 這是「一列幾格挑牌最大的那一種」唯一測得到的角度:
          真的靠視窗量的話,斷言會跟著跑測試的視窗大小飄。 */

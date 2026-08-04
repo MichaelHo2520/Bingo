@@ -26,6 +26,9 @@
          deal  這一局的牌 · bets{pid:n} · acts{pid:"hs"}
          nets{pid:n}  這一場的累計淨籌碼變化(★ 可以是負的)
          over  這一局結算過了沒
+         nx{pid:true} ★★ v1.95.0:結算過場「我看完了」的票 —— **每一個還在房裡的座位
+               都按過**才推進(見四之二);時間到照舊自動推進,那是後備。
+               ⚠ 舊房間沒有這一格 → 當成「沒人按過」,退回只靠時間(加法式)。
        }
      每台裝置各自 `BJ.replay(deal, seats.length, dealerIdx, acts, rules)` 算出完整局面,
      所以**重連歸位不必特別處理**(批次同步就是同一支 replay 多跑幾個動作)。
@@ -199,21 +202,70 @@ const MP = MPCore.create((function(){
       chips: seatsOf().map(id => r.start + ((bj.nets && bj.nets[id]) || 0)),
       key: ctx.roundId() + ":" + seq,
       title: "第 " + (bj.rd + 1) + "/" + r.rounds + " 輪 · 第 " + (bj.k + 1) + " 局 · 結算",
-      /* ★★★ v1.94.0:看完可以點掉(使用者:「時間太短了…我希望有可以快速關掉的操作」)。
-         ⚠⚠ 連線是**全桌一起跳**(誰先按誰推進)—— 那本來就是這一頁「不指定房主」的
-           設計:`advance()` 是交易,守衛是 `b.over` + `seq`,與**到期推進走同一支**。
-           所以鈕上與腳註**一定要講明「全桌一起」**:不講的話按的人不知道自己把別人
-           正在讀的畫面也翻掉了(而那會變成現場的小爭執)。
-         ⚠ 這裡**不可以**自己寫一份「換局」邏輯 —— 兩份推進真相的症狀是
+      /* ★★★ v1.94.0:看完可以按 · ★★★ v1.95.0:**全部人按完才一起跳**
+         (使用者:「我不希望是誰按就全桌一起跳,麻煩改一下變成全部都按完了才一起跳」)。
+         ⚠⚠ v1.94.0 是「誰先按誰推進」(按鈕直接送 advance)—— 那會**把別人正在讀的
+           畫面翻掉**,而過場正是為了「讀得完」才存在的,整個抵銷掉。
+         ★ 所以按鈕只送一筆「**我**看完了」(sendNext);湊齊之後由 `maybeNext()` 叫
+           `advance` —— 而 `advance` 與**到期推進是同一支**(交易守衛 `b.over` + `seq`)。
+         ⚠ 這裡**不可以**自己寫一份「換局」邏輯:兩份推進真相的症狀是
            「同一局在不同裝置變成不同的下一局」。 */
-      /* ⚠ v1.94.0:這一句講**進度條在幹嘛** + **按了會影響誰** ——
-         舊的「準備下一局…」與旁邊那顆鈕講同一件事,而它們並排在同一列。
-         ★ 「全桌一起」四個字不可以拿掉:那是連線與單機**唯一**的行為差別。 */
-      foot: last ? "時間到會自動看結果" : "時間到會自動開下一局(誰按都是全桌一起)",
-      skipTxt: last ? "看結果 ▸" : "下一局 ▸",
-      onSkip: function(){ if(playing()) advance(seq); },
+      /* ⚠ 這一句講**進度條在幹嘛**(舊的「準備下一局…」與旁邊那顆鈕講同一件事,
+         而它們並排在同一列)。★ 「大家按完就開」那一句是 v1.95.0 的重點 ——
+         按過之後的腳註改成「還在等 N 人」,那一份在 board.js 的 footTxt。 */
+      foot: last ? "大家按完就看結果(時間到也會自動看)"
+                 : "大家按完就開下一局(時間到也會自動開)",
+      /* ★ 連線一律寫「我看完了」而不是「下一局」:按下去**不會**馬上換局
+         (要等大家),鈕上的字一定要與實際發生的事一致。單機那邊才是「下一局 ▸」。 */
+      skipTxt: "我看完了 ▸",
+      skipDone: nextDone(ctx.me()),
+      skipWait: nextWait().length,
+      onSkip: function(){ if(playing()) sendNext(seq); },
       ms: Math.max(600, phaseAt + SETTLE_MS - Date.now())
     });
+  }
+
+  /* ==========================================================================
+     四之二、★★★ 「我看完了」的投票(v1.95.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「我不希望是誰按就全桌一起跳,麻煩改一下變成**全部都按完了才一起跳**」。
+       ★ DB 上多一格 `bj.nx = { pid: true }` —— 這一局誰按過「我看完了」。
+         **每一個還在房裡的座位都按過**才推進;時間到(SETTLE_MS)照舊自動推進,
+         那是**後備**(擋掉「有人放著不管全桌乾等」)。
+       ⚠ 「還在等誰」一律過濾**還在房裡的人**(`ctx.players()`)—— 中途離開的人
+         不可以卡住全桌(同 `advance()` 那條 ids 過濾)。
+       ⚠ 沒座位的觀眾(中途加入還沒上桌)按了也寫得進去,但**不列入必須等的名單**:
+         他不在 `seats` 裡,要求他會在他離開時卡住。
+       ⚠⚠ **推進的人不指定**:誰的快照先看到「湊齊了」誰就叫 advance(交易守衛擋重複)——
+         與這一頁其他每一個「不指定房主」的機制同一套。
+       ⚠ 舊版裝置(v1.94.0)按鈕是直接送 advance,所以混版房間裡他還是會把大家翻掉。
+         新版一律不寫 advance,而讀到沒有 `nx` 就當成「沒人按過」→ 退回只靠時間。
+     ========================================================================== */
+  const nextDone = id => !!(bj && bj.nx && bj.nx[id]);
+  // 還在等誰按(pid 陣列)★ 只算「還在房裡 + 這一局有座位」的人
+  function nextWait(){
+    if(!bj) return [];
+    const ids = Object.keys(ctx.players());
+    return seatsOf().filter(id => ids.indexOf(id) >= 0 && !nextDone(id));
+  }
+  function sendNext(seq){
+    const me = ctx.me();
+    txRound((g, b) => {
+      if(!b.over) return false;                     // 還沒結算完 → 這一票沒有意義
+      b.nx = b.nx || {};
+      if(b.nx[me]) return false;                    // 按過了(交易層的冪等)
+      b.nx[me] = true;
+    });
+  }
+  /* 湊齊了就推進。★ 與 maybeSettle 同一個位置被叫(applyGame 的尾巴)。
+     ⚠ 一定要 `bj.over`:還在補牌的時候 nx 裡不該有東西,但多一道門比推理便宜。 */
+  function maybeNext(){
+    if(!bj || !bj.over || !playing()) return;
+    const ids = Object.keys(ctx.players());
+    const need = seatsOf().filter(id => ids.indexOf(id) >= 0);
+    if(need.length < 1) return;
+    for(let i = 0; i < need.length; i++) if(!nextDone(need[i])) return;
+    advance(bj.seq);
   }
 
   /* 動作列那一句話。★ 只講「現在在等什麼」,不透露任何牌情。 */
@@ -540,6 +592,8 @@ const MP = MPCore.create((function(){
       b.seq = (b.seq || 0) + 1;
       b.deal = BJ.newDeal();
       b.bets = {}; b.acts = {}; b.over = false;
+      // ★★★ v1.95.0:新的一局要把「我看完了」那一格清掉(不清就等於下一局一開始就湊齊了)
+      b.nx = {};
     });
   }
 
@@ -629,7 +683,9 @@ const MP = MPCore.create((function(){
            這一場(改了會讓已經打完的局重算出不同結果)。 */
         rules: BJ.normRules(rules),
         bj: { seq: 0, rd: 0, k: 0, rot: rot, seats: seats,
-              deal: BJ.newDeal(), bets: {}, acts: {}, nets: {}, over: false }
+              deal: BJ.newDeal(), bets: {}, acts: {}, nets: {}, over: false,
+              // ★★★ v1.95.0:這一局誰按過「我看完了」(全部按完才推進;見四之二)
+              nx: {} }
       };
     },
     applyGame(g, isPlaying){
@@ -669,6 +725,8 @@ const MP = MPCore.create((function(){
       armPhaseT();
       paint();
       maybeSettle();
+      // ★★★ v1.95.0:全部人按過「我看完了」→ 推進(不指定房主,誰先看到誰叫)
+      maybeNext();
     },
 
     /* ---------- 相位的專屬畫面 ----------
