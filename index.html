@@ -17,8 +17,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.89.0 -->
-<meta name="version" content="1.89.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.89.1 -->
+<meta name="version" content="1.89.1">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -197,19 +197,34 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- 第八個遊戲(v1.84.0):台式21點。
            ⚠ 插圖同樣只用數字與字母,不用撲克牌 Unicode(U+1F0A0 那一段)——
               多數字型沒有,會變豆腐方框(同麻將牌那條禁令,見 notes/13)
-           ★ 沿用排七 / 大老二那組 .pk-* 撲克牌圖示(同一副牌本來就該長一樣)
-           ⚠ 中間那張要放「21」兩個字 → 字級小一號(.bj-cart .pk-r 在 styles.css)
+           ★★ v1.89.1:改成**兩張交疊斜放的牌 ♠A + ♦10**(使用者附了一張參考圖)——
+              A + 10 剛好就是 21 點那一手,比原本「A / 21 / K 三張立正站好」講得清楚。
+              牌面照的是**遊戲裡真的那副牌**:點數在上、花色在下、都置中(同 .bj-card),
+              花色 path 直接抄 js/shared/pk-faces.js 的 PATHS(同一副牌本來就該長一樣),
+              配色走 --bj-face / --bj-line / --bj-blk / --bj-red(所以電子書主題自動黑白)。
+           ⚠ 這一版起**不掛 .pk-* 那組**(那是排七 / 大老二三張牌的圖示,改它會波及兩張卡)
            ⚠⚠ 這裡**不可以**掛 .bj-art —— 那是 blackjack.html 進場插圖的 96px,
                它定義在 .gc-art(54px)後面 → 會把這張卡撐得比另外七張高一截
                (v1.86.0 修掉的;理由記在 styles.css .bj-cart 那條旁邊) -->
       <a class="game-card as-link" href="blackjack.html">
-        <svg class="gc-art pk-art bj-cart" viewBox="0 0 56 56" role="img" aria-label="撲克牌 台式21點">
-          <rect class="pk-bd" x="4" y="13" width="16" height="24" rx="3"/>
-          <rect class="pk-bd" x="21.5" y="9" width="16" height="24" rx="3"/>
-          <rect class="pk-bd" x="36" y="13" width="16" height="24" rx="3"/>
-          <text class="pk-k" x="12" y="29">A</text>
-          <text class="pk-r" x="29.5" y="26">21</text>
-          <text class="pk-k" x="44" y="29">K</text>
+        <svg class="gc-art bj-cart" viewBox="0 0 56 56" role="img" aria-label="撲克牌 台式21點">
+          <!-- 下層:♦10(往左斜) -->
+          <g transform="rotate(-16 19 30)">
+            <rect class="bj-ic-bd" x="8.5" y="15" width="21" height="30" rx="2.7"/>
+            <text class="bj-ic-t bj-ic-red" x="19" y="28">10</text>
+            <g class="bj-ic-s bj-ic-red" transform="translate(15 30.4) scale(.08)">
+              <path d="M50 6 86 50 50 94 14 50z"/>
+            </g>
+          </g>
+          <!-- 上層:♠A(往右斜、蓋在前面) -->
+          <g transform="rotate(16 37.5 29)">
+            <rect class="bj-ic-bd" x="27" y="14" width="21" height="30" rx="2.7"/>
+            <text class="bj-ic-t" x="37.5" y="27">A</text>
+            <g class="bj-ic-s" transform="translate(33.5 29.4) scale(.08)">
+              <path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/>
+              <path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>
+            </g>
+          </g>
         </svg>
         <span class="gc-body">
           <span class="gc-name display">台式21點</span>

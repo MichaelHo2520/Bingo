@@ -3807,17 +3807,34 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-scroll{flex:1 1 auto}
   .bj-hero{text-align:center;margin:14px 0 4px}
   .bj-art{width:96px;height:96px;display:block;margin:0 auto 8px}
-  /* ⚠ 撲克牌小圖示的 .pk-* 是**排七那一段定義的**(index.html 的遊戲卡也共用同一組)。
-     這一頁只是沿用,刻意不再定義一份 —— 同一副撲克牌本來就該長一樣。
-     ★ 但 21 點的中間那張要放「21」兩個字 → 字級要小一號,否則會溢出牌框。
-     ── ★★ v1.86.0:首頁遊戲卡用的是 .bj-cart,**不可以**掛 .bj-art ────────────
+  /* ---------- 插圖:♠A + ♦10 兩張交疊斜放(v1.89.1)----------
+     使用者附了一張參考圖(兩張斜疊的牌:紅 10 + 黑桃 A)要求「用我們遊戲裡的牌來做」。
+     A + 10 剛好就是 21 點那一手,所以它同時是最貼題的圖示。
+     ★ 首頁那張遊戲卡(.gc-art.bj-cart 58px)與這一頁的進場插圖(.bj-art 96px)
+       **共用逐字相同的一份 SVG 節點**(index.html / blackjack.html 各一份),
+       樣式只有下面這四條 —— 牌面照 .bj-card 的畫法(點數在上、花色在下、都置中),
+       花色 path 直接抄 js/shared/pk-faces.js 的 PATHS(同一副牌本來就該長一樣)。
+     ⚠ 顏色一律走 --bj-* 變數,**不寫死** → 電子書主題自動黑白,不必補一組覆寫。
+     ⚠ 紅色那個 class 叫 `.bj-ic-red`,**不可以**用既有的裸 `.red`
+       (`.bj-card.red` / `.sv-card.red` / `.b2-card.red` 都在用它)。
+     ⚠ 字級 9.7px = 牌寬 21 × .46,與 .bj-cr 同一個比例;viewBox 是 56×56,
+       所以兩處各自等比縮放,兩邊都不必再調字級。
+     ⚠ v1.89.1 起這兩處**不再掛 .pk-***(那是排七 / 大老二三張牌圖示那一組,
+       原本的 `.bj-art .pk-r,.bj-cart .pk-r{font-size:11px}` 也跟著刪了)。 */
+  .bj-ic-bd{fill:var(--bj-face);stroke:var(--bj-line);stroke-width:.9}
+  .bj-ic-t{fill:var(--bj-blk);font:800 9.7px/1 'Nunito',sans-serif;text-anchor:middle}
+  .bj-ic-s{fill:var(--bj-blk)}
+  .bj-ic-t.bj-ic-red,.bj-ic-s.bj-ic-red{fill:var(--bj-red)}
+
+  /* ── ★★ v1.86.0:首頁遊戲卡用的是 .bj-cart,**不可以**掛 .bj-art ────────────
        上面那條 .bj-art 是**這一頁進場插圖**的 96px,而它定義在
        .gc-art{width:54px}(第 1152 行)**後面** → 同權重、後定義勝
        → 首頁那張卡的圖直接變成 96px,整張卡比另外七張高一截(v1.85.0 之前一直是這樣)。
        ⚠ 這是 notes/13「CSS 會撞的四類」的第二類(權重 / 順序),而且是**自己撞自己**
          —— 前綴防得了名字撞,防不了這個。加頁面專屬 class 到共用元件上之前,
-         一定要先看那個 class 有沒有在別的地方定尺寸。 */
-  .bj-art .pk-r,.bj-cart .pk-r{font-size:11px}
+         一定要先看那個 class 有沒有在別的地方定尺寸。
+       ⚠ v1.89.1 起插圖換成 .bj-ic-*(上面那組),.pk-* 已經不掛了 ——
+         但這條坑照舊:`.bj-art` 的 96px 仍然定義在 `.gc-art` 後面。 */
   .bj-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
 
   /* ---------- 規則清單 ----------
