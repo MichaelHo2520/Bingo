@@ -802,6 +802,7 @@
     { id:"hurry",   label:"快點來不及啦",  src:"mp3/快點，來不急啦.m4a" },
     { id:"gofast",  label:"你就趕快啦",    src:"mp3/你就趕快啦.m4a" },
     { id:"crying",  label:"你是在哭喔",    src:"mp3/你是在哭喔.m4a" },
+    { id:"verify",  label:"我要驗牌",      src:"mp3/我要驗牌.m4a" },
     // 「聽牌」為連線遊戲自動觸發(有人只差一號就達標),不放進手動表情選單 → auto:true 讓 buildVoiceClips 略過
     { id:"reach",   label:"聽牌",          src:"mp3/聽牌.m4a", auto:true },
   ];
