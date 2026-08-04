@@ -4645,3 +4645,94 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-first-lbl{font:800 10.5px/1.4 'Nunito',sans-serif;color:var(--muted);margin-top:2px}
   .bj-first-note{font:800 10.5px/1.4 'Nunito',sans-serif;color:#ffb4a2;margin-top:4px}
   :root[data-theme="ebook"] .bj-first-note{color:#000}
+
+  /* ==========================================================================
+     台式21點 v1.91.0 —— ★★★ 「這是我」與「現在在等誰」用兩種完全不同的語彙
+     ==========================================================================
+       使用者:「在開始遊戲的時候,**自己的那一個項目會用黃色的框選起來,然後輪到誰
+       也會用相同黃色的框選起來**,這樣表示的方法很難讓人家理解,麻煩你換一個好一點
+       的方式,**以互動為原則**,但是又要讓使用者能**很清楚的了解到自己的位置在哪裡**」
+
+     ── ★★ 為什麼會混:兩個不同性質的訊號共用同一條通道 ────────────────────────
+         .bj-box.me     border #ffd489        ← 我(**身分**,一整場不變)
+         .bj-dealer.act border rgba(255,196,84,.9) ← 莊家在補牌(**暫時**,幾秒後就沒了)
+         .bj-box.target border #ffc454        ← 這一格抓得動(**可點**)
+       三個都是「金色的框」。同色 + 同位置 + 同粗細 → 畫面上三種意思長得一模一樣,
+       玩家只能猜。★ 這與排七 v1.75.2 那條教訓是同一件事(「你會把第一名特別框起來,
+       這樣很容易讓大家以為自己是第一名」)—— 結論也一樣:**訊號要分軌,不是換色**。
+
+     ── ★★★ 分軌之後的語彙表(改任何一格之前先看這張表)────────────────────────
+       | 要講的事 | 顏色 | 位置 / 方向 | 會不會動 |
+       |---|---|---|---|
+       | **這是我**(身分) | 金 `--accent-2` | **左緣直條** + 框 + 底色 + 名字寫「你」 | 靜態 |
+       | **現在在等他**(暫時) | 亮青 `--bj-turn` | **上緣橫條** | **呼吸** |
+       | **這一格抓得動**(可點) | 白 | 整格框 + `🎯 抓` | 呼吸(亮度) |
+       | 爆 / 被抓 | 紅 / 琥珀 | 底色 | 靜態 |
+       ★ 三件事分別落在**不同的顏色 + 不同的位置 + 不同的動靜**上 → 兩兩同時出現
+         (我正在補牌 = 金直條 + 青橫條)照樣一眼分得開。
+       ★ 「互動為原則」落在**會呼吸的那一條**:動的東西 = 現在跟你有關的事,
+         不動的東西 = 身分。這比「兩個都用框、靠色階分」直覺得多。
+
+     ── ⚠ 為什麼這次用**偽元素**而不是 border(CLAUDE.md 那條紅線的例外)──────────
+       紅線原文是「亮框一定要用 border(占版面 → 畫得完整),box-shadow 會被捲動容器
+       裁掉」。那條講的是**外擴**的 box-shadow。這裡兩條記號是**絕對定位在格子內部**的
+       偽元素 → ①不占版面(border 一加粗,BOX_PADX 就得跟著改,而它是「一格塞得下
+       5 張」那條算式的常數 → 我那一格的牌會比別人窄 1px = CARDW 出現兩個值)
+       ②在格子裡面 → 捲動容器裁不到 ③兩條可以同時存在(border 只有一條)。
+     ========================================================================== */
+  :root{ --bj-turn:#6ec8ff; }
+  :root[data-theme="ebook"]{ --bj-turn:#000; }
+  /* 偽元素的定位基準。⚠ 一格 / 莊家台裡面本來沒有絕對定位的東西,加這條零影響。 */
+  .bj-box,.bj-dealer{position:relative}
+
+  /* ---------- ①「這是我」:金框 + 金底 + 金字(三個記號,全部靜態)---------- */
+  /* ★★ 三個記號都指同一件事,而且**只有我有金色** —— 使用者要的是「很清楚知道
+     自己的位置在哪裡」,所以身分這一軌刻意疊三層,而不是靠一條框的色階去分。
+     ⚠⚠ 施工中試過「左緣一條金脊」,放大截圖一看**它與金框糊成一條**(同色又相鄰)
+       = 白畫的一個記號 → 拿掉了。這一格就是 notes/14「量得到、看不太出來」的反面:
+       DOM 上明明有那個元素,但視覺上不存在。
+     ⚠ 莊家台**也要有金框** —— 舊版 .bj-dealer.me 只換背景,於是「我當莊」的時候
+       「我在哪」的記號比我當閒家時弱一階(同一件事在兩個位置強度不同 = 玩家會愣一下)。 */
+  /* ⚠⚠ 金框那一條寫在**檔尾**(見②的結尾)—— 它必須排在 .act 的 transparent 後面,
+     不然「我 + 正在補牌」時框會被關掉。這裡只放不牽涉 border-color 的部分。
+     ⚠ border **寬度**一格都不能動(連電子書主題也不行):BOX_PADX 是「一格塞得下
+       5 張」那條算式的常數,加粗 1px = 我那一格的牌比別人窄 = CARDW 出現兩個值。 */
+  .bj-box.me .bj-bnm,.bj-dealer.me .bj-dnm{color:#ffd489}
+  :root[data-theme="ebook"] .bj-box.me .bj-bnm,
+  :root[data-theme="ebook"] .bj-dealer.me .bj-dnm{color:#000}
+
+  /* ---------- ②「現在在等他」:上緣一條會呼吸的青光條(暫時)---------- */
+  /* ⚠ 這一軌**完全不碰 border** —— border 從此只講身分,所以「我 + 正在補牌」
+     兩個記號可以同時畫得完整(舊版是後定義的 .me 把 .act 蓋掉,等於看不到)。
+     ★ 呼吸刻意做得慢而淺(1.6s · .45→1):牌桌上最多會有 5 格同時在等,
+       閃太兇整桌會像故障燈。 */
+  .bj-box.act::after,.bj-dealer.act::after{
+    content:"";position:absolute;left:10px;right:10px;top:0;height:3px;
+    border-radius:0 0 4px 4px;background:var(--bj-turn);
+    animation:bjTurn 1.6s ease-in-out infinite;pointer-events:none}
+  @keyframes bjTurn{0%,100%{opacity:.45}50%{opacity:1}}
+  /* 會動的東西一律尊重系統的「減少動態效果」→ 那時改成常亮(訊號不可以消失) */
+  @media (prefers-reduced-motion:reduce){
+    .bj-box.act::after,.bj-dealer.act::after{animation:none;opacity:1}
+  }
+  /* ⚠⚠ 舊的兩條「金框 / 白框」要**在這裡歸零**(不是刪掉前面那幾條就好):
+     .bj-dealer.act 在前面出現過兩次(v1.85 的 var(--accent) 與 v1.87 的 amber),
+     只刪後面那條的話前面那條會自動接手,而症狀正是使用者說的「又是黃框」。
+     ★ 這裡用 transparent 把整條軌關掉,而 .bj-box.me 的金框定義在更後面 → 照樣贏。 */
+  .bj-dealer.act{border-color:transparent}
+  .bj-box.act{border-color:transparent}
+  /* ★★ 金框 = 「我」,而且**只有這一條**在發金框(莊家台也要,見①的註解)。
+     ⚠ 順序:一定要排在上面兩條 transparent **後面**,否則「我 + 正在補牌」時
+       框會被關掉(而那正是舊版 .me / .act 互相蓋來蓋去的老問題)。 */
+  .bj-box.me,.bj-box.me.act,.bj-dealer.me,.bj-dealer.me.act{border-color:#ffd489}
+  :root[data-theme="ebook"] .bj-box.me,:root[data-theme="ebook"] .bj-box.me.act,
+  :root[data-theme="ebook"] .bj-dealer.me,:root[data-theme="ebook"] .bj-dealer.me.act{border-color:#000}
+
+  /* ---------- ③「這一格抓得動」:改成白框(金色從此只代表「我」)---------- */
+  /* ★ 抓人展開的那幾秒,那幾格其實是**按鈕** —— 高對比的白框 + 「🎯 抓」比金色更像
+     「可以點我」,而且不會與旁邊「我」那一格的金框混在一起。
+     ⚠ 外圈那層 box-shadow 拿掉了:.bj-boxes 是 overflow:auto,外擴一定被裁邊
+       (大老二 v1.77 / v1.78 各錯一次)。呼吸照舊只動亮度。 */
+  .bj-box.target{border-color:#ffffff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+  .bj-gtip{background:#ffffff;color:#1d2b1f}
+  :root[data-theme="ebook"] .bj-box.target{border-color:#000}

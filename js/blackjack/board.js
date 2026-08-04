@@ -276,7 +276,12 @@ const BJB = (function(){
     const bet = v.bets ? v.bets[s] : 0;
     const bust = !!(st && st.hands[s] && R.valueOf(st.hands[s]).bust &&
                     R.openTo(st, s, v.me));
-    const turn = !!(st && st.phase === "play" && !st.done[s]);
+    /* 「現在還在等他」——★★ v1.91.0 起**下注那一段也算**(還沒押注的人)。
+       ★ 理由是語彙要一致:上緣那條會呼吸的青光條講的是「這一格還沒好」,
+         而下注階段最需要知道的正是「還在等誰」(不然只剩一行小字「下注中…」)。
+       ⚠ 莊家不押注,而他根本不畫在注區裡 → 不必特判。 */
+    const turn = st ? (st.phase === "play" && !st.done[s])
+                    : !!(v.betPhase && !(v.betDone && v.betDone[s]));
     const tgt = grabbable(v, s);
     let cls = "bj-box";
     if(mine) cls += " me";
@@ -357,7 +362,10 @@ const BJB = (function(){
     const avail = H - TABLE_PAD * 2 - ROW_GAP - (rows - 1) * BOX_GAP;
     /* ★★ v1.90.0:莊家台也是「牌高 + 裝潢」了(它改成兩列 = 與一格同構),
        所以這裡扣的是 DEALER_CHROME 而不是舊的 DEALER_PAD,而它一樣是**量回來的**。 */
-    const byH = (avail - DEALER_CHROME - rows * BOX_CHROME) / (rows + 1);
+    /* ⚠ 每一列**留 1px 安全邊**:牌高是 `round(cw × 1.42)`,而 round 有可能往上湊
+       半個 px;一格與莊家台各吃一次,列數一多就變成注區靜靜地捲幾 px
+       (診斷器印 `boxesOver=4 WARN-BOX-ROW-LOST`)。少 1px 的牌寬換「一定放得下」。 */
+    const byH = (avail - DEALER_CHROME - rows * BOX_CHROME) / (rows + 1) - 1;
     let cw = Math.floor(Math.min(byH / CARD_R, byW, CARD_MAX));
     cw = Math.max(CARD_MIN, cw);
     const ch = Math.round(cw * CARD_R);
