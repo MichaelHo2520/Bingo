@@ -17,8 +17,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.88.0 -->
-<meta name="version" content="1.88.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.88.1 -->
+<meta name="version" content="1.88.1">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -65,6 +65,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="hl-rooms" id="hlRooms"></div>
       </div>
 
+      <!-- 精簡首頁(v1.89.0):一行兩張卡,只留插圖 + 遊戲名稱。
+           說明文字與 ▸ 都拿掉了 —— 八個遊戲之後,一列一張的清單讓最下面那兩三個
+           在手機上要捲才看得到(使用者:「主頁面不容易看到最下方的遊戲」)。
+           ⚠ 兩欄是掛在這層 .gc-grid 上,**不可以**把 #homePick 設成 grid ——
+              「現在有人在玩」看板 #hlLive 是它的兄弟,會被塞進格子變成半格寬。 -->
+      <div class="gc-grid">
       <button class="game-card" id="pickBingo" type="button">
         <svg class="home-art gc-art" viewBox="0 0 120 116" role="img" aria-label="賓果卡">
           <rect class="bc-card" x="3" y="3" width="114" height="110" rx="14"/>
@@ -83,10 +89,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </svg>
         <span class="gc-body">
           <span class="gc-name display">BINGO</span>
-          <span class="gc-desc">賓果 · 連線同房比賽,或自己單機練習</span>
           <span class="hl-badge hidden" id="hlBadgeBingo"></span>
         </span>
-        <span class="gc-go" aria-hidden="true">▸</span>
       </button>
 
       <a class="game-card as-link" href="gomoku.html">
@@ -103,10 +107,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </svg>
         <span class="gc-body">
           <span class="gc-name display">五子棋</span>
-          <span class="gc-desc">連線 1 對 1,或跟電腦下 · 先連成五顆就贏</span>
           <span class="hl-badge hidden" id="hlBadgeGomoku"></span>
         </span>
-        <span class="gc-go" aria-hidden="true">▸</span>
       </a>
 
       <a class="game-card as-link" href="sudoku.html">
@@ -120,10 +122,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </svg>
         <span class="gc-body">
           <span class="gc-name display">數獨</span>
-          <span class="gc-desc">單機練習 · 或 2~6 人連線搶格 / 競速</span>
           <span class="hl-badge hidden" id="hlBadgeSudoku"></span>
         </span>
-        <span class="gc-go" aria-hidden="true">▸</span>
       </a>
 
       <a class="game-card as-link" href="mahjong.html">
@@ -135,10 +135,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </svg>
         <span class="gc-body">
           <span class="gc-name display">麻將消消樂</span>
-          <span class="gc-desc">配對消牌 · 單機或 2~6 人連線搶牌 / 競速</span>
           <span class="hl-badge hidden" id="hlBadgeMahjong"></span>
         </span>
-        <span class="gc-go" aria-hidden="true">▸</span>
       </a>
 
       <!-- 第五個遊戲(v1.58.0):真的打麻將,不是消牌。
@@ -155,10 +153,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </svg>
         <span class="gc-body">
           <span class="gc-name display">台灣麻將</span>
-          <span class="gc-desc">真的打麻將 · 吃碰槓胡算台 · 單機對電腦 / 2~4 人連線</span>
           <span class="hl-badge hidden" id="hlBadgeMj16"></span>
         </span>
-        <span class="gc-go" aria-hidden="true">▸</span>
       </a>
 
       <!-- 第六個遊戲(v1.75.0):撲克牌接龍。
@@ -175,10 +171,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </svg>
         <span class="gc-body">
           <span class="gc-name display">排七</span>
-          <span class="gc-desc">撲克牌接龍 · 蓋牌最少者勝 · 單機對電腦 / 2~6 人連線</span>
           <span class="hl-badge hidden" id="hlBadgeSevens"></span>
         </span>
-        <span class="gc-go" aria-hidden="true">▸</span>
       </a>
 
       <!-- 第七個遊戲(v1.76.0):大老二。
@@ -196,10 +190,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </svg>
         <span class="gc-body">
           <span class="gc-name display">大老二</span>
-          <span class="gc-desc">2 最大 · 搶先出完手牌 · 單機對電腦 / 2~4 人連線</span>
           <span class="hl-badge hidden" id="hlBadgeBig2"></span>
         </span>
-        <span class="gc-go" aria-hidden="true">▸</span>
       </a>
 
       <!-- 第八個遊戲(v1.84.0):台式21點。
@@ -221,11 +213,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </svg>
         <span class="gc-body">
           <span class="gc-name display">台式21點</span>
-          <span class="gc-desc">輪流當莊 · 莊家可以抓人 · 單機對電腦 / 2~5 人連線</span>
           <span class="hl-badge hidden" id="hlBadgeBj"></span>
         </span>
-        <span class="gc-go" aria-hidden="true">▸</span>
       </a>
+      </div><!-- /.gc-grid -->
     </div>
 
     <!-- 第二層:BINGO 要怎麼玩 -->

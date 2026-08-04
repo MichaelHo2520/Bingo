@@ -1141,21 +1141,33 @@
   :root[data-theme="ebook"] .home-pick-title{background:none;color:#000;-webkit-text-fill-color:#000}
   .home-pick-head .home-tagline{margin-top:8px}
 
-  /* 遊戲卡:插圖 + 名稱 + 一行說明 + ▸(button 與 <a> 共用同一個外觀) */
-  .game-card{display:flex;align-items:center;gap:14px;width:100%;text-align:left;
+  /* ---------- 精簡首頁(v1.89.0):一行兩張卡,只有插圖 + 名稱 ----------
+     八個遊戲之後,一列一張的清單讓最後兩三個在手機上要捲才看得到
+     (使用者:「主頁面不容易看到最下方的遊戲」)→ 說明文字 .gc-desc 與 ▸ .gc-go
+     連 DOM 一起拿掉了,那兩條規則也跟著刪(留著就是永遠不生效的死規則)。
+     ⚠ 兩欄掛在 index.html 自己包的 .gc-grid 上,**不可以**改成 #homePick{display:grid}
+        —— 「現在有人在玩」看板 #hlLive 是它的兄弟,會被塞進格子變半格寬。
+     ⚠ 卡片的 margin-top 換成 grid 的 gap:兩者並存會讓第二列以後多一段空白。 */
+  .gc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+
+  /* 遊戲卡:插圖在上、名稱在下、整張居中(button 與 <a> 共用同一個外觀)。
+     ⚠ 名稱**不設 nowrap** —— 「麻將消消樂」在窄機上要換行也好過被裁掉;
+        grid 的同一列本來就等高,某張卡多一行不會把版面推歪。 */
+  .game-card{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    gap:8px;width:100%;text-align:center;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:20px;
-    padding:14px 16px;margin-top:12px;cursor:pointer;color:var(--text);
+    padding:14px 10px;cursor:pointer;color:var(--text);
     font-family:'Nunito',sans-serif;transition:transform .15s, border-color .2s}
   .game-card:hover{transform:translateY(-2px);border-color:var(--accent)}
   .game-card:active{transform:scale(.985)}
   /* 覆寫 .home-art 的大尺寸與置中(BINGO 卡直接重用那張賓果卡 svg 的 .bc-* 配色) */
-  .gc-art{width:54px;height:54px;flex:none;margin:0;display:block}
-  .gc-body{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
-  .gc-name{font-size:23px;font-weight:700;line-height:1.05;letter-spacing:.02em}
-  .gc-desc{font-size:12.5px;color:var(--muted);font-weight:700;line-height:1.4}
-  .gc-go{font-family:'Fredoka',sans-serif;font-size:22px;color:var(--accent);flex:none}
+  .gc-art{width:58px;height:58px;flex:none;margin:0;display:block}
+  .gc-body{display:flex;flex-direction:column;align-items:center;gap:3px;
+    flex:1 1 auto;width:100%;min-width:0}
+  .gc-name{font-size:19px;font-weight:700;line-height:1.15;letter-spacing:.02em}
+  /* 即時徽章在窄卡裡要跟著居中(它自己那條是 align-self:flex-start,給一列一張的版型用的) */
+  .gc-body .hl-badge{align-self:center}
   :root[data-theme="ebook"] .game-card{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .gc-go{color:#000}
 
   /* 五子棋卡的小棋盤插圖(沿用棋盤那組 --gmk-* 配色,主題會一起變) */
   .gk-art .gk-bd{fill:var(--gmk-wood);stroke:var(--gmk-frame);stroke-width:2}
@@ -1182,10 +1194,10 @@
   @media (max-height:560px){
     .home-brand{font-size:clamp(19px,5vw,26px);min-height:clamp(20px,5.5vw,28px)}
     .home-pick-head{margin:4px 0 10px}
-    .game-card{padding:11px 13px;margin-top:9px}
+    .gc-grid{gap:8px;margin-top:9px}
+    .game-card{padding:10px 8px;gap:6px}
     .gc-art{width:44px;height:44px}
-    .gc-name{font-size:20px}
-    .gc-desc{font-size:12px}
+    .gc-name{font-size:17px}
   }
 
   /* ==========================================================================
@@ -4375,9 +4387,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-bcs{flex:1 1 auto;min-height:0;display:flex;flex-wrap:wrap;gap:3px;
     align-items:center;align-content:center;justify-content:center;overflow:hidden}
   .bj-bwait{font:700 11px/1 'Nunito',sans-serif;color:var(--muted)}
-  .bj-bft{flex:none;display:flex;align-items:center;gap:4px;min-width:0}
-  .bj-bft .bj-pt{margin-left:0}
-  .bj-bft .bj-st{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* ★★★ v1.88.1:一格只有**兩列**(頭列 + 牌)—— 原本底下那一列(`.bj-bft`)
+     整條拿掉了(使用者:「下方的資訊,是不是可以拿到右上方來顯示」)。
+     頭列右邊這一組 = 「他怎麼了」:押注 · 點數膠囊 · 記號。
+     ⚠ 它一律 `flex:none`,**要縮的是名字**(`.bj-bnm`)—— 名字是這一格最不重要的
+       資訊(座位號碼已經標出他是誰),而點數少一個字就會看錯。
+     ⚠ `min-width:0` 一定要給 `.bj-bnm`,不然 flex item 的 `min-width:auto`
+       會讓它撐開整列而 `text-overflow` 永遠不生效(那時擠掉的會是右邊那一組)。 */
+  .bj-bnm{flex:0 1 auto;min-width:0}
+  .bj-bmeta{margin-left:auto;flex:none;display:flex;align-items:center;gap:3px}
+  .bj-bmeta .bj-pt{margin-left:0}
   .bj-st.caught{color:#ffc454;font-weight:900}
   :root[data-theme="ebook"] .bj-st.caught{color:#000}
   .bj-box.idle{opacity:.85}

@@ -3,11 +3,11 @@
 /* ============================================================================
    21 點 — 盤面(BJB)。牌桌 / 莊家 / 其他閒家 / 我的手牌 / 動作列 / 結果卡都在這裡畫。
 
-   ── ★★★ 尺寸由 fitTable() **一支**算(v1.87.0 改的)──────────────────────────
+   ── ★★★ 尺寸由 planTable() **一支**算(v1.87.0 的 fitTable,v1.88.1 改名並多挑「一列幾格」)──
      v1.86.0 之前是「牌寬交給 CSS 的係數、格高由 JS 平分」→ **兩份真相**,
      視窗一矮就變成「格子 32px、牌高 71px」= 每一張牌都被切掉一截
      (使用者:「玩家的牌沒有完整顯示」)。v1.87.0 把牌寬 / 格高 / 莊家台高度
-     收成 fitTable() 一支算出來的三個 literal,格高 = 牌高 + 固定裝潢 →
+     收成 planTable() 一支算出來的三個 literal,格高 = 牌高 + 固定裝潢 →
      **裁不到牌**,而且莊家 / 我 / 其他閒家**同一個牌寬**。
      ⚠ 它只吃「人數 + 視窗」→ 一整局是常數。**不可以**讓它跟著「牌數」變 ——
        那才是台灣麻將那一整類「忽大忽小」的來源。
@@ -28,7 +28,7 @@
          盤面上的 .bj-card.back 張數  ===  Σ (BJ.hiddenIdx(st, s, me) >= 0)
 
    ── ★★ 「位置不准跳」的三件事 ─────────────────────────────────────────────
-     ① 牌寬 / 一格的高度 / 莊家台的高度只有 fitTable() 一個來源,而它只吃
+     ① 牌寬 / 一格的高度 / 莊家台的高度 / **一列幾格** 只有 planTable() 一個來源,而它只吃
         「人數 + 視窗」→ 補一張牌不會讓任何東西換大小
      ② 牌桌 `flex:1 1 auto`(吃掉盤面剩下的空間,但**不隨自己的內容變**)
      ③ 動作列 `.bj-acts` 固定高度 `--bj-acth`(下注鈕 / 三顆動作鈕 / 一行字 / 倒數環 /
@@ -120,7 +120,20 @@ const BJB = (function(){
   }
 
   /* 這個座位的狀態記號。★ 每一種都是**公開資訊**:
-     停手 / 爆了 / 被抓都是全桌看得到的動作(被抓的人牌也翻開了)。 */
+     停手 / 被抓都是全桌看得到的動作(被抓的人牌也翻開了)。
+
+     ── ★★★ v1.88.1:這一格**只留「點數膠囊講不出來的事」**─────────────────────
+       使用者:「下方的資訊…重新評估一下,到底需要顯示什麼資訊,來防止寬度不夠」。
+       整格的資訊搬到頭列右邊之後,寬度只有 ~168px(390px 一列 2 格),所以
+       **每一個字都要有存在理由**。拿掉兩種:
+         ① 「💥 爆了」—— 點數膠囊本來就寫著「爆」而且是紅底(`pipHTML` 的 bust)
+            → 同一件事講兩次,而它是最占寬度的那一個(截圖裡的「25 爆」+「💥 爆了」)。
+         ② 「考慮中… / 等待…」—— 閒家是**同時**補牌,所以「沒停手的每個人都是考慮中」
+            = 零資訊量;而「現在在等誰」已經有三個地方在講:格子的亮框 `.act`、
+            動作列那句提示、倒數環。
+       ⚠ 「✋停」與「🎯莊N」**不可以**再拿掉:那是點數膠囊講不出來的兩件事
+         (停手 = 他不會再變;被抓時莊家幾點 = 同一局每個人比的點數可能不一樣)。
+       ⚠ 下注階段那兩句**要留**:那一段沒有牌、寬度很鬆,而它是那一段唯一的資訊。 */
   function stateHTML(st, s, betPhase, betDone){
     if(betPhase) return betDone ? '<span class="bj-st ok">已下注</span>'
                                 : '<span class="bj-st wait">下注中…</span>';
@@ -128,12 +141,12 @@ const BJB = (function(){
     // ★ 被抓:講得出「被抓時莊家幾點」—— 同一局每個人比的莊家點數可能不一樣
     if(st.caught[s] >= 0){
       const dh = R.seatCards(st.cards, st.n, st.dealer, st.caught[s]);
-      return '<span class="bj-st caught">🎯 已抓 · 莊 ' + R.valueOf(dh).best + '</span>';
+      return '<span class="bj-st caught" title="被抓時莊家的點數">🎯莊' +
+               R.valueOf(dh).best + '</span>';
     }
-    if(st.hands[s] && R.valueOf(st.hands[s]).bust) return '<span class="bj-st bad">💥 爆了</span>';
-    if(st.done[s]) return '<span class="bj-st ok">✋ 停</span>';
-    const turn = (s === st.dealer) ? st.phase === "dealer" : st.phase === "play";
-    return turn ? '<span class="bj-st wait">考慮中…</span>' : '<span class="bj-st">等待…</span>';
+    if(st.hands[s] && R.valueOf(st.hands[s]).bust) return "";   // ★ 膠囊已經寫著「爆」
+    if(st.done[s]) return '<span class="bj-st ok" title="他停手了">✋停</span>';
+    return "";                                                   // ★ 亮框在講「輪到他」
   }
 
   /* ★ 玩家晶片尾巴:「莊」記號 + 手上的籌碼 —— ★★ 單機與連線**共用這一份**。
@@ -228,9 +241,9 @@ const BJB = (function(){
   }
 
   /* 一個注區。★ 我自己那一格獨占整列;★★ v1.87.0 起**每個人的牌同一個尺寸**
-     (牌寬吃 --bj-cardw,由 fitTable 一支算出來)—— 所以這裡一個 class 都不必挑。
+     (牌寬吃 --bj-cardw,由 planTable 一支算出來)—— 所以這裡一個 class 都不必挑。
      ⚠ 高度**不再由這裡的 inline style 給**:一格的高度 = 牌高 + 固定裝潢,
-       同樣由 fitTable 算(見它的註解:那正是「牌被裁掉」的根治法)。 */
+       同樣由 planTable 算(見它的註解:那正是「牌被裁掉」的根治法)。 */
   function boxHTML(v, s, basis){
     const st = v.st, mine = s === v.me;
     const nm = mine ? "你" : ((v.names && v.names[s]) || ("玩家" + (s + 1)));
@@ -249,28 +262,37 @@ const BJB = (function(){
     if(tgt) cls += " target";
     /* ⚠⚠ v1.88.0:**每一格同寬**(連我自己那一格也是)—— 舊版我獨占一列(100%),
        而注區改成「嚴格照座位號碼排」之後,我排在中間就會把一列切成三段
-       → 6 人算出 4 列,而「≤ 3 列」那條不變量一破就開始裁牌(見 layoutOf)。
-       ★ 「哪一格是我」現在只靠 .me 的金框 + 「你」徽章 —— 牌的大小早在 v1.87.0
-         就已經全桌一致(--bj-cardw),所以獨占一列本來就不再是為了牌大一點。 */
+       → 6 人算出 4 列,而列數一多牌就跟著變小(見 planTable)。
+       ★ 「哪一格是我」現在只靠 .me 的金框 + 名字寫著「你」—— 牌的大小早在 v1.87.0
+         就已經全桌一致(--bj-cardw),所以獨占一列本來就不再是為了牌大一點。
+     ── ★★★ v1.88.1:一格只有**兩列**(頭列 + 牌),底下那一列拿掉了 ────────────────
+       使用者:「閒家的卡片佈局,下方的資訊,是不是可以拿到右上方來顯示,然後重新評估
+       一下,到底需要顯示什麼資訊,來防止寬度不夠」。
+       ★ 頭列 = 左邊「他是誰」+ 右邊「他怎麼了」(`.bj-bmeta`):押注 · 點數膠囊 · 記號。
+       ★ 附帶收益(而且是大的):裝潢少一整列 → `learnChrome()` 量到的 BOX_CHROME
+         從 ~47 掉到 ~28 → 格高 = 牌高 + 裝潢 → **牌自動變大一階**,一行都不必調。
+       ⚠ 右邊那組一律 `flex:none`,**要縮的是名字**(`.bj-bnm` 省略號)——
+         名字是這一格最不重要的資訊(座位號碼已經標出他是誰)。
+       ⚠ 「你」徽章拿掉了:`nm` 在 mine 時本來就是「你」→ 徽章是第二次講同一件事
+         (截圖裡就是「6 你 你 押2」),而它白白吃掉 22px。 */
     return '<div class="' + cls + '" style="flex:0 0 ' + basis + '"' +
              (tgt ? ' data-grab="' + s + '" role="button" title="抓這一家先比較"' : "") + '>' +
              '<div class="bj-bhd">' +
                // ★ 座位號碼取代原本的色點(v1.88.0):顏色照舊,但看得出「我是第幾家」
                snHTML(s) +
                '<span class="bj-bnm">' + esc(nm) + '</span>' +
-               (mine ? '<span class="bj-you">你</span>' : "") +
                // ⚠ 這個記號只講「抓不抓得動」(公開資訊),一個字都不准夾帶牌情
                (tgt ? '<span class="bj-gtip">🎯 抓</span>' : "") +
-               (bet ? '<span class="bj-bet" title="這一局押多少"><i>押</i>' + bet +
-                      (st && st.dbl[s] ? '<b>×2</b>' : '') + '</span>' : "") +
+               '<span class="bj-bmeta">' +
+                 (bet ? '<span class="bj-bet" title="這一局押多少"><i>押</i>' + bet +
+                        (st && st.dbl[s] ? '<b>×2</b>' : '') + '</span>' : "") +
+                 (st ? ptOf(st, s, v.me) : "") +
+                 stateHTML(st, s, v.betPhase, v.betDone && v.betDone[s]) +
+               '</span>' +
              '</div>' +
              '<div class="bj-bcs">' +
                (st ? handOf(st, s, v.me, "")
                    : '<span class="bj-bwait">🎴 等發牌…</span>') +
-             '</div>' +
-             '<div class="bj-bft">' +
-               (st ? ptOf(st, s, v.me) : "") +
-               stateHTML(st, s, v.betPhase, v.betDone && v.betDone[s]) +
              '</div>' +
            '</div>';
   }
@@ -286,16 +308,64 @@ const BJB = (function(){
   const BOX_FIT = 2, BOX_GAP = 7;
   const boxBasis = fit => (fit <= 1) ? "100%"
     : ("calc((100% - " + ((fit - 1) * BOX_GAP) + "px) / " + fit + ")");
-  /* ★★★ v1.88.0:一格幾寬 / 幾列 收成這一支(★ 只吃**人數**,所以一整局不變)。
-     ★ 一列 2 格,但只有一格要畫時它獨占整列(2 人局:留半排空白很難看)。
+  /* ★★★ v1.88.0:一格幾寬 / 幾列 收成這一支(★ 只吃**人數 + 視窗**,所以一整局不變)。
      ⚠ 「我獨占一列」拿掉了 —— 嚴格照座位排的話它會憑我的座位號決定列數
-       (6 人時最壞 4 列),而 fitTable 是照列數算牌大小的 → 又開始裁牌。
-     ⚠ 中途加入的人(meOut)那一格是整列寬 → 它自己算一列。 */
-  function layoutOf(n, d, meOut){
+       (6 人時最壞 4 列),而牌的大小是照列數算的 → 又開始裁牌。
+     ⚠ 中途加入的人(meOut)那一格是整列寬 → 它自己算一列。
+
+     ── ★★★ v1.88.1:「一列幾格」改成**挑牌最大的那一種**(不再寫死 2)────────────
+       同一版把一格的底列拿掉了(資訊搬到頭列右邊)→ 一格的裝潢從 ~57 掉到 ~37,
+       **高度就空出來了**;而手機上牌寬是被「一列 2 格」卡住的(390px → 一格 178px
+       → 5 張牌只能 31px)。兩件事湊起來的結果是「牌沒變大,底下多一塊空白」。
+       ★ 所以這裡改成**把候選版型都算一遍,挑牌最大的**:
+           3 人(2 個閒家)一列 1 格 → 牌 68px(原本 31px)
+           6 人(5 個閒家)一列 2 格 → 牌 31px(一列 1 格會變 29 → 還是 2 格勝)
+         決策只吃「人數 + 視窗 + 裝潢」→ 一整局是常數(這條紅線沒有鬆)。
+       ⚠ 放不下的候選要**淘汰**(`over > 0`):CARD_MIN 夾過之後總高可能超出注區,
+         那時它會靜靜地捲掉一列 —— 全部都放不下時挑「超出最少」的。 */
+  function evalPlan(fit, boxes, extraRow, H, W){
+    const rows = Math.max(1, Math.ceil(boxes / Math.max(1, fit))) + (extraRow ? 1 : 0);
+    const inner = W - TABLE_PAD * 2;
+    const bw = (fit >= 2) ? (inner - BOX_GAP * (fit - 1)) / fit : inner;
+    const byW = (bw - BOX_PADX - (MAXC - 1) * CARD_GAP) / MAXC;
+    const avail = H - TABLE_PAD * 2 - ROW_GAP - (rows - 1) * BOX_GAP;
+    const byH = (avail - DEALER_PAD - rows * BOX_CHROME) / (rows + 1);
+    let cw = Math.floor(Math.min(byH / CARD_R, byW, CARD_MAX));
+    cw = Math.max(CARD_MIN, cw);
+    const ch = Math.round(cw * CARD_R);
+    const bxh = ch + BOX_CHROME;
+    const dlh = Math.max(ch, DEALER_INFO) + DEALER_PAD;
+    const need = TABLE_PAD * 2 + dlh + ROW_GAP + rows * bxh + (rows - 1) * BOX_GAP;
+    return { fit: fit, rows: rows, basis: boxBasis(fit),
+             cw: cw, bxh: bxh, dlh: dlh, over: Math.max(0, need - H) };
+  }
+  function planTable(n, d, meOut){
     const boxes = Math.max(0, n - (d >= 0 ? 1 : 0));      // 閒家 = 除莊家以外的座位
-    const fit = (boxes <= 1) ? 1 : BOX_FIT;
-    const rows = Math.min(3, Math.max(1, Math.ceil(boxes / fit) + (meOut ? 1 : 0)));
-    return { fit: fit, rows: rows, basis: boxBasis(fit) };
+    const H = tableSpace(), W = stage ? (stage.clientWidth || 0) : 0;
+    /* 還沒排版(畫面還是 hidden)→ 用保守的預設,尺寸交給 CSS 的後備值,下一次重畫就對了。
+       ⚠ 這一條也讓 e2e 那種「直接呼叫 render」的用法拿得到穩定的 basis。 */
+    if(!(H > 0) || !W){
+      const fit = (boxes <= 1) ? 1 : BOX_FIT;
+      return { fit: fit, rows: Math.max(1, Math.ceil(boxes / fit) + (meOut ? 1 : 0)),
+               basis: boxBasis(fit), cw: 0 };
+    }
+    return pickPlan(boxes, meOut, H, W);
+  }
+  /* 挑「一列幾格」——★ 抽成一支**吃參數的** H / W(不自己量畫面)。
+     ⚠ 理由是守門:這樣 e2e 才餵得進「390x844 的手機」與「730x605 的矮視窗」
+       兩種尺寸各驗一次(真的靠視窗量的話,斷言就跟著跑測試的視窗大小飄)。 */
+  function pickPlan(boxes, meOut, H, W){
+    /* ⚠ 一列 1 格**一定要當起點**(而不是 `let best = null` 從迴圈裡撿)——
+       回 null 的話呼叫端讀 plan.cw 會整個炸掉(施工中的突變測試真的炸出來過),
+       而那是「版面算不出來」這種小事引起的整頁白掉。 */
+    let best = evalPlan(1, boxes, meOut, H, W);
+    for(let fit = 2; fit <= BOX_FIT; fit++){
+      if(fit > boxes) break;                              // 只有一格 → 不必比「一列 2 格」
+      const p = evalPlan(fit, boxes, meOut, H, W);
+      // 先看放不放得下,再看牌哪個大(都放不下時挑超出最少的)
+      if(p.over < best.over || (p.over === best.over && p.cw > best.cw)) best = p;
+    }
+    return best;
   }
   function boxesHTML(v, lay){
     const st = v.st;
@@ -325,7 +395,7 @@ const BJB = (function(){
   }
 
   /* ==========================================================================
-     三之二、★★★ 牌寬與格高 —— v1.87.0 收成**同一支** fitTable()
+     三之二、★★★ 牌寬 / 格高 / 一列幾格 —— 收成**同一支** planTable()
      ──────────────────────────────────────────────────────────────────────────
        使用者要求③:「玩家的牌沒有完整顯示,我要跟莊家的牌大小一樣」。
 
@@ -381,25 +451,9 @@ const BJB = (function(){
     }
     return ph - PLAY_GAP - reserve;
   }
-  function fitTable(lay){
-    if(!stage) return null;
-    const rows = lay.rows;
-    const H = tableSpace(), W = stage.clientWidth || 0;
-    // 還沒排版(畫面還是 hidden)→ 回 null,這一次交給 CSS 的後備值,下一次重畫就對了
-    if(H <= 0 || !W) return null;
-    const avail = H - TABLE_PAD * 2 - ROW_GAP - (rows - 1) * BOX_GAP;
-    const byH = (avail - DEALER_PAD - rows * BOX_CHROME) / (rows + 1);
-    const inner = W - TABLE_PAD * 2;
-    /* ⚠ 一格幾寬要問**同一份 layout**(v1.88.0):這裡自己判斷「rows ≥ 2 就是半寬」
-       在「2 人局(1 格整列寬)」與「3 人局(2 格但只有 1 列)」兩種情形都會算錯,
-       而算錯的方向是牌太大 → 又開始裁牌。 */
-    const bw = (lay.fit >= 2) ? (inner - BOX_GAP) / lay.fit : inner;
-    const byW = (bw - BOX_PADX - (MAXC - 1) * CARD_GAP) / MAXC;
-    let cw = Math.floor(Math.min(byH / CARD_R, byW, CARD_MAX));
-    cw = Math.max(CARD_MIN, cw);
-    const ch = Math.round(cw * CARD_R);
-    return { cw: cw, bxh: ch + BOX_CHROME, dlh: Math.max(ch, DEALER_INFO) + DEALER_PAD };
-  }
+  /* ⚠ v1.88.1 起這一段的入口是上面的 **planTable() / evalPlan()**(不再有 fitTable):
+     因為「一列幾格」也變成算出來的 —— 一格幾寬與牌多大**必須同一支算**,
+     分兩支的話 3 人局(一列 1 格)那一種會拿 2 格的寬度去算牌(牌太大 → 裁牌)。 */
   /* ★★★ 把「一格的裝潢有多高」從畫面上量回來 —— 這一支是 BOX_CHROME 那個常數的解藥。
        `.bj-bcs` 是 flex:1 → 它的高度 = 一格的高度 − 裝潢,所以
            裝潢 = box.offsetHeight − bcs.offsetHeight
@@ -435,28 +489,33 @@ const BJB = (function(){
        ★ 於是 `--bj-mh` 那個高度也跟著消失,多出來的空間全部給牌桌
          (莊家那一條因此可以做高一點,那是使用者第 ① 點的後半)。
      ========================================================================== */
-  function render(v){
+  function render(v, again){
     if(!stage) return;
     const n = v.n || (v.st ? v.st.n : 2);
     const d = v.st ? v.st.dealer : -1;
     /* ★★★ v1.87.0:牌寬 / 一格的高度 / 莊家台的高度**一次算好掛在牌桌上**
-       (見 fitTable 的註解 —— 三個數字同一個來源,所以牌永遠裁不到、也永遠一樣大)。
+       (見 planTable 的註解 —— 三個數字同一個來源,所以牌永遠裁不到、也永遠一樣大)。
+       ★★ v1.88.1 起「一列幾格」也由同一支算(挑牌最大的那一種)。
        ⚠ 一定要在寫 innerHTML **之前**量 stage:牌桌是 flex:1、高度不吃自己的內容,
          所以量到的是穩定值;寫完再量就多一次 reflow 而且答案一樣。 */
-    const lay = layoutOf(n, d, v.me < 0);
-    const fit = fitTable(lay);
-    const sty = fit ? (' style="' + fitStyle(fit) + '"') : "";
+    const plan = planTable(n, d, v.me < 0);
+    const sty = plan.cw ? (' style="' + fitStyle(plan) + '"') : "";
     stage.innerHTML =
       '<div class="bj-table"' + sty + '>' +
         dealerHTML(v) +
-        boxesHTML(Object.assign({}, v, { n: n }), lay) +
+        boxesHTML(Object.assign({}, v, { n: n }), plan) +
       '</div>';
     /* ★ 量一次「一格的裝潢有多高」;與上一次不一樣就當場用新數字改 CSS 變數
-       (只改變數、不重寫 innerHTML → 不閃、也不會變成無窮迴圈,見 learnChrome)。 */
-    if(fit && learnChrome()){
-      const f2 = fitTable(lay);
+       (只改變數、不重寫 innerHTML → 不閃、也不會變成無窮迴圈,見 learnChrome)。
+       ⚠⚠ v1.88.1 多一種情形:裝潢的高度會影響「一列幾格才讓牌最大」的答案 ——
+         換了的話 basis 已經寫進 innerHTML 了,只改 CSS 變數會**對不起來**
+         (症狀是一列兩格但牌照一格的寬度算 → 一列塞不下),所以**整份重畫一次**。
+         `again` 是遞迴的煞車:learnChrome 學過就回 false,所以最多只會發生一次。 */
+    if(plan.cw && learnChrome()){
+      const p2 = planTable(n, d, v.me < 0);
+      if(p2.fit !== plan.fit && !again){ render(v, true); return; }
       const tb = stage.querySelector(".bj-table");
-      if(f2 && tb) tb.setAttribute("style", fitStyle(f2));
+      if(p2.cw && tb) tb.setAttribute("style", fitStyle(p2));
     }
     keepMeInView();
   }
@@ -603,7 +662,7 @@ const BJB = (function(){
                      '<div class="bj-cdwrap" id="bjCdWrap"></div>';
     syncCd(info);
     /* ★★★ 這裡**也要**檢查一次「我那一格看得到嗎」(v1.88.0)。
-       ⚠⚠ 這是 fitTable 那個老坑的雙胞胎:第一次 render() 時 `#bjActs` 還掛著 .hidden
+       ⚠⚠ 這是 planTable 那個老坑的雙胞胎:第一次 render() 時 `#bjActs` 還掛著 .hidden
          (上面那行才拿掉)→ 那一刻注區拿到的是整條動作列的高度,**還不需要捲**,
          所以 render 裡那一次呼叫一定看到「放得下」而什麼都不做。
        ★ 動作列畫完 = 注區的高度定了 → 這時候問才問得到真的答案。
@@ -1005,6 +1064,10 @@ const BJB = (function(){
     // 一個動作的聲音(四個呼叫點共用)
     moveSfx, bustSfx, bjSfx, dragonSfx, grabSfx,
     // 給 e2e 用:抓人那一排展開了沒(純畫面狀態)
-    _grabOpen: () => grabOpen
+    _grabOpen: () => grabOpen,
+    /* 給 e2e 用:版型的算式(v1.88.1)—— **餵尺寸進去**,不吃畫面。
+       ★ 這是「一列幾格挑牌最大的那一種」唯一測得到的角度:
+         真的靠視窗量的話,斷言會跟著跑測試的視窗大小飄。 */
+    _eval: evalPlan, _pick: pickPlan
   };
 })();
