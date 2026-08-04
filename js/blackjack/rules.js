@@ -77,7 +77,9 @@ const BJ = (function(){
          彩色 emoji,字級與對齊當場失控(同大老二 / 排七)。
      ========================================================================== */
   const NSUIT = 4, NRANK = 13, NCARD = 52;
-  const MIN_PLAYERS = 2, MAX_PLAYERS = 5;
+  /* ★ v1.86.0:5 → 6 人(使用者要求)。座位牌堆撐得住 ——
+     maxDraw(6) = ⌊(52 − 12) / 6⌋ = 6 張,而過五關開著時一手最多 5 張。 */
+  const MIN_PLAYERS = 2, MAX_PLAYERS = 6;
   /* ⚠ 寫成明確碼位而不是貼一個看不見的字元:U+FE0E 在編輯器裡是零寬的,
      複製貼上時很容易被吃掉或換成 U+FE0F(那就變回彩色 emoji 了),
      而症狀是「手機上花色忽然變大變彩色」,在桌機完全看不出來。 */
@@ -135,11 +137,16 @@ const BJ = (function(){
          舊房間、手改 DB 的值、還有 e2e 餵進來的半套物件都要能用,
          而一個 NaN 混進賠率會讓整局的籌碼變 NaN(而且不會報錯)。
      ========================================================================== */
-  const LINE_FREE = 0;                            // 莊家補牌線:0 = 自由(真人自己決定)
+  const LINE_FREE = 0;                            // 補牌線:0 = 關閉(自己決定)
   const RULES_DEF = {
     start: 100,        // 起始籌碼 ★ **純顯示參數**(見下)
     betMax: 10,        // 每局下注上限
-    line: LINE_FREE,   // 莊家補牌線:0 自由 / 16 / 17
+    /* ★★ v1.86.0:補牌線從「只管莊家、而且是雙向鎖」變成「**莊閒都適用的下限**」。
+       0 關閉 / 15 / 16 / 17。使用者的話:「補牌的原則是莊家跟玩家都要一同遵守」。
+       ⚠ 它現在**只管下限**(沒到不能停、也不能抓人;到了要牌或停自己決定)——
+         雙向鎖的話莊家到線就定型,抓人抽不到牌、形同虛設;閒家更是一張牌都不用決定。
+       ⚠ key 刻意還叫 line(值 0/16/17 在舊房間裡照樣有效)。 */
+    line: LINE_FREE,
     pushDealer: true,  // 同點數(平手)莊家吃
     bjPay: 2,          // 21 點賠率(倍):1.5 或 2
     /* 過五關(五張不爆),賠 2 倍,莊閒都能報。
@@ -163,7 +170,7 @@ const BJ = (function(){
      ⚠ 也因此 settle() 根本不吃 start:它只算 delta。 */
   const START_OPTS = [50, 100, 200];
   const BETMAX_OPTS = [5, 10, 20, 50];
-  const LINE_OPTS = [0, 16, 17];
+  const LINE_OPTS = [0, 15, 16, 17];        // ★ v1.86.0 多一格 15(使用者要求)
   const BJPAY_OPTS = [1.5, 2];
   const ROUNDS_OPTS = [1, 2, 3];
   const SEC_OPTS = [0, 20, 30, 45];
@@ -325,6 +332,30 @@ const BJ = (function(){
     return v.bust || v.best === 21 ||
            (rules.dragon && cards.length >= DRAGON_N) || take >= maxDraw(n);
   }
+  /* ★★ 補牌線是**下限**:到線了才停得下來、才抓得動人(v1.86.0)。
+     ⚠ 這一支是「莊閒一同遵守」在程式裡**唯一**的落地點 ——
+       legal() / denyTxt() / autoTo() / replay() 的抓人檢查全部問它,
+       四個地方各寫一次 `best >= line` 就是四份會錯開的真相。
+     ⚠ 關掉(line = 0)時一律回 true(隨時可以停、隨時可以抓)。 */
+  function reachedLine(cards, rules){
+    return !rules.line || valueOf(cards).best >= rules.line;
+  }
+  /* ★★ 抓人的動作字元:'0'..'5' = 抓那個座位(v1.86.0)。
+     ⚠ 刻意不與 h / s / d 重疊,所以 acts 維持「一個字元一個動作」——
+       解析不必分段、舊的 h/s/d 一個字都不用改。
+     ⚠⚠ **這是破壞性的**:v1.85.0 的 replay 讀到 '2' 會判 bad。
+       v1.85.0 的規矩是「寫入收緊、讀取相容」,這一次反過來(新版寫的舊版讀不懂)——
+       連線時全桌要一起更新。單機不受影響。 */
+  const GRAB_CH = "012345";
+  const grabAct = k => GRAB_CH[k] || "";
+  const isGrab  = ch => GRAB_CH.indexOf(ch) >= 0;
+  const grabSeat = ch => GRAB_CH.indexOf(ch);
+  // 還有沒有人可以抓(莊家自己與抓過的都不算)
+  function anyUncaught(st){
+    for(let s = 0; s < st.n; s++)
+      if(s !== st.dealer && st.caught[s] < 0) return true;
+    return false;
+  }
 
   function replay(deal, n, dealer, acts, rules){
     const cards = (typeof deal === "string") ? decodeDeal(deal) : deal;
@@ -333,7 +364,10 @@ const BJ = (function(){
     const R = normRules(rules);
     const st = { n: n, dealer: dealer, rules: R, cards: cards,
                  hands: [], take: [], done: [], dbl: [], tier: [],
+                 caught: [], grabN: 0,
                  phase: "play", reveal: false, bad: -1 };
+    // ★ caught[s] = 被抓時**莊家補了幾張**(-1 = 沒被抓)。先填滿再解析。
+    for(let s = 0; s < n; s++) st.caught[s] = -1;
 
     for(let s = 0; s < n; s++){
       const a = (acts && typeof acts[s] === "string") ? acts[s] : "";
@@ -349,6 +383,21 @@ const BJ = (function(){
           // ★ 加倍只能是**第一個**動作,而且莊家不能加倍(他沒有押注)
           if(i !== 0 || take !== 0 || s === dealer){ st.bad = s; break; }
           dbl = true; take++; stood = true; continue;
+        }
+        /* ★★ 抓人(v1.86.0):只有莊家、只有到線之後、一家只能抓一次。
+           ⚠ **爆掉的閒家照樣抓得到** —— 房規是「兩邊都爆算平手」時,
+             先抓掉已經爆的那幾家正是台式莊家鎖定戰果的方法(見 settle 那段)。 */
+        if(isGrab(ch)){
+          const k = grabSeat(ch);
+          if(s !== dealer){ st.bad = s; break; }             // 只有莊家能抓
+          if(k >= n || k === dealer){ st.bad = s; break; }   // 抓不存在的人 / 抓自己
+          if(st.caught[k] >= 0){ st.bad = s; break; }        // 抓過了
+          if(!reachedLine(cur, R)){ st.bad = s; break; }     // 沒到線不能抓
+          st.caught[k] = take;                              // ★ 記「莊家那時幾張」
+          st.grabN++;
+          // 抓完最後一家 → 這一局就結束了(不必再叫他按一次「停」)
+          if(st.grabN >= n - 1) stood = true;
+          continue;
         }
         st.bad = s; break;                       // 不認得的字元
       }
@@ -385,20 +434,67 @@ const BJ = (function(){
        ⚠ 欄位留著(不是刪掉)是為了讓 replay() 還讀得懂舊版寫進 DB 的 "d",
          見檔頭那一段。 */
   function legal(st, seat){
-    const out = { hit: false, stand: false, dbl: false };
+    const out = { hit: false, stand: false, dbl: false, grab: false };
     if(!st || st.phase === "over") return out;
     if(!(seat >= 0 && seat < st.n)) return out;
     const isDealer = seat === st.dealer;
     // 相位守門:閒家只在 play 動、莊家只在 dealer 動
     if(isDealer ? st.phase !== "dealer" : st.phase !== "play") return out;
     if(st.done[seat]) return out;
-    out.hit = true; out.stand = true;
-    if(isDealer && st.rules.line){
-      const best = valueOf(st.hands[seat]).best;
-      out.hit = best < st.rules.line;
-      out.stand = !out.hit;
-    }
+    /* ★★ v1.86.0:補牌線是**下限**,而且**莊閒都吃這一條**。
+       · hit  永遠 true(到線之後照樣能補 —— 抓完一家再繼續補正是台式的玩法)
+       · stand 只有到線才行
+       ⚠ 這裡**沒有** if(isDealer) 的分支了:「莊閒一同遵守」就是這個意思。 */
+    out.hit = true;
+    out.stand = reachedLine(st.hands[seat], st.rules);
+    // ★ 抓人只有莊家、只有到線、而且還要有人沒被抓
+    if(isDealer) out.grab = out.stand && anyUncaught(st);
     return out;
+  }
+  /* 這一家抓不抓得動(動作列每一顆名字鈕都問它)。 */
+  function canGrab(st, seat){
+    if(!st || !legal(st, st.dealer).grab) return false;
+    return seat >= 0 && seat < st.n && seat !== st.dealer && st.caught[seat] < 0;
+  }
+
+  /* ==========================================================================
+     六之三、★★★ 牌情 —— 誰的牌看得到(v1.86.0 從一條紅線變成 n 條)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者的要求:「除了自己,其他人的第一張牌都要是蓋住的,除了被抓,
+       或是爆了,或是最後的結算」。
+
+       ⚠⚠ 這**反轉**了 v1.84.0 一個刻意的設計(「其他閒家的牌全程明牌 ——
+          看隔壁那個人補到爆是這個遊戲的樂趣」)。改的理由是**使用者要真實感**,
+          不是原本那個決定錯了 —— 不要照舊文件「修回去」。
+
+       ★★ 判斷式只有這一支(比照 v1.84.0 的 st.reveal 那條紅線):
+          畫面端與 AI **都問它**,誰都不准自己寫「他大概停手了吧」那類近似條件。
+          蓋著的位置兩種角色不一樣:
+              莊家  → 第 **2** 張(index 1)  ← 21 點的規則,明牌在前
+              閒家  → 第 **1** 張(index 0)  ← 台式的底牌
+     ========================================================================== */
+  /* 這個座位的牌對 me 全開了沒。me 傳 -1 = 沒有座位的觀眾(什麼都看不到)。 */
+  function openTo(st, seat, me){
+    if(!st || !(seat >= 0 && seat < st.n)) return false;
+    if(seat === me) return true;                        // 自己的牌
+    if(st.phase === "over") return true;                // 結算 → 全桌攤牌
+    if(seat === st.dealer) return !!st.reveal;          // 莊家:吃 reveal(唯一判斷式)
+    if(st.caught[seat] >= 0) return true;               // 被抓過 = 已經比過牌了
+    if(valueOf(st.hands[seat]).bust) return true;        // 爆了是公開的(他輸定了)
+    return false;
+  }
+  /* 這個座位哪一張蓋著(-1 = 都看得到)。★ 牌背要畫在哪一格只准問這一支。 */
+  function hiddenIdx(st, seat, me){
+    if(openTo(st, seat, me)) return -1;
+    return seat === st.dealer ? 1 : 0;
+  }
+  /* 看得到的那幾張(點數顯示用)。
+     ★ 規則統一:看得到的加起來,還有暗牌就在畫面上標「+ ?」——
+       莊家現行的「4 + ?」與閒家的「9 + ?」是**同一條規則**。 */
+  function shownCards(st, seat, me){
+    const h = (st && st.hands[seat]) || [];
+    const k = hiddenIdx(st, seat, me);
+    return k < 0 ? h.slice() : h.filter((c, i) => i !== k);
   }
 
   /* ★ 「這一顆為什麼按不動」—— 單機與連線**共用這一份**文案。
@@ -411,6 +507,7 @@ const BJ = (function(){
     if(!st || !(seat >= 0 && seat < st.n)) return "";
     const lg = legal(st, seat);
     if((act === "h" && lg.hit) || (act === "s" && lg.stand)) return "";
+    if(isGrab(act) && canGrab(st, grabSeat(act))) return "";
     if(act === "d") return "這一版沒有「加倍」—— 想押多一點請在下注那一段調";
     const isDealer = seat === st.dealer;
     if(st.phase === "over") return "這一局結束了";
@@ -418,13 +515,22 @@ const BJ = (function(){
     if(isDealer ? st.phase !== "dealer" : st.phase !== "play")
       return isDealer ? "你是莊家,等閒家先補完"
                       : (st.phase === "dealer" ? "莊家在補牌,這一局你動完了" : "還沒輪到你");
-    // 相位對、還沒停手 → 只剩「莊家補牌線」那一條擋得住
-    if(isDealer && st.rules.line){
-      const best = valueOf(st.hands[seat]).best;
-      return act === "s"
-        ? ("規則要求莊家補到 " + st.rules.line + " —— 現在 " + best + ",還不能停")
-        : ("已經 " + best + " 點了 —— 規則是補到 " + st.rules.line + " 就停");
+    /* 相位對、還沒停手 → 剩下三種擋得住的:抓人的三個前提 + 補牌線的下限。
+       ★★ v1.86.0 起補牌線**莊閒共用同一句話**(它現在是同一條規則)。 */
+    if(isGrab(act)){
+      if(!isDealer) return "只有莊家能抓人";
+      const k = grabSeat(act);
+      if(!(k >= 0 && k < st.n) || k === st.dealer) return "抓不到這一家";
+      if(st.caught[k] >= 0) return "這一家已經抓過了";
+      if(!reachedLine(st.hands[seat], st.rules))
+        return "補到 " + st.rules.line + " 才能抓人 —— 現在 " +
+               valueOf(st.hands[seat]).best + " 點";
+      if(!anyUncaught(st)) return "每一家都抓過了";
+      return "現在不能抓人";
     }
+    if(act === "s" && st.rules.line)
+      return "規則要求補到 " + st.rules.line + " —— 現在 " +
+             valueOf(st.hands[seat]).best + " 點,還不能停";
     return "這個動作現在不行";
   }
 
@@ -433,10 +539,14 @@ const BJ = (function(){
        而「本地覺得可以、伺服器上不行」是連線那邊一定會遇到的事。 */
   function push(st, seat, act, acts){
     const lg = legal(st, seat);
-    if(act === "h" && !lg.hit) return null;
-    if(act === "s" && !lg.stand) return null;
-    if(act === "d" && !lg.dbl) return null;
-    if(act !== "h" && act !== "s" && act !== "d") return null;
+    if(act === "h"){ if(!lg.hit) return null; }
+    else if(act === "s"){ if(!lg.stand) return null; }
+    else if(act === "d"){ if(!lg.dbl) return null; }
+    else if(isGrab(act)){
+      // ★ 抓人的三個前提全部問 canGrab(它自己會問 legal().grab)
+      if(seat !== st.dealer || !canGrab(st, grabSeat(act))) return null;
+    }
+    else return null;
     return ((acts && acts[seat]) || "") + act;
   }
 
@@ -450,19 +560,27 @@ const BJ = (function(){
          錯開的症狀是「代打幫我補的,跟我自己按得出來的不一樣」。
        ⚠ 用 best(軟點數)判斷 = 賭場的 S17(軟 17 也停),對閒家比較友善。
      ========================================================================== */
-  function autoDealer(st){
-    const line = st.rules.line || 17;
-    const d = st.dealer, n = st.n;
-    let take = st.take[d], a = "";
-    let cur = st.hands[d];
+  /* ★★ v1.86.0:泛化成「任何座位到期代打」——**閒家現在也有補牌線**,
+     幫他直接寫 "s" 會是不合法的動作(沒到線不能停),所以要先補到線再停。
+       莊家 → 補牌線 0 時側退成 17(他一定得補到某個地方,不然全場乾等)
+       閒家 → 補牌線 0 時就是「直接停」(= v1.85.0 forceStands 的行為,逐字不變)
+     ⚠ 代打**一律不抓人** —— 抓誰是策略選擇,系統不該替人決定。
+     ⚠ 它與 reachedLine 必須是同一條線(這裡就是呼叫它)。 */
+  function autoTo(st, seat){
+    const isD = seat === st.dealer;
+    const R = isD ? Object.assign({}, st.rules, { line: st.rules.line || 17 }) : st.rules;
+    const n = st.n;
+    let take = st.take[seat], a = "";
+    let cur = st.hands[seat];
     while(!closedAt(cur, n, st.rules, take)){
-      if(valueOf(cur).best >= line) break;
+      if(reachedLine(cur, R)) break;
       a += "h"; take++;
-      cur = seatCards(st.cards, n, d, take);
+      cur = seatCards(st.cards, n, seat, take);
     }
     // 已經停手了就不要再接一個 "s"(那會變成 bad)
     return closedAt(cur, n, st.rules, take) ? a : a + "s";
   }
+  const autoDealer = st => autoTo(st, st.dealer);
 
   /* ==========================================================================
      七、★ 結算 —— 每個座位的籌碼變化
@@ -488,7 +606,7 @@ const BJ = (function(){
   function settle(st, bets, rules){
     const R = normRules(rules || st.rules);
     const d = st.dealer;
-    const dh = st.hands[d], dv = valueOf(dh), dt = tierOf(dh, R);
+    const dhFinal = st.hands[d], dvFinal = valueOf(dhFinal), dtFinal = tierOf(dhFinal, R);
     const rows = [];
     let dealerDelta = 0;
 
@@ -496,6 +614,18 @@ const BJ = (function(){
       if(s === d){ rows[s] = null; continue; }
       const bet = betOf(bets, s, R) * (st.dbl[s] ? 2 : 1);
       const h = st.hands[s], v = valueOf(h), t = tierOf(h, R);
+      /* ★★★ v1.86.0 —— 這一整段改動只有這三行:
+         每個閒家比的是**莊家在「比的那一刻」的手牌**。
+           被抓過   → 抓的那一刻(caught[s] = 莊家那時補了幾張)
+           沒被抓   → 莊家最終手牌(= v1.85.0 逐字相同 → 不抓人的一局結果一個數字都不會變)
+         ★★ 使用者第 4 點「莊家還沒抓我就跟著爆 → 平手」**因此自動成立**,
+            一行特判都不用寫:莊家爆掉那一刻就 done、不能再抓,
+            所以被抓過的人那一刻莊家必定沒爆(他爆了就是單邊爆 → 照樣輸),
+            只有沒被抓的人才會走到下面「兩邊都爆」那一格去吃 bustFirst。 */
+      const dTake = (st.caught[s] >= 0) ? st.caught[s] : st.take[d];
+      const dh = (dTake === st.take[d]) ? dhFinal : seatCards(st.cards, st.n, d, dTake);
+      const dv = (dh === dhFinal) ? dvFinal : valueOf(dh);
+      const dt = (dh === dhFinal) ? dtFinal : tierOf(dh, R);
       let sign = 0, mul = 1, tag = "push";
 
       if(t === T_BUST && dt === T_BUST){
@@ -514,10 +644,14 @@ const BJ = (function(){
       const delta = sign * Math.round(bet * mul);
       dealerDelta -= delta;
       rows[s] = { seat: s, bet: bet, delta: delta, tag: tag,
-                  tier: t, best: v.best, bust: v.bust };
+                  tier: t, best: v.best, bust: v.bust,
+                  /* ★ 被抓的人比的不是莊家的最終手牌 → 結果卡要講得出來
+                     (同一局兩個人跟不同的點數在比,不寫玩家看不懂)。 */
+                  caught: st.caught[s], dBest: dv.best, dBust: dv.bust };
     }
     rows[d] = { seat: d, bet: 0, delta: dealerDelta, tag: "dealer",
-                tier: dt, best: dv.best, bust: dv.bust, dealer: true };
+                tier: dtFinal, best: dvFinal.best, bust: dvFinal.bust, dealer: true,
+                caught: -1, dBest: dvFinal.best, dBust: dvFinal.bust };
     return { rows: rows, dealer: d, dealerDelta: dealerDelta };
   }
 
@@ -551,7 +685,7 @@ const BJ = (function(){
     // 常數
     NSUIT, NRANK, NCARD, MIN_PLAYERS, MAX_PLAYERS, VS15,
     SUIT_CH, SUIT_KEY, SUIT_NAME, RANK_TXT, DRAGON_N,
-    T_BUST, T_NORM, T_BJ, T_DRAGON, T_NAME, LINE_FREE,
+    T_BUST, T_NORM, T_BJ, T_DRAGON, T_NAME, LINE_FREE, GRAB_CH,
     RULES_DEF, START_OPTS, BETMAX_OPTS, LINE_OPTS, BJPAY_OPTS, ROUNDS_OPTS, SEC_OPTS,
     MIN_BET, BET_STEPS,
     // 編碼
@@ -563,8 +697,12 @@ const BJ = (function(){
     valueOf, valueTxt, isBJ, tierOf, mulOf,
     // 座位牌堆
     maxDraw, seatCards, closedAt,
+    // 補牌線(下限)與抓人
+    reachedLine, grabAct, isGrab, grabSeat, anyUncaught, canGrab,
+    // 牌情:誰的牌看得到(★ 畫面與 AI 唯一的判斷式)
+    openTo, hiddenIdx, shownCards,
     // 一局
-    replay, legal, denyTxt, push, autoDealer,
+    replay, legal, denyTxt, push, autoTo, autoDealer,
     // 結算
     betOf, settle, tagTxt, TAG_TXT,
     // 輪莊

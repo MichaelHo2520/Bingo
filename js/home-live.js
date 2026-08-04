@@ -36,13 +36,15 @@ const HomeLive = (function(){
     //   U+1F0A0–U+1F0FF 那段撲克牌字元裡,多數字型沒有會變豆腐方框(CLAUDE.md 的禁令)。
     //   與排七同一個圖示是刻意的 —— 同一副撲克牌,而消消樂與台灣麻將本來也共用 🀄。
     { key:"big2",    index:"big2_index",    name:"大老二", icon:"🎴", badge:"hlBadgeBig2", max:4, href:"big2.html" },
-    /* ★ max 必須與 js/blackjack/adapter.js 的 maxPlayers 一致(5)。
+    /* ★ max 必須與 js/blackjack/adapter.js 的 maxPlayers 一致(v1.86.0 起是 **6**)。
        ★★ joinMid:true 是這張表的**第一個遊戲專屬能力旗標**(v1.84.0)——
           21 點一場 = 很多局,對戰中也可以加入(新人下一局進場),
           所以「可加入」的判定與其他七個不同。
           ⚠ 它必須與 adapter 的 joinMidGame 一致:不一致的話首頁會把進得去的房間
             列成「對戰中」(反過來則是列成可加入、點進去被擋)。 */
-    { key:"bj",      index:"bj_index",      name:"21點",   icon:"🎴", badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true }
+    /* ⚠ name 是**顯示名**(v1.86.0 從「21點」改成「台式21點」)——
+       index / key / href 這三個是**資料與路徑**,一個字都不准跟著改。 */
+    { key:"bj",      index:"bj_index",      name:"台式21點", icon:"🎴", badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true }
   ];
 
   let refs=[];            // 掛著監聽的 firebase ref(stop 時逐一 off)

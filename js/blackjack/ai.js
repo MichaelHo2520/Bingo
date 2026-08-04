@@ -71,28 +71,37 @@ const BJAI = (function(){
     const r = BJ.rankOf(c);
     return r === 1 ? 11 : Math.min(r, 10);
   }
-  /* 場上翻開的所有牌 = 每個閒家的整手 + 莊家的明牌(未翻開時)。
+  /* 場上**這個座位看得到**的所有牌。
      ★ 「高手」數的就是這一份 —— 一副牌每局重洗,所以能數的只有**這一局**,
        而這一局的資訊確實足以微調(例如 10 點的牌已經出掉一半 → 補牌比較不容易爆)。
-     ⚠ st.reveal 是唯一的判斷式(見 rules.js 第六節):翻開了就整副都看得到。 */
-  function visible(st){
+     ── ★★★ v1.86.0:這一支整份交給 BJ.shownCards() ────────────────────────────
+       使用者要求「除了自己,其他人的第一張牌都蓋著」→ 看得到的牌**少了一大塊**,
+       而且**莊家也看不到閒家的底牌**(那正是台式抓人要賭的地方)。
+       ★ 於是牌情的判斷式只有規則層那一支:這裡一行都不自己判 ——
+         `shownCards(st, s, seat)` 已經處理好「我自己全開 / 莊家吃 reveal /
+         閒家第一張蓋著 / 爆了或被抓或結算就全開」。
+       ⚠⚠ **不可以**為了「算得準一點」直接索引 st.hands[s] —— 那是這一支唯一會
+         靜靜地壞掉的地方,而且測試很難抓(AI 只是變強)。守門是 K 節那兩條
+         「換掉別人看不到的牌,AI 的決定必須完全不變」。
+     ⚠ seat 一定要傳:不傳等於「觀眾視角」,連自己的牌都數不到。 */
+  function visible(st, seat){
+    const me = (seat === undefined || seat === null) ? -1 : seat;
     const out = [];
     for(let s = 0; s < st.n; s++){
-      if(s === st.dealer && !st.reveal){ const c = upOf(st); if(c >= 0) out.push(c); continue; }
-      const h = st.hands[s] || [];
+      const h = BJ.shownCards(st, s, me);
       for(let i = 0; i < h.length; i++) out.push(h[i]);
     }
     return out;
   }
-  /* 「再補一張會爆」的機率(只用明牌修正牌堆)。
+  /* 「再補一張會爆」的機率(只用看得到的牌修正牌堆)。
      ⚠ 這是**估計**不是真值:剩下的牌裡有多少張讓我爆,分母用「52 − 看得到的」。
        一副牌每局重洗,所以不必也不能跨局累積。 */
-  function bustOdds(st, hand){
+  function bustOdds(st, hand, seat){
     const v = BJ.valueOf(hand);
     if(v.bust) return 1;
     const room = 21 - v.best;             // 補進來的點數超過這個就爆
     const seen = {};
-    visible(st).forEach(c => { seen[c] = 1; });
+    visible(st, seat).forEach(c => { seen[c] = 1; });
     let bad = 0, tot = 0;
     for(let c = 0; c < BJ.NCARD; c++){
       if(seen[c]) continue;
@@ -167,12 +176,25 @@ const BJAI = (function(){
      ⚠ **它的貢獻很小**,照實記下來免得日後有人以為這裡藏著什麼:
        12 萬局的對照組是 **+0.22pp**(預設房規)/ **+0.03pp**(補 17 + 平手退注)。
        方向正確、留著,但**不要**在它身上再疊東西 —— 上面那兩條就是這樣加壞的。 */
-  function adjust(mv, hand, st){
+  function adjust(mv, hand, st, seat){
     if(mv !== "h") return mv;
     const v = BJ.valueOf(hand);
     if(v.soft) return mv;                              // 軟手補牌不會爆,這條不適用
     if(v.hard < 14 || v.hard > 16) return mv;          // 只管 14~16 那三格
-    return bustOdds(st, hand) > 0.70 ? "s" : mv;
+    return bustOdds(st, hand, seat) > 0.70 ? "s" : mv;
+  }
+
+  /* ★★ 一律用它收尾:回傳的動作**保證合法**。
+     ⚠ v1.86.0 之前「不合法就退回 s」是安全的,現在**不是** ——
+       補牌線是下限,沒到線的時候 "s" 本身就不合法,退回去等於回傳一個
+       呼叫端套不進去的動作(症狀是單機那一局靜靜地卡住)。 */
+  function norm(st, seat, mv){
+    const lg = BJ.legal(st, seat);
+    if(BJ.isGrab(mv)) return BJ.canGrab(st, BJ.grabSeat(mv)) ? mv
+                           : (lg.stand ? "s" : (lg.hit ? "h" : null));
+    if(mv === "h") return lg.hit ? "h" : (lg.stand ? "s" : null);
+    if(mv === "s") return lg.stand ? "s" : (lg.hit ? "h" : null);
+    return lg.hit ? "h" : (lg.stand ? "s" : null);
   }
 
   /* ==========================================================================
@@ -199,7 +221,7 @@ const BJAI = (function(){
       mv = v.best < 13 ? "h" : (v.best < 17 && Math.random() < 0.45 ? "h" : "s");
     }else if(L === "hard"){
       // ★ 完整基本策略(看莊家明牌)+ 一條反向的數牌微調(見 adjust)
-      mv = adjust(basic(hand, upValue(st)), hand, st);
+      mv = adjust(basic(hand, upValue(st)), hand, st, seat);
     }else{
       /* 普通:**照莊家的規矩打** —— 補到 17 就停,完全不看莊家的明牌。
          ★ 這是真人最常見的打法,而它確實比基本策略差一截(量出來每單位押注差 1~7%)
@@ -213,45 +235,83 @@ const BJAI = (function(){
        ⚠ 這一行**不要**刪掉:它是「規則層收緊、AI 自動跟上」的接點 ——
          刪了就等於把加倍的判斷散回這一支。 */
     if(mv === "d" && !lg.dbl) mv = "h";
-    if(mv === "h" && !lg.hit) mv = "s";
-    if(mv === "s" && !lg.stand) mv = lg.hit ? "h" : null;
-    return mv;
+    /* ★★ v1.86.0:補牌線是**下限**,而且閒家也吃 → 「表說停但停不下來」的時候
+       必須退成補牌(下面 norm 那一支就是在做這件事)。
+       ★ 於是 AI 一行決策都不必改就自動遵守補牌線 —— 規則層收緊、AI 自動跟上。 */
+    return norm(st, seat, mv);
   }
 
   /* ==========================================================================
-     四、莊家這一手(只有房規是「自由」時才會被呼叫)
+     四、★★★ 莊家這一手 —— v1.86.0 起他還要決定「抓誰」
      ──────────────────────────────────────────────────────────────────────────
        ★ 這裡是唯一可以看整副莊家手牌的地方 —— **那是他自己的牌**。
-       ★ 真人莊的樂趣在於「他要自己判斷」,所以電腦當莊也不該只會補到 17:
-         全場都爆了就直接停(已經通吃,再補是白冒風險),
-         贏得過最好的那家就停,贏不過就補。
-       ⚠ 房規有補牌線時**不走這裡**(BJ.autoDealer 算得出整段,連等他點都不必)。
+       ★★★ 但 v1.86.0 起**他也看不到閒家的底牌**(每個人的第一張都蓋著)——
+          所以「抓誰」是在資訊不完整下的賭注,那正是台式莊家最好玩的地方。
+          ⚠⚠ 舊版這一支直接讀 `BJ.valueOf(st.hands[s])` 拿閒家的真值,
+            那在新規則下**就是作弊**。現在一律經過 estOf() → BJ.shownCards()。
+       ★ 房規有補牌線也走這裡(v1.86.0 起補牌線只是下限,莊家仍有決策空間)——
+         v1.85.0 那條「有補牌線就 autoDealer 一次算完」已經拿掉了。
+     ── 三個難度的抓人策略(初版,量完再調)─────────────────────────────────────
+         easy 不抓(補到 16 就停)—— 新手不會用這一招,階梯自然分開
+         mid  抓「估計贏得過的」,抓完就停
+         hard 同 mid,但**留下估計贏不過的**繼續補牌
      ========================================================================== */
+  /* 一張看不到的牌估幾點:A~10 各 4 張、J/Q/K 也算 10 → (45 + 30) / 13 ≈ 6.5。
+     ⚠ 取 7(略微高估)是刻意的:高估別人 = 莊家保守一點,而莊家本來就有優勢。 */
+  const HIDDEN_EST = 7;
+  /* 莊家眼中的某一家。★ 一律走 BJ.shownCards / BJ.openTo(不准碰 st.hands[s])。 */
+  function estOf(st, s){
+    const open = BJ.openTo(st, s, st.dealer);
+    const v = BJ.valueOf(BJ.shownCards(st, s, st.dealer));
+    return { open: open, bust: open && v.bust, best: v.best,
+             est: open ? v.best : v.best + HIDDEN_EST };
+  }
+
   function dealerPick(st, level){
     const d = st.dealer;
     const lg = BJ.legal(st, d);
-    if(!lg.hit && !lg.stand) return null;
+    if(!lg.hit && !lg.stand && !lg.grab) return null;
     const v = BJ.valueOf(st.hands[d]);
-    if(v.bust) return "s";
-    if(level === "easy") return v.best < 16 ? "h" : "s";
+    if(v.bust) return norm(st, d, "s");
+    // 新手:不抓人,照舊補到 16(★ 階梯就靠這一級「不會用抓人」拉開)
+    if(level === "easy") return norm(st, d, v.best < 16 ? "h" : "s");
 
-    // 沒爆的閒家裡最好的那個點數
-    let best = -1, alive = 0;
-    for(let s = 0; s < st.n; s++){
-      if(s === d) continue;
-      const pv = BJ.valueOf(st.hands[s]);
-      if(!pv.bust){ alive++; if(pv.best > best) best = pv.best; }
+    /* ---- ① 抓人 ---- */
+    if(lg.grab){
+      const need = st.rules.pushDealer ? 0 : 1;     // 平手莊家吃 → 打平就夠
+      let target = -1, tgtEst = -1;
+      for(let s = 0; s < st.n; s++){
+        if(!BJ.canGrab(st, s)) continue;
+        const e = estOf(st, s);
+        /* ★★ 已經爆的先抓掉 —— 房規是「兩邊都爆算平手」時,這一手把他的輸**鎖住**
+           (莊家等一下自己爆也不影響他了)。bustFirst 開著時抓他無害。
+           ★ 這是規則層那條「爆掉的閒家照樣抓得到」在 AI 這一側的用處。 */
+        if(e.bust) return BJ.grabAct(s);
+        // 估計贏得過 → 抓掉鎖定(從估計最高的那家開始抓,威脅先解決)
+        if(v.best >= e.est + need && e.est > tgtEst){ target = s; tgtEst = e.est; }
+      }
+      if(target >= 0) return BJ.grabAct(target);
     }
-    // ★ 全部爆了 → 已經通吃,一張都不必補(補了反而可能自己爆 → 那是純虧)
-    if(!alive) return "s";
-    if(level === "mid") return v.best < 17 ? "h" : "s";
 
-    // 高手:打得贏就停。★ 平手莊家吃時「打平」就夠了
-    const need = st.rules.pushDealer ? best : best + 1;
-    if(v.best >= need) return "s";
-    if(v.best >= 18) return "s";              // 18 以上再補幾乎必爆,認賠比較划算
-    if(bustOdds(st, st.hands[d]) > 0.72) return "s";
-    return "h";
+    /* ---- ② 剩下的人 → 該補嗎 ---- */
+    let bestEst = -1, alive = 0;
+    for(let s = 0; s < st.n; s++){
+      if(s === d || st.caught[s] >= 0) continue;    // 抓過的已經定案,不必再管他
+      const e = estOf(st, s);
+      if(e.bust) continue;                          // 看得出來已經爆的不構成威脅
+      alive++;
+      if(e.est > bestEst) bestEst = e.est;
+    }
+    // ★ 沒有威脅了 → 一張都不必補(補了反而可能自己爆 → 那是純虧)
+    if(!alive) return norm(st, d, "s");
+    if(level === "mid") return norm(st, d, v.best < 17 ? "h" : "s");
+
+    // 高手:打得贏(估計值)就停。★ 平手莊家吃時「打平」就夠了
+    const need = st.rules.pushDealer ? bestEst : bestEst + 1;
+    if(v.best >= need) return norm(st, d, "s");
+    if(v.best >= 18) return norm(st, d, "s");       // 18 以上再補幾乎必爆,認賠比較划算
+    if(bustOdds(st, st.hands[d], d) > 0.72) return norm(st, d, "s");
+    return norm(st, d, "h");
   }
 
   /* ==========================================================================
@@ -281,10 +341,10 @@ const BJAI = (function(){
 
   return {
     LEVEL_INFO, LEVEL_KEYS, levelOf, thinkMs,
-    // AI 的世界觀(★ 只有明牌)
-    upOf, upValue, visible, bustOdds,
+    // AI 的世界觀(★ 只看得到 BJ.shownCards 給的那些牌)
+    upOf, upValue, visible, bustOdds, estOf, HIDDEN_EST,
     // 決策
-    hardMove, softMove, basic, adjust, pick, dealerPick, bet
+    hardMove, softMove, basic, adjust, norm, pick, dealerPick, bet
   };
 })();
 

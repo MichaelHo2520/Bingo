@@ -3781,8 +3781,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-art{width:96px;height:96px;display:block;margin:0 auto 8px}
   /* ⚠ 撲克牌小圖示的 .pk-* 是**排七那一段定義的**(index.html 的遊戲卡也共用同一組)。
      這一頁只是沿用,刻意不再定義一份 —— 同一副撲克牌本來就該長一樣。
-     ★ 但 21 點的中間那張要放「21」兩個字 → 字級要小一號,否則會溢出牌框。 */
-  .bj-art .pk-r{font-size:11px}
+     ★ 但 21 點的中間那張要放「21」兩個字 → 字級要小一號,否則會溢出牌框。
+     ── ★★ v1.86.0:首頁遊戲卡用的是 .bj-cart,**不可以**掛 .bj-art ────────────
+       上面那條 .bj-art 是**這一頁進場插圖**的 96px,而它定義在
+       .gc-art{width:54px}(第 1152 行)**後面** → 同權重、後定義勝
+       → 首頁那張卡的圖直接變成 96px,整張卡比另外七張高一截(v1.85.0 之前一直是這樣)。
+       ⚠ 這是 notes/13「CSS 會撞的四類」的第二類(權重 / 順序),而且是**自己撞自己**
+         —— 前綴防得了名字撞,防不了這個。加頁面專屬 class 到共用元件上之前,
+         一定要先看那個 class 有沒有在別的地方定尺寸。 */
+  .bj-art .pk-r,.bj-cart .pk-r{font-size:11px}
   .bj-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
 
   /* ---------- 規則清單 ----------
@@ -4262,4 +4269,117 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .bj-seat{flex:1 1 0;min-width:104px}
     .bj-mine{padding:3px 8px}
     .bj-mhd{height:19px}
+  }
+
+  /* ==========================================================================
+     台式21點 v1.86.0 —— ★★★ 牌桌化(這一段刻意追加在最後,靠後定義覆蓋前面)
+     ==========================================================================
+       使用者第二輪的四點要求:
+         ① 拿掉最下方的手牌區(自己就是桌上的一格);莊家的範圍高一點
+         ② 支援 6 人;下方玩家動態排,最多三列
+         ③ 三列時牌不要太小 → 一格超過三張換到下一行
+         ④ 除了自己,每個人的第一張牌也蓋著
+
+     ── ★★ 排法:一列 2 格 + 我獨占一列 ────────────────────────────────────────
+       390px 下一格 177.6px,一行放得下 **4 張** mid 牌(149px < 可用 164px);
+       改成一列 3 格的話一格只有 116px、**3 張就被迫換行** → 違反要求③。
+       列數 = 1 + ⌈(閒家數 − 1) / 2⌉ → 6 人 3 列 · 4 人 2 列 · 2 人 1 列,
+       **永遠 ≤ 3 列**,所以連上限判斷都不必寫。
+       ⚠ flex-basis 由 JS 寫成 literal(board.js 的 boxBasis)——
+         calc 除以 var() 在 Chromium 會讓整條 flex 宣告失效,而症狀是
+         「一列塞不進去的那一格被靜靜擠掉」。
+
+     ── ★★ 「位置不准跳」在新版型下的三個數字 ──────────────────────────────────
+         --bj-trh  牌桌那一塊的下限     --bj-bxh  **一格的高度(寫死)**
+         --bj-acth 動作列
+       ⚠⚠ `--bj-mh` 沒有了(手牌區拿掉)。而 --bj-bxh 一定要**寫死成「兩行牌」的
+         最壞情況** —— 讓它跟著牌數長的話,補到第 5 張的那一刻整桌會重排一次
+         (量出來 132.8 → 185.7px)。
+     ========================================================================== */
+  :root{ --bj-bxh:132px; --bj-trh:300px; }
+  /* 牌桌:綠呢 + 內緣暗角(它現在吃掉整個盤面,因為底下的手牌區沒了) */
+  .bj-table{flex:1 1 auto;min-height:var(--bj-trh);overflow:hidden;
+    display:flex;flex-direction:column;justify-content:flex-start;gap:8px;
+    padding:10px;border-radius:14px;
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%),
+      linear-gradient(180deg,#1d4c3a,#12332a 70%,#0e2822);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.07), inset 0 10px 26px rgba(0,0,0,.34)}
+  :root[data-theme="ebook"] .bj-table{background:#fff;border:1px solid #000;box-shadow:none}
+
+  /* ---------- 莊家台(要求①的後半:範圍高一點、牌大一階)----------
+     ⚠ border 一律 2px **透明**:輪到他時只換顏色,標不標都不會讓整桌高 4px。 */
+  /* ⚠ flex-direction 一定要明寫 row:前面舊的 .bj-dealer 是 column,
+     只覆蓋 display 的話莊家台會變成「牌在上、名字在下」(施工中真的長成那樣)。 */
+  .bj-dealer{flex:none;display:flex;flex-direction:row;align-items:center;gap:10px;
+    padding:10px 11px;border-radius:12px;border:2px solid transparent;
+    background:linear-gradient(180deg,rgba(0,0,0,.34),rgba(0,0,0,.18))}
+  .bj-dealer.act{border-color:rgba(255,196,84,.9)}
+  .bj-dealer.me{background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
+  .bj-card.dbig{--bjw:calc(var(--bj-cw) * .92)}
+  .bj-dcs{flex:none;display:flex;gap:5px;align-items:center;min-height:0;overflow:hidden}
+  .bj-dinfo{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 auto}
+  .bj-dtop{display:flex;align-items:center;gap:6px;min-width:0}
+  .bj-dnm{font:900 15px/1 'Nunito',sans-serif;color:#fff;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bj-dsub{font:800 10.5px/1.3 'Nunito',sans-serif;color:rgba(255,255,255,.58);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  :root[data-theme="ebook"] .bj-dnm,:root[data-theme="ebook"] .bj-dsub{color:#000}
+
+  /* ---------- 注區(要求②)---------- */
+  /* ⚠ overflow **hidden** 不是 auto:每一格的高度是 JS 平分算出來的,不該有東西
+     溢出;而 auto 的話放不下時會**靜靜地捲掉最後一列**(第一版就是這樣少了一列,
+     同 .bj-seats 那個老坑)。 */
+  .bj-boxes{flex:1 1 auto;min-height:0;display:flex;flex-wrap:wrap;
+    align-content:stretch;gap:7px;overflow:hidden}
+  /* ⚠ height 寫死(見上面那段):牌數變不可以讓格子長高 */
+  .bj-box{min-width:0;height:var(--bj-bxh);min-height:0;display:flex;flex-direction:column;gap:3px;
+    padding:6px 5px;border-radius:11px;border:2px solid transparent;
+    background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.045));
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
+  .bj-box.act{border-color:rgba(255,255,255,.42)}
+  .bj-box.bust{background:linear-gradient(180deg,rgba(224,83,63,.22),rgba(224,83,63,.07))}
+  .bj-box.caught{background:linear-gradient(180deg,rgba(255,196,84,.20),rgba(255,196,84,.07))}
+  /* ★ 我自己那一格:金框 + 亮底 + 徽章(要求①「很清楚知道自己坐在哪」) */
+  .bj-box.me{border-color:#ffd489;
+    background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
+  /* ★ 抓人展開時抓得動的那幾格 —— 整格就是那顆鈕在指的東西 */
+  .bj-box.target{border-color:#ffc454;box-shadow:0 0 0 3px rgba(255,196,84,.22)}
+  :root[data-theme="ebook"] .bj-box{background:#fff;border-color:#000}
+  .bj-bhd{display:flex;align-items:center;gap:4px;min-width:0;flex:none}
+  .bj-bnm{font:900 11.5px/1 'Nunito',sans-serif;color:#fff;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  :root[data-theme="ebook"] .bj-bnm{color:#000}
+  /* ★ 要求③:超過放得下的張數就**換行**(不是把牌變小) */
+  .bj-bcs{flex:1 1 auto;min-height:0;display:flex;flex-wrap:wrap;gap:3px;
+    align-items:center;align-content:center;justify-content:center;overflow:hidden}
+  .bj-bwait{font:700 11px/1 'Nunito',sans-serif;color:var(--muted)}
+  .bj-bft{flex:none;display:flex;align-items:center;gap:4px;min-width:0}
+  .bj-bft .bj-pt{margin-left:0}
+  .bj-bft .bj-st{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bj-st.caught{color:#ffc454;font-weight:900}
+  :root[data-theme="ebook"] .bj-st.caught{color:#000}
+  .bj-box.idle{opacity:.85}
+
+  /* ---------- 抓人那一排(動作列切換,★ 不多一列)---------- */
+  .bj-grabs{display:flex;gap:6px;align-items:stretch}
+  /* ⚠ 名字長短不一 → 一律平分 + 省略號。**不可以**讓某一顆換行變兩行高
+     (v1.85.0「＋10」那個坑:整列的高度是最大值,只印整列永遠找不出是哪一顆) */
+  .bj-gbtn{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    padding-left:6px;padding-right:6px}
+  .bj-gx{flex:0 0 auto;min-width:40px}
+  .bj-selbar.grab .bj-selico{color:#ffc454}
+
+  /* 矮視窗 / 橫置:格子與牌桌一起收(★ 三個數字要一起改,只收一個就是手牌被推) */
+  @media (max-height:600px){
+    :root{--bj-bxh:104px; --bj-trh:200px}
+    .bj-dealer{padding:7px 9px;gap:7px}
+    .bj-dnm{font-size:13px}
+    .bj-dsub{-webkit-line-clamp:1}
+    .bj-table{padding:7px 8px;gap:6px;flex-direction:column;align-items:stretch;
+      justify-content:flex-start}
+  }
+  @media (max-height:440px){
+    :root{--bj-bxh:88px; --bj-trh:150px}
+    .bj-dsub{display:none}
   }

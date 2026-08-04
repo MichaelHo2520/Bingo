@@ -202,13 +202,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <span class="gc-go" aria-hidden="true">▸</span>
       </a>
 
-      <!-- 第八個遊戲(v1.84.0):21 點。
+      <!-- 第八個遊戲(v1.84.0):台式21點。
            ⚠ 插圖同樣只用數字與字母,不用撲克牌 Unicode(U+1F0A0 那一段)——
               多數字型沒有,會變豆腐方框(同麻將牌那條禁令,見 notes/13)
            ★ 沿用排七 / 大老二那組 .pk-* 撲克牌圖示(同一副牌本來就該長一樣)
-           ⚠ 中間那張要放「21」兩個字 → 字級小一號(.bj-art .pk-r 在 styles.css) -->
+           ⚠ 中間那張要放「21」兩個字 → 字級小一號(.bj-cart .pk-r 在 styles.css)
+           ⚠⚠ 這裡**不可以**掛 .bj-art —— 那是 blackjack.html 進場插圖的 96px,
+               它定義在 .gc-art(54px)後面 → 會把這張卡撐得比另外七張高一截
+               (v1.86.0 修掉的;理由記在 styles.css .bj-cart 那條旁邊) -->
       <a class="game-card as-link" href="blackjack.html">
-        <svg class="gc-art pk-art bj-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 21 點">
+        <svg class="gc-art pk-art bj-cart" viewBox="0 0 56 56" role="img" aria-label="撲克牌 台式21點">
           <rect class="pk-bd" x="4" y="13" width="16" height="24" rx="3"/>
           <rect class="pk-bd" x="21.5" y="9" width="16" height="24" rx="3"/>
           <rect class="pk-bd" x="36" y="13" width="16" height="24" rx="3"/>
@@ -217,8 +220,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <text class="pk-k" x="44" y="29">K</text>
         </svg>
         <span class="gc-body">
-          <span class="gc-name display">21 點</span>
-          <span class="gc-desc">輪流當莊 · 湊到最接近 21 · 單機對電腦 / 2~5 人連線</span>
+          <span class="gc-name display">台式21點</span>
+          <span class="gc-desc">輪流當莊 · 莊家可以抓人 · 單機對電腦 / 2~5 人連線</span>
           <span class="hl-badge hidden" id="hlBadgeBj"></span>
         </span>
         <span class="gc-go" aria-hidden="true">▸</span>

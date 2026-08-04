@@ -50,6 +50,10 @@ const BJB = (function(){
      ⚠ 一定要在畫的時候夾一次 [1, betMax] —— 房規的上限改小時舊的數字會超出範圍。 */
   let betPend = R.MIN_BET;
   let lastInfo = null;                      // 加減鈕只動 betPend → 用它原地重畫一次動作列
+  /* ★★ 「抓人」那一排展開了沒(v1.86.0)。與 betPend 同一類:**純畫面狀態** ——
+     不進 DB、不進 st、不影響任何判定,所以住在盤面這一層就只有一份。
+     ⚠ 換局 / 換相位 / 抓完一家都要收掉,不然下一段會頂著一排名字鈕。 */
+  let grabOpen = false;
 
   /* ==========================================================================
      一、牌面
@@ -67,14 +71,22 @@ const BJB = (function(){
   }
   const backCard = cls => PKFace.backHTML({ prefix: "bj", cls: cls });
 
-  /* 一排牌。hide = true 時**第二張畫牌背**(只有莊家的暗牌會走到這裡)。
-     ⚠ hide 一律由呼叫端從 `st.reveal` 推,這一支自己不判斷任何相位。 */
-  function cardsHTML(cards, cls, hide){
+  /* 一排牌。★ 第 hidx 張畫**牌背**(-1 = 全部翻開)。
+     ⚠⚠ hidx 一律由呼叫端從 **BJ.hiddenIdx(st, seat, me)** 拿 —— 這一支自己不判斷
+       任何相位,而且畫面端**絕對不可以**自己算「他大概停手了吧」那類近似條件。
+       v1.86.0 起蓋著的不只莊家:每個非我閒家的**第一張**也蓋著(見 rules.js 六之三)。 */
+  function cardsHTML(cards, cls, hidx){
     if(!cards || !cards.length) return "";
+    const k = (hidx === undefined || hidx === null) ? -1 : hidx;
     let h = "";
     for(let i = 0; i < cards.length; i++)
-      h += (hide && i === 1) ? backCard(cls) : cardHTML(cards[i], cls);
+      h += (i === k) ? backCard(cls) : cardHTML(cards[i], cls);
     return h;
+  }
+  /* 某個座位的一手牌 + 它的點數膠囊 —— ★ 牌情只在這兩支裡落地。 */
+  function handOf(st, seat, me, cls){
+    if(!st) return "";
+    return cardsHTML(st.hands[seat], cls, R.hiddenIdx(st, seat, me));
   }
 
   /* 點數膠囊。★ 雙值(「7 / 17」)一律走 BJ.valueTxt —— 這一頁**不准**自己算點數
@@ -97,11 +109,28 @@ const BJB = (function(){
            '</span>';
   }
 
-  /* 這個座位的狀態記號(公開資訊:他的牌就攤在那裡,停手也是公開動作)。 */
+  /* 這個座位的點數膠囊。★ 只算**看得到**的那幾張,還有暗牌就標「+ ?」——
+     莊家的「4 + ?」與閒家的「9 + ?」是**同一條規則**(v1.86.0 統一)。
+     ⚠ 拿整手去算等於把暗牌換成數字洩漏出去。 */
+  function ptOf(st, seat, me){
+    if(!st) return pipHTML(null);
+    const open = R.openTo(st, seat, me);
+    const shown = R.shownCards(st, seat, me);
+    return pipHTML(shown, open ? st.tier[seat] : R.T_NORM,
+                   open && R.valueOf(st.hands[seat]).bust, !open);
+  }
+
+  /* 這個座位的狀態記號。★ 每一種都是**公開資訊**:
+     停手 / 爆了 / 被抓都是全桌看得到的動作(被抓的人牌也翻開了)。 */
   function stateHTML(st, s, betPhase, betDone){
     if(betPhase) return betDone ? '<span class="bj-st ok">已下注</span>'
                                 : '<span class="bj-st wait">下注中…</span>';
     if(!st) return "";
+    // ★ 被抓:講得出「被抓時莊家幾點」—— 同一局每個人比的莊家點數可能不一樣
+    if(st.caught[s] >= 0){
+      const dh = R.seatCards(st.cards, st.n, st.dealer, st.caught[s]);
+      return '<span class="bj-st caught">🎯 已抓 · 莊 ' + R.valueOf(dh).best + '</span>';
+    }
     if(st.hands[s] && R.valueOf(st.hands[s]).bust) return '<span class="bj-st bad">💥 爆了</span>';
     if(st.done[s]) return '<span class="bj-st ok">✋ 停</span>';
     const turn = (s === st.dealer) ? st.phase === "dealer" : st.phase === "play";
@@ -135,32 +164,23 @@ const BJB = (function(){
     const st = v.st, d = st ? st.dealer : -1;
     const mine = d >= 0 && d === v.me;
     const nm = (v.names && v.names[d]) || "莊家";
-    const hand = st ? st.hands[d] : null;
-    /* ★★ 暗牌:hide 只看 st.reveal(唯一的判斷式)。 */
-    const hide = !!(st && !st.reveal);
-    /* 還沒翻牌時點數只算**明牌那一張**(partial = 顯示成「10+」,表示還有一張沒翻)。
-       ⚠ 這一行是牌情紅線的一部分:拿整手去算 valueTxt 等於把暗牌換成數字洩漏出去。 */
-    const shown = (st && hand) ? (hide ? hand.slice(0, 1) : hand) : null;
-
-    let body;
-    if(mine){
-      body = '<span class="bj-dme">你的牌在下面 ▾</span>';
-    }else if(!st){
-      body = '<span class="bj-dwait">等發牌…</span>';
-    }else{
-      body = cardsHTML(hand, "mid", hide);
-    }
-
-    return '<div class="bj-dealer' + (mine ? " me" : "") + (st && st.phase === "dealer" ? " act" : "") + '">' +
-             '<div class="bj-dhd">' +
-               '<span class="bj-crown" title="這一局的莊家">🎩</span>' +
-               '<span class="bj-dnm">' + esc(nm) + '</span>' +
-               '<span class="bj-dtag">莊家</span>' +
-               (mine ? '<span class="bj-you">你</span>' : "") +
-               (st ? pipHTML(shown, mine || st.reveal ? st.tier[d] : R.T_NORM,
-                             (mine || st.reveal) && R.valueOf(hand).bust, hide) : "") +
-             '</div>' +
+    /* ★★ 暗牌:蓋哪一張只問 BJ.hiddenIdx(唯一的判斷式)。
+       ⚠ 例外只有一個:我自己就是莊家時那兩張都是我的牌 —— hiddenIdx 自己處理了。 */
+    const body = st ? handOf(st, d, v.me, "dbig")
+                    : '<span class="bj-dwait">等發牌…</span>';
+    return '<div class="bj-dealer' + (mine ? " me" : "") +
+             (st && st.phase === "dealer" ? " act" : "") + '">' +
              '<div class="bj-dcs">' + body + '</div>' +
+             '<div class="bj-dinfo">' +
+               '<div class="bj-dtop">' +
+                 '<span class="bj-crown" title="這一局的莊家">🎩</span>' +
+                 '<span class="bj-dnm">' + esc(nm) + '</span>' +
+                 '<span class="bj-dtag">莊家</span>' +
+                 (mine ? '<span class="bj-you">你</span>' : "") +
+               '</div>' +
+               '<div class="bj-dsub">' + esc(v.dsub || "") + '</div>' +
+             '</div>' +
+             (st ? ptOf(st, d, v.me) : pipHTML(null)) +
            '</div>';
   }
 
@@ -183,40 +203,79 @@ const BJB = (function(){
        ⚠ 但**同一局之內**列數必須固定 → 不可以改成「只列有牌的人」:
          那會讓發牌那一刻整桌撐開一次(大老二一路在修的「上上下下」)。
      ========================================================================== */
-  function seatRow(v, s){
-    const st = v.st;
-    const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
+  /* 一個注區。★ 我自己那一格 `wide`(獨占整列)+ 牌用原尺寸 —— 我的牌要拿來做決策。 */
+  function boxHTML(v, s, basis, hh){
+    const st = v.st, mine = s === v.me;
+    const nm = mine ? "你" : ((v.names && v.names[s]) || ("玩家" + (s + 1)));
     const bet = v.bets ? v.bets[s] : 0;
-    const hand = st ? st.hands[s] : null;
-    const bust = !!(hand && R.valueOf(hand).bust);
+    const bust = !!(st && st.hands[s] && R.valueOf(st.hands[s]).bust &&
+                    R.openTo(st, s, v.me));
     const turn = !!(st && st.phase === "play" && !st.done[s]);
-    let cls = "bj-seat";
+    let cls = "bj-box";
+    if(mine) cls += " me";
     if(bust) cls += " bust";
-    if(st && st.done[s] && !bust) cls += " done";
+    if(st && st.caught[s] >= 0) cls += " caught";
     if(turn) cls += " act";
-    return '<div class="' + cls + '">' +
-             '<span class="bj-dot p' + s + '"></span>' +
-             '<span class="bj-snm">' + esc(nm) + '</span>' +
-             (bet ? '<span class="bj-bet" title="這一局押多少"><i>押</i>' + bet +
-                    (st && st.dbl[s] ? '<b>×2</b>' : '') + '</span>' : "") +
-             stateHTML(st, s, v.betPhase, v.betDone && v.betDone[s]) +
-             /* ★ 別人的牌**全程明牌**(hide 永遠不傳)—— 只有莊家那一張是蓋著的 */
-             '<span class="bj-scs">' + (st ? cardsHTML(hand, "sm") : "") + '</span>' +
-             (st ? pipHTML(hand, st.tier[s], bust) : "") +
+    /* ★ 抓人展開時:抓得動的那幾格亮起來(整格就是那顆鈕在指的東西) */
+    if(grabOpen && st && R.canGrab(st, s)) cls += " target";
+    return '<div class="' + cls + '" style="flex:0 0 ' + (mine ? "100%" : basis) +
+             ';height:' + (hh || "var(--bj-bxh)") + '">' +
+             '<div class="bj-bhd">' +
+               '<span class="bj-dot p' + s + '"></span>' +
+               '<span class="bj-bnm">' + esc(nm) + '</span>' +
+               (mine ? '<span class="bj-you">你</span>' : "") +
+               (bet ? '<span class="bj-bet" title="這一局押多少"><i>押</i>' + bet +
+                      (st && st.dbl[s] ? '<b>×2</b>' : '') + '</span>' : "") +
+             '</div>' +
+             '<div class="bj-bcs">' +
+               (st ? handOf(st, s, v.me, mine ? "" : "mid")
+                   : '<span class="bj-bwait">🎴 等發牌…</span>') +
+             '</div>' +
+             '<div class="bj-bft">' +
+               (st ? ptOf(st, s, v.me) : "") +
+               stateHTML(st, s, v.betPhase, v.betDone && v.betDone[s]) +
+             '</div>' +
            '</div>';
   }
 
-  function seatsHTML(v){
+  /* ★★ 注區怎麼排(v1.86.0,使用者第 ② 點:最多三列、人多就縮高度往下疊)
+       · **一列 2 格**(390px 下一格 177px,放得下 4 張牌不換行 —— 一列 3 格只放得下 2 張)
+       · **我獨占一列**(牌用原尺寸)
+     → 列數 = 1 + ⌈(閒家數 − 1) / 2⌉:6 人 3 列 · 4 人 2 列 · 2 人 1 列,**永遠 ≤ 3 列**,
+       所以連上限判斷都不必寫。
+     ⚠⚠ flex-basis 一定要寫成 **literal**:`calc((100% - (var(--x) - 1) * 7px) / var(--x))`
+       在 Chromium 裡整條 flex 宣告會被丟掉(calc 不接受除以 var()),而症狀不是報錯 ——
+       是格子照內容長、一列塞不進去的那格被**靜靜擠掉**(施工中真的踩到)。 */
+  const BOX_FIT = 2, BOX_GAP = 7;
+  const boxBasis = () => "calc((100% - " + ((BOX_FIT - 1) * BOX_GAP) + "px) / " + BOX_FIT + ")";
+  /* ★★ 一格多高:**把注區那一塊平分掉**(使用者第 ② 點的後半:
+     「如果有超過人的話,就縮小高度,然後放下面」)。
+     ⚠ 這不違反「位置不准跳」—— 列數 = 人數算出來的,**一整局不變**。
+     ⚠⚠ 同樣要寫成 literal:calc 除以 var() 會讓整條宣告失效(見 boxBasis 那段)。 */
+  const boxHeight = rows => "calc((100% - " + ((rows - 1) * BOX_GAP) + "px) / " + rows + ")";
+  function boxesHTML(v){
     const st = v.st;
     const n = v.n || (st ? st.n : 2);
     const d = st ? st.dealer : -1;
+    const basis = boxBasis();
+    // 閒家格數(含我);我獨占一列 → 列數 = 1 + ⌈(k − 1) / 2⌉,**永遠 ≤ 3**
+    const k = Math.max(1, n - (d >= 0 ? 1 : 0)) + (v.me < 0 ? 1 : 0);
+    const nRows = Math.min(3, 1 + Math.ceil(Math.max(0, k - 1) / BOX_FIT));
+    const hh = boxHeight(nRows);
     let rows = "";
     for(let s = 0; s < n; s++){
-      if(s === d) continue;                    // 莊家在上面那一格
-      if(s === v.me) continue;                 // ★ 我自己在底下那一大塊(見上面那段)
-      rows += seatRow(v, s);
+      if(s === d) continue;                    // 莊家在上面那一條
+      rows += boxHTML(v, s, basis, hh);
     }
-    return '<div class="bj-seats">' + rows + '</div>';
+    /* 中途加入的人:這一局還沒有他的座位(見 adapter 的「排隊不是插入」)。
+       ⚠ 照樣要占一格,否則他加入的那一刻整個牌桌會跳一次。 */
+    if(v.me < 0)
+      rows += '<div class="bj-box me idle" style="flex:0 0 100%;height:' + hh + '">' +
+                '<div class="bj-bhd"><span class="bj-bnm">你</span>' +
+                  '<span class="bj-st wait">下一局開始就發你牌</span></div>' +
+                '<div class="bj-bcs"><span class="bj-bwait">🎴 等這一局打完…</span></div>' +
+              '</div>';
+    return '<div class="bj-boxes">' + rows + '</div>';
   }
 
   /* ==========================================================================
@@ -228,44 +287,15 @@ const BJB = (function(){
        ⚠ slots 用**上限**(過五關開著 = 5,關掉 = 2 + maxDraw)而不是目前張數:
          用目前張數的話容器會跟著長,那就等於沒固定。
      ========================================================================== */
-  function slotsOf(v){
-    const st = v.st;
-    if(!st) return R.DRAGON_N;
-    return st.rules.dragon ? R.DRAGON_N : Math.min(8, 2 + R.maxDraw(st.n));
-  }
-  function mineHTML(v){
-    const st = v.st, me = v.me;
-    if(me < 0){
-      /* 中途加入的人:這一局還沒有他的座位(見 adapter 的「排隊不是插入」)。
-         ⚠ 這一格照樣要占高度,否則他加入的那一刻整個牌桌會跳一次。 */
-      return '<div class="bj-mine idle"><div class="bj-mhd">' +
-               '<span class="bj-mnm">你</span>' +
-               '<span class="bj-st wait">下一局開始就發你牌</span>' +
-             '</div><div class="bj-mcs"><span class="bj-mwait">🎴 等這一局打完…</span></div></div>';
-    }
-    const isD = !!(st && st.dealer === me);
-    const hand = st ? st.hands[me] : null;
-    const bust = !!(hand && R.valueOf(hand).bust);
-    const bet = v.bets ? v.bets[me] : 0;
-    const slots = slotsOf(v);
-    let body;
-    if(!st) body = '<span class="bj-mwait">🎴 等發牌…</span>';
-    else body = cardsHTML(hand, "", false);          // ★ 我自己的牌一律全開
-
-    return '<div class="bj-mine' + (bust ? " bust" : "") + (isD ? " dealer" : "") + '">' +
-             '<div class="bj-mhd">' +
-               (isD ? '<span class="bj-crown" title="這一局你當莊">🎩</span>' : "") +
-               '<span class="bj-mnm">' + (isD ? "你(莊家)" : "你") + '</span>' +
-               (bet ? '<span class="bj-bet"><i>押</i>' + bet +
-                      (st && st.dbl[me] ? '<b>×2</b>' : '') + '</span>' : "") +
-               (st ? pipHTML(hand, st.tier[me], bust) : "") +
-             '</div>' +
-             '<div class="bj-mcs" style="--bj-slots:' + slots + '">' + body + '</div>' +
-           '</div>';
-  }
-
   /* ==========================================================================
      五、整個舞台
+     ──────────────────────────────────────────────────────────────────────────
+       ★★★ v1.86.0:**最下面那一塊獨立的手牌區拿掉了**(使用者:「不要有最下方的
+          手牌顯示區,因為在桌上其實都有了,只要能夠很清楚的知道自己是坐在哪個位置」)。
+          我自己就是桌上的一格 —— 靠 `.bj-box.me`(金框 + 「你」徽章 + 獨占一列 +
+          原尺寸的牌)標出來,位置跟著座位跑。
+       ★ 於是 `--bj-mh` 那個高度也跟著消失,多出來的空間全部給牌桌
+         (莊家那一條因此可以做高一點,那是使用者第 ① 點的後半)。
      ========================================================================== */
   function render(v){
     if(!stage) return;
@@ -273,9 +303,8 @@ const BJB = (function(){
     stage.innerHTML =
       '<div class="bj-table">' +
         dealerHTML(v) +
-        seatsHTML(Object.assign({}, v, { n: n })) +
-      '</div>' +
-      mineHTML(v);
+        boxesHTML(Object.assign({}, v, { n: n })) +
+      '</div>';
   }
 
   /* ==========================================================================
@@ -345,8 +374,27 @@ const BJB = (function(){
         ? esc(info.hint)
         : ('輪到 <b>' + esc(info.turnName || "對手") + '</b>…')) + '</span>';
 
-    /* ---------- 我要牌 / 停 ---------- */
+    /* ---------- 我要牌 / 停 / 抓人 ---------- */
     const lg = info.legal || {};
+    const st = info.st;
+
+    /* ★★ 抓人展開:**同一列**換成一排閒家名字鈕(不多一列)。
+       ⚠ 動作列是寫死高度的(--bj-acth),多一列就等於把牌桌推上去。 */
+    if(grabOpen && st && lg.grab){
+      let g = '<div class="bj-selbar grab">' +
+                '<span class="bj-selico">🎯</span>' +
+                '<span class="bj-seltxt">要抓誰?(先跟他比,比完你還能繼續補牌)</span>' +
+              '</div><div class="bj-btns bj-grabs">';
+      for(let s = 0; s < st.n; s++){
+        if(!R.canGrab(st, s)) continue;
+        const nm = (info.names && info.names[s]) || ("玩家" + (s + 1));
+        g += '<button class="btn primary bj-act bj-gbtn" data-act="g" data-s="' + s + '">' +
+             esc(nm) + '</button>';
+      }
+      g += '<button class="btn ghost bj-act bj-gx" data-act="gcancel">✕</button>';
+      return g + '</div>';
+    }
+
     let h = '<div class="bj-selbar">' +
               '<span class="bj-selico">☝</span>' +
               '<span class="bj-seltxt">' + esc(info.hint || "要牌還是停?") + '</span>' +
@@ -354,6 +402,11 @@ const BJB = (function(){
     h += '<div class="bj-btns">';
     h += '<button class="btn primary bj-act' + (lg.hit ? "" : " dim") + '" data-act="h">要牌</button>';
     h += '<button class="btn ghost bj-act' + (lg.stand ? "" : " dim") + '" data-act="s">停</button>';
+    /* ★ 抓人只有莊家看得到這一顆(閒家沒有這個動作 → 畫出來只是雜訊)。
+       ⚠ 不合法時只是**變暗**、照樣按得動 → 跳 BJ.denyTxt 那句(不用 disabled)。 */
+    if(info.isDealer)
+      h += '<button class="btn ghost bj-act' + (lg.grab ? "" : " dim") +
+           '" data-act="gopen">抓人 ▸</button>';
     h += '</div>';
     return h;
   }
@@ -367,6 +420,9 @@ const BJB = (function(){
 
   function renderActs(info){
     if(!acts) return;
+    /* ★ 抓人那一排只在「莊家、抓得動」時活著 —— 相位一變就收掉,
+       不然下一段會頂著一排名字鈕(而且那時它們都不合法了)。 */
+    if(grabOpen && !(info.legal && info.legal.grab)) grabOpen = false;
     lastInfo = info;                        // 加減鈕要原地重畫一次(見 mount 的 bstep)
     acts.classList.remove("hidden");
     acts.innerHTML = '<div class="bj-actrow">' + actsHTML(info) + '</div>' +
@@ -450,7 +506,7 @@ const BJB = (function(){
 
        ⚠⚠ 莊家的事件要等 `st.reveal` —— 沒翻牌就喊「莊家 21 點」等於把暗牌講出來。
      ========================================================================== */
-  let anPrev = null, anKey = "";
+  let anPrev = null, anKey = "", anCaught = null;
 
   /* 這一頁的聲音刻意**全部是合成音**(沒有語音檔)。
      ⚠ 哪天要補「爆了 / 21 點」的人聲(照大老二那兩格),音效槽一定要帶 `{ el:true }` ——
@@ -484,25 +540,46 @@ const BJB = (function(){
      沒有東西抓得到(那正是這個專案最痛的一類;大老二 v1.81.0 真的有一條突變這樣存活)。 */
   function moveSfx(act){
     if(typeof Sound === "undefined") return;
+    if(R.isGrab(act)){ grabSfx(); return; }
     if(act === "h" || act === "d") Sound.place();
     else Sound.takeback();
+  }
+  /* 抓人:兩短一長的下行「指過去」—— 與爆(下行滑音)/ 21 點(上行)分得出來。 */
+  function grabSfx(){
+    if(typeof Sound === "undefined") return;
+    Sound.tone(740, { type: "square", dur: 0.07, vol: 0.20 });
+    Sound.tone(740, { type: "square", dur: 0.07, vol: 0.20, delay: 0.10 });
+    Sound.tone(494, { type: "square", dur: 0.22, vol: 0.22, delay: 0.20 });
   }
 
   /* 每次重畫都叫一次(單機 solo.paint() / 連線 adapter.paint() 各一行)。
      v = { st, names[], me, key } —— key 就是「這是哪一局」。 */
   function announce(v){
     const st = v && v.st;
-    if(!st || !st.hands){ anPrev = null; return; }
-    const now = [];
+    if(!st || !st.hands){ anPrev = null; anCaught = null; return; }
+    const now = [], caught = [];
     for(let s = 0; s < st.n; s++){
-      const hidden = (s === st.dealer) && !st.reveal && s !== v.me;
-      // ⚠ 莊家沒翻牌前一律記成「沒事」—— 喊出來就等於把暗牌講出去
+      /* ⚠⚠ v1.86.0:**每個看不到牌的座位**都要記成「沒事」,不只莊家 ——
+         喊「小美 21 點!」等於把她的底牌講出去。判斷式一律問 BJ.openTo。 */
+      const hidden = !R.openTo(st, s, v.me);
       now[s] = hidden ? 0 : (R.valueOf(st.hands[s]).bust ? 1 : st.tier[s] + 2);
+      caught[s] = st.caught[s] >= 0 ? 1 : 0;
     }
     if(anPrev === null || v.key !== anKey){
-      anKey = v.key; anPrev = now; return;
+      anKey = v.key; anPrev = now; anCaught = caught; return;
     }
     let snd = null;
+    /* ★ 抓人是公開事件(被抓的人牌當場翻開)→ 喊得出來。
+       ⚠ 走 diff 而不是在動作點插一行 Sound —— 單機與連線的動作路徑完全不同,
+         但「有人被抓了」在兩邊是同一個 diff(同爆 / 21 點那三種)。 */
+    for(let s = 0; s < caught.length; s++){
+      if(caught[s] && anCaught && !anCaught[s]){
+        const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
+        showToast((s === v.me ? "你被抓了" : ("莊家抓 " + nm)) + " 🎯", 2000);
+        snd = grabSfx;
+      }
+    }
+    anCaught = caught;
     for(let s = 0; s < now.length; s++){
       if(now[s] === anPrev[s]) continue;
       const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
@@ -516,8 +593,8 @@ const BJB = (function(){
        ⚠ 優先權是「過五關 > 21 點 > 爆」(上面那三行的 snd 賦值就是在做這件事)。 */
     if(snd) snd();
   }
-  // 換局 / 離場:把 diff 的種子清掉(下一次只記不響)
-  function resetAnnounce(){ anPrev = null; anKey = ""; }
+  // 換局 / 離場:把 diff 的種子清掉(下一次只記不響)+ 收掉抓人那一排
+  function resetAnnounce(){ anPrev = null; anKey = ""; anCaught = null; grabOpen = false; }
 
   /* ==========================================================================
      八、結果卡的結算表 —— ★ 這裡莊家的暗牌一定是翻開的
@@ -553,7 +630,10 @@ const BJB = (function(){
           // ⚠ 名字本身就叫「你」時(單機的 0 號位)不掛徽章 —— 「你 你」是純雜訊,
           //   而「這一列是我」還有框在標,訊號沒少(同大老二 resultHTML 那條)
           (me && nm !== "你" ? '<span class="you-badge">你</span>' : "") +
-          '<span class="bj-rtag">' + esc(R.tagTxt(r.tag)) + '</span>' +
+          /* ★ 被抓的人比的**不是**莊家的最終手牌 → 一定要寫出來,
+             不然同一局兩個人跟不同的點數在比,玩家看不懂為什麼。 */
+          '<span class="bj-rtag">' + esc(R.tagTxt(r.tag)) +
+            (r.caught >= 0 ? (" · 被抓時莊 " + r.dBest) : "") + '</span>' +
           '<span class="bj-rpt">' + (r.bust ? "爆" : r.best) + '</span>' +
           (ch !== null && ch !== undefined
             ? '<span class="bj-rchip" title="這一場的籌碼">' + ch + '</span>' : "") +
@@ -631,13 +711,20 @@ const BJB = (function(){
       ? "<b>過五關</b> = 五張牌不爆,賠 <b>2 倍</b>(莊家也能報,那就通吃全場)。"
       : "<b>過五關關掉了</b> —— 五張不爆只是普通手,照點數比大小。");
     L.push("<b>不做</b>加倍 / 分牌 / 保險 / 投降 —— 想賭大一點就在下注那一段押多一點。");
-    /* ★ 補牌線只管莊家(使用者問過「這個選項是只有莊家才有嗎」)——
-       所以這一行明講「閒家不受限」,免得有人以為自己也得補到 17。 */
+    /* ★★★ v1.86.0:補牌線是**莊閒都適用的下限**(使用者:「莊家跟玩家都要一同遵守」)。
+       ⚠ 舊版那句「只有莊家受限 / 閒家永遠自己決定」已經是**錯的**,不要照舊文件加回來。 */
     L.push(r.line
-      ? ("莊家<b>必須補到 " + r.line + "</b>(<b>只有莊家</b>受這條限制)—— 但還是他自己按:" +
-         "沒到 " + r.line + " 不能停、到了就不能再補。")
-      : "莊家<b>可以自由決定</b>補不補 —— 當莊的人要自己判斷(全場都在看他)。");
-    L.push("<b>閒家永遠自己決定</b>要不要補牌,沒有任何點數限制。");
+      ? ("<b>補牌線 " + r.line + "</b> —— <b>莊家和閒家都一樣</b>:沒到 " + r.line +
+         " 不能停;到了之後要不要再補<b>自己決定</b>。")
+      : "<b>沒有補牌線</b> —— 要補到幾點、什麼時候停,每個人自己決定。");
+    /* ★★ 抓人:這一版的核心玩法,一定要有一行講它 */
+    L.push(r.line
+      ? ("<b>抓人</b> —— 莊家補到 " + r.line + " 之後,可以隨時指名一家<b>先比較</b>;" +
+         "比完他還能繼續補牌再抓下一家。")
+      : "<b>抓人</b> —— 莊家可以隨時指名一家<b>先比較</b>;比完他還能繼續補牌再抓下一家。");
+    L.push("被抓的人<b>比的是莊家那一刻的點數</b>,之後莊家補到幾點都與他無關。");
+    /* ★ 牌情:這一版每個人的第一張都蓋著,規則清單一定要講(不然玩家以為是 bug) */
+    L.push("除了自己,<b>每個人的第一張牌都是蓋著的</b>;被抓、爆掉或結算時才翻開。");
     L.push(r.pushDealer
       ? "同點數(平手)<b>莊家吃</b>。"
       : "同點數(平手)<b>退注</b>,誰都不賺不賠。");
@@ -669,6 +756,22 @@ const BJB = (function(){
         /* ★ 加減鈕**不往上送** —— 它只改「還沒送出去的金額」,是純畫面的事
            (真的下注是後面那顆「押注 ▸」,它才帶 data-act="bet")。 */
         if(b.dataset.act === "bstep"){ bumpBet(+b.dataset.d || 0); return; }
+        /* ★ 「抓人 ▸」與「✕」同樣**不往上送**:它們只開關那一排名字鈕。
+           ⚠ 抓不動的時候照樣按得動 → 由呼叫端跳 BJ.denyTxt(不用 disabled)。 */
+        if(b.dataset.act === "gopen"){
+          const lg = lastInfo && lastInfo.legal;
+          if(!lg || !lg.grab){
+            if(hAct) hAct("gdeny", 0);          // 讓呼叫端用 BJ.denyTxt 說得出原因
+            return;
+          }
+          grabOpen = true; renderActs(lastInfo); return;
+        }
+        if(b.dataset.act === "gcancel"){ grabOpen = false; renderActs(lastInfo); return; }
+        if(b.dataset.act === "g"){
+          grabOpen = false;
+          if(hAct) hAct("g", +b.dataset.s);     // ★ 真正的抓人才往上送
+          return;
+        }
         if(!hAct) return;
         hAct(b.dataset.act, b.dataset.bet ? +b.dataset.bet : 0);
       });
@@ -677,10 +780,12 @@ const BJB = (function(){
 
   return {
     mount, render, renderActs, resultHTML, matchHTML, rulesHTML, chipHTML, stopCd,
-    cardHTML, backCard, cardsHTML, pipHTML,
-    // 公告(單機與連線共用):爆 / 21 點 / 過五關
+    cardHTML, backCard, cardsHTML, pipHTML, handOf, ptOf,
+    // 公告(單機與連線共用):爆 / 21 點 / 過五關 / **被抓**
     announce, resetAnnounce,
     // 一個動作的聲音(四個呼叫點共用)
-    moveSfx, bustSfx, bjSfx, dragonSfx
+    moveSfx, bustSfx, bjSfx, dragonSfx, grabSfx,
+    // 給 e2e 用:抓人那一排展開了沒(純畫面狀態)
+    _grabOpen: () => grabOpen
   };
 })();

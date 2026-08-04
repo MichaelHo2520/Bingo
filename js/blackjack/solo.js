@@ -27,7 +27,7 @@
 const Solo = (function(){
 
   const ME = 0;                                  // 我固定坐 0 號位
-  const NAMES = ["你", "阿發", "小美", "老K", "阿德"];
+  const NAMES = ["你", "阿發", "小美", "老K", "阿德", "阿慶嫂"];   // ★ v1.86.0 加到 6 人
   const OWN_KEY = "bj.solo.v1";
   const SETTLE_MS = 2900;                        // 一局結算後停幾毫秒再開下一局
 
@@ -143,10 +143,15 @@ const Solo = (function(){
     }
     if(st.phase === "dealer"){
       /* ★★ v1.85.0:我當莊時**一律自己按**(使用者:「電腦幫我自動會很沒感覺」)。
-         有補牌線的話只是「哪一顆按得動」不同,那一句話要講得出線在哪。 */
-      if(iAmDealer()) return rules.line
-        ? ("翻牌了 —— 規則要求補到 " + rules.line + ",你自己按")
-        : "翻牌了 —— 你要補嗎?(莊家自由決定)";
+         ★★★ v1.86.0:補牌線變成下限,而且到線之後可以**抓人** —— 那才是台式的重點,
+            所以這一句要把「現在能不能抓」講出來。 */
+      if(iAmDealer()){
+        const lg = BJ.legal(st, ME);
+        if(lg.grab) return "翻牌了 —— 可以補牌,也可以抓人";
+        return rules.line
+          ? ("翻牌了 —— 補到 " + rules.line + " 才能停 / 抓人")
+          : "翻牌了 —— 你要補嗎?(莊家自由決定)";
+      }
       return "莊家在補牌…";
     }
     return "";
@@ -164,12 +169,13 @@ const Solo = (function(){
       st: betting ? null : st, n: seats, me: ME, names: nms,
       bets: bets, betPhase: betting,
       betDone: (function(){ const a = []; for(let s = 0; s < seats; s++) a[s] = bets[s] !== undefined; return a; })(),
-      rules: rules, over: over
+      rules: rules, over: over, dsub: hintOf()
     });
 
-    const lg = (st && !betting) ? BJ.legal(st, ME) : { hit: false, stand: false, dbl: false };
+    const lg = (st && !betting) ? BJ.legal(st, ME)
+                                : { hit: false, stand: false, dbl: false, grab: false };
     const myTurn = !!(st && !betting && !over && !busy && !settled &&
-                      (lg.hit || lg.stand));
+                      (lg.hit || lg.stand || lg.grab));
     BJB.renderActs({
       betPhase: betting,
       // 我是莊家時 mine 明確給 false → 動作列會講「這一局你當莊,不用下注」
@@ -177,6 +183,8 @@ const Solo = (function(){
       betMax: rules.betMax,
       myBet: bets[ME] || 0,
       legal: lg,
+      // ★ 抓人那一排要畫得出名字 → 動作列吃得到 st / me / names(v1.86.0)
+      st: betting ? null : st, me: ME, names: nms, isDealer: iAmDealer(),
       turnName: st ? (st.phase === "dealer" ? seatName(d) : "其他人") : "",
       over: !!settled || over,
       hint: hintOf()
@@ -308,8 +316,11 @@ const Solo = (function(){
         later(() => {
           let mv = null;
           try{ mv = BJAI.pick(st, seat, level); }catch(e){ mv = null; }
-          // 保險:AI 出了任何意外都不能讓遊戲卡住 → 退回「停」
-          if(!mv || !apply(seat, mv)) apply(seat, "s");
+          /* 保險:AI 出了任何意外都不能讓遊戲卡住。
+             ⚠⚠ v1.86.0 起**不可以**無腦退回 "s" —— 補牌線是下限,沒到線的時候
+               "s" 本身就不合法,apply 會回 false 而這一局就靜靜地卡住了。
+               → 退回「合法的那一顆」。 */
+          if(!mv || !apply(seat, mv)) apply(seat, safeAct(seat));
           busy = false;
           paint();
           drive();
@@ -329,28 +340,25 @@ const Solo = (function(){
          所以規則一個字都沒鬆,但每一張牌都是自己按出來的。
          ⚠ 這一行**要在 rules.line 那條之前** —— 順序反了就又變成系統幫我補完。 */
       if(d === ME){ busy = false; paint(); return; }
-      /* 電腦當莊 + 房規有補牌線 → 他沒有決策空間,整段算得出來(連一步一步演都不必)。 */
-      if(rules.line){
-        busy = true; paint();
-        later(() => {
-          const seq = BJ.autoDealer(st);
-          for(let i = 0; i < seq.length; i++) apply(d, seq[i]);
-          busy = false;
-          paint();
-          drive();
-        }, 620);
-        return;
-      }
+      /* ★★★ v1.86.0 拿掉了「房規有補牌線 → autoDealer 一次算完」那一段:
+         補牌線變成**下限**之後,莊家到線了還能繼續補、還能決定抓誰 ——
+         他**永遠有決策空間**,所以一律走 dealerPick 一步一步演。
+         ⚠ 順帶:一次算完的話畫面會跳過抓人那幾步,玩家看不到發生什麼事。 */
       busy = true; paint();
       later(() => {
         let mv = null;
         try{ mv = BJAI.dealerPick(st, level); }catch(e){ mv = null; }
-        if(!mv || !apply(d, mv)) apply(d, "s");
+        if(!mv || !apply(d, mv)) apply(d, safeAct(d));
         busy = false;
         paint();
         drive();
       }, BJAI.thinkMs(level));
     }
+  }
+  /* 一定套得進去的那一顆(見上面兩處的 ⚠)。★ 與 BJ.legal 同一份真相。 */
+  function safeAct(seat){
+    const lg = BJ.legal(st, seat);
+    return lg.stand ? "s" : (lg.hit ? "h" : "s");
   }
 
   /* 我按了下注 / 要牌 / 停(★ v1.85.0 起沒有加倍了) */
@@ -362,6 +370,22 @@ const Solo = (function(){
     if(settled){ showToast("本局結算中,等一下就開下一局"); return; }
     if(busy){ showToast("等其他人動完"); return; }
     if(!st) return;
+    /* ★ 抓人(v1.86.0):a="g" 帶座位、a="gdeny" 是「抓不動的時候按了那一顆」。
+       ⚠ 兩條都走 BJ.denyTxt —— 文案只有一份(單機與連線共用)。 */
+    if(a === "gdeny"){
+      const first = (function(){ for(let s = 0; s < seats; s++) if(s !== ME) return s; return 0; })();
+      showToast(BJ.denyTxt(st, ME, BJ.grabAct(first)) || "現在不能抓人");
+      return;
+    }
+    if(a === "g"){
+      const k = betVal;
+      const why = BJ.denyTxt(st, ME, BJ.grabAct(k));
+      if(why){ showToast(why); return; }
+      if(!apply(ME, BJ.grabAct(k))){ showToast("這個動作現在不行"); return; }
+      paint();
+      drive();
+      return;
+    }
     if(a !== "h" && a !== "s") return;
     /* ★ 說得出原因 —— 不用 disabled 讓點擊靜默消失(CLAUDE.md 的紅線)。
        ★★ 文案走 BJ.denyTxt(單機與連線同一份):它也負責莊家補牌線那兩句

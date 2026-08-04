@@ -120,17 +120,21 @@ const MP = MPCore.create((function(){
     BJB.render({
       st: betting() ? null : st, n: n, me: me, names: nms,
       bets: bets, betPhase: betting(), betDone: betDone,
-      rules: gRules, over: ph === "over"
+      rules: gRules, over: ph === "over", dsub: hintOf()
     });
 
-    const lg = (st && !betting() && me >= 0) ? BJ.legal(st, me) : { hit: false, stand: false, dbl: false };
+    const lg = (st && !betting() && me >= 0) ? BJ.legal(st, me)
+                                             : { hit: false, stand: false, dbl: false, grab: false };
     BJB.renderActs({
       betPhase: betting(),
       mine: betting() ? (me >= 0 && seatsOf()[me] !== dealerPid())
-                      : !!(playing() && (lg.hit || lg.stand)),
+                      : !!(playing() && (lg.hit || lg.stand || lg.grab)),
       betMax: (gRules ? gRules.betMax : rules.betMax),
       myBet: (me >= 0 && bets[me]) || 0,
       legal: lg,
+      // ★ 抓人那一排要畫得出名字 → 動作列吃得到 st / me / names(v1.86.0)
+      st: betting() ? null : st, me: me, names: nms,
+      isDealer: !!(me >= 0 && seatsOf()[me] === dealerPid()),
       turnName: st ? (st.phase === "dealer" ? nameOfSeat(dealerIdx()) : "其他人") : "",
       over: ph === "over",
       hint: hintOf(),
@@ -165,11 +169,14 @@ const MP = MPCore.create((function(){
       return "要牌還是停?";
     }
     if(ph === "dealer"){
-      /* ★★ v1.85.0:當莊的人**自己按**(有補牌線也一樣,那只是限制哪一顆按得動)。
+      /* ★★ v1.85.0:當莊的人**自己按**。★★★ v1.86.0:到線之後還能**抓人**。
          ⚠ 措辭與單機那份(solo.js hintOf)刻意寫成同一句。 */
-      if(iAmD) return gRules.line
-        ? ("翻牌了 —— 規則要求補到 " + gRules.line + ",你自己按")
-        : "翻牌了 —— 你要補嗎?(莊家自由決定)";
+      if(iAmD){
+        if(st && BJ.legal(st, me).grab) return "翻牌了 —— 可以補牌,也可以抓人";
+        return gRules.line
+          ? ("翻牌了 —— 補到 " + gRules.line + " 才能停 / 抓人")
+          : "翻牌了 —— 你要補嗎?(莊家自由決定)";
+      }
       return "莊家在補牌…";
     }
     return "";
@@ -250,6 +257,18 @@ const MP = MPCore.create((function(){
     if(ph === "bet"){ showToast("先押注"); return; }
     if(ph === "over"){ showToast("本局結算中,等一下就開下一局"); return; }
     if(!st) return;
+    /* ★ 抓人(v1.86.0)。⚠ 文案一律走 BJ.denyTxt(與單機同一份)。 */
+    if(a === "gdeny"){
+      const first = (function(){ for(let s = 0; s < st.n; s++) if(s !== st.dealer) return s; return 0; })();
+      showToast(BJ.denyTxt(st, me, BJ.grabAct(first)) || "現在不能抓人");
+      return;
+    }
+    if(a === "g"){
+      const why = BJ.denyTxt(st, me, BJ.grabAct(betVal));
+      if(why){ showToast(why); return; }
+      sendAct(BJ.grabAct(betVal));
+      return;
+    }
     if(a !== "h" && a !== "s") return;
     /* ★ 說得出原因 —— 不用 disabled 讓點擊靜默消失(CLAUDE.md 的紅線)。
        ★★ 文案走 BJ.denyTxt(與單機同一份;它也負責莊家補牌線那兩句)。 */
@@ -317,7 +336,11 @@ const MP = MPCore.create((function(){
       if(!any) return false;
     });
   }
-  /* 到期還沒停手的閒家 → 幫他停(★ 不是幫他補:補牌會爆,而「停」永遠不會讓他更慘) */
+  /* 到期還沒停手的閒家 → 幫他停(★ 不是幫他補:補牌會爆,而「停」永遠不會讓他更慘)。
+     ⚠⚠ v1.86.0:**閒家現在也有補牌線** —— 沒到線的時候 "s" 本身就不合法,
+       硬寫進去會讓整份 acts 變成 bad(而症狀是「那一局從此算不出來」)。
+       → 一律走 BJ.autoTo:它會先幫他補到線再停(補牌線關掉時就是單純的 "s",
+         與 v1.85.0 的行為逐字相同)。 */
   function forceStands(seq){
     txRound((g, b) => {
       const seats = Array.isArray(b.seats) ? b.seats : [];
@@ -327,7 +350,9 @@ const MP = MPCore.create((function(){
       let any = false;
       for(let i = 0; i < seats.length; i++){
         if(i === chk.dealer || chk.done[i]) continue;
-        b.acts[seats[i]] = ((b.acts[seats[i]]) || "") + "s";
+        const add = BJ.autoTo(chk, i);
+        if(!add) continue;
+        b.acts[seats[i]] = ((b.acts[seats[i]]) || "") + add;
         any = true;
       }
       if(!any) return false;
@@ -460,7 +485,7 @@ const MP = MPCore.create((function(){
      ========================================================================== */
   return {
     ns: { rooms: "bj_rooms", index: "bj_index" },
-    minPlayers: 2, maxPlayers: 5,          // ★ 改這裡要同步改 js/home-live.js 的 GAMES.max
+    minPlayers: 2, maxPlayers: 6,          // ★ 改這裡要同步改 js/home-live.js 的 GAMES.max
     prefsKey: "bj.prefs.v1",
     emoteAnchor: "bjStage",
     winCardId: "bjWinCard",
