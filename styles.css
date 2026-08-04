@@ -3216,16 +3216,24 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
              (`.b2-trick{flex:1 1 auto}`)。使用者:「中間的出牌局怎麼靠下了,
              導致上面有一堆的空白區」—— 高螢幕上 v1.78 那塊固定高度的框被推到最下面,
              玩家晶片列底下空了將近 500px。理由與量法見 .b2-trick。
-          ★ 下限 248 =「三排座位剛好」(3 × 一格 64.5 + 兩個 gap 10 + 標題 21 + padding 16);
-            一格 64.5 = 牌高 37.5 + 名字列 15 + gap 2 + padding 6 + 亮框的 border 4。 */
-         --b2-trh:248px; --b2-acth:96px;
-         /* ★★★ 座位式牌桌「一格都不准動」的三個數字(v1.83.0 換掉 v1.79.1 的四個)。
+          ★ 下限 184 =「兩列格子剛好」(2 × 一格 67.5 + gap 7 + 標題 21 + padding 16 + 餘裕);
+            一格 67.5 = 牌高 37.5 + 名字列 18 + gap 2 + padding 6 + 亮框的 border 4。
+          ⚠ v1.98.0 從 248 降下來(舊值是十字版型的「三排座位」)——
+            一列 2 格之後最多只有 2 列(4 人局),而 min-height 只在矮視窗生效:
+            留著 248 等於在矮視窗白白多留一整排的高度,那一塊反而更早開始捲。 */
+         --b2-trh:184px; --b2-acth:96px;
+         /* ★★★ 牌桌「一格都不准動」的三個數字(v1.83.0 換掉 v1.79.1 的四個)。
             舊版是一列列的清單,所以需要「名字欄 / 牌型欄固定寬」去對齊每一列的第一張牌;
-            座位版每個人各占一格、牌從那一格的左緣開始,那件事自然成立 →
+            格子版每個人各占一格、牌置中在那一格裡,那件事自然成立 →
             改成「**一格**多大」這兩個數字:
               --b2-tch 一格裡那排牌的高(mid 牌:--b2-cw × .66 × 1.42 ≈ ×.937)
-              --b2-tpw 一格的寬 = 5 張 mid 牌 + 4 個間距 + padding + border + **餘裕**
+              --b2-tpw 一格**至少**要多寬才塞得下 5 張 = 5 張 mid 牌 + 4 個間距
+                       + padding + border + **餘裕**
                        (×.66×5 = ×3.3;40 = gap 12 + padding 10 + border 4 + 餘裕 14)
+                       ⚠ v1.98.0 起它**不再是格子的實際寬度**(那一欄是 minmax(0,1fr))
+                         —— 它變成兩件事:①整組的寬度上限 2.5 × 它
+                         ②「一列 2 格夠不夠寬」那筆帳的參考值。算過最窄的情況:
+                         320px 手機 → 一格 144px vs 需要 129px,還有餘裕。
                        ⚠⚠ 那 14px 的餘裕**不可以省**。第一版寫成剛好等於內容寬(+26),
                          結果**截圖裡第五張牌被切掉一半** —— 而 DOM 量出來是
                          「130/130 ok」(clientWidth 沒有溢出),兩邊對不上:
@@ -3361,13 +3369,37 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        ⚠ flex + justify-content:center 的老坑(內容超出時開頭被裁掉又捲不回去)在這裡
          碰不到:.b2-tseats 自己 min-height:0 + overflow-y:auto,它會先縮再捲,
          整組永遠不會超出框。 */
-  .b2-trick{flex:1 1 auto;min-height:var(--b2-trh);overflow:hidden;
+  /* ★★★ v1.98.0:這一塊從「一個深色的框」變成**一整塊綠呢桌面**(照21點的 .bj-table)。
+     使用者:「一個大桌面,然後又繼續分格子,這樣看起來也像是在同一個桌上玩」——
+     所以桌布(這一條)與座位格(.b2-tseats / .b2-tmv)是**兩層**,不是一層。
+     ⚠ position:relative 是給桌面中央那個浮水印當定位基準用的,
+       **不可以順手加 z-index** —— 那會讓它變成 stacking context 而困住覆蓋層
+       (.veil 50 / 表情層 64;21點的 .bj-play 註解裡有同一條)。 */
+  .b2-trick{flex:1 1 auto;min-height:var(--b2-trh);overflow:hidden;position:relative;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
-    background:rgba(0,0,0,.16);border-radius:12px;padding:8px 10px}
-  /* 這一輪還沒有人出牌 → 桌面淡一點(框還在,它是「桌子」;高度也一格都不變 ——
-     ⚠ 不可以改成「空的時候把框縮小」,那會讓手牌在空的一輪與有牌之間跳一次) */
-  .b2-trick.empty{background:rgba(0,0,0,.10)}
-  :root[data-theme="ebook"] .b2-trick{background:#fff;border:1px solid #000}
+    border-radius:12px;padding:8px 10px;
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%),
+      linear-gradient(180deg,#1d4c3a,#12332a 70%,#0e2822);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.07), inset 0 10px 26px rgba(0,0,0,.34)}
+  /* ★ 桌布上那個淡淡的圖示(v1.98.0 從 DOM 節點 .b2-tmid 改成浮水印)。
+     ⚠ 一定要 🎴(U+1F3B4)—— 撲克牌 Unicode(U+1F0A0 那一段,含 🃏)一個都不准進畫面,
+       多數字型沒有會變豆腐方框(CLAUDE.md 的禁令)。
+     ⚠ 絕對定位是重點:舊版那個節點是十字的「中央格」,2 人版型留著它會被丟進一個
+       新的隱含列 → 整桌多一排(v1.83.0 靠看圖才發現)。偽元素不占版面,不可能再發生。
+     ⚠⚠ 位置是**桌面底部**而不是正中央 —— 第一版擺 top:50% translateY(-50%),
+       放大截圖一看它**正好被四格擋住,只從格子之間的縫隙露出一小塊**,
+       看起來是桌布上一塊莫名的灰斑(notes/14「只有看圖才發現」的那一類)。
+       擺底部就落在格子下方**真的空著的**那片桌面上;矮視窗格子填滿時它被格子蓋掉
+       (偽元素是第一個子節點 → 一定畫在格子底下),那也是對的:那時桌面本來就滿了。 */
+  .b2-trick::before{content:"🎴";position:absolute;left:0;right:0;bottom:6px;
+    text-align:center;font-size:34px;line-height:1;
+    opacity:.13;pointer-events:none}
+  /* 這一輪還沒有人出牌 → **桌布不變**(它是桌子),只讓中央那個圖示亮一點 =
+     「桌面是空的」。高度一格都不變 ——
+     ⚠ 不可以改成「空的時候把框縮小」,那會讓手牌在空的一輪與有牌之間跳一次 */
+  .b2-trick.empty::before{opacity:.2}
+  :root[data-theme="ebook"] .b2-trick{background:#fff;border:1px solid #000;box-shadow:none}
   .b2-tlbl{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
     font:700 11.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
   .b2-tttl{padding:1px 9px;border-radius:9px;background:rgba(255,255,255,.13);
@@ -3375,56 +3407,65 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-thint b{color:var(--accent)}
   :root[data-theme="ebook"] .b2-tttl{background:#eee;color:#000;border:1px solid #ccc}
 
-  /* ★★★ 座位格線(v1.83.0)。使用者:「改成像是四個人正常的座位分上下左右,
-       自己永遠是在下方,然後其他一順序來顯示位置」——
-         4 人  "t t t" / "l m r" / "b b b"     (自己 b · 下家 r · 對家 t · 上家 l)
-         3 人  "l m r" / "b b b"               (沒有對家)
-         2 人  "t t t" / "b b b"               (面對面)
-     ★★ 「格數 = 人數」是 board.js 那邊決定的(class s2/s3/s4),而**一整局不變** ——
-        所以這一塊的高度與「這一輪進行到哪」無關,手牌一格都不會被推。
-     ⚠ grid-auto-rows 用 minmax(--b2-tph,auto):正常情況每一排剛好一格高
-       (= 空格與出五張牌一樣高),而萬一有人名字爆長 / 字型換掉也只是那一排長高,
+  /* ★★★ 座位格(v1.98.0 把 v1.83.0 的十字整份換掉)。使用者:
+       「不用分成好幾個,就用一個牌桌就行了」/「一個大桌面,然後又繼續分格子」
+     → **一列 2 格、照座位號碼 1 → n 往下排**(board.js 的迴圈已經不再旋轉)。
+         2 人  一列排完(並排)
+         3 人  2 + 1(最後那一格撐滿整列,見下面 .s3 那條)
+         4 人  2 + 2
+     ★★ 「格數 = 人數」是 board.js 決定的(class s2/s3/s4),而**一整局不變**;
+        v1.98.0 起**列數也是常數**(一列幾格寫死在 CSS,不看視窗、不看內容)
+        → 這一塊的高度與「這一輪進行到哪」無關,手牌一格都不會被推。
+     ⚠⚠ **不可以**改成 `repeat(auto-fit,minmax(var(--b2-tpw),1fr))`:欄數會跟著
+       視窗寬度跑,4 人局在寬螢幕變成 3 + 1(一格獨自吊在第二列)。
+       算過:桌面上限 700px(內容 680)時 4 欄要 703px,**差 3px 排不進去**。
+     ⚠ minmax 的 min 用 **0** 不是 --b2-tpw:給了 tpw 的話窄視窗會把格子撐到溢出,
+       而 .b2-stage 是 overflow-x:hidden → 第二欄**靜靜地被裁掉**。
+       真的窄到放不下 5 張時交給牌自己擠窄(.b2-tcs .b2-card 的 flex-shrink)。
+     ★ 整組寬度有上限(2.5 × 一格)+ 由 .b2-trick 置中:不夾的話桌機上一格會寬到
+       337px,而牌只有 132px 寬 → 每個人面前空一大片,「同一張桌子」的感覺反而散掉。
+     ⚠ grid-auto-rows 用 minmax(--b2-tph,auto):正常情況每一列剛好一格高
+       (= 空格與出五張牌一樣高),而萬一有人名字爆長 / 字型換掉也只是那一列長高,
        不會把牌裁掉。
      ⚠ 矮視窗放不下時**自己捲**(min-height:0 + overflow-y:auto),但 board.js
-       刻意不自動捲到底:自動捲會把對家那一格推出畫面。
+       刻意不自動捲到底:自動捲會把前面那幾格推出畫面。
      ⚠⚠ align-content 一定是 **start 不可以是 center**:置中 + 溢出是那個老坑 ——
        內容比框高時兩端都被切掉,而**上面那一段捲不回去**(捲軸的起點在內容頂端)。
-       橫置手機(430px 高)實測就是「對家那一格被切掉一半、怎麼捲都回不去」。
+       橫置手機(430px 高)實測就是「最後那一格被切掉一半、怎麼捲都回不去」。
        ★ 整組還是置中的:.b2-tseats 是 flex item(flex:0 1 auto),放得下時
-         高度等於內容、由 .b2-trick 的 justify-content:center 居中 —— 兩者不衝突。
-     ⚠ 中間那一格(.b2-tmid)在 2 人局要收掉 —— s2 的版型沒有 "m" 這個區域,
-       留著它會被丟進一個**新的隱含列**,整桌高度就多一排(看圖才發現的那一類)。 */
+         高度等於內容、由 .b2-trick 的 justify-content:center 居中 —— 兩者不衝突。 */
+  /* ⚠⚠ gap 是 **7px 不是 5px**(照21點的 BOX_GAP):「在等他」那條青光條畫在格子的
+     **上緣**,而第二列的格子上緣緊貼著第一列的下緣 —— 5px 的時候放大截圖一看,
+     那條青線讀起來像「上面那一格的底線」(訊號指錯了一格,而那比看不到還糟)。
+     7px + 兩邊各 2px 的透明 border = 隔開 11px,一眼就看得出它屬於下面那一格。 */
   .b2-tseats{flex:0 1 auto;min-height:0;overflow-y:auto;
-    display:grid;gap:5px;align-content:start;justify-items:center;
-    width:min(100%,calc(var(--b2-tpw) * 3 + 10px));
-    grid-template-columns:var(--b2-tpw) minmax(0,1fr) var(--b2-tpw);
-    grid-template-areas:"t t t" "l m r" "b b b";
+    display:grid;gap:7px;align-content:start;
+    width:min(100%,calc(var(--b2-tpw) * 2.5 + 7px));
+    grid-template-columns:repeat(2,minmax(0,1fr));
     grid-auto-rows:minmax(var(--b2-tph),auto)}
-  .b2-tseats.s3{grid-template-areas:"l m r" "b b b"}
-  .b2-tseats.s2{grid-template-areas:"t t t" "b b b"}
-  .b2-tseats.s2 .b2-tmid{display:none}
-  /* 一格站在哪裡。★ 左右兩家的那一格**靠外側**(左家貼左緣、右家貼右緣)——
-     置中的話兩格會往中間靠,看起來像三個人擠在同一邊。 */
-  .b2-tseat{width:100%;display:flex}
-  .b2-tseat.pos-t{grid-area:t;justify-content:center}
-  .b2-tseat.pos-b{grid-area:b;justify-content:center}
-  .b2-tseat.pos-l{grid-area:l;justify-content:flex-start}
-  .b2-tseat.pos-r{grid-area:r;justify-content:flex-end}
-  /* 桌子正中央:只有一個淡淡的圖示(牌是往中間打的,那裡刻意不放資訊) */
-  .b2-tmid{grid-area:m;display:grid;place-items:center;font-size:26px;opacity:.22}
+  /* 3 人局:最後一格會獨自吊在左半邊 → 撐滿整列,看起來是刻意的版型而不是缺一角。
+     ⚠ 只給 .s3(4 人局的 :last-child 在第 2 欄,給了也不會生效,但寫清楚意圖)。
+     ⚠ 這一格因此比另兩格寬 —— 那是**版型**造成的,不是內容造成的,
+       所以「空格與出五張牌一樣大」那條紅線(它講的是同一格隨內容變)沒有鬆:
+       高度照樣是 --b2-tph,手牌一格都不會跳。 */
+  .b2-tseats.s3 .b2-tmv:last-child{grid-column:1 / -1}
   /* ⚠⚠ border 是 2px **透明**的(不是「沒有 border」):亮框(.top)只換顏色,
      所以標不標「目前最大」都不會讓那一格高 4px —— 差了的話整桌的高度就跟著
      「這一輪有沒有人出牌」變,手牌會跳。
      ⚠ min-height 讓**空的 / Pass 的 / 出五張牌的**三種格子一樣高(接 v1.79.1 那條):
        不一樣高的話同一個人從 Pass 變成出牌、或反過來,整桌就位移一次。 */
-  .b2-tmv{width:min(100%,var(--b2-tpw));min-height:var(--b2-tph);
+  /* ⚠ v1.98.0:width 那一段拿掉了 —— 這一格現在**直接是 grid item**(舊版外面還包
+     一層 .b2-tseat 負責 grid-area),寬度由那一欄決定(minmax(0,1fr))。
+     ⚠ position:relative 是「我」與「在等他」兩條偽元素軌的定位基準(見檔尾那一段)。 */
+  .b2-tmv{min-height:var(--b2-tph);position:relative;
     display:flex;flex-direction:column;justify-content:center;gap:2px;
     padding:3px 5px;border:2px solid transparent;border-radius:10px;
     background:rgba(255,255,255,.05)}
-  /* 還沒表態的那一格淡一點(空著就是「還沒動」);自己那一格亮一點。
-     ⚠ 這兩條一定要寫在 .top 之前 —— 「目前最大」的底色必須贏(見下一條)。 */
+  /* 還沒表態的那一格淡一點(空著就是「還沒動」)。
+     ⚠ 這一條要寫在 .top 之前 —— 「目前最大」的底色必須贏(見下一條)。
+     ⚠ v1.98.0:`.b2-tmv.me` 的那一層淡底色**從這裡搬到檔尾**(它現在是金色的,
+       而金底必須排在 .top 的亮底後面才不會被蓋掉 —— 見「三軌」那一段)。 */
   .b2-tmv.idle{background:rgba(255,255,255,.03)}
-  .b2-tmv.me{background:rgba(255,255,255,.09)}
   /* ★ 目前最大的那一手要一眼認得出來 —— 玩家要判斷的就是「我壓不壓得過它」。
      ⚠⚠ 這個框畫過三種,前兩種都畫不完整(使用者兩次回饋「黃色框都沒辦法完整」):
         ① inset box-shadow(v1.77)→ 畫在元素自己的背景上,被裡面那幾張牌
@@ -3444,7 +3485,17 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      有出牌的那一格會比空的那一格高 3px → 整桌隨著「誰動過」上下移。
      18 = 牌型膠囊的最壞情況(10.5px × line-height 1.5 + padding 2)。 */
   .b2-thd{display:flex;align-items:center;gap:4px;min-width:0;height:18px;overflow:hidden}
-  .b2-thd .b2-seat{width:7px;height:7px}
+  /* ★★ 座位號碼徽章(v1.98.0 取代原本純裝飾的 7px 色點,照21點的 .bj-sn)——
+     格子是照座位號碼排的,「這是第幾家」一定要看得出來,否則排列順序沒有意義。
+     ⚠ 顏色沿用晶片列那一套 p0..p3(大老二最多 4 人,沒有 p4/p5)→ 兩個地方對得上。
+     ⚠ 高度 15px 要壓在 .b2-thd 的 18px 裡:那一列一長高,「空格與出五張牌一樣高」
+       就得重算 --b2-tph(牌不會變小,但整桌會跳一次)。 */
+  .b2-sn{flex:none;min-width:15px;height:15px;padding:0 3px;border-radius:8px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font:900 10px/1 'Nunito',sans-serif;color:#241a2e;background:#cfd4e0}
+  .b2-sn.p0{background:#ff6b8a}.b2-sn.p1{background:#4fc3f7}
+  .b2-sn.p2{background:#ffd54f}.b2-sn.p3{background:#81c784}
+  :root[data-theme="ebook"] .b2-sn{background:#fff;color:#000;border:1px solid #000}
   .b2-tnm{flex:1 1 auto;min-width:1.2em;
     font:800 11.5px/1.3 'Nunito',sans-serif;color:var(--text);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3458,8 +3509,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* 輪到他、還沒動 —— ⚠ 只有這三個字,牌情一律不准進這一格 */
   .b2-twait{font:700 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
   /* 那一格的牌:**一定要 nowrap + 固定高度**(五張牌剛好一排)——
-     換行的話那一格會高一倍,整桌跟著跳 */
-  .b2-tcs{display:flex;flex-wrap:nowrap;align-items:center;gap:3px;
+     換行的話那一格會高一倍,整桌跟著跳。
+     ★ v1.98.0 起**置中**(舊版靠左):格子變寬了(不再等於 --b2-tpw),靠左會讓
+       每個人的牌都黏在自己那一格的左緣、中間空一大條 —— 置中才像牌往桌子中間放。 */
+  .b2-tcs{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:3px;
     min-height:var(--b2-tch);overflow:hidden}
   /* ★★ 放不下時**擠窄**而不是被裁掉(v1.83.0 的雙保險,見 --b2-tpw 那段)。
      .b2-card 是寫死寬度的,預設 flex-shrink:1 對它無效(基準是 width)——
@@ -3468,7 +3521,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-tcs .b2-card{flex:0 1 auto;min-width:0}
   /* ⚠ ebook 只換**顏色**,不換尺寸(換了就等於讓亮框改變格子的高,見上) */
   :root[data-theme="ebook"] .b2-tmv{background:#fff;border-color:#bbb}
-  :root[data-theme="ebook"] .b2-tmv.me{background:#fff}
   :root[data-theme="ebook"] .b2-tmv.top{background:#fff;border-color:#000}
   :root[data-theme="ebook"] .b2-tct{background:#eee;color:#000;border:1px solid #ccc}
   :root[data-theme="ebook"] .b2-tyou{background:#000;color:#fff}
@@ -3477,6 +3529,65 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-rbomb{flex:none;padding:1px 5px;border-radius:8px;background:var(--b2-redlit);
     font:800 9.5px/1.5 'Nunito',sans-serif;color:#2a0d0d}
   :root[data-theme="ebook"] .b2-rbomb{background:#000;color:#fff}
+
+  /* ==========================================================================
+     大老二 v1.98.0 —— ★★★ 牌桌上三個訊號 = 三條軌
+     ==========================================================================
+       這一版把「自己永遠在下面」換成「照座位號碼排」(使用者要的是一個大桌面、
+       裡面分格子)。**位置從此不再是「我在哪」的線索** → me 一定要變成看得見的記號,
+       而那一刻它就會與既有的「目前最大」撞在同一條通道上(兩個都想用框)。
+
+     ── ★★★ 語彙表(改任何一格之前先看這張表)──────────────────────────────────
+       | 要講的事 | 顏色 | 位置 / 方向 | 會不會動 |
+       |---|---|---|---|
+       | **這是我**(身分,一局不變) | 金 `#ffd489` | **左緣直條** + 底色 + 名字 | 靜態 |
+       | **現在在等他**(暫時) | 亮青 `--b2-turn` | **上緣橫條** | **呼吸** |
+       | **目前最大**(這一輪的關鍵) | `--accent` | **整格 border** | 靜態 |
+       ★ 三件事落在**不同顏色 + 不同位置 + 不同動靜**上 → 三個同時掛在一格上
+         (我 + 在等我 + 我最大)照樣三個都畫得完整。那正是21點 v1.91.0 整版在修的事:
+         舊版三個訊號共用「金色的框」,後定義的把前面的蓋掉 = 其中一個直接消失。
+       ★ 「互動為原則」落在**會呼吸的那一條**:動的東西 = 現在跟你有關的事。
+
+     ── ⚠ 為什麼 me / act 用偽元素而 top 用 border(兩條紅線的分工)──────────────
+       CLAUDE.md 那條是「**目前最大**的亮框一定要用 border(占版面 → 畫得完整),
+       box-shadow 會被 .b2-tseats 的捲動容器裁掉或被牌蓋掉」(v1.77/v1.78 各錯一次)
+       → 所以 **top 那一條一個字都不要動**。
+       而 me / act 是**絕對定位在格子內部**的偽元素:①不占版面(border 一加粗,
+       --b2-tpw 的餘裕就被吃掉 = 我那一格的第五張牌會被擠窄)②在格子裡面 →
+       捲動容器裁不到 ③兩條可以同時存在(border 只有一條)。
+     ⚠ 21點試過「左緣金脊」並且**放棄了**,理由是「與同色的金框糊成一條」——
+       這一頁 me 這一軌**刻意不發 border**,金色只出現在左緣那一條 → 不會糊。
+       **不要**照21點的結論把它刪掉。
+     ========================================================================== */
+  :root{ --b2-turn:#6ec8ff; }
+  :root[data-theme="ebook"]{ --b2-turn:#000; }
+
+  /* ---------- ①「這是我」:左緣金直條 + 金底 + 金名字(全部靜態)---------- */
+  /* ⚠⚠ 金底這一條一定要排在 `.b2-tmv.top` **後面**(同特異度 0,2,0 → 後者贏):
+     排前面的話「我 + 目前最大」時金底會被 top 的亮白底蓋掉,少一個記號。 */
+  .b2-tmv.me,.b2-tmv.me.top{
+    background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
+  .b2-tmv.me .b2-tnm{color:#ffd489}
+  /* ⚠ left:0 是 padding box 的左緣(border 內側),而 padding-left 是 5px >
+     金條的 3px → 它壓在 padding 裡,不會把裡面的內容推走。 */
+  .b2-tmv.me::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;
+    border-radius:0 4px 4px 0;background:#ffd489;pointer-events:none}
+  :root[data-theme="ebook"] .b2-tmv.me,
+  :root[data-theme="ebook"] .b2-tmv.me.top{background:#fff}
+  :root[data-theme="ebook"] .b2-tmv.me .b2-tnm{color:#000}
+  :root[data-theme="ebook"] .b2-tmv.me::before{background:#000}
+
+  /* ---------- ②「現在在等他」:上緣一條會呼吸的青光條(暫時)---------- */
+  /* ★ 呼吸刻意做得慢而淺(1.6s · .45→1),逐字沿用21點那顆:同一個訊號在兩個遊戲裡
+     長得一樣,玩家學一次就好。⚠ 這一軌**完全不碰 border**。 */
+  .b2-tmv.act::after{content:"";position:absolute;left:10px;right:10px;top:0;height:3px;
+    border-radius:0 0 4px 4px;background:var(--b2-turn);
+    animation:b2Turn 1.6s ease-in-out infinite;pointer-events:none}
+  @keyframes b2Turn{0%,100%{opacity:.45}50%{opacity:1}}
+  /* 會動的東西一律尊重系統的「減少動態效果」→ 那時改成常亮(訊號不可以消失) */
+  @media (prefers-reduced-motion:reduce){
+    .b2-tmv.act::after{animation:none;opacity:1}
+  }
 
   /* ✗ 算牌表(.b2-seen / .b2-sgrid / .b2-spip …)v1.78.0 整段拿掉 ——
      使用者:「出過的牌不要顯示好了,我覺得還是要自己記,比較好玩」。
@@ -3701,15 +3812,18 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        吃光,手牌反而被擠出畫面(那比「手牌會跳」嚴重得多)。
        ⚠ --b2-trh 在 v1.79.0 起是 min-height:矮視窗算得出來的高度通常就是這個下限,
          那時牌桌自己捲(.b2-tseats),手牌照樣貼著動作列。
-       ⚠⚠ 176 是**上限而不是理想值**:600px 高的視窗裡盤面只有 249px、手牌吃掉 54,
-         所以這個下限只要超過 195 就會把盤面撐爆(手牌被推出畫面 —— 那比「手牌會跳」
-         嚴重得多)。三排座位在這個牌寬下要 223px → **這個尺寸的牌桌本來就放不下**,
-         那時它自己捲(align-content:start,從上面開始捲)。
+       ⚠⚠ 這個數字是**上限而不是理想值**:600px 高的視窗裡盤面只有 249px、
+         手牌吃掉 54,所以這個下限只要超過 195 就會把盤面撐爆(手牌被推出畫面 ——
+         那比「手牌會跳」嚴重得多)。
+         ★★ v1.98.0 從 176 降到 172:一列 2 格之後 4 人局只要**兩列** ——
+           2 × 61.9 + gap 7 + 標題 21 + padding 16 = 169,這個尺寸**放得下了**
+           (v1.83.0 的十字要三排 223px,那時牌桌只能自己捲)。
+           ⚠ 只留 3px 餘裕:再壓下去那一塊就會開始捲(而 195 是撐爆盤面的上限)。
          ★ 真的手機都不會走到這裡:portrait 的高度一律 > 600(390×844 / 360×640),
-           走的是上面那組大牌寬、而且空間夠。橫置手機另有一段把牌桌壓成兩排。
+           走的是上面那組大牌寬、而且空間夠。
          ⚠ 不可以為了「讓它放得下」把牌桌的格子縮小 —— 算下來牌會小到 15px,
            而 21px 已經是「認得出點數」的下限(見 .b2-card.tiny)。 */
-    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:176px; --b2-acth:74px}
+    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:172px; --b2-acth:74px}
     body.b2-mp{--b2-acth:106px}
     .b2-hero{margin:6px 0 2px}
     .b2-art{width:66px;height:66px}
@@ -3741,22 +3855,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     /* 房間框 / 單機列也收一號:它是第二大的固定開銷(約 90px) */
     body.b2-mp .b2-room,body.b2-solo .b2-room{padding:5px 9px}
     .b2-room .mp-subrow,.b2-room-foot{margin-top:3px}
-    /* ★★ v1.83.0:這個尺寸(430px 高)**放不下十字的三排座位** ——
-       量出來牌桌只有 179px、三排要 223px。所以這一個尺寸(而且只有這一個)把牌桌
-       壓成**兩排**:三家並排一排 + 自己一排(2 × 62 + gap + 標題 = 157,進得去)。
-         "l t r"        上家 · 對家 · 下家
-         "b b b"        自己
-       ★ 它仍然是「自己永遠在下面、其他人照順序在上面」,只是把對家從第一排搬到中間 ——
-         版型是 CSS 的事(grid-template-areas),**board.js 一行都不用改**。
-       ⚠ 2 人 / 3 人不吃這一條:那兩張版型本來就只有兩排(基礎那一段的
-         .b2-tseats.s2 / .s3 權重 0,2,0 壓得過這裡的 0,1,0)。
-       ⚠ 中間那個 🎴 要收掉:這個版型沒有 "m" 區域,留著它會被丟進一個**新的隱含列**,
-         整桌就又多一排(那正是想省掉的那一排)。
+    /* ★★ v1.83.0 這裡原本要把十字的**三排**壓成兩排(430px 高的視窗量出來牌桌只有
+       179px、三排要 223px)。v1.98.0 之後**這一段不必再管版型** ——
+       一列 2 格 → 4 人局本來就是兩列(2 × 62 + gap 4 + 標題 = 157,進得去),
+       所以那條 grid-template-areas 與收掉中央格的規則一起拿掉了。
        ⚠ 收間距可以,**不可以收格子本身**:格子一縮就等於「牌會不會被裁掉」重算一次
          (--b2-tpw / --b2-tph 那一整套)。 */
     .b2-trick{padding:4px 8px;gap:3px}
-    .b2-tseats{grid-template-areas:"l t r" "b b b";gap:4px}
-    .b2-tmid{display:none}
+    .b2-tseats{gap:4px}
   }
 
   /* ==========================================================================
