@@ -659,6 +659,31 @@ const MP = MPCore.create((function(){
     },
     readRoom(r){ if(r && r.bjRules) rules = BJ.normRules(r.bjRules); },
 
+    /* ---------- 誤按離開的救援:同名接續時把這一場的籌碼搬過來(v1.97.0) ----------
+       核心的 adoptScore 只搬 scores/{pid},而那是**跨場**累計。21 點還有一份
+       **這一場**的累計淨籌碼住在 game.bj.nets{pid} —— 兩個管道都在回答「他現在有多少錢」,
+       漏搬一邊就是「結果卡的成績接回來了,桌上的籌碼卻歸零」。
+       ★ 只有 pid 真的變了才會走到這裡(換裝置 / 清過 localStorage / 隱私視窗)。
+         **同一台裝置**誤按離開再進來一個字都不必搬:leave() 從頭到尾不動 game 節點,
+         nets[我] 一直都在 —— 這也是為什麼這一版對 21 點的常見情境是零風險的。
+       ⚠ **加法合併**不是覆寫:新 pid 可能已經打了幾局才想起要接回舊帳。
+       ⚠ 已知邊界(刻意不處理):那個人在**某一局的中途**離開、又在同一局結算前就換裝置回來,
+         那一局的 delta 仍會記到舊 pid(結算讀的是 bj.seats,裡面還是舊 pid)→ 少接回一局。
+         救援的語意是「下一局接回來繼續打」,而多做一層 pid 別名等於讓結算多一份真相。
+       ⚠ nx(過場「我看完了」的票)**不必搬**:nextWait 只算「還在房裡 + 這一局有座位」的人,
+         舊 pid 已經不在房裡 → 卡不住全桌,而 advance() 每局都把它清成 {}。 */
+    adoptId(oldId, newId){
+      if(!oldId || !newId || oldId === newId) return;
+      ctx.txGame(g => {
+        const b = g && g.bj;
+        if(!b || !b.nets || typeof b.nets[oldId] !== "number") return false;
+        b.nets[newId] = (b.nets[newId] || 0) + b.nets[oldId];
+        // ⚠ delete 而不是 `=null`(同核心 adoptScore 那條:mock 的 clone 留得住 null)
+        delete b.nets[oldId];
+        return true;
+      });
+    },
+
     /* ---------- 一場的生命週期 ---------- */
     lobbyGame(){ return { rules: null, bj: null }; },
     resetRound(){

@@ -246,7 +246,8 @@ const MPCore = (function(){
         A.readRoom && A.readRoom(r);      // 先把房主的設定套上,免得大廳閃一下預設值
         claimSeat(okSeat=>{
           if(!okSeat){ setMsg("這個房間已經滿了,請選別間。"); roomRef=null; code=null; return; }
-          enterLobby();
+          // ★ 誤按離開的救援(v1.97.0):進大廳之前先把同名的舊成績接回來,免得畫面先閃一次 0
+          adoptScore(r,enterLobby);
         });
       }).catch(e=>setMsg("加入失敗:"+e.message));
     }
@@ -272,6 +273,66 @@ const MPCore = (function(){
         const ok=!err&&committed;
         if(ok) roomRef.child("players/"+meId).onDisconnect().remove();
         done&&done(ok);
+      });
+    }
+
+    /* ---------- 誤按離開的救援:同名接續(v1.97.0) ----------
+       「不小心離開」在親友聚會很常發生,而三種離開方式原本的下場**完全不同**:
+         · 斷線 / 關頁面 / 切 App 太久 → players 被 onDisconnect 移除,而 scores **刻意**
+           不掛 onDisconnect(見檔頭 #2)→ 同一台裝置重進本來就自動接回,一行都不必改
+         · 訪客按「離開房間」          → 連 scores 一起刪掉 → **進度真的沒了**(這一版改的就是它)
+         · 房主按「離開房間」          → 整間房 remove,沒有東西可以接(這一版刻意不動:
+                                        要救它得做「房主轉移」,是另一個量級的改動)
+       所以這一版只做兩件事:
+         ① 訪客主動離開**不再刪 scores**,只把名字補上去(見 leave())→ 同一台裝置回來自動接回
+         ② pid 變了(換裝置 / 清過 localStorage / 隱私視窗)→ 進房時找「名字一樣 + 已經不在
+            座位上」的那一筆孤兒紀錄搬過來
+       ⚠ 名字寄生在 scores/{pid}.nm,**不新開 DB 節點**:scores 本來就不掛 onDisconnect,
+         名字住在裡面連「斷線」那條路徑都留得住,而且 Firebase 規則一個字都不必改。
+       ⚠ 只認**不在 players 裡**的紀錄 → 兩個人剛好同名而且都還在房裡,不會互相搶。
+       ⚠ 被房主踢掉的人 scores 是**真的刪掉**(見 kick)→ 踢了又自己溜回來不會把成績帶回來。
+       ⚠ 這一支只管核心的 scores。遊戲自己那份「per-pid 的一場進度」(21 點的 bj.nets)
+         由 A.adoptId 搬 —— 不要往這裡塞遊戲名字。 */
+    function resumeMsg(n){
+      // SIGNED 的遊戲(21 點)接回來的可能是正的也可能是負的 → 正數補個 + 才看得出是賺
+      return "已接回你先前的成績:"+((SIGNED&&n>0)?"+":"")+n+" "+SCORE_UNIT;
+    }
+    function adoptScore(r,done){
+      const fin=()=>{ done&&done(); };
+      if(!roomRef||!meId){ fin(); return; }
+      const ps=(r&&r.players)||{}, sc=(r&&r.scores)||{};
+      /* ① 同一台裝置:分數從頭到尾都還在自己那一格(離開時沒刪)→ 一個字都不必寫,報一聲就好。
+         ⚠ n===0 不報 —— 「接回 0 勝」等於沒接回,跳一行 toast 只會讓人以為出了什麼事。 */
+      const mine=sc[meId];
+      if(mine&&typeof mine.n==="number"&&mine.n!==0){ showToast(resumeMsg(mine.n)); fin(); return; }
+      // ② pid 變了:名字一樣、已經不在座位上、而且不是自己那一格
+      let src=null;
+      Object.keys(sc).forEach(id=>{
+        if(src||id===meId||ps[id])return;
+        const s=sc[id];
+        if(s&&s.nm===meName&&typeof s.n==="number"&&s.n!==0) src=id;
+      });
+      if(!src){ fin(); return; }
+      /* 搬移用**整個 scores 節點**的交易(不是兩次 set):中止就什麼都沒發生,
+         不會出現「舊的刪了、新的沒寫進去」那種把成績弄丟的中間態。
+         ⚠ 老實記一筆:名字比對在這裡與上面的搜尋各一道,**互為多餘**(拿掉任一道另一道會
+           接手,行為一個字都不變)→ 單獨突變會存活,守門是 mut-rejoin-e2e.js 那條
+           「兩道一起拿掉」。留著兩道是刻意的:交易這一道是唯一擋得住競態的(讀快照到
+           寫入之間那個人可能又進房了),搜尋那一道則讓「根本沒有候選」時連交易都不必發。
+           **不要因為「單獨拿掉測試不會紅」就刪掉其中一道。** */
+      roomRef.child("scores").transaction(s=>{
+        if(!s||!s[src]||s[src].nm!==meName)return;                  // 已經被搬走 / 名字對不上 → 中止
+        if(s[meId]&&typeof s[meId].n==="number")return;             // 自己已經有分數 → 絕不覆蓋
+        // ⚠ 用 delete 不用 `=null`:mock 的 clone 走 JSON.stringify(null 留得住),
+        //   真 Firebase 的 null 是刪除 —— 寫 null 會讓測試與現場語意不一樣
+        s[meId]=s[src]; delete s[src]; return s;
+      },(err,committed)=>{
+        if(!err&&committed){
+          showToast(resumeMsg(sc[src].n));
+          // 遊戲自己那份 per-pid 的一場進度(21 點的 bj.nets);沒實作的遊戲自動跳過
+          A.adoptId && A.adoptId(src,meId);
+        }
+        fin();
       });
     }
 
@@ -524,7 +585,10 @@ const MPCore = (function(){
         scoredThisRound=true;
         roomRef.child("scores/"+meId).transaction(s=>{
           if(s && s.round===roundId) return;
-          return { n:((s&&s.n)||0)+myAdd, round:roundId, d:myAdd };
+          /* ★ nm 是「誤按離開後同名接續」用的(v1.97.0,見 adoptScore)。
+             寫在**得分的那一刻**而不是離開的時候 —— 斷線是沒有機會執行程式碼的
+             (onDisconnect 只能寫預先講好的值),名字要早一點放進來才留得住。 */
+          return { n:((s&&s.n)||0)+myAdd, round:roundId, d:myAdd, nm:meName };
         },()=>{ if(winner) renderScoreboard(); });
       }
       /* ★ 反向修正:這一局先前判給我、後來的真值改判別人 → 把那一分收回來(v1.56.0 修)。
@@ -544,7 +608,8 @@ const MPCore = (function(){
           // ⚠ 舊資料沒有 d(v1.76.0 之前寫的)→ 退回 1,與舊行為完全一致
           const back=(typeof s.d==="number") ? s.d : 1;
           // ★ SIGNED 的遊戲不夾成 ≥ 0(見 clampScore);舊遊戲照樣 Math.max(0, …)
-          return { n:clampScore((s.n||0)-back), round:"void" };
+          // ⚠ nm 要跟著留下來(v1.97.0):這條路徑會整份覆寫,漏掉就等於把接續用的名字擦掉
+          return { n:clampScore((s.n||0)-back), round:"void", nm:meName };
         },()=>{ if(winner) renderScoreboard(); });
       }
 
@@ -691,9 +756,10 @@ const MPCore = (function(){
     }
     function resetScores(){
       if(!isHost||!roomRef)return;
-      const ups={}; Object.keys(players).forEach(id=>{ ups["scores/"+id]=null; });
       scoredThisRound=false;
-      if(Object.keys(ups).length) roomRef.update(ups);
+      /* ★ v1.97.0:整份清掉,不再只清「現在還在座位上的人」——
+         誤按離開的人留下的離席紀錄也是戰績,漏清的話重設完他回來又把舊分數接回去。 */
+      roomRef.child("scores").remove();
       showToast("已重設戰績 🏆");
     }
     // 房主改房間層級設定的共同守門(盤面大小、難度、模式…都走這支)
@@ -824,7 +890,17 @@ const MPCore = (function(){
           }else if(meId){
             const pr=roomRef.child("players/"+meId);
             pr.onDisconnect().cancel(); pr.remove();
-            roomRef.child("scores/"+meId).remove();
+            /* ★★ v1.97.0:**不再刪掉自己的分數**(舊版是 scores/{meId}.remove())——
+               誤按一下就把整場成績歸零太痛,而斷線那條路徑本來就留著、兩種離開下場不一致。
+               留下的那一筆就是「離席紀錄」:同一台裝置回來自動接回,換了裝置靠名字認領
+               (見 adoptScore)。
+               ⚠ 這裡順手把 nm 更新成現在的名字 —— 得分時就寫過一次了,但那可能是幾局前的舊名。
+               ⚠ 用交易而不是 update:一分都沒得過的人節點不存在 → 中止,不要生出一堆只有 nm 的空紀錄。
+               ⚠ 房主**不走這裡**(上面那條整間房 remove,沒有東西留得下來)。 */
+            roomRef.child("scores/"+meId).transaction(s=>{
+              if(!s||typeof s.n!=="number")return;
+              s.nm=meName; return s;
+            });
           }
         }
       }catch(e){}
@@ -949,6 +1025,10 @@ const MPCore = (function(){
                         不帶就是舊行為,七個舊遊戲一個字都不受影響。grep SIGNED 看落地的五處。
      joinMidGame      ★ 允許對局中加入(v1.84.0 為 21 點加)——
                         同樣不帶就是舊行為。⚠ 要一起改 js/home-live.js 的 joinable()
+     adoptId(old,now)  ★ 同名接續時,把遊戲自己那份「per-pid 的一場進度」從舊 pid 搬到新 pid
+                        (v1.97.0;核心只負責 scores 節點,見 adoptScore)。
+                        只有 21 點需要(bj.nets);其他七個遊戲對局中不能加入 → 回大廳才進得來,
+                        那時 game 節點沒有 per-pid 進度 → 不實作就自動跳過。
      init(ctx)          接住核心給的執行環境(見上方 ctx)
      api:{...}          要額外暴露給 main.js 的方法(tap / setBoardSize / …)
      roomFields()       房間層級設定欄位的預設值 {key:val};核心負責建房寫入與監聽
