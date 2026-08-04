@@ -854,20 +854,28 @@ const BJB = (function(){
     Sound.tone(330, { type: "sawtooth", dur: 0.10, vol: 0.20 });
     Sound.tone(196, { type: "sawtooth", dur: 0.26, vol: 0.20, delay: 0.08, slideTo: 110 });
   }
+  /* ★★★ v1.93.0:**華麗度跟著階走**(21 點 > 過五關)。
+     使用者:「幫我改成 black jack 比較大」→ 兩段樂句**互換**:
+       21 點  四音上行 + 更高的亮頂(最盛大 = 最大的階)
+       過五關 三音上行(比 21 點收一階)
+     ⚠ 這不是「順手好聽一點」:聲音是玩家判斷「哪一個比較厲害」的第二個管道
+       (第一個是點數膠囊的顏色)—— 留著舊的華麗度等於**用聲音告訴他過五關比較大**,
+       而結算會說 21 點贏。同一件事兩個管道講反話 = 玩家認定壞掉。
+     ⚠ **語音檔一個字都沒動**(`mp3/bj/bj.wav` 唸的還是「二十一點」)——
+       換的是合成音那一層的華麗度,兩層是分開的。 */
   function bjSfx(){
     if(typeof Sound === "undefined") return;
-    // 三音上行 = 21 點
-    Sound.tone(523, { type: "triangle", dur: 0.10, vol: 0.26 });
-    Sound.tone(659, { type: "triangle", dur: 0.10, vol: 0.26, delay: 0.09 });
-    Sound.tone(880, { type: "triangle", dur: 0.28, vol: 0.28, delay: 0.18 });
-  }
-  function dragonSfx(){
-    if(typeof Sound === "undefined") return;
-    // 過五關比 21 點更誇張一階(它更難、賠得更多)
     Sound.tone(587, { type: "triangle", dur: 0.09, vol: 0.28 });
     Sound.tone(784, { type: "triangle", dur: 0.09, vol: 0.28, delay: 0.08 });
     Sound.tone(988, { type: "triangle", dur: 0.09, vol: 0.28, delay: 0.16 });
     Sound.tone(1319, { type: "triangle", dur: 0.34, vol: 0.30, delay: 0.24, slideTo: 1568 });
+  }
+  function dragonSfx(){
+    if(typeof Sound === "undefined") return;
+    // 三音上行 = 過五關(比 21 點收一階)
+    Sound.tone(523, { type: "triangle", dur: 0.10, vol: 0.26 });
+    Sound.tone(659, { type: "triangle", dur: 0.10, vol: 0.26, delay: 0.09 });
+    Sound.tone(880, { type: "triangle", dur: 0.28, vol: 0.28, delay: 0.18 });
   }
   /* 一個動作的聲音(要牌 = 牌拍到桌上、停 = 收手)。★ **四個呼叫點共用這一份**:
      單機我自己 · 單機電腦 · 單機莊家 · 連線收到 diff ——
@@ -1028,7 +1036,19 @@ const BJB = (function(){
     if(anPrev === null || v.key !== anKey){
       anKey = v.key; anPrev = now; anCaught = caught; anRev = rev; return;
     }
-    let snd = null;
+    /* ★★★ v1.93.0:一次重畫只響一聲,而「哪一聲贏」一律問**規則層的階**
+       (`R.tierRank`)—— 舊版把「過五關 > 21 點」**寫死**在這裡(`if(snd !== "dragon")`),
+       而這一版把兩個階互換之後,寫死的那一份就會與規則層反過來
+       (公告說過五關比較大、結算說 21 點贏 = 玩家會認定壞掉)。
+       ⚠ 用出價(rank)而不是「誰後寫誰贏」:批次同步時有可能兩家同時報出兩種階。
+       ★ 抓人與翻牌不是「階」,但它們在同一條優先權軸上 —— 給它們固定的名次:
+           翻牌 = 最低(莊家剛好爆 / 21 點時那兩聲才是主角)
+           抓人 = 普通階那一格(壓得過「爆」,但輸給 21 點 / 過五關)
+         ⚠ 這兩個名次就是**舊版那兩行 `snd || ` / `!snd` 的語意**,不是新規則。 */
+    let snd = null, sndRank = -99;
+    const bid = (key, rank) => { if(rank > sndRank){ sndRank = rank; snd = key; } };
+    const RANK_REVEAL = R.tierRank(R.T_BUST) - 1;     // 比「爆」還低
+    const RANK_GRAB = R.tierRank(R.T_NORM);           // 爆 < 抓 < 過五關 / 21 點
     /* ★ 抓人是公開事件(被抓的人牌當場翻開)→ 喊得出來。
        ⚠ 走 diff 而不是在動作點插一行 Sound —— 單機與連線的動作路徑完全不同,
          但「有人被抓了」在兩邊是同一個 diff(同爆 / 21 點那三種)。 */
@@ -1036,7 +1056,7 @@ const BJB = (function(){
       if(caught[s] && anCaught && !anCaught[s]){
         const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
         showToast((s === v.me ? "你被抓了" : ("莊家抓 " + nm)) + " 🎯", 2000);
-        snd = "grab";
+        bid("grab", RANK_GRAB);
       }
     }
     anCaught = caught;
@@ -1044,20 +1064,23 @@ const BJB = (function(){
       if(now[s] === anPrev[s]) continue;
       const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
       const who = (s === v.me) ? "你" : nm;
-      if(now[s] === 1){ showToast(who + " 爆了 💥", 1800); snd = snd || "bust"; }
-      else if(now[s] === R.T_DRAGON + 2){ showToast(who + " 過五關!五張不爆 🐉", 2400); snd = "dragon"; }
-      else if(now[s] === R.T_BJ + 2){ showToast(who + " 21 點! 🎯", 2000); if(snd !== "dragon") snd = "bj"; }
+      if(now[s] === 1){ showToast(who + " 爆了 💥", 1800); bid("bust", R.tierRank(R.T_BUST)); }
+      else if(now[s] === R.T_DRAGON + 2){
+        showToast(who + " 過五關!五張不爆 🐉", 2400); bid("dragon", R.tierRank(R.T_DRAGON));
+      }else if(now[s] === R.T_BJ + 2){
+        showToast(who + " 21 點! 🎯", 2000); bid("bj", R.tierRank(R.T_BJ));
+      }
     }
     anPrev = now;
     /* ★★★ v1.92.0:莊家掀開暗牌 —— 台式 21 點最戲劇的一刻(舊版一點聲音都沒有)。
        ⚠ 判斷式還是**只有 st.reveal 一個字**(rules.js 那條紅線);這裡記的是
          「它剛剛才變成 true」,不是自己另外算一套「大家都停手了吧」。
-       ⚠ 它是**最低優先權**(`!snd` 才響):同一個 diff 裡莊家剛好爆了 / 21 點的話,
-         那兩聲才是主角 —— 翻牌聲會把它們蓋掉。 */
-    if(rev && !anRev && !snd) snd = "reveal";
+       ⚠ 它是**最低優先權**(見上面 RANK_REVEAL):同一個 diff 裡莊家剛好爆了 /
+         21 點的話,那兩聲才是主角 —— 翻牌聲會把它們蓋掉。 */
+    if(rev && !anRev) bid("reveal", RANK_REVEAL);
     anRev = rev;
     /* ★ 一次重畫只響一聲:批次同步時有可能兩家同時爆,響兩聲會疊成噪音。
-       ⚠ 優先權是「過五關 > 21 點 > 爆 > 翻牌」(上面幾行的 snd 賦值就是在做這件事)。 */
+       ⚠ 優先權**不寫在這裡** —— 全部由上面 bid() 的名次決定(而階的名次來自規則層)。 */
     if(snd === "reveal") revealSfx();
     else if(snd) evSfx(snd);                        // ★ 動作聲 + 喊出來那一句兩層
   }
@@ -1289,14 +1312,24 @@ const BJB = (function(){
        到底是誰比較大,然後有真的都賠兩倍嗎」)。
        ★ 舊版只各寫「21 點賠 N 倍」「過五關賠 2 倍」兩行 —— 兩個**階**誰大完全沒講,
          而它是 settle 的第一條判斷(t > dt 就直接贏,不看點數)。
-       ⚠ 括號裡那個例子不是裝飾:「15 點贏 21 點」看起來像 bug,不舉例沒有人會相信。 */
-    L.push("<b>牌型大小</b> —— " + (r.dragon ? "<b>過五關 &gt; 21 點 &gt;</b> " : "<b>21 點 &gt;</b> ") +
-           "普通點數,爆掉最小;<b>階不一樣就直接比階、不看點數</b>" +
-           (r.dragon ? "(五張 15 點的過五關<b>贏</b>莊家的 21 點)" : "") + "。");
-    L.push("<b>21 點</b> = 前兩張就湊到 21,賠 <b>" + r.bjPay + " 倍</b>。");
+       ⚠ 括號裡那個例子不是裝飾:「15 點贏 21 點」看起來像 bug,不舉例沒有人會相信。
+       ★★★ v1.93.0:**21 點變成最大的階**(使用者:「幫我改成 black jack 比較大」)——
+         而這一行**不可以自己寫死順序**:名字一律由 `BJ.T_NAME` 照階排出來,
+         哪天再互換一次這一行自動跟著對(它與規則層是同一個順序)。 */
+    const tiers = r.dragon ? [R.T_BJ, R.T_DRAGON, R.T_NORM] : [R.T_BJ, R.T_NORM];
+    L.push("<b>牌型大小</b> —— <b>" +
+           tiers.map(t => (t === R.T_NORM ? "普通點數" : R.T_NAME[t])).join(" &gt; ") +
+           "</b>,爆掉最小;<b>階不一樣就直接比階、不看點數</b>" +
+           (r.dragon ? "(所以兩張的 21 點<b>贏</b>五張的過五關)" : "") + "。");
+    /* ★ v1.93.0:兩個階**都是 2 倍**(面板那一列拿掉了)。
+       ⚠ 這裡照舊印 `r.bjPay` 而不是寫死 2 —— 舊房主凍進 game.rules 的 1.5
+         要讓清單講實話(規則層 mulOf 也還讀得懂它,見 rules.js 第四節)。 */
+    L.push("<b>21 點</b> = 前兩張就湊到 21,賠 <b>" + r.bjPay + " 倍</b>" +
+           (r.dragon ? " —— 它是<b>最大的牌型</b>" : "") + "。");
     L.push(r.dragon
-      ? ("<b>過五關</b> = 五張牌不爆,賠 <b>2 倍</b>(莊家也能報,那就通吃全場)" +
-         (r.bjPay < 2 ? " —— 目前設定下它<b>比 21 點賠得多</b>" : ";與 21 點<b>同樣是 2 倍</b>") + "。")
+      ? ("<b>過五關</b> = 五張牌不爆,賠 <b>2 倍</b>(莊家也能報,那就通吃全場);" +
+         (r.bjPay === 2 ? "與 21 點<b>一樣是 2 倍</b>,但<b>比 21 點小</b>"
+                        : "目前設定下它<b>比 21 點賠得多</b>,但階<b>比 21 點小</b>") + "。")
       : "<b>過五關關掉了</b> —— 五張不爆只是普通手,照點數比大小。");
     L.push("<b>不做</b>加倍 / 分牌 / 保險 / 投降 —— 想賭大一點就在下注那一段押多一點。");
     /* ★★★ v1.86.0:補牌線是**莊閒都適用的下限**(使用者:「莊家跟玩家都要一同遵守」)。

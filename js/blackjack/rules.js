@@ -50,7 +50,7 @@
    ── 這一支負責什麼 ────────────────────────────────────────────────────────
      • 牌的編碼與 deal 字串
      • valueOf():軟 / 硬點數      ★ 爆掉與雙值顯示**共用這一支**
-     • tierOf():爆 / 普通 / 21 點 / 過五關 這四階
+     • tierOf():爆 < 普通 < 過五關 < **21 點** 這四階(v1.93.0 起 21 點最大)
      • replay():從 deal + acts 重算**一局**的真相   ★ 唯一的真相入口
      • settle():依房規算出每個座位的籌碼變化
      • autoDealer():房規有補牌線時,莊家該補到哪裡(到期代打也用它)
@@ -148,7 +148,11 @@ const BJ = (function(){
        ⚠ key 刻意還叫 line(值 0/16/17 在舊房間裡照樣有效)。 */
     line: LINE_FREE,
     pushDealer: true,  // 同點數(平手)莊家吃
-    bjPay: 2,          // 21 點賠率(倍):1.5 或 2
+    /* 21 點賠率(倍)。★★ v1.93.0 起**永遠是 2**(與過五關一樣)——
+       面板上那一列拿掉了,使用者:「過五關跟 21 點改成都是兩倍」。
+       ⚠ 欄位與 BJPAY_OPTS 的 1.5 刻意留著:那是**讀取相容**(舊房主可能凍了 1.5),
+         理由見第四節那一大段。**寫入一律 2**。 */
+    bjPay: 2,
     /* 過五關(五張不爆),賠 2 倍,莊閒都能報。
        ⚠ 欄位名刻意還叫 dragon:v1.85.0 只把**畫面上的字**從「五小龍」改成「過五關」,
          而這個 key 已經寫在別人裝置的 DB(bjRules)與 localStorage 裡 ——
@@ -189,6 +193,9 @@ const BJ = (function(){
   const START_OPTS = [50, 100, 200];
   const BETMAX_OPTS = [5, 10, 20, 50];
   const LINE_OPTS = [0, 15, 16, 17];        // ★ v1.86.0 多一格 15(使用者要求)
+  /* ⚠ 1.5 留在這裡**不是**忘了刪:面板已經沒有那一列(v1.93.0 起寫入一律 2),
+     但舊版裝置當房主時可能把 1.5 凍進 game.rules —— `pick()` 收得下它,
+     全桌才會算出同一個數字(見第四節「讀取相容」那一段)。 */
   const BJPAY_OPTS = [1.5, 2];
   const ROUNDS_OPTS = [1, 2, 3];
   const HANDS_OPTS = [1, 2, 3];             // ★ v1.87.0 幾局換莊
@@ -300,28 +307,65 @@ const BJ = (function(){
   const isBJ = cards => cards.length === 2 && valueOf(cards).best === 21;
 
   /* ==========================================================================
-     四、四個階:爆 < 普通 < 21 點 < 過五關
+     四、四個階:爆 < 普通 < 過五關 < **21 點**
      ──────────────────────────────────────────────────────────────────────────
        ★ 21 點與過五關**互斥**(一個是兩張、一個是五張)→ 不會撞。
+         (而且 closedAt 在 best === 21 就把手收掉了 → 兩張 21 永遠長不到五張。)
        ★ 過五關是房規,關掉時 5 張就只是普通手(照點數比)。
-       ★ 賠率跟著**贏家自己的階**走(莊家過五關 = 通吃全場加倍),
+       ★ 賠率跟著**贏家自己的階**走(莊家 21 點 = 通吃全場加倍),
          而不是「誰是莊」—— 輪莊制下對稱才自洽。
-       ⚠ 識別字(T_DRAGON / DRAGON_N / rules.dragon)刻意**不改名**:
+
+     ── ★★★ v1.93.0:**21 點變成最大的階**(使用者:「幫我改成 black jack 比較大」)────
+       舊版是 `T_BJ = 1 < T_DRAGON = 2`(過五關比較大)。這一版把**兩個常數的值互換**,
+       而不是去改 settle 裡那幾行比較 —— 理由:`settle()` 的判斷是 `t > dt`(比階),
+       **階的大小就是這兩個數字**,所以「誰比較大」只有一個落地點。
+       ⚠⚠ 由此長出三條「一起改」:
+         ① `T_NAME` **不可以再寫死 key**(舊版是 `{ "1":"21點", "2":"過五關" }`)——
+            那是「用數字當 key」的第二份真相,互換之後會靜靜地把兩個名字對調。
+            → 改成從常數組出來。
+         ② board.js 的**公告優先權**(同一次重畫只響一聲)舊版寫死「過五關贏 21 點」,
+            要跟著翻;而它也不可以再寫死 —— 一律問 `tierRank()`。
+         ③ 畫面上的**強度階梯**(點數膠囊的顏色、音效的華麗度)要跟著翻,
+            不然聲音與顏色會反過來告訴玩家「過五關比較大」。
+     ── ★★★ v1.93.0:**兩個階都賠 2 倍**(使用者:「過五關跟 21 點改成都是兩倍」)────
+       `bjPay` 那一列**從面板上拿掉了**(1.5 倍不再選得到)。
+       ⚠ 但 `BJPAY_OPTS` **刻意還留著 1.5** —— 那是**讀取相容**:舊版裝置當房主時
+         有可能把 1.5 凍進 `game.rules`,而 `maybeSettle` 是「誰先算完誰寫」→
+         兩台算出不同倍數的話,同一局的籌碼會變成**看誰的 timer 先響**(不確定)。
+         ★ 規矩與 v1.85.0 拿掉加倍逐字相同:**寫入的閘門收緊,讀取的相容性不動**。
+       ⚠ 連帶:自己的偏好(`bj.solo.v1` / `bj.prefs.v1`)裡如果留著 1.5,
+         沒有按鈕改得回來 → 兩個呼叫端**還原偏好時一律丟掉這一格**(見 solo.loadOwn /
+         adapter.usePrefs 那兩行);房間欄位照舊尊重(那才是相容要保護的東西)。
+
+       ⚠ 識別字(T_DRAGON / DRAGON_N / rules.dragon / bjPay)刻意**一個都不改名**:
          v1.85.0 動的只有畫面上那三個字(五小龍 → 過五關),見 RULES_DEF.dragon 那段。
      ========================================================================== */
-  const T_BUST = -1, T_NORM = 0, T_BJ = 1, T_DRAGON = 2;
-  const T_NAME = { "-1":"爆", "0":"普通", "1":"21點", "2":"過五關" };
+  const T_BUST = -1, T_NORM = 0, T_DRAGON = 1, T_BJ = 2;
+  /* ⚠ 一律從常數組出來 —— 寫死 `{ "1":"21點", "2":"過五關" }` 的話,
+     哪天再互換一次這張表會靜靜地把兩個名字對調(而且不會有人發現)。 */
+  const T_NAME = {};
+  T_NAME[T_BUST] = "爆"; T_NAME[T_NORM] = "普通";
+  T_NAME[T_DRAGON] = "過五關"; T_NAME[T_BJ] = "21點";
   const DRAGON_N = 5;                    // 幾張不爆才算過五關
+  /* 「這個階有多強」——★ 給**畫面**用(公告優先權 / 顏色 / 音效的華麗度)。
+     ⚠ 存在理由:那三處以前各自寫死「過五關 > 21 點」,而階一互換就三處一起走鐘。
+       它與 settle 的 `t > dt` 是同一個順序(就是階本身),所以不是第二份真相。 */
+  const tierRank = t => t;
 
   function tierOf(cards, rules){
     const v = valueOf(cards);
     if(v.bust) return T_BUST;
+    // ⚠ 順序無所謂(兩者互斥),但**不可以**改成「先判 isBJ 就 return」再靠順序表達大小
     if(rules.dragon && cards.length >= DRAGON_N) return T_DRAGON;
     if(isBJ(cards)) return T_BJ;
     return T_NORM;
   }
+  /* 賠幾倍。★★ v1.93.0 起兩個特殊階**都是 2 倍**。
+     ⚠ `T_BJ` 這一格仍然讀 `rules.bjPay`(而不是寫死 2)—— 那是上面講的讀取相容:
+       舊房主凍進去的 1.5 要算得跟他一樣。新版寫出去的一律是 2(面板沒有那一列了)。 */
+  const DRAGON_PAY = 2;
   function mulOf(tier, rules){
-    if(tier === T_DRAGON) return 2;
+    if(tier === T_DRAGON) return DRAGON_PAY;
     if(tier === T_BJ) return rules.bjPay;
     return 1;
   }
@@ -630,12 +674,16 @@ const BJ = (function(){
        階梯(見第四節)+ 三條房規:
          · 兩邊都爆   → bustFirst ? 閒家輸(先爆先輸) : 平手退注
          · 只有一邊爆 → 沒爆的那邊贏,倍數吃**贏家自己的階**
-         · 階不同     → 高的階贏(莊家過五關 = 通吃全場加倍)
+         · 階不同     → 高的階贏(莊家 21 點 / 過五關 = 通吃全場加倍)
+                        ★★ v1.93.0 起 **21 點 > 過五關**,而兩個階都賠 2 倍 ——
+                           所以「階不同」只在**不同座位**各拿一種時才分得出勝負
+                           (同一手不可能同時是兩張 21 與五張,見第四節)。
          · 同階       → 比點數;真的一樣 → pushDealer ? 莊家吃 : 退注
        ★ 莊家的 delta = −Σ(閒家 delta) —— 零和,不必另外算一次。
 
        ⚠ 賠率 1.5 倍會出現 .5 → 一律**四捨五入**(押 1 贏 2、押 3 贏 5)。
-         這也是預設值選 2 倍的理由:2 倍的籌碼永遠是整數,沒有這回事。
+         ★ v1.93.0 起面板已經選不到 1.5(寫入一律 2 → 籌碼永遠是整數),
+           但這一段留著:舊房主凍進 game.rules 的 1.5 還是要算得跟他一樣。
      ========================================================================== */
   function betOf(bets, seat, rules){
     const raw = bets && (bets[seat] !== undefined ? bets[seat] : bets[String(seat)]);
@@ -699,7 +747,10 @@ const BJ = (function(){
   const TAG_TXT = {
     bust: "爆了", bothbust: "兩邊都爆 · 退注", dbust: "莊家爆了",
     win: "點數比莊家大", lose: "點數比莊家小", tie: "同點數 · 莊家吃",
-    push: "同點數 · 退注", bj: "21 點!", dbj: "莊家 21 點",
+    push: "同點數 · 退注", bj: "21 點!",
+    /* ★ v1.93.0:21 點與過五關都賠 2 倍 → 莊家報到哪一個都是**通吃全場加倍**,
+       所以這兩句要對稱(舊版只有過五關那一句寫「通吃」)。 */
+    dbj: "莊家 21 點 · 通吃",
     dragon: "過五關!", ddragon: "莊家過五關 · 通吃", dealer: "莊家"
   };
   const tagTxt = tag => TAG_TXT[tag] || "";
@@ -785,7 +836,7 @@ const BJ = (function(){
     // 常數
     NSUIT, NRANK, NCARD, MIN_PLAYERS, MAX_PLAYERS, VS15,
     SUIT_CH, SUIT_KEY, SUIT_NAME, RANK_TXT, DRAGON_N,
-    T_BUST, T_NORM, T_BJ, T_DRAGON, T_NAME, LINE_FREE, GRAB_CH,
+    T_BUST, T_NORM, T_BJ, T_DRAGON, T_NAME, tierRank, LINE_FREE, GRAB_CH,
     RULES_DEF, START_OPTS, BETMAX_OPTS, LINE_OPTS, BJPAY_OPTS, ROUNDS_OPTS, HANDS_OPTS, SEC_OPTS,
     MIN_BET, BET_STEPS, FIRST_HOST, FIRST_RAND, FIRST_PICK,
     // 編碼

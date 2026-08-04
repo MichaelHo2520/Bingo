@@ -789,7 +789,18 @@ const MP = MPCore.create((function(){
 
     /* ---------- 偏好 ---------- */
     ownPrefs(){ return { bjRules: rules }; },
-    usePrefs(o){ if(o && o.bjRules) rules = BJ.normRules(o.bjRules); },
+    /* ⚠⚠ v1.93.0:還原偏好時**丟掉 bjPay** —— 面板已經沒有那一列了(兩個階都賠 2 倍),
+       曾經選過 1.5 的人**沒有任何按鈕改得回來**,會永遠卡在 1.5(而且他當房主時
+       全桌都吃那個值)。★ 這是「寫入收緊」;讀取那一側(readRoom / onRoomField)
+       **刻意不動** —— 舊版房主寫的 1.5 要照樣尊重,不然同一局兩台算出不同籌碼。
+       ⚠ 這一段與 solo.loadOwn 是**同一件事的兩份**(單機與連線的偏好各存一包),
+         改一邊記得改另一邊。 */
+    usePrefs(o){
+      if(!o || !o.bjRules) return;
+      const r0 = Object.assign({}, o.bjRules);
+      delete r0.bjPay;
+      rules = BJ.normRules(r0);
+    },
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {

@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台式21點 ｜ 輪流當莊 · 莊家抓人 · 單機對電腦 + 2~6 人連線</title>
-<!-- 台式21點 · v1.92.0 -->
+<!-- 台式21點 · v1.93.0 -->
 <!-- ⚠ 顯示名改過兩次(21點 → 台式21點),而**資料的名字一個都沒動**:
        bj_rooms / bj_index / bjRules / bj.solo.v1 / bj.prefs.v1 / line / dragon
        —— 那些 key 已經寫在別人裝置的 DB 與 localStorage 裡(同 v1.85.0 五小龍那條)。
@@ -21,7 +21,7 @@
      ⚠⚠ 註解裡**一個字都不可以出現註解的結束標記** —— v1.87.0 真的踩到:
        那一串被當成註解結束,後面整段文字就漏到畫面最上面變成一行亂碼,
        而它**只有截圖看得出來**(DOM 量出來完全正常)。 -->
-<meta name="version" content="1.92.0">
+<meta name="version" content="1.93.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -110,7 +110,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <li>莊家補到規則點數之後可以<b>抓人</b> —— 指名一家先跟他比。</li>
           <li><b>閒家可以同時補牌</b>,不必等別人 —— 每個人抽自己的牌。</li>
           <li>下注用<b>加減鈕</b>(±1 / ±5 / ±10)自己調,上限由房主決定。</li>
-          <li><b>21 點</b>(前兩張就 21)賠得比較多;<b>過五關</b>(五張不爆)賠更多。</li>
+          <!-- ★★★ v1.93.0:兩個都賠 2 倍,而 21 點是**最大**的牌型(使用者要求)。
+               ⚠ 舊版寫「過五關賠更多」——那句現在是錯的,不要照舊文件加回來。 -->
+          <li><b>21 點</b>(前兩張就 21)與<b>過五關</b>(五張不爆)都賠 <b>2 倍</b>;
+              而<b>21 點最大</b> —— 階不一樣就直接比階,不看點數。</li>
           <li><b>不會被淘汰</b> —— 籌碼可以打到負的,比的是誰賺得多。</li>
           <li>其他細節(平手誰贏、莊家要不要補到 17、賠幾倍…)全部<b>由房主決定</b>。</li>
         </ul>
@@ -404,17 +407,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
 
         <div class="set-group">
-          <div class="set-group-title">賠率</div>
+          <div class="set-group-title">牌型</div>
+          <!-- ★★★ v1.93.0:「21 點賠率」那一列**拿掉了**(使用者:「過五關跟 21 點改成
+               都是兩倍」)—— 兩個階從此都是 2 倍,籌碼永遠是整數。
+               ⚠ 資料的欄位 bjPay 與 BJPAY_OPTS 的 1.5 刻意留著:那是**讀取相容**
+                 (舊版裝置當房主時可能把 1.5 凍進 game.rules,而結算是「誰先算完誰寫」
+                  → 兩台算出不同倍數就變成看誰的 timer 先響)。見 rules.js 第四節。
+               ⚠ 不要因為「面板上看不到」就把那個欄位刪掉。 -->
           <div class="set-row col">
-            <!-- ⚠ 2 倍的籌碼永遠是整數;1.5 倍會四捨五入(押 1 贏 2、押 3 贏 5) -->
-            <span class="set-lbl">21 點賠率<span class="set-sub">2 倍時籌碼永遠是整數</span></span>
-            <div class="seg" aria-label="21 點賠率">
-              <button data-rk="bjPay" data-rv="1.5">1.5 倍</button>
-              <button data-rk="bjPay" data-rv="2">2 倍</button>
-            </div>
-          </div>
-          <div class="set-row col">
-            <span class="set-lbl">過五關<span class="set-sub">五張不爆賠 2 倍,莊家也能報</span></span>
+            <span class="set-lbl">過五關<span class="set-sub">五張不爆賠 2 倍(與 21 點同倍,但比 21 點小)</span></span>
             <div class="seg" aria-label="過五關">
               <button data-rk="dragon" data-rv="1">開</button>
               <button data-rk="dragon" data-rv="0">關</button>

@@ -57,7 +57,16 @@ const Solo = (function(){
       const o = JSON.parse(localStorage.getItem(OWN_KEY)) || {};
       if(BJAI.LEVEL_INFO[o.level]) level = o.level;
       if(o.seats >= BJ.MIN_PLAYERS && o.seats <= BJ.MAX_PLAYERS) seats = o.seats;
-      if(o.rules) rules = BJ.normRules(o.rules);
+      /* ⚠⚠ v1.93.0:還原偏好時**丟掉 bjPay** —— 那一列已經從面板上拿掉了
+         (兩個階都賠 2 倍),所以曾經選過 1.5 的人**沒有任何按鈕改得回來**,
+         會永遠卡在 1.5。★ 這是「寫入收緊」的一部分:我自己的偏好一律回到預設 2;
+         而**房間欄位照舊尊重**(那才是讀取相容要保護的東西,見 rules.js 第四節)。
+         ⚠ 只 delete 這一格、不要整份丟掉:其他房規是使用者自己調的。 */
+      if(o.rules){
+        const r0 = Object.assign({}, o.rules);
+        delete r0.bjPay;
+        rules = BJ.normRules(r0);
+      }
       rec = (o.rec && typeof o.rec === "object") ? o.rec : {};
     }catch(e){}
     BJAI.LEVEL_KEYS.forEach(x => { if(!rec[x]) rec[x] = blank(); });

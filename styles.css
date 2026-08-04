@@ -4068,8 +4068,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     font:900 11px/1.5 'Nunito',sans-serif;color:var(--text)}
   .bj-pt i{font-style:normal;font-weight:800;font-size:9.5px;margin-left:2px}
   .bj-pt.bust{background:rgba(224,83,63,.3);color:#ffd7cf}
-  .bj-pt.bj{background:rgba(129,199,132,.3);color:#dcffdd}
-  .bj-pt.dragon{background:var(--accent-2);color:#2a1c00}
+  /* ★★★ v1.93.0:兩個特殊階的顏色**互換**了 —— 21 點從此是最大的階
+     (使用者:「幫我改成 black jack 比較大」),所以最搶眼的實心 accent 給它,
+     過五關退成綠色。⚠ 這不是配色偏好:顏色是玩家判斷「哪一個比較厲害」的第一個管道,
+     留著舊的強度等於**用顏色告訴他過五關比較大**,而結算會說 21 點贏。 */
+  .bj-pt.bj{background:var(--accent-2);color:#2a1c00}
+  .bj-pt.dragon{background:rgba(129,199,132,.3);color:#dcffdd}
   /* 「4 + ?」= 這個數字只算了明牌那一張(莊家還沒翻牌)。
      ⚠ 那個 <b>+ ?</b> 要比數字淡:它不是點數的一部分,是「還有一張不知道」 */
   .bj-pt.part b{font-weight:800;font-size:9.5px;opacity:.7;margin-left:1px}
