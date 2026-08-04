@@ -1199,13 +1199,15 @@
     .home-brand{font-size:clamp(19px,5vw,26px);min-height:clamp(20px,5.5vw,28px)}
     .home-pick-head{margin:4px 0 10px}
     /* ⚠⚠ 矮視窗(橫置手機 900x430)一定要**四欄** —— 兩欄是 4 列,量出來
-       4×91 + 頂列 + panel padding ≈ 480 > 430,而首頁的捲動不在 document 上
-       → 最後一列不是「要捲」而是**直接被裁掉看不到**(截圖才看得出來:
-       診斷器那時還報 needScroll=no,是量錯容器的假綠 —— 要問的是
-       「最後一張卡的下緣還在視窗裡嗎」)。
+       4×91 + 頂列 + panel padding ≈ 480 > 430 → 最後一列**要捲才看得到**,
+       而這一版的訴求就是「不必捲」(#home 自己是 overflow-y:auto,v1.54.0 加的,
+       所以捲得到、不是被裁掉 —— 但要捲就等於沒解決使用者的問題)。
        ⚠ 三欄(3 列)也**不夠**:「現在有人在玩」的徽章一出現就把每格撐高 26px,
-         量出來 lastBottom=435/430 —— 差 5px 就看不到最後一列。四欄 = 2 列,
-         連上面那塊 #hlLive 看板一起出現都還有餘裕。 */
+         量出來 lastBottom=435/430 —— 差 5px 就得捲。四欄 = 2 列,
+         連上面那塊 #hlLive 看板一起出現都還有餘裕。
+       ⚠ 量的一定是「最後一張卡的下緣還在視窗裡嗎」——
+         document.scrollHeight 在這裡永遠等於 innerHeight(捲的是 #home 不是頁面),
+         拿它當「要不要捲」會報 needScroll=no 的假綠。 */
     .gc-grid{grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px}
     .game-card{padding:10px 8px;gap:6px}
     .gc-art{width:44px;height:44px}
