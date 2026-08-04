@@ -3619,6 +3619,52 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .b2-tmv.act::after{animation:none;opacity:1}
   }
 
+  /* ==========================================================================
+     大老二 v1.100.0 —— 房規蓋板(#b2RulesVeil)
+     ==========================================================================
+       ★★ 單機與連線**共用這一組 DOM**(照21點 v1.85.0 的 .bj-rules-card;
+          結構逐字沿用,所以那一版的兩個坑這裡不會再踩)。
+       ⚠⚠ **只有 .set-body 捲、卡片自己不捲**:共用的 `.set-card` 是
+         「整張卡 max-height + overflow-y:auto」,而 `.card-x` 是 position:sticky
+         → 整張卡在捲的時候那個 ✕ 會一路壓在設定列上(21點 v1.87.0 的圖)。
+         **兩條要一起在** —— 只給 overflow:hidden 而沒讓 .set-body 可捲的話,
+         下面幾列會靜靜地被裁掉而且捲不到(比 ✕ 重疊更糟)。
+       ⚠ 選擇器一律用前綴 class(`.set-card.b2-rules-card`),**不可以**寫
+         `#b2RulesVeil .set-card` —— 那會波及另外七頁共用的那張設定卡。 */
+  .set-card.b2-rules-card{width:min(92vw,480px);max-width:none;
+    display:flex;flex-direction:column;overflow:hidden}
+  .b2-rules-card .set-body{flex:1 1 auto;min-height:0;overflow-y:auto;
+    overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .b2-rules-who{flex:none;margin:-4px 0 8px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--accent-2)}
+  .b2-rules-card .set-row.col{flex-direction:column;align-items:stretch;gap:5px}
+  .b2-rules-card .set-row.col .set-lbl{text-align:left}
+  .b2-rules-card .set-row.col .seg{width:100%}
+  .b2-rules-card .set-row.col .seg button{flex:1 1 0;min-width:0;font-size:12.5px;padding:6px 4px}
+  /* ★★ 順子那一組是**兩行的完整排序**(使用者:「把這三組的大小列出來,然後用選的」)
+     → 那兩顆鈕要**直排**,而且字要放得下「23456 > A2345 > 10JQKA > … > 34567」。
+     ⚠ 橫排(共用的 .seg)在 390px 手機上會把那一串壓成三行高、兩顆還不一樣高。 */
+  .b2-rules-card .seg.col{flex-direction:column;gap:4px}
+  .b2-rules-card .seg.col button{flex:none;width:100%;text-align:left;
+    font-size:12px;padding:7px 9px;letter-spacing:.2px;white-space:normal;line-height:1.35}
+  .b2-rules-card .seg.col button b{color:var(--accent-2)}
+  .b2-rules-card .seg.col button.on b{color:inherit}
+  /* 訪客:看得到但改不動。⚠ **不用 disabled / pointer-events:none** ——
+     CLAUDE.md 的紅線是「不用 disabled 讓點擊靜默消失」,按下去要跳
+     「只有房主能改規則」(擋在 MP.setRule,不是擋在 CSS)。 */
+  .b2-rules-card .seg.readonly{opacity:.78}
+  /* 「這一版的玩法(固定)」那份清單 —— 它就是使用者要的「原本放在外面的規則」。 */
+  .b2-rules-list{margin:2px 0 0;padding:0;list-style:none;text-align:left}
+  .b2-rules-list li{position:relative;padding:3px 0 3px 15px;
+    font:600 12px/1.55 'Nunito',sans-serif;color:var(--muted)}
+  .b2-rules-list li::before{content:"";position:absolute;left:3px;top:10px;
+    width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .b2-rules-list li b{color:var(--text)}
+  .b2-rules-sum{flex:none;text-align:left;padding-top:8px;
+    font:700 12px/1.5 'Nunito',sans-serif;color:var(--accent-2)}
+  :root[data-theme="ebook"] .b2-rules-list li::before{background:#000}
+  :root[data-theme="ebook"] .b2-rules-list li b{color:#000;text-decoration:underline}
+  :root[data-theme="ebook"] .b2-rules-sum{color:#000}
+
   /* ✗ 算牌表(.b2-seen / .b2-sgrid / .b2-spip …)v1.78.0 整段拿掉 ——
      使用者:「出過的牌不要顯示好了,我覺得還是要自己記,比較好玩」。
      要復活的話連同 board.js 那條紅線一起看(只准標已經出過的)。 */

@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>大老二 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 大老二 · v1.99.0 -->
-<meta name="version" content="1.99.0">
+<!-- 大老二 · v1.100.0 -->
+<meta name="version" content="1.100.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -108,6 +108,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button class="on" data-seats="4">4 人</button>
         </div>
       </div>
+      <!-- ★ 房規:與連線**共用同一個蓋板**(#b2RulesVeil)。單機時「我就是房主」
+           (照21點 v1.85.0 那一套:兩邊各一顆入口鈕 → 一組 DOM、一支 syncRules) -->
+      <div class="field">
+        <span class="field-label">房規</span>
+        <button class="btn ghost block-btn" id="b2SoloRules" type="button">⚙ 改規則</button>
+      </div>
       <button class="btn primary block-btn home-btn" id="b2StartSolo">開始對局 ▸</button>
       <div class="home-hint" id="b2SoloHint"></div>
     </div>
@@ -197,6 +203,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-sec="60">60 秒</button>
         </div>
       </div>
+      <!-- ★★ 房規(v1.100.0):面板本體是共用蓋板 #b2RulesVeil(單機也是它),
+           這裡只有一顆入口鈕 + 一行摘要。⚠ 對戰中不給改(規則在開局那一刻就凍了) -->
+      <div class="field">
+        <span class="field-label" id="b2RulesLabel">房規</span>
+        <button class="btn ghost block-btn" id="b2RulesOpen" type="button">⚙ 改規則</button>
+      </div>
+      <div class="hint" id="b2RuleHint"></div>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">
@@ -271,6 +284,72 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
   <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
+
+  <!-- ====== ★★★ 房規(v1.100.0)—— 單機與連線**共用這一個蓋板** ======
+       使用者:「我也希望能像21點那樣,建立一些遊戲規則,像是 A2345 跟 10JQKA 到底誰在大,
+                原本放在外面的規則,也可以放進去」
+
+       ⚠ 只有**一組** DOM(單機第二層一顆鈕、大廳一顆鈕都開它)—— 塞兩份就是兩個 id。
+       ⚠ 卡片結構照21點的 .bj-rules-card:**只有中間那塊會捲**
+         (`.b2-rules-card{display:flex;overflow:hidden}` + `.set-body{flex:1;min-height:0;
+         overflow-y:auto}` 兩條要一起在)—— 整張卡自己捲的話 position:sticky 的 ✕
+         會一路壓在設定列上(21點 v1.87.0 踩過)。
+       ⚠ 規則清單擺在**面板裡面**(不是只有進場選單那一份):使用者要的是「規則放進去」,
+         而順子大小這件事本來在任何地方都沒寫出來過。 -->
+  <div class="veil" id="b2RulesVeil">
+    <div class="set-card b2-rules-card">
+      <button class="card-x" id="b2RulesClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">房規</div>
+      <div class="b2-rules-who" id="b2RulesWho"></div>
+      <div class="set-body" id="b2RulesBody">
+
+        <div class="set-group">
+          <div class="set-group-title">牌型大小</div>
+          <div class="set-row col">
+            <!-- ★★★ 使用者:「把這三組的大小列出來,然後用選的,不過 23456 就固定為最大」
+                 → 所以選項本身就是**完整的排序**(玩家不必自己推),而 23456 不進選項。 -->
+            <span class="set-lbl">順子誰大<span class="set-sub">2-3-4-5-6 兩邊都固定最大;要選的是 A-2-3-4-5 排哪裡</span></span>
+            <div class="seg col" id="b2StrSeg" aria-label="順子誰大">
+              <button data-rk="str" data-rv="hi">23456 &gt; <b>A2345</b> &gt; 10JQKA &gt; … &gt; 34567</button>
+              <button data-rk="str" data-rv="lo">23456 &gt; 10JQKA &gt; … &gt; 34567 &gt; <b>A2345</b></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ 出牌倒數:**連線專屬**(單機沒有倒數 —— 卡多久是自己的節奏)。
+             ⚠ 它不進房規物件:那個欄位(turnSec)早就在用,而且它不影響任何判定。 -->
+        <div class="set-group hidden" id="b2SecGroup">
+          <div class="set-group-title">出牌倒數</div>
+          <div class="set-row col">
+            <span class="set-lbl">每一手幾秒<span class="set-sub">時間到系統會幫他出一手</span></span>
+            <div class="seg" id="b2SecSeg2" aria-label="出牌倒數">
+              <button data-sec="0">關</button>
+              <button data-sec="20">20 秒</button>
+              <button data-sec="40">40 秒</button>
+              <button data-sec="60">60 秒</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">這一版的玩法(固定,不能改)</div>
+          <ul class="b2-rules-list">
+            <li>52 張全發給 <b>2~4 人</b>;拿到 ♣︎3 的人先出,<b>第一手一定要帶 ♣︎3</b>。</li>
+            <li>可出 <b>1 張 · 2 張 · 5 張</b>;五張只有<b>順子 · 葫蘆 · 鐵支 · 同花順</b>
+                (沒有三條單出、沒有同花、沒有兩對)。</li>
+            <li><b>同牌型才能互壓</b> —— 順子只壓順子、葫蘆只壓葫蘆。</li>
+            <li><b>鐵支與同花順壓得過任何牌型</b>,而同花順又比鐵支大。</li>
+            <li>單張 / 對子的大小:<b>2 最大</b>,接著 A、K…3;同點數比花色 ♠︎&gt;♥︎&gt;♦︎&gt;♣︎。</li>
+            <li>壓不過就 <b>Pass</b>;一輪只剩一個人沒 Pass → 他重新領出。</li>
+            <li>出完的人退出、牌局繼續,打到只剩一家。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。</li>
+            <li>誰<b>剩最後一手</b>(不管幾張)系統會自動報一聲「<b>拉</b>」。</li>
+          </ul>
+        </div>
+
+      </div>
+      <div class="b2-rules-sum" id="b2RulesSum"></div>
+    </div>
+  </div>
 
   <!-- ====== 設定 ====== -->
   <div class="veil" id="setVeil">

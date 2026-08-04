@@ -22,6 +22,9 @@ const Solo = (function(){
   const OWN_KEY = "big2.solo.v1";
 
   let level = "mid", seats = 4;
+  /* ★★★ 房規(v1.100.0):單機這一份是「我自己想怎麼玩」,與連線那份(房主替全房選的)
+     刻意分開存 —— 同 level / seats 的理由。⚠ 一律經過 B2.normRules(白名單守門)。 */
+  let rules = B2.defRules();
   let st = null, names = [];
   let active = false, over = false, busy = false;
   let gen = 0;                                   // 世代記號:離場 / 換局後,舊的 timer 一律不執行
@@ -40,12 +43,13 @@ const Solo = (function(){
       const o = JSON.parse(localStorage.getItem(OWN_KEY)) || {};
       if(B2AI.LEVEL_INFO[o.level]) level = o.level;
       if(o.seats >= B2.MIN_PLAYERS && o.seats <= B2.MAX_PLAYERS) seats = o.seats;
+      rules = B2.normRules(o.rules);        // ⚠ 舊的 localStorage 沒有這格 → 退回預設
       rec = (o.rec && typeof o.rec === "object") ? o.rec : {};
     }catch(e){}
     B2AI.LEVEL_KEYS.forEach(k => { if(!rec[k]) rec[k] = blank(); });
   }
   function saveOwn(){
-    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, seats, rec })); }catch(e){}
+    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, seats, rec, rules })); }catch(e){}
   }
   function recOf(k){ const r = rec[k] || blank(); if(typeof r.p !== "number") r.p = 0; return r; }
   function recText(k){
@@ -151,7 +155,9 @@ const Solo = (function(){
   function start(){
     bumpGen();
     round++;                                   // ★ 新的一局 → 手牌回到照牌力排(見上)
-    st = B2.replay(B2.newDeal(), seats, []);
+    /* ⚠⚠ 房規要在**開局那一刻**進 st(replay 會 normRules 一次凍在 st.rules)——
+       之後面板怎麼改都不影響這一局(同21點 v1.85.0 的「開局凍結」)。 */
+    st = B2.replay(B2.newDeal(), seats, [], rules);
     names = [];
     for(let s = 0; s < seats; s++) names.push(NAMES[s]);
     over = false; busy = false; active = true;
@@ -242,7 +248,7 @@ const Solo = (function(){
       try{ mv = B2AI.pick(st, seat, level); }catch(e){ mv = null; }
       // 保險:AI 出了任何意外都不能讓遊戲卡住 —— 退回「照規則自己挑一手」
       if(!mv || !B2.step(st, mv)){
-        const cs = B2.playsBeating(st.hands[seat], st.cur ? st.cur.cls : null);
+        const cs = B2.playsBeating(st.hands[seat], st.cur ? st.cur.cls : null, st);   // ⚠ 帶房規
         const ok = st.opened ? cs : cs.filter(p => p.cards.indexOf(B2.CLUB3) >= 0);
         const fb = ok.length ? B2.encMove(ok[0].cards) : B2.PASS;
         if(!B2.step(st, fb)){ busy = false; paint(); return; }
@@ -252,7 +258,7 @@ const Solo = (function(){
       if(B2.isPass(mv)){
         showToast(seatName(seat) + " Pass", 1000);
       }else{
-        const cls = B2.classify(B2.decMove(mv));
+        const cls = B2.classify(B2.decMove(mv), st);      // ⚠ 帶房規
         if(cls && B2.isBomb(cls.t)) showToast(seatName(seat) + " 出了" + B2.T_NAME[cls.t] + "!", 1600);
         if(!st.hands[seat].length) showToast(seatName(seat) + " 把牌出完了", 1600);
       }
@@ -307,6 +313,14 @@ const Solo = (function(){
     recText, recLine,
     setLevel(v){ if(B2AI.LEVEL_INFO[v]){ level = v; saveOwn(); paintBar(); } },
     setSeats(v){ if(v >= B2.MIN_PLAYERS && v <= B2.MAX_PLAYERS){ seats = v; saveOwn(); } },
+    /* ---------- ★★★ 房規(v1.100.0):面板是單機連線共用的,分流點只有 main.js 三支 ----------
+       ⚠ `rules()` 回**現在設定的那一份**(下一局才生效);對局中的真相在 `st.rules`,
+         那兩個在對局中可能不一樣 —— 而那正是「開局凍結」要的。 */
+    rules: () => B2.normRules(rules),
+    setRule(key, val){
+      const next = B2.normRules(Object.assign({}, rules, { [key]: val }));
+      rules = next; saveOwn();
+    },
     // 給 e2e 用:直接讀當下的局面(不經過畫面)
     _st: () => st
   };

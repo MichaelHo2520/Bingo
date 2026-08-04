@@ -38,6 +38,18 @@ const MP = MPCore.create((function(){
   let turnSec = 40;                     // ★ 比排七長 —— 大老二一手要在 13 張裡湊組合
   let ctx = null;
 
+  /* ★★★ 房規(v1.100.0)—— **兩份**,而它們刻意不一樣:
+       rules   房間欄位 `b2Rules`(房主現在設定的那一份 → **下一局**才生效)
+       gRules  這一局**開局那一刻凍結**的那一份(`game.rules`,真相層要用的就是它)
+     ⚠⚠ 兩份的理由與21點 v1.85.0 逐字相同:房規改了不可以讓**已經在打的這一局**
+       重算出不同結果(症狀是「重連的人算出來的牌局跟現場不一樣」)。
+     ⚠⚠ 交易裡(send / autoPlay / maybeSettle)**一律用 `g.rules`,不是 gRules** ——
+       伺服器上那一局凍的是什麼,只有 g 知道(同「拿伺服器的 moves 重跑一次」那條)。
+     ★ 出牌倒數 `turnSec` **刻意不併進這個物件**:它不影響任何判定(不是真相),
+       而且它是既有的房間欄位 —— 併進去等於把舊房間的設定弄丟。 */
+  let rules = B2.defRules();
+  let gRules = B2.defRules();
+
   let deal = "", moves = [], st = null;
   let curRound = null;                 // ★ 新局判定一律用 roundId(不可以看 deal 變沒變)
   let lastLen = -1, turnAt = 0;        // 這一手的錨點(本地時鐘;各台差幾百毫秒無妨)
@@ -131,7 +143,7 @@ const MP = MPCore.create((function(){
       if(g.status !== "playing" || g.winner) return false;
       const list = Array.isArray(g.moves) ? g.moves : [];
       if(list.length !== step) return false;            // 這一手已被別人推進 → 中止,等快照
-      const chk = B2.replay(g.deal, n, list);
+      const chk = B2.replay(g.deal, n, list, g.rules);   // ⚠ 用**伺服器上凍結的**房規
       if(!chk || chk.over || chk.turn !== me) return false;
       if(!B2.step(chk, mv)) return false;               // 伺服器真值上不合法 → 不寫
       g.moves = list.concat(mv);
@@ -200,7 +212,7 @@ const MP = MPCore.create((function(){
       if(g.status !== "playing" || g.winner) return false;
       const list = Array.isArray(g.moves) ? g.moves : [];
       if(list.length !== step) return false;            // 他自己出了 / 別人已經幫他出了
-      const chk = B2.replay(g.deal, n, list);
+      const chk = B2.replay(g.deal, n, list, g.rules);   // ⚠ 同上:房規在 g 裡
       if(!chk || chk.over || chk.turn !== seat) return false;
       const mv = B2AI.autoMove(chk, seat);              // 替人代打一律用「普通」,不套難度
       if(!B2.step(chk, mv)) return false;
@@ -222,7 +234,7 @@ const MP = MPCore.create((function(){
     const n = nPlayers(), ord = ctx.order();
     ctx.txGame(g => {
       if(g.winner) return false;
-      const chk = B2.replay(g.deal, n, Array.isArray(g.moves) ? g.moves : []);
+      const chk = B2.replay(g.deal, n, Array.isArray(g.moves) ? g.moves : [], g.rules);
       if(!chk || !chk.over) return false;
       const sc = B2.score(chk);
       const pts = {};
@@ -249,7 +261,11 @@ const MP = MPCore.create((function(){
            "(沒有三條單出、沒有同花、沒有兩對)。<br>" +
            "<b>同牌型才能互壓</b> —— 順子只壓順子、葫蘆只壓葫蘆;而<b>鐵支與同花順壓得過任何牌型</b>," +
            "同花順又比鐵支大。<br>" +
-           "點數 <b>2 最大</b>(2>A>K>…>3),同點數比花色 ♠>♥>♦>♣。順子認 A-2-3-4-5 與 2-3-4-5-6(帶 2 的最大)。<br>" +
+           "點數 <b>2 最大</b>(2>A>K>…>3),同點數比花色 ♠︎>♥︎>♦︎>♣︎。<br>" +
+           /* ★★ v1.100.0:順子大小是**房規**(房主決定)→ 這一行一定要講**現在這一間房**
+              是哪一種,不可以再寫死「帶 2 的最大」。⚠ 文案走 b2RulesText(main.js 那一支),
+              大廳摘要 / 面板底部 / 這一格三處共用同一句(三份會走鐘)。 */
+           "<b>" + esc(b2RulesText(rules)) + "</b>(房主可改)。<br>" +
            "<b>出完的人退出、牌局繼續</b>,打到只剩一家有牌。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。<br>" +
            "出牌倒數:" + sec + "。";
   }
@@ -268,8 +284,18 @@ const MP = MPCore.create((function(){
     init(c){ ctx = c; },
 
     /* ---------- 房間層級設定 ---------- */
-    roomFields(){ return { turnSec: turnSec }; },
+    roomFields(){ return { turnSec: turnSec, b2Rules: B2.normRules(rules) }; },
     onRoomField(k, v){
+      /* ★ 房規:整包一個欄位(面板一次只改一項,但寫進去的是整份)——
+         ⚠ 守門一律走 normRules(白名單):手改 DB / 舊房間的值都要能用。 */
+      if(k === "b2Rules"){
+        const next = B2.normRules(v);
+        if(next.str === rules.str) return;
+        rules = next;
+        ctx.unreadyOnFieldChange();
+        ctx.syncSetup(); ctx.updateGoal();
+        return;
+      }
       if(k !== "turnSec") return;
       // ⚠ 守門用**範圍**而不是白名單 —— 舊房間 / 手改 DB 的值也要能用
       if(typeof v !== "number" || !(v === 0 || (v >= 10 && v <= 120)) || v === turnSec) return;
@@ -278,10 +304,13 @@ const MP = MPCore.create((function(){
       ctx.syncSetup(); ctx.updateGoal();
       if(ctx.phase() === "playing"){ armTurnT(); paint(); }
     },
-    readRoom(r){ if(typeof r.turnSec === "number") turnSec = r.turnSec; },
+    readRoom(r){
+      if(typeof r.turnSec === "number") turnSec = r.turnSec;
+      if(r && r.b2Rules) rules = B2.normRules(r.b2Rules);   // ⚠ 舊房間沒有 → 維持預設
+    },
 
     /* ---------- 一局的生命週期 ---------- */
-    lobbyGame(){ return { deal: "", moves: [] }; },
+    lobbyGame(){ return { deal: "", moves: [], rules: B2.normRules(rules) }; },
     resetRound(){
       clearTurnT();
       deal = ""; moves = []; st = null; curRound = null; lastLen = -1;
@@ -294,7 +323,8 @@ const MP = MPCore.create((function(){
         const j = Math.floor(Math.random() * (i + 1));
         const t = ord[i]; ord[i] = ord[j]; ord[j] = t;
       }
-      return { order: ord, deal: B2.newDeal(), moves: [] };
+      /* ★★★ 房規在**這一刻**凍進 game.rules —— 之後房間欄位怎麼改都不影響這一局。 */
+      return { order: ord, deal: B2.newDeal(), moves: [], rules: B2.normRules(rules) };
     },
     applyGame(g, isPlaying){
       const next = Array.isArray(g.moves) ? g.moves : [];
@@ -306,7 +336,11 @@ const MP = MPCore.create((function(){
       if(!isPlaying){ st = null; return; }
       if(fresh){ curRound = rid; lastLen = -1; B2B.clearSel(); }
 
-      st = B2.replay(deal, nPlayers(), moves);
+      /* ★ 讀**這一局凍結的**那一份(不是房間欄位)。
+         ⚠ 照 deal 那一行的模式用「有才蓋掉」:某一次快照少了這個欄位時,
+           寧可沿用上一次讀到的,也不要靜靜地退回預設房規(那會讓整局重算)。 */
+      if(g.rules) gRules = B2.normRules(g.rules);
+      st = B2.replay(deal, nPlayers(), moves, gRules);
       if(!st) return;                            // deal 壞掉(理論上不會)→ 等下一個快照
 
       /* 音效走「前後兩份的 diff」而不是在動作點插 Sound.xxx() ——
@@ -364,6 +398,13 @@ const MP = MPCore.create((function(){
       }
       const lbl = $("b2SecLabel");
       if(lbl) lbl.textContent = isHost ? "出牌倒數" : "出牌倒數(房主決定)";
+      /* ★★ 房規那一列(v1.100.0):標籤跟著身分換字,而摘要與規則清單同一份 ruleHint()。
+         ⚠ 面板**開著**的時候也要跟著同步 —— 房主改了規則,訪客那台是靠這裡刷新的
+           (漏掉的症狀是「訪客的面板停在舊規則,而大廳摘要已經換了」)。 */
+      const rl = $("b2RulesLabel");
+      if(rl) rl.textContent = isHost ? "房規" : "房規(房主決定)";
+      if(typeof syncRules === "function" && $("b2RulesVeil") &&
+         $("b2RulesVeil").classList.contains("show")) syncRules(rules, isHost);
       const hint = $("b2RuleHint");
       if(hint) hint.innerHTML = ruleHint();
     },
@@ -440,14 +481,31 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { turnSec: turnSec }; },
+    ownPrefs(){ return { turnSec: turnSec, b2Rules: B2.normRules(rules) }; },
     usePrefs(o){
       if(typeof o.turnSec === "number" && (o.turnSec === 0 || (o.turnSec >= 10 && o.turnSec <= 120))) turnSec = o.turnSec;
+      /* ★ 我上次當房主設的房規 → 下次建房自動帶回來(同 turnSec)。
+         ⚠ 一律 normRules:那份 JSON 住在 localStorage,版本一換就可能有認不出的值。 */
+      if(o.b2Rules) rules = B2.normRules(o.b2Rules);
     },
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
       tap, act, isMyTurn,
+      /* ---------- ★★★ 房規(v1.100.0):面板是單機連線共用的,分流點在 main.js ----------
+         ⚠ `rules()` 回**房間欄位**那一份(下一局生效);這一局的真相在 `st.rules`。
+         ⚠ 寫入走 ctx.setRoomField(整包一個欄位)—— lobbyOnly:對戰中不給改
+           (與21點一樣:規則在開局那一刻就凍了,對戰中改只會讓人以為這一局變了)。 */
+      rules: () => B2.normRules(rules),
+      /* 這一局**真的在用**的那一份(給畫面 / 摘要用;沒在打就退回房間欄位) */
+      liveRules: () => B2.normRules(ctx.phase() === "playing" ? gRules : rules),
+      setRule(key, val){
+        const next = B2.normRules(Object.assign({}, rules, { [key]: val }));
+        if(next.str === rules.str) return;
+        if(!ctx.setRoomField("b2Rules", next, { lobbyOnly: true,
+             denyMsg: "只有房主能改規則", busyMsg: "對戰中不能改規則 —— 這一局的規則已經定下來了" })) return;
+        rules = next; ctx.syncSetup(); ctx.updateGoal(); savePrefs();
+      },
       turnSec: () => turnSec,
       setTurnSec(v){
         if(SECS.indexOf(v) < 0) return;

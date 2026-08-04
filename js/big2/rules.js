@@ -97,11 +97,14 @@ const B2 = (function(){
      所以**只有這兩種**改用點數的自然序(A=1 < 2 < 3 …)。
      ⚠ 只影響顯示;比大小一律還是 classify() 的 (t, k),一個字都沒動。
      (它用到第三節的 classify / straightOf —— 那兩支是 function 宣告,呼叫時早就就緒。) */
+  /* ⚠⚠ v1.100.0:認「帶 2 的那兩種」一律問 `straightOf().low`,**不可以再比 lv** ——
+     房規會把 A2345 的 lv 變成 3(比所有一般順子小),而舊的 `lv >= 12` 那時會靜靜失效
+     (症狀:A2345 顯示成 `3 4 5 A 2`)。這一支**不吃房規**:顯示順序與誰大誰小無關。 */
   function sortShow(cards){
     const cl = classify(cards);
     if(cl && (cl.t === T_STRAIGHT || cl.t === T_SFLUSH)){
       const st = straightOf(cards);
-      if(st && st.lv >= 12) return cards.slice().sort((a, b) => rankOf(a) - rankOf(b));
+      if(st && st.low) return cards.slice().sort((a, b) => rankOf(a) - rankOf(b));
     }
     return cards.slice().sort(cmpCard);
   }
@@ -221,32 +224,87 @@ const B2 = (function(){
   const isBomb = t => t === T_QUADS || t === T_SFLUSH;
   const bombLv = t => (t === T_SFLUSH ? 1 : 0);      // ★ 同花順 > 鐵支
 
+  /* ==========================================================================
+     二之二、★★★ 房規(v1.100.0)—— 目前只有一項:**順子大小**
+     ──────────────────────────────────────────────────────────────────────────
+       使用者(2026-08-05):「像是 **A2345 跟 10JQKA 到底誰在大**,原本放在外面的規則,
+       也可以放進去(房規面板)」/「**23456 應該是最大**…把這三組的大小列出來,
+       然後用選的,不過 23456 就固定為最大」
+
+       所以要選的只有**一件事**:A-2-3-4-5 與 10-J-Q-K-A 誰大。
+
+         str = "hi"(預設)   23456 > **A2345** > 10JQKA > … > 34567
+         str = "lo"         23456 > 10JQKA > … > 34567 > **A2345**(A 當 1 的那一派)
+
+       ★ 23456 **兩派都固定最大**(使用者指定)—— 它不進選項,所以 lv 寫死 14。
+
+     ── ★★★ 為什麼房規要進 `st`(而不是模組層的一個變數)─────────────────────
+       與 21點 v1.85.0 逐字相同的理由:**房規是真相的一部分**。順子大小直接決定
+       `classify().k` → `beats()` → 哪一手合法 → `replay()` 算出來的整局。
+       模組層變數的症狀是「重連的人算出來的牌局跟現場不一樣」,而且**不會報錯**。
+       ⚠ 所以 `replay(deal, n, moves, rules)` 多吃一個參數,並且把它**凍進 `st.rules`**;
+         吃 `st` 的那幾支(`step` / `playable` / `pickGroup` / `whyNot` / `playsWith`)
+         **簽名一個字都沒改** —— 它們從 `st.rules` 讀。
+       ⚠ 這也是為什麼 `strOf()` 收得下 st / rules 物件 / 字串 / undefined 四種:
+         呼叫端手上有什麼就傳什麼,而**沒傳一律回預設**("hi" = v1.99.0 之前的行為
+         再把 23456 提到最大)。
+       ⚠⚠ **連線是破壞性的**:v1.99.0 的 `replay` 不認得 `rules`,而且它的 23456
+         排第二。同一間房要一起更新(同 21點 v1.86.0 抓人那一版)。
+     ========================================================================== */
+  const STR_HI = "hi", STR_LO = "lo";
+  const STR_OPTS = [STR_HI, STR_LO];
+  /* ⚠ 用**白名單**守門而不是信任呼叫端:值有一部分來自 DB / localStorage
+     (舊房間沒有這個欄位、也可能被手改)。認不出來一律回預設。 */
+  function normRules(r){
+    const o = (r && typeof r === "object") ? r : {};
+    return { str: STR_OPTS.indexOf(o.str) >= 0 ? o.str : STR_HI };
+  }
+  function defRules(){ return normRules(null); }
+  /* 從「呼叫端手上的東西」問出 str:st(有 .rules)· rules 物件 · 字串 · 什麼都沒有。 */
+  function strOf(x){
+    if(!x) return STR_HI;
+    if(typeof x === "string") return x === STR_LO ? STR_LO : STR_HI;
+    if(x.rules) return strOf(x.rules);
+    return normRules(x).str;
+  }
+
   /* ---------- 順子的等級 ----------
-     由大到小:A-2-3-4-5(13) > 2-3-4-5-6(12) > 10-J-Q-K-A(11) > … > 3-4-5-6-7(4)
+     由大到小(str = "hi"):2-3-4-5-6(14) > A-2-3-4-5(13) > 10-J-Q-K-A(11) > … > 3-4-5-6-7(4)
+                (str = "lo"):2-3-4-5-6(14) > 10-J-Q-K-A(11) > … > 3-4-5-6-7(4) > A-2-3-4-5(3)
      ⚠ 一律**不繞圈**(Q-K-A-2-3 不算);2 只透過上面那兩種特例進順子,
        所以一般順子裡出現 rank 2 一律不承認(否則會冒出 J-Q-K-A-2)。
-     回傳 { lv, rep } —— rep = 依大老二點序最大的那張(同等級時比它的花色)。
-     ★ 兩個特例的 rep 都是那張 2,所以**等級必須是主鍵**,花色只能當 tie-break。 */
-  function straightOf(cards){
+     回傳 { lv, rep, low } —— rep = 依大老二點序最大的那張(同等級時比它的花色)、
+       low = 這是不是「帶 2 的那兩種特例」(給 sortShow 用的旗標)。
+     ★ 兩個特例的 rep 都是那張 2,所以**等級必須是主鍵**,花色只能當 tie-break。
+     ⚠⚠ `low` 是 v1.100.0 加的,而它**不是可有可無的**:sortShow 原本用 `lv >= 12`
+       認那兩種特例,而房規把 A2345 的 lv 變成 3 之後那個判斷會靜靜地失效
+       (症狀:A2345 顯示成 `3 4 5 A 2`,而使用者要的是 `A 2 3 4 5`)。
+       **不要把 low 拿掉改回比 lv** —— lv 現在是房規的函數,它不再能代表「帶不帶 2」。 */
+  function straightOf(cards, rl){
     if(cards.length !== 5) return null;
     const rs = cards.map(rankOf).slice().sort((a, b) => a - b);
     for(let i = 1; i < 5; i++) if(rs[i] === rs[i - 1]) return null;   // 有對子 → 不是順子
     const has = r => rs.indexOf(r) >= 0;
     const cardWithRank = r => { for(let i = 0; i < 5; i++) if(rankOf(cards[i]) === r) return cards[i]; return -1; };
 
-    if(has(1) && has(2) && has(3) && has(4) && has(5)) return { lv: 13, rep: cardWithRank(2) };
-    if(has(2) && has(3) && has(4) && has(5) && has(6)) return { lv: 12, rep: cardWithRank(2) };
+    if(has(1) && has(2) && has(3) && has(4) && has(5))
+      /* A2345:"hi" 排 23456 之下(13)、"lo" 掉到所有一般順子之下(3 < 34567 的 4)。 */
+      return { lv: strOf(rl) === STR_LO ? 3 : 13, rep: cardWithRank(2), low: true };
+    if(has(2) && has(3) && has(4) && has(5) && has(6))
+      return { lv: 14, rep: cardWithRank(2), low: true };            // ★ 兩派都固定最大
     if(has(2)) return null;                                          // 其餘帶 2 的一律不算
 
     const os = cards.map(c => rkOrder(rankOf(c))).sort((a, b) => a - b);
     for(let i = 1; i < 5; i++) if(os[i] !== os[i - 1] + 1) return null;
     const top = os[4];
-    return { lv: top, rep: cardWithRank(rkFromOrder(top)) };
+    return { lv: top, rep: cardWithRank(rkFromOrder(top)), low: false };
   }
 
   /* ---------- 這幾張是什麼牌型 ----------
      回傳 { t, k, n } 或 null(不是合法牌型)。k 只在**同一個 t** 之間比得有意義。 */
-  function classify(cards){
+  /* ⚠ rl = 房規(st / rules 物件 / 字串 / 不傳都收;不傳一律預設)——
+     它只往下傳給 straightOf,因為**只有順子的等級**吃房規。 */
+  function classify(cards, rl){
     if(!Array.isArray(cards)) return null;
     const seen = {};
     for(let i = 0; i < cards.length; i++){
@@ -276,7 +334,7 @@ const B2 = (function(){
       return { t: T_FULL, k: rkOrder(groups[0].r), n: 5 };
     if(groups[0].cs.length >= 2) return null;        // 三條+雜牌 / 兩對+單張 → 都不是牌型
 
-    const st = straightOf(cards);
+    const st = straightOf(cards, rl);
     if(!st) return null;                             // 五張雜牌;同花(非順)也走到這裡 → 不承認
     const oneSuit = cards.every(c => suitOf(c) === suitOf(cards[0]));
     return { t: oneSuit ? T_SFLUSH : T_STRAIGHT, k: st.lv * NSUIT + suitOf(st.rep), n: 5 };
@@ -341,12 +399,16 @@ const B2 = (function(){
     return -1;
   }
 
-  function blank(cards, n){
+  /* ★★★ v1.100.0:房規**凍在 st 上**(st.rules)—— 這是「吃 st 的那幾支簽名一個字
+     都沒改」的全部理由(step / playable / pickGroup / whyNot / playsWith 都從這裡讀)。
+     ⚠ 一定要 normRules():呼叫端傳進來的可能是 DB 上的原始物件、也可能是 undefined。 */
+  function blank(cards, n, rules){
     const hands = handsOf(cards, n);
     return {
       n: n, hands: hands, turn: startSeat(hands),
       cur: null, passes: 0, played: [], finished: [],
       trick: [],
+      rules: normRules(rules),
       opened: false, over: false, last: null, bad: -1
     };
   }
@@ -377,7 +439,7 @@ const B2 = (function(){
       if(!cards || !cards.length) return false;
       const hand = st.hands[seat];
       for(let i = 0; i < cards.length; i++) if(hand.indexOf(cards[i]) < 0) return false;
-      const cls = classify(cards);
+      const cls = classify(cards, st);            // ⚠ 帶 st = 帶房規(順子大小);漏了就用預設值判合法
       if(!cls) return false;
       // ★ 第一手必須包含 ♣3
       if(!st.opened && cards.indexOf(CLUB3) < 0) return false;
@@ -411,10 +473,13 @@ const B2 = (function(){
     return true;
   }
 
-  function replay(deal, n, moves){
+  /* ⚠⚠ v1.100.0 多吃 rules(房規)—— 它是**真相的一部分**(順子大小決定哪一手合法)。
+     ⚠ 呼叫端一律傳「開局那一刻凍結的那一份」:連線 = game.rules、單機 = Solo.rules()。
+       不傳 = 預設房規,而那在連線裡的症狀是「重連的人算出來的牌局跟現場不一樣」。 */
+  function replay(deal, n, moves, rules){
     const cards = (typeof deal === "string") ? decodeDeal(deal) : deal;
     if(!cards || !(n >= MIN_PLAYERS && n <= MAX_PLAYERS)) return null;
-    const st = blank(cards, n);
+    const st = blank(cards, n, rules);
     const mv = Array.isArray(moves) ? moves : [];
     for(let i = 0; i < mv.length; i++){
       if(!step(st, mv[i])){ st.bad = i; break; }      // 不合法就停在這裡,不硬套
@@ -514,10 +579,13 @@ const B2 = (function(){
     return out;
   }
 
-  function enumPlays(hand, cap){
+  /* ⚠ v1.100.0 多吃 rl(房規:st / rules 物件 / 字串皆可)—— **牌型合法性與房規無關**
+     (A2345 在兩派都是順子),但每一手的 `cls.k` 吃它,而 cmpPlay / playsBeating 用 k 排序。
+     漏傳的症狀是「AI 與智慧選取用預設房規排序」= 挑到的那一手在 lo 派下壓不過。 */
+  function enumPlays(hand, cap, rl){
     const lim = cap > 0 ? cap : STRAIGHT_CAP;
     const out = [];
-    const push = cs => { const cl = classify(cs); if(cl) out.push({ cards: cs.slice().sort(cmpCard), cls: cl }); };
+    const push = cs => { const cl = classify(cs, rl); if(cl) out.push({ cards: cs.slice().sort(cmpCard), cls: cl }); };
     const by = {};
     hand.forEach(c => { const r = rankOf(c); (by[r] = by[r] || []).push(c); });
     const ranks = Object.keys(by).map(r => +r);
@@ -581,8 +649,8 @@ const B2 = (function(){
            a.cls.k - b.cls.k;
   }
   // 能壓過 cur 的候選手,由「最便宜」排到「最貴」
-  function playsBeating(hand, cur){
-    return enumPlays(hand).filter(p => beats(p.cls, cur)).sort(cmpPlay);
+  function playsBeating(hand, cur, rl){
+    return enumPlays(hand, 0, rl).filter(p => beats(p.cls, cur)).sort(cmpPlay);
   }
 
   /* ==========================================================================
@@ -623,7 +691,7 @@ const B2 = (function(){
     const cur = (st && st.cur) ? st.cur.cls : null;
     const opened = !st || st.opened !== false;
     const need = Array.isArray(sel) ? sel : [];
-    const legal = enumPlays(hand, FULL_CAP).filter(p => {
+    const legal = enumPlays(hand, FULL_CAP, st).filter(p => {   // ⚠ 帶 st = 帶房規
       if(!opened && p.cards.indexOf(CLUB3) < 0) return false;   // 第一手一定要帶 ♣3
       return beats(p.cls, cur);
     });
@@ -704,7 +772,7 @@ const B2 = (function(){
     const cur = (st && st.cur) ? st.cur.cls : null;
     const opened = !st || st.opened !== false;
     const need = want || [];
-    return enumPlays(hand, FULL_CAP).filter(p => {
+    return enumPlays(hand, FULL_CAP, st).filter(p => {          // ⚠ 帶 st = 帶房規
       // ⚠ 這兩條與 playable() 逐字相同,但**註解刻意不一樣** ——
       //   突變測試的錨點是字串比對,一模一樣的兩行會變成「出現 2 次」而整條過期。
       if(!opened && p.cards.indexOf(CLUB3) < 0) return false;   // 第一手要帶 ♣3(同 playable)
@@ -755,7 +823,7 @@ const B2 = (function(){
     if(!n) return "先點要出的牌";
     if(n !== 1 && n !== 2 && n !== 5)
       return "只能出 1 張、2 張或 5 張(選了 " + n + " 張)" + (n === 3 ? " —— 三條不能單獨出" : "");
-    const cls = classify(cards);
+    const cls = classify(cards, st);                            // ⚠ 帶 st = 帶房規
     if(!cls){
       if(n === 2) return "兩張要同點數才是對子";
       return "這 5 張不是牌型 —— 只有順子、葫蘆、鐵支、同花順(沒有同花、沒有兩對)";
@@ -784,6 +852,8 @@ const B2 = (function(){
     shuffled, newDeal, handsOf, dealCounts,
     // 牌型
     isBomb, bombLv, straightOf, classify, beats,
+    // ★★★ 房規(v1.100.0):順子大小。normRules 是白名單守門,STR_* 是那兩個值
+    normRules, defRules, strOf, STR_HI, STR_LO, STR_OPTS,
     // 一局
     blank, step, replay, startSeat, nextActive, activeCount, trickDone,
     // 結算

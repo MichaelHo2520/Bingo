@@ -62,9 +62,88 @@ function paintSoloHint(){
     " · 你固定坐第一位,先出的是拿到 ♣︎3 的人。<br>"+
     "名次分 "+(n===4 ? "<b>5 / 3 / 1 / 0</b>" : (n===3 ? "<b>5 / 3 / 0</b>" : "<b>5 / 0</b>"))+
     "(最後一名固定 0 分)。<br>"+
+    /* ★★ v1.100.0:順子大小是房規 → 第二層一定要講**現在設的是哪一種**
+       (單機的房規存在自己的偏好裡,跨場黏著 —— 不寫出來會忘記上次改過)。 */
+    "<b>"+esc(b2RulesText(Solo.rules()))+"</b>(按上面「⚙ 改規則」可換)。<br>"+
     // ⚠ 圖示一律 🎴(U+1F3B4);小丑牌那顆是 U+1F0CF,落在被禁的區段(見 solo.js 那條註解)
     "<span class=\"b2-warn\">🎴 "+esc(Solo.recLine(Solo.level()))+"</span>";
 }
+/* ==========================================================================
+   ★★★ 房規面板(v1.100.0)—— 單機與連線**共用這一支**
+   ──────────────────────────────────────────────────────────────────────────
+     使用者:「我也希望能像21點那樣,建立一些遊戲規則,像是 A2345 跟 10JQKA 到底誰在大,
+              原本放在外面的規則,也可以放進去」
+
+     結構逐字照21點 v1.85.0(`js/blackjack/main.js` 那一段):
+       · 面板本體是一個蓋板 #b2RulesVeil,單機第二層與大廳各一顆鈕打開它
+       · 每一列是 .seg,按鈕帶 data-rk(哪一項)/ data-rv(值)
+       · 分流點**只有下面三支**(b2Editable / b2RulesNow / b2SetRule)
+     ⚠ 不能改的時候給 .readonly(只是不亮)—— **不用 disabled**:
+       CLAUDE.md 的紅線是「不用 disabled 讓點擊靜默消失」,訪客按下去要看得到
+       「只有房主能改規則」(擋在 MP.setRule / Solo 那一側,不是擋在 CSS)。
+   ========================================================================== */
+/* 這一版只有一項房規,而它的值是**字串** —— ⚠ dataset 永遠是字串,所以這裡不做轉型
+   (21點那邊要 BJ_BOOLS / BJ_STRS 兩張表就是因為它混了布林與數字)。 */
+function b2RuleVal(raw){ return String(raw); }
+/* 一句話講「現在是什麼規則」——★ 面板底部與大廳摘要**共用這一支**(兩份會走鐘)。 */
+function b2RulesText(r){
+  const rr = B2.normRules(r);
+  return rr.str === B2.STR_LO
+    ? "順子:2-3-4-5-6 最大,A-2-3-4-5 最小(A 當 1)"
+    : "順子:2-3-4-5-6 最大,接著 A-2-3-4-5,再來 10-J-Q-K-A";
+}
+function syncRules(rules, editable){
+  const r = B2.normRules(rules);
+  document.querySelectorAll("#b2RulesBody .seg").forEach(seg => {
+    seg.classList.toggle("readonly", !editable);
+    [...seg.children].forEach(b => {
+      const k = b.dataset.rk;
+      if(!k) return;
+      b.classList.toggle("on", b2RuleVal(b.dataset.rv) === r[k]);
+    });
+  });
+  /* ★ 出牌倒數那一組**只有連線才有**(單機沒有倒數 —— 卡多久是自己的節奏)。
+     ⚠ 它不在 rules 物件裡:那個房間欄位早就在用,而且它不影響任何判定。 */
+  const secG = $("b2SecGroup");
+  if(secG){
+    const on = MP.isOnline();
+    secG.classList.toggle("hidden", !on);
+    if(on){
+      const seg = $("b2SecSeg2");
+      if(seg){
+        seg.classList.toggle("readonly", !editable);
+        [...seg.children].forEach(b => b.classList.toggle("on", (+b.dataset.sec) === MP.turnSec()));
+      }
+    }
+  }
+  const who = $("b2RulesWho");
+  if(who) who.textContent = editable ? "你是房主,規則由你決定" : "規則由房主決定(對戰中不能改)";
+  const sum = $("b2RulesSum");
+  if(sum) sum.textContent = b2RulesText(r);
+}
+/* 現在該對誰設定 —— 單機改 Solo 的、連線改房間的(★ 唯一的分流點就這三支) */
+function b2Editable(){ return !MP.isOnline() || MP.amHost(); }
+function b2RulesNow(){ return MP.isOnline() ? MP.rules() : Solo.rules(); }
+function b2SetRule(key, val){
+  if(MP.isOnline()){ MP.setRule(key, val); syncRules(b2RulesNow(), b2Editable()); return; }
+  if(Solo.playing()){ showToast("對局中不能改規則 —— 這一場的規則已經定下來了", 2400); return; }
+  Solo.setRule(key, val);
+  syncRules(Solo.rules(), true);
+  paintSoloHint();
+}
+function openRules(){
+  syncRules(b2RulesNow(), b2Editable());
+  $("b2RulesVeil").classList.add("show");
+}
+function closeRules(){
+  $("b2RulesVeil").classList.remove("show");
+  /* 關掉之後把摘要重畫一次(大廳那行 / 單機第二層那段各一份文案,但**同一支** b2RulesText)。 */
+  if(MP.isOnline()){
+    const hint = $("b2RuleHint");
+    if(hint) hint.textContent = b2RulesText(MP.rules());
+  }else paintSoloHint();
+}
+
 /* 選擇列共用的「點一下亮起來」 */
 function segPick(id, attr, fn){
   const seg = $(id); if(!seg) return;
@@ -99,6 +178,8 @@ $("b2SoloCfgBack").addEventListener("click",()=>showHomeLayer("pick"));
 segPick("b2LvSeg","lv",v=>Solo.setLevel(v));
 segPick("b2SeatSeg","seats",v=>Solo.setSeats(+v));
 $("b2StartSolo").addEventListener("click",()=>Solo.start());
+/* ★ 房規:單機第二層那顆鈕(面板本體與連線共用,見上面那一段) */
+$("b2SoloRules").addEventListener("click",openRules);
 
 /* ---------- 單機的牌桌列 / 結果卡 ---------- */
 $("b2SoloExit").addEventListener("click",()=>Solo.quit());
@@ -107,6 +188,19 @@ $("b2SoloHome").addEventListener("click",()=>Solo.quit());
 
 /* ---------- 大廳設定(房主可改) ---------- */
 $("b2SecSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setTurnSec(+b.dataset.sec); });
+/* ---------- ★★★ 房規面板(一組 DOM,兩個入口)----------
+   ⚠ 監聽綁在 #b2RulesBody 上**一次**(委派):那一排「點名」式的鈕沒有,
+     但兩顆順子鈕是寫死在 HTML 裡的 —— 委派仍然比逐顆綁安全(以後加項目不必改這裡)。 */
+$("b2RulesOpen").addEventListener("click",openRules);
+$("b2RulesClose").addEventListener("click",closeRules);
+$("b2RulesVeil").addEventListener("click",e=>{ if(e.target.id==="b2RulesVeil") closeRules(); });
+$("b2RulesBody").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-rk]");
+  if(b){ b2SetRule(b.dataset.rk, b2RuleVal(b.dataset.rv)); return; }
+  /* 出牌倒數那一組走既有的房間欄位(不是房規物件)——⚠ 兩處入口寫同一支 MP.setTurnSec */
+  const s=e.target.closest("#b2SecSeg2 button");
+  if(s){ MP.setTurnSec(+s.dataset.sec); syncRules(b2RulesNow(), b2Editable()); }
+});
 $("scoreSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setScoreMode(b.dataset.score); });
 $("wgMinus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()-1));
 $("wgPlus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()+1));

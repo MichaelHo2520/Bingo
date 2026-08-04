@@ -60,6 +60,12 @@ const B2AI = (function(){
     return {
       n: st.n,
       seat: seat,
+      /* ★★★ v1.100.0:房規要跟著進 view(順子大小 → 哪一手壓得過哪一手)。
+         ⚠ 它**不是牌情** —— 房規是公開的(面板上人人看得到),所以放進 view
+           不影響「AI 不作弊」那條結構性保證。
+         ⚠ 漏了它的症狀最惡劣:AI 用預設房規挑一手出去 → 規則層擋下來 →
+           `step()` 回 false → **整局靜靜地卡住**(而不是「AI 下得比較差」)。 */
+      rules: B2.normRules(st.rules),
       hand: st.hands[seat].slice(),
       opened: !!st.opened,
       lead: !st.cur,
@@ -192,7 +198,8 @@ const B2AI = (function(){
          規則層擋下來的結果是「AI 出了不合法的手 → step 回 false → 整局卡住」。
      ========================================================================== */
   function candidates(v){
-    let cs = B2.playsBeating(v.hand, v.cur ? { t: v.cur.t, k: v.cur.k, n: v.cur.n } : null);
+    let cs = B2.playsBeating(v.hand, v.cur ? { t: v.cur.t, k: v.cur.k, n: v.cur.n } : null,
+                             v.rules);      // ⚠ 帶房規:候選手的排序與合法性都吃它
     if(!v.opened) cs = cs.filter(p => p.cards.indexOf(B2.CLUB3) >= 0);
     return cs;
   }
