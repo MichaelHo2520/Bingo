@@ -132,7 +132,11 @@ const MP = MPCore.create((function(){
     BJB.render({
       st: betting() ? null : st, n: n, me: me, names: nms,
       bets: bets, betPhase: betting(), betDone: betDone,
-      rules: gRules, over: ph === "over", dsub: hintOf()
+      /* ★★ v1.90.0:`dsub`(莊家台的副標)拿掉了 —— 它與下面那一行的 hintOf() 逐字相同,
+         上下各印一次(使用者:「裡面有很多資訊是重覆了」)。
+         ★ 改傳 `dealer`:下注階段 st 是 null,盤面靠它才知道莊家是誰
+           (否則莊家台沒有名字,而莊家自己還會多占注區一格)。 */
+      rules: gRules, over: ph === "over", dealer: dealerIdx()
     });
 
     const lg = (st && !betting() && me >= 0) ? BJ.legal(st, me)
@@ -636,13 +640,24 @@ const MP = MPCore.create((function(){
       const btn = $("bjRulesOpen");
       if(btn) btn.textContent = ctx.isHost() ? "⚙ 改規則" : "📋 看規則";
     },
+    /* ★★★ v1.90.0:**對戰中不畫「⏱ Ns」那一段**。
+       使用者:「已經開始遊戲後,限時幾秒不要顯示,有機會影響到麥克風跟 emoji 的位置」。
+       ★ 理由不只是長度 —— 對戰中「還剩幾秒」由動作列那顆倒數環在講,而且它講的是
+         **這一段還剩多久**(比一個固定的設定值有用)→ 這一段在對戰中是重複資訊。
+       ⚠ 大廳照舊要畫:那是房主挑設定的地方,看不到就不知道自己選了什麼。
+       ⚠ 這一支在 enterPlaying / backToLobby / enterLobby 都會被核心叫一次
+         (mp-core),所以相位一換文字就跟著換 —— 不必自己另外接線。
+       ⚠ 「擠掉麥克風」還有 CSS 那一半:.mp-goal 是 flex:none(整條不縮),
+         styles.css 的 `.bj-room .mp-goal` 把它改成縮得動 + 省略號。兩邊都要。 */
     updateGoal(){
       const el = $("mpBarGoal");
       if(!el) return;
       const r = gRules || rules;
+      const playing = ctx.phase() === "playing";
       el.textContent = "🎩 " + r.rounds + " 輪 · " +
         (r.hands > 1 ? (r.hands + " 局換莊 · ") : "每局換莊 · ") +
-        "押上限 " + r.betMax + (r.sec ? (" · ⏱ " + r.sec + "s") : " · ⏱ 不限時");
+        "押上限 " + r.betMax +
+        (playing ? "" : (r.sec ? (" · ⏱ " + r.sec + "s") : " · ⏱ 不限時"));
       el.classList.remove("hidden");
     },
 

@@ -3794,9 +3794,18 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
          /* 我的手牌那一塊:頭列 22 + gap 3 + 牌高(--bj-cw × 1.42)+ padding 8 */
          --bj-mh:calc(var(--bj-cw) * 1.42 + 33px); }
   /* 連線多一圈倒數(.bj-cdwrap 在動作列裡面)→ 預留它的高度。
-     ⚠ 房規把倒數設成 0(關掉)時那一圈不出現,那時會多留 30px 空白 ——
-       **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次(同大老二)。 */
-  body.bj-mp{ --bj-acth:134px; }
+     ⚠ 房規把倒數設成 0(關掉)時那一圈不出現,那時會多留一塊空白 ——
+       **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次(同大老二)。
+     ⚠⚠ v1.90.0 倒數從「一條 6px 的橫條」換成「34px 的環」(使用者要求)——
+       三處(這裡 / 600 / 440)**要一起改**,只改一處的症狀是那個尺寸的環被裁掉半圈。
+     ★★ 這一版順手把預留值**收緊到量出來的值**:各相位量到最高的一列是 72
+       (下注那一段:提示列 37 + gap 6 + 六顆加減鈕 29),加上 padding 4 + gap 6 +
+       環 34 = **116**。舊值 134 是「104 + 30」湊出來的圓數字,而多留的每一 px
+       都直接從牌桌扣走(牌就小一階)—— 128 留 12px 給「提示長到換四行」。
+       ⚠ 收得太緊的症狀:某個相位的內容撐破 min-height → 那一段的牌桌變矮 →
+         **牌換一次大小**。所以改這三個數字之前一定要先量 actrow 的最大值
+         (shot-bj.ps1 會印 actrow=/selbar=/btns=)。 */
+  body.bj-mp{ --bj-acth:128px; }
   :root[data-theme="ebook"]{ --bj-face:#ffffff; --bj-line:#000000; --bj-blk:#000000;
          --bj-red:#000000; --bj-redlit:#000000; --bj-grn:#000000; --bj-bk:#666666; }
 
@@ -3895,6 +3904,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-room .bj-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-size:13px;font-weight:700;color:var(--muted)}
   .bj-room .bj-room-title b{font-size:15px;color:var(--text)}
+  /* ★★★ v1.90.0:房規摘要**縮得動**(使用者:「限時幾秒…有機會影響到麥克風跟 emoji
+     的位置」)。共用的 .mp-goal 是 `flex:none` = 整條字不縮 → 這一頁的摘要最長
+     (「🎩 2 輪 · 每局換莊 · 押上限 10 · ⏱ 30s」),窄螢幕上它會把右邊的 🎤 / 😀
+     **推出可視範圍**(截圖裡 😀 只剩半顆)。
+     ⚠ 這是「另一半」—— adapter 的 updateGoal 對戰中已經不畫「⏱ Ns」了,但大廳照畫,
+       而房名一長照樣會擠;兩邊都要。
+     ⚠ 選擇器鎖在 `.bj-room` 底下 → 另外七個遊戲的 .mp-goal 一個字都不受影響。 */
+  .bj-room .mp-goal{flex:0 1 auto;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
      不寫這條的話它們會是 42px,跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
   .bj-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
@@ -3985,12 +4003,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-crown{flex:none;font-size:13px;line-height:1}
   .bj-dnm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font:800 12.5px/1.3 'Nunito',sans-serif;color:var(--text)}
-  .bj-dtag{flex:none;padding:0 5px;border-radius:6px;background:rgba(255,210,74,.22);
-    font:900 9.5px/1.6 'Nunito',sans-serif;color:#ffe9a8}
-  :root[data-theme="ebook"] .bj-dtag{background:#000;color:#fff}
-  .bj-you{flex:none;padding:0 4px;border-radius:6px;background:var(--accent-2);
-    font:900 9.5px/1.5 'Nunito',sans-serif;color:#2a1c00}
-  :root[data-theme="ebook"] .bj-you{background:#000;color:#fff}
+  /* ⚠ v1.90.0 刪掉了三條:.bj-dtag(「莊家」文字標籤)· .bj-you(「你」徽章)· .bj-dme
+     —— 使用者:「莊家你看一下,裡面有很多資訊是重覆了」。
+       · 「莊家」標籤與旁邊的 🎩 講同一件事(而 🎩 是這一頁到處在用的莊家記號)
+       · 我當莊時名字直接寫「你」→ 徽章是第二次講同一件事(同 v1.88.1 注區那條)
+     留著沒有用到的 class 只會讓下一個人以為畫面上還有那兩顆。 */
   /* 那一格的牌:★ 固定高度(中牌一排),不換行 */
   .bj-dcs{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;
     min-height:calc(var(--bj-cw) * 0.72 * 1.42);overflow:hidden}
@@ -3999,8 +4016,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      所以這裡明寫 flex:0 1 auto + min-width:0 讓它縮得動。
      ⚠ 只給**桌上**那幾排:我的手牌一縮就等於格位變了。 */
   .bj-dcs .bj-card,.bj-scs .bj-card{flex:0 1 auto;min-width:0}
-  .bj-dme,.bj-dwait{font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted)}
-  .bj-dme{color:var(--accent-2)}
+  .bj-dwait{font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted)}
 
   /* ---------- 其他閒家(一列一人,★ 單行)----------
      ★★ 一列**只有一行**:名字 · 押注 · 狀態 · 牌 · 點數 全部橫排。
@@ -4185,16 +4201,36 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 一定要留 pointer-events:auto,否則變暗就等於靜默吃掉點擊。 */
   .bj-btns .btn.dim{opacity:.62;pointer-events:auto}
 
-  /* 倒數環。★ 全桌都看得到(「現在在等誰、還剩幾秒」是公開資訊)。
-     ⚠ 動畫關鍵影格 svCd 是排七那一段定義的,這裡刻意沿用同一個(不再定義一份同名的)。 */
-  .bj-cdwrap{display:flex;align-items:center}
-  .bj-cd{display:inline-flex;align-items:center;gap:7px}
-  .bj-cd i{position:relative;display:block;width:56px;height:6px;border-radius:3px;
-    background:rgba(255,255,255,.16);overflow:hidden}
-  .bj-cd i::after{content:"";position:absolute;inset:0;transform-origin:left center;
-    background:linear-gradient(90deg,var(--accent),var(--accent-2));
-    animation:svCd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
-  .bj-cd b{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);min-width:1.5em;text-align:right}
+  /* ---------- 倒數環(v1.90.0 起**與台灣麻將同一顆**)----------
+     使用者:「最下方的倒數秒數,我希望做成跟台灣麻將一樣」。
+     舊版是一條 56×6 的橫條 + 旁邊一個數字;現在是 34px 的 SVG 環圈 + 中間的秒數,
+     最後 3 秒轉紅並脈動、秒數每跳一次縮放一下。
+     ★ 幾何與關鍵影格**逐字沿用 m16**(viewBox 40 · r=17 · dasharray 107 ·
+       m16cd / m16beat / m16cdhot)—— 同一件事只有一種畫法,不再定義一份同名的。
+       (這一頁本來就是這樣沿用排七的 svCd,只是換了參照對象。)
+     ★ 全桌都看得到(「現在在等誰、還剩幾秒」是公開資訊)。
+     ⚠ 三段「特效」刻意都只作用在這 34px 上,不碰牌桌:放大的是**注意力**,不是遮擋。
+     ⚠⚠ 環變大 = 動作列變高 → --bj-acth 的三組 body.bj-mp 數字要一起調(見那三處)。 */
+  .bj-cdwrap{display:flex;align-items:center;justify-content:center}
+  .bj-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+  .bj-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .bj-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  .bj-cdbg{stroke:rgba(255,255,255,.16)}
+  /* 107 ≈ 2πr(r=17)。從 0 排到滿 = 環圈整圈消失 */
+  .bj-cdfg{stroke:var(--accent);stroke-dasharray:107;stroke-dashoffset:0;
+    animation:m16cd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .bj-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .bj-cdn.bj-beat{animation:m16beat .34s ease-out}
+  .bj-cd.bj-hot .bj-cdfg{stroke:var(--bj-redlit)}
+  .bj-cd.bj-hot .bj-cdn{color:var(--bj-redlit)}
+  .bj-cd.bj-hot{animation:m16cdhot .9s ease-in-out infinite}
+  :root[data-theme="ebook"] .bj-cdbg{stroke:rgba(0,0,0,.18)}
+  :root[data-theme="ebook"] .bj-cdfg{stroke:#000}
+  /* 會動的東西一律尊重系統的「減少動態效果」(同 m16 那條) */
+  @media (prefers-reduced-motion:reduce){
+    .bj-cd.bj-hot{animation:none}
+    .bj-cdn.bj-beat{animation:none}
+  }
 
   /* ==========================================================================
      結果卡(.win-card.bj-win)
@@ -4279,7 +4315,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     /* ⚠ 牌桌的**下限**與動作列的固定高度也要跟著收 —— 不收的話矮視窗會被這兩塊
        吃光,手牌反而被擠出畫面(那比「手牌會跳」嚴重得多)。 */
     :root{--bj-cw:clamp(36px,10vw,50px); --bj-hgap:5px; --bj-trh:168px; --bj-acth:80px}
-    body.bj-mp{--bj-acth:110px}
+    /* ⚠ v1.90.0:倒數換成環 → 這一組也要跟著長(量到的最高內容 + 環 30 + gap 4) */
+    body.bj-mp{--bj-acth:112px}
+    .bj-cd{width:30px;height:30px}
+    .bj-cdn{font-size:12.5px}
     .bj-hero{margin:6px 0 2px}
     .bj-art{width:66px;height:66px}
     .bj-play{gap:5px}
@@ -4324,10 +4363,17 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        ⚠ **不可以**為了好看把牌再放大:那會讓上面那一格再度被裁,而且裁掉的是
          莊家的明牌 —— 那是玩家唯一能據以判斷的資訊。 */
     :root{--bj-cw:34px; --bj-hgap:4px; --bj-trh:64px; --bj-acth:78px}
-    body.bj-mp{--bj-acth:96px}
+    /* ⚠ v1.90.0:倒數換成環 → 量到的最高內容 + 環 26 + gap 4(三組要一起改) */
+    body.bj-mp{--bj-acth:108px}
+    .bj-cd{width:26px;height:26px}
+    .bj-cdn{font-size:11.5px}
     .bj-table{flex-direction:row;align-items:center;justify-content:flex-start;
       padding:4px 8px;gap:6px}
-    .bj-dealer{flex:0 0 auto;max-width:44%}
+    /* ⚠⚠ 這裡原本有一條 `.bj-dealer{flex:0 0 auto;max-width:44%}` —— 那是 v1.85.0
+       「牌桌橫成一條」時代的東西,而 v1.86.0 之後這個尺寸的 .bj-table 已經被後面
+       那條 max-height:600px 改回 column(靠後定義取勝),莊家台是**整列寬**的。
+       留著它的後果是莊家那一排牌只剩 44% 寬 → 補到三四張就開始擠窄
+       (v1.90.0 莊家台改成兩列之後更明顯:牌列本來就該吃滿整列)。 */
     .bj-seats{flex:1 1 auto;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:4px}
     /* ⚠ 一定要 flex:1 1 0(平分)而不是 0 0 auto(照內容長):照內容長的話
        牌多的那一格會把後面的推出容器 → 最後一個人**靜靜地捲到看不見**。
@@ -4375,22 +4421,32 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 
   /* ---------- 莊家台(要求①的後半:範圍高一點、牌大一階)----------
      ⚠ border 一律 2px **透明**:輪到他時只換顏色,標不標都不會讓整桌高 4px。 */
-  /* ⚠ flex-direction 一定要明寫 row:前面舊的 .bj-dealer 是 column,
-     只覆蓋 display 的話莊家台會變成「牌在上、名字在下」(施工中真的長成那樣)。 */
-  .bj-dealer{flex:none;display:flex;flex-direction:row;align-items:center;gap:10px;
-    padding:10px 11px;border-radius:12px;border:2px solid transparent;
+  /* ★★★ v1.90.0:莊家台改回**兩列**(頭列 + 牌列)—— 與注區一格同構。
+     ⚠⚠ v1.87.0 那一版是橫排(牌 | 名字+副標 | 點數)而牌那一格是 flex:none,
+       莊家補到 4~5 張時整條寬度被牌吃光,**右邊的名字與點數被推出可視範圍**
+       (使用者:「因為牌多一點,然後字被擠到外面去了」)。
+       ★ 修法不是「讓牌縮一點」(那破掉 v1.87.0 的「每一張牌一樣大」),
+         而是讓牌列**自己占一整列** → 永遠不必跟文字搶寬度。
+     ⚠ 高度照舊由 --bj-dlh 給(planTable 算的),而它現在 = 牌高 + 量回來的裝潢。 */
+  /* ⚠⚠ 左右 padding **一定要與 .bj-box 一樣(5px)** —— board.js 的 BOX_PADX 是
+     「一格塞得下 5 張」那條算式的常數,兩邊不一樣的話就得取大的,等於全桌的牌
+     都跟著最寬的那一格縮(而且是靜靜地縮:症狀只有 CARDW 印出兩個數字)。 */
+  .bj-dealer{flex:none;display:flex;flex-direction:column;align-items:stretch;gap:3px;
+    padding:6px 5px;border-radius:12px;border:2px solid transparent;
     background:linear-gradient(180deg,rgba(0,0,0,.34),rgba(0,0,0,.18))}
   .bj-dealer.act{border-color:rgba(255,196,84,.9)}
   .bj-dealer.me{background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
   .bj-card.dbig{--bjw:calc(var(--bj-cw) * .92)}
-  .bj-dcs{flex:none;display:flex;gap:5px;align-items:center;min-height:0;overflow:hidden}
-  .bj-dinfo{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 auto}
-  .bj-dtop{display:flex;align-items:center;gap:6px;min-width:0}
-  .bj-dnm{font:900 15px/1 'Nunito',sans-serif;color:#fff;
+  /* 頭列:左邊「他是誰」(🎩 座位號 名字)+ 右邊 .bj-bmeta「他怎麼了」。
+     ⚠ 要縮的一律是**名字**(同注區一格 v1.88.1 那條):`.bj-dnm` 已經是
+       flex:0 1 auto + min-width:0(前面那條),這裡只換字級。 */
+  .bj-dhd{flex:none;height:20px}
+  .bj-dnm{font:900 15px/1.3 'Nunito',sans-serif;color:#fff;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .bj-dsub{font:800 10.5px/1.3 'Nunito',sans-serif;color:rgba(255,255,255,.58);
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  :root[data-theme="ebook"] .bj-dnm,:root[data-theme="ebook"] .bj-dsub{color:#000}
+  :root[data-theme="ebook"] .bj-dnm{color:#000}
+  /* 牌列:吃掉那一格剩下的高度,不換行(放不下就擠窄,同注區 .bj-bcs 那條) */
+  .bj-dcs{flex:1 1 auto;min-height:0;display:flex;flex-wrap:nowrap;gap:3px;
+    align-items:center;justify-content:center;overflow:hidden}
 
   /* ---------- 注區(要求②)---------- */
   /* ⚠ overflow **hidden** 不是 auto:每一格的高度是 JS 平分算出來的,不該有東西
@@ -4428,6 +4484,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ `min-width:0` 一定要給 `.bj-bnm`,不然 flex item 的 `min-width:auto`
        會讓它撐開整列而 `text-overflow` 永遠不生效(那時擠掉的會是右邊那一組)。 */
   .bj-bnm{flex:0 1 auto;min-width:0}
+  /* ★★★ v1.90.0:頭列**寫死高度**。
+     ⚠⚠ 不寫死的話它會隨相位變:下注那一段右邊只有「下注中…」(10px 字 → 15px),
+       發牌之後多了點數膠囊(11px/1.5 + padding → 18.5px)→ 一格的裝潢差 3px,
+       而裝潢是牌寬的輸入 → **發牌那一刻整桌的牌換一次大小**(量出來 131 → 134)。
+     ★ 19px 是「最高的那顆膠囊」(.bj-pt)的高度,所以寫死不會裁到任何東西;
+       矮視窗那一段的膠囊更矮(padding 收成 0 5px),照樣裝得下。 */
+  .bj-bhd{height:19px}
   .bj-bmeta{margin-left:auto;flex:none;display:flex;align-items:center;gap:3px}
   .bj-bmeta .bj-pt{margin-left:0}
   .bj-st.caught{color:#ffc454;font-weight:900}
@@ -4444,17 +4507,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-selbar.grab .bj-selico{color:#ffc454}
 
   /* 矮視窗 / 橫置:格子與牌桌一起收(★ 三個數字要一起改,只收一個就是手牌被推) */
+  /* ⚠ 莊家台的 padding / 頭列高度 / 名字字級**不要寫在這裡** —— 它們與 .bj-box 那組
+     一起放在後面的 `@media (max-height:700px)`(那一段在檔案裡比較後面 → 同權重時它贏,
+     寫在這裡只會是一組看起來有效、其實被蓋掉的死規則)。 */
   @media (max-height:600px){
     :root{--bj-bxh:104px; --bj-trh:200px}
-    .bj-dealer{padding:7px 9px;gap:7px}
-    .bj-dnm{font-size:13px}
-    .bj-dsub{-webkit-line-clamp:1}
     .bj-table{padding:7px 8px;gap:6px;flex-direction:column;align-items:stretch;
       justify-content:flex-start}
   }
   @media (max-height:440px){
     :root{--bj-bxh:88px; --bj-trh:150px}
-    .bj-dsub{display:none}
   }
 
   /* ==========================================================================
@@ -4548,6 +4610,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .bj-box{padding:4px 5px;gap:2px}
     .bj-box .bj-bet,.bj-box .bj-pt{padding:0 5px}
     .bj-bnm{font-size:11px}
+    /* 膠囊的上下 padding 在這一段被收成 0 → 頭列只要 17px 就裝得下(見上面那條) */
+    .bj-bhd{height:17px}
+    /* ★★★ v1.90.0:莊家台**跟著一起收**(它現在與一格同構了)。
+       ⚠⚠ 兩邊的裝潢一定要一起收:莊家台的裝潢是 evalPlan 的固定開銷之一
+         (byH 的分子扣 DEALER_CHROME),只收一半的話矮視窗的牌會小一階,
+         而那是使用者上一輪才抱怨過的事。 */
+    .bj-dealer{padding:4px 5px;gap:2px}
+    .bj-dhd{height:19px}
+    .bj-dnm{font-size:14px}
   }
 
   /* ==========================================================================

@@ -174,7 +174,11 @@ const Solo = (function(){
       st: betting ? null : st, n: seats, me: ME, names: nms,
       bets: bets, betPhase: betting,
       betDone: (function(){ const a = []; for(let s = 0; s < seats; s++) a[s] = bets[s] !== undefined; return a; })(),
-      rules: rules, over: over, dsub: hintOf()
+      /* ★★ v1.90.0:`dsub`(莊家台的副標)拿掉了 —— 它吃的就是下面那一行的 hintOf(),
+         上下各印一次同一句話(使用者:「裡面有很多資訊是重覆了」)。
+         ★ 改傳 `dealer`:下注階段 st 還是 null,盤面靠它才知道莊家是誰
+           (否則莊家台沒有名字,而莊家自己還會多占注區一格)。 */
+      rules: rules, over: over, dealer: d
     });
 
     const lg = (st && !betting) ? BJ.legal(st, ME)

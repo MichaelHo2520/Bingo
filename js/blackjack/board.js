@@ -40,7 +40,7 @@ const BJB = (function(){
   const R = BJ;
   let stage = null, acts = null;
   let hAct = null;                          // 按動作鈕的回呼(這一頁沒有點牌,只有按鈕)
-  let cdKey = "", cdT = null;               // 倒數環:用 key 去重,不看 timer(見 syncCd)
+  let cdKey = "", cdT = null, cdEnd = 0;    // 倒數環:用 key 去重,不看 timer(見 syncCd)
   /* ★★ 「還沒送出去的押注金額」住在這裡(v1.85.0 的加減鈕)。
      ★ 它是**純畫面狀態** —— 不進 DB、不進 st、不影響任何判定,所以放在盤面這一層
        就只有一份;放進 solo.js 與 adapter.js 就是兩份(這個專案最痛的那類走鐘)。
@@ -179,35 +179,61 @@ const BJB = (function(){
   /* ==========================================================================
      二、莊家那一格(牌桌最上面)
      ──────────────────────────────────────────────────────────────────────────
-       ★ 我自己是莊家時這一格**不畫牌** —— 那副牌在底下我的手牌區(我看得到兩張)。
-         畫兩次會讓人以為桌上有兩副;而高度兩種情形完全一樣(頭列 + 牌列),
-         所以切換莊家不會讓底下的手牌跳。
+     ── ★★★ v1.90.0:改回**兩列**(頭列 + 牌列),與注區一格結構完全一樣 ──────────
+       使用者:「莊家你看一下,裡面有很多資訊是重覆了…另外有發生因為牌多一點,
+       然後字被擠到外面去了」。兩件事其實是同一個根:
+
+       ① **一列排不下**。v1.87.0 的莊家台是橫排「牌 | 名字+副標 | 點數」,而牌是
+          `flex:none` —— 莊家補到 4~5 張時那一排就吃掉整條寬度,右邊的名字與點數
+          被**推出可視範圍**(390px 手機 + 牌寬 68:5 張 = 360 > 一格的 336)。
+          ⚠ 修法**不可以**是「讓牌縮一點」:那會破掉 v1.87.0 的「每一張牌一樣大」。
+            牌列自己占一整列就永遠不必跟文字搶寬度(注區一格早就是這樣了)。
+       ② **同一件事講兩次**。副標 `.bj-dsub` 吃的是 `hintOf()` —— 與動作列那一句
+          **逐字相同**(截圖裡上下各一份「這一局你當莊,不用下注 —— 等大家押完」)。
+          → 整條拿掉,「現在在等什麼」只留動作列那一份。
+          同理拿掉「莊家」文字標籤(🎩 已經在講同一件事)與「你」徽章
+          (我當莊時名字直接寫「你」,同 v1.88.1 注區那條)。
+
+     ── ★★ 莊家是誰,**下注階段就要看得到** ────────────────────────────────────
+       下注時 `st` 是 null(還沒發牌),舊版因此只畫得出一個沒有名字的「莊家」,
+       而**莊家自己那一格照樣被畫進注區** → 同一個人同時出現在兩個地方
+       (使用者:「如果我當莊家時,應該沒有必要兩個地方都顯示一樣的資訊」)。
+       ★ 所以呼叫端多傳一個 `dealer`(座位號),兩段共用 `dealerOf()` 一支解讀。
+       ★ 這是**公開資訊** —— 晶片列上早就標著「🎩 莊」,牌情紅線一個字都沒鬆。
+       ★★ 附帶修掉一件量得到的事:注區的格數本來會從 n(下注)掉到 n−1(發牌),
+          而格數是 planTable 的輸入 → **發牌那一刻整桌的牌會換一次大小**。
      ========================================================================== */
+  /* 這一局誰當莊。★ 唯一的解讀點:發牌後問 st,下注階段問呼叫端傳的 dealer。 */
+  const dealerOf = v => v.st ? v.st.dealer
+                             : (typeof v.dealer === "number" ? v.dealer : -1);
   function dealerHTML(v){
-    const st = v.st, d = st ? st.dealer : -1;
+    const st = v.st, d = dealerOf(v);
     const mine = d >= 0 && d === v.me;
-    const nm = (v.names && v.names[d]) || "莊家";
+    // ⚠ 我當莊時名字寫「你」(不是我的暱稱)—— 於是「你」徽章就不必存在了
+    const nm = mine ? "你" : ((v.names && v.names[d]) || "莊家");
     /* ★★ 暗牌:蓋哪一張只問 BJ.hiddenIdx(唯一的判斷式)。
        ⚠ 例外只有一個:我自己就是莊家時那兩張都是我的牌 —— hiddenIdx 自己處理了。 */
     /* ⚠ v1.87.0 起**不挑尺寸 class** —— 牌桌上每一張牌都吃 --bj-cardw
        (使用者:「我要跟莊家的牌大小一樣」)。這裡塞 "dbig" 回去就是又變成兩份真相。 */
-    const body = st ? handOf(st, d, v.me, "")
-                    : '<span class="bj-dwait">等發牌…</span>';
+    const body = st && d >= 0 ? handOf(st, d, v.me, "")
+                              : '<span class="bj-dwait">🎴 等發牌…</span>';
     return '<div class="bj-dealer' + (mine ? " me" : "") +
              (st && st.phase === "dealer" ? " act" : "") + '">' +
-             '<div class="bj-dcs">' + body + '</div>' +
-             '<div class="bj-dinfo">' +
-               '<div class="bj-dtop">' +
-                 '<span class="bj-crown" title="這一局的莊家">🎩</span>' +
-                 // ★ 座位號碼(v1.88.0):輪莊照號碼往下輪 → 莊家那一格也要標得出他是第幾家
-                 (d >= 0 ? snHTML(d) : "") +
-                 '<span class="bj-dnm">' + esc(nm) + '</span>' +
-                 '<span class="bj-dtag">莊家</span>' +
-                 (mine ? '<span class="bj-you">你</span>' : "") +
-               '</div>' +
-               '<div class="bj-dsub">' + esc(v.dsub || "") + '</div>' +
+             '<div class="bj-dhd">' +
+               '<span class="bj-crown" title="這一局的莊家">🎩</span>' +
+               // ★ 座位號碼(v1.88.0):輪莊照號碼往下輪 → 莊家那一格也要標得出他是第幾家
+               (d >= 0 ? snHTML(d) : "") +
+               '<span class="bj-dnm">' + esc(nm) + '</span>' +
+               /* ★ 右邊那一組與注區一格**同一個 class**(.bj-bmeta):
+                  「他怎麼了」在兩個地方長得一樣,而且要縮的一律是左邊的名字。
+                  ⚠ 下注階段 st 是 null → 這一組整個是空的(那一段沒有點數可講,
+                    而「不用下注」動作列已經在講了)。 */
+               '<span class="bj-bmeta">' +
+                 (st && d >= 0 ? ptOf(st, d, v.me) : "") +
+                 (st && d >= 0 ? stateHTML(st, d, false, false) : "") +
+               '</span>' +
              '</div>' +
-             (st ? ptOf(st, d, v.me) : pipHTML(null)) +
+             '<div class="bj-dcs">' + body + '</div>' +
            '</div>';
   }
 
@@ -329,12 +355,14 @@ const BJB = (function(){
     const bw = (fit >= 2) ? (inner - BOX_GAP * (fit - 1)) / fit : inner;
     const byW = (bw - BOX_PADX - (MAXC - 1) * CARD_GAP) / MAXC;
     const avail = H - TABLE_PAD * 2 - ROW_GAP - (rows - 1) * BOX_GAP;
-    const byH = (avail - DEALER_PAD - rows * BOX_CHROME) / (rows + 1);
+    /* ★★ v1.90.0:莊家台也是「牌高 + 裝潢」了(它改成兩列 = 與一格同構),
+       所以這裡扣的是 DEALER_CHROME 而不是舊的 DEALER_PAD,而它一樣是**量回來的**。 */
+    const byH = (avail - DEALER_CHROME - rows * BOX_CHROME) / (rows + 1);
     let cw = Math.floor(Math.min(byH / CARD_R, byW, CARD_MAX));
     cw = Math.max(CARD_MIN, cw);
     const ch = Math.round(cw * CARD_R);
     const bxh = ch + BOX_CHROME;
-    const dlh = Math.max(ch, DEALER_INFO) + DEALER_PAD;
+    const dlh = ch + DEALER_CHROME;
     const need = TABLE_PAD * 2 + dlh + ROW_GAP + rows * bxh + (rows - 1) * BOX_GAP;
     return { fit: fit, rows: rows, basis: boxBasis(fit),
              cw: cw, bxh: bxh, dlh: dlh, over: Math.max(0, need - H) };
@@ -370,7 +398,8 @@ const BJB = (function(){
   function boxesHTML(v, lay){
     const st = v.st;
     const n = v.n || (st ? st.n : 2);
-    const d = st ? st.dealer : -1;
+    // ⚠ v1.90.0:一律走 dealerOf —— 寫 `st ? st.dealer : -1` 的話下注階段莊家會多一格
+    const d = dealerOf(v);
     const basis = lay.basis;
     /* ★★★ v1.88.0:**嚴格照座位號碼排**(使用者:「看你是第幾家,然後順序就應該是怎樣」)。
        ⚠ 這**推翻**了 v1.87.0 的「我自己那一格排第一個」(那一版的理由是:矮視窗放不下
@@ -421,15 +450,24 @@ const BJB = (function(){
   const CARD_R   = 1.42;      // 牌的高寬比(與 .bj-card 的 height:calc(w*1.42) 同一個數)
   const CARD_GAP = 3;         // .bj-bcs 的 gap
   const MAXC     = 5;         // 一手的實務上限(過五關 = 五張不爆)
-  const BOX_PADX = 10;        // .bj-box 左右 padding 合計
+  /* 一格 / 莊家台「除了牌以外」的**橫向**開銷:左右 padding(5+5)+ 左右 border(2+2)。
+     ⚠⚠ v1.90.0 修正:舊值 10 只算了 padding,漏掉 border → 一格剛好差 4px,
+       而症狀是「滿手 5 張時最後那一張被 flex 擠窄」= 牌桌上出現兩種寬度
+       (診斷器的 CARDW=66/68 WARN-CARD-SIZES-DIFFER)。
+     ⚠ 兩邊的橫向 padding **一定要一樣**(莊家台也是 5px)—— 不一樣的話就得取大的那個,
+       而那等於全桌的牌都跟著最寬的那一格縮。 */
+  const BOX_PADX = 14;
   /* 一格裡「除了牌以外」的高度(padding + 兩個 gap + 頭列 + 尾列)。
      ★★ 這是**起始猜測**,實際值由 learnChrome() 從畫面上量回來(見它的註解)——
         寫死一個常數的話,矮視窗那幾條 media query 一改字級 / padding 就會與它錯開,
         而錯開的方向是「又開始裁牌」。量出來的第一版是 57。
      ⚠ 猜大了只是牌小 1~2px(沒有壞處);猜小了就是使用者說的「牌沒有完整顯示」。 */
   let BOX_CHROME = 58;
-  const DEALER_PAD = 24;      // 莊家台上下 padding + border
-  const DEALER_INFO = 48;     // 莊家台右邊那疊字的高度(名字列 + 兩行提示)
+  /* 莊家台「除了牌以外」的高度。★★ v1.90.0 起它與一格同構(頭列 + 牌列),
+     所以同樣由 learnChrome() 量回來 —— 舊版的 DEALER_PAD(24)+ DEALER_INFO(48)
+     那兩個常數是「橫排」時代的東西,一起拿掉了。
+     ⚠ 猜大了只是牌小 1~2px;猜小了就是莊家那一排牌被裁掉一截。 */
+  let DEALER_CHROME = 44;
   const TABLE_PAD = 10, ROW_GAP = 8, PLAY_GAP = 8;
   const CARD_MIN = 26, CARD_MAX = 78;
   /* ★★ 牌桌拿得到多少高度 —— **從 .bj-play 往下扣**,不是量 .bj-stage。
@@ -464,13 +502,22 @@ const BJB = (function(){
        常數與現實錯開,而症狀就是使用者說的「牌沒有完整顯示」。 */
   function learnChrome(){
     if(!stage) return false;
+    let changed = false;
     const bx = stage.querySelector(".bj-box");
     const bc = bx && bx.querySelector(".bj-bcs");
-    if(!bx || !bc || !bx.offsetHeight) return false;
-    const c = bx.offsetHeight - bc.offsetHeight;
-    if(!(c > 0) || Math.abs(c - BOX_CHROME) < 0.5) return false;
-    BOX_CHROME = Math.ceil(c);
-    return true;
+    if(bx && bc && bx.offsetHeight){
+      const c = bx.offsetHeight - bc.offsetHeight;
+      if(c > 0 && Math.abs(c - BOX_CHROME) >= 0.5){ BOX_CHROME = Math.ceil(c); changed = true; }
+    }
+    /* ★★ v1.90.0:莊家台也要量 —— 它改成「頭列 + 牌列」之後與一格同構,
+       而兩者的裝潢**不一樣高**(莊家的名字大一號)→ 只量一邊就是又剩一個寫死的常數。 */
+    const dl = stage.querySelector(".bj-dealer");
+    const dc = dl && dl.querySelector(".bj-dcs");
+    if(dl && dc && dl.offsetHeight){
+      const c2 = dl.offsetHeight - dc.offsetHeight;
+      if(c2 > 0 && Math.abs(c2 - DEALER_CHROME) >= 0.5){ DEALER_CHROME = Math.ceil(c2); changed = true; }
+    }
+    return changed;
   }
 
   /* ==========================================================================
@@ -492,7 +539,8 @@ const BJB = (function(){
   function render(v, again){
     if(!stage) return;
     const n = v.n || (v.st ? v.st.n : 2);
-    const d = v.st ? v.st.dealer : -1;
+    // ⚠ v1.90.0:下注階段也要知道莊家是誰(否則格數會從 n 掉到 n−1 = 牌換一次大小)
+    const d = dealerOf(v);
     /* ★★★ v1.87.0:牌寬 / 一格的高度 / 莊家台的高度**一次算好掛在牌桌上**
        (見 planTable 的註解 —— 三個數字同一個來源,所以牌永遠裁不到、也永遠一樣大)。
        ★★ v1.88.1 起「一列幾格」也由同一支算(挑牌最大的那一種)。
@@ -689,8 +737,17 @@ const BJB = (function(){
     renderActs(lastInfo);
   }
 
-  /* 倒數環。★ **全桌都看得到**(「現在在等誰、還剩幾秒」是公開資訊,
-     讓大家知道為什麼卡著)—— 判準同排七 / 大老二 / 台灣麻將。
+  /* ── ★★★ 倒數環(v1.90.0 改成**與台灣麻將同一顆**)────────────────────────────
+     使用者:「最下方的倒數秒數,我希望做成跟台灣麻將一樣」。
+     舊版是一條 56×6 的橫條 + 旁邊一個數字;改成 34px 的 SVG 環圈 + 中間的秒數,
+     最後 3 秒轉紅並脈動,秒數每跳一次縮放一下。
+
+     ★ 幾何與關鍵影格**逐字沿用 m16**(viewBox 40 · r=17 · dasharray 107 ·
+       `@keyframes m16cd` / `m16beat` / `m16cdhot`)—— 同一件事只有一種畫法,
+       不再定義一份同名的環(這一頁本來就是這樣沿用排七的 svCd 的)。
+
+     ★ **全桌都看得到**(「現在在等誰、還剩幾秒」是公開資訊,讓大家知道為什麼卡著)
+       —— 判準同排七 / 大老二 / 台灣麻將。
 
      ★ 兩個從台灣麻將繼承的坑(notes/11 第三節):
        ① 用**負的 animation-delay** 接續播放,duration 永遠是那一段的總長
@@ -698,7 +755,11 @@ const BJB = (function(){
        ② 去重的 key **不可以看 timer 還在不在**:數字走到 0 之後 interval 就停了,
           而 timer 本身還有幾百毫秒沒響;那段空窗裡只要有人再叫一次 renderActs()
           環就會彈回滿格,而那個彈跳本身就是雜訊。
-     ⚠ 動畫關鍵影格 svCd 是排七那一段定義的,這裡刻意沿用同一個(不再定義一份同名的)。 */
+     ⚠ 與 m16 唯一的差別:這一頁的環是**每次 renderActs 都重建的節點**
+       (m16 是刻意留著不動的持久節點)。重建照樣接得上,靠的就是①那個負延遲;
+       但因此「秒數跳動」那個 .bj-beat **不可以寫進初始 HTML** —— 寫進去的話
+       每一次重畫(對手一動就一次)都會閃一下。 */
+  const CD_HOT = 3000;                        // 最後 3 秒轉紅 + 脈動(同 m16)
   function syncCd(info){
     const box = $("bjCdWrap");
     if(!box) return;
@@ -706,22 +767,37 @@ const BJB = (function(){
     const key = info.cdMs + ":" + info.cdEnd;
     const left = info.cdEnd - Date.now();
     if(left <= 0){ stopCd(); return; }
+    cdEnd = info.cdEnd;
     box.innerHTML =
-      '<span class="bj-cd" id="bjCd" style="--cd-dur:' + (info.cdMs / 1000) + 's;--cd-delay:' +
-      (-(info.cdMs - left) / 1000) + 's"><i></i><b id="bjCdN">' + Math.ceil(left / 1000) + '</b></span>';
+      '<span class="bj-cd' + (left <= CD_HOT ? " bj-hot" : "") + '" id="bjCd" aria-hidden="true"' +
+        ' style="--cd-dur:' + (info.cdMs / 1000) + 's;--cd-delay:' +
+        (-(info.cdMs - left) / 1000) + 's">' +
+        '<svg viewBox="0 0 40 40"><circle class="bj-cdbg" cx="20" cy="20" r="17"/>' +
+        '<circle class="bj-cdfg" cx="20" cy="20" r="17"/></svg>' +
+        '<b class="bj-cdn" id="bjCdN">' + Math.ceil(left / 1000) + '</b>' +
+      '</span>';
     if(key === cdKey && cdT) return;          // 同一段倒數:重畫畫面不重跑動畫
     cdKey = key;
     if(cdT) clearInterval(cdT);
-    cdT = setInterval(() => {
-      const el = $("bjCdN");
-      const ms = info.cdEnd - Date.now();
-      if(!el || ms <= 0){ clearInterval(cdT); cdT = null; return; }
-      el.textContent = Math.ceil(ms / 1000);
-    }, 250);
+    cdT = setInterval(tickCd, 200);
+  }
+  /* 只換中間那個數字與 hot 狀態 —— 環圈本身完全交給 CSS 動畫(理由見上面①)。 */
+  function tickCd(){
+    const el = $("bjCd");
+    if(!el){ if(cdT){ clearInterval(cdT); cdT = null; } return; }
+    const left = cdEnd - Date.now();
+    const n = el.querySelector(".bj-cdn");
+    const s = String(Math.max(0, Math.ceil(left / 1000)));
+    if(n && n.textContent !== s){
+      n.textContent = s;
+      n.classList.remove("bj-beat"); void n.offsetWidth; n.classList.add("bj-beat");
+    }
+    el.classList.toggle("bj-hot", left <= CD_HOT);
+    if(left <= 0){ clearInterval(cdT); cdT = null; }
   }
   function stopCd(){
     if(cdT){ clearInterval(cdT); cdT = null; }
-    cdKey = "";
+    cdKey = ""; cdEnd = 0;
     const box = $("bjCdWrap");
     if(box) box.innerHTML = "";
   }
