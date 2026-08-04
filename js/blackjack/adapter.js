@@ -19,7 +19,10 @@
          rot[] **這一輪**的輪莊順序(pid;輪開始時凍結)
                → 莊家 = BJ.dealerOf(rot, k, rules.hands) ★ v1.87.0 起「幾局換莊」可調,
                  所以一輪的局數是 BJ.handsPerRound(rot.length, hands) 而不是 rot.length
+               ★★ v1.88.0 起它一定是 seats 的**旋轉**(BJ.rotOrder / BJ.rotKeep)——
+                  座位號碼怎麼排,輪莊就怎麼輪;房規 first 只決定「從誰開始」
          seats[] **這一局**在桌上的人(pid;每局開始時重建 → 新人下一局就能當閒家)
+               ★★ 它的順序就是桌上的「第幾家」(v1.88.0 起不洗牌了,見 newGame)
          deal  這一局的牌 · bets{pid:n} · acts{pid:"hs"}
          nets{pid:n}  這一場的累計淨籌碼變化(★ 可以是負的)
          over  這一局結算過了沒
@@ -431,7 +434,9 @@ const MP = MPCore.create((function(){
          (新人下一輪才排進輪莊表)—— 這正是使用者拍板的那一條。
        ⚠ rot[k] 的人離開了 → 那一格跳掉(k 繼續往前);整輪跳完就換輪。
      ========================================================================== */
-  // 保留原本的相對順序、補上新人、去掉離開的人(★ 新人一律排在後面 = 最後才當莊)
+  /* 保留原本的相對順序、補上新人、去掉離開的人。
+     ★ 這一支現在**只給座位表用**(v1.88.0):座位號碼要黏著同一個人,新人排在後面。
+     ⚠ 輪莊表**不可以**用它 —— rot 是座位表的旋轉,由 BJ.rotKeep 排(見 advance)。 */
   function mergeIds(prev, ids){
     const keep = (prev || []).filter(id => ids.indexOf(id) >= 0);
     const add = ids.filter(id => keep.indexOf(id) < 0);
@@ -455,6 +460,9 @@ const MP = MPCore.create((function(){
       const hands = (g.rules && g.rules.hands) || 1;
       let rd = b.rd, k = b.k + 1;
       let rot = (b.rot || []).slice();
+      /* 下一局的座位表(★ 先算它:v1.88.0 起輪莊表是**座位表的旋轉**,
+         所以換輪那一步要拿新的座位表去排,順序反了新人就會被丟到輪莊表最後)。 */
+      const seats2 = mergeIds(b.seats, ids);
       const per = BJ.handsPerRound(rot.length, hands);
       /* 這一輪剩下的莊家裡,已經離開的直接跳掉。
          ⚠ hands ≥ 2 時「一個莊家」占 hands 格 → 條件一定要問 BJ.dealerOf,
@@ -463,10 +471,13 @@ const MP = MPCore.create((function(){
       if(k >= per){
         k = 0; rd++;
         if(rd >= rounds) return false;                // 整場結束 → 上面那條路處理
-        rot = mergeIds(rot, ids);                     // ★ 新人下一輪進輪莊表
+        /* ★★★ v1.88.0:下一輪的輪莊表 = **新座位表的旋轉**(接著上一輪的起點),
+           不再是 mergeIds(那會把中途加入的人丟到輪莊表最後)。
+           ⚠ 落地點只有 BJ.rotKeep 一支 —— 在這裡自己排就是第二份輪莊真相。 */
+        rot = BJ.rotKeep(seats2, rot);                // ★ 新人下一輪進輪莊表(照座位號)
       }
       b.rd = rd; b.k = k; b.rot = rot;
-      b.seats = mergeIds(b.seats, ids);               // ★ 新人下一局就能當閒家
+      b.seats = seats2;                               // ★ 新人下一局就能當閒家
       b.seq = (b.seq || 0) + 1;
       b.deal = BJ.newDeal();
       b.bets = {}; b.acts = {}; b.over = false;
@@ -543,19 +554,22 @@ const MP = MPCore.create((function(){
       BJB.resetAnnounce(); BJB.stopCd();
     },
     newGame(ids){
-      /* 座位每場重抽(輪莊順序也跟著換,不然同一個人永遠第一個當莊)。
-         ★ rot 與 seats 在開局時是同一份;之後 seats 每局重建、rot 每輪重建。 */
-      const rot = ids.slice();
-      for(let i = rot.length - 1; i > 0; i--){
-        const j = Math.floor(Math.random() * (i + 1));
-        const t = rot[i]; rot[i] = rot[j]; rot[j] = t;
-      }
+      /* ★★★ v1.88.0:座位**不再洗牌** —— seats 的順序就是桌上的「第幾家」(座位號碼),
+         而輪莊表是它的**旋轉**(起點由房規 first 決定)。
+         使用者:①「玩家順序,為什麼我總是最後」②「房主需要能夠指定誰先當莊」。
+         ⚠ 拿掉洗牌不影響公平性:公平性來自輪莊制的「每個人當莊次數一樣」,
+           而旋轉不改變那件事 —— 洗牌反而讓玩家看不出下一個莊家是誰。
+         ★ 只有房主會跑到這裡(核心的 startGame 擋過)→ first="host" 的那個人就是 ctx.me()。
+         ★ rot 與 seats 在開局時是**同一組人**(順序差一個旋轉);
+           之後 seats 每局重建、rot 每輪由 BJ.rotKeep 重建。 */
+      const seats = ids.slice();
+      const rot = BJ.rotOrder(seats, rules.first, ctx.me());
       return {
-        order: rot,
+        order: seats,
         /* ★★ 房規在**這一刻**凍結成 game.rules 的副本 —— 之後房間欄位怎麼改都不影響
            這一場(改了會讓已經打完的局重算出不同結果)。 */
         rules: BJ.normRules(rules),
-        bj: { seq: 0, rd: 0, k: 0, rot: rot, seats: rot.slice(),
+        bj: { seq: 0, rd: 0, k: 0, rot: rot, seats: seats,
               deal: BJ.newDeal(), bets: {}, acts: {}, nets: {}, over: false }
       };
     },
@@ -617,7 +631,8 @@ const MP = MPCore.create((function(){
     syncSetup(){
       syncRules(rules, ctx.isHost());          // ★ 面板只有一份(單機也呼叫這一支)
       const hint = $("bjRuleHint");
-      if(hint) hint.innerHTML = BJB.rulesHTML(rules);   // ★ 清單文案也只有一份
+      // ★ 清單文案也只有一份;⚠ 「點名」那一位的名字由 main.js 的 bjFirstName 解讀 token
+      if(hint) hint.innerHTML = BJB.rulesHTML(rules, bjFirstName(rules));
       const btn = $("bjRulesOpen");
       if(btn) btn.textContent = ctx.isHost() ? "⚙ 改規則" : "📋 看規則";
     },
@@ -647,7 +662,9 @@ const MP = MPCore.create((function(){
       if(!bj) return "";
       const net = (bj.nets && bj.nets[id]) || 0;
       const chip = (gRules ? gRules.start : rules.start) + net;
-      return BJB.chipHTML(chip, net, id === dealerPid());
+      /* ★ 座位號碼(v1.88.0):輪莊照號碼往下輪 → 晶片列也要看得出誰是第幾家。
+         ⚠ 大廳沒有座位表 → seatOf 回 -1,chipHTML 就不畫那顆徽章(號碼要開局才定)。 */
+      return BJB.chipHTML(chip, net, id === dealerPid(), seatOf(id));
     },
     lobbyStatusText(ids){ return ids.length < 2 ? "等待其他人加入…" : "等待大家準備…"; },
     readyHint(ids, ready){

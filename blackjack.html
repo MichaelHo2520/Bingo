@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台式21點 ｜ 輪流當莊 · 莊家抓人 · 單機對電腦 + 2~6 人連線</title>
-<!-- 台式21點 · v1.87.0 -->
+<!-- 台式21點 · v1.88.0 -->
 <!-- ⚠ 顯示名改過兩次(21點 → 台式21點),而**資料的名字一個都沒動**:
        bj_rooms / bj_index / bjRules / bj.solo.v1 / bj.prefs.v1 / line / dragon
        —— 那些 key 已經寫在別人裝置的 DB 與 localStorage 裡(同 v1.85.0 五小龍那條)。
@@ -21,7 +21,7 @@
      ⚠⚠ 註解裡**一個字都不可以出現註解的結束標記** —— v1.87.0 真的踩到:
        那一串被當成註解結束,後面整段文字就漏到畫面最上面變成一行亂碼,
        而它**只有截圖看得出來**(DOM 量出來完全正常)。 -->
-<meta name="version" content="1.87.0">
+<meta name="version" content="1.88.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -320,6 +320,23 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
         <div class="set-group">
           <div class="set-group-title">莊家</div>
+          <!-- ★★★ v1.88.0:誰先當莊(使用者:「房主需要能夠指定誰先當莊的順序,或是隨機之類的」)。
+               ★ 它只決定**起點** —— 之後一律照座位號碼往下輪(第 1 家 → 第 2 家 → …),
+                 所以「每個人各當一次莊」那條公平性不受影響。
+               ⚠ 「點名」那一排的選項要跟著**現在有誰**變 → 由 main.js 的 bjPaintFirstWho 生成
+                 (連線放 pid、單機放座位號;值一律 BJ.mkFirst 產生的 "p:<token>")。 -->
+          <div class="set-row col">
+            <span class="set-lbl">誰先當莊<span class="set-sub">之後照座位號碼往下輪(第 1 家 → 第 2 家 → …)</span></span>
+            <div class="seg" aria-label="誰先當莊">
+              <button data-rk="first" data-rv="host">👑 房主</button>
+              <button data-rk="first" data-rv="rand">🎲 隨機</button>
+            </div>
+            <!-- ⚠ 這一句不是裝飾:少了它,底下那一排名字看起來像「不知道要幹嘛的第二排鈕」
+                 (截圖才發現的 —— aria-label 讀不出來給眼睛看) -->
+            <span class="bj-first-lbl">或直接點名一位先當莊:</span>
+            <div class="seg bj-first-who" id="bjFirstWho" aria-label="點名誰先當莊"></div>
+            <div class="bj-first-note hidden" id="bjFirstNote"></div>
+          </div>
           <!-- ★★★ v1.87.0:幾局換莊(使用者:「現在是每一把就換莊,但我要這個是可以調整的」)。
                ⚠ 一輪的**定義沒變**(每個人各當一次莊),只是一輪的局數 = 人數 × 這個數字
                  → 「當莊次數一樣」那條公平性照樣成立(所以不必動上面那個「打幾輪」)。

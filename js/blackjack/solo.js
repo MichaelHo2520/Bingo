@@ -110,11 +110,12 @@ const Solo = (function(){
         const chip = rules.start + net;
         const isTurn = !!(st && !betting && !over &&
                           (s === d ? st.phase === "dealer" : (st.phase === "play" && !st.done[s])));
+        /* ★ 座位號碼(v1.88.0)由 BJB.chipHTML 那一份畫(連線的 chipTail 走同一支)——
+           原本那顆純裝飾的色點就不必了:號碼本身已經帶著同一組顏色。 */
         h += '<div class="mp-chip' + (isTurn ? " turn" : "") + (s === ME ? " me" : "") + '">' +
-               '<span class="bj-dot p' + s + '"></span>' +
                '<span class="gmk-nm">' + esc(seatName(s)) + '</span>' +
                (s === ME ? '<span class="you-badge">你</span>' : "") +
-               BJB.chipHTML(chip, net, s === d) +
+               BJB.chipHTML(chip, net, s === d, s) +
              '</div>';
       }
       box.innerHTML = h;
@@ -201,11 +202,16 @@ const Solo = (function(){
      ========================================================================== */
   function startMatch(){
     bumpGen();
-    /* ★ 輪莊順序:我(0 號位)排在**最後** —— 第一局讓電腦當莊,新手才看得懂
-       「莊家是怎麼運作的」。⚠ 每個人還是各當一次,公平性不受影響。 */
-    rot = [];
-    for(let s = 1; s < seats; s++) rot.push(s);
-    rot.push(ME);
+    /* ★★★ v1.88.0:輪莊順序 = **座位順序的旋轉**,起點由房規 first 決定
+       (BJ.rotOrder 一支,連線那邊呼叫的是同一支)。
+       ⚠⚠ 舊版把 ME 寫死排在**最後**(「第一局讓電腦當莊,新手才看得懂」)——
+         那正是使用者抱怨的「為什麼我總是最後」,**不要因為那個理由再加回去**:
+         現在預設是 first="host" = 我先當莊,想讓電腦先當莊改房規點名一台就好。
+       ★ 單機的「座位識別」就是座位號(0..n-1),而 rotOrder 只做字串比對 →
+         單機與連線因此共用同一份輪莊真相(不是兩份長得很像的程式)。 */
+    const ids = [];
+    for(let s = 0; s < seats; s++) ids.push(s);
+    rot = BJ.rotOrder(ids, rules.first, ME);
     rd = 0; k = 0; round = 0;
     nets = [];
     for(let s = 0; s < seats; s++) nets[s] = 0;
@@ -496,6 +502,8 @@ const Solo = (function(){
     level: () => level, seats: () => seats,
     rules: () => rules, setRule,
     recText, recLine, totalRounds, perRound,
+    // ★ 座位名字表(給房規面板的「點名誰先當莊」用;單機的 token 就是座位號)
+    seatNames: names,
     setLevel(v){ if(BJAI.LEVEL_INFO[v]){ level = v; saveOwn(); paintBar(); } },
     setSeats(v){ if(v >= BJ.MIN_PLAYERS && v <= BJ.MAX_PLAYERS){ seats = v; saveOwn(); } },
     // 給 e2e 用:直接讀當下的局面(不經過畫面)

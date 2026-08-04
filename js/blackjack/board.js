@@ -144,13 +144,24 @@ const BJB = (function(){
      ★ 兩樣都是**公開資訊**(誰當莊全場都看得到;籌碼是結算過的歷史)。
      ⚠ 這一格一個字都不准提牌 —— 這一頁唯一藏起來的是莊家那張暗牌,而它在盤面上。
      · chip 手上的籌碼(= 起始 + 淨變化)· net 這一場的淨變化(可以是負的) */
-  function chipHTML(chip, net, isDealer){
-    return (isDealer ? '<span class="bj-chd" title="這一局的莊家">🎩 莊</span>' : "") +
+  function chipHTML(chip, net, isDealer, seat){
+    return (typeof seat === "number" && seat >= 0 ? snHTML(seat) : "") +
+           (isDealer ? '<span class="bj-chd" title="這一局的莊家">🎩 莊</span>' : "") +
            '<span class="bj-chc" title="手上的籌碼">💰<b>' + chip + '</b>' +
              (net ? '<i class="' + (net > 0 ? "up" : "down") + '">' +
                     (net > 0 ? "+" : "") + net + '</i>' : "") +
            '</span>';
   }
+
+  /* ★★★ 座位號碼(「第幾家」)—— v1.88.0 加的,**單機與連線共用這一支**。
+     使用者:「不應該…看你是第幾家,然後順序就應該是怎樣嗎?」
+     → 輪莊改成照座位號循環之後,號碼**一定要看得到**:看不到的話「照號碼往下輪」
+       這件事在畫面上等於不存在,而那正是原本那句抱怨的來源。
+     ★ 一律 1-based(玩家講的是「第 3 家」不是「2 號位」);顏色沿用 p0..p5 那一組。
+     ⚠ **不要**用 ①②③ 那種圈碼字元(U+2460 那一段):它不在被禁的牌面區,
+       但字型一樣有缺、而且第 7 家以後就沒得用 —— 圈圈用 CSS 畫最穩。 */
+  const snHTML = s => '<span class="bj-sn p' + s + '" title="第 ' + (s + 1) + ' 家">' +
+                        (s + 1) + '</span>';
 
   /* ==========================================================================
      二、莊家那一格(牌桌最上面)
@@ -175,6 +186,8 @@ const BJB = (function(){
              '<div class="bj-dinfo">' +
                '<div class="bj-dtop">' +
                  '<span class="bj-crown" title="這一局的莊家">🎩</span>' +
+                 // ★ 座位號碼(v1.88.0):輪莊照號碼往下輪 → 莊家那一格也要標得出他是第幾家
+                 (d >= 0 ? snHTML(d) : "") +
                  '<span class="bj-dnm">' + esc(nm) + '</span>' +
                  '<span class="bj-dtag">莊家</span>' +
                  (mine ? '<span class="bj-you">你</span>' : "") +
@@ -234,10 +247,16 @@ const BJB = (function(){
     /* ★★★ v1.87.0:抓人展開時**整格就是那顆鈕**(使用者:「我是想要直接在牌桌上點人」)。
        data-grab 是唯一的落點 —— mount 那邊只認它,不認 class(class 是給樣式看的)。 */
     if(tgt) cls += " target";
-    return '<div class="' + cls + '" style="flex:0 0 ' + (mine ? "100%" : basis) + '"' +
+    /* ⚠⚠ v1.88.0:**每一格同寬**(連我自己那一格也是)—— 舊版我獨占一列(100%),
+       而注區改成「嚴格照座位號碼排」之後,我排在中間就會把一列切成三段
+       → 6 人算出 4 列,而「≤ 3 列」那條不變量一破就開始裁牌(見 layoutOf)。
+       ★ 「哪一格是我」現在只靠 .me 的金框 + 「你」徽章 —— 牌的大小早在 v1.87.0
+         就已經全桌一致(--bj-cardw),所以獨占一列本來就不再是為了牌大一點。 */
+    return '<div class="' + cls + '" style="flex:0 0 ' + basis + '"' +
              (tgt ? ' data-grab="' + s + '" role="button" title="抓這一家先比較"' : "") + '>' +
              '<div class="bj-bhd">' +
-               '<span class="bj-dot p' + s + '"></span>' +
+               // ★ 座位號碼取代原本的色點(v1.88.0):顏色照舊,但看得出「我是第幾家」
+               snHTML(s) +
                '<span class="bj-bnm">' + esc(nm) + '</span>' +
                (mine ? '<span class="bj-you">你</span>' : "") +
                // ⚠ 這個記號只講「抓不抓得動」(公開資訊),一個字都不准夾帶牌情
@@ -265,25 +284,33 @@ const BJB = (function(){
        在 Chromium 裡整條 flex 宣告會被丟掉(calc 不接受除以 var()),而症狀不是報錯 ——
        是格子照內容長、一列塞不進去的那格被**靜靜擠掉**(施工中真的踩到)。 */
   const BOX_FIT = 2, BOX_GAP = 7;
-  const boxBasis = () => "calc((100% - " + ((BOX_FIT - 1) * BOX_GAP) + "px) / " + BOX_FIT + ")";
-  /* 注區有幾列(★ 只吃**人數**,所以一整局不變 → 版面不會跳)。 */
-  function boxRows(n, d, meOut){
-    const k = Math.max(1, n - (d >= 0 ? 1 : 0)) + (meOut ? 1 : 0);
-    return Math.min(3, 1 + Math.ceil(Math.max(0, k - 1) / BOX_FIT));
+  const boxBasis = fit => (fit <= 1) ? "100%"
+    : ("calc((100% - " + ((fit - 1) * BOX_GAP) + "px) / " + fit + ")");
+  /* ★★★ v1.88.0:一格幾寬 / 幾列 收成這一支(★ 只吃**人數**,所以一整局不變)。
+     ★ 一列 2 格,但只有一格要畫時它獨占整列(2 人局:留半排空白很難看)。
+     ⚠ 「我獨占一列」拿掉了 —— 嚴格照座位排的話它會憑我的座位號決定列數
+       (6 人時最壞 4 列),而 fitTable 是照列數算牌大小的 → 又開始裁牌。
+     ⚠ 中途加入的人(meOut)那一格是整列寬 → 它自己算一列。 */
+  function layoutOf(n, d, meOut){
+    const boxes = Math.max(0, n - (d >= 0 ? 1 : 0));      // 閒家 = 除莊家以外的座位
+    const fit = (boxes <= 1) ? 1 : BOX_FIT;
+    const rows = Math.min(3, Math.max(1, Math.ceil(boxes / fit) + (meOut ? 1 : 0)));
+    return { fit: fit, rows: rows, basis: boxBasis(fit) };
   }
-  function boxesHTML(v){
+  function boxesHTML(v, lay){
     const st = v.st;
     const n = v.n || (st ? st.n : 2);
     const d = st ? st.dealer : -1;
-    const basis = boxBasis();
-    /* ★★ 我自己那一格**排第一個**(v1.87.0)。
-       ⚠ 理由不是好看:矮視窗放不下所有列時注區會捲(overflow-y:auto),而那時
-         最不能被捲出去的就是**我的牌**。排第一個 = 一定看得到。
-       ★ 列數不受影響:我那一格是 flex:0 0 100%(強制換行),放前面放中間都一樣。 */
+    const basis = lay.basis;
+    /* ★★★ v1.88.0:**嚴格照座位號碼排**(使用者:「看你是第幾家,然後順序就應該是怎樣」)。
+       ⚠ 這**推翻**了 v1.87.0 的「我自己那一格排第一個」(那一版的理由是:矮視窗放不下
+         所有列時注區會捲,而最不能被捲出去的是我的牌)。使用者權衡過後要的是
+         「每台裝置看到的排列完全一致 = 桌號看得懂」,所以那個理由讓位。
+       ★ 代償:①列數少了(我不再獨占一列)→ 同樣的高度分給更少的列,牌反而大一階
+         ②我那一格有金框 + 「你」徽章 + 座位號碼三個記號在標。 */
     let rows = "";
-    if(v.me >= 0 && v.me < n && v.me !== d) rows += boxHTML(v, v.me, basis);
     for(let s = 0; s < n; s++){
-      if(s === d || s === v.me) continue;      // 莊家在上面那一條;我已經畫過了
+      if(s === d) continue;                    // 莊家畫在上面那一條(不重複畫)
       rows += boxHTML(v, s, basis);
     }
     /* 中途加入的人:這一局還沒有他的座位(見 adapter 的「排隊不是插入」)。
@@ -354,16 +381,19 @@ const BJB = (function(){
     }
     return ph - PLAY_GAP - reserve;
   }
-  function fitTable(rows){
+  function fitTable(lay){
     if(!stage) return null;
+    const rows = lay.rows;
     const H = tableSpace(), W = stage.clientWidth || 0;
     // 還沒排版(畫面還是 hidden)→ 回 null,這一次交給 CSS 的後備值,下一次重畫就對了
     if(H <= 0 || !W) return null;
     const avail = H - TABLE_PAD * 2 - ROW_GAP - (rows - 1) * BOX_GAP;
     const byH = (avail - DEALER_PAD - rows * BOX_CHROME) / (rows + 1);
     const inner = W - TABLE_PAD * 2;
-    // rows ≥ 2 才有半寬的格子(rows = 1 時只有我那一格,它是整列寬)
-    const bw = (rows >= 2) ? (inner - BOX_GAP) / 2 : inner;
+    /* ⚠ 一格幾寬要問**同一份 layout**(v1.88.0):這裡自己判斷「rows ≥ 2 就是半寬」
+       在「2 人局(1 格整列寬)」與「3 人局(2 格但只有 1 列)」兩種情形都會算錯,
+       而算錯的方向是牌太大 → 又開始裁牌。 */
+    const bw = (lay.fit >= 2) ? (inner - BOX_GAP) / lay.fit : inner;
     const byW = (bw - BOX_PADX - (MAXC - 1) * CARD_GAP) / MAXC;
     let cw = Math.floor(Math.min(byH / CARD_R, byW, CARD_MAX));
     cw = Math.max(CARD_MIN, cw);
@@ -413,21 +443,41 @@ const BJB = (function(){
        (見 fitTable 的註解 —— 三個數字同一個來源,所以牌永遠裁不到、也永遠一樣大)。
        ⚠ 一定要在寫 innerHTML **之前**量 stage:牌桌是 flex:1、高度不吃自己的內容,
          所以量到的是穩定值;寫完再量就多一次 reflow 而且答案一樣。 */
-    const rows = boxRows(n, d, v.me < 0);
-    const fit = fitTable(rows);
+    const lay = layoutOf(n, d, v.me < 0);
+    const fit = fitTable(lay);
     const sty = fit ? (' style="' + fitStyle(fit) + '"') : "";
     stage.innerHTML =
       '<div class="bj-table"' + sty + '>' +
         dealerHTML(v) +
-        boxesHTML(Object.assign({}, v, { n: n })) +
+        boxesHTML(Object.assign({}, v, { n: n }), lay) +
       '</div>';
     /* ★ 量一次「一格的裝潢有多高」;與上一次不一樣就當場用新數字改 CSS 變數
        (只改變數、不重寫 innerHTML → 不閃、也不會變成無窮迴圈,見 learnChrome)。 */
     if(fit && learnChrome()){
-      const f2 = fitTable(rows);
+      const f2 = fitTable(lay);
       const tb = stage.querySelector(".bj-table");
       if(f2 && tb) tb.setAttribute("style", fitStyle(f2));
     }
+    keepMeInView();
+  }
+  /* ★★★ v1.88.0:注區真的要捲的時候,把**我那一格**帶進視野。
+     ── 為什麼需要它 ────────────────────────────────────────────────────────
+       v1.87.0 靠「我排第一個」保證我的牌一定看得到;這一版改成嚴格照座位號碼排
+       (使用者要求),那個保證就沒了 —— 6 人 + 矮視窗時 `.bj-boxes` 會捲
+       (診斷器印 boxesOver / WARN-BOX-ROW-LOST),而我可能剛好在捲出去的那一列。
+     ★ 只在**真的有捲軸**時動,而且是 block:"nearest" 的語意(看得到就什麼都不做)
+       → 一旦到位就不再動,不會每次重畫都跳。
+     ⚠ **不可以**用 el.scrollIntoView():它會連**祖先**一起捲(整頁跟著跳),
+       這裡只准動 .bj-boxes 自己的 scrollTop。 */
+  function keepMeInView(){
+    if(!stage) return;
+    const bx = stage.querySelector(".bj-boxes");
+    const mine = bx && bx.querySelector(".bj-box.me");
+    if(!bx || !mine) return;
+    if(bx.scrollHeight <= bx.clientHeight + 1) return;      // 放得下 → 不要動
+    const r = mine.getBoundingClientRect(), c = bx.getBoundingClientRect();
+    if(r.top < c.top) bx.scrollTop -= (c.top - r.top);
+    else if(r.bottom > c.bottom) bx.scrollTop += (r.bottom - c.bottom);
   }
   const fitStyle = f => "--bj-cardw:" + f.cw + "px;--bj-bxh:" + f.bxh + "px;--bj-dlh:" + f.dlh + "px";
 
@@ -552,6 +602,13 @@ const BJB = (function(){
     acts.innerHTML = '<div class="bj-actrow">' + actsHTML(info) + '</div>' +
                      '<div class="bj-cdwrap" id="bjCdWrap"></div>';
     syncCd(info);
+    /* ★★★ 這裡**也要**檢查一次「我那一格看得到嗎」(v1.88.0)。
+       ⚠⚠ 這是 fitTable 那個老坑的雙胞胎:第一次 render() 時 `#bjActs` 還掛著 .hidden
+         (上面那行才拿掉)→ 那一刻注區拿到的是整條動作列的高度,**還不需要捲**,
+         所以 render 裡那一次呼叫一定看到「放得下」而什麼都不做。
+       ★ 動作列畫完 = 注區的高度定了 → 這時候問才問得到真的答案。
+         (診斷器的守門是 shot-bj.ps1 的 meVis;漏掉這一行就是 meVis=0@sc0。) */
+    keepMeInView();
   }
   /* 加減鈕:只動「還沒送出去的金額」,不碰 st、不碰 DB、不通知呼叫端。
      ★ 所以它整條路都留在盤面這一層 —— 呼叫端(solo / adapter)一行都不必改。
@@ -749,7 +806,8 @@ const BJB = (function(){
       return '<div class="bj-rrow' + (me ? " me" : "") + (isD ? " dealer" : "") +
                  (dv > 0 ? " up" : (dv < 0 ? " down" : "")) + '">' +
         '<div class="bj-rmain">' +
-          (isD ? '<span class="bj-crown">🎩</span>' : '<span class="bj-dot p' + s + '"></span>') +
+          // ★ 座位號碼取代原本的色點(v1.88.0);莊家那一列讓 🎩 出面(他的號碼在牌桌上)
+          (isD ? '<span class="bj-crown">🎩</span>' : snHTML(s)) +
           '<span class="bj-rname">' + esc(nm) + '</span>' +
           // ⚠ 名字本身就叫「你」時(單機的 0 號位)不掛徽章 —— 「你 你」是純雜訊,
           //   而「這一列是我」還有框在標,訊號沒少(同大老二 resultHTML 那條)
@@ -819,9 +877,22 @@ const BJB = (function(){
          (全螢幕 / 表情 / 罐頭句 / 大老二的三個音效呼叫點都踩過),
          而走鐘了兩邊各自都不會壞、沒有東西抓得到。
      ========================================================================== */
-  function rulesHTML(rules){
+  /* firstName = 被「點名」的那一位叫什麼(只有呼叫端解讀得出 token:連線是 pid、
+     單機是座位號)。★ 不傳 / 傳空字串 = 那個人已經不在 → 文案自己退回「第 1 家」,
+     ⚠ 這一支**不可以**自己去查名單:它同時服務單機與連線,查得到的只會是其中一邊。 */
+  function rulesHTML(rules, firstName){
     const r = R.normRules(rules);
     const L = [];
+    /* ★★★ v1.88.0:誰先當莊 + 之後照座位號碼輪(使用者:「為什麼我總是最後」/
+       「房主需要能夠指定誰先當莊的順序,或是隨機之類的」)。
+       ⚠ 這一行要排在「輪流當莊」前面:它決定的是**起點**,先講起點才讀得順。 */
+    L.push("<b>誰先當莊</b> —— " + (
+      r.first === R.FIRST_RAND ? "開局<b>隨機</b>抽一位"
+        : (R.firstTok(r.first)
+            ? (firstName ? ("房主點名 <b>" + esc(firstName) + "</b>")
+                         : "房主點名的那一位(<b>他已經不在了 → 由第 1 家開始</b>)")
+            : "<b>房主</b>")
+    ) + ";之後<b>照座位號碼往下輪</b>(第 1 家 → 第 2 家 → … → 繞回來)。");
     /* ★★★ v1.87.0:換莊頻率可調 → 這一行**不可以**寫死「每一局換」
        (使用者:「現在是每一把就換莊,但我要這個是可以調整的」)。 */
     L.push(r.hands > 1

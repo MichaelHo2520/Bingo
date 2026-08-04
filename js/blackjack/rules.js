@@ -164,6 +164,16 @@ const BJ = (function(){
        ⚠⚠ 舊房間沒有這個欄位 → normRules 補 1 = 逐字回到 v1.86.0 的行為
          (**加法式**,同 rounds / line 那幾格)。 */
     hands: 1,
+    /* ★★★ v1.88.0:**誰先當莊**(使用者:「房主需要能夠指定誰先當莊的順序,或是隨機之類的」)。
+         "host"      房主先當莊(單機 = 我)—— 預設
+         "rand"      開局隨機抽一位
+         "p:<token>" 房主**點名**的那一位
+       ★ 它只在**開局那一刻**用得到(生成 rot),之後一個字都不影響結算 ——
+         放進房規的理由是「房主開局前決定的事」都在同一包裡凍結,少一個例外少一條走鐘的路。
+       ⚠ token 是**呼叫端的座位識別**:連線是 pid、單機是座位號 —— 這一層不解讀它,
+         只負責在 seats 裡找同一個字串(找不到就退回第 1 家,見 firstIdx)。
+       ⚠⚠ 舊房間沒有這個欄位 → normRules 補 "host"(**加法式**,同 hands / line 那幾格)。 */
+    first: "host",
     /* 每一段的操作倒數(秒;0 = 關掉)。★ 它**不影響結算**,放進 rules 的理由只有一個:
        這一整包在開局那一刻凍結,少一個「要不要跟著鎖」的例外就少一條會走鐘的路。
        ⚠ 一段 = 下注 / 閒家補牌 / 莊家補牌 各自一段(閒家同時動 → 那一段是**共用**一個窗口)。
@@ -185,6 +195,24 @@ const BJ = (function(){
   const SEC_OPTS = [0, 20, 30, 45];
 
   function pick(opts, v, dflt){ return opts.indexOf(v) >= 0 ? v : dflt; }
+  /* ★★★ 「誰先當莊」的守門(v1.88.0)。★ 兩個字面值 + 一條 token 格式,其餘一律退回 "host"。
+     ⚠ 這一格的值有一部分是**呼叫端給的 token**(pid / 座位號)→ 不能用白名單列舉,
+       所以改成「格式 + 長度」守門:pid 是 "p" + 7 碼 base36,單機是一位數字。
+     ⚠ token 不准含空白 / 引號 / 尖括號:它會被塞進 data-rv 與 DB 欄位旁邊。 */
+  const FIRST_HOST = "host", FIRST_RAND = "rand", FIRST_PICK = "p:";
+  const TOK_RE = /^[A-Za-z0-9_.@-]{1,64}$/;
+  function normFirst(v){
+    if(v === FIRST_RAND) return FIRST_RAND;
+    if(typeof v === "string" && v.indexOf(FIRST_PICK) === 0){
+      const tok = v.slice(FIRST_PICK.length);
+      if(TOK_RE.test(tok)) return FIRST_PICK + tok;
+    }
+    return FIRST_HOST;
+  }
+  // 被點名的是誰(回 token;不是「點名」就回空字串)★ 呼叫端唯一該用的解讀方式
+  const firstTok = v => (typeof v === "string" && v.indexOf(FIRST_PICK) === 0)
+    ? v.slice(FIRST_PICK.length) : "";
+  const mkFirst = tok => normFirst(FIRST_PICK + tok);
   function normRules(r){
     r = r || {};
     return {
@@ -197,7 +225,8 @@ const BJ = (function(){
       dragon:     (typeof r.dragon === "boolean") ? r.dragon : RULES_DEF.dragon,
       bustFirst:  (typeof r.bustFirst === "boolean") ? r.bustFirst : RULES_DEF.bustFirst,
       rounds:     pick(ROUNDS_OPTS, +r.rounds, RULES_DEF.rounds),
-      hands:      pick(HANDS_OPTS, +r.hands, RULES_DEF.hands)
+      hands:      pick(HANDS_OPTS, +r.hands, RULES_DEF.hands),
+      first:      normFirst(r.first)
     };
   }
   const defRules = () => normRules(null);
@@ -708,18 +737,63 @@ const BJ = (function(){
     return rot[Math.floor(k / h) % rot.length];
   }
 
+  /* ── ★★★ v1.88.0:輪莊順序 = **座位順序的旋轉**,只有「從誰開始」可以調 ──────────
+       使用者的兩句話:①「玩家順序,為什麼我總是最後」②「房主需要能夠指定誰先當莊」。
+       ★ 舊行為:連線**每場洗牌**、單機把我**寫死排最後** —— 於是桌上的座位號碼與輪莊
+         順序毫無關係,玩家看不出「下一個莊家是誰」(而那是這個遊戲最該看得出來的事)。
+       ★ 新行為:rot 一律是 seats 的**旋轉**(第 1 家 → 第 2 家 → … → 繞回來),
+         房規 first 只決定**起點**。由此:
+           · 每個人各當一次莊 → 公平性照舊(旋轉不改變這件事,所以 rounds / hands 不必動)
+           · 「下一個莊家」照號碼往下數就知道 → 看得懂
+       ⚠ 這三支是**純函式**:seats 裝什麼型別它們不管(連線 pid / 單機座位號),
+         一律用 String() 比對找 token —— 兩種呼叫端因此共用同一份輪莊真相。
+     ──────────────────────────────────────────────────────────────────────────── */
+  const rotAt = (seats, i) => seats.slice(i).concat(seats.slice(0, i));
+  /* 起點是誰(回 seats 的索引)。★ 找不到一律回 0 = **第 1 家**:
+     指名的人離開了 / 房主不在座位表裡 / 舊房間沒有這個欄位,三種情形都走這條 ——
+     ⚠ 絕對不可以在這裡丟錯或回 -1:開局那一刻算不出莊家就是整場開不起來。 */
+  function firstIdx(seats, first, hostId, rng){
+    if(!seats || !seats.length) return 0;
+    const f = normFirst(first);
+    if(f === FIRST_RAND) return Math.floor((rng || Math.random)() * seats.length) % seats.length;
+    const want = (f === FIRST_HOST) ? hostId : firstTok(f);
+    if(want === undefined || want === null || want === "") return 0;
+    for(let i = 0; i < seats.length; i++) if(String(seats[i]) === String(want)) return i;
+    return 0;
+  }
+  // 開局:座位表 + 房規 → 這一輪的輪莊表
+  function rotOrder(seats, first, hostId, rng){
+    const a = (seats || []).slice();
+    return a.length ? rotAt(a, firstIdx(a, first, hostId, rng)) : [];
+  }
+  /* 下一輪:座位表可能變了(有人加入 / 離開),但「這一圈從誰開始」要**接得上** ——
+     所以拿上一輪的起點(還在座位表裡的第一個)去旋轉**新的**座位表。
+     ★ 中途加入的人因此自動坐進他的座位號,而不是被丟到輪莊表最後
+       (丟到最後就又回到使用者抱怨的那件事:「為什麼我總是最後」)。 */
+  function rotKeep(seats, prevRot){
+    const a = (seats || []).slice();
+    if(!a.length) return [];
+    const p = prevRot || [];
+    for(let i = 0; i < p.length; i++){
+      const j = a.indexOf(p[i]);
+      if(j >= 0) return rotAt(a, j);
+    }
+    return a;
+  }
+
   return {
     // 常數
     NSUIT, NRANK, NCARD, MIN_PLAYERS, MAX_PLAYERS, VS15,
     SUIT_CH, SUIT_KEY, SUIT_NAME, RANK_TXT, DRAGON_N,
     T_BUST, T_NORM, T_BJ, T_DRAGON, T_NAME, LINE_FREE, GRAB_CH,
     RULES_DEF, START_OPTS, BETMAX_OPTS, LINE_OPTS, BJPAY_OPTS, ROUNDS_OPTS, HANDS_OPTS, SEC_OPTS,
-    MIN_BET, BET_STEPS,
+    MIN_BET, BET_STEPS, FIRST_HOST, FIRST_RAND, FIRST_PICK,
     // 編碼
     suitOf, rankOf, cardOf, isRed, suitCh, rankTxt, nameOf, longName,
     chr, unchr, encodeDeal, decodeDeal, shuffled, newDeal,
-    // 房規
+    // 房規(★ normFirst / firstTok / mkFirst = 「誰先當莊」唯一的解讀方式,v1.88.0)
     normRules, defRules, betTiers, betSteps, minBet, clampBet,
+    normFirst, firstTok, mkFirst,
     // 點數與階
     valueOf, valueTxt, isBJ, tierOf, mulOf,
     // 座位牌堆
@@ -733,7 +807,9 @@ const BJ = (function(){
     // 結算
     betOf, settle, tagTxt, TAG_TXT,
     // 輪莊(★ hands = 幾局換莊,v1.87.0)
-    leftInRound, dealerOf, handsPerRound
+    leftInRound, dealerOf, handsPerRound,
+    // ★★ 輪莊順序 = 座位順序的旋轉(v1.88.0)—— 呼叫端**不可以**自己排 rot
+    firstIdx, rotOrder, rotKeep
   };
 })();
 

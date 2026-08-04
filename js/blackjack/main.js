@@ -71,12 +71,55 @@ function showHomeLayer(which){
        訪客按下去要看得到「只有房主能改規則」。
    ========================================================================== */
 const BJ_BOOLS = { pushDealer: 1, dragon: 1, bustFirst: 1 };
+/* ★★ v1.88.0:first(誰先當莊)的值是**字串**("host" / "rand" / "p:<token>")——
+   ⚠ 不列進來的話 `+raw` 會把它變成 NaN,而症狀是「那一列一顆都不亮、按了也選不上」。 */
+const BJ_STRS = { first: 1 };
 function bjRuleVal(key, raw){
   if(BJ_BOOLS[key]) return raw === "1" || raw === "true";
+  if(BJ_STRS[key]) return String(raw);
   return +raw;
+}
+/* ★★★ 「點名」的那一位叫什麼名字 —— **只有這一支解讀 token**(v1.88.0):
+     連線 = pid → 名單裡的 name;單機 = 座位號 → Solo 的名字表。
+   ★ 回空字串 = 那個人已經不在(離開房間 / 人數改小了)→ 文案與面板都退回「第 1 家」,
+     而規則層的 BJ.firstIdx 找不到 token 時**正好**也是回第 1 家(同一個答案兩處各自成立)。 */
+function bjFirstName(rules){
+  const tok = BJ.firstTok(rules && rules.first);
+  if(!tok) return "";
+  if(MP.isOnline()){
+    const m = MP.roster().filter(x => x.id === tok)[0];
+    return m ? m.name : "";
+  }
+  const nms = Solo.seatNames();
+  const i = +tok;
+  return (i >= 0 && i < nms.length) ? nms[i] : "";
+}
+/* 「點名誰先當莊」那一排 —— ★ 選項跟著**現在有誰**變,所以只能在這裡生成。
+   ⚠ 單機的 token 是座位號、連線是 pid:兩邊的差別只在這一支(其餘一律走 BJ.mkFirst)。 */
+function bjPaintFirstWho(r, editable){
+  const box = $("bjFirstWho");
+  if(!box) return;
+  const list = MP.isOnline()
+    ? MP.roster().map(x => ({ tok: x.id, nm: x.name }))
+    : Solo.seatNames().map((nm, i) => ({ tok: String(i), nm: nm }));
+  const cur = BJ.firstTok(r.first);
+  box.classList.toggle("readonly", !editable);
+  /* ⚠ 只放鈕,一個字都不要夾在 .seg 裡面(那是分段控制的版面,塞說明會擠歪);
+     「.on」由下面 syncRules 那個共用迴圈統一決定 —— 這裡不自己判斷第二次。 */
+  box.innerHTML = list.map(x =>
+    '<button data-rk="first" data-rv="' + esc(BJ.mkFirst(x.tok)) + '">' +
+      esc(x.nm) + '</button>').join("");
+  // ★ 指名的人已經不在 → 說出來(不然那一排一顆都沒亮,看起來像壞掉)
+  const note = $("bjFirstNote");
+  if(note){
+    const gone = !!cur && !list.some(x => x.tok === cur);
+    note.textContent = gone ? "指名的那一位已經不在 → 由第 1 家先當莊" : "";
+    note.classList.toggle("hidden", !gone);
+  }
 }
 function syncRules(rules, editable){
   const r = BJ.normRules(rules);
+  bjPaintFirstWho(r, editable);        // ★ 要在下面那個迴圈**之前**:它生成的鈕也要吃 .readonly
   document.querySelectorAll("#bjRulesBody .seg").forEach(seg => {
     seg.classList.toggle("readonly", !editable);
     [...seg.children].forEach(b => {
@@ -88,7 +131,7 @@ function syncRules(rules, editable){
   const lbl = $("bjRulesWho");
   if(lbl) lbl.textContent = editable ? "你是房主,規則由你決定" : "規則由房主決定(對戰中不能改)";
   const sum = $("bjRulesSum");
-  if(sum) sum.innerHTML = BJB.rulesHTML(r);
+  if(sum) sum.innerHTML = BJB.rulesHTML(r, bjFirstName(r));
 }
 /* 目前該對誰設定 —— 單機改 Solo 的、連線改房間的(★ 唯一的分流點就這一支)。 */
 function bjEditable(){ return !MP.isOnline() || MP.amHost(); }
@@ -110,7 +153,7 @@ function closeRules(){
      大廳是 #bjRuleHint 那份 <ul>、單機是第二層的 #bjSoloHint。 */
   if(MP.isOnline()){
     const hint = $("bjRuleHint");
-    if(hint) hint.innerHTML = BJB.rulesHTML(MP.rules());
+    if(hint) hint.innerHTML = BJB.rulesHTML(MP.rules(), bjFirstName(MP.rules()));
   }else paintSoloHint();
 }
 
@@ -125,7 +168,15 @@ function paintSoloHint(){
     "<b>" + n + " 人</b> · 打 <b>" + r.rounds + " 輪</b>(共 " + Solo.totalRounds() + " 局)· " +
     // ★ v1.87.0:換莊頻率可調 → 這一句不可以寫死「每一局換」
     (r.hands > 1 ? ("<b>連做 " + r.hands + " 局才換莊</b>") : "<b>每一局換莊</b>") + "。<br>" +
-    "你固定坐第一位,<b>第一局由電腦當莊</b>(每個人各當 " + r.rounds + " 次莊)。<br>" +
+    /* ★★★ v1.88.0:這一句原本寫死「你固定坐第一位,第一局由電腦當莊」——
+       那正是使用者抱怨的「為什麼我總是最後」。現在起點由房規決定,所以這一句
+       **一定要跟著房規變**(寫死的文案就是第二份真相,而且是最會騙人的那一種)。 */
+    "你坐<b>第 1 家</b>," + (
+      r.first === BJ.FIRST_RAND ? "<b>誰先當莊隨機抽</b>"
+        : (BJ.firstTok(r.first)
+            ? ("<b>" + esc(bjFirstName(r) || "第 1 家") + " 先當莊</b>")
+            : "<b>第一局你當莊</b>")
+    ) + ",之後照座位號碼往下輪(每個人各當 " + r.rounds + " 次莊)。<br>" +
     // ⚠ 圖示一律 🎴(U+1F3B4);小丑牌那顆是 U+1F0CF,落在被禁的區段
     "<span class=\"bj-warn\">🎴 " + esc(Solo.recLine(Solo.level())) + "</span>";
 }

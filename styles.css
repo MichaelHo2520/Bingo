@@ -4497,3 +4497,28 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .bj-box .bj-bet,.bj-box .bj-pt{padding:0 5px}
     .bj-bnm{font-size:11px}
   }
+
+  /* ==========================================================================
+     ★★★ v1.88.0:座位號碼(「第幾家」)+ 房規的「誰先當莊」
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:①「玩家順序,為什麼我總是最後,不應該…看你是第幾家,順序就應該是怎樣嗎?」
+              ②「房主需要能夠指定誰先當莊的順序,或是隨機之類的」
+       ★ 輪莊改成「照座位號碼往下輪」之後,號碼**一定要看得到** ——
+         所以牌桌上每一格 / 莊家台 / 晶片列 / 結果卡都掛同一顆 .bj-sn。
+       ⚠ 這顆徽章取代了原本純裝飾的 .bj-dot(9px 色點):顏色照舊沿用 p0..p5,
+         但 v1.86.0 起有第 6 家 → **p5 一定要補**,不補的話第 6 家是透明的。
+       ⚠ 尺寸要壓在一格的「頭列」高度裡:頭列變高 = fitTable 量到的裝潢變高 =
+         牌變小一階(learnChrome 會自己跟上,但沒必要白繳這個學費)。
+     ========================================================================== */
+  .bj-sn{flex:none;min-width:15px;height:15px;padding:0 3px;border-radius:8px;
+    display:inline-flex;align-items:center;justify-content:center;
+    font:900 10px/1 'Nunito',sans-serif;color:#241a2e;background:#cfd4e0}
+  .bj-sn.p0{background:#ff6b8a}.bj-sn.p1{background:#4fc3f7}.bj-sn.p2{background:#ffd54f}
+  .bj-sn.p3{background:#81c784}.bj-sn.p4{background:#ba9cff}.bj-sn.p5{background:#ffab7a}
+  :root[data-theme="ebook"] .bj-sn{background:#fff;color:#000;border:1px solid #000}
+  /* 房規面板:「點名誰先當莊」那一排(選項由 main.js 生成 → 這裡只管排版)。
+     ⚠ 名字長短不一 → 允許換行(這是設定面板,不是寫死高度的動作列)。 */
+  .bj-first-who{flex-wrap:wrap}
+  .bj-first-lbl{font:800 10.5px/1.4 'Nunito',sans-serif;color:var(--muted);margin-top:2px}
+  .bj-first-note{font:800 10.5px/1.4 'Nunito',sans-serif;color:#ffb4a2;margin-top:4px}
+  :root[data-theme="ebook"] .bj-first-note{color:#000}
