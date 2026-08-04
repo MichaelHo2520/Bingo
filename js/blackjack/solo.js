@@ -32,10 +32,13 @@ const Solo = (function(){
   /* 一局結算後停幾毫秒再開下一局(= 過場開著的時間)。
      ★★ v1.92.0 從 2900 拉到 3600:這一段從「一句飄走的 toast」變成一塊要**讀**的過場
        (每一家的押注 / 點數 / ±籌碼 / 手上多少),6 人局那張表 2.9 秒讀不完。
+     ★★★ v1.94.0 再拉到 6000(使用者:「最後結算的畫面時間太短了」)——
+       ⚠ 敢拉這麼長的**前提是同一版給了「點掉」那顆鈕**(見 board.js 八之四):
+         只加長會變成「每一局都在等」。兩件事要一起改。
      ⚠ 連線那邊有自己的一份(adapter 的 SETTLE_MS)—— 兩邊刻意不共用:它同時是
        「到期推進」的窗口長度,而那是連線特有的機制(單機沒有 timer 在搶)。
        ★ 但**數字要一樣**,不然同一件事在兩邊的節奏不同(改一邊記得改另一邊)。 */
-  const SETTLE_MS = 3600;
+  const SETTLE_MS = 6000;
 
   let level = "mid", seats = 4;
   let rules = BJ.defRules();
@@ -474,20 +477,41 @@ const Solo = (function(){
       chips: (function(){ const a = []; for(let s = 0; s < seats; s++) a[s] = rules.start + (nets[s] || 0); return a; })(),
       key: "solo:" + round,
       title: "第 " + (doneRounds() + 1) + "/" + totalRounds() + " 局 · 結算",
-      foot: last ? "這一場打完了…" : "準備下一局…",
+      /* ⚠ v1.94.0:這一句從「準備下一局…」改成講**進度條在幹嘛** ——
+         舊的字與旁邊那顆鈕(「下一局 ▸」)講同一件事,而它們就並排在同一列
+         (看圖才發現的重複,同 v1.90.0 莊家台那個副標)。 */
+      foot: last ? "時間到會自動看結果" : "時間到會自動開下一局",
+      /* ★★★ v1.94.0:看完可以點掉(使用者:「時間太短了…我希望有可以快速關掉的操作」)。
+         ★ 單機按下去就是**立刻**跑 nextRound() —— 卡多久是自己的節奏
+           (同「單機不做倒數」那條)。⚠ 走的是**與到期同一支** nextRound,
+           不是在這裡再寫一份「k++ / 換輪 / 結束」(那就是兩份推進真相)。 */
+      skipTxt: last ? "看結果 ▸" : "下一局 ▸",
+      onSkip: nextRound,
       ms: SETTLE_MS
     });
 
     // 下一局 / 下一輪 / 整場結束
-    later(() => {
-      settled = null;
-      k++;
-      // ⚠ 一輪的局數是**人數 × 幾局換莊**(v1.87.0)—— 寫死 seats 的話 hands=2 時
-      //   每個人只當得到一次莊的一半,而「當莊次數一樣」那條公平性就沒了
-      if(k >= perRound()){ k = 0; rd++; }
-      if(rd >= rules.rounds){ finishMatch(); return; }
-      startRound();
-    }, SETTLE_MS);
+    later(nextRound, SETTLE_MS);
+  }
+  /* 推進到下一局(★ **到期與「點掉過場」共用這一支**,v1.94.0)。
+     ── 「提前點掉」為什麼不會偷偷多跳一局 ────────────────────────────────────
+       真正在守的是**下面 `startRound()` / `finishMatch()` 自己就會 `bumpGen()`** ——
+       那次還沒響的 `later(nextRound, SETTLE_MS)` 因此對不上 gen、不會執行。
+     ⚠⚠ **老實記一筆:這一行 bumpGen 與 `!settled` 那一關互為多餘,兩個都沒有守門**
+       (施工中各拿掉一條驗過,e2e 照樣全綠 —— 因為 startRound 那一次就夠了)。
+       留著的理由只有一個:讓「這一支自己負責讓舊 timer 失效 + 只生效一次」不依賴
+       呼叫順序 —— 哪天有人在 nextRound 與 startRound 之間插一段等待,
+       它們就是唯一的門了。**不要因為「測試不會紅」把它們刪掉。** */
+  function nextRound(){
+    if(!active || over || !settled) return;
+    bumpGen();
+    settled = null;
+    k++;
+    // ⚠ 一輪的局數是**人數 × 幾局換莊**(v1.87.0)—— 寫死 seats 的話 hands=2 時
+    //   每個人只當得到一次莊的一半,而「當莊次數一樣」那條公平性就沒了
+    if(k >= perRound()){ k = 0; rd++; }
+    if(rd >= rules.rounds){ finishMatch(); return; }
+    startRound();
   }
 
   function finishMatch(){

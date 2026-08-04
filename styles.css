@@ -4809,4 +4809,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   @keyframes bjHbar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
   :root[data-theme="ebook"] .bj-hbar{background:#eee;border:1px solid #000}
   :root[data-theme="ebook"] .bj-hbar i{background:#000}
-  .bj-hfoot{font:800 11px/1 'Nunito',sans-serif;color:var(--muted);text-align:center}
+  /* ★★★ v1.94.0:腳註與「點掉」那顆鈕同一列(使用者:「我希望有可以快速關掉的操作」)。
+     ⚠ 這一列是 flex 而不是「腳註一列 + 鈕一列」:過場的高度是被 `.bj-hlist` 的
+       `flex:1` 吃掉剩下的,多一列就等於中間那張表少一列(6 人局最需要那一列)。
+     ⚠ 腳註要 `min-width:0` + 省略號:連線那句多了「(全桌一起)」,390px 下會擠掉鈕
+       —— 而**被擠掉的一定要是文字,不是鈕**(鈕是這一版的主角)。 */
+  .bj-hend{display:flex;align-items:center;gap:8px;margin-top:2px}
+  .bj-hfoot{flex:1 1 auto;min-width:0;font:800 11px/1.3 'Nunito',sans-serif;
+    color:var(--muted);text-align:left;overflow:hidden;text-overflow:ellipsis}
+  /* ⚠ 高度寫得比一般 .btn 矮一階:它住在過場裡,而過場的空間要留給那張表。 */
+  .bj-hskip{flex:0 0 auto;padding:7px 14px;font-size:13px;white-space:nowrap}

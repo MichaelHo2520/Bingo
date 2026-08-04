@@ -58,8 +58,11 @@ const MP = MPCore.create((function(){
   /* 一局結算後停多久再開下一局(= 過場開著的時間;全桌都要看得到結果)。
      ★★ v1.92.0 從 3200 拉到 3600:這一段從「一句飄走的 toast」變成一塊要**讀**的過場
        (每一家的押注 / 點數 / ±籌碼 / 手上多少)。
+     ★★★ v1.94.0 再拉到 6000(使用者:「最後結算的畫面時間太短了」)——
+       ⚠ 敢拉這麼長的**前提是同一版給了「點掉」那顆鈕**(見 board.js 八之四):
+         只加長會變成「每一局都在等」。兩件事要一起改。
      ⚠ 單機有自己的一份(solo 的 SETTLE_MS)—— **數字要一樣**,改一邊記得改另一邊。 */
-  const SETTLE_MS = 3600;
+  const SETTLE_MS = 6000;
   let ctx = null;
 
   let rules = BJ.defRules();              // 大廳的房規(房主可改;開局後看的是 game.rules)
@@ -190,12 +193,25 @@ const MP = MPCore.create((function(){
     // 這一局是不是整場最後一局(★ 與 advance() 那條判斷同一個算式)
     const perR = BJ.handsPerRound((bj.rot || []).length, r.hands);
     const last = (bj.rd + 1 >= r.rounds) && (bj.k + 1 >= perR);
+    const seq = bj.seq;
     BJB.showHand({
       st: st, names: nms, me: me, sc: sc,
       chips: seatsOf().map(id => r.start + ((bj.nets && bj.nets[id]) || 0)),
-      key: ctx.roundId() + ":" + bj.seq,
+      key: ctx.roundId() + ":" + seq,
       title: "第 " + (bj.rd + 1) + "/" + r.rounds + " 輪 · 第 " + (bj.k + 1) + " 局 · 結算",
-      foot: last ? "這一場打完了…" : "準備下一局…",
+      /* ★★★ v1.94.0:看完可以點掉(使用者:「時間太短了…我希望有可以快速關掉的操作」)。
+         ⚠⚠ 連線是**全桌一起跳**(誰先按誰推進)—— 那本來就是這一頁「不指定房主」的
+           設計:`advance()` 是交易,守衛是 `b.over` + `seq`,與**到期推進走同一支**。
+           所以鈕上與腳註**一定要講明「全桌一起」**:不講的話按的人不知道自己把別人
+           正在讀的畫面也翻掉了(而那會變成現場的小爭執)。
+         ⚠ 這裡**不可以**自己寫一份「換局」邏輯 —— 兩份推進真相的症狀是
+           「同一局在不同裝置變成不同的下一局」。 */
+      /* ⚠ v1.94.0:這一句講**進度條在幹嘛** + **按了會影響誰** ——
+         舊的「準備下一局…」與旁邊那顆鈕講同一件事,而它們並排在同一列。
+         ★ 「全桌一起」四個字不可以拿掉:那是連線與單機**唯一**的行為差別。 */
+      foot: last ? "時間到會自動看結果" : "時間到會自動開下一局(誰按都是全桌一起)",
+      skipTxt: last ? "看結果 ▸" : "下一局 ▸",
+      onSkip: function(){ if(playing()) advance(seq); },
       ms: Math.max(600, phaseAt + SETTLE_MS - Date.now())
     });
   }

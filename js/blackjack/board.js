@@ -56,8 +56,11 @@ const BJB = (function(){
   /* ★★ 「一局結束的過場」開著沒有 / 開的是哪一局(v1.92.0,見八之四)。
      與 betPend / grabOpen 同一類:**純畫面狀態**,不進 DB、不進 st、不影響任何判定。
      ⚠ handKey 是**去重**用的:過場開著的時候每一次 paint 都會叫 showHand 一次
-       (連線一個快照一次),沒有它結算聲會一直重播。 */
-  let handKey = "", handOn = false;
+       (連線一個快照一次),沒有它結算聲會一直重播。
+     ⚠ handDone 是 v1.94.0 加的:**已經被使用者點掉的那一局** —— 連線送出 advance 之後
+       要等一次交易來回,那期間 paint() 照樣會叫 showHand,沒有它過場會閃回來。
+     ⚠ hSkip 是呼叫端給的「按下去要做什麼」(單機 = 立刻換局 / 連線 = 送 advance)。 */
+  let handKey = "", handOn = false, handDone = "", hSkip = null;
 
   /* ==========================================================================
      一、牌面
@@ -1089,7 +1092,7 @@ const BJB = (function(){
        (單機是 "solo:1"),不清的話那一局的結算聲會被去重當成「已經響過了」。 */
   function resetAnnounce(){
     anPrev = null; anKey = ""; anCaught = null; anRev = false; anBets = null;
-    grabOpen = false; handKey = "";
+    grabOpen = false; handKey = ""; handDone = "";
   }
 
   /* ==========================================================================
@@ -1211,15 +1214,33 @@ const BJB = (function(){
           過場裡也有牌(結算了,全部翻開),放進 stage 就會把那條不變量弄壞
      ⚠ 蓋住整個 `.bj-play`(含動作列)是**刻意的**:那一段動作列只有一行字,而
        「過場」的意思就是把畫面接管一下。表情 / 麥克風在房間框上,沒有被蓋到。
-     ⚠ 這一頁沒有「跳過」鈕:連線要全桌同時看到同一段(不能有人先跳掉),
-       而單機獨立一份就是兩份會走鐘的推進邏輯。
+
+     ── ★★★ v1.94.0:**看完可以點掉**(使用者:「最後結算的畫面時間太短了,
+        然後我希望有可以快速關掉的操作」)────────────────────────────────────────
+       兩件事一起改才對:**窗口加長**(3.6 → 6 秒,6 人局那張表要讀得完)
+       + **點一下就換下一局**。只加長會變成「每一局都在等」,只給鈕又還是讀不完。
+       ★★ 「按了會發生什麼事」由**呼叫端**給(`v.onSkip`)—— 面板只有這一份:
+            單機 → 立刻跑 `nextRound()`(取消還沒響的那一次 later)
+            連線 → 送 `advance(seq)`,與**到期推進走同一支**(交易守衛一樣是 `b.over` + `seq`)
+         ⚠⚠ 所以連線**是全桌一起跳**(誰先按誰推進;那本來就是這一頁「不指定房主」的
+            設計)—— 鈕上與腳註一定要講明「全桌一起」,不然按的人不知道自己把別人的
+            畫面也翻掉了。這一版刻意接受它:受眾是坐在一起的親友,
+            「好了下一局」本來就是有人喊的。
+       ⚠ v1.92.0 那條註解(「這一頁沒有跳過鈕:連線要全桌同時看到同一段」)**已經被
+         這一版推翻**,不要照舊文件加回去。
+       ⚠ **能點的只有那顆鈕與卡片外面的空白**(`.bj-hcard` 本身不吃點擊)——
+         中間那張表是可以捲的,整片都能點的話「捲到一半手指離開」會誤跳。
+       ⚠ 點掉之後要記住「這一局已經點掉了」(`handDone`):連線送出 advance 之後
+         要等一次交易來回,那期間 paint() 照樣會叫 showHand → 過場會閃回來。
      ========================================================================== */
-  /* v = { st, names[], me, sc, chips[], key, title, foot, ms } */
+  /* v = { st, names[], me, sc, chips[], key, title, foot, ms, skipTxt, onSkip } */
   function showHand(v){
     const box = $("bjHand");
     if(!box || !v || !v.st || !v.sc) return;
+    if(v.key === handDone) return;          // ★ 這一局已經被點掉了(見檔頭最後那條 ⚠)
     const fresh = (v.key !== handKey);
     handKey = v.key; handOn = true;
+    hSkip = (typeof v.onSkip === "function") ? v.onSkip : null;
     box.innerHTML = handHTML(v);
     box.classList.add("show");
     /* ★ 結算聲只在**第一次**開的時候響(去重就是 handKey 的存在理由),
@@ -1233,10 +1254,21 @@ const BJB = (function(){
   function hideHand(){
     if(!handOn) return;                    // ★ 每次 paint 都會叫一次 → 沒開就什麼都不做
     handOn = false;
+    hSkip = null;
     const box = $("bjHand");
     if(!box) return;
     box.classList.remove("show");
     box.innerHTML = "";
+  }
+  /* 使用者點掉過場(那顆鈕 / 卡片外面的空白)。★ 先收畫面再通知呼叫端 ——
+     連線那一側會送交易,晚一步的話那一格還亮著、看起來像沒吃到(同 grabOpen 那條)。 */
+  function skipHand(){
+    if(!handOn) return;
+    const fn = hSkip;
+    handDone = handKey;                    // ★ 記住「這一局點掉了」→ 重畫不會閃回來
+    hideHand();
+    Sound.takeback();                      // 很輕的一聲「收起來」(與停手同一顆)
+    if(fn) fn();
   }
   function handHTML(v){
     const st = v.st, sc = v.sc, me = v.me;
@@ -1264,7 +1296,16 @@ const BJB = (function(){
                 而且時有時無(v1.91.0 踩過),所以守門一律看這個 inline 值。 */
              '<div class="bj-hbar" style="--bj-hdur:' +
                (Math.max(400, v.ms || 3000) / 1000) + 's"><i></i></div>' +
-             '<div class="bj-hfoot">' + esc(v.foot || "準備下一局…") + '</div>' +
+             /* ★★★ v1.94.0:看完可以點掉(使用者:「我希望有可以快速關掉的操作」)。
+                ⚠ 鈕上的字由**呼叫端**給:最後一局要寫「看結果」而不是「下一局」,
+                  而「這是不是最後一局」只有呼叫端算得出來(連線的一輪長度會變)。
+                ⚠ 這一列要**在進度條下面**:它是「不想等就按」,而進度條是「還剩多久」——
+                  順序反過來讀起來像「按了才開始倒數」。 */
+             '<div class="bj-hend">' +
+               '<span class="bj-hfoot">' + esc(v.foot || "準備下一局…") + '</span>' +
+               '<button class="btn primary bj-hskip" type="button">' +
+                 esc(v.skipTxt || "下一局 ▸") + '</button>' +
+             '</div>' +
            '</div>';
   }
 
@@ -1370,6 +1411,17 @@ const BJB = (function(){
     stage = $("bjStage");
     acts = $("bjActs");
     hAct = h && h.onAct;
+    /* ★★★ 過場的「點掉」(v1.94.0)。
+       ⚠ **只認那顆鈕與卡片外面的空白** —— `.bj-hcard` 裡面那張表是可以捲的,
+         整片都能點的話「捲到一半手指離開」會誤跳一局(而那一局就再也看不到了)。
+       ⚠ 綁在這裡(掛載時一次)而不是每次 showHand 重綁:過場的 innerHTML 每一次
+         重畫都會換掉,重綁就會疊上好幾層監聽(同一下點擊送出好幾次 advance)。 */
+    const hand = $("bjHand");
+    if(hand){
+      hand.addEventListener("click", e => {
+        if(e.target.closest(".bj-hskip") || e.target === hand) skipHand();
+      });
+    }
     /* ★★★ 牌桌上點人抓人(v1.87.0)。
        ⚠ 只認 `data-grab` —— 那個屬性只有 boxHTML 在「抓人展開 + 我是莊家 +
          BJ.canGrab 說抓得動」時才發,所以這裡不必也**不可以**再判斷一次相位
@@ -1433,8 +1485,8 @@ const BJB = (function(){
     dealSfx, chipSfx, revealSfx, settleSfx, evSfx, primeVoice,
     // 給 e2e 用:抓人那一排展開了沒(純畫面狀態)
     _grabOpen: () => grabOpen,
-    // 給 e2e 用:過場開著沒 / 開的是哪一局(純畫面狀態)
-    _handOn: () => handOn, _handKey: () => handKey,
+    // 給 e2e 用:過場開著沒 / 開的是哪一局 / 哪一局被點掉了(全是純畫面狀態)
+    _handOn: () => handOn, _handKey: () => handKey, _handDone: () => handDone,
     /* 給 e2e 用:版型的算式(v1.88.1)—— **餵尺寸進去**,不吃畫面。
        ★ 這是「一列幾格挑牌最大的那一種」唯一測得到的角度:
          真的靠視窗量的話,斷言會跟著跑測試的視窗大小飄。 */
