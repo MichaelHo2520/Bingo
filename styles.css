@@ -1148,12 +1148,16 @@
      ⚠ 兩欄掛在 index.html 自己包的 .gc-grid 上,**不可以**改成 #homePick{display:grid}
         —— 「現在有人在玩」看板 #hlLive 是它的兄弟,會被塞進格子變半格寬。
      ⚠ 卡片的 margin-top 換成 grid 的 gap:兩者並存會讓第二列以後多一段空白。 */
-  .gc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  /* ⚠ grid-auto-rows:1fr = **每一列都一樣高**。不加的話「現在有人在玩」的徽章
+     一出現就只把它那一列撐高 26px,八張卡高低不齊(截圖才看得出來)。 */
+  .gc-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:10px;margin-top:12px}
 
   /* 遊戲卡:插圖在上、名稱在下、整張居中(button 與 <a> 共用同一個外觀)。
      ⚠ 名稱**不設 nowrap** —— 「麻將消消樂」在窄機上要換行也好過被裁掉;
-        grid 的同一列本來就等高,某張卡多一行不會把版面推歪。 */
-  .game-card{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+        grid 的同一列本來就等高,某張卡多一行不會把版面推歪。
+     ⚠ justify-content:center 是搭配上面那條等高用的:卡片被拉高時內容要留在中間,
+        靠上(flex-start)會在名稱底下留一塊空白。 */
+  .game-card{display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:8px;width:100%;text-align:center;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:20px;
     padding:14px 10px;cursor:pointer;color:var(--text);
@@ -1194,7 +1198,15 @@
   @media (max-height:560px){
     .home-brand{font-size:clamp(19px,5vw,26px);min-height:clamp(20px,5.5vw,28px)}
     .home-pick-head{margin:4px 0 10px}
-    .gc-grid{gap:8px;margin-top:9px}
+    /* ⚠⚠ 矮視窗(橫置手機 900x430)一定要**四欄** —— 兩欄是 4 列,量出來
+       4×91 + 頂列 + panel padding ≈ 480 > 430,而首頁的捲動不在 document 上
+       → 最後一列不是「要捲」而是**直接被裁掉看不到**(截圖才看得出來:
+       診斷器那時還報 needScroll=no,是量錯容器的假綠 —— 要問的是
+       「最後一張卡的下緣還在視窗裡嗎」)。
+       ⚠ 三欄(3 列)也**不夠**:「現在有人在玩」的徽章一出現就把每格撐高 26px,
+         量出來 lastBottom=435/430 —— 差 5px 就看不到最後一列。四欄 = 2 列,
+         連上面那塊 #hlLive 看板一起出現都還有餘裕。 */
+    .gc-grid{grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px}
     .game-card{padding:10px 8px;gap:6px}
     .gc-art{width:44px;height:44px}
     .gc-name{font-size:17px}
@@ -1655,7 +1667,9 @@
   /* 哪個遊戲的房間 —— 首頁三個遊戲混在一起列,沒有這顆會分不出來 */
   .hl-tag{flex:none;font-size:12px;font-weight:800;color:var(--muted);
     padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.14);white-space:nowrap}
-  /* 遊戲卡上的即時徽章:接在 .gc-desc 下面自成一行(.gc-body 是 column) */
+  /* 遊戲卡上的即時徽章:接在 .gc-name 下面自成一行(.gc-body 是 column)。
+     ⚠ v1.89.0 首頁改成一行兩張的窄卡之後,居中那條在上面
+       (.gc-body .hl-badge{align-self:center},兩層 → 蓋掉這裡的 flex-start)。 */
   .hl-badge{align-self:flex-start;margin-top:2px;font-size:11.5px;font-weight:800;
     padding:2px 8px;border-radius:999px;white-space:nowrap;
     background:rgba(34,197,94,.16);color:#22c55e}
@@ -1728,8 +1742,8 @@
   .mk-r{fill:var(--mj-jz);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
   .mk-g{fill:var(--mj-jf);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
   :root[data-theme="ebook"] .mk-bd{fill:#fff;stroke:#000}
-  /* 「調校中」標記(v1.58.1):首頁第五張遊戲卡與台灣麻將進場頁共用。
-     .gc-body 是 flex column,所以接在 .gc-desc 後面會自成一行(同 .hl-badge 的作法)。
+  /* 「調校中」標記(v1.58.1):台灣麻將進場頁在用(首頁那張卡 v1.89.0 精簡掉了)。
+     .gc-body 是 flex column,所以接在 .gc-name 後面會自成一行(同 .hl-badge 的作法)。
      用 align-self:flex-start,不然在 column 裡會被拉滿整列、色塊變成一長條。
      ⚠ 顏色用琥珀(同 .hl-badge[data-state="busy"] 那組警示色),不要拿 --mj-jf 的綠 ——
        綠字在紫底上 11px 幾乎讀不到(截圖才看得出來,色碼看不出來)。 */
