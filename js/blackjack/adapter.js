@@ -55,7 +55,11 @@
 
 const MP = MPCore.create((function(){
 
-  const SETTLE_MS = 3200;                 // 一局結算後停多久再開下一局(全桌都要看得到結果)
+  /* 一局結算後停多久再開下一局(= 過場開著的時間;全桌都要看得到結果)。
+     ★★ v1.92.0 從 3200 拉到 3600:這一段從「一句飄走的 toast」變成一塊要**讀**的過場
+       (每一家的押注 / 點數 / ±籌碼 / 手上多少)。
+     ⚠ 單機有自己的一份(solo 的 SETTLE_MS)—— **數字要一樣**,改一邊記得改另一邊。 */
+  const SETTLE_MS = 3600;
   let ctx = null;
 
   let rules = BJ.defRules();              // 大廳的房規(房主可改;開局後看的是 game.rules)
@@ -63,6 +67,11 @@ const MP = MPCore.create((function(){
   let st = null;                          // 這一局的真相(BJ.replay)
   let curRound = null;                    // ★ 新場判定一律用 roundId
   let phaseKey = "", phaseAt = 0;         // 這一段的錨點(本地時鐘;各台差幾百毫秒無妨)
+  /* 上一次的相位**名字**(v1.92.0)。★ 存在理由只有一個:發牌那一聲的判準是
+     「**從 bet 換過來**」而不是「現在是 play」—— 開局兩張就到 21 / 爆的局會直接
+     bet → dealer,用「現在是 play」的話那一局沒有發牌聲。
+     ⚠ 它與 phaseKey 一定要一起清(fresh / resetRound / backToLobby / onLeave 四處)。 */
+  let phaseNm = "";
   let phaseT = null;
   let baseNets = {};                      // 開局那一刻每個人的累積分快照(結果卡用)
 
@@ -123,11 +132,15 @@ const MP = MPCore.create((function(){
       betDone[i] = (bj.bets && bj.bets[id] !== undefined);
     });
 
-    /* ★ 公告(爆 / 21 點 / 過五關)—— 與單機**共用 board.js 的同一支**,所以這裡只有一行。
+    /* ★ 公告(爆 / 21 點 / 過五關 / 被抓 / **有人押注** / **莊家翻牌**)—— 與單機
+       **共用 board.js 的同一支**,所以這裡只有一行。
        ⚠ key 一律用 roundId + seq:換場**與**換局都要把上一份記錄清掉,
-         而 seed 那條(prev === null 就只記不響)擋掉進場 / 重連 / 批次同步的亂響。 */
+         而 seed 那條(prev === null 就只記不響)擋掉進場 / 重連 / 批次同步的亂響。
+       ⚠ v1.92.0 起要一起餵 betDone:「押好的人多了一個」就響一聲籌碼(那一段 st 是 null)。
+         舊版連線**別人押注一點聲音都沒有** —— 單機在動作點插了一行、連線沒有,
+         那正是「兩邊各寫一份」走鐘的標準症狀。 */
     const key = ctx.roundId() + ":" + bj.seq;
-    BJB.announce({ st: betting() ? null : st, names: nms, me: me, key: key });
+    BJB.announce({ st: betting() ? null : st, names: nms, me: me, key: key, betDone: betDone });
 
     BJB.render({
       st: betting() ? null : st, n: n, me: me, names: nms,
@@ -158,7 +171,33 @@ const MP = MPCore.create((function(){
       cdMs: secOn() ? gRules.sec * 1000 : 0,
       cdEnd: secOn() ? phaseAt + winMs() : 0
     });
+    paintHand(ph, me, nms);
     ctx.renderPlayers();
+  }
+
+  /* ★★★ 一局結束的過場(v1.92.0)—— 與單機**共用 BJB.showHand 那一支**。
+     使用者:「每一把結束到底誰贏多少誰輸多少有點不太明確,乾脆搞個中間的過場」。
+     ⚠⚠ 判準是 **`bj.over`**(結算真的寫進 DB 了)而不是只看 `ph === "over"`:
+       `phaseName()` 在 `st.phase === "over"` 的那一刻就回 "over",但那時 `bj.nets`
+       還沒加上這一局 → 過場的「手上多少」會先印舊值、下一個快照才跳對,
+       而那個閃動剛好落在最需要看清楚的那一格。代價只是晚一次交易來回(~100~300ms)。
+     ⚠ 進度條吃的是**剩下多久**(不是整段 SETTLE_MS):過場比相位晚開那一點點。 */
+  function paintHand(ph, me, nms){
+    if(ph !== "over" || !bj || !bj.over){ BJB.hideHand(); return; }
+    const sc = settleNow();
+    if(!sc){ BJB.hideHand(); return; }
+    const r = gRules || rules;
+    // 這一局是不是整場最後一局(★ 與 advance() 那條判斷同一個算式)
+    const perR = BJ.handsPerRound((bj.rot || []).length, r.hands);
+    const last = (bj.rd + 1 >= r.rounds) && (bj.k + 1 >= perR);
+    BJB.showHand({
+      st: st, names: nms, me: me, sc: sc,
+      chips: seatsOf().map(id => r.start + ((bj.nets && bj.nets[id]) || 0)),
+      key: ctx.roundId() + ":" + bj.seq,
+      title: "第 " + (bj.rd + 1) + "/" + r.rounds + " 輪 · 第 " + (bj.k + 1) + " 局 · 結算",
+      foot: last ? "這一場打完了…" : "準備下一局…",
+      ms: Math.max(600, phaseAt + SETTLE_MS - Date.now())
+    });
   }
 
   /* 動作列那一句話。★ 只講「現在在等什麼」,不透露任何牌情。 */
@@ -554,8 +593,8 @@ const MP = MPCore.create((function(){
     lobbyGame(){ return { rules: null, bj: null }; },
     resetRound(){
       clearPhaseT();
-      bj = null; gRules = null; st = null; curRound = null; phaseKey = ""; phaseAt = 0;
-      BJB.resetAnnounce(); BJB.stopCd();
+      bj = null; gRules = null; st = null; curRound = null; phaseKey = ""; phaseNm = ""; phaseAt = 0;
+      BJB.resetAnnounce(); BJB.stopCd(); BJB.hideHand();
     },
     newGame(ids){
       /* ★★★ v1.88.0:座位**不再洗牌** —— seats 的順序就是桌上的「第幾家」(座位號碼),
@@ -581,7 +620,7 @@ const MP = MPCore.create((function(){
       const rid = ctx.roundId();
       const fresh = (rid !== curRound);           // ★ 新場一律看 roundId
       if(!isPlaying){ bj = null; st = null; gRules = null; return; }
-      if(fresh){ curRound = rid; phaseKey = ""; BJB.resetAnnounce(); }
+      if(fresh){ curRound = rid; phaseKey = ""; phaseNm = ""; BJB.resetAnnounce(); }
 
       gRules = BJ.normRules(g.rules);             // ⚠ 讀凍結的那一份,不是房間欄位
       bj = g.bj || null;
@@ -596,12 +635,20 @@ const MP = MPCore.create((function(){
       /* 這一段的錨點:相位名字變了就重新起算(公開資訊,全桌看得到同一個環)。
          ⚠ key 要含 seq —— 不含的話「上一局的 bet」與「這一局的 bet」是同一個字串,
            換局時倒數不會重新起算(而症狀是新的一局一開始就只剩幾秒)。 */
-      const pk = bj.seq + ":" + phaseName();
+      const ph0 = phaseName();
+      const pk = bj.seq + ":" + ph0;
       if(pk !== phaseKey){
-        phaseKey = pk;
+        const fromBet = (phaseNm === "bet");
+        phaseKey = pk; phaseNm = ph0;
         phaseAt = Date.now();
-        if(!fresh && phaseName() === "play" && mySeat() >= 0 &&
-           seatsOf()[mySeat()] !== dealerPid()) Sound.turn();
+        /* ★★ v1.92.0:「押注收齊 → 牌刷出去」那一聲 —— dealSfx 的**兩個呼叫點之一**
+           (另一個在 solo.maybeDeal)。舊版這裡是 Sound.turn()(Bingo 的「換你了」叮咚),
+           而且只有**非莊家的閒家**聽得到 —— 發牌是全桌同時發生的事,大家都該聽到。
+           ⚠ 判準是「從 bet 換過來」不是「現在是 play」:兩張就到 21 / 爆的局會直接
+             bet → dealer(見 phaseNm 的註解)。
+           ⚠ `!fresh` 那一關要留:重連 / 第一次同步時相位一定「剛變」,
+             不擋的話一進房就刷一串發牌聲(同 announce 的 seed 那條)。 */
+        if(!fresh && fromBet && ph0 !== "bet") BJB.dealSfx(nSeats() * 2);
       }
       armPhaseT();
       paint();
@@ -614,8 +661,8 @@ const MP = MPCore.create((function(){
     enterLobby(){ clearPhaseT(); showScreen("lobby"); },
     backToLobby(){
       clearPhaseT();
-      bj = null; gRules = null; st = null; curRound = null; phaseKey = "";
-      BJB.resetAnnounce(); BJB.stopCd();
+      bj = null; gRules = null; st = null; curRound = null; phaseKey = ""; phaseNm = "";
+      BJB.resetAnnounce(); BJB.stopCd(); BJB.hideHand();
       showScreen("lobby");
     },
     enterPlaying(){
@@ -624,11 +671,17 @@ const MP = MPCore.create((function(){
       baseNets = {};
       ctx.order().forEach(id => { baseNets[id] = ctx.scoreOf(id); });
       BJB.resetAnnounce();
+      BJB.hideHand();
+      /* ★ 四句喊牌語音先載好(爆了 / 21 點 / 過五關 / 抓)—— 語音槽沒有合成音後備,
+         懶載入的話「這一場第一次爆」永遠沒聲音(見 board.js primeVoice)。
+         ⚠ 這裡已經在使用者手勢之後(他剛按了「準備好了」)→ AudioContext 解得開。 */
+      BJB.primeVoice();
     },
     onLeave(){
       clearPhaseT();
-      bj = null; gRules = null; st = null; curRound = null; phaseKey = ""; baseNets = {};
-      BJB.resetAnnounce(); BJB.stopCd();
+      bj = null; gRules = null; st = null; curRound = null;
+      phaseKey = ""; phaseNm = ""; baseNets = {};
+      BJB.resetAnnounce(); BJB.stopCd(); BJB.hideHand();
     },
 
     /* ---------- 大廳設定列 / 房間框徽章 ---------- */
@@ -678,8 +731,10 @@ const MP = MPCore.create((function(){
       const net = (bj.nets && bj.nets[id]) || 0;
       const chip = (gRules ? gRules.start : rules.start) + net;
       /* ★ 座位號碼(v1.88.0):輪莊照號碼往下輪 → 晶片列也要看得出誰是第幾家。
-         ⚠ 大廳沒有座位表 → seatOf 回 -1,chipHTML 就不畫那顆徽章(號碼要開局才定)。 */
-      return BJB.chipHTML(chip, net, id === dealerPid(), seatOf(id));
+         ⚠ 大廳沒有座位表 → seatOf 回 -1,chipHTML 就不畫那顆徽章(號碼要開局才定)。
+         ⚠ v1.92.0:chipHTML 不再吃 net(「±多少」那一格拿掉了)—— 這一把賺賠多少
+           由**過場**講,晶片列只答「他現在有多少錢」(見 board.js chipHTML)。 */
+      return BJB.chipHTML(chip, id === dealerPid(), seatOf(id));
     },
     lobbyStatusText(ids){ return ids.length < 2 ? "等待其他人加入…" : "等待大家準備…"; },
     readyHint(ids, ready){
@@ -692,6 +747,7 @@ const MP = MPCore.create((function(){
     outcome(w, { iWon, ids }){
       clearPhaseT();
       BJB.stopCd();
+      BJB.hideHand();                  // ★ 過場收掉,換整場的結果卡上場(v1.92.0)
       const me = mySeat();
       const nets = (bj && bj.nets) || {};
       const seats = seatsOf();

@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.91.0";
+const VERSION = "1.92.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -115,6 +115,19 @@ const CORE = [
        列了不存在的檔會讓整批快取失敗(離線變成整個不能玩)。 */
   "./mp3/big2/la.wav",
   "./mp3/big2/pass.wav",
+  /* 台式21點的喊牌語音(v1.92.0,tools/gen-bj-voice.ps1 產生)。
+     ★ 四句都是**公開事件**、而且都已經是 board.js announce 的 diff:
+       爆了 / 二十一點 / 過五關 / 抓 —— 要牌與停一局要響十幾次,刻意不配語音
+       (那是台灣麻將講過的「報帳機」)。
+     ⚠ 這一組**有東西可以墊**(同大老二那兩格):動作聲那一層(bustSfx / bjSfx /
+       dragonSfx / grabSfx)照舊會響,語音只是疊在上面 —— 所以離線抓不到不會啞掉。
+       但照樣列進來:使用者聽慣人聲,忽然只剩音階會被當成壞掉。
+     ⚠ 這四個檔一定要**與這幾行同一版進 repo**:addAll() 是全有全無的,
+       列了不存在的檔會讓整批快取失敗(離線變成整個不能玩)。 */
+  "./mp3/bj/bust.wav",
+  "./mp3/bj/bj.wav",
+  "./mp3/bj/dragon.wav",
+  "./mp3/bj/grab.wav",
   "./mp3/是要多久.m4a",
   "./mp3/啊西好了沒.m4a",
   "./mp3/快點，來不急啦.m4a",

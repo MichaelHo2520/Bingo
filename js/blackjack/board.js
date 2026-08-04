@@ -53,6 +53,11 @@ const BJB = (function(){
      不進 DB、不進 st、不影響任何判定,所以住在盤面這一層就只有一份。
      ⚠ 換局 / 換相位 / 抓完一家都要收掉,不然下一段會頂著一排名字鈕。 */
   let grabOpen = false;
+  /* ★★ 「一局結束的過場」開著沒有 / 開的是哪一局(v1.92.0,見八之四)。
+     與 betPend / grabOpen 同一類:**純畫面狀態**,不進 DB、不進 st、不影響任何判定。
+     ⚠ handKey 是**去重**用的:過場開著的時候每一次 paint 都會叫 showHand 一次
+       (連線一個快照一次),沒有它結算聲會一直重播。 */
+  let handKey = "", handOn = false;
 
   /* ==========================================================================
      一、牌面
@@ -156,14 +161,20 @@ const BJB = (function(){
         兩份的配色要一起改才會一致 —— 那正是這個專案最痛的那類走鐘,所以先併起來再改色。
      ★ 兩樣都是**公開資訊**(誰當莊全場都看得到;籌碼是結算過的歷史)。
      ⚠ 這一格一個字都不准提牌 —— 這一頁唯一藏起來的是莊家那張暗牌,而它在盤面上。
-     · chip 手上的籌碼(= 起始 + 淨變化)· net 這一場的淨變化(可以是負的) */
-  function chipHTML(chip, net, isDealer, seat){
+     · chip 手上的籌碼(= 起始 + 淨變化)
+
+     ── ★★★ v1.92.0:後面那一格「±N」拿掉了 ──────────────────────────────────────
+       使用者:「最上方的房間框裡面只要顯示最後有多少錢,不要再顯示後面的加減多少」。
+       ★ 理由不只是長度(6 人 + 座位號 + 🎩 + 💰 + ±N 一列本來就很擠),而是**一格一件事**:
+         晶片列答的是「他**現在**有多少錢」,而「這一把賺賠多少」從這一版起由**過場**
+         (showHand,見八之四)專門講 —— 那正是使用者說「有點不太明確」的那件事。
+       ⚠ 淨變化沒有消失,它還在**兩個**地方:過場那一列的 ±N、結果卡排名表的 ±N 欄。
+       ⚠ 參數也一起拿掉(不是留著不畫):留著的話呼叫端會繼續算一個沒人用的數字,
+         而下一個人讀到 `chipHTML(chip, net, …)` 只會以為是漏畫了。 */
+  function chipHTML(chip, isDealer, seat){
     return (typeof seat === "number" && seat >= 0 ? snHTML(seat) : "") +
            (isDealer ? '<span class="bj-chd" title="這一局的莊家">🎩 莊</span>' : "") +
-           '<span class="bj-chc" title="手上的籌碼">💰<b>' + chip + '</b>' +
-             (net ? '<i class="' + (net > 0 ? "up" : "down") + '">' +
-                    (net > 0 ? "+" : "") + net + '</i>' : "") +
-           '</span>';
+           '<span class="bj-chc" title="手上的籌碼">💰<b>' + chip + '</b></span>';
   }
 
   /* ★★★ 座位號碼(「第幾家」)—— v1.88.0 加的,**單機與連線共用這一支**。
@@ -831,12 +842,12 @@ const BJB = (function(){
        ⚠⚠ 莊家的事件要等 `st.reveal` —— 沒翻牌就喊「莊家 21 點」等於把暗牌講出來。
      ========================================================================== */
   let anPrev = null, anKey = "", anCaught = null;
+  let anRev = false;          // 上一次畫的時候「莊家翻牌了沒」(★ 翻底牌那一聲的 diff)
+  let anBets = null;          // 下注那一段:{ key, n } —— 押好的人數,多一個就響一聲籌碼
 
-  /* 這一頁的聲音刻意**全部是合成音**(沒有語音檔)。
-     ⚠ 哪天要補「爆了 / 21 點」的人聲(照大老二那兩格),音效槽一定要帶 `{ el:true }` ——
-       使用者是**直接用瀏覽器開網頁**(`file://`),那時 fetch 被擋,
-       沒有它永遠載不到音檔,而且**在 http:// 下完全測不出來**(大老二 v1.81.0 真的漏過);
-       而音檔進 mp3/ 要**同一版**補 sw.js 的 CORE(addAll 是全有全無)。 */
+  /* ★★★ v1.92.0 起這一頁**不再是「全部合成音」** —— 四個公開事件多了一層人聲
+     (見下面的 VOICE / evSfx)。合成音一格都沒有拿掉:那一層是「發生了什麼」的動作聲,
+     人聲是「有人喊出來」,真牌桌上兩個同時有(照台灣麻將 sfx.js 那兩層的結論)。 */
   function bustSfx(){
     if(typeof Sound === "undefined") return;
     // 下行兩音 + 尾巴滑下去 = 爆了(與 21 點的上行完全相反,不看畫面也分得出來)
@@ -876,11 +887,135 @@ const BJB = (function(){
     Sound.tone(494, { type: "square", dur: 0.22, vol: 0.22, delay: 0.20 });
   }
 
+  /* ==========================================================================
+     七之二、★★★ v1.92.0 新增的四種聲音(使用者:「我想要加入一些音效,
+                麻煩你參考其他的遊戲,看看有什麼音效可以加進來」)
+     ──────────────────────────────────────────────────────────────────────────
+       盤點過八個遊戲之後,這一頁少的**不是「更多聲音」而是四個沒有聲音的節點**:
+         ① 發牌      舊版只有一聲 Sound.turn()(那是 Bingo 的「換你了」叮咚)——
+                     而「押注收齊 → 牌刷出去」是這一頁節奏感最強的一刻
+         ② 押注      舊版用 Sound.place()(= 牌拍到桌上),可是下注那一段桌上還沒有牌;
+                     而且**連線那邊別人押注完全沒聲音**(只有單機在動作點插了一行)
+         ③ 翻底牌    莊家掀開暗牌 —— 台式 21 點最戲劇的一刻,舊版一點聲音都沒有
+         ④ 一局結算  單機播 Sound.win()/lose()(整首勝敗音檔),連線**完全沒有**
+       ⚠⚠ 頻率一律留在 500Hz 以上:手機與筆電的小喇叭 300Hz 以下幾乎沒有輸出 ——
+         台灣麻將 v1.61.0 上線後第一個回報(「試玩了一下,沒有聽到」)就是這條
+         (notes/11 第三節)。低頻可以留一點當厚度,絕不能讓它當主體。
+     ========================================================================== */
+  /* ① 發牌:一張一張刷出去(★ **兩個呼叫點共用這一支** —— 單機 maybeDeal / 連線相位換手)。
+     ⚠ 張數要夾上限:6 人局是 12 張,12 聲會變成一串雜訊 —— 聽得出「刷刷刷」就夠了。 */
+  const DEAL_MAX = 6;
+  function dealSfx(cards){
+    if(typeof Sound === "undefined") return;
+    const n = Math.max(2, Math.min(DEAL_MAX, cards || 2));
+    for(let i = 0; i < n; i++)
+      Sound.tone(760 + (i % 2) * 130, { type: "triangle", dur: 0.055, vol: 0.16,
+                                        delay: i * 0.075, slideTo: 500 });
+  }
+  /* ② 籌碼推出去:金屬的「叮」。★ 走 announce 的 diff(**呼叫點只有一個**)——
+     單機的電腦押注與連線收到的快照因此是同一條路,不必兩邊各插一行 Sound.place()。
+     ⚠ 音量刻意壓在 .16:一局要響 n−1 次(6 人局 5 次),大聲一點就變催促。 */
+  function chipSfx(){
+    if(typeof Sound === "undefined") return;
+    Sound.tone(1245, { type: "sine", dur: 0.05, vol: 0.16 });
+    Sound.tone(1661, { type: "sine", dur: 0.09, vol: 0.12, delay: 0.035 });
+  }
+  /* ③ 莊家翻底牌:一聲往上掀 + 一顆亮點。
+     ⚠ 它是**最低優先權**:同一個 diff 裡莊家剛好爆了 / 21 點的話,那兩聲才是主角
+       (announce 的 snd 只留一個,見那裡的優先權那一行)。 */
+  function revealSfx(){
+    if(typeof Sound === "undefined") return;
+    Sound.tone(392, { type: "triangle", dur: 0.13, vol: 0.22, slideTo: 740 });
+    Sound.tone(1109, { type: "sine", dur: 0.16, vol: 0.14, delay: 0.10 });
+  }
+  /* ④ 一局結算(★ 過場開的那一刻響一次,單機與連線共用 —— 去重由 showHand 負責)。
+     ⚠⚠ **不可以**改用 Sound.win() / Sound.lose():那是整首勝敗音檔(0.5~1 秒以上),
+       而一場有十幾局 —— 每一局放一次會膩到讓人想關音效。那兩個留給**整場**結束
+       (單機 finishMatch / 連線 outcome 照舊)。 */
+  function settleSfx(delta){
+    if(typeof Sound === "undefined") return;
+    if(delta > 0)
+      [659, 880, 1175].forEach((f, i) =>
+        Sound.tone(f, { type: "triangle", dur: 0.13, vol: 0.24, delay: i * 0.075 }));
+    else if(delta < 0){
+      Sound.tone(440, { type: "triangle", dur: 0.13, vol: 0.20 });
+      Sound.tone(294, { type: "triangle", dur: 0.26, vol: 0.20, delay: 0.10, slideTo: 220 });
+    }else
+      Sound.tone(587, { type: "sine", dur: 0.20, vol: 0.18 });     // 平手:不上不下的一聲
+  }
+
+  /* ==========================================================================
+     七之三、★★★ 喊牌語音(v1.92.0)—— 照大老二 v1.81.1 那一套
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 只有**公開事件**配語音,而且只有這四格:爆了 / 21 點 / 過五關 / 抓 ——
+         它們本來就是牌桌上會喊出來的四句,而且**都已經是 announce 的 diff**
+         (要牌 / 停一局要響十幾次,配語音就是台灣麻將講過的「報帳機」)。
+       ★ 與合成音是**分開的兩層**,刻意不互相取代:合成音是動作聲、語音是有人喊出來。
+       ⚠⚠ 音效槽一定要帶 `{ el:true }` —— 使用者是**直接用瀏覽器開網頁**(`file://`),
+         那時 fetch 被擋,沒有它**永遠載不到音檔**、只會退回合成音,
+         而且**在 http:// 下完全測不出來**(大老二 v1.81.0 真的漏了)。
+       ⚠ 語音槽**沒有合成音後備**(synth 傳 null):音檔取不到就是不講話 ——
+         拿音階去墊會變成同一個事件響兩次很像的聲音(台灣麻將 sfx.js 的同一條)。
+       ⚠ 音檔進 mp3/bj/ 要**同一版**補 sw.js 的 CORE(addAll 是全有全無)。
+       ⚠ 嫌某一句吵就**把那個 wav 刪掉**,自動退回只有合成音 —— 程式一行都不用改。 */
+  const VOICE = ["bust", "bj", "dragon", "grab"];
+  const SYNTH = { bust: bustSfx, bj: bjSfx, dragon: dragonSfx, grab: grabSfx };
+  let defed = false;
+  function ensureDefs(){
+    if(defed || typeof Sound === "undefined" || !Sound.def) return;
+    defed = true;
+    VOICE.forEach(k => Sound.def("bjv" + k, ["mp3/bj/" + k + ".wav"], null, { el: true }));
+  }
+  /* 一個公開事件的聲音 = 動作聲 + 喊出來那一句。★ **呼叫點只有 announce 一個**。
+     ⚠ 語音壓在動作聲後面 90ms:太近人耳會融成一團,太遠又像回音(同 M16Sfx.play)。 */
+  function evSfx(k){
+    if(typeof Sound === "undefined") return;
+    if(SYNTH[k]) SYNTH[k]();
+    if(VOICE.indexOf(k) < 0 || !Sound.sfx) return;
+    ensureDefs();
+    setTimeout(() => { if(typeof Sound !== "undefined" && Sound.sfx) Sound.sfx("bjv" + k); }, 90);
+  }
+  /* 進牌桌時先把四個語音檔載好。
+     ⚠ 這不是效能優化而是**正確性**:音效槽是懶載入的,而語音層沒有合成音可以墊 ——
+       不預載的話「這一場第一次爆」永遠是沒聲音的(音檔那時才開始飛),
+       使用者只會覺得「有時候有、有時候沒有」(台灣麻將 M16Sfx.preload 的同一條)。
+     ⚠ 呼叫時機一定要在**已經有使用者手勢之後**(單機 startMatch / 連線 enterPlaying),
+       不然只是白白建立一個解不開的 AudioContext。 */
+  function primeVoice(){
+    if(typeof Sound === "undefined" || !Sound.prime) return;
+    ensureDefs();
+    VOICE.forEach(k => Sound.prime("bjv" + k));
+  }
+
+  /* ★★★ v1.92.0:下注那一段的 diff —— 「押好的人多了一個」就響一聲籌碼。
+     ★ 走 diff 而不是在動作點插一行的理由與其他四種事件逐字相同:單機的電腦押注
+       (solo.aiBets 的 later)與連線收到的快照是**完全不同的路徑**,但「有人押了」
+       在兩邊是同一個 diff。舊版單機在動作點插了 Sound.place(),而**連線那邊
+       別人押注一點聲音都沒有** —— 那就是「兩邊各寫一份」走鐘的標準症狀。
+     ⚠ 種子(key 換了 / 第一次)一律**只記不響**:同 announce 那一條,
+       它擋掉「進場 / 重連 / 批次同步 / 換局」四種亂響(6 人局會一次響 5 聲)。 */
+  function betDiff(v){
+    const done = (v && v.betDone) || null;
+    if(!done){ anBets = null; return; }
+    let cnt = 0;
+    for(let i = 0; i < done.length; i++) if(done[i]) cnt++;
+    const key = (v.key || "") + "/bet";
+    if(anBets === null || anBets.key !== key){ anBets = { key: key, n: cnt }; return; }
+    if(cnt > anBets.n) chipSfx();
+    anBets.n = cnt;
+  }
+
   /* 每次重畫都叫一次(單機 solo.paint() / 連線 adapter.paint() 各一行)。
-     v = { st, names[], me, key } —— key 就是「這是哪一局」。 */
+     v = { st, names[], me, key, betDone[] } —— key 就是「這是哪一局」。
+     ⚠ betDone 只在**下注那一段**有意義(那時 st 是 null,見兩個呼叫端)。 */
   function announce(v){
     const st = v && v.st;
-    if(!st || !st.hands){ anPrev = null; anCaught = null; return; }
+    if(!st || !st.hands){
+      anPrev = null; anCaught = null; anRev = false;
+      betDiff(v);                                   // ★ 下注那一段唯一的事件
+      return;
+    }
+    anBets = null;                                  // 牌發出來了 → 下注那一段的記錄丟掉
     const now = [], caught = [];
     for(let s = 0; s < st.n; s++){
       /* ⚠⚠ v1.86.0:**每個看不到牌的座位**都要記成「沒事」,不只莊家 ——
@@ -889,8 +1024,9 @@ const BJB = (function(){
       now[s] = hidden ? 0 : (R.valueOf(st.hands[s]).bust ? 1 : st.tier[s] + 2);
       caught[s] = st.caught[s] >= 0 ? 1 : 0;
     }
+    const rev = !!st.reveal;                        // ★ v1.92.0:莊家翻底牌那一聲的 diff
     if(anPrev === null || v.key !== anKey){
-      anKey = v.key; anPrev = now; anCaught = caught; return;
+      anKey = v.key; anPrev = now; anCaught = caught; anRev = rev; return;
     }
     let snd = null;
     /* ★ 抓人是公開事件(被抓的人牌當場翻開)→ 喊得出來。
@@ -900,7 +1036,7 @@ const BJB = (function(){
       if(caught[s] && anCaught && !anCaught[s]){
         const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
         showToast((s === v.me ? "你被抓了" : ("莊家抓 " + nm)) + " 🎯", 2000);
-        snd = grabSfx;
+        snd = "grab";
       }
     }
     anCaught = caught;
@@ -908,17 +1044,30 @@ const BJB = (function(){
       if(now[s] === anPrev[s]) continue;
       const nm = (v.names && v.names[s]) || ("玩家" + (s + 1));
       const who = (s === v.me) ? "你" : nm;
-      if(now[s] === 1){ showToast(who + " 爆了 💥", 1800); snd = snd || bustSfx; }
-      else if(now[s] === R.T_DRAGON + 2){ showToast(who + " 過五關!五張不爆 🐉", 2400); snd = dragonSfx; }
-      else if(now[s] === R.T_BJ + 2){ showToast(who + " 21 點! 🎯", 2000); if(snd !== dragonSfx) snd = bjSfx; }
+      if(now[s] === 1){ showToast(who + " 爆了 💥", 1800); snd = snd || "bust"; }
+      else if(now[s] === R.T_DRAGON + 2){ showToast(who + " 過五關!五張不爆 🐉", 2400); snd = "dragon"; }
+      else if(now[s] === R.T_BJ + 2){ showToast(who + " 21 點! 🎯", 2000); if(snd !== "dragon") snd = "bj"; }
     }
     anPrev = now;
+    /* ★★★ v1.92.0:莊家掀開暗牌 —— 台式 21 點最戲劇的一刻(舊版一點聲音都沒有)。
+       ⚠ 判斷式還是**只有 st.reveal 一個字**(rules.js 那條紅線);這裡記的是
+         「它剛剛才變成 true」,不是自己另外算一套「大家都停手了吧」。
+       ⚠ 它是**最低優先權**(`!snd` 才響):同一個 diff 裡莊家剛好爆了 / 21 點的話,
+         那兩聲才是主角 —— 翻牌聲會把它們蓋掉。 */
+    if(rev && !anRev && !snd) snd = "reveal";
+    anRev = rev;
     /* ★ 一次重畫只響一聲:批次同步時有可能兩家同時爆,響兩聲會疊成噪音。
-       ⚠ 優先權是「過五關 > 21 點 > 爆」(上面那三行的 snd 賦值就是在做這件事)。 */
-    if(snd) snd();
+       ⚠ 優先權是「過五關 > 21 點 > 爆 > 翻牌」(上面幾行的 snd 賦值就是在做這件事)。 */
+    if(snd === "reveal") revealSfx();
+    else if(snd) evSfx(snd);                        // ★ 動作聲 + 喊出來那一句兩層
   }
-  // 換局 / 離場:把 diff 的種子清掉(下一次只記不響)+ 收掉抓人那一排
-  function resetAnnounce(){ anPrev = null; anKey = ""; anCaught = null; grabOpen = false; }
+  /* 換局 / 離場:把 diff 的種子清掉(下一次只記不響)+ 收掉抓人那一排。
+     ⚠ v1.92.0 起也要清掉**過場的 key**:再打一場時第一局的 key 會與上一場一樣
+       (單機是 "solo:1"),不清的話那一局的結算聲會被去重當成「已經響過了」。 */
+  function resetAnnounce(){
+    anPrev = null; anKey = ""; anCaught = null; anRev = false; anBets = null;
+    grabOpen = false; handKey = "";
+  }
 
   /* ==========================================================================
      八、結果卡的結算表 —— ★ 這裡莊家的暗牌一定是翻開的
@@ -1010,6 +1159,93 @@ const BJB = (function(){
   }
 
   /* ==========================================================================
+     八之四、★★★ 一局結束的過場(v1.92.0)—— 單機與連線**共用這一份**
+     ==========================================================================
+       使用者:「現在每一把結束到底誰贏多少誰輸多少有點不太明確,乾脆搞個中間的過場,
+       用來顯示輸贏多少」。
+
+     ── 舊版為什麼「不太明確」(這是根因,不是感受)────────────────────────────
+       一局結束時「誰贏多少」只有兩個地方在講,而兩個都只講**我自己**:
+         ① 一句 2.4 秒的 toast(「本局:你 +5 籌碼 · 點數比莊家大」)
+         ② 動作列那一行同樣的字
+       別人賺賠多少完全沒有畫出來 —— 要自己看牌桌上的點數去推,而那時牌剛翻開、
+       toast 又在飄。晶片列的「±N」是**整場累計**,不是這一把,所以它反而更容易誤讀。
+
+     ── 這一版做什麼 ──────────────────────────────────────────────────────────
+       把那一段(SETTLE_MS,本來就存在的窗口)升級成**蓋在牌桌上的一塊過場**:
+         · 大字   = 我這一把 ±多少(贏綠、輸紅、平手灰)
+         · 一句話 = 為什麼(BJ.tagTxt)+ 我手上剩多少
+         · 一張表 = 每一家的「押多少 / 幾點 / 為什麼 / ±多少 / 手上多少」+ 攤開的牌
+         · 進度條 = 這一段還剩多久(倒數環被過場蓋住了,所以它自己要講)
+       ★★ 那張表就是結果卡在用的 **BJB.resultHTML(同一支)** —— 不是長得很像的第二份。
+          兩份的下場看 CLAUDE.md 那一整串(全螢幕 / 表情 / 罐頭句都踩過)。
+
+     ── ⚠ 為什麼它是 `.bj-play` 的**絕對定位兄弟**,不是 `#bjStage` 的子節點 ────────
+       ① `render()` 每次都重寫 `stage.innerHTML` —— 放進去就會被吹掉
+       ② 絕對定位不占版面 → planTable 量的 `#bjPlay` / 動作列高度**一個像素都沒變**
+          (牌的大小只吃「人數 + 視窗」那條紅線因此完全沒鬆)
+       ③ 牌情的守門不變量是「**`#bjStage`** 裡的 `.bj-card.back` 張數 = Σ hiddenIdx」——
+          過場裡也有牌(結算了,全部翻開),放進 stage 就會把那條不變量弄壞
+     ⚠ 蓋住整個 `.bj-play`(含動作列)是**刻意的**:那一段動作列只有一行字,而
+       「過場」的意思就是把畫面接管一下。表情 / 麥克風在房間框上,沒有被蓋到。
+     ⚠ 這一頁沒有「跳過」鈕:連線要全桌同時看到同一段(不能有人先跳掉),
+       而單機獨立一份就是兩份會走鐘的推進邏輯。
+     ========================================================================== */
+  /* v = { st, names[], me, sc, chips[], key, title, foot, ms } */
+  function showHand(v){
+    const box = $("bjHand");
+    if(!box || !v || !v.st || !v.sc) return;
+    const fresh = (v.key !== handKey);
+    handKey = v.key; handOn = true;
+    box.innerHTML = handHTML(v);
+    box.classList.add("show");
+    /* ★ 結算聲只在**第一次**開的時候響(去重就是 handKey 的存在理由),
+       而且刻意慢 320ms —— 翻牌那一刻 announce 可能剛喊完「21 點」/「爆了」,
+       兩聲疊在一起會糊成一團。 */
+    if(!fresh) return;
+    const row = (v.me >= 0 && v.sc.rows) ? v.sc.rows[v.me] : null;
+    const d = row ? row.delta : 0;
+    setTimeout(() => { if(handOn && handKey === v.key) settleSfx(d); }, 320);
+  }
+  function hideHand(){
+    if(!handOn) return;                    // ★ 每次 paint 都會叫一次 → 沒開就什麼都不做
+    handOn = false;
+    const box = $("bjHand");
+    if(!box) return;
+    box.classList.remove("show");
+    box.innerHTML = "";
+  }
+  function handHTML(v){
+    const st = v.st, sc = v.sc, me = v.me;
+    const row = (me >= 0 && sc.rows) ? sc.rows[me] : null;
+    const d = row ? row.delta : 0;
+    const chip = (v.chips && me >= 0) ? v.chips[me] : null;
+    /* 大字:我這一把 ±多少。★ 我當莊時 row.delta 就是「通吃 / 通賠」的總和(settle 已經算好),
+       所以這裡一個特判都不用寫。⚠ 中途加入還沒上桌的人(me < 0)沒有這一格。 */
+    const big = (me < 0) ? "旁觀" : ((d > 0 ? "+" : "") + d);
+    const cls = (me < 0) ? "none" : (d > 0 ? "up" : (d < 0 ? "down" : "even"));
+    const why = (me < 0) ? "這一局你還沒上桌 —— 下一局就發你牌"
+      : (R.tagTxt(row ? row.tag : "") +
+         (row && row.caught >= 0 ? "(被抓時莊 " + row.dBest + ")" : "") +
+         (chip !== null && chip !== undefined ? " · 手上 " + chip : ""));
+    return '<div class="bj-hcard">' +
+             '<div class="bj-httl">' + esc(v.title || "本局結算") + '</div>' +
+             '<div class="bj-hbig ' + cls + '">' + esc(big) + '</div>' +
+             '<div class="bj-hwhy">' + esc(why) + '</div>' +
+             '<div class="bj-hlist">' +
+               resultHTML(st, v.names || [], me, sc, v.chips || null, "") +
+             '</div>' +
+             /* 進度條:這一段還剩多久。★ 動畫時長寫成 **inline 的 CSS 變數**
+                (逐字沿用倒數環那條 `--cd-dur` 的做法)—— 量 computed 的
+                animationDuration 在 headless 的 virtual-time 下會被壓成 0.001s
+                而且時有時無(v1.91.0 踩過),所以守門一律看這個 inline 值。 */
+             '<div class="bj-hbar" style="--bj-hdur:' +
+               (Math.max(400, v.ms || 3000) / 1000) + 's"><i></i></div>' +
+             '<div class="bj-hfoot">' + esc(v.foot || "準備下一局…") + '</div>' +
+           '</div>';
+  }
+
+  /* ==========================================================================
      八之三、★ 房規清單 —— 單機與連線**共用這一份**
      ──────────────────────────────────────────────────────────────────────────
        ★★ 使用者的原話:「剛開始的時候我把規則寫清楚,記得要一條一條的線,
@@ -1049,9 +1285,18 @@ const BJB = (function(){
     L.push("<b>不會被淘汰</b> —— 籌碼可以打到負的,排名看的是「賺賠多少」。");
     L.push("<b>閒家同時補牌</b>,不必等別人;莊家最後才動。");
     L.push("A 算 <b>1 或 11</b>(畫面會同時顯示兩種點數);超過 21 就爆。");
+    /* ★★★ v1.92.0:**牌型大小**一定要有自己一行(使用者:「現在過五關跟 blackjack
+       到底是誰比較大,然後有真的都賠兩倍嗎」)。
+       ★ 舊版只各寫「21 點賠 N 倍」「過五關賠 2 倍」兩行 —— 兩個**階**誰大完全沒講,
+         而它是 settle 的第一條判斷(t > dt 就直接贏,不看點數)。
+       ⚠ 括號裡那個例子不是裝飾:「15 點贏 21 點」看起來像 bug,不舉例沒有人會相信。 */
+    L.push("<b>牌型大小</b> —— " + (r.dragon ? "<b>過五關 &gt; 21 點 &gt;</b> " : "<b>21 點 &gt;</b> ") +
+           "普通點數,爆掉最小;<b>階不一樣就直接比階、不看點數</b>" +
+           (r.dragon ? "(五張 15 點的過五關<b>贏</b>莊家的 21 點)" : "") + "。");
     L.push("<b>21 點</b> = 前兩張就湊到 21,賠 <b>" + r.bjPay + " 倍</b>。");
     L.push(r.dragon
-      ? "<b>過五關</b> = 五張牌不爆,賠 <b>2 倍</b>(莊家也能報,那就通吃全場)。"
+      ? ("<b>過五關</b> = 五張牌不爆,賠 <b>2 倍</b>(莊家也能報,那就通吃全場)" +
+         (r.bjPay < 2 ? " —— 目前設定下它<b>比 21 點賠得多</b>" : ";與 21 點<b>同樣是 2 倍</b>") + "。")
       : "<b>過五關關掉了</b> —— 五張不爆只是普通手,照點數比大小。");
     L.push("<b>不做</b>加倍 / 分牌 / 保險 / 投降 —— 想賭大一點就在下注那一段押多一點。");
     /* ★★★ v1.86.0:補牌線是**莊閒都適用的下限**(使用者:「莊家跟玩家都要一同遵守」)。
@@ -1143,12 +1388,20 @@ const BJB = (function(){
   return {
     mount, render, renderActs, resultHTML, matchHTML, rulesHTML, chipHTML, stopCd,
     cardHTML, backCard, cardsHTML, pipHTML, handOf, ptOf,
-    // 公告(單機與連線共用):爆 / 21 點 / 過五關 / **被抓**
+    // 公告(單機與連線共用):爆 / 21 點 / 過五關 / **被抓** / **有人押注** / **莊家翻牌**
     announce, resetAnnounce,
+    // ★★ 一局結束的過場(v1.92.0,單機與連線共用一份)
+    showHand, hideHand,
     // 一個動作的聲音(四個呼叫點共用)
     moveSfx, bustSfx, bjSfx, dragonSfx, grabSfx,
+    /* ★★ v1.92.0 新加的四種聲音 + 喊牌語音。
+       ⚠ dealSfx 有**兩個呼叫點**(單機 maybeDeal / 連線相位換手)→ 兩條接線斷言;
+         chipSfx / revealSfx / settleSfx 各只有一個(announce / showHand 裡面)。 */
+    dealSfx, chipSfx, revealSfx, settleSfx, evSfx, primeVoice,
     // 給 e2e 用:抓人那一排展開了沒(純畫面狀態)
     _grabOpen: () => grabOpen,
+    // 給 e2e 用:過場開著沒 / 開的是哪一局(純畫面狀態)
+    _handOn: () => handOn, _handKey: () => handKey,
     /* 給 e2e 用:版型的算式(v1.88.1)—— **餵尺寸進去**,不吃畫面。
        ★ 這是「一列幾格挑牌最大的那一種」唯一測得到的角度:
          真的靠視窗量的話,斷言會跟著跑測試的視窗大小飄。 */

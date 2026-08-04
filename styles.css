@@ -3938,32 +3938,36 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      使用者:「顯示每個人剩下多少籌碼,這部分的配色需要可以讓籌碼看的明顯一點」。
      原本是 10.5px 的 var(--muted) 純文字,擠在名字後面幾乎看不到,
      而它是這個遊戲**唯一的計分板**(21 點比的就是籌碼)。
-     ★ 改成金色膠囊 + 12px 的粗體數字:與旁邊的「🎩 莊」同一組視覺語言(都是金的),
-       而 ± 那一小段維持綠 / 紅(那是「這一場賺賠」,與「手上多少」是兩件事)。
+     ★ 改成金色膠囊 + 12px 的粗體數字:與旁邊的「🎩 莊」同一組視覺語言(都是金的)。
      ⚠ 高度要與「🎩 莊」一致(都是 padding 1px + 行高 1.4)——
        晶片列是 nowrap 單行的,兩者不等高會讓整列的基線歪掉。
      ⚠ .mp-chip.turn 那一格底色會變成 accent(亮橘)→ 金膠囊在上面會糊掉,
-       所以下面補一條反白(深底亮字);不補的話「輪到誰」那一格的籌碼反而最難讀。 */
+       所以下面補一條反白(深底亮字);不補的話「輪到誰」那一格的籌碼反而最難讀。
+     ── ★★★ v1.92.0:「±N」那一小段(.bj-chc i,綠 / 紅)整組拿掉了 ──────────────────
+       使用者:「最上方的房間框裡面只要顯示最後有多少錢,不要再顯示後面的加減多少」。
+       ★ 那一格講的是**整場累計**,而玩家在結算那一刻想知道的是**這一把**賺賠多少 ——
+         兩個數字擺在一起最容易誤讀,所以「這一把」交給**過場**(.bj-hand)專門講。
+       ⚠ 淨變化沒有消失:過場那一列的 ±N + 結果卡排名表的 ±N 欄都還在。 */
   .bj-chc{display:inline-flex;align-items:center;gap:2px;white-space:nowrap;
     padding:1px 6px;border-radius:7px;
     background:rgba(255,210,74,.18);box-shadow:0 0 0 1px rgba(255,210,74,.42) inset;
     font:800 10px/1.4 'Nunito',sans-serif;color:#ffe9a8}
   .bj-chc b{font:900 12px/1 'Fredoka','Nunito',sans-serif;color:#fff4d2;letter-spacing:.2px}
-  .bj-chc i{font-style:normal;font-weight:900;font-size:10px}
-  .bj-chc i.up{color:var(--bj-grn)}
-  .bj-chc i.down{color:var(--bj-redlit)}
   .mp-chip.turn .bj-chc{background:rgba(0,0,0,.26);box-shadow:none;color:#fff1c4}
   .mp-chip.turn .bj-chc b{color:#fff}
-  .mp-chip.turn .bj-chc i.up{color:#0d3b12}
-  .mp-chip.turn .bj-chc i.down{color:#5c0d0d}
   :root[data-theme="ebook"] .bj-chc{background:#fff;color:#000;border:1px solid #000;box-shadow:none}
-  :root[data-theme="ebook"] .bj-chc b,:root[data-theme="ebook"] .bj-chc i{color:#000}
+  :root[data-theme="ebook"] .bj-chc b{color:#000}
 
   /* ---------- 牌桌 ----------
      ⚠ .bj-acts 一定要 flex:none —— .bj-play 底下只能有一個可壓縮的兄弟,
        兩個都可壓縮時可視高度不足會按內容高度分攤,盤面高度反過來取決於自己的內容
        (台灣麻將 v1.58.4 的 ResizeObserver 迴圈,見 notes/11 第六節)。 */
-  .bj-play{flex:1 1 auto;min-height:0;width:var(--bj-tw);
+  /* ⚠ position:relative 是 v1.92.0 加的:一局結束的過場(#bjHand)是它的**絕對定位兄弟**,
+       靠這一行才蓋得住整塊牌桌(見檔尾的 .bj-hand)。
+     ⚠ **不可以**順手給 z-index —— 給了它就變成一個 stacking context,
+       而覆蓋層(結果卡 .veil z-index:50 / 表情層 .emote-fly-layer z-index:64)是
+       position:fixed 的全域元素,被困在裡面就會被盤面內容穿過去(消消樂 v1.56.0 的坑)。 */
+  .bj-play{flex:1 1 auto;min-height:0;width:var(--bj-tw);position:relative;
     display:flex;flex-direction:column;align-items:stretch;gap:8px}
   /* z-index:0 讓盤面自成一個 stacking context —— 覆蓋層(結果卡 / 設定蓋板)不該有
      任何機會被盤面內容穿過去(消消樂 v1.56.0 就是少了這一行)。
@@ -4736,3 +4740,69 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-box.target{border-color:#ffffff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
   .bj-gtip{background:#ffffff;color:#1d2b1f}
   :root[data-theme="ebook"] .bj-box.target{border-color:#000}
+
+  /* ==========================================================================
+     ★★★ 一局結束的過場(v1.92.0)—— #bjHand · BJB.showHand / hideHand
+     ==========================================================================
+       使用者:「現在每一把結束到底誰贏多少誰輸多少有點不太明確,乾脆搞個中間的過場,
+       用來顯示輸贏多少」。
+
+     ★ 它是 `.bj-play` 的**絕對定位兄弟**(不是 #bjStage 的子節點),理由三條寫在
+       board.js 八之四與 blackjack.html 那個節點上面 —— 摘要:render() 會吹掉 stage 的
+       innerHTML、絕對定位不占版面(牌的大小一個像素都沒變)、而且牌情的守門不變量
+       量的是「#bjStage 裡的 .bj-card.back 張數」。
+     ⚠ z-index 只要壓得過同一層的 .bj-stage(它是 z-index:0)就夠了 ——
+       結果卡(.veil 50)與表情層(64)一定要還在它上面,所以**不要往上加**。
+     ⚠ 蓋住整個 .bj-play(含動作列)是刻意的:那一段動作列只有一行字,而
+       「過場」的意思就是把畫面接管一下。表情 / 麥克風在房間框上,沒有被蓋到。
+     ========================================================================== */
+  /* ⚠ 遮罩要**夠不透明**(.93):第一版是 .74,看圖才發現底下牌桌的牌會從結算表
+     每一列之間的縫隙透出來 —— 那一列本身是半透明的,兩層疊起來就是一片花。
+     ★ blur 只讓它「有層次」,擋不擋得住靠的是這個 alpha(截圖看得出來、斷言看不出來)。 */
+  .bj-hand{position:absolute;inset:0;z-index:3;display:none;
+    align-items:center;justify-content:center;padding:5px;border-radius:12px;
+    background:rgba(8,12,18,.93);backdrop-filter:blur(3px)}
+  .bj-hand.show{display:flex}
+  :root[data-theme="ebook"] .bj-hand{background:#fff;backdrop-filter:none}
+  /* ★★ **只有中間那張表會捲**(逐字照房規面板 v1.87.0 那一組:`.bj-rules-card` +
+     `.set-body`)—— 6 人局的結算表 + 六排牌在橫置手機(430px 高)一定超出,
+     而第一版是「整張卡自己捲」→ 進度條與「準備下一局…」被推到捲軸下面,
+     於是**最需要看到的「還剩多久」反而看不到**。
+     ⚠⚠ 這兩條(卡片 overflow:hidden + 表格 flex:1 + min-height:0 + overflow-y:auto)
+       **一定要一起在**:只給 overflow:hidden 會讓下面幾列靜靜地被裁掉而且捲不到
+       (CLAUDE.md 記的同一條)。 */
+  .bj-hcard{width:100%;max-height:100%;overflow:hidden;
+    display:flex;flex-direction:column;gap:4px;padding:9px 10px;border-radius:14px;
+    background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.035));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+  :root[data-theme="ebook"] .bj-hcard{background:#fff;border:2px solid #000;box-shadow:none}
+  .bj-httl{font:800 11px/1 'Nunito',sans-serif;color:var(--muted);
+    letter-spacing:.7px;text-align:center}
+  /* 大字 = 我這一把 ±多少。★ clamp 而不是三段 media query:這一格的字級只跟寬度有關,
+     而它在 390px 手機與 730px 矮視窗都要一眼看得到。 */
+  .bj-hbig{font:900 clamp(24px,8vw,36px)/1 'Fredoka','Nunito',sans-serif;
+    text-align:center;letter-spacing:.5px;color:#fff}
+  .bj-hbig.up{color:var(--bj-grn)}
+  .bj-hbig.down{color:var(--bj-redlit)}
+  /* 平手 / 旁觀:數字本身沒有方向 → 不給顏色,而且刻意小一號(它不是重點) */
+  .bj-hbig.even,.bj-hbig.none{font-size:clamp(18px,5.5vw,24px)}
+  :root[data-theme="ebook"] .bj-hbig,:root[data-theme="ebook"] .bj-hbig.up,
+  :root[data-theme="ebook"] .bj-hbig.down{color:#000}
+  .bj-hwhy{font:800 12px/1.35 'Nunito',sans-serif;color:#fff;text-align:center;opacity:.92}
+  :root[data-theme="ebook"] .bj-hwhy{color:#000}
+  /* ★ 這是卡片裡**唯一**可捲的一塊(見 .bj-hcard 那段的兩條)。
+     ⚠ min-height:0 少一個字,flex 子項就不肯縮到內容以下 → 又變成整張卡溢出。 */
+  .bj-hlist{flex:1 1 auto;min-height:0;overflow-y:auto;margin-top:1px}
+  /* 進度條 = 這一段還剩多久。★ 倒數環被過場蓋住了,所以它自己要講「等一下就開下一局」。
+     ⚠ 時長由 board.js 寫成 inline 的 --bj-hdur(逐字沿用倒數環 --cd-dur 那條做法)——
+       量 computed 的 animationDuration 在 headless 的 virtual-time 下會被壓成 0.001s
+       而且時有時無(v1.91.0 踩過),所以守門一律看那個 inline 值。 */
+  .bj-hbar{height:4px;border-radius:3px;margin-top:3px;overflow:hidden;
+    background:rgba(255,255,255,.16)}
+  .bj-hbar i{display:block;height:100%;width:100%;border-radius:3px;
+    background:var(--accent);transform-origin:left center;
+    animation:bjHbar var(--bj-hdur,3s) linear forwards}
+  @keyframes bjHbar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+  :root[data-theme="ebook"] .bj-hbar{background:#eee;border:1px solid #000}
+  :root[data-theme="ebook"] .bj-hbar i{background:#000}
+  .bj-hfoot{font:800 11px/1 'Nunito',sans-serif;color:var(--muted);text-align:center}

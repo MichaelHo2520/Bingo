@@ -29,7 +29,13 @@ const Solo = (function(){
   const ME = 0;                                  // 我固定坐 0 號位
   const NAMES = ["你", "阿發", "小美", "老K", "阿德", "阿慶嫂"];   // ★ v1.86.0 加到 6 人
   const OWN_KEY = "bj.solo.v1";
-  const SETTLE_MS = 2900;                        // 一局結算後停幾毫秒再開下一局
+  /* 一局結算後停幾毫秒再開下一局(= 過場開著的時間)。
+     ★★ v1.92.0 從 2900 拉到 3600:這一段從「一句飄走的 toast」變成一塊要**讀**的過場
+       (每一家的押注 / 點數 / ±籌碼 / 手上多少),6 人局那張表 2.9 秒讀不完。
+     ⚠ 連線那邊有自己的一份(adapter 的 SETTLE_MS)—— 兩邊刻意不共用:它同時是
+       「到期推進」的窗口長度,而那是連線特有的機制(單機沒有 timer 在搶)。
+       ★ 但**數字要一樣**,不然同一件事在兩邊的節奏不同(改一邊記得改另一邊)。 */
+  const SETTLE_MS = 3600;
 
   let level = "mid", seats = 4;
   let rules = BJ.defRules();
@@ -112,10 +118,12 @@ const Solo = (function(){
                           (s === d ? st.phase === "dealer" : (st.phase === "play" && !st.done[s])));
         /* ★ 座位號碼(v1.88.0)由 BJB.chipHTML 那一份畫(連線的 chipTail 走同一支)——
            原本那顆純裝飾的色點就不必了:號碼本身已經帶著同一組顏色。 */
+        /* ⚠ v1.92.0:chipHTML 不再吃 net(「±多少」那一格拿掉了,見 board.js 那段)——
+           這一把賺賠多少由**過場**講,晶片列只答「他現在有多少錢」。 */
         h += '<div class="mp-chip' + (isTurn ? " turn" : "") + (s === ME ? " me" : "") + '">' +
                '<span class="gmk-nm">' + esc(seatName(s)) + '</span>' +
                (s === ME ? '<span class="you-badge">你</span>' : "") +
-               BJB.chipHTML(chip, net, s === d, s) +
+               BJB.chipHTML(chip, s === d, s) +
              '</div>';
       }
       box.innerHTML = h;
@@ -131,7 +139,10 @@ const Solo = (function(){
       : ("🎴 " + seats + " 人 · " + recText(level));
   }
 
-  /* 動作列那一句話。★ 只講「現在在等什麼」,不透露任何牌情。 */
+  /* 動作列那一句話。★ 只講「現在在等什麼」,不透露任何牌情。
+     ⚠ v1.92.0 起結算那一段被**過場**蓋住了 → 下面那句話平常看不到。刻意留著:
+       混合快取(拿到新的 js 卻還吃著舊的 blackjack.html)時 `#bjHand` 不存在,
+       showHand 會早退 → 這一句就是那時唯一的結算資訊。 */
   function hintOf(){
     if(settled){
       const mine = settled.rows[ME];
@@ -166,14 +177,20 @@ const Solo = (function(){
     paintBar();
     const d = dealer();
     const nms = names();
-    /* ★ 公告(爆 / 21 點 / 過五關)—— 與連線**共用 board.js 的同一支**,所以這裡只有一行。
+    // 誰押好了(★ 畫面與公告的 diff **吃同一份** —— 算兩次就是兩份會錯開的真相)
+    const bd = [];
+    for(let s = 0; s < seats; s++) bd[s] = bets[s] !== undefined;
+    /* ★ 公告(爆 / 21 點 / 過五關 / 被抓 / **有人押注** / **莊家翻牌**)—— 與連線
+       **共用 board.js 的同一支**,所以這裡只有一行。
        ⚠ key 一律用「這是哪一局」:換局時它負責把上一局的記錄清掉,
-         而 seed 那條(prev === null 就只記不響)擋掉進場 / 換局的亂響。 */
-    BJB.announce({ st: betting ? null : st, names: nms, me: ME, key: "solo:" + round });
+         而 seed 那條(prev === null 就只記不響)擋掉進場 / 換局的亂響。
+       ⚠ v1.92.0 起要一起餵 betDone:「押好的人多了一個」就響一聲籌碼,而那一段 st 是 null。 */
+    BJB.announce({ st: betting ? null : st, names: nms, me: ME,
+                   key: "solo:" + round, betDone: bd });
     BJB.render({
       st: betting ? null : st, n: seats, me: ME, names: nms,
       bets: bets, betPhase: betting,
-      betDone: (function(){ const a = []; for(let s = 0; s < seats; s++) a[s] = bets[s] !== undefined; return a; })(),
+      betDone: bd,
       /* ★★ v1.90.0:`dsub`(莊家台的副標)拿掉了 —— 它吃的就是下面那一行的 hintOf(),
          上下各印一次同一句話(使用者:「裡面有很多資訊是重覆了」)。
          ★ 改傳 `dealer`:下注階段 st 還是 null,盤面靠它才知道莊家是誰
@@ -221,15 +238,21 @@ const Solo = (function(){
     for(let s = 0; s < seats; s++) nets[s] = 0;
     over = false; busy = false; active = true;
     BJB.resetAnnounce();
+    BJB.hideHand();
     closeWin();
     showScreen("solo");
     Sound.start();
+    /* ★ 四句喊牌語音先載好(爆了 / 21 點 / 過五關 / 抓)—— 語音槽沒有合成音後備,
+       懶載入的話「這一場第一次爆」永遠沒聲音(見 board.js primeVoice 的註解)。
+       ⚠ 這裡已經在使用者手勢之後(他剛按了「開始」),所以 AudioContext 解得開。 */
+    BJB.primeVoice();
     saveOwn();
     startRound();
   }
 
   function startRound(){
     bumpGen();
+    BJB.hideHand();                                // ★ 上一局的過場收掉(v1.92.0)
     round++;
     deal = BJ.newDeal();
     acts = [];
@@ -247,7 +270,7 @@ const Solo = (function(){
     bumpGen();
     active = false; over = false; busy = false; betting = false;
     st = null; settled = null;
-    BJB.resetAnnounce(); BJB.stopCd();
+    BJB.resetAnnounce(); BJB.stopCd(); BJB.hideHand();
     closeWin();
     showScreen("home");
     showHomeLayer("solo");        // 回到「電腦對決」那一層,方便換難度再來
@@ -273,7 +296,9 @@ const Solo = (function(){
       later(() => {
         if(!betting || bets[seat] !== undefined) return;
         bets[seat] = BJAI.bet(rules, nets[seat] || 0, level);
-        Sound.place();
+        /* ⚠ v1.92.0:這裡**不再**插一行 Sound.place() —— 籌碼那一聲改走
+           BJB.announce 的 diff(paint() 裡那一行),所以單機與連線是同一條路。
+           留著的話會與 diff 疊成兩聲。 */
         paint();
         maybeDeal();
       }, 240 + seat * 210);
@@ -286,8 +311,7 @@ const Solo = (function(){
     if(iAmDealer()){ showToast("這一局你當莊,不用下注"); return; }
     const b = BJ.clampBet(v, rules);
     bets[ME] = b;
-    Sound.place();
-    paint();
+    paint();                       // ⚠ 籌碼那一聲走 announce 的 diff(同 aiBets 那條)
     maybeDeal();
   }
   /* 全部押完 → 發牌。★ 「發牌」在這一頁只是把 betting 關掉:
@@ -296,7 +320,10 @@ const Solo = (function(){
     if(!betting || needBets()) return;
     betting = false;
     st = BJ.replay(deal, seats, dealer(), acts, rules);
-    Sound.turn();
+    /* ★★ v1.92.0:發牌那一刻改成「牌一張一張刷出去」(舊版是 Sound.turn() —— 那是
+       Bingo 的「換你了」叮咚,跟發牌沒關係)。★ 這是 dealSfx 的**兩個呼叫點之一**
+       (另一個在 adapter 的相位換手),兩邊各寫一份就是走鐘。 */
+    BJB.dealSfx(seats * 2);
     paint();
     later(drive, 420);
   }
@@ -422,12 +449,25 @@ const Solo = (function(){
     if(settled) return;
     settled = BJ.settle(st, bets, rules);
     for(let s = 0; s < seats; s++) nets[s] += (settled.rows[s] ? settled.rows[s].delta : 0);
-    const mine = settled.rows[ME];
-    if(mine && mine.delta > 0) Sound.win();
-    else if(mine && mine.delta < 0) Sound.lose();
     paint();
-    showToast("本局:你 " + (mine.delta > 0 ? "+" : "") + mine.delta + " 籌碼 · " +
-              BJ.tagTxt(mine.tag), 2400);
+    /* ★★★ v1.92.0:一局結算改成**蓋在牌桌上的過場**(使用者:「每一把結束到底誰贏多少
+       誰輸多少有點不太明確,乾脆搞個中間的過場」)。
+       ★ 舊版這裡有兩樣東西,兩樣都拿掉了:
+           ① 一句 toast(只講我自己,而且會飄走)→ 過場的大字 + 那張表講得更清楚
+           ② Sound.win() / Sound.lose()(**整首**勝敗音檔)→ 換成過場裡的短音
+              settleSfx:一場有十幾局,每局放一次整首會膩到讓人想關音效。
+              那兩個音檔留給**整場**結束(finishMatch 照舊)。
+       ★ 面板與文案只有一份(BJB.showHand)—— 連線那邊呼叫的是同一支。 */
+    const last = (k + 1 >= perRound()) && (rd + 1 >= rules.rounds);
+    BJB.showHand({
+      st: st, names: names(), me: ME, sc: settled,
+      // 手上的籌碼:nets 上面剛加完 → 這一格就是「這一把之後我有多少錢」
+      chips: (function(){ const a = []; for(let s = 0; s < seats; s++) a[s] = rules.start + (nets[s] || 0); return a; })(),
+      key: "solo:" + round,
+      title: "第 " + (doneRounds() + 1) + "/" + totalRounds() + " 局 · 結算",
+      foot: last ? "這一場打完了…" : "準備下一局…",
+      ms: SETTLE_MS
+    });
 
     // 下一局 / 下一輪 / 整場結束
     later(() => {
@@ -444,6 +484,7 @@ const Solo = (function(){
   function finishMatch(){
     over = true; busy = false;
     bumpGen();
+    BJB.hideHand();                    // ★ 過場收掉,換整場的結果卡上場(v1.92.0)
     // 名次看**淨變化**(見 board.js matchHTML 那段的紅線)
     const sorted = [];
     for(let s = 0; s < seats; s++) sorted.push({ s: s, net: nets[s] || 0 });
@@ -514,6 +555,8 @@ const Solo = (function(){
     // ★ _round / _k / _rd 是「幾局換莊」的守門要用的(要看得出同一個人連做了幾局)
     _round: () => round, _k: () => k, _rd: () => rd,
     _st: () => st,
+    // ★ 這一局結算中沒有(v1.92.0 的過場守門要拿它當「真相」對照畫面)
+    _settled: () => settled,
     _nets: () => nets.slice(),
     _bets: () => Object.assign({}, bets),
     _dealer: dealer

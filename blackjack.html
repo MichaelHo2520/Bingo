@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台式21點 ｜ 輪流當莊 · 莊家抓人 · 單機對電腦 + 2~6 人連線</title>
-<!-- 台式21點 · v1.91.0 -->
+<!-- 台式21點 · v1.92.0 -->
 <!-- ⚠ 顯示名改過兩次(21點 → 台式21點),而**資料的名字一個都沒動**:
        bj_rooms / bj_index / bjRules / bj.solo.v1 / bj.prefs.v1 / line / dragon
        —— 那些 key 已經寫在別人裝置的 DB 與 localStorage 裡(同 v1.85.0 五小龍那條)。
@@ -21,7 +21,7 @@
      ⚠⚠ 註解裡**一個字都不可以出現註解的結束標記** —— v1.87.0 真的踩到:
        那一串被當成註解結束,後面整段文字就漏到畫面最上面變成一行亂碼,
        而它**只有截圖看得出來**(DOM 量出來完全正常)。 -->
-<meta name="version" content="1.91.0">
+<meta name="version" content="1.92.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -266,6 +266,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 莊家 / 其他閒家 / 我的手牌,全部由 BJB.render() 畫 -->
     <div class="bj-stage" id="bjStage"></div>
     <div class="bj-acts hidden" id="bjActs"></div>
+    <!-- ★★★ 一局結束的過場(v1.92.0,BJB.showHand / hideHand 畫;單機與連線共用)
+         使用者:「現在每一把結束到底誰贏多少誰輸多少有點不太明確,乾脆搞個中間的過場」。
+         ⚠ 它一定要是 .bj-play 的**絕對定位兄弟**,不可以塞進 #bjStage:
+           ① render() 每次都重寫 stage.innerHTML → 放進去會被吹掉
+           ② 絕對定位不占版面 → planTable 量的高度一個像素都沒變(牌不會換大小)
+           ③ 牌情的守門不變量量的是「#bjStage 裡的 .bj-card.back 張數」,
+              而過場裡也有牌(結算了,全部翻開)—— 放進 stage 會把那條不變量弄壞 -->
+    <div class="bj-hand" id="bjHand" aria-live="polite"></div>
   </div>
 
   <!-- ====== 主要動作列 ====== -->
