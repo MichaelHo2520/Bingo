@@ -3,14 +3,17 @@
 /* ============================================================================
    大老二 — 盤面(B2B)。牌桌 / 我的手牌 / 動作列 / 結果卡的排名表全部由這裡畫。
 
-   ── ★ 這一頁刻意**沒有** JS 算牌寬(照排七的結論)──────────────────────────
+   ── ★ 尺寸誰算:**手牌交給 CSS · 桌上那副牌由 JS 量**(v1.101.0 之後)──────────
      台灣麻將的牌寬要靠 board.js 量高度再夾,為此長出地板 / 暖身期 / 二分回檢一整套
      ([notes/11](../../notes/11-台灣麻將16張.md) 第六節),因為那副牌的張數每一手都在變。
-     大老二的手牌**只會變少**、中間那塊自己可捲,
-     所以尺寸整份交給 CSS(flex + clamp),JS 只寫一個數字 ——
-     `--b2-slots`(**開局張數**,固定手牌的格位;它一整局都不變)。
-     那一整類「忽大忽小」的 bug 在這一頁結構上不存在。
-     ⚠ 不要為了「手牌少的時候放大一點」改回 JS 算,那正是忽大忽小的來源。
+     ★ **手牌**這一邊照排七的結論:整份交給 CSS(flex + clamp),JS 只寫一個數字 ——
+       `--b2-slots`(**開局張數**,固定手牌的格位;它一整局都不變)。
+       ⚠ 不要為了「手牌少的時候放大一點」改回 JS 算,那正是忽大忽小的來源。
+     ★★★ **桌上那副牌**(`.b2-card.mid`)v1.101.0 起由 `fitTrick()` 量出來
+       (使用者:「中間區域是不是要隨著不同的螢幕大小,讓裡面的牌大一點」)。
+       ⚠ 它與上面那條**不衝突**,界線是「吃什麼」而不是「誰算」:
+         fitTrick 只吃**人數 + 視窗**(而且列數 / 格寬都是量回來的)→ 一整局是常數;
+         忽大忽小的來源是吃**牌數 / 這一輪進行到哪**。整套理由見第二之二節。
 
    ── ★★ 手牌的位置一格都不准動(v1.78.0)──────────────────────────────────
      使用者兩輪回饋都在講這件事(「位置會一直變來變去」/「又會上上下下的」)。
@@ -162,7 +165,9 @@ const B2B = (function(){
      ── ★★ 「高度不准跳」在格子版怎麼守(接 v1.79.1 那兩層)──────────────────
        格數 = **人數**(一整局都不變),不是「有幾個人動過」→ 沒動過的座位
        照樣畫一格空的。所以這一塊的高度與「這一輪進行到哪」完全無關。
-       每一格的高 / 寬都是 CSS 算的(--b2-tph / --b2-tpw,五張牌 + 名字列的最壞情況),
+       每一格的高 / 寬還是「五張牌 + 名字列的最壞情況」(--b2-tph / --b2-tsw),
+       ★ v1.101.0 起那個「五張牌多寬」由 fitTrick() 量出來(見第二之二節)——
+         ⚠ 它吃的是**視窗**,不是這一輪的內容 → 下面這一條紅線一個字都沒鬆:
        ⚠ 空的格子與出五張牌的格子**一樣大** —— 少了這一條,同一個人從 Pass 變成
          出牌就會把整桌撐開一次(那正是使用者一路在講的「上上下下」)。
        ★ **列數也是常數**:v1.99.0 起版型寫在 CSS 的 grid-template-areas
@@ -316,7 +321,129 @@ const B2B = (function(){
   }
 
   /* ==========================================================================
-     ✗ 二之二、算牌表 —— **v1.78.0 拿掉了**
+     二之二、★★★ 桌上那副牌有多大 —— fitTrick()(v1.101.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「大老二,我們是不是中間區域要隨著不同的螢幕大小,讓裡面的牌大一點」
+
+     ── 為什麼舊版一定會小 ──────────────────────────────────────────────────
+       v1.100.0 的桌上牌寬是**寫死的比例**(--b2-cw × .66),而 `.b2-trick` 從 v1.79.0
+       起會**吃掉盤面剩下的垂直空間** —— 兩件事湊起來就是使用者截圖裡的畫面:
+       桌面很大、牌很小、格子四周空一大片(731×667 的視窗量出來:桌面 693 × 416,
+       牌只有 26px,而一格放得下 56px)。
+       ★ 這與台灣麻將那一整類「忽大忽小」**不是同一件事**:那是牌寬跟著**牌數**變,
+         這裡是跟著**視窗**變 —— 一整局是常數。
+
+     ── ★★ 界線(照21點 planTable 那一條)────────────────────────────────────
+       這一支只吃三種東西,三種都與「這一輪進行到哪」無關:
+         ① 量到的可用空間(.b2-trick 的內容框)—— 它是 flex:1,高度**不吃自己的內容**
+         ② 版型(幾列 / 哪一列是桌心 / 一格多寬)—— ★ 全部**從畫面量回來**;
+            JS 不可以自己再寫一份 areas 表(那是第二份真相,CSS 那三張才是真的)
+         ③ 一格「除了牌以外」的高度 —— 同樣量回來(照21點的 learnChrome:矮視窗那幾條
+            media query 一改 padding / 字級,寫死的常數就與現實錯開,而方向是裁牌)
+       ⚠⚠ **不可以**讓它吃「這一輪有幾個人出過牌 / 誰出了幾張」——
+         那一刻起「空的格子與出五張牌的格子一樣大」就破了(v1.83.0 起的紅線)。
+
+     ── ★ 上下限刻意留在 CSS(styles.css 的 --b2-tcw)────────────────────────
+       JS 只回答一個問題:「**放得下多大**」。夾的事交給 CSS 的 clamp:
+         下限 = v1.100.0 的舊值 → **這一支沒跑 / 量不到就是舊行為**(加法式)
+         上限 = 手牌那麼大(使用者選的那一案)→ 桌上的牌不會比手上的大,
+                而 --b2-tsw 也照同一個上限算 → 格子與牌剛好閉合、桌布還留得住邊
+       ⚠ 所以寫進去的那一格叫 --b2-tfit(「放得下多大」)而不是 --b2-tcw。
+
+     ── ⚠⚠ 為什麼一輪就收斂(不會變成麻將那種震盪)──────────────────────────
+       量到的兩個輸入都**不依賴牌的大小**:
+         · 高度:.b2-trick 是 flex:1 1 auto + min-height,內容再高也只會讓 .b2-tseats
+           自己捲(min-height:0 + overflow-y:auto),不會把桌面撐高
+         · 寬度:整組的寬度上限 --b2-tsw 只吃 --b2-cw ★ v1.101.0 改的正是這一件 ——
+           舊的 `2.5 × --b2-tpw` 吃**實際**牌寬 → 牌一大就把格子撐寬 → 又可以更大…
+           那會變成「量一次長一階」,要好幾輪才停而且每一輪都閃
+       所以每一次 render 都算出同一個數字(innerHTML 重建會把 inline 的 --b2-tfit
+       一起沖掉,而重算的結果一樣 → 使用者看不到中間狀態:同一個同步流程只 paint 一次)。
+     ========================================================================== */
+  const T_CARD_R = 1.42;    // 牌的高寬比(與 .b2-card 的 height:calc(w × 1.42) 同一個數)
+  const T_MAXC   = 5;       // 一手最多五張 → 一格要塞得下五張才永遠不換行
+  /* 一格「除了牌以外」的高度(名字列 + gap + padding + border)。★★ 這是**起始猜測**,
+     實際值每次 fitTrick 都從畫面量回來 —— 與 styles.css 的 --b2-tph 裡那個 30 是同一件事,
+     但那裡是「算出來的」、這裡是「量回來的」,所以不會與 media query 錯開。 */
+  let T_CHROME = 30;
+
+  /* ★ 純算式抽出來(吃參數、不碰畫面)—— 理由是守門:e2e 才餵得進「手機」與「矮視窗」
+     兩種尺寸各驗一次。真的靠視窗量的話斷言就跟著跑測試的那個視窗飄,
+     而 headless 的視窗永遠只有一種(750×485)= 假綠的老坑(notes/14 第四節)。 */
+  function fitOf(m){
+    const rows = Math.max(1, m.rows | 0);
+    /* ① 高度:可用高扣掉「桌心那一列」與列間的 gap,剩下的由 rows 排牌平分,
+         每一排再扣掉自己那一格的裝潢。
+       ⚠ 每一排留 **1px**(照21點 evalPlan 的 byH):牌高是 round(w × 1.42),round 有可能
+         往上湊半個 px,列數一多就變成「整組靜靜地捲掉幾 px」。 */
+    const spare = m.availH - m.fixedH - Math.max(0, m.rowN - 1) * m.rowGap - rows * m.chrome;
+    const byH = spare / rows / T_CARD_R - 1;
+    /* ② 寬度:一格要塞得下 5 張。⚠ 那一排是 nowrap + overflow:hidden → 放不下
+         **不會溢出、只會靜靜少一張牌**(v1.83.0 最難發現的壞法),所以寧可再讓 0.5px。 */
+    const byW = (m.cellW - m.padX - (T_MAXC - 1) * m.cardGap) / T_MAXC - 0.5;
+    return Math.max(0, Math.floor(Math.min(byH, byW)));
+  }
+
+  /* 量 → 算 → 把答案寫成 .b2-trick 的 inline literal。
+     ⚠⚠ 一定要寫在 **.b2-trick 節點上**:--b2-tch / --b2-tph 都在那一條規則裡引用
+       --b2-tfit,而 custom property 在「定義它的那個元素」上就完成代換 ——
+       寫到 :root / body 去的話那幾條看不到它,症狀是「算出來的數字完全沒有作用」
+       而且不會有任何錯誤訊息。
+     ⚠ 只改變數、不重寫 innerHTML → 拖曳中呼叫也是安全的(手指底下那個節點不會被銷毀)。 */
+  function fitTrick(){
+    if(!stage) return;
+    const tr = stage.querySelector(".b2-trick");
+    const seats = tr && tr.querySelector(".b2-tseats");
+    const cell = seats && seats.querySelector(".b2-tmv");
+    const cs = cell && cell.querySelector(".b2-tcs");
+    if(!tr || !seats || !cell || !cs) return;
+    /* 還沒排版(大廳 / 蓋板蓋著時盤面是 hidden)→ 什麼都不做,尺寸交給 CSS 的後備值。
+       ⚠ 這一條也讓 e2e 那種「直接呼叫 render」的用法拿得到穩定的結果。 */
+    const H = tr.clientHeight, cellW = cell.clientWidth;
+    if(!(H > 0) || !(cellW > 0)) return;
+
+    const px = v => (parseFloat(v) || 0);
+    const trs = getComputedStyle(tr), ss = getComputedStyle(seats), cst = getComputedStyle(cell);
+    const lbl = tr.querySelector(".b2-tlbl");
+    /* 可用高 = 桌面的內容高 − 標題那一列 − 標題與格子之間的 gap。
+       ⚠ clientHeight **含 padding**(這一塊沒有 border)→ 要自己扣掉。 */
+    const availH = H - px(trs.paddingTop) - px(trs.paddingBottom)
+                     - (lbl ? lbl.offsetHeight : 0) - px(trs.rowGap);
+
+    /* ★★★ 幾列 / 哪一列是桌心 —— 用每一格**實際的 offsetTop 分組**量回來。
+       ⚠ 刻意不讀 grid-template-areas、也不照人數自己算:版型的真相是 CSS 那三張表
+         (加上矮視窗那一份覆寫),JS 一寫就是第二份,而錯開的症狀是「牌算太大 → 整組捲」。
+       ⚠ display:none 的節點(矮視窗 4 人局的桌心)offsetHeight / offsetWidth 都是 0 →
+         要跳過,否則它會占掉一個假的「列」而多扣一個 gap(牌白白小一號)。 */
+    const rowsMap = {};
+    [].forEach.call(seats.children, el => {
+      if(!el.offsetHeight && !el.offsetWidth) return;
+      const k = Math.round(el.offsetTop);
+      const r = rowsMap[k] || (rowsMap[k] = { seat: false, h: 0 });
+      if(el.classList.contains("b2-tmv")) r.seat = true;
+      if(el.offsetHeight > r.h) r.h = el.offsetHeight;
+    });
+    const keys = Object.keys(rowsMap);
+    let rows = 0, fixedH = 0;
+    keys.forEach(k => { const r = rowsMap[k]; if(r.seat) rows++; else fixedH += r.h; });
+    if(!rows) return;                       // 量不出座位列(不該發生)→ 交給 CSS
+
+    /* ★ 一格的裝潢有多高 —— 量回來(.b2-tcs 的 min-height 就是那一排牌的高 --b2-tch)。
+       ⚠ 裝潢**不吃牌的大小**(名字列寫死 18px)→ 一輪就收斂。 */
+    const ch = cell.offsetHeight - cs.offsetHeight;
+    if(ch > 0) T_CHROME = Math.ceil(ch);
+
+    const fit = fitOf({
+      availH: availH, rowN: keys.length, rows: rows, fixedH: fixedH,
+      rowGap: px(ss.rowGap), chrome: T_CHROME,
+      cellW: cellW, padX: px(cst.paddingLeft) + px(cst.paddingRight),
+      cardGap: px(getComputedStyle(cs).columnGap)
+    });
+    tr.style.setProperty("--b2-tfit", fit + "px");
+  }
+
+  /* ==========================================================================
+     ✗ 二之三、算牌表 —— **v1.78.0 拿掉了**
      ──────────────────────────────────────────────────────────────────────────
        v1.77.0 在中間那塊底下加過一張算牌表(13 個點數 × 4 個花色,出過的亮起),
        理由是「♠2 出了沒」本來全靠記憶。使用者玩過之後的原話:
@@ -396,6 +523,12 @@ const B2B = (function(){
       (v.hand.length ? "" : '<span class="b2-empty">手牌出完了 ✨</span>') +
       '</div>';
     stage.innerHTML = h;
+
+    /* ★★★ v1.101.0:桌上那副牌照「量到的可用空間」放大一次(見第二之二節)。
+       ⚠ 一定要在寫完 innerHTML **之後**:.b2-trick 是這一行才生出來的節點,
+         而 --b2-tfit 是 inline 寫在它身上的(寫到 :root 去不會有作用)。
+       ⚠ 同一個同步流程裡量 + 改變數 → 只 paint 一次,使用者看不到「先小一下再變大」。 */
+    fitTrick();
 
     /* ✗ 「捲到最新那一手」那一段 v1.83.0 拿掉了 —— 這張牌桌**沒有時間順序**,
        格子的位置由座位號碼決定。舊版是「由舊到新的清單」才需要每次把 scrollTop 推到底。
@@ -754,6 +887,17 @@ const B2B = (function(){
         if(b && hAct) hAct(b.dataset.act);
       });
     }
+    /* ★★ 視窗變了要重算桌上的牌(v1.101.0)—— 轉向 / 縮視窗 / 手機收起網址列都會走到。
+       ⚠ 只呼叫 fitTrick(**不重畫**):它只改 CSS 變數,所以
+         ①拖曳中呼叫是安全的(手指底下那個節點不會被 innerHTML 銷毀)
+         ②版型換了(矮視窗那組 media query)也不必重畫 —— 列數是**量回來的**,
+           量的時候新版型已經生效了。
+       ⚠ 轉向要延遲一下再量:orientationchange 觸發時新的視窗尺寸還沒套用
+         (照 mahjong16/board.js 那 180ms)。 */
+    let fitT = null;
+    const schedFit = ms => { clearTimeout(fitT); fitT = setTimeout(fitTrick, ms || 120); };
+    addEventListener("resize", () => schedFit(120));
+    addEventListener("orientationchange", () => schedFit(180));
   }
 
   /* ==========================================================================
@@ -928,6 +1072,10 @@ const B2B = (function(){
     },
     setSel(arr){ sel = (arr || []).slice(); },
     clearSel(){ sel = []; },
+    /* ★ 桌上那副牌的尺寸(v1.101.0,第二之二節)。fitTrick 也 export 出來是為了
+       「resize 之後不重畫也對得上」那條斷言;_fit 是純算式,e2e 拿它餵兩種尺寸。 */
+    fitTrick,
+    _fit: fitOf,
     // 給 e2e 用:玩家自訂的顯示順序(沒拖過 = null)
     _ord: () => (ord ? ord.slice() : null)
   };

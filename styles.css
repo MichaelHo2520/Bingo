@@ -3197,9 +3197,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ★ 這一段的骨架照排七(.sv-*)抄,但**這一頁沒有軌道** ——
        盤面只有「牌河(上一手)」+「我的手牌」兩塊,所以垂直預算比排七寬鬆得多。
 
-     ★★ 這一頁一樣**沒有 JS 算尺寸**:手牌只會變少、牌河永遠最多 5 張,
-        尺寸整份交給 CSS(flex wrap + clamp)。台灣麻將那一整類「忽大忽小」的 bug
-        在這裡結構上不存在 —— ⚠ 不要為了「手牌少的時候放大一點」改回 JS 算。
+     ★★ **手牌**的尺寸一樣沒有 JS 算(flex wrap + clamp)。台灣麻將那一整類
+        「忽大忽小」的 bug 在這裡結構上不存在 —— ⚠ 不要為了「手牌少的時候放大一點」
+        改回 JS 算,那正是忽大忽小的來源。
+     ★★★ v1.101.0 例外:**桌上那副牌**(.b2-card.mid)的寬度由 board.js 的 fitTrick()
+        量出來(使用者:「中間區域是不是要隨著不同的螢幕大小,讓裡面的牌大一點」)。
+        ⚠ 它與上面那條**不衝突**:fitTrick 只吃「量到的可用空間 + 版型」——
+          兩者都只跟**人數 + 視窗**有關,一整局是常數(照21點 planTable 那條界線)。
+          真正不可以的是「跟著**牌數 / 這一輪進行到哪**變」。
+        ★ 上下限仍然寫在 CSS(見 .b2-trick 的 --b2-tcw):JS 沒跑 / 量不到時
+          自動退回 v1.100.0 的行為(--b2-cw × .66)。
 
      ★ 紅色有兩支(排七 notes/15 第六節那條界線,這裡照抄):
          --b2-red     畫在**象牙白牌面**上(要夠深才看得清)
@@ -3224,39 +3231,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
             那個尺寸下 4 人局會被壓成兩列(見 @media max-height:600 那段的 .s4),
             兩件事是一組的:改一個就要重算另一個,不然矮視窗會開始捲。 */
          --b2-trh:248px; --b2-acth:96px;
-         /* ★★★ 牌桌「一格都不准動」的三個數字(v1.83.0 換掉 v1.79.1 的四個)。
-            舊版是一列列的清單,所以需要「名字欄 / 牌型欄固定寬」去對齊每一列的第一張牌;
-            格子版每個人各占一格、牌置中在那一格裡,那件事自然成立 →
-            改成「**一格**多大」這兩個數字:
-              --b2-tch 一格裡那排牌的高(mid 牌:--b2-cw × .66 × 1.42 ≈ ×.937)
-              --b2-tpw 一格**至少**要多寬才塞得下 5 張 = 5 張 mid 牌 + 4 個間距
-                       + padding + border + **餘裕**
-                       (×.66×5 = ×3.3;40 = gap 12 + padding 10 + border 4 + 餘裕 14)
-                       ⚠ v1.98.0 起它**不再是格子的實際寬度**(那一欄是 minmax(0,1fr))
-                         —— 它變成兩件事:①整組的寬度上限 2.5 × 它
-                         ②「一列 2 格夠不夠寬」那筆帳的參考值。算過最窄的情況:
-                         320px 手機 → 一格 144px vs 需要 129px,還有餘裕。
-                       ⚠⚠ 那 14px 的餘裕**不可以省**。第一版寫成剛好等於內容寬(+26),
-                         結果**截圖裡第五張牌被切掉一半** —— 而 DOM 量出來是
-                         「130/130 ok」(clientWidth 沒有溢出),兩邊對不上:
-                         量數字與截圖是兩次不同的執行、視窗高度不一樣(notes/14 第四節),
-                         而牌寬是 clamp 出來的小數,環境一差就差一號。
-                       ★ 所以這裡是**雙保險**:算式留餘裕 + 那一排的牌允許 flex-shrink
-                         (見 .b2-tcs .b2-card)。真的放不下時牌會**擠窄一點**,
-                         而不是「靜靜地少一張」—— 少一張是這一版最難發現的壞法
-                         (.b2-tcs 是 nowrap + overflow:hidden,不會溢出、不會報錯)。
-              --b2-tph 一格的高 = 那排牌 + 名字列(30 = 名字列 18 + gap 2 + padding 6 + border 4)
-                       ⚠ 名字列**寫死 18px**(.b2-thd 的 height)而不是讓它跟著內容:
-                         裡面的「牌型」膠囊有 padding + line-height 1.5,比純文字高 3px →
-                         沒鎖的話**有出牌的那一格比空的那一格高 3px**,整桌就跟著
-                         「這一輪誰動過」上下移(v1.83.0 量出來 59 vs 62,看不太出來但真的在動)。
-            ⚠⚠ **空的格子與出五張牌的格子一樣大**靠的就是這兩個數字 ——
-              少了它們,同一個人從 Pass 變成出五張牌就會把整桌撐開一次
-              (使用者一路在講的「上上下下」)。
-            ⚠ 改牌大小 / 一格的 padding / gap 就要重算那兩個常數,不然牌會換行。 */
-         --b2-tch:calc(var(--b2-cw) * 0.937);
-         --b2-tpw:calc(var(--b2-cw) * 3.3 + 40px);
-         --b2-tph:calc(var(--b2-tch) + 30px); }
+         /* ★★★ 牌桌「一格都不准動」的那幾個數字 **v1.101.0 起定義在 `.b2-trick` 上**
+            (舊版在這裡,而且是從 --b2-cw 推的)。
+            ⚠⚠ 搬家的理由只有一個、而且是硬的:它們現在要引用 `--b2-tfit`,
+              而那一格是 board.js **inline 寫在 .b2-trick 節點上**的 ——
+              custom property 在「定義它的那個元素」上就完成代換,所以寫在 :root 的
+              --b2-tch 只看得到 :root 的 --b2-tfit(不存在 → 永遠用後備值)。
+              症狀會是「JS 算出來的數字完全沒有作用」,而且沒有任何錯誤訊息。
+            → 定義與整套算式看 .b2-trick 那一段(--b2-tcw / --b2-tch / --b2-tph / --b2-tsw)。 */ }
   /* 連線多一圈出牌倒數(.b2-cdwrap 在動作列裡面)→ 預留它的高度。
      ⚠ 房主把倒數設成 0(關掉)時那一圈不出現,那時會多留 32px 空白 ——
        **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次。 */
@@ -3378,7 +3360,41 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        變成 grid item 了)—— 它是這一塊將來要放任何絕對定位東西的基準,
        **不可以順手加 z-index** —— 那會讓它變成 stacking context 而困住覆蓋層
        (.veil 50 / 表情層 64;21點的 .bj-play 註解裡有同一條)。 */
-  .b2-trick{flex:1 1 auto;min-height:var(--b2-trh);overflow:hidden;position:relative;
+  /* ★★★ v1.101.0:桌上那副牌與一格的尺寸**定義在這一條**(舊版在 :root —— 搬家的理由
+     是硬的,見那邊那段 ⚠⚠:custom property 在「定義它的元素」上就完成代換)。
+       --b2-tcw  桌上那張牌的寬(`.b2-card.mid` 吃它)
+                 = clamp(下限 = 手牌 × .66 , **量出來的** --b2-tfit , 上限 = 手牌)
+                 ★ 上限是「跟手牌一樣大」(使用者選的那一案):桌上的牌不會比手上的大,
+                   而格子的寬度上限 --b2-tsw 也是照這個上限算的 → 兩者剛好閉合。
+                 ★ 下限 = v1.100.0 的舊值 → **JS 沒跑 / 量不到就是舊行為**(加法式)。
+                 ⚠ --b2-tfit 由 board.js 的 fitTrick() 量完寫成 inline literal。
+       --b2-tch  一格裡那排牌的高 = 牌寬 × 1.42(與 .b2-card 的 height 同一個數)
+       --b2-tph  一格的高 = 那排牌 + 名字列(30 = 名字列 18 + gap 2 + padding 6 + border 4)
+                 ⚠ 名字列**寫死 18px**(.b2-thd 的 height)而不是跟著內容:裡面的「牌型」
+                   膠囊有 padding + line-height 1.5,比純文字高 3px → 沒鎖的話**有出牌的
+                   那一格比空的那一格高 3px**,整桌就跟著「這一輪誰動過」上下移
+                   (v1.83.0 量出來 59 vs 62,看不太出來但真的在動)。
+                 ⚠⚠ **空的格子與出五張牌的格子一樣大**靠的就是這一條。
+                 ⚠ 那個 30 在 board.js 是**量回來的**(fitTrick 的 chrome)—— 矮視窗那幾條
+                   media query 一改 padding / 字級,寫死的常數就與現實錯開(照21點 learnChrome)。
+       --b2-tsw  整組(.b2-tseats)的寬度**上限** = 兩格 + 桌心 + 兩個 gap,而「一格」照
+                 **上限牌寬**算:5 × cw + gap 12 + padding 10 + border 4 = 5cw + 26
+                 → 2 × (5cw + 26) + 44 + 14 = 10cw + 110,再留 12px 餘裕 = 10cw + 122。
+                 ★★ v1.100.0 是 `2.5 × --b2-tpw`(那個變數已經拿掉了)—— 舊算式吃的是
+                   **實際**牌寬,而牌寬現在又是從格寬算出來的 → 互相追著跑,要好幾輪才
+                   收斂而且每一輪都閃。改成吃**上限**(只跟 --b2-cw 有關)之後一輪就收斂。
+                 ⚠⚠ 那 12px 餘裕**不可以省**(v1.83.0 的教訓,舊版是 tpw 裡的 14):
+                   量數字與截圖是兩次不同的執行、視窗高度不一樣(notes/14 第四節),而牌寬是
+                   clamp 出來的小數,環境一差就差一號 → **第五張牌被切掉一半**,
+                   而 DOM 量出來是「130/130 ok」(clientWidth 沒有溢出)。
+                 ★ 雙保險的另一半留著:那一排的牌允許 flex-shrink(見 .b2-tcs .b2-card)——
+                   真的放不下時牌會**擠窄一點**而不是「靜靜地少一張」
+                   (.b2-tcs 是 nowrap + overflow:hidden,不會溢出、不會報錯)。 */
+  .b2-trick{--b2-tcw:clamp(calc(var(--b2-cw) * .66),var(--b2-tfit,0px),var(--b2-cw));
+    --b2-tch:calc(var(--b2-tcw) * 1.42);
+    --b2-tph:calc(var(--b2-tch) + 30px);
+    --b2-tsw:calc(var(--b2-cw) * 10 + 122px);
+    flex:1 1 auto;min-height:var(--b2-trh);overflow:hidden;position:relative;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
     border-radius:12px;padding:8px 10px;
     background:
@@ -3415,17 +3431,25 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         → 這一塊的高度與「這一輪進行到哪」無關,手牌一格都不會被推。
      ⚠⚠ **不可以**改成 `repeat(auto-fit,minmax(…))` 那種跟著視窗算欄數的寫法
        (v1.98.0 算過:桌面上限 700px 時 4 欄要 703px,差 3px 就掉成 3 + 1)。
-     ⚠ minmax 的 min 用 **0** 不是 --b2-tpw:給了 tpw 的話窄視窗會把格子撐到溢出,
-       而 .b2-stage 是 overflow-x:hidden → 右邊那一欄**靜靜地被裁掉**。
-       真的窄到放不下 5 張時交給牌自己擠窄(.b2-tcs .b2-card 的 flex-shrink)。
+     ⚠ minmax 的 min 一定是 **0**(不可以給「一格至少多寬」那種值):給了的話窄視窗會把
+       格子撐到溢出,而 .b2-stage 是 overflow-x:hidden → 右邊那一欄**靜靜地被裁掉**。
+       真的窄到放不下 5 張時交給牌自己擠窄(.b2-tcs .b2-card 的 flex-shrink);
+       ★ v1.101.0 起還多一層:fitTrick() 會**照量到的格寬把牌算小一號** → 先擠窄再說。
      ★★★ 中央那一欄是**桌心**(--b2-tmw 44px):十字的左右兩家因此真的分坐兩側,
         而 🎴 落在中間那片空著的桌面上(v1.98.0 的浮水印是絕對定位在桌面底部的,
         那是因為格子版的中央被格子占滿 —— 這一版中央真的空了,所以搬回中央)。
-     ★ 整組寬度有上限(2.5 × --b2-tpw)+ 由 .b2-trick 置中:不夾的話桌機上一格會寬到
-       337px,而牌只有 132px 寬 → 每個人面前空一大片,「同一張桌子」的感覺反而散掉。
+     ★ 整組寬度有上限(**--b2-tsw**,v1.101.0 換掉舊的 `2.5 × --b2-tpw`)+ 由 .b2-trick
+       置中。⚠ 舊算式吃的是**實際**牌寬,而 v1.101.0 的牌寬又是從格寬算出來的 →
+       兩者會互相追著跑(要好幾輪才收斂、每一輪都閃);新算式只吃**上限牌寬**
+       (= --b2-cw,見 .b2-trick 那一段)→ fitTrick 一輪收斂。
+       ★ 上限存在的理由沒變:不夾的話桌機上一格會寬到 337px。v1.100.0 的症狀是
+         「牌只有 132px、每個人面前空一大片」;v1.101.0 牌會跟著長大,所以症狀換成
+         「格子貼到桌緣、桌布一點邊都不留」—— 使用者要的是「像在一張桌子上擺著牌」,
+         所以桌布**一定要留邊**(桌機上兩側各 ~80px)。
      ⚠ 一格的實際寬度 = **(整組 − 桌心 − 兩個 gap) / 2**;最窄的情況算過:
        320px 手機 → 桌面內容 303、整組 303 → 一格 (303−44−14)/2 = 122px,
-       而 5 張 mid 牌需要 ~117px(--b2-cw 24.3 × .66 × 5 + gap 12)→ 還有餘裕。
+       而 fitTrick 會照這個寬度把牌算成 ~19px(5 張 + gap 12 + padding 10 剛好塞得下,
+       等於退回 v1.100.0 那個 clamp 下限)。
      ⚠ grid-auto-rows 用 minmax(--b2-tph,auto):正常情況每一列剛好一格高
        (= 空格與出五張牌一樣高),而萬一有人名字爆長 / 字型換掉也只是那一列長高,
        不會把牌裁掉。⚠ 桌心那一列**不吃 auto-rows**(s2 明寫 rows,見那一條)。
@@ -3445,7 +3469,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   :root{ --b2-tmw:44px; }
   .b2-tseats{flex:0 1 auto;min-height:0;overflow-y:auto;
     display:grid;gap:7px;align-content:start;
-    width:min(100%,calc(var(--b2-tpw) * 2.5 + 7px));
+    width:min(100%,var(--b2-tsw));
     grid-template-columns:minmax(0,1fr) var(--b2-tmw) minmax(0,1fr);
     grid-auto-rows:minmax(var(--b2-tph),auto)}
   /* ★★★ 三張版型表。⚠⚠ **每一張都要有 m** —— v1.83.0 踩過的坑是「2 人版型沒有
@@ -3756,10 +3780,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     box-shadow:0 12px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent)}
   :root[data-theme="ebook"] .b2-hand .b2-card.b2-drag{box-shadow:0 6px 12px rgba(0,0,0,.35),0 0 0 3px #000}
   .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
-  /* 這一輪的記錄用的尺寸(v1.77.0)。★ 為什麼比 .sm 再小一級:一輪可能有 4 手,
-     .sm(牌高 40px)四列就 300px,一定捲;.mid 之後常見的 3~4 手放得下不必捲。
-     ⚠ 不要再往下調 —— 21px(.tiny)是「認得出點數」的下限,那是結果卡縮圖用的。 */
-  .b2-card.mid{--b2w:calc(var(--b2-cw) * .66);cursor:default}
+  /* 桌上那副牌的尺寸(v1.77.0 是「.sm 再小一級」的固定值)。
+     ★★★ v1.101.0 起它**跟著螢幕長大** —— 值由 .b2-trick 的 --b2-tcw 給
+       (下限 = 舊的 --b2-cw × .66 · 上限 = 手牌那麼大 · 中間由 board.js 的 fitTrick 量)。
+     ⚠ fallback 一定要留:`.b2-card.mid` 萬一被畫在 .b2-trick 之外(將來加別的區塊),
+       var() 找不到 --b2-tcw 會讓整條宣告失效 → 牌變成手牌的大小、當場擠爆那一格。
+     ⚠ 下限不要再往下調 —— 21px(.tiny)是「認得出點數」的下限,那是結果卡縮圖用的。 */
+  .b2-card.mid{--b2w:var(--b2-tcw,calc(var(--b2-cw) * .66));cursor:default}
   .b2-card.tiny{--b2w:21px;cursor:default;box-shadow:0 1px 1px rgba(0,0,0,.22)}
   .b2-empty{font:800 13px/1 'Nunito',sans-serif;color:var(--accent);padding:12px 0}
   :root[data-theme="ebook"] .b2-card{background:#fff;border-color:#000;box-shadow:none}
@@ -3881,8 +3908,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ---------- 矮視窗:每一塊都收一號 ----------
      ⚠⚠ 牌寬只准動 --b2-cw,**不要**在這裡改 .b2-card 的 --b2w ——
         排七踩過:只縮手牌、軌道沒跟著,結果「格子比手牌大」。
-        這一頁沒有軌道,但牌桌上的 .b2-card.mid 是從 --b2-cw 推回來的,一起變才對
-        (--b2-tch / --b2-tpw / --b2-tph 三個也全部跟著它算)。 */
+        這一頁沒有軌道,但牌桌那一副牌的**上下限**都是從 --b2-cw 推回來的
+        (--b2-tcw 的 clamp / --b2-tsw / 跟著它們的 --b2-tch / --b2-tph),一起變才對。
+     ★ v1.101.0:桌上的牌在這個尺寸也**照量到的空間放大**(fitTrick),所以這一段
+       只要把 --b2-cw 收一號就夠了 —— 上限跟著收、實際值跟著量到的高度走。 */
   @media (max-height:600px){
     /* ⚠ 中間那塊的**下限**與動作列的固定高度也要跟著收 —— 不收的話矮視窗會被這兩塊
        吃光,手牌反而被擠出畫面(那比「手牌會跳」嚴重得多)。
@@ -3915,8 +3944,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     /* ★★★ v1.99.0:矮視窗放不下十字的**三列** → 4 人局壓成兩列
        「左 · 對家 · 右」+「我」(v1.83.0 也是在這個尺寸壓成兩排,同一個理由)。
        ⚠ 這裡是三欄**等寬**(桌心收掉):對家要擠進中間那一欄,44px 放不下一格。
-       ⚠ 整組的寬度上限跟著從 2.5 × 一格放寬到 3 ×:不放寬的話三欄各只有 105px,
-         而 5 張矮視窗的 mid 牌要 113px → 每一格的牌都會被擠窄一號。
+       ⚠ 整組的寬度上限要跟著放寬成**三格**(v1.100.0 是 `3 × --b2-tpw`,v1.101.0 換成
+         照上限牌寬算的 `15 × --b2-cw + 92`:三格 × (5cw + 26) + 2 個 gap 4 + 餘裕)——
+         不放寬的話三欄各只有 105px,而 5 張矮視窗的牌要 113px → 每一格的牌都被擠窄一號。
        ⚠⚠ **只有跨整列的那一格(我)要夾寬度**,而對家在這個版型自己占一欄 →
          它要**兩條一起改**:`width:auto` **加上** `justify-self:stretch`。
          只寫 width:auto 的話 justify-self:center 還在 → 那一格變成 shrink-to-fit,
@@ -3927,7 +3957,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
          (這一段最常命中的尺寸)本來就是寬扁的桌子。 */
     .b2-tseats.s4{grid-template-columns:repeat(3,minmax(0,1fr));
       grid-template-areas:"l t r" "b b b";
-      width:min(100%,calc(var(--b2-tpw) * 3 + 8px))}
+      width:min(100%,calc(var(--b2-cw) * 15 + 92px))}
     .b2-tseats.s4 .b2-tmv.pos-t{width:auto;justify-self:stretch}
     .b2-tseats.s4 .b2-tmv.pos-b{width:min(100%,calc((100% - 8px) / 3))}
     /* ⚠ 桌心那一格只在 4 人局收掉(3 人局的中央欄還在 = 兩家真的分坐兩側);
