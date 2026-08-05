@@ -12,7 +12,7 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台式21點 ｜ 輪流當莊 · 莊家抓人 · 單機對電腦 + 2~6 人連線</title>
-<!-- 台式21點 · v1.101.0 -->
+<!-- 台式21點 · v1.101.1 -->
 <!-- ⚠ 顯示名改過兩次(21點 → 台式21點),而**資料的名字一個都沒動**:
        bj_rooms / bj_index / bjRules / bj.solo.v1 / bj.prefs.v1 / line / dragon
        —— 那些 key 已經寫在別人裝置的 DB 與 localStorage 裡(同 v1.85.0 五小龍那條)。
@@ -21,7 +21,7 @@
      ⚠⚠ 註解裡**一個字都不可以出現註解的結束標記** —— v1.87.0 真的踩到:
        那一串被當成註解結束,後面整段文字就漏到畫面最上面變成一行亂碼,
        而它**只有截圖看得出來**(DOM 量出來完全正常)。 -->
-<meta name="version" content="1.101.0">
+<meta name="version" content="1.101.1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -64,24 +64,26 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="bj-hero">
         <!-- ⚠ 插圖只用數字與字母,不用撲克牌 Unicode(U+1F0A0 那一段)——
              多數字型沒有,會變豆腐方框(見 notes/13 的禁令)
-             ★★ v1.89.1:♠A + ♦10 兩張交疊斜放(= 21 點那一手)。
+             ★★ v1.89.1:♠︎A + ♦︎10 兩張交疊斜放(= 21 點那一手)。
                 **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
                 (這裡是 .bj-art 96px、首頁是 .gc-art.bj-cart 58px)——
-                同一副牌本來就該長一樣,樣式在 styles.css 的 .bj-ic-* 那幾條 -->
+                同一副牌本來就該長一樣,樣式在 styles.css 的 .pk-ic-* 那幾條
+             ★★ v1.101.1:那組 class 從 `.bj-ic-*` 改名成 **`.pk-ic-*`** —— 同一版排七與
+                大老二的圖示也換成這套牌面畫法,三個撲克牌遊戲共用一組 -->
         <svg class="bj-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 台式21點">
-          <!-- 下層:♦10(往左斜) -->
+          <!-- 下層:♦︎10(往左斜) -->
           <g transform="rotate(-16 19 30)">
-            <rect class="bj-ic-bd" x="8.5" y="15" width="21" height="30" rx="2.7"/>
-            <text class="bj-ic-t bj-ic-red" x="19" y="28">10</text>
-            <g class="bj-ic-s bj-ic-red" transform="translate(15 30.4) scale(.08)">
+            <rect class="pk-ic-bd" x="8.5" y="15" width="21" height="30" rx="2.7"/>
+            <text class="pk-ic-t pk-ic-red" x="19" y="28">10</text>
+            <g class="pk-ic-s pk-ic-red" transform="translate(15 30.4) scale(.08)">
               <path d="M50 6 86 50 50 94 14 50z"/>
             </g>
           </g>
-          <!-- 上層:♠A(往右斜、蓋在前面) -->
+          <!-- 上層:♠︎A(往右斜、蓋在前面) -->
           <g transform="rotate(16 37.5 29)">
-            <rect class="bj-ic-bd" x="27" y="14" width="21" height="30" rx="2.7"/>
-            <text class="bj-ic-t" x="37.5" y="27">A</text>
-            <g class="bj-ic-s" transform="translate(33.5 29.4) scale(.08)">
+            <rect class="pk-ic-bd" x="27" y="14" width="21" height="30" rx="2.7"/>
+            <text class="pk-ic-t" x="37.5" y="27">A</text>
+            <g class="pk-ic-s" transform="translate(33.5 29.4) scale(.08)">
               <path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/>
               <path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>
             </g>
