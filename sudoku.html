@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.101.1 -->
-<meta name="version" content="1.101.1">
+<!-- 數獨 · v1.101.2 -->
+<meta name="version" content="1.101.2">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -56,13 +56,41 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
          三個遊戲進門的操作一致 —— 原本把難度膠囊擺在最前面,等於逼人先回答一個還沒決定的問題 -->
     <div id="sdkPickMode">
       <div class="sdk-hero">
+        <!-- ★★ v1.101.2:木框 + 一格一格的米黃小方塊 + 右下一支鉛筆正在填(使用者附了一張
+             參考圖:「數獨的 icon 我不喜歡,參考這個樣式」)。舊版是「一張紙 + 兩組線」的平面線稿。
+             ⚠ 格子是 36 個獨立 rect、縫隙露出凹槽色 = 立體感的全部(沒有陰影 / 濾鏡);
+                格縫 0.9 / 宮縫 1.8 / 格寬 6.95 是**一組**數字,改一個要重算六個座標。
+             ⚠ 6×6 盤面只能用 1~6(舊圖寫了 7 與 9),而這九個數字同列 / 同行 / 同宮都不重複。
+             ★ **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
+                (這裡是 .sdk-art 92px、首頁是 .gc-art.sk-art 58px)——
+                樣式在 styles.css 的 .sk-* 那幾條(tools/test-pages.js 的 F 節在守這對雙胞胎) -->
         <svg class="sdk-art" viewBox="0 0 56 56" role="img" aria-label="數獨盤">
-          <rect class="sk-bd" x="2" y="2" width="52" height="52" rx="6"/>
-          <g class="sk-ln"><path d="M19.3 4V52M36.6 4V52M4 19.3H52M4 36.6H52"/></g>
-          <g class="sk-tn"><path d="M13.6 4V52M25.1 4V52M30.9 4V52M42.4 4V52M4 13.6H52M4 25.1H52M4 30.9H52M4 42.4H52"/></g>
-          <g class="sk-nm"><text x="8.8" y="12">5</text><text x="26" y="12">7</text><text x="43.2" y="12">2</text>
-             <text x="14.5" y="29">3</text><text x="31.8" y="29">9</text><text x="49" y="29">1</text>
-             <text x="8.8" y="46">6</text><text x="37.5" y="46">4</text></g>
+          <rect class="sk-bd" x="0.7" y="0.7" width="54.6" height="54.6" rx="7.5"/>
+          <rect class="sk-well" x="3.4" y="3.4" width="49.2" height="49.2" rx="4.5"/>
+          <g class="sk-c">
+            <rect x="4" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="4" width="6.95" height="6.95" rx="1.1"/>
+            <rect x="4" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="11.85" width="6.95" height="6.95" rx="1.1"/>
+            <rect x="4" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="20.6" width="6.95" height="6.95" rx="1.1"/>
+            <rect x="4" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="28.45" width="6.95" height="6.95" rx="1.1"/>
+            <rect x="4" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect class="sk-hi" x="37.2" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="37.2" width="6.95" height="6.95" rx="1.1"/>
+            <rect x="4" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="45.05" width="6.95" height="6.95" rx="1.1"/>
+          </g>
+          <g class="sk-nm">
+            <text x="7.5" y="9.5">5</text><text x="24.1" y="9.5">3</text><text x="48.5" y="9.5">2</text>
+            <text x="15.3" y="17.4">1</text>
+            <text x="31.9" y="26.1">6</text><text x="40.7" y="26.1">4</text>
+            <text x="7.5" y="34">6</text>
+            <text x="24.1" y="42.7">1</text><text x="40.7" y="42.7">5</text>
+            <text x="31.9" y="50.6">4</text>
+          </g>
+          <!-- 鉛筆:筆尖落在那格高亮的右上角,筆桿往右下伸出畫面(SVG 自己裁掉)。
+               ⚠ 三段的對比(深石墨尖 / 淺木段 / 飽和橘桿)是「小尺寸下認得出是鉛筆」的全部 -->
+          <g class="sk-pen" transform="translate(43.8 38.6) rotate(44)">
+            <path class="sk-tip" d="M0 0 5.6-3.2 5.6 3.2Z"/>
+            <path class="sk-wood" d="M5.6-3.2H9.6V3.2H5.6Z"/>
+            <rect class="sk-barrel" x="9.6" y="-3.2" width="18" height="6.4" rx="1.2"/>
+            <rect class="sk-shine" x="10.2" y="-2.6" width="16.8" height="2" rx="1"/>
+          </g>
         </svg>
         <div class="home-tagline">填滿 1~9,每列每行每宮不重複</div>
       </div>

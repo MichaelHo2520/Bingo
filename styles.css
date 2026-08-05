@@ -1268,10 +1268,52 @@
   /* ---------- 進場插圖 ---------- */
   .sdk-hero{text-align:center;margin:14px 0 4px}
   .sdk-art{width:92px;height:92px;display:block;margin:0 auto 8px}
-  .sk-bd{fill:var(--sdk-paper);stroke:var(--sdk-thick);stroke-width:2}
-  .sk-ln path{stroke:var(--sdk-thick);stroke-width:1.6;fill:none}
-  .sk-tn path{stroke:var(--sdk-line);stroke-width:.8;fill:none}
-  .sk-nm text{fill:var(--sdk-given);font-family:'Fredoka',sans-serif;font-weight:700;font-size:8px}
+  /* ---------- 數獨插圖 .sk-*:木框 + 一格一格的米黃小方塊 + 鉛筆(v1.101.2)----------
+     使用者附了一張參考圖(木質數獨盤,右下一支鉛筆正在填一格):「數獨的 icon 我不喜歡,
+     參考這個樣式」。舊版是「一張紙 + 兩組線」的平面線稿(`.sk-bd`/`.sk-ln`/`.sk-tn`/`.sk-nm`,
+     已刪),在深色首頁上最沒有質感 —— 而八張卡裡另外三張(麻將 / 撲克 / 五子棋)本來就是
+     **實體材質感**,所以這一版讓數獨也站到同一條線上。
+     ★ 用它的地方有兩處(首頁遊戲卡 58px + `sudoku.html` 進場插圖 92px),**逐字相同的一份
+       SVG** —— 守門是 `tools/test-pages.js` 的 F 節(照撲克牌那三對的作法)。
+     ★★ **格子是 36 個獨立的 rect,縫隙露出的是凹槽色** —— 這就是「一格一格浮起來」的全部,
+        沒有任何陰影 / 濾鏡。⚠ 格縫 0.9 / **宮縫 1.8**(6×6 盤面的宮是 2×2)是一組數字,
+        改一個就要重算 x/y 那六個座標(格寬 = (48 − 2×1.8 − 3×0.9) / 6 = 6.95)。
+     ⚠⚠ 材質色**刻意不吃 `--sdk-*` 主題變數**(那組會讓 midnight 變深藍紙、arcade 變黑紙):
+        它與 `--sv-face`(撲克)/ 麻將牌面同一個路線 —— **實體材質在每個主題下都長一樣**,
+        只有電子書主題覆寫成黑白。⚠ ebook 的格縫靠 `--sk-well:#000` 撐出來(白格子 + 黑縫),
+        不是給格子加 stroke(36 個 rect 各描一次邊,線寬在 44px 下會糊成一團)。
+     ⚠ 6×6 盤面**只能用 1~6**:舊插圖寫了 7 與 9(遊戲裡不可能出現),這一版順手改對,
+       而且九個數字擺成同列 / 同行 / 同宮都不重複的合法局面。
+     ⚠⚠ 三個「放大截圖才看得出來」的調整(第一版三樣都不及格,而 DOM 量起來完全正常):
+        ①**格縫靠顏色對比,不是靠寬度** —— 縫佔格寬 13% 已經夠寬,第一版凹槽 `#bd8f56`
+          與格子太接近 → 整塊看起來是「一片米黃 + 隱約的線」;加深到 `#a2743d` 才浮起來
+        ②**數字要照格寬算**(6.95 × .9 ≈ 6.2px):第一版沿用線稿時代的比例算成 5.4,
+          小一號就從「粗黑圓體」變成細細的小字
+        ③**鉛筆是最容易畫壞的東西** —— 第一版寬 5 / 尖 4.7,在 58px 下只剩一個小三角,
+          讀起來像雜點。它要靠**三段明確的對比**(深石墨尖 + 淺木段 + 飽和橘桿)才認得出來,
+          而且桿要夠寬(6.4)。⚠ 筆尖座標與 `rotate` 的角度決定露出多長:角度越接近垂直
+          露出越長(44° 時被右邊界裁在 17 個單位處)—— 這件事**只有看圖**,不要憑算式決定。 */
+  :root{ --sk-frame:#cfa86e; --sk-edge:#a3763f; --sk-well:#a2743d; --sk-cell:#f7e9c9;
+         --sk-num:#3d3833; --sk-hl:#fffdf2; --sk-hlline:#e8a127;
+         --sk-barrel:#d3872a; --sk-shine:#f0b458; --sk-wood:#f6ddb2; --sk-tip:#463d36; }
+  :root[data-theme="ebook"]{ --sk-frame:#ffffff; --sk-edge:#000000; --sk-well:#000000;
+         --sk-cell:#ffffff; --sk-num:#000000; --sk-hl:#dddddd; --sk-hlline:#000000;
+         --sk-barrel:#ffffff; --sk-shine:#ffffff; --sk-wood:#ffffff; --sk-tip:#000000; }
+  .sk-bd{fill:var(--sk-frame);stroke:var(--sk-edge);stroke-width:1.4}
+  .sk-well{fill:var(--sk-well)}
+  .sk-c{fill:var(--sk-cell)}
+  .sk-c.sk-hi{fill:var(--sk-hl);stroke:var(--sk-hlline);stroke-width:1}
+  .sk-nm text{fill:var(--sk-num);font-family:'Fredoka',sans-serif;font-weight:700;
+    font-size:6.2px;text-anchor:middle}
+  /* 鉛筆:整支描一圈凹槽色,才不會與底下的米黃格子融在一起(58px 下最吃這一條) */
+  .sk-pen path,.sk-pen rect{stroke:var(--sk-well);stroke-width:.35}
+  .sk-tip{fill:var(--sk-tip)}
+  .sk-wood{fill:var(--sk-wood)}
+  .sk-barrel{fill:var(--sk-barrel)}
+  .sk-shine{fill:var(--sk-shine);stroke:none}
+  /* ebook:鉛筆變成白底黑線的線稿(不然整支是白的、看不見) */
+  :root[data-theme="ebook"] .sk-pen path,:root[data-theme="ebook"] .sk-pen rect{
+    stroke:#000;stroke-width:.5}
 
   /* ---------- 房間框(比照五子棋的瘦身版:把高度讓給盤面) ---------- */
   .sdk-room{padding:9px 12px}
@@ -3212,7 +3254,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   }
 
   /* ==========================================================================
-     大老二(big2.html · js/big2/*)—— 第七個遊戲,v1.76.0
+     大老二(big2.html · js/big2 那幾支)—— 第七個遊戲,v1.76.0
      ==========================================================================
      ★ 這一段的骨架照排七(.sv-*)抄,但**這一頁沒有軌道** ——
        盤面只有「牌河(上一手)」+「我的手牌」兩塊,所以垂直預算比排七寬鬆得多。
@@ -4017,7 +4059,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   }
 
   /* ==========================================================================
-     21 點(blackjack.html · js/blackjack/*)—— 第八個遊戲,v1.84.0
+     21 點(blackjack.html · js/blackjack 那幾支)—— 第八個遊戲,v1.84.0
      ==========================================================================
      ★ 骨架照大老二(.b2-*)抄,但**版型完全不同** ——
        21 點的桌子不是「大家往中間丟牌」,而是「所有人面對莊家」:
