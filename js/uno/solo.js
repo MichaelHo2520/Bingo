@@ -109,6 +109,10 @@ const Solo = (function(){
   function paint(){
     if(!st) return;
     paintBar();
+    /* ★ 「喊過 UNO」只在**手上剛好 2 張**的那一手有意義 —— 手牌一變就自動歸零。
+       ⚠ 沒有這一行的話:武裝之後被跳過 / 被罰抽,旗標會一路留到下一次剛好 2 張的
+         時候,畫面顯示「喊過了」但玩家根本沒按過(而鈕已經收掉了,他也補不了)。 */
+    if(st.hands[ME].length !== 2) unoArmed = false;
     const mine = st.turn === ME && !over && !busy && pendWild < 0;
     const nms = [];
     for(let s = 0; s < seats; s++) nms.push(seatName(s));
@@ -116,6 +120,7 @@ const Solo = (function(){
     UNB.render({
       hand: st.hands[ME].slice(),
       top: st.top, col: st.col, dir: st.dir, pend: st.pend, stack: st.rules.stack,
+      n: seats,                                   // ★ 2 人局不畫方向(見 board 的 tableHTML)
       pileLeft: st.pile.length, discLeft: st.disc.length,
       mine: mine, over: over,
       turnName: st.over ? "" : seatName(st.turn),
@@ -236,10 +241,14 @@ const Solo = (function(){
     if(pendWild >= 0){ showToast("先選一個顏色"); return; }
     if(busy || st.turn !== ME){ showToast("還沒輪到你"); return; }
     if(a === "uno"){
-      /* ★ UNO! 是**出牌前先按下的切換**(宣告與出牌必須是同一手,見 rules.js 第五節)。 */
+      /* ★ UNO 要在**出牌前**先喊(宣告與出牌必須是同一手,見 rules.js 第五節)。
+         ★★ **一按就定案,不是切換**(v1.109.0)—— 使用者:「應該要按完就不見,
+            而不是在那邊不小心按一下又取消掉」。喊了不會讓自己吃虧,所以「取消」
+            這個動作只有壞處。⚠ 連線那支(adapter 的 act)逐字一樣。 */
       if(st.hands[ME].length !== 2){ showToast("剩兩張時才用得到", 1500); return; }
-      unoArmed = !unoArmed;
-      if(unoArmed) UNB.sfx.uno();
+      if(unoArmed) return;                  // 已經喊過 → 什麼都不做(鈕本來也收掉了)
+      unoArmed = true;
+      UNB.sfx.uno();
       paint();
       return;
     }

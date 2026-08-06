@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.108.0 -->
-<meta name="version" content="1.108.0">
+<!-- UNO · v1.109.0 -->
+<meta name="version" content="1.109.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -83,7 +83,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <!-- ⚠ 這兩句與房規面板、rules.js 的 doDraw 是同一件事的三個說法,改一處要看另兩處 -->
         手上有出得了的牌就<b>一定要出</b>;真的一張都出不了才<b>抽一張</b>,
         抽完就換下一家(<b>可在房規改成「抽到的可以馬上出」</b>)。<br>
-        動作牌:<b>⊘ 跳過</b>下一家 · <b>⇄ 迴轉</b>換方向(<b>2 人局等同跳過</b>)·
+        動作牌:<b>⊘ 跳過</b>下一家 · <b>⇄ 迴轉</b>換方向(2 人局就是<b>換對手出</b>)·
         <b>+2</b> 讓下一家抽兩張並跳過 · <b>+4</b> 換顏色再讓他抽四張。<br>
         <!-- ★ 這兩句是「為什麼我剩一張要按一顆鈕」的唯一說明。
              不寫的話玩家第一次被抓會以為是 bug(而它是房規,預設開著)。 -->
@@ -362,7 +362,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <li><b>2~6 人</b>,每人先發 <b>7 張</b>;起始牌一律翻到<b>第一張數字牌</b>為止。</li>
             <li>出牌條件:<b>同色</b>或<b>同數字 / 同動作</b>;<b>Wild 隨時可出</b>並指定顏色。</li>
             <li>手上有出得了的牌就<b>一定要出</b>(不能改抽牌);真的一張都出不了才<b>抽一張</b>。</li>
-            <li><b>⇄ 迴轉在 2 人局等同跳過</b>(官方規則)。</li>
+            <li><b>⇄ 迴轉</b>反轉出牌方向;<b>2 人局就是換對手出</b>(官方是「等同跳過」,這一桌改成換人)。</li>
             <li><b>+4 隨時可出,而且不做挑戰驗牌</b> —— 這一版刻意簡化(這個 App 本來就不防作弊)。</li>
             <li>牌堆抽乾時,把<b>牌河除最上面那張</b>洗回牌堆繼續打。</li>
             <li>有人打完最後一張,<b>這一局立刻結束</b>。</li>

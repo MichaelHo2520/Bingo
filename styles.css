@@ -5520,8 +5520,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-dir{font:800 11.5px/1 'Nunito',sans-serif;color:var(--muted);
     padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.16)}
   /* 累積罰抽。⚠ 顏色**不可以吃 --accent-2** —— 桌布是寫死的深綠,而 --accent-2 在
-     bubblegum 是紫、在 candy 是桃紅,壓上去幾乎看不見(同上面那段 ⚠⚠ 的理由)。 */
-  .un-pen{font:800 12.5px/1 'Nunito',sans-serif;color:#ffd66b;text-align:center;
+     bubblegum 是紫、在 candy 是桃紅,壓上去幾乎看不見(同上面那段 ⚠⚠ 的理由)。
+     ★★★ **釘在左上角**(對稱右上角的牌堆),直立與橫置都一樣(v1.109.0)。
+        v1.108.0 只有橫置那段是 absolute,直立那段仍然是桌子裡的一列 ——
+        而 `.un-table` 是 `justify-content:center`,多一列就把「桌上那張牌 + 現在顏色」
+        整組往上挪半列:沿著一整局取樣量到**每次有人砸 +2 / +4 就跳 16px**。
+        那是使用者說的「介面一直跳來跳去」裡最頻繁的一種。
+     ⚠ 罰抽出現與否**不可以**再影響任何人的位置 —— 要加東西進桌子一律走這條路
+       (釘角落),不要往那個 flex column 裡塞新的一列。 */
+  .un-pen{position:absolute;left:9px;top:7px;z-index:1;
+    font:800 12.5px/1 'Nunito',sans-serif;color:#ffd66b;text-align:center;
     background:rgba(0,0,0,.28);border-radius:999px;padding:4px 11px}
   .un-pen b{font-size:14px;color:#fff}
   :root[data-theme="ebook"] .un-pen{color:#000;background:#eee}
@@ -5540,7 +5548,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-hlabel{display:flex;align-items:center;gap:8px;
     font:800 12px/1.2 'Nunito',sans-serif;color:var(--muted);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* ★ 高度**寫死**(= 牌高 + 上下 padding)—— 不然手牌超過一列寬時瀏覽器會長出一條
+     橫向捲軸,那條捲軸的厚度直接加在這一列上,整排牌就跟著上下挪一次。
+     ⚠ 一定要用 calc(var(--un-cw) * 1.45 ...) 而不是寫死 px:牌寬是 clamp 出來的,
+       視窗一變牌就變高(同 .un-card 那條「牌高在牌自己身上算」的紀律)。 */
   .un-hand{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;
+    height:calc(var(--un-cw) * 1.45 + 12px);
     padding:8px 2px 4px;scrollbar-width:thin;touch-action:pan-x}
 
   /* ---------- 動作列 ----------
@@ -5552,7 +5565,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 兩列的高度加起來要留在 --un-acth 之內:40 + 5 + 16 = 61 ≤ 74(矮視窗那段另有一組)。 */
   .un-acts{flex:0 0 auto;height:var(--un-acth);position:relative;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
-  .un-arow{flex:none;min-height:40px;display:flex;align-items:center;justify-content:center;
+  /* ⚠ height 而不是 min-height:鈕的高度會因為字級 / 主題差一兩 px,而這一列一動
+     上面整組就跟著挪(這一頁的所有「跳一下」都是這樣來的)。 */
+  .un-arow{flex:none;height:40px;display:flex;align-items:center;justify-content:center;
     gap:8px;flex-wrap:nowrap;max-width:100%}
   .un-atxt{flex:none;height:16px;max-width:100%;text-align:center;
     font:800 12.5px/16px 'Nunito',sans-serif;color:var(--muted);
@@ -5560,16 +5575,64 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-atxt.me{color:var(--accent)}
   /* ⚠ 鈕一律**一行字**(沒有 small 副標了):兩行的鈕會把那一列撐到 60px 以上,
      上面那條「加起來 ≤ --un-acth」就守不住。 */
-  .un-acts .btn{flex:0 1 auto;min-width:92px;padding:10px 16px;font-size:16px;line-height:1.2;
+  .un-acts .btn{flex:0 1 auto;min-width:92px;padding:9px 16px;font-size:16px;line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  /* UNO! 切換鈕:按下去要看得出來「已經武裝」 */
-  .un-unobtn{background:rgba(255,255,255,.14);color:var(--text)}
-  .un-unobtn.on{background:var(--un-y);color:#3a2a00;box-shadow:0 0 0 2px var(--un-y)}
   .un-catch{background:var(--un-r);color:#fff}
-  /* 出牌倒數的環:動作列底部一條(公開資訊,全桌都看得到還剩多久) */
-  .un-cd{position:absolute;left:6px;right:6px;bottom:0;height:4px;border-radius:3px;
-    background:rgba(255,255,255,.14);overflow:hidden}
-  .un-cd i{display:block;height:100%;background:var(--accent);border-radius:3px}
+
+  /* ---------- 喊 UNO 的徽章鈕(v1.109.0) ----------
+     使用者:「報 UNO 目前的觸發方式很奇怪…應該要按完就不見,而不是在那邊不小心按一下
+     又取消掉,而且那個按鈕不要當成全螢幕,一眼就看出這個是要喊 UNO」。
+     三件事:
+       ① **一按就定案** —— 切換態(.on)整個拿掉了,按下去鈕就從 DOM 收掉
+          (狀態改由下面那行固定高度的說明字講)。所以這裡不再有 .un-unobtn.on。
+       ② **不掛 .btn** —— 共用 .btn 會一起吃到 min-width:92px 與方角,
+          變成「跟旁邊那顆一樣、只是字不同」。它要一眼認得出是 UNO 的招牌:
+          **紅字壓黃底**(UNO 自己的兩個色,而 --un-r / --un-y 在任何主題下都是原值)。
+       ③ **小顆、不占整列** —— 88px 寬,旁邊還放得下「抓 X!」與「抽一張」。
+     ★ 脈動是 transform,**不影響版面**(同 .m16-cd 那顆環的紀律:放大的是注意力)。
+     ⚠ 高度 38 ≤ .un-arow 的 40,所以它出現不會把那一列撐高。 */
+  .un-unobtn{flex:none;display:inline-grid;place-items:center;
+    width:88px;height:38px;padding:0;border:none;border-radius:999px;cursor:pointer;
+    background:var(--un-y);
+    box-shadow:0 0 0 2.5px #fff inset,0 3px 0 rgba(0,0,0,.24),0 4px 12px rgba(0,0,0,.26);
+    animation:unpulse 1.25s ease-in-out infinite}
+  .un-uw{display:block;transform:rotate(-7deg);
+    font:italic 800 19px/1 'Fredoka','Nunito',sans-serif;color:var(--un-r);
+    letter-spacing:.4px;text-shadow:0 1px 0 rgba(255,255,255,.55)}
+  .un-unobtn:active{animation:none;transform:scale(.94)}
+  @keyframes unpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+
+  /* ---------- 出牌倒數的環 ----------
+     ★★ 使用者:「倒數秒數的方式,請參考台灣麻將的顯示方式」——
+        所以這顆與 .m16-cd **是同一份配方**(SVG 環圈 + 中間秒數,最後 3 秒轉紅脈動),
+        只有顏色跟著這一頁走。原本是動作列底部一條 4px 的進度條:看得出「在跑」,
+        看不出「還剩幾秒」。
+     ⚠ 107 ≈ 2πr(r=17)。從 0 排到滿 = 環圈整圈消失。
+     ★★ 它是**鈕列裡的第一個成員**(不是釘在動作列右緣)。第一版寫成
+        `position:absolute;right:6px`,而 .un-acts 整條有 720px 寬 → 那顆環掉在
+        視窗最右邊、離鈕一大截,看起來像一個沒人管的數字(只有截圖看得出來)。
+        排進鈕列就跟著一起置中,擺法與 .m16-cd 一致。 */
+  .un-cd{flex:none;position:relative;width:36px;height:36px;display:grid;place-items:center}
+  .un-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .un-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  /* ⚠ 底環比麻將那份亮一階(.16 → .24):這一列旁邊是三顆實心的鈕,.16 的細環
+     在它們旁邊看起來像沒畫完(只有截圖看得出來)。 */
+  .un-cdbg{stroke:rgba(255,255,255,.24)}
+  .un-cdfg{stroke:var(--accent);stroke-dasharray:107;stroke-dashoffset:0}
+  @keyframes uncd{from{stroke-dashoffset:0}to{stroke-dashoffset:107}}
+  .un-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .un-cdn.un-beat{animation:unbeat .34s ease-out}
+  @keyframes unbeat{0%{transform:scale(1.55);opacity:.55}70%{transform:scale(1)}100%{transform:scale(1)}}
+  .un-cd.un-hot .un-cdfg{stroke:var(--un-r)}
+  .un-cd.un-hot .un-cdn{color:var(--un-r)}
+  .un-cd.un-hot{animation:uncdhot .9s ease-in-out infinite}
+  @keyframes uncdhot{0%,100%{transform:scale(1)}50%{transform:scale(1.14)}}
+  /* 會動的東西一律尊重系統的「減少動態效果」 */
+  @media (prefers-reduced-motion:reduce){
+    .un-unobtn{animation:none}
+    .un-cd.un-hot{animation:none}
+    .un-cdn.un-beat{animation:none}
+  }
 
   /* ---------- 選色盤 ---------- */
   .un-colors{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
@@ -5613,9 +5676,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   :root[data-theme="ebook"] .un-cl{display:block}
   :root[data-theme="ebook"] .un-table{background:#fff;border:1px solid #000}
   :root[data-theme="ebook"] .un-dir{background:#eee;color:#000}
-  :root[data-theme="ebook"] .un-cd{background:#eee}
-  :root[data-theme="ebook"] .un-cd i{background:#000}
-  :root[data-theme="ebook"] .un-unobtn{background:#eee;color:#000;border:1px solid #000}
+  :root[data-theme="ebook"] .un-cdbg{stroke:rgba(0,0,0,.18)}
+  :root[data-theme="ebook"] .un-cdfg{stroke:#000}
+  :root[data-theme="ebook"] .un-cd.un-hot .un-cdfg{stroke:#000}
+  :root[data-theme="ebook"] .un-cd.un-hot .un-cdn{color:#000}
+  /* ★ UNO 徽章在電子書主題轉黑白 —— 它是**按鈕**不是牌面,不吃「四色一律保留」
+     那條紅線(同首頁圖示的處理:圖示不承載規則)。 */
+  :root[data-theme="ebook"] .un-unobtn{background:#fff;
+    box-shadow:0 0 0 2px #000 inset,0 2px 0 rgba(0,0,0,.5)}
+  :root[data-theme="ebook"] .un-uw{color:#000;text-shadow:none}
 
   /* ==========================================================================
      UNO 的外框(照 .b2-* 那一組做一份對應的)
@@ -5732,11 +5801,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .un-table{flex:none;padding:6px 8px;gap:clamp(10px,3vw,22px);min-height:0;max-height:none;
       flex-direction:row;align-items:center;justify-content:center}
     .un-card.big{--un-cw:clamp(50px,13vw,62px)}
-    .un-pen{position:absolute;left:9px;top:7px}
-    .un-hand{padding:6px 2px 3px}
+    /* (罰抽的 position:absolute 已經搬到基本規則裡 —— 直立也一樣釘左上角,見上面 ★★★) */
+    .un-hand{padding:6px 2px 3px;height:calc(var(--un-cw) * 1.45 + 9px)}
     /* ⚠ 動作列在這裡也要守「兩列加起來 ≤ --un-acth」:32 + 5 + 16 = 53 ≤ 58。 */
-    .un-arow{min-height:32px}
+    .un-arow{height:32px}
     .un-acts .btn{padding:6px 13px;font-size:14.5px;min-width:80px}
+    /* UNO 徽章與倒數環在矮視窗一起縮一階(徽章 30 ≤ 鈕列 32) */
+    .un-unobtn{width:76px;height:30px}
+    .un-uw{font-size:16px}
+    .un-cd{width:28px;height:28px}
+    .un-cdn{font-size:12px}
     .un-colors{grid-template-columns:repeat(4,1fr)}
     .un-cbtn{padding:12px 6px;font-size:14px}
   }

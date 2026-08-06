@@ -87,6 +87,8 @@ const MP = MPCore.create((function(){
     if(!st) return;
     const me = mySeat();
     if(me < 0) return;
+    /* ★ 「喊過 UNO」只在手上剛好 2 張的那一手有意義 —— ⚠ 與單機那份逐字一樣 */
+    if(st.hands[me].length !== 2) unoArmed = false;
     const mine = isMyTurn() && pendWild < 0;
     const nms = [];
     for(let s = 0; s < nPlayers(); s++) nms.push(nameOfSeat(s));
@@ -95,6 +97,7 @@ const MP = MPCore.create((function(){
     UNB.render({
       hand: st.hands[me].slice(),
       top: st.top, col: st.col, dir: st.dir, pend: st.pend, stack: st.rules.stack,
+      n: nPlayers(),                              // ★ 2 人局不畫方向
       pileLeft: st.pile.length, discLeft: st.disc.length,
       mine: mine, over: !!ctx.winner() || st.over,
       turnName: st.over ? "" : nameOfSeat(st.turn),
@@ -203,9 +206,11 @@ const MP = MPCore.create((function(){
     if(!isMyTurn()){ showToast("還沒輪到你"); return; }
     const me = mySeat();
     if(a === "uno"){
+      /* ★★ 一按就定案,不是切換 —— ⚠ 與單機那支(solo.js 的 act)逐字一樣。 */
       if(st.hands[me].length !== 2){ showToast("剩兩張時才用得到", 1500); return; }
-      unoArmed = !unoArmed;
-      if(unoArmed) UNB.sfx.uno();
+      if(unoArmed) return;
+      unoArmed = true;
+      UNB.sfx.uno();
       paint();
       return;
     }
@@ -300,7 +305,7 @@ const MP = MPCore.create((function(){
     return "108 張牌,每人先發 <b>7 張</b>。出牌條件是<b>同色</b>或<b>同數字 / 同動作</b>;" +
            "<b>Wild 隨時可出</b>並指定顏色。<br>" +
            "出不了就<b>抽一張</b> —— <b>抽到的那張能出就可以馬上出</b>。" +
-           "<b>⇄ 迴轉在 2 人局等同跳過</b>。<br>" +
+           "<b>⇄ 迴轉</b>反轉方向,<b>2 人局就是換對手出</b>。<br>" +
            "<b>" + esc(unRulesText(rules)) + "</b>(房主可改)。<br>" +
            "有人打完最後一張,<b>這一局立刻結束</b>。名次照<b>手上剩牌的點數</b>排" +
            "(跳過/迴轉/+2 各 20 · Wild 各 50),名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。<br>" +

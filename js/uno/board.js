@@ -135,9 +135,18 @@ const UNB = (function(){
     /* ⚠ 方向的箭頭用**幾何字元**(U+25B8 / U+25C2)而不是迴轉箭頭(U+21BB / U+21BA)——
        後者在部分 Android 字型缺字會變豆腐方框(同 CLAUDE.md 紅線 8 的精神:
        禁令列的是麻將與撲克牌那兩段,但「這個字型有沒有」的問題對任何字元都成立,
-       所以能挑常見的就挑常見的)。牌面上的 ⊘ / ⇄ 由截圖驗過。 */
-    const dirTxt = o.dir > 0 ? "順向 ▸" : "逆向 ◂";
-    /* ★ 短到一眼看完 —— 「疊得上就疊,不然只能抽」那半句改成點牌時才講(whyNot)。 */
+       所以能挑常見的就挑常見的)。牌面上的 ⊘ / ⇄ 由截圖驗過。
+       ★★ **2 人局不畫方向**(v1.109.0):兩個人的桌上「順向」與「逆向」是同一件事,
+          而迴轉現在一律換對手出(見 rules.js 的 K_REV)—— 那顆膠囊翻來翻去卻什麼都沒
+          改變,正是使用者說的「很像工程用的東西」。 */
+    const dir = (o.n === 2) ? "" :
+      '<span class="un-dir">' + (o.dir > 0 ? "順向 ▸" : "逆向 ◂") + '</span>';
+    /* ★ 短到一眼看完 —— 「疊得上就疊,不然只能抽」那半句改成點牌時才講(whyNot)。
+       ★★ 罰抽是**釘在左上角**的(對稱右上角的牌堆),不是桌子裡的一列 ——
+          它一出現就不可以把桌上的牌與「現在顏色」那一列推開。
+          v1.108.0 只在橫置矮視窗釘住,直立那段仍然是流內元素:實測沿著一整局取樣,
+          桌上那張牌在 pend 有無之間**上下跳 16px**(桌子 justify-content:center,
+          多一列就整組往上挪半列)—— 那正是使用者說的「介面一直跳來跳去」。 */
     const pen = o.pend > 0 ? '<div class="un-pen">罰抽 <b>' + o.pend + '</b> 張</div>' : "";
     return '<div class="un-table">' +
              '<button class="un-deck" id="unDraw" type="button" aria-label="牌堆還有 ' +
@@ -146,7 +155,7 @@ const UNB = (function(){
              '<div class="un-now">' +
                '<span class="un-swatch ' + colCls + '" aria-hidden="true"></span>' +
                '<span class="un-nowtxt">現在顏色 <b>' + colTxt + '</b></span>' +
-               '<span class="un-dir">' + dirTxt + '</span>' +
+               dir +
              '</div>' + pen +
            '</div>';
   }
@@ -188,7 +197,7 @@ const UNB = (function(){
      五、動作列
      ──────────────────────────────────────────────────────────────────────────
        o = { mine, over, turnName, drew, noPlay, handLen,
-             unoOn(UNO! 有沒有按下), unoRule, catchName(可以抓誰,空 = 沒有),
+             unoOn(UNO 已經喊了), unoRule, catchName(可以抓誰,空 = 沒有),
              cdMs, cdEnd }
        ★★ 手上有合法牌可出時**不准抽**(強制出牌,見 rules.js 的 doDraw)——
           所以「抽一張」鈕只在 noPlay 時才畫;不畫的時候唯一的動作就是點一張亮起來
@@ -199,11 +208,44 @@ const UNB = (function(){
             · 高度不再隨內容變 → 上面的手牌與桌子不會被推得上上下下(見 styles.css)。
             · 鈕上的 <small> 副標全部拿掉、說明字縮成半句 —— 原本一顆 UNO! 鈕上就掛著
               「先按這裡再出牌,不然會被抓」,那是說明書不是遊戲。
+       ★★★★ 這一列**永遠占著 --un-acth 那個高度**(v1.109.0),連 over 都不收起來 ——
+          原本 over 時 `classList.add("hidden")` 讓整條 74px 消失,而它下面沒有東西、
+          上面的手牌是靠 margin-top:auto 貼著它的 → 手牌會在結算那一刻整組**掉 82px**。
+          (沿著一整局取樣量到的:手牌列 top 611 / 693 兩種值。)
      ========================================================================== */
-  function renderActs(o){
+  /* ★★ 兩列是**常駐節點**(v1.109.0),每次只換裡面的東西 —— 理由有兩個:
+       ① 倒數環要當成鈕列裡的一員(排在鈕的左邊,像台灣麻將那樣),而環一離開文件
+          CSS 動畫就被取消 → 整條列不可以再 innerHTML 重畫。
+       ② 順手保證兩列永遠存在(over 也是),高度就永遠是 --un-acth。 */
+  let rowEl = null, txtEl = null;
+  function ensureRows(){
     const box = $("unActs");
+    if(!box) return null;
+    if(!rowEl || !rowEl.isConnected || !txtEl || !txtEl.isConnected){
+      box.innerHTML = '<div class="un-arow"></div><div class="un-atxt"></div>';
+      rowEl = box.querySelector(".un-arow");
+      txtEl = box.querySelector(".un-atxt");
+      cdEl = null;                       // ⚠ 整條重建 → 舊的環已經脫離文件,要跟著忘掉
+    }
+    return box;
+  }
+  /* ⚠ 清鈕但**留下倒數環**(見 ensureCd 的註解) */
+  function clearRow(){
+    if(rowEl) [...rowEl.children].forEach(el => { if(el !== cdEl) el.remove(); });
+  }
+
+  function renderActs(o){
+    const box = ensureRows();
     if(!box) return;
-    if(o.over){ box.classList.add("hidden"); box.innerHTML = ""; return; }
+    box.classList.remove("hidden");
+    clearRow();
+    /* ★ over 也要留著兩列的空盒子 —— 高度不變,版面才不會在結算那一刻掉一截。 */
+    if(o.over){
+      stopCd();
+      txtEl.className = "un-atxt";
+      txtEl.innerHTML = "";
+      return;
+    }
     let btn = "", txt = "", cls = "";
 
     /* ★★ 抓鈕**不分回合**(視窗是「下一家出手之前」,不是「輪到我」)——
@@ -217,13 +259,21 @@ const UNB = (function(){
       txt = "輪到 " + esc(o.turnName || "") + "…";
     }else{
       cls = " me";
-      /* ★ UNO! 是**出牌前先按下的切換**,不是出牌後補按的 ——
-         宣告與出牌必須是同一手(見 rules.js 第五節:不然會與下一家的出牌競態)。
-         ⚠ 只有「手上剛好 2 張」才出現:此時出一張就剩一張。 */
+      /* ★ UNO 一定要在**出牌前**先喊 —— 宣告與出牌必須是同一手
+         (見 rules.js 第五節:做成出完再補按會與下一家的出牌競態)。
+         ⚠ 只有「手上剛好 2 張」才出現:此時出一張就剩一張。
+         ★★★ 它是**一按就定案**,不是切換(v1.109.0)。使用者原話:
+            「應該要按完就不見,而不是在那邊不小心按一下又取消掉」——
+            喊了 UNO 從來不會讓自己吃虧(規則層只在剩 1 張時接受 `!`),
+            所以「取消」這個動作沒有任何用途,卻多送一次誤觸把宣告吃掉的機會。
+            按下去 → 鈕收掉,狀態改由下面那行字講(那一行是固定高度的,不會推版面)。 */
       const unoNow = !!(o.unoRule && o.handLen === 2);
-      if(unoNow){
-        btn += '<button class="btn un-unobtn' + (o.unoOn ? " on" : "") +
-                 '" id="unUno" type="button">UNO!</button>';
+      if(unoNow && !o.unoOn){
+        /* ⚠ 這顆**不掛 .btn** —— 它要長得像 UNO 的招牌(紅字壓黃底的橢圓徽章),
+           不是動作列上另一顆一般的方鈕。共用 .btn 就會一起吃到 min-width:92px
+           與方角,整顆變成「跟旁邊那顆一樣、只是字不同」。 */
+        btn += '<button class="un-unobtn" id="unUno" type="button" aria-label="喊 UNO">' +
+                 '<span class="un-uw">UNO!</span></button>';
       }
       if(o.drew){
         btn += '<button class="btn ghost" id="unPass" type="button">不出了</button>';
@@ -234,35 +284,95 @@ const UNB = (function(){
       }else{
         txt = "輪到你,點一張亮的牌";
       }
-      // UNO! 那顆鈕沒有副標了 → 它要幹嘛只講在這一行(而且只在該按的那一刻講)
-      if(unoNow) txt = o.unoOn ? "好,出牌時會喊 UNO" : "出這張前先按 UNO!";
+      // 這一格只在該喊的那一刻講,而且喊過與沒喊各一句(鈕本身已經收掉了)
+      if(unoNow) txt = o.unoOn ? "✔ 喊過 UNO 了,出牌吧" : "出牌前先喊 UNO!";
     }
-    box.innerHTML = '<div class="un-arow">' + btn + '</div>' +
-                    '<div class="un-atxt' + cls + '">' + txt + '</div>';
-    box.classList.remove("hidden");
-    if(o.cdMs > 0) startCd(o.cdEnd, o.cdMs);
+    /* ⚠ 鈕一律 **beforeend**(接在環後面)—— 環是鈕列的第一個成員,順序是
+       「⏱ 環 · 抓 X! · UNO! · 抽一張」。 */
+    rowEl.insertAdjacentHTML("beforeend", btn);
+    txtEl.className = "un-atxt" + cls;
+    txtEl.innerHTML = txt;
+    if(o.cdMs > 0) startCd(o.cdMs, o.cdEnd);
     else stopCd();
   }
 
-  /* ---------- 出牌倒數的環(公開資訊:大家都要知道為什麼卡著)---------- */
-  let cdT = null;
-  function stopCd(){ if(cdT){ clearInterval(cdT); cdT = null; } const b = $("unCd"); if(b) b.remove(); }
-  function startCd(endAt, span){
-    stopCd();
-    const box = $("unActs");
-    if(!box || !endAt) return;
-    const bar = document.createElement("div");
-    bar.className = "un-cd"; bar.id = "unCd";
-    bar.innerHTML = '<i></i>';
-    box.appendChild(bar);
-    const paint = () => {
-      const left = Math.max(0, endAt - Date.now());
-      const i = bar.firstChild;
-      if(i) i.style.width = Math.max(0, Math.min(100, left / span * 100)) + "%";
-      if(left <= 0) stopCd();
-    };
-    paint();
-    cdT = setInterval(paint, 100);
+  /* ==========================================================================
+     五之二、出牌倒數的環(公開資訊:全桌都要知道還剩多久)
+     ──────────────────────────────────────────────────────────────────────────
+       ★★ 照**台灣麻將那顆**(js/mahjong16/adapter.js 的 ensureCd,v1.58.4)——
+          使用者:「倒數秒數的方式,請參考台灣麻將的顯示方式」。
+          一顆 SVG 環圈 + 中間的秒數:環隨時間排空,最後 3 秒轉紅並脈動。
+       ★ 「動」全部交給 CSS animation,JS 只換中間那個數字 —— **不可以**每次
+         renderActs() 都重畫一條進度條:那條列會因為「別人出牌了」「抓鈕出現了」
+         被叫很多次,每一次重畫動畫就從頭開始,倒數會忽然跳回滿格。
+       ★ 因此這顆是**持久節點**:clearRow() 刻意跳過它(元素一離開文件,CSS 動畫
+         就被取消,插回去等於重跑一次 —— 症狀跟上面那條一模一樣)。
+       ★★ 位置是**鈕列裡的第一個成員**,不是釘在動作列右緣 —— 第一版釘在
+          `right:6px`,而 .un-acts 是整條 720px 寬:那顆環會落在視窗最右邊、
+          離鈕一大截,看起來像一個掉在角落的數字(截圖才看得出來)。
+          排進鈕列就會跟著一起置中,與台灣麻將那顆的擺法一致。
+       ⚠ 因此環出現 / 消失會讓鈕左右挪 21px —— 而它在實務上不會中途切換:
+         turnSec 開著就整局都在,關著就整局都沒有(單機是後者)。
+     ========================================================================== */
+  let cdEl = null, cdT = null, cdEnd = 0, cdKey = "";
+  function ensureCd(){
+    if(cdEl && cdEl.isConnected) return cdEl;
+    if(!ensureRows() || !rowEl) return null;
+    cdEl = document.createElement("span");
+    cdEl.className = "un-cd hidden";
+    cdEl.setAttribute("aria-hidden", "true");
+    cdEl.innerHTML =
+      '<svg viewBox="0 0 40 40"><circle class="un-cdbg" cx="20" cy="20" r="17"/>' +
+      '<circle class="un-cdfg" cx="20" cy="20" r="17"/></svg><b class="un-cdn">–</b>';
+    rowEl.insertBefore(cdEl, rowEl.firstChild);
+    return cdEl;
+  }
+  /* 收掉 = **藏起來**,不是把節點丟掉 —— 丟掉的話下一手要重建,而重建 = 動畫重跑。
+     ⚠ 麻將那份還多一支「離房時把 cdEl 設回 null」的 dropCd:這一頁不需要,因為
+       #unActs 是 uno.html 裡的常駐節點(沒有人會把它整個換掉),而 ensureCd() 另外
+       用 isConnected 自癒 —— 那正是麻將那條「cdEl 指著脫離文件的節點就再也畫不出來」
+       的坑,這裡用檢查取代紀律。 */
+  function stopCd(){
+    if(cdT){ clearInterval(cdT); cdT = null; }
+    cdKey = "";
+    if(cdEl){ cdEl.classList.add("hidden"); cdEl.classList.remove("un-hot"); }
+  }
+  /* 畫一顆「總長 totalMs、在 endAt 歸零」的環。
+     ★ **同一顆環就不重跑**(cdKey):renderActs() 一手之內會被叫好幾次,不去重的話
+       環每次都彈回滿格 —— 那個彈跳本身就會被玩家讀成「時間重算了」。
+     ⚠ 去重條件**不可以**看 cdT:數字走到 0 之後 tick 就把 interval 停掉了,而
+       那之後還會有 renderActs() 進來,環會彈回滿格(麻將 v1.65.0 的原話)。
+     ★ 已經跑掉的部分靠**負的 animation-delay** 跳過去,duration 永遠是那一段的總長。 */
+  function startCd(totalMs, endAt){
+    if(!(totalMs > 0) || !endAt){ stopCd(); return; }
+    const el = ensureCd(); if(!el) return;
+    const key = Math.round(totalMs) + "@" + Math.round(endAt);
+    if(cdKey === key && !el.classList.contains("hidden")) return;
+    cdKey = key;
+    if(cdT){ clearInterval(cdT); cdT = null; }
+    cdEnd = endAt;
+    el.classList.remove("hidden", "un-hot");
+    const ring = el.querySelector(".un-cdfg");
+    const past = Math.max(0, Math.min(totalMs, totalMs - (endAt - Date.now())));
+    /* 重跑動畫:只改 duration 不會重新開始 —— 要先拿掉、強制 reflow、再掛回去。
+       ⚠ animationDelay 一定要寫在 shorthand **之後**(shorthand 會把 delay 歸零)。 */
+    ring.style.animation = "none"; void ring.offsetWidth;
+    ring.style.animation = "uncd " + totalMs + "ms linear forwards";
+    ring.style.animationDelay = (-past) + "ms";
+    tickCd();
+    cdT = setInterval(tickCd, 200);
+  }
+  function tickCd(){
+    if(!cdEl) return;
+    const left = Math.max(0, cdEnd - Date.now());
+    const s = String(Math.ceil(left / 1000));
+    const n = cdEl.querySelector(".un-cdn");
+    if(n && n.textContent !== s){
+      n.textContent = s;
+      n.classList.remove("un-beat"); void n.offsetWidth; n.classList.add("un-beat");
+    }
+    cdEl.classList.toggle("un-hot", left <= 3000);      // 最後 3 秒:轉紅 + 脈動
+    if(left <= 0){ clearInterval(cdT); cdT = null; }
   }
 
   /* ==========================================================================
