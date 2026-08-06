@@ -1032,7 +1032,10 @@ const B2B = (function(){
       try{ el.setPointerCapture(e.pointerId); }catch(err){}
     });
 
-    stage.addEventListener("pointermove", e => {
+    /* ⚠⚠ move / up / cancel 掛在 **window** 不是 stage(v1.107.3,見下面「捕獲會被自己搬掉」):
+       捕獲一旦被收回,事件就退回「打到誰算誰」—— 手指滑出盤面那幾顆 move / up 就再也
+       不會經過 stage。掛 window 收得到全部,而且 endDrag() 開頭就 return,重複進來沒有副作用。 */
+    addEventListener("pointermove", e => {
       if(!drag || e.pointerId !== drag.id) return;
       if(!stage.contains(drag.el)){ endDrag(true); return; }   // 保險:節點被抽掉了
       if(!drag.on){
@@ -1045,16 +1048,28 @@ const B2B = (function(){
       follow(e.clientX, e.clientY);
     });
 
-    stage.addEventListener("pointerup", e => {
+    addEventListener("pointerup", e => {
       if(drag && e.pointerId === drag.id) endDrag(false);
     });
-    stage.addEventListener("pointercancel", e => {
+    addEventListener("pointercancel", e => {
       if(drag && e.pointerId === drag.id) endDrag(true);
     });
-    /* 瀏覽器把捕獲收回去(節點被移走 / 手勢被別人接手)→ 當成取消,不要留半套。
-       ⚠ 自己 releasePointerCapture() 也會觸發它,但那時 drag 已經是 null 了。 */
+    /* ⚠⚠⚠ 捕獲**是我們自己搬掉的**(v1.107.3,先在台灣麻將被回報)———————————————
+       「被捕獲的元素從父節點被移走」= 瀏覽器當場收回捕獲,而拖曳排序每換一次位就
+       `insertBefore` 搬它一次 → 第一次換位就收到 lostpointercapture。舊版把它一律當成
+       中斷,所以**拖曳永遠活不過第一次換位**:牌彈回原位、`ord` 沒寫進去。
+       ★ 兩個引擎都會收回(WebKit / Blink 實測皆然),不是 iOS 專屬 —— 只是觸控每一次拖
+         都會碰到別張牌,滑鼠可以「舉高高繞過去」,才顯得像只有手機壞掉。
+       ★ 判準是**節點還在不在盤面上**:還在 → 是我們自己搬的,**什麼都不做**繼續拖;
+         不在 → 才是真的沒了,照舊收攤。真正的「手勢被別人接手」走 pointercancel。
+       ⚠⚠ **不可以在這裡 setPointerCapture() 補回來** —— 補回去會馬上又被收回,
+         got / lost 互踢成無限迴圈,**整頁當場凍住**(WebKit 實測)。捕獲丟了沒關係:
+         上面 move / up 掛在 window,照樣收得到。這兩件事是**同一個修正的兩半**,
+         拆掉任何一半都會壞。 */
     stage.addEventListener("lostpointercapture", e => {
-      if(drag && e.pointerId === drag.id) endDrag(true);
+      if(!drag || e.pointerId !== drag.id) return;
+      if(stage.contains(drag.el)) return;
+      endDrag(true);
     });
   }
 

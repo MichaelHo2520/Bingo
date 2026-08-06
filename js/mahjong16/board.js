@@ -1068,7 +1068,11 @@ const M16B = (function(){
       try{ el.setPointerCapture(e.pointerId); }catch(err){}
     });
 
-    host.addEventListener("pointermove", e => {
+    /* ⚠⚠ move / up / cancel 掛在 **window** 不是 host(v1.107.3,見上面「捕獲會被自己搬掉」):
+       捕獲一旦被收回,事件就退回「打到誰算誰」—— 手指滑出盤面(或滑到動作列上)那幾顆
+       move / up 就再也不會經過 host。掛 window 收得到全部,而且 endDrag() 開頭就 return,
+       重複進來也沒有副作用。 */
+    addEventListener("pointermove", e => {
       if(!drag || e.pointerId !== drag.id) return;
       if(!host.contains(drag.el)){ endDrag(true); return; }   // 保險:節點被抽掉了
       if(!drag.on){
@@ -1083,16 +1087,32 @@ const M16B = (function(){
       follow(e.clientX, e.clientY);
     });
 
-    host.addEventListener("pointerup", e => {
+    addEventListener("pointerup", e => {
       if(drag && e.pointerId === drag.id) endDrag(false);
     });
-    host.addEventListener("pointercancel", e => {
+    addEventListener("pointercancel", e => {
       if(drag && e.pointerId === drag.id) endDrag(true);
     });
-    /* 瀏覽器把捕獲收回去(節點被移走 / 手勢被別人接手)→ 當成取消,不要留半套。
-       ⚠ 自己 releasePointerCapture() 也會觸發它,但那時 drag 已經是 null 了。 */
+    /* ⚠⚠⚠ 捕獲**是我們自己搬掉的**(v1.107.3,iPhone 上回報「一拖就彈回來」)———————
+       「被捕獲的元素從父節點被移走」= 瀏覽器當場收回捕獲,而拖曳排序每換一次位就
+       `insertBefore` 搬它一次 → 第一次換位就收到 lostpointercapture。舊版把它一律
+       當成中斷,所以**拖曳永遠活不過第一次換位**:牌彈回原位、`ord` 沒寫進去,
+       而且 noClick 沒設 → 補上來的那一下 click 會被當成點擊(這一頁 = 真的把牌打出去)。
+       ★ 兩個引擎都會收回(WebKit / Blink 實測皆然),不是 iOS 專屬 ——
+         只是 iPhone 是觸控、每一次拖都會碰到別張牌,所以人人都撞得到;
+         滑鼠可以「舉高高繞過去」不碰到別張牌,才顯得像只有 iPhone 壞掉。
+       ★ 判準是**節點還在不在盤面上**:還在 → 是我們自己搬的,**什麼都不做**繼續拖;
+         不在 → 才是真的沒了(重畫把節點換掉之類),照舊收攤。
+       ⚠⚠ **不可以在這裡 setPointerCapture() 補回來** —— 補回去會馬上又被收回,
+         got / lost 互踢成無限迴圈,**整頁當場凍住**(WebKit 實測跑不完一次拖曳)。
+         捕獲丟了沒關係:上面 move / up 掛在 window,照樣收得到。
+         ⚠ 這兩件事是**同一個修正的兩半**,拆掉任何一半都會壞:
+           只掛 window 不改這裡 → 照樣被當成中斷;只改這裡不掛 window → 手指滑出盤面就斷。
+       ⚠ 真正的「手勢被別人接手」走的是 pointercancel(上面那一條),不歸這裡管。 */
     host.addEventListener("lostpointercapture", e => {
-      if(drag && e.pointerId === drag.id) endDrag(true);
+      if(!drag || e.pointerId !== drag.id) return;
+      if(host.contains(drag.el)) return;
+      endDrag(true);
     });
   }
 
