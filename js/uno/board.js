@@ -4,13 +4,18 @@
    UNO — 盤面(UNB):牌面自繪 + 手牌 + 牌桌中央 + 動作列 + 選色盤 + 結果表。
    單機(solo.js)與連線(adapter.js)**共用這一支**,所以每一個畫面元件只有一份。
 
-   ── ★★★ 牌面上一定要有**色名字母**(R / Y / G / B)────────────────────────
-     這不是裝飾,是規則的可讀性:
-       ① 電子書主題把畫面轉黑白,而 UNO 的規則本體就是顏色 → 沒有字母就玩不了
-       ② 紅綠色盲的玩家吃同一條(而這是給親友聚會用的,一定會遇到)
-     所以四色變數 --un-r/y/g/b 在**任何主題下都保持原值**(見 styles.css 那段 ★★★),
-     而字母是第二條獨立的資訊通道。
+   ── ★ 牌面右下角的**色名字母**(R / Y / G / B)只在電子書主題現身 ──────────
+     v1.106.0 原本任何主題都畫(電子書黑白 + 紅綠色盲兩個理由),但玩家實測反饋
+     不想在牌角看到英文字母,而彩色主題下顏色本身已經夠分辨,所以改成:
+       · 一般(彩色)主題:不畫 —— CSS 預設 .un-cl{display:none}
+       · 電子書主題:畫 —— 轉黑白之後顏色判斷通道消失,靠字母補回來
+         (見 styles.css 電子書那段的 `.un-cl{display:block}` override)
+     字母本身還是 HTML(每次 render() 都會吐出來),只是彩色主題下被 CSS 藏起來
+     ——不是 JS 判斷主題再決定要不要塞這段 HTML,理由是**主題可能隨時切換**,
+     CSS 版本不必等下一次 render() 就會跟著換。
      ⚠ 用英文字母而不是「紅黃綠藍」:CJK 字在 20px 寬的牌角落會糊成一塊墨。
+     四色變數 --un-r/y/g/b 仍然在**任何主題下都保持原值**(見 styles.css 那段 ★★★)——
+     這條沒變,顏色仍然是 UNO 的規則本體。
 
    ── 牌面的畫法(與首頁 / 進場圖示的 .un-ic-* 是同一套視覺,但**不是同一份碼**)──
      圖示是 SVG(要能縮到 32px 還認得出來),牌面是 HTML + CSS(要能點、要能捲、
@@ -50,7 +55,7 @@ const UNB = (function(){
                '<span class="un-lb wild' + two + '">' + lb + '</span>';
     }else{
       inner += '<span class="un-lb' + two + '">' + lb + '</span>' +
-               // ★★ 色名字母(見檔頭):電子書主題與色盲都靠它
+               // ★ 色名字母(見檔頭):HTML 一律吐出來,CSS 只在電子書主題顯示
                '<span class="un-cl" aria-hidden="true">' + UN.letterOf(id) + '</span>';
     }
     return '<span class="un-card ' + c + (cls ? " " + cls : "") + '" data-c="' + id +
@@ -179,9 +184,13 @@ const UNB = (function(){
   /* ==========================================================================
      五、動作列
      ──────────────────────────────────────────────────────────────────────────
-       o = { mine, over, turnName, canDraw, drew, noPlay, handLen,
+       o = { mine, over, turnName, drew, noPlay, handLen,
              unoOn(UNO! 有沒有按下), unoRule, catchName(可以抓誰,空 = 沒有),
              cdMs, cdEnd }
+       ★★ 手上有合法牌可出時**不准抽**(強制出牌,見 rules.js 的 doDraw)——
+          所以「抽一張」鈕只在 noPlay 時才畫;不畫的時候唯一的動作就是點一張亮起來
+          的牌。牌桌中央那顆牌堆(#unDraw)仍然一直可以點,誤按由 hAct("draw") 那一側
+          的驗證跳 toast 講原因(不用 disabled 讓點擊靜默消失)。
      ========================================================================== */
   function renderActs(o){
     const box = $("unActs");
@@ -208,13 +217,12 @@ const UNB = (function(){
       }
       if(o.drew){
         h += '<button class="btn ghost" id="unPass" type="button">不出了 ▸</button>';
-      }else{
-        h += '<button class="btn' + (o.noPlay ? " primary" : " ghost") + '" id="unDrawBtn" type="button">' +
-               '抽一張' + (o.noPlay ? '<small>沒有牌可出</small>' : '') + '</button>';
+      }else if(o.noPlay){
+        h += '<button class="btn primary" id="unDrawBtn" type="button">抽一張<small>沒有牌可出</small></button>';
       }
       h += '<div class="un-hint">' +
              (o.drew ? "抽到的那張可以出,也可以不出"
-                     : (o.noPlay ? "手上沒有出得了的牌 —— 抽一張" : "點一張亮起來的牌就出牌"))
+                     : (o.noPlay ? "手上沒有出得了的牌 —— 抽一張" : "手上有牌可以出 —— 點一張亮起來的牌就出牌"))
            + '</div>';
     }
     box.innerHTML = h;

@@ -217,10 +217,12 @@ const Solo = (function(){
      ⚠ 三種情形要分開講:罰抽在頭上 / 抽完只能出抽到那張 / 顏色數字都不對。 */
   function whyNot(card){
     if(st.pend > 0){
-      return st.rules.stack
-        ? ("你頭上有 " + st.pend + " 張罰抽 —— 只能出 " +
-           (st.pendK === UN.K_W4 ? "+4" : "+2") + " 疊回去,或按「抽一張」把它吃下來")
-        : ("你頭上有 " + st.pend + " 張罰抽,這一版不能疊 —— 只能按「抽一張」");
+      if(!st.rules.stack) return "你頭上有 " + st.pend + " 張罰抽,這一版不能疊 —— 只能按「抽一張」";
+      /* ★ 手上如果還有別的同種牌能疊,強制出牌就輪到那一條 —— 不能靠抽來吃掉罰抽。 */
+      return UN.canPlay(st.hands[ME], st)
+        ? ("你頭上有 " + st.pend + " 張罰抽 —— 手上有能疊的 " +
+           (st.pendK === UN.K_W4 ? "+4" : "+2") + ",要出那張,不能抽")
+        : ("你頭上有 " + st.pend + " 張罰抽,手上沒有同種牌能疊 —— 只能按「抽一張」把它吃下來");
     }
     if(st.drew) return "你剛抽了 " + UN.nameOf(st.drewCard) + " —— 這一手只能出那一張,或按「不出了」";
     const c = UN.COL_NAME[st.col] || "";
@@ -240,7 +242,14 @@ const Solo = (function(){
       paint();
       return;
     }
-    if(a === "draw"){ commit(UN.DRAW); return; }
+    if(a === "draw"){
+      /* ★★ 手上有合法牌可出時不准抽(強制出牌,見 rules.js 的 doDraw)——
+         按鈕在這個狀態下本來就不畫,但牌堆圖示(#unDraw)一直可以點,
+         誤按要跳 toast 講原因,不能讓 commit() 就地靜默失敗。 */
+      if(UN.canPlay(st.hands[ME], st)){ showToast("手上還有牌可以出 —— 要先出牌,不能抽", 2200); return; }
+      commit(UN.DRAW);
+      return;
+    }
     if(a === "pass"){
       if(!st.drew){ showToast("要先抽一張才有「不出了」"); return; }
       commit(UN.PASS);

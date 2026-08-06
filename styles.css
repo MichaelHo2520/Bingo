@@ -5381,10 +5381,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-c-y .un-lb{color:var(--un-y)}
   .un-c-g .un-lb{color:var(--un-g)}
   .un-c-b .un-lb{color:var(--un-b)}
-  /* ★★ 色名字母:電子書主題與紅綠色盲都靠它(見 js/uno/board.js 檔頭)。
-     擺右下角、白字 —— 底是牌色所以對比一定夠。 */
+  /* ★ 色名字母:只在電子書主題(黑白)才顯示 —— 一般彩色主題下顏色本身就夠分辨,
+     玩家實測反饋不想在牌角看到英文字母,所以彩色主題預設 display:none;
+     電子書主題轉黑白之後顏色判斷通道消失,靠它補回來(見下面 ebook 那段 override)。 */
   .un-cl{position:absolute;right:calc(var(--un-cw) * .08);bottom:calc(var(--un-cw) * .04);
-    font:800 calc(var(--un-cw) * .22)/1 'Nunito',sans-serif;color:#fff;opacity:.92}
+    font:800 calc(var(--un-cw) * .22)/1 'Nunito',sans-serif;color:#fff;opacity:.92;display:none}
   /* Wild:白橢圓裡四色風車 + 中央深色圓寫 W / +4 */
   /* ★ Wild 的四色**填滿整顆橢圓**(與 .un-ov 同一組尺寸)—— 那才是真牌的畫法:
      Wild 牌是黑底 + 一顆被切成四色的橢圓,不是「白橢圓裡放一個小風車」。
@@ -5516,6 +5517,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   :root[data-theme="ebook"] .un-card{box-shadow:none;border-color:#000}
   :root[data-theme="ebook"] .un-card.can{box-shadow:0 0 0 3px #000}
   :root[data-theme="ebook"] .un-card.no{filter:saturate(.2) brightness(.85)}
+  /* ★★ 色名字母只有這個主題才現身(見上面 .un-cl 那條 ★ 註解)——
+     轉黑白之後顏色判斷通道消失,紅綠色盲的玩家與所有人一樣改靠字母分色。 */
+  :root[data-theme="ebook"] .un-cl{display:block}
   :root[data-theme="ebook"] .un-table{background:#fff;border:1px solid #000}
   :root[data-theme="ebook"] .un-dir{background:#eee;color:#000}
   :root[data-theme="ebook"] .un-cd{background:#eee}

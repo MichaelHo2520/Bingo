@@ -301,7 +301,13 @@ const UN = (function(){
     if(!st || st.over || typeof mv !== "string" || !mv.length) return false;
     const t = mv[0];
     if(t === "c") return doCatch(st, mv);
-    if(t === "d"){ st.catchSeat = -1; return doDraw(st); }
+    /* ⚠⚠ 「d」現在可能被強制出牌擋掉(手上有合法牌可出時 doDraw 回 false)——
+       一定要等它**真的成功**才關視窗,不可以先清再呼叫,否則一手被擋掉的非法
+       「d」照樣會把視窗關掉(回合沒真的往前走,視窗卻悄悄關了)。
+       ⚠ 「p」不一樣,不要為了對稱把它改成同一種寫法:doPlay 自己的尾巴會在
+       「剩 1 張又沒宣告」時**重新**開視窗,所以這裡沿用原本「先清掉上一個視窗、
+       再讓 doPlay 決定要不要開新的」這個順序 —— 兩邊的正確做法本來就不同。 */
+    if(t === "d"){ const ok = doDraw(st); if(ok) st.catchSeat = -1; return ok; }
     if(t === "p"){ st.catchSeat = -1; return doPlay(st, mv); }
     if(t === "x") return doPass(st);
     return false;
@@ -350,8 +356,18 @@ const UN = (function(){
   }
 
   function doDraw(st){
-    if(st.drew) return false;                       // 一個回合只能抽一次
     const seat = st.turn;
+    /* ★★★ 手上有合法牌可出時不准抽 —— 強制出牌。
+       這裡刻意用 canPlay(),與「疊牌」共用同一個閘門:被罰抽時如果手上有同種牌
+       能疊上去,也一樣不准直接抽來吃掉罰抽(能疊就必須疊)。
+       ⚠ ai.js 一路都是這樣寫的(pl.length 才回 DRAW)——這條讓規則層與 AI 的假設對齊,
+       不是新規則,是把原本只有 AI 遵守的界線也套到人類玩家身上。
+       ⚠⚠ 「一個回合只能抽一次」**不必再寫成獨立的一條**(`if(st.drew) return false`)——
+       抽到的那張只要合法,legalOn() 就會把 st.drew 的 gate 套在它身上,讓它自己也算
+       canPlay 為真的其中一張;換句話說 st.drew 為真時 canPlay 必然為真,這一行會先
+       擋下來。第一版寫了獨立那一行,突變測試證明它是**測不到的等價碼**(拿掉照樣
+       全綠,因為上面這行永遠先擋),所以直接拿掉,不留一層沒有牙齒的檢查。 */
+    if(canPlay(st.hands[seat], st)) return false;
     if(st.pend > 0){
       for(let i = 0; i < st.pend; i++){ const id = drawOne(st); if(id < 0) break; st.hands[seat].push(id); }
       st.pend = 0; st.pendK = 0;
