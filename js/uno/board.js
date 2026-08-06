@@ -148,9 +148,9 @@ const UNB = (function(){
           桌上那張牌在 pend 有無之間**上下跳 16px**(桌子 justify-content:center,
           多一列就整組往上挪半列)—— 那正是使用者說的「介面一直跳來跳去」。 */
     const pen = o.pend > 0 ? '<div class="un-pen">罰抽 <b>' + o.pend + '</b> 張</div>' : "";
+    /* ★★ 牌堆那顆鈕(#unDraw)v1.110.0 **搬到手牌右邊**了(見 drawPadHTML)——
+       所以桌上只剩「牌河最上面那張 + 現在顏色」兩件事。 */
     return '<div class="un-table">' +
-             '<button class="un-deck" id="unDraw" type="button" aria-label="牌堆還有 ' +
-               o.pileLeft + ' 張">牌堆 <b>' + o.pileLeft + '</b></button>' +
              '<div class="un-top">' + (o.top >= 0 ? cardHTML(o.top, "big") : "") + '</div>' +
              '<div class="un-now">' +
                '<span class="un-swatch ' + colCls + '" aria-hidden="true"></span>' +
@@ -189,20 +189,45 @@ const UNB = (function(){
         /* ★ 「剛抽到的那張只能出它」不寫在這裡(v1.108.0):亮起來的就只有那一張,
            畫面已經說完了;文字版留在動作列那一行(而且那一行是固定高度的)。 */
         '<div class="un-hlabel">你的手牌 <b>' + hand.length + '</b> 張</div>' +
-        '<div class="un-hand" id="unHand">' + cards + '</div>' +
+        '<div class="un-handrow">' +
+          '<div class="un-hand" id="unHand">' + cards + '</div>' +
+          drawPadHTML(o, hot) +
+        '</div>' +
       '</div>';
+  }
+
+  /* ---------- 抽牌墊:手牌**右邊**那一塊(v1.110.0)----------
+     使用者:「如果要加牌的話,不要顯示在最下面,可以把他移到牌的例如右邊,
+     不然這個字出的時候,牌還是會跳一下」。
+     ★★ 三件事一起解決:
+       ① 它**永遠在**(不像原本的「抽一張」鈕只在沒牌可出時才畫)→ 版面一格都不會挪。
+       ② 抽牌這個動作長在手牌旁邊,而不是跑到畫面最底下的一列鈕裡。
+       ③ 牌堆還剩幾張也收進來 —— 原本桌子右上角那行「牌堆 N」整個拿掉,
+          桌上只留「牌河最上面那張 + 現在顏色」。同一件事只有一個地方。
+     ⚠ 它**不是一張牌**(刻意用虛線框 + 文字,不畫牌背):擺在手牌尾巴的牌背
+       會被看成「我的第 N 張牌」。v1.108.0 把桌上那張牌背拿掉的理由是同一條。
+     ⚠ 沒輪到 / 有牌可出時**照樣點得動**(誤按跳 toast 講原因)——
+       CLAUDE.md 的紅線:不用 disabled 讓點擊靜默消失。
+     ★ 只有「輪到我而且一張都出不了」時亮起來 —— 用 box-shadow 的光圈,不動位置。 */
+  function drawPadHTML(o, hot){
+    const must = !!(o.mine && !o.over && !(hot || []).length);
+    return '<button class="un-drawpad' + (must ? " can" : "") + '" id="unDraw" type="button"' +
+             ' aria-label="抽一張(牌堆還有 ' + o.pileLeft + ' 張)">' +
+             '<span class="un-dp-t">抽牌</span>' +
+             '<span class="un-dp-n">' + o.pileLeft + '</span>' +
+           '</button>';
   }
 
   /* ==========================================================================
      五、動作列
      ──────────────────────────────────────────────────────────────────────────
-       o = { mine, over, turnName, drew, noPlay, handLen,
+       o = { mine, over, turnName, drew, noPlay, handLen, iAmOut,
              unoOn(UNO 已經喊了), unoRule, catchName(可以抓誰,空 = 沒有),
              cdMs, cdEnd }
-       ★★ 手上有合法牌可出時**不准抽**(強制出牌,見 rules.js 的 doDraw)——
-          所以「抽一張」鈕只在 noPlay 時才畫;不畫的時候唯一的動作就是點一張亮起來
-          的牌。牌桌右上角那行「牌堆 N」(#unDraw)仍然一直可以點,誤按由 hAct("draw")
-          那一側的驗證跳 toast 講原因(不用 disabled 讓點擊靜默消失)。
+       ★★ 「抽一張」鈕 v1.110.0 **從這一列拿掉了** —— 抽牌搬到手牌右邊那一塊
+          (drawPadHTML,它永遠在)。手上有合法牌可出時不准抽這條規則沒變,
+          誤按由 hAct("draw") 那一側的驗證跳 toast 講原因
+          (不用 disabled 讓點擊靜默消失)。
        ★★★ 版型是**固定的兩列**(v1.108.0):鈕那一列 + 一行說明字。
           兩件事一起解決:
             · 高度不再隨內容變 → 上面的手牌與桌子不會被推得上上下下(見 styles.css)。
@@ -255,7 +280,11 @@ const UNB = (function(){
                esc(o.catchName) + '!</button>';
     }
 
-    if(!o.mine){
+    if(o.iAmOut){
+      /* ★ 房規 toLast 開著才有這一格:我出完了,牌局還在打 ——
+         要講清楚「不是卡住了,是在等別人分高下」(不然玩家會以為畫面壞了)。 */
+      txt = "你出完了 · 等其他人分高下";
+    }else if(!o.mine){
       txt = "輪到 " + esc(o.turnName || "") + "…";
     }else{
       cls = " me";
@@ -279,8 +308,9 @@ const UNB = (function(){
         btn += '<button class="btn ghost" id="unPass" type="button">不出了</button>';
         txt = "可以出剛抽到的那張";
       }else if(o.noPlay){
-        btn += '<button class="btn primary" id="unDrawBtn" type="button">抽一張</button>';
-        txt = "沒有牌可以出";
+        /* ★ 「抽一張」那顆鈕 v1.110.0 拿掉了 —— 抽牌改成手牌右邊那一塊
+           (它永遠在,所以不會因為這一格出現 / 消失而讓牌挪一次)。 */
+        txt = "沒有牌可以出,點右邊的抽牌";
       }else{
         txt = "輪到你,點一張亮的牌";
       }
@@ -424,7 +454,7 @@ const UNB = (function(){
     const st0 = stage;
     if(st0){
       st0.addEventListener("click", e => {
-        // 牌堆:點它 = 抽一張(與動作列那顆「抽一張」同一條路)
+        // 抽牌墊(手牌右邊那一塊):點它 = 抽一張
         if(e.target.closest("#unDraw")){ if(hAct) hAct("draw"); return; }
         const el = e.target.closest(".un-card");
         if(!el || !hCard) return;
@@ -438,8 +468,9 @@ const UNB = (function(){
       acts.addEventListener("click", e => {
         const b = e.target.closest("button");
         if(!b || !hAct) return;
-        if(b.id === "unDrawBtn") hAct("draw");
-        else if(b.id === "unPass") hAct("pass");
+        /* ⚠ 這一列已經沒有「抽一張」了(v1.110.0 搬到手牌右邊的 #unDraw,
+           而它在 #unStage 那一條委派裡)。 */
+        if(b.id === "unPass") hAct("pass");
         else if(b.id === "unUno") hAct("uno");
         else if(b.id === "unCatch") hAct("catch");
       });

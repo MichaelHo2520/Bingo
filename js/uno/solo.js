@@ -133,6 +133,8 @@ const Solo = (function(){
       drew: st.drew,
       noPlay: mine && !hot.length,
       handLen: st.hands[ME].length,
+      /* ★ 房規 toLast 開著才有這一格:我出完了、牌局還在打(見 board 的 renderActs)。 */
+      iAmOut: !over && !st.over && st.hands[ME].length === 0,
       unoOn: unoArmed, unoRule: st.rules.unoCall,
       // ★ 抓鈕:不分回合(視窗是「下一家出手之前」)。單機時我可以抓電腦。
       catchName: (st.rules.unoCall && st.catchSeat >= 0 && st.catchSeat !== ME && !over)

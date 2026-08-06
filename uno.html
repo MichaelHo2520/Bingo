@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.109.0 -->
-<meta name="version" content="1.109.0">
+<!-- UNO · v1.110.0 -->
+<meta name="version" content="1.110.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -90,7 +90,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         出到<b>剩一張</b>時要在出牌的同時按 <b>UNO!</b> ——
         沒按而被別人抓到就<b>罰抽 2 張</b>(可在房規關掉)。<br>
         有人打完最後一張,<b>這一局立刻結束</b>。名次照<b>手上剩牌的點數</b>排,
-        名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。
+        名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分
+        (房規可改成<b>打到最後一個</b> —— 那時每個人都有名次,分數依人數算)。
       </div>
     </div>
 
@@ -314,7 +315,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="set-body" id="unRulesBody">
 
         <div class="set-group">
-          <div class="set-group-title">可以改的三條</div>
+          <div class="set-group-title">可以改的四條</div>
           <div class="set-row col">
             <span class="set-lbl">疊 +2 / +4<span class="set-sub">被 +2 時可以再出 +2 把懲罰往下疊(同種才疊得上);關掉就照官方:抽 2 張並跳過</span></span>
             <div class="seg" id="unStackSeg" aria-label="疊 +2 / +4">
@@ -336,6 +337,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <div class="seg" id="unDrawnSeg" aria-label="抽到的牌可以馬上出">
               <button data-rk="playDrawn" data-rv="1">✔ 可以出</button>
               <button class="on" data-rk="playDrawn" data-rv="0">✘ 抽完就換人</button>
+            </div>
+          </div>
+          <!-- ★★ 打到最後一個(v1.110.0):預設**關**(有人出完就結束 = 官方)。
+               開了之後每個人都排得出名次,名次分改成看人數 —— 文案要把這件事講出來,
+               不然玩家只會看到「打比較久」。 -->
+          <div class="set-row col">
+            <span class="set-lbl">打到最後一個才算完<span class="set-sub">開:有人出完牌局繼續,打到只剩一個人手上還有牌;每個人都有名次,名次分依人數(第一名 5 分、最後一名 0 分,中間平分)。關(預設):有人出完這一局立刻結束</span></span>
+            <div class="seg" id="unLastSeg" aria-label="打到最後一個才算完">
+              <button data-rk="toLast" data-rv="1">✔ 打到最後</button>
+              <button class="on" data-rk="toLast" data-rv="0">✘ 出完就結束</button>
             </div>
           </div>
         </div>
@@ -365,7 +376,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <li><b>⇄ 迴轉</b>反轉出牌方向;<b>2 人局就是換對手出</b>(官方是「等同跳過」,這一桌改成換人)。</li>
             <li><b>+4 隨時可出,而且不做挑戰驗牌</b> —— 這一版刻意簡化(這個 App 本來就不防作弊)。</li>
             <li>牌堆抽乾時,把<b>牌河除最上面那張</b>洗回牌堆繼續打。</li>
-            <li>有人打完最後一張,<b>這一局立刻結束</b>。</li>
+            <li>有人打完最後一張,<b>這一局立刻結束</b> —— 除非房規開了<b>「打到最後一個」</b>,
+                那就打到<b>只剩一個人手上還有牌</b>,名次照<b>出完的先後</b>排、名次分<b>依人數</b>算。</li>
             <li>名次照<b>手上剩牌的點數</b>排(數字照面值 · 跳過/迴轉/+2 各 <b>20</b> · Wild 各 <b>50</b>),
                 名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。</li>
           </ul>

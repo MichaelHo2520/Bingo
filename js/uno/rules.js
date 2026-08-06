@@ -18,13 +18,17 @@
        本來就是同一件事,而多一次自己的回合只會讓對手覺得被卡住。
        所以這一頁一律 `dir = -dir` 再走一格 —— 2 人局自然就落到對手身上。
      牌堆抽乾 → 牌河除最上面那張之外**決定性重洗**回牌堆(見第二節)。
-     **有人打完最後一張,這一局立刻結束**(不像大老二打到只剩一人)。
+     **有人打完最後一張,這一局立刻結束** —— 除非房規 `toLast` 開著,那就打到
+     **只剩一個人手上還有牌**為止(像大老二),名次照出完的先後排。
 
-     ★ 兩條房規(房主設定,開局那一刻凍結):
-         stack    疊 +2 / +4 —— **同種才疊得上**(+2 疊 +2、+4 疊 +4);
-                  關掉就照官方:被 +2 就抽 2 張並跳過。
-         unoCall  沒喊 UNO 罰抽 2 張 —— 出到剩 1 張要在**同一手**宣告(見第五節);
-                  關掉就沒有抓,由畫面自動公告「還剩一張」。
+     ★ 四條房規(房主設定,開局那一刻凍結):
+         stack     疊 +2 / +4 —— **同種才疊得上**(+2 疊 +2、+4 疊 +4);
+                   關掉就照官方:被 +2 就抽 2 張並跳過。
+         unoCall   沒喊 UNO 罰抽 2 張 —— 出到剩 1 張要在**同一手**宣告(見第五節);
+                   關掉就沒有抓,由畫面自動公告「還剩一張」。
+         playDrawn 抽到的那張能出就可以馬上出(**預設關**)。
+         toLast    **打到只剩一個人手上還有牌**才結束(預設關)——
+                   開了之後每個人都有自己的名次,名次分改成看人數(見第六節)。
 
      ★ 兩件刻意做成固定行為、不進房規面板的(規則清單裡有寫給玩家看):
          ① 「抽到能出的牌可以馬上出」= 官方規則,固定開啟。
@@ -207,13 +211,17 @@ const UN = (function(){
        v1.106.0 原本寫死成「抽到能出就可以馬上出」(官方規則),使用者要把它做成
        可設定的房規、而且**預設關掉**。所以這裡不要「順手」把它跟著改成 true:
        那不是筆誤,是刻意的。 */
-  function defRules(){ return { stack: true, unoCall: true, playDrawn: false }; }
+  /* ⚠ toLast 的預設也是 **false**(有人打完就結束 = 官方規則)——
+       它是 v1.110.0 加的第四條房規:開了之後**打到只剩一個人手上還有牌**才結束,
+       每個人都有自己的名次(名次分改成看人數,見第六節)。 */
+  function defRules(){ return { stack: true, unoCall: true, playDrawn: false, toLast: false }; }
   function normRules(r){
     const d = defRules();
     if(!r || typeof r !== "object") return d;
     return { stack:     typeof r.stack     === "boolean" ? r.stack     : d.stack,
              unoCall:   typeof r.unoCall   === "boolean" ? r.unoCall   : d.unoCall,
-             playDrawn: typeof r.playDrawn === "boolean" ? r.playDrawn : d.playDrawn };
+             playDrawn: typeof r.playDrawn === "boolean" ? r.playDrawn : d.playDrawn,
+             toLast:    typeof r.toLast    === "boolean" ? r.toLast    : d.toLast };
   }
 
   /* ==========================================================================
@@ -235,6 +243,9 @@ const UN = (function(){
       drew: false, drewCard: -1,         // 這回合抽過了嗎 / 抽到的那張(只有它能出)
       uno: [],                           // 每個座位「這次剩 1 張有沒有宣告」
       catchSeat: -1,                     // 現在可以抓誰(-1 = 沒有);視窗是回合制的
+      /* ★ 出完牌的座位,**照出完的先後**推進來(房規 toLast 的名次就是這個順序)。
+         ⚠ 房規關著時它也照記(只會有一個人)—— score() 兩種模式共用同一把鑰匙。 */
+      outOrder: [],
       shuffles: 0, seed: 0,
       over: false, winner: -1
     };
@@ -272,9 +283,26 @@ const UN = (function(){
     return st.pile.length ? st.pile.shift() : -1;      // -1 = 真的一張都沒了
   }
 
+  /* 還有幾個人手上有牌(房規 toLast 的結束條件) */
+  const aliveCount = st => st.hands.reduce((c, h) => c + (h.length ? 1 : 0), 0);
+
   /* ---------- 輪次 ----------
-     ⚠ 一律走這一支,不要在別處自己算 —— dir 與「跳過 = 走兩格」都在這裡。 */
-  function adv(st, k){ st.turn = (((st.turn + st.dir * k) % st.n) + st.n) % st.n; }
+     ⚠ 一律走這一支,不要在別處自己算 —— dir 與「跳過 = 走兩格」都在這裡。
+     ★★ 「**跳過已經出完的人**」也在這裡(v1.110.0 的房規 toLast)——
+        一格一格走,每一格都要停在「手上還有牌」的座位上。
+        ⚠ 房規關著時這一層是**沒有作用**的(有人出完就立刻結束,盤面上不會同時
+          存在空手與未結束),所以不必為它加 if:少一個分支就少一個走鐘點。
+        ⚠⚠ 一定要**逐格**走而不是「先算 turn + dir*k 再往前找活人」——
+          跳過(k=2)的語意是「跳掉下一個**還在玩的人**」,不是「跳掉下一個座位」;
+          用後者的話,下一個座位剛好出完時那張跳過等於白出。
+     ⚠ guard:全部人都出完(理論上到不了,結束條件會先擋)時不要卡死。 */
+  function adv(st, k){
+    for(let i = 0; i < k; i++){
+      let guard = st.n;
+      do{ st.turn = (((st.turn + st.dir) % st.n) + st.n) % st.n; }
+      while(st.hands[st.turn].length === 0 && guard-- > 0);
+    }
+  }
 
   /* ==========================================================================
      ★ 規則的心臟:這張現在出不出得了
@@ -347,7 +375,17 @@ const UN = (function(){
     st.col = (col >= 0) ? col : CARDS[id].col;
     st.uno[seat] = declared;
 
-    if(!h.length){ st.over = true; st.winner = seat; return true; }   // 打完 → 這局結束
+    /* ★★ 出完最後一張。兩種房規在這裡分岔:
+         toLast 關(預設 / 官方):**這一局立刻結束**,他就是 winner ——
+           ⚠ 這一條刻意**在動作牌生效之前** return:最後一張是 +2 的話,
+             結束了才罰下一家沒有意義,而畫面上還會多一個「罰抽 2」的殘影。
+         toLast 開:他退場,**牌局繼續**打到只剩一個人 ——
+           這時最後一張的動作牌**照樣生效**(出 +2 收尾就是要讓下一家吃)。 */
+    if(!h.length){
+      st.outOrder.push(seat);
+      if(!st.rules.toLast){ st.over = true; st.winner = seat; return true; }
+      if(st.winner < 0) st.winner = seat;          // ★ winner 恆為「第一個出完的人」
+    }
 
     switch(CARDS[id].k){
       case K_SKIP: adv(st, 2); break;
@@ -363,6 +401,9 @@ const UN = (function(){
       case K_W4:   st.pend += 4; st.pendK = K_W4; adv(st, 1); break;
       default:     adv(st, 1);
     }
+    /* ★ toLast:只剩一個人手上還有牌 → 這一局結束(他是最後一名)。
+       ⚠ 一定要放在動作牌之後 —— 最後那張 +2 要先砸出去,盤面才是對的。 */
+    if(!h.length && aliveCount(st) <= 1){ st.over = true; return true; }
     // 剩 1 張又沒宣告 → 開抓的視窗(房規關掉就沒有抓這件事)
     if(h.length === 1 && !declared && st.rules.unoCall) st.catchSeat = seat;
     return true;
@@ -442,9 +483,9 @@ const UN = (function(){
   }
 
   /* ==========================================================================
-     六、結算 —— 名次分 5 / 3 / 1 / 0
+     六、結算 —— 名次分(兩張表:官方模式 5/3/1/0 · toLast 模式看人數)
      ──────────────────────────────────────────────────────────────────────────
-       ★ 與 js/big2/rules.js 的 RANK_PTS / ptsForRank **逐字相同的一份**
+       ★ 官方模式那張與 js/big2/rules.js 的 RANK_PTS / ptsForRank **逐字相同的一份**
          (6 人局自然就是 5/3/1/0/0/0,最後一名恆 0)。
        ★ 名次一律照「**手牌點數 → 張數 → 座位**」排 ——
          點數放第一順位是刻意的:UNO 的策略味道就是「別留大牌」,
@@ -460,16 +501,53 @@ const UN = (function(){
             那一層真的擋著「靠編碼巧合」,這一條沒擋任何東西。
      ========================================================================== */
   const RANK_PTS = [5, 3, 1, 0];
-  function ptsForRank(rank, n){ return rank === n ? 0 : (RANK_PTS[rank - 1] || 0); }
+  /* ★★★ 房規 toLast 開著時的名次分:**每一名都有分,而且分數依人數算**
+     (使用者:「這個時候也是用積分的方式給,麻煩你依人數決定到底要給多少積分」)。
+       公式:第一名固定 5 分、最後一名固定 0 分,中間**平均分佈**再四捨五入 →
+         2 人 5 / 0
+         3 人 5 / 3 / 0
+         4 人 5 / 3 / 2 / 0
+         5 人 5 / 4 / 3 / 1 / 0
+         6 人 5 / 4 / 3 / 2 / 1 / 0
+     ★ 為什麼頂端仍然是 5:目標分(房間設定,預設 15)是同一個,頂端一換整個「打幾局
+       才會結束」就跟著換 —— 而房規是一局一局在切的,不該把賽制也拖著走。
+     ⚠⚠ **不可以**在這個模式沿用 5/3/1/0:那張表 4 人以後全部是 0 分,而 toLast 的
+       整個重點就是「後面幾名之間也要分高下」—— 沿用等於打到最後卻沒有意義。
+     ⚠ 每一個人數的表都必須**嚴格遞減**(不可以有兩名同分),守門在 test 的 K 節。 */
+  function ptsForRankOut(rank, n){
+    if(!(n >= 2) || rank >= n) return 0;
+    return Math.round(5 * (n - rank) / (n - 1));
+  }
+  /* ⚠ 第三個參數是**選填**的(舊呼叫端 / 大老二那份逐字相同的表都不帶)——
+     不帶就是原本的 5/3/1/0、最後一名恆 0。 */
+  function ptsForRank(rank, n, toLast){
+    if(toLast) return ptsForRankOut(rank, n);
+    return rank === n ? 0 : (RANK_PTS[rank - 1] || 0);
+  }
   const handPts = cards => (cards || []).reduce((s, id) => s + ptsOf(id), 0);
 
+  /* ★★ 名次的第一把鑰匙是 **outOrder(誰先出完)**,第二把才是手牌點數。
+     兩種房規共用同一段排序:
+       toLast 關 → outOrder 裡只有一個人(贏家),而他手上 0 張 = 0 點,
+         本來就會排第一 → **這一把鑰匙在那個模式下不改變任何結果**。
+       toLast 開 → 出完的人手上都是 0 張 0 點,**只有出完的先後**分得出高下,
+         沒有這把鑰匙他們會全部並列然後照座位排(= 名次是假的)。
+     ⚠ 所以它不是「多寫一層測不到的碼」(那是 v1.106.0 拿掉的 `a.seat === st.winner`)——
+       這一層在 toLast 開的時候是**唯一**的判準,K 節有兩條斷言分別釘住兩個模式。 */
   function score(st){
     const rows = [];
-    for(let s = 0; s < st.n; s++)
-      rows.push({ seat: s, left: st.hands[s].length, pts: handPts(st.hands[s]), rank: 0, rp: 0 });
+    const order = Array.isArray(st.outOrder) ? st.outOrder : [];
+    const OUTLESS = 1e9;                       // 還沒出完的人一律排在出完的人後面
+    for(let s = 0; s < st.n; s++){
+      const oi = order.indexOf(s);
+      rows.push({ seat: s, left: st.hands[s].length, pts: handPts(st.hands[s]),
+                  out: oi, rank: 0, rp: 0 });
+    }
+    const toLast = !!(st.rules && st.rules.toLast);
     const sorted = rows.slice().sort((a, b) =>
+      ((a.out < 0 ? OUTLESS : a.out) - (b.out < 0 ? OUTLESS : b.out)) ||
       (a.pts - b.pts) || (a.left - b.left) || (a.seat - b.seat));
-    sorted.forEach((r, i) => { r.rank = i + 1; r.rp = ptsForRank(r.rank, st.n); });
+    sorted.forEach((r, i) => { r.rank = i + 1; r.rp = ptsForRank(r.rank, st.n, toLast); });
     return { rows: rows, sorted: sorted,
              winners: st.winner >= 0 ? [st.winner] : sorted.filter(r => r.rank === 1).map(r => r.seat) };
   }
@@ -507,9 +585,9 @@ const UN = (function(){
     // 房規
     defRules, normRules,
     // 一局
-    start, step, replay, adv, drawOne, reshuffle, legalOn, playable, canPlay,
+    start, step, replay, adv, drawOne, reshuffle, legalOn, playable, canPlay, aliveCount,
     // 結算 / 顯示
-    score, ptsForRank, handPts, sortHand, isUno,
+    score, ptsForRank, ptsForRankOut, handPts, sortHand, isUno,
     // 洗牌(測試要單獨驗決定性)
     hashStr, mulberry32, shuffleWith
   };

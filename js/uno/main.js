@@ -84,7 +84,8 @@ function unRulesText(r){
      ⚠ 不要把面板的 set-sub 文案搬過來:三項乘上完整說明會變成一段公文。 */
   return (rr.stack ? "可疊 +2 / +4" : "不可疊") + " · " +
          (rr.unoCall ? "剩一張要喊 UNO" : "不必喊 UNO") + " · " +
-         (rr.playDrawn ? "抽到可馬上出" : "抽完就換人");
+         (rr.playDrawn ? "抽到可馬上出" : "抽完就換人") + " · " +
+         (rr.toLast ? "打到最後一個" : "出完就結束");
 }
 function syncRules(rules, editable){
   const r = UN.normRules(rules);

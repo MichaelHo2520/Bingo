@@ -82,8 +82,19 @@ const UNAI = (function(){
     };
   }
 
-  /* 下一家是誰(view 裡有 dir 與 n 就算得出來) */
-  const nextSeatOf = v => (((v.seat + v.dir) % v.n) + v.n) % v.n;
+  /* 下一家是誰(view 裡有 dir 與 n 就算得出來)。
+     ★ 要**跳過已經出完的人**(房規 toLast 開著時才會有人手上 0 張)——
+       不跳的話 hard 那條「你剩 1~2 張就把 +4 砸過來」會瞄準一個已經退場的座位,
+       而症狀是「電腦忽然變笨」,畫面上完全看不出來。
+     ⚠ `left` 是 view 本來就有的公開資訊(晶片上就寫著),不是新開的洩漏通道。
+     ⚠ guard:全部人都出完(到不了,規則層會先結束)時不要卡死。 */
+  function nextSeatOf(v){
+    const left = v.left || [];
+    let s = v.seat, guard = v.n;
+    do{ s = (((s + v.dir) % v.n) + v.n) % v.n; }
+    while(left[s] === 0 && s !== v.seat && guard-- > 0);
+    return s;
+  }
 
   /* 一張牌在**手上**有多好用(越高 = 越想留)。★ 這不是官方點數 ——
      官方點數是「留著會被罰多少」,這裡要的是「留著有多好用」,兩件事不同:

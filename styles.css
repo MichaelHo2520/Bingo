@@ -5467,7 +5467,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        綠牌 #2ea94c 壓在深綠桌布上仍然分得出來 —— 但這件事斷言測不到,
        驗收點是 `node tools/gen-uno-shot.js` 的截圖(它吃 `?theme=`,
        **bubblegum 與 ebook 一定要各看一次**)。 */
-  /* ★ position:relative 是給右上角那行「牌堆 62」定位用的(見 .un-deck)。 */
+  /* ★ position:relative 是給釘左上角的罰抽膠囊(.un-pen)定位用的。 */
   .un-table{position:relative;flex:0 1 auto;min-height:200px;max-height:340px;
     display:flex;flex-direction:column;align-items:center;
     justify-content:center;gap:10px;
@@ -5495,19 +5495,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-table .un-dir{color:rgba(255,255,255,.78);background:rgba(0,0,0,.26)}
   :root[data-theme="ebook"] .un-table .un-nowtxt{color:#000}
   :root[data-theme="ebook"] .un-table .un-dir{color:#555;background:#eee}
-  /* ---------- 牌堆:右上角一行字 ----------
-     ★ 這裡**刻意不畫一張牌背**:桌上唯一該有的一張牌是牌河最上面那張(那是要看的),
-       再擺一張牌背只會讓玩家的眼睛在兩張牌之間猶豫 —— 而牌堆真正的資訊只有「還剩幾張」。
-     ★ 仍然是一顆 <button>(#unDraw):點得動這件事沒變(誤按跳 toast 講原因),
-       只是它看起來就是一行字。
-     ⚠ absolute 定位靠 .un-table 的 position:relative;牌河那張牌置中,兩者不會撞。 */
-  .un-deck{position:absolute;right:9px;top:7px;z-index:1;
-    background:rgba(0,0,0,.26);border:none;border-radius:999px;padding:4px 10px;
-    font:800 11px/1 'Nunito',sans-serif;color:rgba(255,255,255,.76);
-    cursor:pointer;-webkit-tap-highlight-color:transparent}
-  .un-deck b{font-size:12.5px;color:#fff}
-  :root[data-theme="ebook"] .un-deck{background:#eee;color:#555;border:1px solid #000}
-  :root[data-theme="ebook"] .un-deck b{color:#000}
+  /* (v1.108.0 那顆桌子右上角的「牌堆 N」`.un-deck` 在 v1.110.0 拿掉了 ——
+      牌堆與「抽一張」合併成手牌右邊的 `.un-drawpad`,同一件事只留一個地方。
+      桌上現在只有兩件事:牌河最上面那張 + 現在顏色。) */
   .un-top{display:flex;align-items:center;justify-content:center}
   /* ★★ 「現在顏色」一定要獨立畫一塊 —— Wild 打出去之後桌上那張是黑的,
      顏色只存在 st.col 裡。漏了它玩家完全不知道現在該出什麼色(最容易漏的一格)。 */
@@ -5555,6 +5545,33 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-hand{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;
     height:calc(var(--un-cw) * 1.45 + 12px);
     padding:8px 2px 4px;scrollbar-width:thin;touch-action:pan-x}
+  /* ---------- 手牌 + 抽牌墊 那一列(v1.110.0) ----------
+     ⚠ .un-hand 要 `min-width:0` 才縮得下去 —— flex 子元素的預設 min-width 是 auto,
+       手牌一多它會把抽牌墊擠出畫面右緣(而那一塊正是現在唯一的抽牌入口)。 */
+  .un-handrow{display:flex;align-items:center;gap:7px}
+  .un-handrow .un-hand{flex:1 1 auto;min-width:0}
+  /* ---------- 抽牌墊:手牌右邊那一塊 ----------
+     使用者:「如果要加牌的話,不要顯示在最下面,可以把他移到牌的例如右邊,
+     不然這個字出的時候,牌還是會跳一下」。
+     ★★ 它**永遠在**(不隨「能不能抽」出現 / 消失)—— 一出現就會把整排牌往左推一次,
+        而那正是要修掉的那種跳動。要說的話由光圈說(.can),不由存在與否說。
+     ⚠ **刻意不畫牌背**:擺在手牌尾巴的牌背會被看成「我的第 N 張牌」
+        (v1.108.0 把桌上那張牌背拿掉是同一條理由)。虛線框 + 兩行字才看得出
+        「這不是我的牌,是牌堆」。
+     ⚠ 高度與牌**一樣**,寬度窄一階 → 它不會改變這一列的高度。 */
+  .un-drawpad{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;padding:0;cursor:pointer;
+    width:calc(var(--un-cw) * .72);height:calc(var(--un-cw) * 1.45);
+    border:2px dashed var(--panel-line);border-radius:calc(var(--un-cw) * .14);
+    background:rgba(255,255,255,.06);color:var(--muted)}
+  .un-drawpad .un-dp-t{font:800 11px/1.1 'Nunito',sans-serif}
+  .un-drawpad .un-dp-n{font:800 12px/1 'Fredoka','Nunito',sans-serif;opacity:.75}
+  /* ★ 「現在只能抽」才亮 —— 只加光圈與顏色,位置一個像素都不動(同 .un-card.can) */
+  .un-drawpad.can{border-style:solid;border-color:var(--accent);color:var(--accent);
+    background:rgba(255,255,255,.12);box-shadow:0 0 0 3px rgba(255,255,255,.14)}
+  .un-drawpad:active{transform:scale(.96)}
+  :root[data-theme="ebook"] .un-drawpad{border-color:#000;color:#000;background:#fff}
+  :root[data-theme="ebook"] .un-drawpad.can{box-shadow:0 0 0 3px #000}
 
   /* ---------- 動作列 ----------
      ★★ 高度是**寫死的**(不是 min-height),而且裡面是固定的兩列:

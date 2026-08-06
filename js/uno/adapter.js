@@ -112,6 +112,8 @@ const MP = MPCore.create((function(){
       drew: st.drew,
       noPlay: mine && !hot.length,
       handLen: st.hands[me].length,
+      // ★ 房規 toLast 開著才有這一格 —— ⚠ 與單機那份逐字一樣
+      iAmOut: !ctx.winner() && !st.over && st.hands[me].length === 0,
       unoOn: unoArmed, unoRule: st.rules.unoCall,
       // ★ 抓鈕不分回合(視窗是「下一家出手之前」)
       catchName: (st.rules.unoCall && st.catchSeat >= 0 && st.catchSeat !== me &&
@@ -307,8 +309,12 @@ const MP = MPCore.create((function(){
            "出不了就<b>抽一張</b> —— <b>抽到的那張能出就可以馬上出</b>。" +
            "<b>⇄ 迴轉</b>反轉方向,<b>2 人局就是換對手出</b>。<br>" +
            "<b>" + esc(unRulesText(rules)) + "</b>(房主可改)。<br>" +
-           "有人打完最後一張,<b>這一局立刻結束</b>。名次照<b>手上剩牌的點數</b>排" +
-           "(跳過/迴轉/+2 各 20 · Wild 各 50),名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。<br>" +
+           (rules.toLast
+             ? ("有人出完牌局<b>繼續</b>,打到<b>只剩一個人手上還有牌</b>才結束;" +
+                "名次照<b>出完的先後</b>排,名次分<b>依人數</b>算" +
+                "(第一名 <b>5</b> 分、最後一名 <b>0</b> 分,中間平分)。<br>")
+             : ("有人打完最後一張,<b>這一局立刻結束</b>。名次照<b>手上剩牌的點數</b>排" +
+                "(跳過/迴轉/+2 各 20 · Wild 各 50),名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。<br>")) +
            "出牌倒數:" + sec + "。";
   }
 
@@ -336,7 +342,7 @@ const MP = MPCore.create((function(){
            加房規忘了補這裡的症狀是「房主按了那一項,別人的畫面完全不動」
            (寫進 DB 了,但這裡當成沒變就 return 掉)。同一份比對在下面 setRule 也有一份。 */
         if(next.stack === rules.stack && next.unoCall === rules.unoCall &&
-           next.playDrawn === rules.playDrawn) return;
+           next.playDrawn === rules.playDrawn && next.toLast === rules.toLast) return;
         rules = next;
         ctx.unreadyOnFieldChange();
         ctx.syncSetup(); ctx.updateGoal();
@@ -541,9 +547,9 @@ const MP = MPCore.create((function(){
       liveRules: () => UN.normRules(ctx.phase() === "playing" ? gRules : rules),
       setRule(key, val){
         const next = UN.normRules(Object.assign({}, rules, { [key]: val }));
-        // ⚠ 三項都要比(見 onRoomField 那一份的說明)—— 漏一項 = 那一項按了沒反應
+        // ⚠ 四項都要比(見 onRoomField 那一份的說明)—— 漏一項 = 那一項按了沒反應
         if(next.stack === rules.stack && next.unoCall === rules.unoCall &&
-           next.playDrawn === rules.playDrawn) return;
+           next.playDrawn === rules.playDrawn && next.toLast === rules.toLast) return;
         if(!ctx.setRoomField("unRules", next, { lobbyOnly: true,
              denyMsg: "只有房主能改規則", busyMsg: "對戰中不能改規則 —— 這一局的規則已經定下來了" })) return;
         rules = next; ctx.syncSetup(); ctx.updateGoal(); savePrefs();
