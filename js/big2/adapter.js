@@ -172,7 +172,17 @@ const MP = MPCore.create((function(){
     if(a === "clear"){ B2B.clearSel(); paint(); return; }
     if(a === "pass"){
       if(!st.cur){ showToast("這一輪由你開始,一定要出牌"); return; }
+      /* ★★ Pass 要**順手清掉選取**(單機那支清在 commit() 裡,見 solo.js)。
+         ⚠ 這裡少了它不會有任何東西壞掉,所以漏了很久:出牌之後手牌變了,
+           board 的自癒(render 裡 `sel.filter(在手上)`)會把選取收掉 ——
+           但 **Pass 之後手牌一張都沒少**,那道自癒接不到,牌就一直站著,
+           只能等玩家自己去按「清除」。
+         ⚠⚠ 而且不只是好看的問題:殘留的 sel 會被下一手的
+           B2.playable(hand, st, sel) 拿去**收窄亮起來的牌**(它只留「還包含
+           這幾張」的出法),玩家看到的是「怎麼只剩這幾張點得動」。 */
+      B2B.clearSel();
       send(B2.PASS);
+      paint();                                    // 牌立刻放下,不必等伺服器回音
       return;
     }
     if(a !== "play") return;

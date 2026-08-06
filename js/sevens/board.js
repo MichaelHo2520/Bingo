@@ -103,6 +103,17 @@ const SVB = (function(){
      ========================================================================== */
   function render(v){
     if(!stage) return;
+
+    /* ★ 選中的牌若已經不在手上(蓋掉了 / 換局)就丟掉 —— 同大老二 board 的那一行。
+       蓋牌是**兩段式**(選一張 → 按「確定蓋掉」),而連線那支送出之後不清 sel
+       (單機清在 commit() 裡)。留著的話下一次沒牌可出時,動作列會**直接**長出一顆
+       「確定蓋掉 ♦5(罰 5 分)」對著一張早就蓋掉的牌:手牌上什麼都沒站起來
+       (那張牌不在了),按下去伺服器也不會收(送的是不合法的一手)—— 玩家看到的
+       是「這顆鈕按了沒反應」。
+       ⚠ 一定要在**畫手牌與 renderActs() 之前**:兩者都讀 sel,而兩條路徑都是
+         先 render() 再 renderActs()(solo.js / adapter.js 的 paint)。 */
+    if(sel >= 0 && v.hand.indexOf(sel) < 0) sel = -1;
+
     let h = '<div class="sv-tracks">';
     for(let s = 0; s < 4; s++) h += trackHTML(v.tracks, s);
     h += '</div>';

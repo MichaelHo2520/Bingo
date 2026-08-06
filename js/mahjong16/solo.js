@@ -47,6 +47,10 @@ const Solo = (function(){
   let st = null;                                  // 這一局的 MJT state
   let tai = [];                                   // 這一場的累計台數(依座位)
   let handNo = 0;                                 // 打完幾局了
+  /* 下一局的莊家與連莊數(v1.102.0)。★ 規則只有一份,在 MJT.nextDealerOf() ——
+     這裡只是把它算出來的東西存到下一次 newHand()。單機座位固定,所以直接存座位編號
+     (連線那份要換算成玩家 id,見 adapter.js 的 lastDeal)。 */
+  let dealerSeat = 0, dealerStreak = 0;
   let active = false, settled = false;
   let claimDone = "";                             // 這個宣告視窗的電腦表態排過了沒
   let sfxPrev = null;                             // 上一次餵給音效的 state(見 sfxTick)
@@ -118,6 +122,9 @@ const Solo = (function(){
     active = true;
     tai = new Array(seats).fill(0);
     handNo = 0;
+    /* 新的一場:玩家先坐莊、連莊歸零。★ 一定要在這裡重設 —— 上一場打到誰連莊都不能
+       帶進新的一場,而且家數可能改過(舊的 dealerSeat 會超出新的座位數)。 */
+    dealerSeat = ME; dealerStreak = 0;
     saveOwn();
     showScreen("solo");
     closeWin();
@@ -138,7 +145,8 @@ const Solo = (function(){
     closeWin();
     st = MJT.newRound({
       rs: "p" + seats,
-      dealer: handNo % seats,                     // 每局換莊(同連線:局數才可預測)
+      dealer: dealerSeat,                         // 誰坐莊由上一局的結果決定(連莊,見 finishHand)
+      dealerStreak: dealerStreak,
       roundWind: MJ16.idxOf("fe"),
       handNo: handNo + 1,
       base: base
@@ -346,6 +354,10 @@ const Solo = (function(){
     const o = st.over;
     if(o.type === "win") o.deltas.forEach(function(d,s){ tai[s] += d; });
     handNo++;
+    /* 連莊(v1.102.0):下一局的莊與連莊數由這一局的結果決定。
+       ⚠ 一定要在這裡算而不是 newHand():那時 st 已經被新的一局蓋掉了。 */
+    const nx = MJT.nextDealerOf(st);
+    if(nx){ dealerSeat = nx.dealer; dealerStreak = nx.streak; }
     paintBar();
 
     const last = handNo >= goal;

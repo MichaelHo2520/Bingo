@@ -41,8 +41,23 @@ const MJ16S = (function(){
     { id:"menqing", name:"門清",   tai:1, test:c=> c.allConcealed },
     /* ★ 有爭議:門清自摸各地算 2~3 台。本表採「門清 1 + 自摸 1 + 門清自摸再 1」= 共 3 台。 */
     { id:"mqZimo",  name:"門清自摸", tai:1, test:c=> c.allConcealed && c.selfDraw },
-    { id:"danDiao", name:"單吊",   tai:1, test:c=> c.winIsPair },
-    /* 全求人:五組全部攤在外面(只剩將是自己的)+ 食胡。必然單吊,故蓋掉單吊。 */
+    /* ---- 聽牌形狀:邊、坎、吊各 1 台 ----
+       ★ 一副牌只有**一個**「聽」,所以這三台**互斥、最多拿一台** —— 同一張胡牌常常能解讀成
+         好幾種形狀(waitShapes 是一整包「可以這樣主張」的集合),照 excl 排下來就是
+         「取對玩家最有利的那一種」:平胡(兩面)2 台 > 單吊 / 嵌張 / 邊張 1 台 > 沒有。
+       ⚠ 所以平胡也要蓋掉這三台(見 pingHu 的 excl):平胡的定義本來就要求兩面聽,
+         「又平胡又嵌張」是同一個聽被算兩次。
+       ⚠ 「獨聽」(只聽一張)不另外開一格 —— 邊 / 坎 / 吊本來就都是只聽一張。 */
+    { id:"danDiao",  name:"單吊", tai:1, excl:["kanZhang","bianZhang"],
+      test:c=> c.waitShapes.has("pair") },
+    { id:"kanZhang", name:"嵌張", tai:1, excl:["bianZhang"],
+      test:c=> c.waitShapes.has("middle") },
+    { id:"bianZhang", name:"邊張", tai:1,
+      test:c=> c.waitShapes.has("edge") },
+    /* 全求人:五組全部攤在外面(只剩將是自己的)+ 食胡。必然單吊,故蓋掉單吊。
+       ⚠ **不要**順手把 kanZhang / bianZhang 也列進來:五組全攤 = 手上只剩那一對將,
+         waitShapes 只可能是 pair(見 buildCtx 的 fromHand 濾網),那兩條永遠不會被觸發
+         = 死程式碼,而且測資也永遠測不到它(突變測試抓出來的,同下面「一色 / 老頭」那一段)。 */
     { id:"quanQiuRen", name:"全求人", tai:2, excl:["danDiao"],
       test:c=> !c.selfDraw && c.sets.every(s=>!s.concealed) },
 
@@ -72,8 +87,9 @@ const MJ16S = (function(){
     { id:"pengPeng", name:"碰碰胡", tai:4,
       test:c=> c.sets.every(s=>s.kind!=="chow") },
     /* 平胡(屁胡):全順子 + 將不是字牌 + 沒有花 + 食胡 + 兩面聽。
-       ★ 有爭議:有些桌要求「完全沒有其他台」。本表用上面五個條件,不看其他台。 */
-    { id:"pingHu", name:"平胡", tai:2,
+       ★ 有爭議:有些桌要求「完全沒有其他台」。本表用上面五個條件,不看其他台。
+       ★ excl:平胡已經把「兩面聽」算進這 2 台裡了,不可以再疊邊 / 坎 / 吊(見上面那一段)。 */
+    { id:"pingHu", name:"平胡", tai:2, excl:["danDiao","kanZhang","bianZhang"],
       test:c=> c.sets.every(s=>s.kind==="chow") && !R.isHonor(c.pair) &&
                !c.selfDraw && c.flowers.length===0 && c.waitShapes.has("open") },
     /* ⚠ 下面幾個「一色 / 老頭」系的 excl 刻意**只列真的會撞的**。
@@ -123,8 +139,8 @@ const MJ16S = (function(){
        ★ 這一台換來的代價是「宣告之後只能摸切、不能吃碰」(見 table.js 的 declareTing)——
          明星三缺一的說明就是「聽牌之後不能眼牌,所以額外給宣告聽牌者加一台」。
        ★ 天聽 / 地聽**不與聽牌重複計台**(excl),同大三元蓋掉中發白那一套。
-       ⚠ 「獨聽」(只聽一張)在本表就是既有的**單吊**1 台,不另外開一格 —— 它與宣告無關,
-         沒宣告也算得到。 */
+       ⚠ 這三台是「有沒有**宣告**」,與聽的形狀無關 —— 只聽一張的那一台在上面的
+         單吊 / 嵌張 / 邊張(沒宣告也算得到)。 */
     { id:"ting",     name:"聽牌", tai:1, test:c=> !!c.ting },
     { id:"diTing",   name:"地聽", tai:4, excl:["ting"], test:c=> c.ting==="di" },
     { id:"tianTing", name:"天聽", tai:8, excl:["ting","diTing"], test:c=> c.ting==="tian" },
@@ -138,7 +154,12 @@ const MJ16S = (function(){
 
     /* ---- 莊家 ---- */
     { id:"zhuang", name:"莊家", tai:1, test:c=> c.isDealer },
-    /* 連 N 拉 N。預設關(每局換莊),開啟時由 adapter 傳 dealerStreak 進來。 */
+    /* 連 N 拉 N:連莊 N 次就多 2N 台。dealerStreak 由 table.js 的 nextDealerOf() 一路帶進來
+       (誰坐莊 / 連幾拉幾的規則只有那一份,v1.102.0 才真的接上)。
+       ★ 有爭議:「拉莊」是**整局加台**還是「只有莊家胡才加」。本表採整局加台 ——
+         閒家胡牌照樣算得到這 2N 台,那才是「莊家愈連,大家愈搶著把他拉下來」的規則;
+         只給莊家的話,閒家胡牌完全感覺不到莊家連了幾局,「拉」就沒有意義了。
+         莊家台(上面那一台)才是莊家專屬的。 */
     { id:"lianZhuang", name:"連莊", tai:c=> 2*c.dealerStreak, test:c=> c.dealerStreak>0 }
   ];
 
@@ -202,15 +223,18 @@ const MJ16S = (function(){
       return R.isTerminal(s.t);
     };
 
-    /* ---- 胡的那張落在哪裡:決定單吊與聽牌形狀 ----
+    /* ---- 胡的那張落在哪裡:決定聽牌形狀(單吊 / 嵌張 / 邊張 / 兩面)----
        同一張牌在一種拆法裡可能對得上好幾個積木,取「對玩家最有利」的解讀,
-       所以這裡收集**所有可能**的形狀,而不是挑第一個。 */
+       所以這裡收集**所有可能**的形狀,而不是挑第一個(誰蓋掉誰交給台數表的 excl)。
+       ⚠ 只認**手上拆出來的**組(fromHand):吃 / 碰 / 槓攤出去的那幾組在胡之前就已經成立,
+         胡的那張不可能是在等它們。而牌值是會重複的 —— 不濾掉的話「吃了 d4d5d6、
+         胡的卻是別處的 d5」會白拿一台嵌張(下面暗刻的食胡扣減同理)。 */
     const wt = hand.winTile;
     c.winIsPair = (wt===pair);
     c.waitShapes = new Set();
     if(c.winIsPair) c.waitShapes.add("pair");
-    let winInChow = false, winPungIdx = -1;
-    sets.forEach((s,i)=>{
+    let winInChow = false, winPung = null;
+    sets.filter(s=>s.fromHand).forEach(s=>{
       if(s.kind==="chow"){
         if(wt===s.t){
           winInChow = true;
@@ -223,7 +247,7 @@ const MJ16S = (function(){
           c.waitShapes.add((s.t%9)===0 ? "edge" : "open");
         }
       }else if(s.t===wt){
-        winPungIdx = i;
+        winPung = s;
         c.waitShapes.add("pung");
       }
     });
@@ -233,7 +257,7 @@ const MJ16S = (function(){
          但如果那張牌也能解讀成落在某個順子裡,玩家就可以那樣主張 → 不扣。
          這條規則不寫的話,「碰碰胡食胡」會被多送一台三暗刻。 */
     let cp = sets.filter(s=>s.kind!=="chow" && s.concealed).length;
-    if(!c.selfDraw && !winInChow && winPungIdx>=0 && sets[winPungIdx].concealed) cp--;
+    if(!c.selfDraw && !winInChow && winPung && winPung.concealed) cp--;
     c.concealedPungs = cp;
 
     /* ---- 花 ---- */
@@ -289,8 +313,10 @@ const MJ16S = (function(){
 
     let best = null;
     combos.forEach(cm=>{
-      // 手上拆出來的組預設是暗的;攤出去的照 melds 給的
-      const sets = cm.sets.map(s=>({ kind:s.kind, t:s.t, concealed:true }))
+      /* 手上拆出來的組預設是暗的;攤出去的照 melds 給的。
+         ⚠ fromHand 一定要標:暗槓也是 concealed:true,光看 concealed 分不出「這一組是不是
+           胡牌那一刻才成立的」—— 聽牌形狀與暗刻的食胡扣減都靠它(見 buildCtx)。 */
+      const sets = cm.sets.map(s=>({ kind:s.kind, t:s.t, concealed:true, fromHand:true }))
                    .concat(melds.map(m=>({ kind:m.kind, t:m.t, concealed:!!m.concealed })));
       const r = scoreOne(hand, cm.pair, sets);
       if(!best || r.tai > best.tai) best = r;

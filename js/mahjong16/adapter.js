@@ -74,6 +74,13 @@ const MP = MPCore.create((function(){
      ⚠ 與排七的 baseWins 是同一套(notes/15)—— 那邊踩過,這邊直接照抄。 */
   let baseWins = {};
   let lastGained = [];              // 核心在 outcome() 給的得分名單(這一局誰 +1)
+  /* ★ 下一局誰坐莊、連了幾拉幾(連莊,v1.102.0)。規則在 MJT.nextDealerOf(),這裡只記結果。
+     ⚠ 存的是**玩家 id 不是座位編號**:座位每局輪換(見 newGame),連莊要跟著人走。
+     ⚠ 為什麼可以放在本地變數:它是從 game 節點的「已結束那一局」算出來的,而 newGame()
+       只有房主叫得到 —— 房主中途重連也會重新收到那一包 over 快照(applyGame 那時
+       playing 是 false 但 winner 有值,照樣進得來)。真的問不到(例如房主是這一局
+       結束後才進房的)就退回原本的「局數 % 家數」,不會壞掉、只是不連莊。 */
+  let lastDeal = null;              // { id:下一局的莊家 playerId, streak:連莊數 }
 
   const secOn   = () => claimSec > 0;                     // 操作倒數有沒有開
   const budgetMs = () => claimSec * 1000;                 // 一手的總預算(從 handAt 起算)
@@ -432,7 +439,13 @@ const MP = MPCore.create((function(){
     }, { local:false });                          // 見檔頭:寫 winner 的交易一律不做本地樂觀套用
   }
   function sendBid(type, tiles){
-    myBid = true; renderActs();
+    /* ★ 兩個旗標一起設(見 board.js 的 bidDone):myBid 收動作列的三顆鈕,
+       bidDone 讓**牌立刻放下**。少了後者,txGame 帶 { local:false } → 本地
+       bids[me] 還是空的 → 那幾張候選牌會站著等伺服器回音,而動作列已經寫
+       「已表態,等其他人…」了。單機那支不必(MJT.bid 當場回新 state)。 */
+    myBid = true; M16B.setBidDone(true);
+    M16B.render(st, Math.max(0, mySeat()));
+    renderActs();
     const me = mySeat();
     ctx.txGame(g=>{
       if(g.status!=="playing" || g.winner) return false;
@@ -579,6 +592,8 @@ const MP = MPCore.create((function(){
       "<b>台灣 16 張</b>:摸打吃碰槓,湊「5 組面子 + 1 對將」就胡。<br>"+
       "<b>4 人</b>用整副 144 張;<b>2~3 人</b>去掉萬子(108 張),<b>3 人不能吃</b>。<br>"+
       "<b>相互算台</b>:自摸三家付、放槍一家付,<b>底 "+baseTai+" 台</b>。<br>"+
+      /* 連莊是規則,不是實作細節 —— 它直接改「下一局誰坐莊」與台數(連 N 拉 N),要寫出來。 */
+      "莊家胡牌或流局<b>連莊</b>(連 N 拉 N,全桌加台)。<br>"+
       (secOn()
         ? ("每打出一張牌起算 <b>"+claimSec+" 秒</b>,吃碰與接著的出牌共用這段時間;"+
            "沒表態算過,輪到出牌沒動作就摸切。<br>")
@@ -652,9 +667,18 @@ const MP = MPCore.create((function(){
          中途有人離開不換牌組(換了等於重排整局)。 */
       const n = Math.max(2, Math.min(4, ids.length));
       const done = handsDone();
+      /* 誰坐莊:連莊(v1.102.0)—— 上一局算出來的那個人,換算成他在**新座位表**的位子。
+         ⚠ 找不到人(第一局 / 他離開了 / 房主是這局結束後才進來的)一律退回「局數 % 家數」,
+           連莊歸零 —— 寧可不連莊,也不要把莊留在「原座位」上(那個位子已經換人坐了)。 */
+      let dealer = done % n, streak = 0;
+      if(lastDeal){
+        const i = ord.indexOf(lastDeal.id);
+        if(i >= 0){ dealer = i; streak = lastDeal.streak; }
+      }
       const s = MJT.newRound({
         rs: "p"+n,
-        dealer: done % n,                        // 每局換莊(連莊預設不做,局數才可預測)
+        dealer: dealer,
+        dealerStreak: streak,
         roundWind: MJ16.idxOf("fe"),
         handNo: done+1,
         base: baseTai
@@ -690,9 +714,13 @@ const MP = MPCore.create((function(){
            吃碰槓);斷線重連時 before 是 null,sfx 自己也會擋掉。 */
       const ev = newRnd ? [] : (M16Sfx.play(before, s, mySeat()) || []);
       if(ev.indexOf("draw") >= 0) buzzTurn();
-      // 宣告視窗換了一輪 → 我的表態記號要清掉
+      /* 宣告視窗換了一輪 → 我的表態記號要清掉。
+         ⚠ 兩個旗標一起清(見 sendBid 與 board.js 的 bidDone):只清 myBid 的話
+           下一輪宣告的牌不會站起來(bidDone 卡在 true → claimOpts() 回空)。 */
       if(!before || !before.claim || !s.claim ||
-         before.claim.t!==s.claim.t || before.claim.from!==s.claim.from) myBid = false;
+         before.claim.t!==s.claim.t || before.claim.from!==s.claim.from){
+        myBid = false; M16B.setBidDone(false);
+      }
 
       M16B.render(st, Math.max(0, mySeat()));
       renderHud(); renderActs(); ctx.updateGoal();
@@ -705,6 +733,12 @@ const MP = MPCore.create((function(){
       if(s.over && rid){
         const d = (s.over.type==="win") ? s.over.deltas : new Array(s.seats).fill(0);
         commitTai(rid, d);
+        /* 連莊:把「下一局誰坐莊」換算成玩家 id 記下來(v1.102.0)。
+           ⚠ 這裡的 ctx.order() 還是**這一局**的座位表 —— 新的一局要等房主寫進 game
+             節點才會換,所以這一刻換算才對得上。重算幾次都是同一個答案(冪等)。 */
+        const nx = MJT.nextDealerOf(s);
+        const nid = nx ? idOfSeat(nx.dealer) : "";
+        if(nid) lastDeal = { id:nid, streak:nx.streak };
       }
     },
 
@@ -729,7 +763,7 @@ const MP = MPCore.create((function(){
     },
     onLeave(){
       clearClaimT(); clearTurnT(); st=null; curRound=null; tai={}; myBid=false; handAt=0;
-      baseWins = {}; lastGained = [];
+      baseWins = {}; lastGained = []; lastDeal = null;   // 離房:連莊記錄跟著清(換房間就是新牌局)
       wipeActs();
     },
 

@@ -504,6 +504,23 @@ const MJT = (function(){
   }
   function wallLeft(st){ return st.wall.length - st.pos; }
 
+  /* ★ 下一局誰坐莊、連了幾拉幾(連莊,v1.102.0)——「一局結束」到「開新局」之間唯一的一條規則。
+     本桌採用的是最常見的那一套:
+       莊家胡牌(自摸或食胡)→ 莊不變,連莊 +1
+       流局                 → 莊不變,連莊 +1(俗稱「拉莊」)
+       別家胡牌             → 換莊給**莊家的下家**,連莊歸零
+     ⚠ 刻意做成「吃一份結束的 state、回傳純資料」而不是寫回 st:開新局的地方有兩份
+       (solo.js 的 newHand / adapter.js 的 newGame),規則只能有一份。
+     ⚠ 回傳的 dealer 是**這一局的座位編號**。連線每局會輪換座位,所以 adapter 必須把它
+       換算成玩家 id 再放回新座位表(見 adapter.js 的 lastDeal)—— 直接沿用座位編號會變成
+       「莊留在原位、但原位換人坐了」。 */
+  function nextDealerOf(st){
+    if(!st || !st.over) return null;
+    const keep = (st.over.type==="draw") || (st.over.seat===st.dealer);
+    return keep ? { dealer: st.dealer, streak: (st.dealerStreak||0) + 1 }
+                : { dealer: nextOf(st.dealer, st.seats), streak: 0 };
+  }
+
   /* ---------- 序列化:整包寫進 Firebase 的 game 節點 ----------
      ★ 陣列一律轉成字串:RTDB 的稀疏陣列很難纏(中間有 null 就變成物件),
        而且整局的 wall 有 144 個數字,字串短很多。 */
@@ -569,7 +586,7 @@ const MJT = (function(){
     concealedKong, addKong, selfDrawWin, settleWin,
     // 宣告聽牌(v1.67.0)
     declareTing, canDeclareTing, tingTiles, tingTypeOf, tingOf, DI_TING_MAX,
-    ownActions, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft,
+    ownActions, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft, nextDealerOf,
     seatWind, leftOf, nextOf, needOf, toPlay, holding, allTiles, enc, dec
   };
 })();

@@ -109,6 +109,16 @@ const M16B = (function(){
   /* 宣告聽牌的選牌模式(v1.67.0):按了動作列那顆「宣告聽牌」之後為 true,
      這時點手牌 = 選要打哪一張來宣告。⚠ 換局 / 離房 / 宣告成立都要清掉(clearSel)。 */
   let tingPick = false;
+  /* ★ 「我這一輪已經表態了」—— **只有連線用得到**。
+     連線的表態走 txGame(..., { local:false })(不做本地樂觀套用),所以按下「過 / ✔ 碰」
+     的那一刻**本地的 st.claim.bids[me] 還是空的** → claimOpts() 照樣算得出選項、
+     那幾張牌會繼續站在那裡等伺服器回音,而動作列已經換成「已表態,等其他人…」了
+     (一副「我按了沒有用」的樣子)。這個旗標讓牌立刻放下。
+     ⚠ 生命週期與 adapter 的 myBid **完全一樣**、寫在同兩個點:sendBid() 設 true,
+       「宣告視窗換了一輪」設 false(clearSel 再兜一層)。所以它不會多出一種卡死 ——
+       真要卡在 true,連線那支的動作列本來就不讓我表態了。
+     ⚠ 單機**用不到也不該用**:MJT.bid() 當場就回一個新 state,bids[me] 立刻是實的。 */
+  let bidDone = false;
   /* 「只縮不放」的地板(見檔頭④):fitTw = 目前用的牌寬,一局裡單調不遞增。
      ★ v1.70.1 拿掉了原本一起記的 fitKey(容器寬 × 高,一變就把地板放掉)——
        「盤面變矮」有兩種,而尺寸值分不出來:
@@ -136,7 +146,7 @@ const M16B = (function(){
          最後一次 render 的值上,等於沒改。
      ⚠ **刻意只在橫向啟用**(landscape() 為假時 warmUntil 歸零)。直向很可能有同一條
        毛病,但這次改動的界線是「不碰正常佈局」,直向要不要一起吃另外評估。
-       → notes/plan/eval-20260801-台灣麻將橫向版面.md 第九節。 */
+       → notes/11-台灣麻將16張.md 第六節(「地板的暖身期 WARM_MS」那一段)。 */
   /* 1200ms 是「牌桌整個安定下來」的量級(房間框畫完 + 字型換好 + 動作列第一次有內容 +
      開局補花)。拉太短會鎖在補花前的暫時值,太長則是使用者盯著看的時間變久 ——
      實測 844×390 一整局在 700ms 下還會變一次(32→38),1200 之後才穩。 */
@@ -745,7 +755,8 @@ const M16B = (function(){
     opts = [];
     if(!st || !st.claim || st.over) return opts;
     const types = st.claim.elig[me];
-    if(!types || st.claim.bids[me]) return opts;         // 沒資格 / 已經表態過
+    // 沒資格 / 已經表態過(bidDone = 連線剛按下、伺服器還沒回音,見上面那個旗標)
+    if(!types || st.claim.bids[me] || bidDone) return opts;
     /* ⚠⚠ 這裡一定要用 **viewHand()**(v1.82.0):idx 是「畫面上的第幾格」,
        而 handTile() 拿到的 i 是 plan.rows 串起來的序號 = viewHand() 的索引。
        玩家拖過之後 st.hands[me] 的順序與畫面**不一樣**,拿原始手牌算會亮錯牌
@@ -1179,7 +1190,12 @@ const M16B = (function(){
          這一支在「吃碰成立」「我表態完」「結算」都會被叫到,順手清掉等於
          每碰一次就把玩家排好的手牌打散 —— 而那只有真的玩才看得出來。
          換局 / 離開牌桌請叫 resetOrder()。 */
-    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; tingPick=false; },
+    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; tingPick=false; bidDone=false; },
+    /* 「我這一輪已經表態了」(**只有連線該叫**,見上面那個旗標的註解):
+       按下「過 / ✔ 碰」→ true,宣告視窗換了一輪 → false。
+       ⚠ 呼叫端要與它的 myBid **寫在同一行**,兩者分家就會出現「動作列說已表態、
+         牌卻還站著」或反過來(牌放下了卻還能再按一次)。 */
+    setBidDone(v){ bidDone = !!v; },
     /* 把玩家拖出來的顯示順序丟掉,回到照牌序。
        ★ 只有**換局 / 離開牌桌**該叫(呼叫端各一行,就掛在 resetFit() 旁邊):
          新的一局手牌整副換了,沿用上一局的順序沒有意義。
