@@ -348,6 +348,28 @@ const M16B = (function(){
      ★ 莊家的記號放在**每個人自己那一列**(v1.58.3)——原本寫在盤面頂端那條資訊列
        («莊 某某»),但那條整列被拿掉了(可吃 / 牌山對玩的人沒有用)。
        我自己是不是莊,由房間框的玩家晶片講(adapter.chipLead),兩邊同一套記號。 */
+  /* 對手那一列的「花 + 明牌」那一格 —— **一格都沒有的時候放一個等高的透明佔位**(v1.111.1)。
+     使用者:「如果對手沒有補到花的情況下,最小高度會太小,應該要把他最小高度變成跟
+     有補花到的情況一樣,才不會那個框的高度跳來跳去」。
+
+     ★ 同檔頭①「摸進來那一格一律預留」與橫向 `.m16-mymelds` 那條紀律:
+       高度的**變化**比高度本身值錢 —— 這一列一長高盤面就矮一點,整副牌跟著縮一次(檔頭③)。
+     ★★ 為什麼是**佔位**而不是給 `.m16-fmelds` 一個 min-height:那條要自己算
+       「一排迷你牌有多高」,而真正的高度是 `牌高 + .m16-meld 的內距 + 邊框` ——
+       第一版寫 `mtw*1.32` 實測還是跳 6px(34 → 40)。**照抄一份真的結構再隱藏起來**
+       就不必猜任何數字,CSS 那邊改內距也自動跟著對。
+     ⚠ 一律用 `visibility:hidden` 而不是 opacity/透明色:它要**佔高度但完全看不見**,
+       而且不可以吃到點擊(同 `.m16-pslot` 那條「一個可見的樣式都不給」)。
+     ⚠ class 刻意**不叫 `.m16-flg`** —— e2e 有一條在數「花牌是一組真的牌」,
+       佔位混進去就變成「沒人摸到花也說有花」。 */
+  function foeShowHTML(seat, fl, mtw){
+    const melds = st.melds[seat] || [];
+    if(fl.length || melds.length)
+      return (fl.length ? flowerHTML(fl, mtw) : "") + melds.map(m=>meldHTML(m, mtw)).join("");
+    return '<span class="m16-meld m16-fslot" style="--m16w:'+mtw+'px" aria-hidden="true">'+
+             '<i class="m16-tile m16-mt"></i></span>';
+  }
+
   function foeHTML(seat, tw){
     const wind = R.codeOf(MJT.seatWind(seat, st.dealer, st.seats));
     /* ⚠ 張數用**真的** st.turn:宣告視窗中下一家還沒摸牌(16 張),沒人宣告時他早就摸到
@@ -389,7 +411,7 @@ const M16B = (function(){
       '<span class="m16-fmelds">'+
         (shown
           ? revealHTML(st, seat, mtw, winT)
-          : (fl.length?flowerHTML(fl, mtw):"")+st.melds[seat].map(m=>meldHTML(m, mtw)).join(""))+
+          : foeShowHTML(seat, fl, mtw))+
       '</span>'+
     '</div>';
   }

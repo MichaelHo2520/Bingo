@@ -2393,6 +2393,12 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
   padding:3px 7px;border-radius:9px;background:rgba(255,255,255,.07);
   font:700 11px/1.4 'Nunito',sans-serif}
 .m16-foe.on{background:rgba(255,255,255,.18);box-shadow:inset 0 0 0 1.5px var(--mj-jf)}
+/* ★★ 花 / 明牌那一格的**透明佔位**(v1.111.1)。使用者:「如果對手沒有補到花的情況下,
+   最小高度會太小,應該要把他最小高度變成跟有補花到的情況一樣,才不會那個框的高度跳來跳去」。
+   結構由 board.js 的 foeShowHTML() 給(照抄一份真的花牌組再隱藏),所以這裡不必猜
+   「一排迷你牌有多高」—— 第一版用 min-height:牌寬×1.32 實測還是跳 6px(內距與邊框沒算到)。
+   ⚠ 一律 visibility:hidden:要佔高度、完全看不見、也不吃點擊(同 .m16-pslot 那條)。 */
+.m16-fslot{visibility:hidden}
 .m16-wind{display:inline-flex;align-items:center;justify-content:center;
   width:19px;height:19px;border-radius:50%;background:var(--mj-z);color:#fff;
   font:800 11px/19px 'Nunito',sans-serif;flex:none}
@@ -2607,8 +2613,15 @@ body.m16-mp .mj-play,body.m16-solo .mj-play{position:relative}
      .m16-cd.m16-hot 的脈動動畫改的正是 transform,會把 translate 整個蓋掉(環當場偏右)。
    ⚠ min-height:42px = 「環還在流裡」時這一列的實際高度(34px 環 + 上下 4px 內距)。
      環一脫離流,這一列就只剩一行字 → 掉回 min-height:38 → **矮 4px = 整副牌縮一次**
-     (board.js 檔頭③)。橫向那段的內距只有 2px,所以那邊另外寫 38。 */
-.m16-acts.m16-hush{min-height:42px}
+     (board.js 檔頭③)。橫向那段的內距只有 2px,所以那邊另外寫 38。
+   ⚠⚠⚠ 那個補償**只有在環真的顯示著的時候才成立**,所以條件是 `:has(.m16-cd:not(.hidden))`:
+     ①**單機沒有倒數環**(那是連線為了「不能讓全房等一個人」才有的)
+     ②連線也可以把操作倒數整個關掉(房間設定「關」)
+     這兩種情況下無條件寫 42px 會**反過來把那一列撐高 4px** → 盤面矮一點 → ResizeObserver
+     再叫一次 render() → 又是那個沒收斂的迴圈(`.m16-acts` 的 flex:none 整段註解在講的東西)。
+     實測 v1.111.0 的單機 e2e 三跑三次都丟「ResizeObserver loop completed with undelivered
+     notifications」,而面板之前的版本三次都沒有 —— 那不是雜訊,是「這一輪沒收斂」的告示。 */
+.m16-acts.m16-hush:has(.m16-cd:not(.hidden)){min-height:42px}
 .m16-acts.m16-hush .m16-cd{position:absolute;left:50%;margin-left:-17px;
   bottom:calc(var(--m16cb,36%) + var(--m16ch,120px) - 17px);z-index:7;pointer-events:none;
   background:radial-gradient(closest-side,rgba(9,15,12,.94) 68%,rgba(9,15,12,0));
@@ -2972,13 +2985,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      會從盤面上緣衝出去(board.js 的 placeClaim() 會夾住,但夾完就貼在頂上、
      跟房間框黏成一塊)。牌面本身由 board.js 的 CLAIM_TW_LAND 收成 30px。
      ⚠ .m16-acts.m16-hush 那條 min-height 要**在這裡重寫成 38** —— 橫向的內距是
-       2px,「環還在流裡」時這一列是 34+4 = 38,不是直向的 42(見那條的註解)。 */
+       2px,「環還在流裡」時這一列是 34+4 = 38,不是直向的 42(見那條的註解)。
+       ⚠⚠ 連 `:has(.m16-cd:not(.hidden))` 也要照抄:沒有環的時候撐高這一列會把盤面
+         壓矮一點,ResizeObserver 就再叫一次 render() —— 那個迴圈是真的踩到過的。 */
   .m16-claim{padding:7px 11px 8px;gap:5px;border-radius:14px;max-width:min(94vw,330px)}
   .m16-chd{font-size:12px;gap:7px}
   .m16-claim .m16-act{padding:8px 13px;font-size:14px;border-radius:11px}
   .m16-claim .m16-more{font-size:10.5px}
   .m16-crow{gap:6px}
-  .m16-acts.m16-hush{min-height:38px}
+  .m16-acts.m16-hush:has(.m16-cd:not(.hidden)){min-height:38px}
 }
 
 /* ==========================================================================
