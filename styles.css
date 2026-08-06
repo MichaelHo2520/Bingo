@@ -2412,6 +2412,14 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
 .m16-dz{display:inline-grid;place-items:center;min-width:18px;height:17px;padding:0 3px;flex:none;
   border-radius:6px;background:var(--mj-jz);color:#fff;
   font:800 11px/1 'Nunito',sans-serif}
+/* 連莊(v1.108.0):貼在莊家記號右邊的小膠囊「連2」= 連 2 拉 2,全桌加 4 台。
+   ⚠ 刻意**另開一顆**而不是把字塞進 .m16-dz —— 那顆是三個地方共用的固定寬度小方塊
+     (盤面對手列 / 我的晶片 / 單機晶片),塞字進去三個地方一起變形。
+   ⚠ 顏色與 .m16-dz(紅)分開:它不是「誰是莊」,是「連了幾把」—— 兩個資訊疊同一色會讀成一塊。 */
+.m16-lz{display:inline-grid;place-items:center;height:17px;padding:0 5px;flex:none;
+  border-radius:6px;background:var(--accent-2);color:#1c1008;
+  font:800 11px/1 'Nunito',sans-serif;margin-left:3px}
+:root[data-theme="ebook"] .m16-lz{background:#fff;color:#000;border:1px solid #000}
 
 /* ---------- 動作列(吃 / 碰 / 槓 / 胡 / 過) ----------
    ★ min-height(v1.58.3):這一列在「一行 12px 提示字」與「一排 30px 按鈕」之間跳,
@@ -2853,6 +2861,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .m16-foe{flex-wrap:wrap;padding:2px 6px;gap:4px;font-size:10.5px}
   .m16-foe .m16-wind{width:17px;height:17px;font-size:10px;line-height:17px}
   .m16-foe .m16-dz{min-width:16px;height:15px;font-size:10px}
+  .m16-foe .m16-lz{height:15px;padding:0 4px;font-size:10px;margin-left:2px}
   .m16-foe .m16-foename{max-width:4em}
   .m16-fmelds{display:flex;flex-wrap:wrap;gap:2px}
   .m16-acts{min-height:34px;padding:2px 0}
@@ -5429,9 +5438,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 
   /* 亮 / 暗。★ 暗的**照樣點得動**(只是會跳 toast 說原因)——
      CLAUDE.md 的紅線:不用 disabled / pointer-events:none 讓點擊靜默消失。 */
+  /* ★★ 亮起來的牌**不上抬**(v1.108.0)—— 原本 hover 會 translateY(-6px),
+     而觸控裝置點過之後 hover 會**黏著**:一路點下來整列牌此起彼落地上上下下,
+     玩家的回報就是「牌會上上下下」。回饋改成只加深光圈(位置一個像素都不動);
+     按下去只縮一點點,不位移。 */
   .un-card.can{box-shadow:0 0 0 2px var(--accent),0 3px 10px rgba(0,0,0,.34)}
-  .un-card.can:hover{transform:translateY(-6px)}
-  .un-card.can:active{transform:translateY(-2px) scale(.97)}
+  .un-card.can:hover{box-shadow:0 0 0 3px var(--accent),0 4px 14px rgba(0,0,0,.42)}
+  .un-card.can:active{transform:scale(.96)}
   /* ⚠⚠ 暗牌**不可以降飽和度** —— 第一版寫 `saturate(.35) brightness(.62)`,
      紅 / 黃 / 綠三色全部塌成同一團土黃,連白橢圓都變灰綠(放大截圖才看得出來)。
      而「手上有哪些顏色」是 UNO 玩家規劃下一手的唯一依據:看不出顏色 = 這一頁不能玩。
@@ -5454,7 +5467,8 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        綠牌 #2ea94c 壓在深綠桌布上仍然分得出來 —— 但這件事斷言測不到,
        驗收點是 `node tools/gen-uno-shot.js` 的截圖(它吃 `?theme=`,
        **bubblegum 與 ebook 一定要各看一次**)。 */
-  .un-table{flex:0 1 auto;min-height:200px;max-height:340px;
+  /* ★ position:relative 是給右上角那行「牌堆 62」定位用的(見 .un-deck)。 */
+  .un-table{position:relative;flex:0 1 auto;min-height:200px;max-height:340px;
     display:flex;flex-direction:column;align-items:center;
     justify-content:center;gap:10px;
     border-radius:18px;padding:12px 10px;
@@ -5477,16 +5491,24 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      邊界會糊掉,而它是 Wild 之後唯一的顏色線索(牌面靠的是同一招:2px 白邊)。
      ⚠ 只加 box-shadow,**不准碰 background** —— 那條紅線見上面 .un-c-* 那一段。 */
   .un-table .un-swatch{box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),0 0 0 2px rgba(255,255,255,.24)}
-  .un-table .un-pn{color:rgba(255,255,255,.72)}
   .un-table .un-nowtxt{color:#fff}
   .un-table .un-dir{color:rgba(255,255,255,.78);background:rgba(0,0,0,.26)}
-  :root[data-theme="ebook"] .un-table .un-pn{color:#555}
   :root[data-theme="ebook"] .un-table .un-nowtxt{color:#000}
   :root[data-theme="ebook"] .un-table .un-dir{color:#555;background:#eee}
-  .un-piles{display:flex;align-items:flex-start;justify-content:center;gap:clamp(14px,6vw,34px)}
-  .un-pile,.un-top{display:flex;flex-direction:column;align-items:center;gap:5px;
-    background:none;border:none;padding:0;cursor:pointer}
-  .un-pn{font:800 11px/1 'Nunito',sans-serif;color:var(--muted);white-space:nowrap}
+  /* ---------- 牌堆:右上角一行字 ----------
+     ★ 這裡**刻意不畫一張牌背**:桌上唯一該有的一張牌是牌河最上面那張(那是要看的),
+       再擺一張牌背只會讓玩家的眼睛在兩張牌之間猶豫 —— 而牌堆真正的資訊只有「還剩幾張」。
+     ★ 仍然是一顆 <button>(#unDraw):點得動這件事沒變(誤按跳 toast 講原因),
+       只是它看起來就是一行字。
+     ⚠ absolute 定位靠 .un-table 的 position:relative;牌河那張牌置中,兩者不會撞。 */
+  .un-deck{position:absolute;right:9px;top:7px;z-index:1;
+    background:rgba(0,0,0,.26);border:none;border-radius:999px;padding:4px 10px;
+    font:800 11px/1 'Nunito',sans-serif;color:rgba(255,255,255,.76);
+    cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .un-deck b{font-size:12.5px;color:#fff}
+  :root[data-theme="ebook"] .un-deck{background:#eee;color:#555;border:1px solid #000}
+  :root[data-theme="ebook"] .un-deck b{color:#000}
+  .un-top{display:flex;align-items:center;justify-content:center}
   /* ★★ 「現在顏色」一定要獨立畫一塊 —— Wild 打出去之後桌上那張是黑的,
      顏色只存在 st.col 裡。漏了它玩家完全不知道現在該出什麼色(最容易漏的一格)。 */
   .un-now{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
@@ -5497,32 +5519,49 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-nowtxt{font:800 13px/1.2 'Nunito',sans-serif;color:var(--text)}
   .un-dir{font:800 11.5px/1 'Nunito',sans-serif;color:var(--muted);
     padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.16)}
-  .un-pen{font:800 12.5px/1.3 'Nunito',sans-serif;color:var(--accent-2);text-align:center}
+  /* 累積罰抽。⚠ 顏色**不可以吃 --accent-2** —— 桌布是寫死的深綠,而 --accent-2 在
+     bubblegum 是紫、在 candy 是桃紅,壓上去幾乎看不見(同上面那段 ⚠⚠ 的理由)。 */
+  .un-pen{font:800 12.5px/1 'Nunito',sans-serif;color:#ffd66b;text-align:center;
+    background:rgba(0,0,0,.28);border-radius:999px;padding:4px 11px}
+  .un-pen b{font-size:14px;color:#fff}
+  :root[data-theme="ebook"] .un-pen{color:#000;background:#eee}
+  :root[data-theme="ebook"] .un-pen b{color:#000}
 
   /* ---------- 手牌 ----------
      ⚠ 橫向捲動 + nowrap:手牌可能到二十幾張,換行會把桌子擠掉。
-     ⚠ 一定要 padding-top —— .can:hover 會往上抬 6px,沒有留位置會被裁掉
+     ⚠ padding-top 留著 —— 牌雖然不再上抬(見 .un-card.can),但亮牌的光圈是
+        3px 的 box-shadow,貼著捲動容器的上緣一樣會被裁掉
         (那是 notes/13 第三節「捲動容器裡會放大的東西」的同一類問題)。 */
   /* ★★ margin-top:auto = **手牌貼著動作列**(桌子在上面、剩下的空間全給它們之間)。
      ⚠ 第一版用 `.un-stage{justify-content:center}` 把「桌子 + 手牌」當一組垂直居中,
        結果手牌與動作列之間空了 150px(截圖才看得出來)—— 而手牌應該在拇指附近。 */
   .un-handwrap{flex:0 0 auto;margin-top:auto;display:flex;flex-direction:column;gap:4px}
-  .un-hlabel{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-    font:800 12px/1.2 'Nunito',sans-serif;color:var(--muted)}
-  .un-drewtag{font-weight:800;color:var(--accent-2)}
+  /* ⚠ 一行寫得完的短字 —— 這一列會換行的話,整排手牌就跟著上下跳(見下面動作列那段)。 */
+  .un-hlabel{display:flex;align-items:center;gap:8px;
+    font:800 12px/1.2 'Nunito',sans-serif;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .un-hand{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;
     padding:8px 2px 4px;scrollbar-width:thin;touch-action:pan-x}
 
   /* ---------- 動作列 ----------
-     ⚠ 寫死最小高度:內容會變(抓鈕 / UNO 鈕 / 提示各自出現),
-        不固定的話桌子會跟著一起上下跳(大老二 --b2-acth 的同一條理由)。 */
-  .un-acts{flex:0 0 auto;min-height:var(--un-acth);position:relative;
-    display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
-  .un-wait{font:800 13.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
-  .un-hint{flex:1 1 100%;text-align:center;
-    font:700 11.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
-  .un-acts .btn{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15}
-  .un-acts .btn small{font-size:10px;font-weight:700;opacity:.85}
+     ★★ 高度是**寫死的**(不是 min-height),而且裡面是固定的兩列:
+        鈕那一列(沒有鈕時照樣占位)+ 一行說明字(固定一行、超出用 …)。
+        v1.108.0 之前是 min-height + flex-wrap:三顆鈕擠不下就換行、說明字長一點就兩行,
+        每換一次高度就把上面的手牌與桌子整組往上下推 —— 玩家看到的是「牌會上上下下」。
+        內容再多也只會在這個框裡溢出,**不會把版面推走**。
+     ⚠ 兩列的高度加起來要留在 --un-acth 之內:40 + 5 + 16 = 61 ≤ 74(矮視窗那段另有一組)。 */
+  .un-acts{flex:0 0 auto;height:var(--un-acth);position:relative;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px}
+  .un-arow{flex:none;min-height:40px;display:flex;align-items:center;justify-content:center;
+    gap:8px;flex-wrap:nowrap;max-width:100%}
+  .un-atxt{flex:none;height:16px;max-width:100%;text-align:center;
+    font:800 12.5px/16px 'Nunito',sans-serif;color:var(--muted);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .un-atxt.me{color:var(--accent)}
+  /* ⚠ 鈕一律**一行字**(沒有 small 副標了):兩行的鈕會把那一列撐到 60px 以上,
+     上面那條「加起來 ≤ --un-acth」就守不住。 */
+  .un-acts .btn{flex:0 1 auto;min-width:92px;padding:10px 16px;font-size:16px;line-height:1.2;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   /* UNO! 切換鈕:按下去要看得出來「已經武裝」 */
   .un-unobtn{background:rgba(255,255,255,.14);color:var(--text)}
   .un-unobtn.on{background:var(--un-y);color:#3a2a00;box-shadow:0 0 0 2px var(--un-y)}
@@ -5680,9 +5719,24 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .un-room{padding:6px 10px}
     .un-room .mp-subrow,.un-room-foot{margin-top:3px}
     .un-play{--un-cw:clamp(38px,9vw,48px);--un-acth:58px}
-    .un-table{padding:6px 8px;gap:6px}
-    .un-piles{gap:clamp(10px,4vw,24px)}
+    /* ★★ 橫置時桌子改成**一列**(牌在左、狀態在右),而且不再撐 200px 的下限 ——
+       直立那種「上下堆」在 430px 高的視窗會把手牌整條擠出畫面下緣
+       (量到的是「手牌列底部 446 > 視窗 430」,而手牌被裁掉這一頁就不能玩了)。
+       v1.108.0 拿掉牌堆那一疊之後這一列才擺得下。
+     ⚠ 罰抽改成釘在**左上角**(對稱右上角的牌堆):它一出現就不會把版面推開 ——
+       同一條「不上下跳」的紀律。 */
+    .un-stage{gap:6px}
+    /* ⚠⚠ 這裡一定要 flex:none —— 桌子預設是 `flex:0 1 auto`(**shrink 開著**),
+       而矮視窗的 .un-stage 空間不夠時它會被壓到比裡面那張牌還矮
+       (量到「桌高 71 / 牌 62×90」= 牌整個溢出桌面壓到手牌上)。 */
+    .un-table{flex:none;padding:6px 8px;gap:clamp(10px,3vw,22px);min-height:0;max-height:none;
+      flex-direction:row;align-items:center;justify-content:center}
+    .un-card.big{--un-cw:clamp(50px,13vw,62px)}
+    .un-pen{position:absolute;left:9px;top:7px}
     .un-hand{padding:6px 2px 3px}
+    /* ⚠ 動作列在這裡也要守「兩列加起來 ≤ --un-acth」:32 + 5 + 16 = 53 ≤ 58。 */
+    .un-arow{min-height:32px}
+    .un-acts .btn{padding:6px 13px;font-size:14.5px;min-width:80px}
     .un-colors{grid-template-columns:repeat(4,1fr)}
     .un-cbtn{padding:12px 6px;font-size:14px}
   }

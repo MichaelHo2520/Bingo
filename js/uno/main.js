@@ -120,7 +120,7 @@ function unEditable(){ return !MP.isOnline() || MP.amHost(); }
 function unRulesNow(){ return MP.isOnline() ? MP.rules() : Solo.rules(); }
 function unSetRule(key, val){
   if(MP.isOnline()){ MP.setRule(key, val); syncRules(unRulesNow(), unEditable()); return; }
-  if(Solo.playing()){ showToast("對局中不能改規則 —— 這一場的規則已經定下來了", 2400); return; }
+  if(Solo.playing()){ showToast("對局中不能改規則", 1600); return; }
   Solo.setRule(key, val);
   syncRules(Solo.rules(), true);
   paintSoloHint();

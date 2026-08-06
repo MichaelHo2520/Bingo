@@ -335,6 +335,15 @@ const M16B = (function(){
     return st.turn;
   }
 
+  /* 連莊記號「連N」(v1.108.0)。★ 只有一份,三個地方共用
+     (這一支的 foeHTML / adapter.js 的 chipLead / solo.js 的 paintBar)——
+     莊家記號本來就是「三個地方同一套」,連莊跟著它走。
+     ⚠ streak 是**這一局的**連莊數(0 = 第一次坐莊,不畫)。台數是 2N 台,見 scoring.js。 */
+  function lianHTML(streak){
+    const n = +streak || 0;
+    return n > 0 ? '<span class="m16-lz" title="連 ' + n + ' 拉 ' + n + ',全桌加 ' + (2*n) + ' 台">連' + n + '</span>' : "";
+  }
+
   /* ---------- 對手那一列 ----------
      ★ 莊家的記號放在**每個人自己那一列**(v1.58.3)——原本寫在盤面頂端那條資訊列
        («莊 某某»),但那條整列被拿掉了(可吃 / 牌山對玩的人沒有用)。
@@ -370,7 +379,9 @@ const M16B = (function(){
     return '<div class="m16-foe'+(shownTurn()===seat?" on":"")+(tk?" ting":"")+
              (shown?" shown":"")+'" data-seat="'+seat+'">'+
       '<span class="m16-wind">'+F.info(wind).glyph+'</span>'+
-      (seat===st.dealer?'<span class="m16-dz">莊</span>':'')+
+      /* ★ 連莊(v1.108.0):莊家記號後面接「連N」= 連 N 拉 N,全桌加 2N 台。
+         三個地方都要畫(這裡 / adapter.chipLead / solo.paintBar)—— 那三支是同一套記號。 */
+      (seat===st.dealer?'<span class="m16-dz">莊</span>'+lianHTML(st.dealerStreak):'')+
       (tk?'<span class="m16-tg">'+(TING_LBL[tk]||"聽")+'</span>':'')+
       '<span class="m16-foename" data-seat="'+seat+'"></span>'+
       // 攤開之後不再寫「🀫 N」:牌就在旁邊,而牌背的圖示反而像「還是蓋著的」
@@ -1257,7 +1268,7 @@ const M16B = (function(){
   }
 
   return {
-    mount, render, revealHTML, readyHTML, overWord, roleOf, rankHTML,
+    mount, render, revealHTML, readyHTML, overWord, roleOf, rankHTML, lianHTML,
     /* 只清「選取 / 宣告選項」那一組狀態。
        ⚠⚠ **不動牌寬的地板 fitTw**(v1.70.1,見檔頭⑤下面那條):這一支在
          「吃碰成立」「我表態完」也會被叫到,順手清掉地板就等於每次宣告結束

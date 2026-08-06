@@ -768,7 +768,22 @@ const MP = MPCore.create((function(){
       /* ★ 牌組跟著人數走(2/3 人去萬子)。人數是**開局當下**的 ids.length ——
          中途有人離開不換牌組(換了等於重排整局)。 */
       const n = Math.max(2, Math.min(4, ids.length));
-      const done = handsDone();
+      /* ★★★ 新的一場 = **台數與局數整份歸零**(v1.108.0,檔頭那句「打滿了…開新賽季」
+         原本沒有實作)。局數的真相是 `tai._r` 的筆數,而 tai 節點只有在房主離開
+         (整間房 remove)時才會消失 —— 所以同一間房打完第二場開始:
+           · `handsDone()` 從 4 起跳 → 徽章卡在「第 4/4 局」(第一手就顯示打滿了)
+           · `contOn()` 恆 false → **每打完一手就「本場結束」**,續局倒數永遠不出現
+         使用者的回報就是這個:「玩了 4 局後又繼續玩 4 局,朋友感覺只玩了兩局,
+         程式說 4 局了」。
+         ⚠ 判斷式是 `done >= handsGoal`(不是 `> 0`):中途有人離開退回大廳、房主再開,
+           那是**同一場續打**(局數要接下去),不可以歸零。
+         ⚠ 本地的 tai 也要當場清掉 —— remove() 是非同步的,而下面 done 立刻要用。 */
+      let done = handsDone();
+      if(done >= handsGoal){
+        const tr = ctx.ref("tai");
+        if(tr) tr.remove();
+        tai = {}; done = 0; lastDeal = null;      // 新的一場:連莊也跟著歸零
+      }
       /* 誰坐莊:連莊(v1.102.0)—— 上一局算出來的那個人,換算成他在**新座位表**的位子。
          ⚠ 找不到人(第一局 / 他離開了 / 房主是這局結束後才進來的)一律退回「局數 % 家數」,
            連莊歸零 —— 寧可不連莊,也不要把莊留在「原座位」上(那個位子已經換人坐了)。 */
@@ -932,7 +947,8 @@ const MP = MPCore.create((function(){
       const wind = st ? MJFace.info(MJ16.codeOf(MJT.seatWind(s, st.dealer, st.seats))).glyph : "";
       return '<span class="m16-seat '+colorOf(s)+'"></span>'+
              (wind?'<span class="m16-cw">'+wind+'</span>':'')+
-             (st && s===st.dealer ? '<span class="m16-dz">莊</span>' : '');
+             // ★ 連莊記號跟著莊家記號走(v1.108.0),三個地方共用 M16B.lianHTML()
+             (st && s===st.dealer ? '<span class="m16-dz">莊</span>' + M16B.lianHTML(st.dealerStreak) : '');
     },
     chipTail(id){
       const t = taiOf(id);

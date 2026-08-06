@@ -157,7 +157,8 @@ const Solo = (function(){
     paint();
     Sound.start();
     saveOwn();
-    showToast("起始牌是 " + UN.nameOf(st.top) + ",由 " + seatName(st.turn) + " 先出", 2200);
+    // ★ 起始牌就攤在桌上,不必再唸一次 —— 只講「誰先出」這件看不出來的事
+    showToast(st.turn === ME ? "你先出牌" : (seatName(st.turn) + " 先出牌"), 1500);
     if(st.turn !== ME) aiTurn();
   }
   function quit(){
@@ -196,7 +197,7 @@ const Solo = (function(){
     if(st.hands[ME].indexOf(card) < 0) return;
     /* ★★ 沒亮的牌不給出,但**一定要說得出原因** ——
        CLAUDE.md 的紅線是「不用 disabled 讓牌**靜默**吃掉點擊」。 */
-    if(!UN.legalOn(st, card)){ showToast(whyNot(card), 2200); return; }
+    if(!UN.legalOn(st, card)){ showToast(whyNot(card), 1800); return; }
     if(UN.isWild(card)){
       pendWild = card;
       paint();                              // 選色盤開著時手牌要變成不能點
@@ -205,7 +206,7 @@ const Solo = (function(){
         pendWild = -1;                        // ★ 一定要先清 —— 它是「手牌能不能點」的閘門
         if(c < 0 || !active || over){ paint(); return; }
         // ★ col < 0 = 取消(按了返回鍵 / 點了蓋板外框)→ 那一手 Wild 不算,牌回到手上
-        if(col < 0){ showToast("取消了 —— 那張 Wild 還在你手上", 1600); paint(); return; }
+        if(col < 0){ showToast("取消了", 1200); paint(); return; }
         commit(UN.encPlay(c, col, unoArmed && st.hands[ME].length === 2));
       });
       return;
@@ -213,20 +214,20 @@ const Solo = (function(){
     commit(UN.encPlay(card, 0, unoArmed && st.hands[ME].length === 2));
   }
 
-  /* 為什麼這張出不了 —— 文案要講得出**具體**的原因,不是「不能出」。
-     ⚠ 三種情形要分開講:罰抽在頭上 / 抽完只能出抽到那張 / 顏色數字都不對。 */
+  /* 為什麼這張出不了 —— 講得出**具體**的原因,但一句就好(v1.108.0 全部砍到半行:
+     原本每一句都是「你頭上有 N 張罰抽,手上沒有同種牌能疊 —— 只能按「抽一張」把它吃下來」
+     這種說明書口氣,而 toast 只閃兩秒,沒人讀得完)。
+     ⚠ 三種情形仍然要分開講:罰抽在頭上 / 抽完只能出抽到那張 / 顏色數字都不對。 */
   function whyNot(card){
     if(st.pend > 0){
-      if(!st.rules.stack) return "你頭上有 " + st.pend + " 張罰抽,這一版不能疊 —— 只能按「抽一張」";
+      if(!st.rules.stack) return "被罰抽 " + st.pend + " 張 —— 只能抽";
       /* ★ 手上如果還有別的同種牌能疊,強制出牌就輪到那一條 —— 不能靠抽來吃掉罰抽。 */
       return UN.canPlay(st.hands[ME], st)
-        ? ("你頭上有 " + st.pend + " 張罰抽 —— 手上有能疊的 " +
-           (st.pendK === UN.K_W4 ? "+4" : "+2") + ",要出那張,不能抽")
-        : ("你頭上有 " + st.pend + " 張罰抽,手上沒有同種牌能疊 —— 只能按「抽一張」把它吃下來");
+        ? ("要用 " + (st.pendK === UN.K_W4 ? "+4" : "+2") + " 疊上去")
+        : ("疊不上 —— 只能抽 " + st.pend + " 張");
     }
-    if(st.drew) return "你剛抽了 " + UN.nameOf(st.drewCard) + " —— 這一手只能出那一張,或按「不出了」";
-    const c = UN.COL_NAME[st.col] || "";
-    return "出不了 —— 要跟桌上一樣是 " + c + " 色,或同一個數字 / 同一種動作,或出 Wild";
+    if(st.drew) return "只能出剛抽到的那張";
+    return "要出 " + (UN.COL_NAME[st.col] || "") + " 色、同數字,或 Wild";
   }
 
   function act(a){
@@ -236,7 +237,7 @@ const Solo = (function(){
     if(busy || st.turn !== ME){ showToast("還沒輪到你"); return; }
     if(a === "uno"){
       /* ★ UNO! 是**出牌前先按下的切換**(宣告與出牌必須是同一手,見 rules.js 第五節)。 */
-      if(st.hands[ME].length !== 2){ showToast("只有剩兩張、要出到剩一張時才用得到", 2000); return; }
+      if(st.hands[ME].length !== 2){ showToast("剩兩張時才用得到", 1500); return; }
       unoArmed = !unoArmed;
       if(unoArmed) UNB.sfx.uno();
       paint();
@@ -246,12 +247,12 @@ const Solo = (function(){
       /* ★★ 手上有合法牌可出時不准抽(強制出牌,見 rules.js 的 doDraw)——
          按鈕在這個狀態下本來就不畫,但牌堆圖示(#unDraw)一直可以點,
          誤按要跳 toast 講原因,不能讓 commit() 就地靜默失敗。 */
-      if(UN.canPlay(st.hands[ME], st)){ showToast("手上還有牌可以出 —— 要先出牌,不能抽", 2200); return; }
+      if(UN.canPlay(st.hands[ME], st)){ showToast("有牌可以出,不能抽", 1600); return; }
       commit(UN.DRAW);
       return;
     }
     if(a === "pass"){
-      if(!st.drew){ showToast("要先抽一張才有「不出了」"); return; }
+      if(!st.drew){ showToast("先抽一張"); return; }
       commit(UN.PASS);
       return;
     }
@@ -261,11 +262,11 @@ const Solo = (function(){
   function doCatch(){
     if(!st || over || !st.rules.unoCall) return;
     const t = st.catchSeat;
-    if(t < 0 || t === ME){ showToast("現在沒有人可以抓"); return; }
+    if(t < 0 || t === ME){ showToast("沒人可以抓"); return; }
     const nm = seatName(t);
-    if(!UN.step(st, UN.encCatch(ME, t))){ showToast("來不及了 —— 已經換下一家出手"); return; }
+    if(!UN.step(st, UN.encCatch(ME, t))){ showToast("來不及了"); return; }
     UNB.sfx.caught();
-    showToast("抓到了!" + nm + " 沒喊 UNO,罰抽 2 張", 2200);
+    showToast("抓到 " + nm + "!罰抽 2 張", 1800);
     paint();
   }
 
@@ -311,33 +312,33 @@ const Solo = (function(){
       try{ cm = UNAI.catchMove(st, s, level); }catch(e){ cm = null; }
       if(cm && UN.step(st, cm)){
         UNB.sfx.caught();
-        showToast(seatName(s) + " 抓到 " + (target === ME ? "你" : seatName(target)) +
-                  " 沒喊 UNO —— 罰抽 2 張", 2400);
+        showToast(seatName(s) + " 抓到" + (target === ME ? "你" : seatName(target)) +
+                  "!罰抽 2 張", 1800);
         return;
       }
     }
   }
 
-  /* 電腦這一手要不要出聲說明。★ 只講**看不出來**的事(換顏色 / 罰抽 / 出完),
-     一般數字牌不講 —— 那會變成台灣麻將講過的「報帳機」。 */
+  /* 電腦這一手要不要出聲說明。
+     ★★ v1.108.0 砍到只剩**兩件事**:換了顏色、砸了罰抽 —— 而且都只有半句。
+        原本連「跳過了下一家」「迴轉」「喊了 UNO!」「把牌出完了」都各跳一次 toast,
+        四人局等於每一手都有字飛出來,玩家的回報是「話太多」。砍掉的那四句都有別的
+        管道說完了:
+          跳過 / 迴轉 → 有專屬音效,而且方向與輪到誰在畫面上一直看得到
+          喊 UNO      → UNB.announce() 已經跳過一次「X 剩一張牌!」(重複了)
+          出完了      → 下一秒就是結果卡
+        留下來的兩件事是**畫面上真的看不出來**的:Wild 換成什麼色(牌是黑的)、
+        罰抽砸到誰頭上(桌上只寫數字,不寫誰砸的)。 */
   function announceAi(seat, mv){
     const nm = seatName(seat);
     if(UN.isDraw(mv)) return;                       // 抽牌有音效,不必再講
     const id = UN.moveCard(mv);
     if(id < 0) return;
     const k = UN.kindOf(id);
-    if(UN.isWildK(k)){
-      showToast(nm + " 出了 " + UN.nameOf(id) + ",指定 " + (UN.COL_NAME[st.col] || "") + " 色" +
-                (st.pend > 0 ? (" —— 累積罰抽 " + st.pend + " 張") : ""), 2000);
-    }else if(k === UN.K_D2){
-      showToast(nm + " 出了 +2 —— 累積罰抽 " + st.pend + " 張", 1800);
-    }else if(k === UN.K_SKIP){
-      showToast(nm + " 跳過了下一家", 1400);
-    }else if(k === UN.K_REV){
-      showToast(nm + " 迴轉" + (seats === 2 ? "(2 人局等同跳過)" : ""), 1400);
-    }
-    if(UN.moveDeclared(mv)) showToast(nm + " 喊了 UNO!", 1600);
-    if(!st.hands[seat].length) showToast(nm + " 把牌出完了", 1600);
+    const col = UN.COL_NAME[st.col] || "";
+    if(k === UN.K_W4) showToast(nm + " 出 +4,換 " + col + " 色", 1600);
+    else if(k === UN.K_WILD) showToast(nm + " 換 " + col + " 色", 1400);
+    else if(k === UN.K_D2) showToast(nm + " 出 +2", 1400);
   }
 
   /* ---------- 結算 ---------- */

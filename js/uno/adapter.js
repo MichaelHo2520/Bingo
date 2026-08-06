@@ -163,7 +163,7 @@ const MP = MPCore.create((function(){
     if(st.hands[me].indexOf(card) < 0) return;
     /* ★★ 沒亮的牌不給出,但**一定要說得出原因** ——
        CLAUDE.md 的紅線是「不用 disabled 讓牌**靜默**吃掉點擊」。 */
-    if(!UN.legalOn(st, card)){ showToast(whyNot(card), 2200); return; }
+    if(!UN.legalOn(st, card)){ showToast(whyNot(card), 1800); return; }
     if(UN.isWild(card)){
       pendWild = card;
       paint();
@@ -172,7 +172,7 @@ const MP = MPCore.create((function(){
         pendWild = -1;                        // ★ 一定要先清 —— 它是「手牌能不能點」的閘門
         if(c < 0 || !playing()){ paint(); return; }
         // ★ col < 0 = 取消(按了返回鍵 / 點了蓋板外框)→ 那一手 Wild 不算,牌回到手上
-        if(col < 0){ showToast("取消了 —— 那張 Wild 還在你手上", 1600); paint(); return; }
+        if(col < 0){ showToast("取消了", 1200); paint(); return; }
         send(UN.encPlay(c, col, unoArmed && st.hands[mySeat()].length === 2));
         unoArmed = false;
         paint();
@@ -186,16 +186,14 @@ const MP = MPCore.create((function(){
   /* 為什麼這張出不了 —— ⚠ 與單機那支(solo.js 的 whyNot)逐字一樣 */
   function whyNot(card){
     if(st.pend > 0){
-      if(!st.rules.stack) return "你頭上有 " + st.pend + " 張罰抽,這一版不能疊 —— 只能按「抽一張」";
+      if(!st.rules.stack) return "被罰抽 " + st.pend + " 張 —— 只能抽";
       /* ★ 手上如果還有別的同種牌能疊,強制出牌就輪到那一條 —— 不能靠抽來吃掉罰抽。 */
       return UN.canPlay(st.hands[mySeat()], st)
-        ? ("你頭上有 " + st.pend + " 張罰抽 —— 手上有能疊的 " +
-           (st.pendK === UN.K_W4 ? "+4" : "+2") + ",要出那張,不能抽")
-        : ("你頭上有 " + st.pend + " 張罰抽,手上沒有同種牌能疊 —— 只能按「抽一張」把它吃下來");
+        ? ("要用 " + (st.pendK === UN.K_W4 ? "+4" : "+2") + " 疊上去")
+        : ("疊不上 —— 只能抽 " + st.pend + " 張");
     }
-    if(st.drew) return "你剛抽了 " + UN.nameOf(st.drewCard) + " —— 這一手只能出那一張,或按「不出了」";
-    const c = UN.COL_NAME[st.col] || "";
-    return "出不了 —— 要跟桌上一樣是 " + c + " 色,或同一個數字 / 同一種動作,或出 Wild";
+    if(st.drew) return "只能出剛抽到的那張";
+    return "要出 " + (UN.COL_NAME[st.col] || "") + " 色、同數字,或 Wild";
   }
 
   function act(a){
@@ -205,7 +203,7 @@ const MP = MPCore.create((function(){
     if(!isMyTurn()){ showToast("還沒輪到你"); return; }
     const me = mySeat();
     if(a === "uno"){
-      if(st.hands[me].length !== 2){ showToast("只有剩兩張、要出到剩一張時才用得到", 2000); return; }
+      if(st.hands[me].length !== 2){ showToast("剩兩張時才用得到", 1500); return; }
       unoArmed = !unoArmed;
       if(unoArmed) UNB.sfx.uno();
       paint();
@@ -213,12 +211,12 @@ const MP = MPCore.create((function(){
     }
     if(a === "draw"){
       /* ⚠ 與單機那支(solo.js 的 act)**逐字一樣**:手上有合法牌可出時不准抽。 */
-      if(UN.canPlay(st.hands[me], st)){ showToast("手上還有牌可以出 —— 要先出牌,不能抽", 2200); return; }
+      if(UN.canPlay(st.hands[me], st)){ showToast("有牌可以出,不能抽", 1600); return; }
       send(UN.DRAW);
       return;
     }
     if(a === "pass"){
-      if(!st.drew){ showToast("要先抽一張才有「不出了」"); return; }
+      if(!st.drew){ showToast("先抽一張"); return; }
       send(UN.PASS);
       return;
     }
@@ -228,7 +226,7 @@ const MP = MPCore.create((function(){
   function doCatch(){
     if(!st || !st.rules.unoCall || !playing()) return;
     const me = mySeat(), t = st.catchSeat;
-    if(t < 0 || t === me){ showToast("現在沒有人可以抓"); return; }
+    if(t < 0 || t === me){ showToast("沒人可以抓"); return; }
     send(UN.encCatch(me, t));
   }
 

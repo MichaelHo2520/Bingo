@@ -669,7 +669,15 @@ const MPCore = (function(){
         else Sound.lose();
       }
       renderScoreboard();
-      showResult();
+      /* ★★ 正在偷看牌桌時**不要把結果卡叫回來**(v1.108.0)。
+         showOutcome() 會被 players / scores 的任何變動叫起來(別人按「我看完了」、
+         有人改名、分數同步…),而它以前一律 showResult() —— 使用者按了「看牌」正在
+         研究牌桌,畫面卻**自己跳回結算畫面**:「我按返回去看牌,然後突然跳回來結算畫面」。
+         ⚠ 卡片的內容(大字 / 訊息 / 台數表)上面幾行照樣更新了,所以按「🏆 看結果」
+           回來看到的是最新的一份 —— 這裡只是不搶畫面。
+         ⚠ 換局是安全的:新的一局 winner 被清掉 → 核心走 closeWin(),那一支會把
+           peeking 一起拿掉(見 ui-kit.js)。 */
+      if(!document.body.classList.contains("peeking")) showResult();
       const firstShow=!outcomeShown;
       outcomeShown=true;
       /* 本局結束就把自己設為未準備(下一局要各自重新按準備)。

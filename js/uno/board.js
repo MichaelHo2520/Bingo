@@ -117,10 +117,15 @@ const UNB = (function(){
      三、牌桌中央
      ──────────────────────────────────────────────────────────────────────────
        畫四件事,而它們都是**公開資訊**:
-         牌堆(剩幾張)· 牌河最上面那張 · **現在的有效顏色** · 方向 + 累積罰抽
+         牌河最上面那張 · **現在的有效顏色** · 方向 · 累積罰抽 · 牌堆還剩幾張
        ★★ 「現在的有效顏色」一定要**獨立畫一塊**,不可以只靠那張牌的顏色 ——
           Wild 打出去之後桌上那張是黑的,顏色只存在 st.col 裡。
           漏了它玩家會完全不知道現在該出什麼色(這是最容易漏的一格)。
+       ★★ 牌堆**不畫牌背**(v1.108.0):桌上唯一該有的一張牌是牌河最上面那張 ——
+          它才是「我可以接什麼」的答案。旁邊再擺一張永遠一樣的牌背,眼睛得先分辨
+          「哪一張是要看的」,而它能提供的資訊只有一個數字。所以收成右上角一行字
+          (仍然是 #unDraw,點得動這件事沒變)。同理**牌河剩幾張不再顯示** ——
+          那是只有寫程式的人會在意的數字。
      ========================================================================== */
   function tableHTML(o){
     const colTxt = (o.col >= 0 && o.col < 4) ? UN.COL_NAME[o.col] : "—";
@@ -132,21 +137,12 @@ const UNB = (function(){
        禁令列的是麻將與撲克牌那兩段,但「這個字型有沒有」的問題對任何字元都成立,
        所以能挑常見的就挑常見的)。牌面上的 ⊘ / ⇄ 由截圖驗過。 */
     const dirTxt = o.dir > 0 ? "順向 ▸" : "逆向 ◂";
-    const pen = o.pend > 0
-      ? '<div class="un-pen">累積罰抽 <b>' + o.pend + '</b> 張' +
-        (o.stack ? "(疊得上就疊,不然只能抽)" : "") + '</div>'
-      : "";
+    /* ★ 短到一眼看完 —— 「疊得上就疊,不然只能抽」那半句改成點牌時才講(whyNot)。 */
+    const pen = o.pend > 0 ? '<div class="un-pen">罰抽 <b>' + o.pend + '</b> 張</div>' : "";
     return '<div class="un-table">' +
-             '<div class="un-piles">' +
-               '<button class="un-pile" id="unDraw" type="button" aria-label="抽一張牌">' +
-                 backHTML() +
-                 '<span class="un-pn">牌堆 ' + o.pileLeft + '</span>' +
-               '</button>' +
-               '<div class="un-top">' +
-                 (o.top >= 0 ? cardHTML(o.top, "big") : "") +
-                 '<span class="un-pn">牌河 ' + o.discLeft + '</span>' +
-               '</div>' +
-             '</div>' +
+             '<button class="un-deck" id="unDraw" type="button" aria-label="牌堆還有 ' +
+               o.pileLeft + ' 張">牌堆 <b>' + o.pileLeft + '</b></button>' +
+             '<div class="un-top">' + (o.top >= 0 ? cardHTML(o.top, "big") : "") + '</div>' +
              '<div class="un-now">' +
                '<span class="un-swatch ' + colCls + '" aria-hidden="true"></span>' +
                '<span class="un-nowtxt">現在顏色 <b>' + colTxt + '</b></span>' +
@@ -160,6 +156,8 @@ const UNB = (function(){
      ──────────────────────────────────────────────────────────────────────────
        o = { hand, top, col, dir, pend, stack, pileLeft, discLeft,
              mine, over, turnName, hot(可出的 id 陣列), drew, drewCard, key }
+       ※ stack / discLeft / drewCard 現在畫面上用不到(v1.108.0 精簡掉那三句話),
+         但兩個呼叫端照樣傳 —— 少傳等於下次要用時得改三個檔。
        ★ hot 由呼叫端算好傳進來(UN.playable)—— 盤面不自己算規則。
      ========================================================================== */
   let stage = null;
@@ -179,9 +177,9 @@ const UNB = (function(){
     box.innerHTML =
       tableHTML(o) +
       '<div class="un-handwrap">' +
-        '<div class="un-hlabel">你的手牌 <b>' + hand.length + '</b> 張' +
-          (o.drew && o.drewCard >= 0 ? '<span class="un-drewtag">剛抽到 ' + esc(UN.nameOf(o.drewCard)) + ' —— 只能出這張</span>' : '') +
-        '</div>' +
+        /* ★ 「剛抽到的那張只能出它」不寫在這裡(v1.108.0):亮起來的就只有那一張,
+           畫面已經說完了;文字版留在動作列那一行(而且那一行是固定高度的)。 */
+        '<div class="un-hlabel">你的手牌 <b>' + hand.length + '</b> 張</div>' +
         '<div class="un-hand" id="unHand">' + cards + '</div>' +
       '</div>';
   }
@@ -194,43 +192,53 @@ const UNB = (function(){
              cdMs, cdEnd }
        ★★ 手上有合法牌可出時**不准抽**(強制出牌,見 rules.js 的 doDraw)——
           所以「抽一張」鈕只在 noPlay 時才畫;不畫的時候唯一的動作就是點一張亮起來
-          的牌。牌桌中央那顆牌堆(#unDraw)仍然一直可以點,誤按由 hAct("draw") 那一側
-          的驗證跳 toast 講原因(不用 disabled 讓點擊靜默消失)。
+          的牌。牌桌右上角那行「牌堆 N」(#unDraw)仍然一直可以點,誤按由 hAct("draw")
+          那一側的驗證跳 toast 講原因(不用 disabled 讓點擊靜默消失)。
+       ★★★ 版型是**固定的兩列**(v1.108.0):鈕那一列 + 一行說明字。
+          兩件事一起解決:
+            · 高度不再隨內容變 → 上面的手牌與桌子不會被推得上上下下(見 styles.css)。
+            · 鈕上的 <small> 副標全部拿掉、說明字縮成半句 —— 原本一顆 UNO! 鈕上就掛著
+              「先按這裡再出牌,不然會被抓」,那是說明書不是遊戲。
      ========================================================================== */
   function renderActs(o){
     const box = $("unActs");
     if(!box) return;
     if(o.over){ box.classList.add("hidden"); box.innerHTML = ""; return; }
-    let h = "";
+    let btn = "", txt = "", cls = "";
 
     /* ★★ 抓鈕**不分回合**(視窗是「下一家出手之前」,不是「輪到我」)——
        所以它排在最前面,而且不管 mine 是什麼都要畫。 */
     if(o.catchName){
-      h += '<button class="btn danger un-catch" id="unCatch" type="button">' +
-             '抓!<small>' + esc(o.catchName) + ' 沒喊 UNO</small></button>';
+      btn += '<button class="btn danger un-catch" id="unCatch" type="button">抓 ' +
+               esc(o.catchName) + '!</button>';
     }
 
     if(!o.mine){
-      h += '<div class="un-wait">等 <b>' + esc(o.turnName || "") + '</b> 出牌…</div>';
+      txt = "輪到 " + esc(o.turnName || "") + "…";
     }else{
+      cls = " me";
       /* ★ UNO! 是**出牌前先按下的切換**,不是出牌後補按的 ——
          宣告與出牌必須是同一手(見 rules.js 第五節:不然會與下一家的出牌競態)。
          ⚠ 只有「手上剛好 2 張」才出現:此時出一張就剩一張。 */
-      if(o.unoRule && o.handLen === 2){
-        h += '<button class="btn un-unobtn' + (o.unoOn ? " on" : "") + '" id="unUno" type="button">' +
-               'UNO!<small>' + (o.unoOn ? "出牌時會一起喊" : "先按這裡再出牌,不然會被抓") + '</small></button>';
+      const unoNow = !!(o.unoRule && o.handLen === 2);
+      if(unoNow){
+        btn += '<button class="btn un-unobtn' + (o.unoOn ? " on" : "") +
+                 '" id="unUno" type="button">UNO!</button>';
       }
       if(o.drew){
-        h += '<button class="btn ghost" id="unPass" type="button">不出了 ▸</button>';
+        btn += '<button class="btn ghost" id="unPass" type="button">不出了</button>';
+        txt = "可以出剛抽到的那張";
       }else if(o.noPlay){
-        h += '<button class="btn primary" id="unDrawBtn" type="button">抽一張<small>沒有牌可出</small></button>';
+        btn += '<button class="btn primary" id="unDrawBtn" type="button">抽一張</button>';
+        txt = "沒有牌可以出";
+      }else{
+        txt = "輪到你,點一張亮的牌";
       }
-      h += '<div class="un-hint">' +
-             (o.drew ? "抽到的那張可以出,也可以不出"
-                     : (o.noPlay ? "手上沒有出得了的牌 —— 抽一張" : "手上有牌可以出 —— 點一張亮起來的牌就出牌"))
-           + '</div>';
+      // UNO! 那顆鈕沒有副標了 → 它要幹嘛只講在這一行(而且只在該按的那一刻講)
+      if(unoNow) txt = o.unoOn ? "好,出牌時會喊 UNO" : "出這張前先按 UNO!";
     }
-    box.innerHTML = h;
+    box.innerHTML = '<div class="un-arow">' + btn + '</div>' +
+                    '<div class="un-atxt' + cls + '">' + txt + '</div>';
     box.classList.remove("hidden");
     if(o.cdMs > 0) startCd(o.cdEnd, o.cdMs);
     else stopCd();
@@ -360,7 +368,7 @@ const UNB = (function(){
         const seat = +s;
         const nm = (o.names && o.names[seat]) || ("玩家" + (seat + 1));
         sfx.uno();
-        if(window.showToast) showToast((seat === o.me ? "你" : nm) + " 只剩一張牌了!", 1800);
+        if(window.showToast) showToast((seat === o.me ? "你" : nm) + " 剩一張牌!", 1500);
       });
       unoPrev = now;
     }

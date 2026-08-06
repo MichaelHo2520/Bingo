@@ -390,7 +390,8 @@ const Solo = (function(){
         h += '<div class="mp-chip'+(isTurn?" turn":"")+(s===ME?" me":"")+'">'+
              '<span class="m16-seat p'+s+'"></span>'+
              (st?'<span class="m16-cw">'+windGlyph(s)+'</span>':"")+
-             (st && s===st.dealer?'<span class="m16-dz">莊</span>':"")+
+             // ★ 連莊記號跟著莊家記號走(v1.108.0),三個地方共用 M16B.lianHTML()
+             (st && s===st.dealer?'<span class="m16-dz">莊</span>'+M16B.lianHTML(st.dealerStreak):"")+
              '<span class="gmk-nm">'+esc(seatName(s))+'</span>'+
              (s===ME?'<span class="you-badge">你</span>':"")+
              '<span class="m16-pts'+(t<0?" neg":"")+'">'+(t>0?"+":"")+t+'<em>台</em></span>'+
