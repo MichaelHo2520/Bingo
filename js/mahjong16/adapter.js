@@ -265,9 +265,10 @@ const MP = MPCore.create((function(){
   }
 
   /* ---------- 動作列 ---------- */
-  /* ⚠ 清空但**留下倒數環**(見 ensureCd 的註解) */
+  /* ⚠ 清空但**留下倒數環與宣告面板**(兩個都是持久節點:環是為了動畫不重跑
+       —— 見 ensureCd 的註解;面板是為了進場動畫只播一次 —— 見 board.js 那一節)。 */
   function clearActs(box){
-    [...box.children].forEach(el=>{ if(el!==cdEl) el.remove(); });
+    [...box.children].forEach(el=>{ if(el!==cdEl && !M16B.isClaim(el)) el.remove(); });
   }
   /* 離房 / 回大廳:整條收掉,倒數環也一起丟。
      ⚠ cdEl 一定要跟著設回 null —— 只清 innerHTML 的話 cdEl 會指著一個已經脫離文件的
@@ -275,6 +276,10 @@ const MP = MPCore.create((function(){
   function wipeActs(){
     stopCd(); cdEl = null;
     const a = $("m16Acts"); if(!a) return;
+    /* ⚠ 宣告面板也在這一列裡(v1.111.0):innerHTML 清掉它本身是對的(board.js 會
+       在需要時重建),但 m16-hush 這個 class 一定要跟著拿掉 —— 留著的話下次進房
+       那顆倒數環會用上一局的 --m16cb 飄在盤面中央。 */
+    a.classList.remove("m16-hush");
     a.classList.add("hidden"); a.innerHTML = "";
   }
   function actBtn(label, cls, fn){
@@ -311,22 +316,33 @@ const MP = MPCore.create((function(){
     /* 環在**這裡統一決定**(syncCd 只看 state / myBid,不看動作列畫了什麼)——
        擺在所有 return 之前,才不會有哪一條路徑忘了收環或忘了接上。 */
     syncCd();
+    /* ★★ 「我自己正在決定要不要吃碰槓胡」(v1.111.0)—— 這一個布林值決定**盤面中間
+       那塊面板**在不在,所以它要算在所有 return 之前(每一條路徑都得把面板收掉)。
+       ⚠ 但**不可以**無條件先 hideClaim() 再 claimPanel():hideClaim 會清掉內容,
+         而「從關到開」那一次要播進場動畫 → 每次重畫都會閃一下(board.js 紅線②)。 */
+    const meNow = mySeat();
+    const iDecide = !!(st && !st.over && ctx.phase()==="playing" && meNow>=0 &&
+                       st.claim && st.claim.elig[meNow] && !st.claim.bids[meNow] && !myBid);
+    if(!iDecide) M16B.hideClaim(box);
     if(!st || st.over || ctx.phase()!=="playing"){ box.classList.add("hidden"); return; }
-    const me = mySeat();
+    const me = meNow;
     if(me<0){ box.classList.add("hidden"); return; }
     box.classList.remove("hidden");
 
-    /* ★ 聽牌那一排(v1.66.0):**一律先插**,只跳過「我自己正在決定要不要吃碰」那一格
-       (那時動作列有 ✔ / 胡 / 過 三顆鈕,再多一排會換行 → 動作列長高 → 整副牌縮一次)。
-       ⚠ 條件刻意與 st.claim **無關** —— 見 appendReady 的註解那條第 6 管道。 */
-    const iDecide = !!(st.claim && st.claim.elig[me] && !st.claim.bids[me] && !myBid);
-    if(!iDecide) appendReady(box, me);
+    /* ★ 聽牌那一排(v1.66.0):**一律插**。
+       ⚠ 條件刻意與 st.claim **無關** —— 見 appendReady 的註解那條第 6 管道。
+       ★ v1.111.0 起連「我正在決定吃碰」那一格也插:當年跳過它是怕跟 ✔ / 胡 / 過
+         三顆鈕擠成兩行(動作列長高 → 整副牌縮一次),而那三顆鈕已經搬到中間的面板了。 */
+    appendReady(box, me);
 
     /* --- 宣告視窗 ----------------------------------------------------------
        ★ v1.58.2:吃 / 碰 / 槓**不再各出一顆按鈕** —— 選哪一組是在牌上點的(見 board.js
-         檔頭)。這裡只留三顆:✔ 送出目前這一組、胡!、過。
-       ★「過」永遠在最後、永遠在,而且是整列最容易命中的位置 —— 使用者要求「要放棄的話
-         也要有一個比較容易看到的」。 */
+         檔頭)。只留三顆:✔ 送出目前這一組、胡!、過。
+       ★★ v1.111.0:那三顆鈕**搬到盤面中間的面板**(M16B.claimPanel)——
+         使用者:「大家都反應在最下面很不明顯」。底下這一列因此對「當事人」與
+         「非當事人」寫的字**完全一樣**(turnText),牌情那條紅線又牢一分:
+         v1.65.0 統一的是兩句話,現在連「有沒有按鈕」都統一了。
+       ★「過」永遠在最後、永遠在 —— 使用者要求「要放棄的話也要有一個比較容易看到的」。 */
     if(st.claim){
       const types = st.claim.elig[me];
       /* ★★ 不是我在決定的時候,這裡**一個字都不能提吃碰**(v1.59.0)。
@@ -341,7 +357,7 @@ const MP = MPCore.create((function(){
          ⚠ 藏不掉的殘留管道只剩一條:**下一家的張數**(宣告視窗中他還沒摸牌 → 16 張,
            沒人宣告時他早就摸到 → 17 張)。刻意不假造 —— 顯示 17 之後若有人碰,那家
            會從 17 掉回 16,反而是更明顯的破綻;而張數要主動去數才看得出來。 */
-      if(!types || st.claim.bids[me] || myBid){
+      if(!iDecide){
         const tag = document.createElement("span");
         tag.className = "m16-timer";
         /* 「已表態」只回給**按過的那個人自己**(他早就知道自己有資格、剛按了什麼),
@@ -352,27 +368,25 @@ const MP = MPCore.create((function(){
         box.appendChild(tag);
         return;
       }
+      /* ★ 底下這一列寫的字與非當事人**逐字相同**(見上面那條紅線);
+         要決定的三顆鈕、那張牌與倒數,全部在中間的面板上。 */
       const tag = document.createElement("span");
       tag.className = "m16-timer";
-      tag.textContent = "別人打「"+face(st.claim.t).name+"」";
+      tag.textContent = turnText(dispTurn());
       box.appendChild(tag);
 
       const co  = M16B.claimOpts();
       const cur = M16B.claimCur();
-      if(cur){
-        const lbl = { chow:"吃", pong:"碰", kong:"槓" }[cur.type] || cur.type;
-        const b = actBtn("✔ "+lbl+" "+cur.tiles.map(t=>face(t).name).join(""), "take",
-                         ()=>sendBid(cur.type, cur.type==="chow" ? cur.tiles : null));
-        box.appendChild(b);
-        if(co.length>1){
-          const n = document.createElement("span");
-          n.className = "m16-timer m16-more";
-          n.textContent = (co.indexOf(cur)+1)+" / "+co.length+" · 點手牌換一組";
-          box.appendChild(n);
-        }
-      }
-      if(types.indexOf("win")>=0) box.appendChild(actBtn("胡!", "win", ()=>sendBid("win", null)));
-      box.appendChild(actBtn("過", "pass", ()=>sendBid("pass", null)));
+      M16B.claimPanel(box, {
+        tile: st.claim.t,
+        who: nameOfSeat(st.claim.from),           // 誰打的是公開資訊(牌河上就看得到)
+        opts: co,
+        cur: cur,
+        canWin: types.indexOf("win")>=0,
+        onTake: ()=>{ if(cur) sendBid(cur.type, cur.type==="chow" ? cur.tiles : null); },
+        onWin: ()=>sendBid("win", null),
+        onPass: ()=>sendBid("pass", null)
+      });
       return;
     }
 
@@ -406,7 +420,11 @@ const MP = MPCore.create((function(){
        所以要在「我還在想這一手怎麼打」的視線裡。 */
     if(MJT.canDeclareTing(st, me))
       box.appendChild(actBtn("宣告聽牌", "ting", ()=>{ M16B.setTingPick(true); renderActs(); }));
-    if(a.discard && !box.children.length){
+    /* ⚠ 判準是「這一列有沒有**按鈕**」,不是「空不空」——
+       這一列常駐兩個非按鈕的子元素(倒數環、宣告面板)加上聽牌那一排,
+       用 children.length 的話這句操作提示永遠不會出現。
+       (solo.js 的 paintActs() v1.66.0 就改成問 .m16-act 了,這邊漏了同步。) */
+    if(a.discard && !box.querySelector(".m16-act")){
       const tag = document.createElement("span");
       tag.className = "m16-timer";
       // 一段式 / 兩段式看裝置,只有盤面知道 → 提示文字跟它要

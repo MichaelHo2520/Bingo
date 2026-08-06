@@ -461,6 +461,165 @@ const M16B = (function(){
   }
 
   /* ==========================================================================
+     ★★ 宣告面板 —— 吃 / 碰 / 槓 / 胡 **跳在盤面中間**(v1.111.0)
+     ──────────────────────────────────────────────────────────────────────────
+     使用者:「如果今天可以吃碰槓胡,可以改成跳出在中間,但要帥氣一點然後決定,
+     大家都反應在最下面很不明顯」。舊版三顆鈕住在畫面最底那條 .m16-acts 裡 ——
+     那一列平常寫的是「輪到 ○○…」,眼睛早就學會不看它了,而吃碰只有幾秒。
+
+     ★ 這一份是**單機與連線共用**的(同 readyHTML / rankHTML 那幾支)——
+       兩邊的 renderActs() / paintActs() 各自呼叫,面板本身只有一份。
+
+     ★★★ 四條紅線,少一條就會壞掉:
+
+     ① **面板是 `#m16Acts` 的子元素,而且 position:absolute。**
+        · 子元素 → e2e 那一整批 `#m16Acts .m16-act.pass` 的後代選擇器照樣命中
+          (搬到 .mj-play 底下就要改十幾條斷言,而那些斷言本身沒有錯)。
+        · absolute → **完全不進 flex 流**,動作列的高度一個像素都不變。
+          動作列一長高盤面就矮一點、整副牌跟著縮一次(檔頭③那條紅線);
+          面板有一百多 px 高,放進流裡等於每次有人打牌都把牌縮一級。
+        · 定位基準是 `.mj-play`(styles.css 給它 position:relative)——
+          不是盤面 `.m16-stage`:那是 overflow-y:auto 的捲動容器,面板會被裁掉一角。
+
+     ② **面板是持久節點,但一律從 DOM 找回來,不可以拿模組變數快取。**
+        離房 / 回選單走的是 `box.innerHTML = ""`(adapter 的 wipeActs / solo 的 quit),
+        面板會連同倒數環一起被丟掉 —— 快取住的話下次進房那顆面板永遠不再出現
+        (adapter 的 cdEl 就是這樣踩過一次,見那邊的註解)。
+        持久是為了**進場動畫只播一次**:renderActs() 在宣告視窗開著的幾秒內會被叫
+        很多次(別人表態、我切換吃法、ResizeObserver),每次重建就是每次重播 = 閃爍。
+
+     ③ **關掉的時候一定要清掉 body 的內容**,不可以只加 .hidden ——
+        「視窗關掉之後吃碰 / 過的按鈕都收掉了」是 e2e 真的在驗的一條,
+        而 querySelector 找得到隱藏起來的按鈕。清空同時也是防誤按的最後一道。
+
+     ④ **`--m16cb` 是「面板底邊離 .mj-play 底部多遠」**,由 placeClaim() 每次算:
+        目標是**貼在手牌上緣之上 8px** —— 面板不可以蓋住手牌,因為「換一組吃法」
+        是點手牌完成的(見上面 cycleTo)。蓋住牌河沒關係:別人打的那張牌
+        本來就放大畫在面板上了。
+        ⚠ 倒數環(.m16-cd)在宣告期間也吃這個變數飛到面板下緣 —— 見 styles.css
+          的 .m16-acts.m16-hush;**環的 DOM 一個字都不准動**(移動節點 = CSS 動畫
+          重跑 = 倒數彈回滿格,adapter 的 ensureCd() 整段都在講這件事)。
+     ========================================================================== */
+  const CLAIM_TW = 42;            // 面板上那張「別人打出來的牌」有多寬(自繪)
+  const CLAIM_TW_LAND = 30;       // 橫向手機:盤面只有 ~161px 高,牌與按鈕都收一號
+
+  function panelOf(box){ return box ? box.querySelector(".m16-claim") : null; }
+
+  /* 收掉面板。★ 冪等 —— 已經關著就什麼都不做(否則每次 renderActs 都會重播進場動畫)。 */
+  function hideClaim(box){
+    if(box) box.classList.remove("m16-hush");
+    const p = panelOf(box);
+    if(!p || p.classList.contains("hidden")) return;
+    p.classList.add("hidden");
+    p.classList.remove("m16-in");
+    const b = p.querySelector(".m16-cbd");
+    if(b) b.innerHTML = "";                              // 見紅線③
+  }
+
+  /* 面板該擺在哪(見紅線④)。⚠ 一定要在面板已經可見之後才叫 —— offsetHeight 要量得到。
+     ★ 同時把面板高度寫成 --m16ch:倒數環要靠它貼到**面板上緣**(styles.css 的 m16-hush)。
+       ⚠ 環刻意不貼下緣:下緣外面就是手牌,那 34px 會壓在手牌最上面一排 ——
+         而宣告的時候手牌正是要點的東西(換一組吃法)。上緣外面是牌河,點它沒有任何作用。 */
+  function placeClaim(box, p){
+    const par = p.offsetParent;
+    if(!box || !par) return;
+    const pr = par.getBoundingClientRect();
+    const ph = p.offsetHeight || 120;
+    let bottom = Math.round(pr.height * 0.36);           // 量不到手牌時的退路
+    const hand = host && host.querySelector(".m16-hand");
+    if(hand){
+      const hr = hand.getBoundingClientRect();
+      bottom = pr.bottom - hr.top + 10;                  // 貼在手牌上緣之上
+    }
+    /* 夾在容器裡:太高會衝出盤面上緣(橫向手機盤面只有 ~161px),太低會壓到動作列那行字。 */
+    bottom = Math.max(6, Math.min(bottom, Math.max(6, pr.height - ph - 4)));
+    box.style.setProperty("--m16cb", Math.round(bottom) + "px");
+    box.style.setProperty("--m16ch", Math.round(ph) + "px");
+  }
+
+  /* 畫 / 更新面板。info:
+       { tile, who, opts, cur, canWin, onTake, onWin, onPass }
+     ⚠ 按鈕一律用 createElement + addEventListener(不是 innerHTML 拼字串):
+       名字與牌名都是使用者資料,拼進 HTML 就要自己記得 esc。 */
+  function claimPanel(box, info){
+    if(!box || !info) return;
+    let p = panelOf(box);
+    if(!p){
+      p = document.createElement("div");
+      p.className = "m16-claim hidden";
+      p.setAttribute("role", "group");
+      p.setAttribute("aria-label", "吃碰槓胡");
+      p.innerHTML = '<div class="m16-cbd"></div>';
+      box.appendChild(p);
+    }
+    const b = p.querySelector(".m16-cbd");
+    if(!b) return;
+    const fresh = p.classList.contains("hidden");        // 這一次是「跳出來」還是「更新內容」
+    b.innerHTML = "";
+
+    /* --- 標頭:誰打出了什麼(兩者都是公開資訊 —— 牌河上本來就看得到) --- */
+    const hd = document.createElement("div");
+    hd.className = "m16-chd";
+    const tw = landscape() ? CLAIM_TW_LAND : CLAIM_TW;
+    if(F && R && typeof info.tile === "number")
+      hd.innerHTML = '<span class="m16-cbig" style="--m16w:'+tw+'px">'+
+                     tileHTML(codeOf(info.tile), "m16-ct")+'</span>';
+    const wt = document.createElement("b");
+    wt.textContent = (info.who || "別人") + " 打出";
+    hd.appendChild(wt);
+    b.appendChild(hd);
+
+    /* --- 三顆鈕:✔ 送出目前這一組 / 胡! / 過 -----------------------------------
+       ★ 順序與底下那一列**完全一樣**(✔ → 胡 → 過),「過」永遠在最後、永遠在。
+       ★ 「胡!」刻意最顯眼(金色 + 脈動):它最少見、最不能錯過,而且不吃特定手牌。 */
+    const row = document.createElement("div");
+    row.className = "m16-crow";
+    /* html 是**自己產生的**(固定的字 + tileHTML),沒有任何使用者資料 —— 名字那一格
+       走的是上面的 textContent。⚠ 要在這裡加任何外來字串之前,先想清楚 esc。 */
+    const mk = (html, cls, fn) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "m16-act" + (cls ? " " + cls : "");
+      btn.innerHTML = html;
+      btn.addEventListener("click", fn);
+      row.appendChild(btn);
+    };
+    const cur = info.cur;
+    if(cur){
+      const lbl = { chow:"吃", pong:"碰", kong:"槓" }[cur.type] || cur.type;
+      /* ★ 「碰哪兩張」給**牌面**不給牌名(v1.111.0)—— 同「已宣告聽牌」那一排的理由:
+         自繪牌面一開始就是為了這種地方,而「5萬5萬」四個字要在腦裡再翻譯一次。
+         ⚠ 20px 是 READY_TW 那條驗過的下限(16px 放大三倍認得出、原尺寸要瞇眼)。 */
+      const tiles = (F && R)
+        ? '<span class="m16-cmt" style="--m16w:'+READY_TW+'px">'+
+          cur.tiles.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+'</span>'
+        : cur.tiles.map(t=>F.info(codeOf(t)).name).join("");
+      mk("✔ " + lbl + tiles, "take", info.onTake || function(){});
+    }
+    if(info.canWin) mk("胡!", "win", info.onWin || function(){});
+    mk("過", "pass", info.onPass || function(){});
+    b.appendChild(row);
+
+    /* --- 還有別的吃法 → 說一次「點手牌換一組」(選擇在牌上,見上面 cycleTo) --- */
+    const co = info.opts || [];
+    if(co.length > 1 && cur){
+      const n = document.createElement("div");
+      n.className = "m16-more";
+      n.textContent = (co.indexOf(cur) + 1) + " / " + co.length + " · 點手牌換一組";
+      b.appendChild(n);
+    }
+
+    box.classList.add("m16-hush");                       // 倒數環跟著飛上來(見 styles.css)
+    p.classList.remove("hidden");
+    if(fresh){                                           // 只有真的「跳出來」那一次才播動畫
+      p.classList.remove("m16-in");
+      void p.offsetWidth;
+      p.classList.add("m16-in");
+    }
+    placeClaim(box, p);
+  }
+
+  /* ==========================================================================
      渲染
      ========================================================================== */
   function render(state, mySeat){
@@ -1269,6 +1428,11 @@ const M16B = (function(){
 
   return {
     mount, render, revealHTML, readyHTML, overWord, roleOf, rankHTML, lianHTML,
+    /* 宣告面板(v1.111.0,單機與連線共用一份)—— 呼叫規矩見那一節的四條紅線。
+       ⚠ 清動作列時要用 isClaim() 跳過它(同倒數環):它是持久節點,
+         每次重建就是每次重播進場動畫。兩邊的 clearActs / paintActs 各一行。 */
+    claimPanel, hideClaim,
+    isClaim(el){ return !!(el && el.classList && el.classList.contains("m16-claim")); },
     /* 只清「選取 / 宣告選項」那一組狀態。
        ⚠⚠ **不動牌寬的地板 fitTw**(v1.70.1,見檔頭⑤下面那條):這一支在
          「吃碰成立」「我表態完」也會被叫到,順手清掉地板就等於每次宣告結束

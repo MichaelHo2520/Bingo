@@ -163,8 +163,10 @@ const Solo = (function(){
     M16B.resetFit();                              // 離開牌桌:下次進來從頭量
     M16B.resetOrder();                            // 離開牌桌:下次進來回到照牌序(v1.82.0)
     closeWin();
+    /* ⚠ m16-hush 要跟著拿掉(v1.111.0):留著的話下次進來那顆倒數環(連線那邊)
+       會用上一場的 --m16cb 飄在盤面中央 —— 兩種模式共用同一條動作列。 */
     const box = $("m16Acts");
-    if(box){ box.classList.add("hidden"); box.innerHTML = ""; }
+    if(box){ box.classList.remove("m16-hush"); box.classList.add("hidden"); box.innerHTML = ""; }
     showScreen("home");
     showHomeLayer("solo");                        // 回到「單機」那一層,方便換難度再來
   }
@@ -436,7 +438,21 @@ const Solo = (function(){
   function paintActs(){
     const box = $("m16Acts");
     if(!box) return;
-    box.innerHTML = "";
+    /* ⚠ 清空但**留下宣告面板與倒數環**(v1.111.0):兩者都是持久節點 ——
+       面板重建一次就重播一次進場動畫,而 paintActs() 在宣告視窗開著的那幾秒會被叫
+       很多次(電腦表態、我切換吃法、ResizeObserver)。理由與呼叫規矩見 board.js 那一節。
+       ★ 單機**不會有**倒數環(那是連線為了「不能讓全房等一個人」才有的),留它是為了
+         與 adapter.js 的 clearActs() 語意一致 —— 而且 tools 的宣告面板截圖會塞一顆
+         替身環進來(gen-mj16-solo-e2e.js 的 ?claim=…&cd=1),不留就每次都被清掉。
+       ⚠ 這一支與 adapter.js 的 clearActs() 是**兩份**(grep m16Acts)。 */
+    [].slice.call(box.children).forEach(function(el){
+      if(!M16B.isClaim(el) && !el.classList.contains("m16-cd")) el.remove();
+    });
+    /* ★★ 「我自己正在決定要不要吃碰槓胡」—— 決定盤面中間那塊面板在不在。
+       ⚠ 不可以無條件先 hideClaim() 再 claimPanel()(會每次重播動畫,board.js 紅線②)。 */
+    const iDecide = !!(active && st && !st.over && st.claim &&
+                       st.claim.elig[ME] && !st.claim.bids[ME]);
+    if(!iDecide) M16B.hideClaim(box);
     if(!active || !st || st.over){ box.classList.add("hidden"); return; }
     box.classList.remove("hidden");
     const tag = function(txt){
@@ -446,11 +462,10 @@ const Solo = (function(){
       box.appendChild(el);
     };
 
-    /* ★ 聽牌那一排(v1.66.0):**一律先插**,只跳過「我自己正在決定要不要吃碰」那一格
-       (那時已經有 ✔ / 胡 / 過 三顆鈕,再多一排會換行 → 動作列長高 → 整副牌縮一次)。
+    /* ★ 聽牌那一排(v1.66.0):**一律插**(v1.111.0 起連宣告那一格也插 ——
+       當年跳過它是怕跟三顆鈕擠成兩行,而那三顆鈕已經搬到中間的面板了)。
        ⚠ 條件刻意與 st.claim **無關**,見 appendReady 的註解那條第 6 管道。 */
-    const iDecide = !!(st.claim && st.claim.elig[ME] && !st.claim.bids[ME]);
-    if(!iDecide) appendReady(box, ME);
+    appendReady(box, ME);
 
     /* --- 宣告視窗 --- */
     if(st.claim){
@@ -460,26 +475,26 @@ const Solo = (function(){
            兩句話不一樣,玩家照樣看得出「電腦在考慮要不要吃我這張」。單機更致命:
            就那兩三家,等於直接報牌。改成走 turnText(dispTurn()),兩種情況的字一模一樣。
            ⚠ 與 adapter.js 的 renderActs() 是**兩份**,改一邊要看另一邊(grep dispTurn)。 */
-      if(!types || st.claim.bids[ME]){
+      if(!iDecide){
         tag(st.claim.bids[ME] ? "已表態,等其他人…" : turnText(dispTurn()));
         return;
       }
-      tag("別人打「" + face(st.claim.t).name + "」");
+      /* ★★ v1.111.0:吃 / 碰 / 槓 / 胡 / 過**跳在盤面中間**(M16B.claimPanel,與連線
+         共用同一份面板)—— 使用者:「大家都反應在最下面很不明顯」。
+         ⚠ 底下這一列因此與非當事人**逐字相同**(turnText),牌情那條又牢一分。 */
+      tag(turnText(dispTurn()));
       const co = M16B.claimOpts();
       const cur = M16B.claimCur();
-      if(cur){
-        const lbl = { chow:"吃", pong:"碰", kong:"槓" }[cur.type] || cur.type;
-        box.appendChild(actBtn("✔ " + lbl + " " + cur.tiles.map(function(t){ return face(t).name; }).join(""),
-          "take", function(){ humanBid(cur.type, cur.type === "chow" ? cur.tiles : null); }));
-        if(co.length > 1){
-          const n = document.createElement("span");
-          n.className = "m16-timer m16-more";
-          n.textContent = (co.indexOf(cur)+1) + " / " + co.length + " · 點手牌換一組";
-          box.appendChild(n);
-        }
-      }
-      if(types.indexOf("win") >= 0) box.appendChild(actBtn("胡!", "win", function(){ humanBid("win", null); }));
-      box.appendChild(actBtn("過", "pass", function(){ humanBid("pass", null); }));
+      M16B.claimPanel(box, {
+        tile: st.claim.t,
+        who: seatName(st.claim.from),          // 誰打的是公開資訊(牌河上就看得到)
+        opts: co,
+        cur: cur,
+        canWin: types.indexOf("win") >= 0,
+        onTake: function(){ if(cur) humanBid(cur.type, cur.type === "chow" ? cur.tiles : null); },
+        onWin:  function(){ humanBid("win", null); },
+        onPass: function(){ humanBid("pass", null); }
+      });
       return;
     }
 

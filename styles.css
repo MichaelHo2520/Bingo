@@ -2529,6 +2529,109 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
   .m16-cdn.m16-beat{animation:none}
 }
 
+/* ---------- ★★ 宣告面板:吃 / 碰 / 槓 / 胡 跳在盤面中間(v1.111.0) ----------
+   使用者:「如果今天可以吃碰槓胡,可以改成跳出在中間,但要帥氣一點然後決定,
+   大家都反應在最下面很不明顯」。三顆鈕原本住在畫面最底那條 .m16-acts 裡,而那一列
+   平常寫的是「輪到 ○○…」—— 眼睛早就學會不看它了,吃碰卻只有幾秒。
+
+   ★ 面板的 DOM 在 #m16Acts **裡面**(理由與四條紅線都在 js/mahjong16/board.js
+     那一節:e2e 的後代選擇器、進場動畫只播一次、離房清空後要重建、不可以蓋住手牌)。
+   ★★ position:absolute 是版面紅線:動作列一長高盤面就矮一點、整副牌跟著縮一次
+     (board.js 檔頭③)。面板有一百多 px 高,進了 flex 流等於每次有人打牌就縮一級。
+   ⚠ 定位基準是 .mj-play(下面那條 position:relative),**不是** .m16-stage ——
+     那是 overflow-y:auto 的捲動容器,面板會被裁掉一角(同拖曳中那條紅線)。
+   ⚠ --m16cb 由 board.js 的 placeClaim() 每次算(面板底邊離 .mj-play 底部多遠)。
+     這裡的 36% 只是「還沒量到手牌」的退路。 */
+body.m16-mp .mj-play,body.m16-solo .mj-play{position:relative}
+
+.m16-claim{position:absolute;left:50%;bottom:var(--m16cb,36%);z-index:6;
+  transform:translateX(-50%);
+  max-width:min(94vw,380px);
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  padding:12px 16px 13px;border-radius:20px;
+  background:linear-gradient(180deg,rgba(32,48,39,.95),rgba(10,18,14,.97));
+  backdrop-filter:blur(8px);
+  box-shadow:0 18px 40px rgba(0,0,0,.56),
+             0 0 0 1.5px rgba(255,255,255,.16),
+             inset 0 1px 0 rgba(255,255,255,.18),
+             0 0 30px -6px rgba(255,210,74,.3)}
+.m16-claim.hidden{display:none}
+/* 頂端那條金色細高光:比「整框發光」精緻得多,而且在小螢幕上仍然一眼看得到
+   「這是一塊跳出來的東西」。⚠ 純裝飾 → pointer-events:none(它蓋在面板上緣)。 */
+.m16-claim::before{content:"";position:absolute;left:16px;right:16px;top:0;height:1.5px;
+  border-radius:2px;pointer-events:none;
+  background:linear-gradient(90deg,rgba(255,210,74,0),rgba(255,210,74,.85),rgba(255,210,74,0))}
+/* 標頭:誰打出了什麼。兩者都是公開資訊(牌河上本來就看得到),所以放大不洩漏牌情。
+   ★ 給**牌**不給牌名 —— 自繪牌面一開始就是為了這種地方(同「已宣告聽牌」那一排)。 */
+.m16-chd{display:flex;align-items:center;gap:10px;
+  font:800 14.5px/1 'Nunito',sans-serif;color:var(--text)}
+.m16-chd b{font-weight:800;opacity:.92}
+.m16-cbig{flex:none;display:block}
+/* ✔ 那顆鈕裡的牌面(要碰 / 吃哪幾張)。20px 同「已宣告聽牌」那一排的下限。 */
+.m16-cmt{display:inline-flex;align-items:center;gap:2px}
+/* 紅框 = 「就是剛打出來的這一張」,與牌河最新那張 .m16-pt.last 同一組語彙。
+   ⚠ 用 outline 而不是 box-shadow:.m16-tile 的 box-shadow 已經在畫牌緣與側面厚度,
+     覆蓋掉就變成一張沒有立體感的平板。 */
+.m16-cbig .m16-ct{outline:2px solid var(--mj-jz);outline-offset:1px}
+.m16-crow{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+/* 面板上的按鈕比底下那一列大一號:這是「要在幾秒內按下去」的地方 */
+.m16-claim .m16-act{display:inline-flex;align-items:center;gap:6px;
+  padding:10px 16px;border-radius:13px;font-size:15.5px;
+  box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.m16-claim .m16-act:active{transform:translateY(2px) scale(.97);box-shadow:0 1px 0 rgba(0,0,0,.3)}
+/* 「胡!」最少見、最不能錯過 → 金色 + 脈動(全套唯一一顆會自己動的鈕)。
+   ⚠ 底色不用 --mj-jz(紅):那是「莊 / 最新那張牌」的顏色,而且紅底白字在小字級下
+     比金底深字難讀。琥珀 --accent-2 與連莊膠囊 .m16-lz 同一組。 */
+.m16-claim .m16-act.win{background:linear-gradient(180deg,var(--accent),var(--accent-2));
+  color:#2a1503;animation:m16chu 1.15s ease-in-out infinite}
+@keyframes m16chu{
+  0%,100%{box-shadow:0 3px 0 rgba(0,0,0,.3),0 0 0 0 rgba(251,191,36,.42)}
+  50%{box-shadow:0 3px 0 rgba(0,0,0,.3),0 0 17px 3px rgba(251,191,36,.42)}}
+.m16-claim .m16-more{opacity:.82;font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted)}
+/* 跳出來那一下(只播一次 —— 見 board.js 紅線②)。
+   ⚠ 每一格 keyframe 都要帶 translateX(-50%),不然彈跳過程中面板會往右偏半個身。 */
+.m16-claim.m16-in{animation:m16cin .3s cubic-bezier(.22,1.4,.4,1) both}
+@keyframes m16cin{
+  0%{transform:translateX(-50%) translateY(12px) scale(.84);opacity:0}
+  60%{transform:translateX(-50%) translateY(0) scale(1.04);opacity:1}
+  100%{transform:translateX(-50%) translateY(0) scale(1);opacity:1}}
+
+/* ★★ 面板開著的時候,倒數環也**飛到面板上緣**(半顆嵌在面板裡的計時徽章)——
+   決定與時間壓力要在同一個地方,不然人會漏看剩幾秒。
+   ⚠ 貼**上**緣不是下緣:下緣外面就是手牌,那 34px 會壓在最上面一排牌上,而宣告的時候
+     手牌正是要點的東西(換一組吃法)。上緣外面是牌河,點它沒有任何作用。
+     配套是 pointer-events:none —— 環從來不接受點擊,而它現在蓋在別的東西上面。
+   ⚠⚠ 環的 DOM **一個字都不准動**:移動節點 = CSS 動畫重跑 = 倒數彈回滿格
+     (js/mahjong16/adapter.js 的 ensureCd() 整段都在講這件事)。所以這裡只搬「位置」。
+   ⚠⚠ 一定要用 margin-left 對齊中線,**不可以用 transform** —— 最後 3 秒那顆
+     .m16-cd.m16-hot 的脈動動畫改的正是 transform,會把 translate 整個蓋掉(環當場偏右)。
+   ⚠ min-height:42px = 「環還在流裡」時這一列的實際高度(34px 環 + 上下 4px 內距)。
+     環一脫離流,這一列就只剩一行字 → 掉回 min-height:38 → **矮 4px = 整副牌縮一次**
+     (board.js 檔頭③)。橫向那段的內距只有 2px,所以那邊另外寫 38。 */
+.m16-acts.m16-hush{min-height:42px}
+.m16-acts.m16-hush .m16-cd{position:absolute;left:50%;margin-left:-17px;
+  bottom:calc(var(--m16cb,36%) + var(--m16ch,120px) - 17px);z-index:7;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(9,15,12,.94) 68%,rgba(9,15,12,0));
+  border-radius:50%}
+
+/* 純黑白主題:發光與金色都不存在 → 靠實框與反黑撐辨識度(同 .m16-wall 那一組的做法) */
+:root[data-theme="ebook"] .m16-claim{background:#fff;backdrop-filter:none;
+  box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 2px #000}
+:root[data-theme="ebook"] .m16-claim::before{display:none}
+:root[data-theme="ebook"] .m16-chd{color:#000}
+:root[data-theme="ebook"] .m16-claim .m16-act.win{background:#000;color:#fff;animation:none}
+:root[data-theme="ebook"] .m16-acts.m16-hush .m16-cd{background:#fff;box-shadow:0 0 0 1px #000}
+/* ⚠⚠ 「過」在 ebook 下**原本會整顆消失**(放大截圖才看出來):它的底是半透明白 +
+   半透明白內框,而這個主題的底色是純白 —— 白上白。而「過」正是最不能找不到的一顆
+   (使用者當初的要求就是「要放棄的話也要有一個比較容易看到的」)。
+   ★ 刻意寫成不帶 .m16-claim 的通則:底下那條動作列上的同一顆鈕有一樣的毛病。 */
+:root[data-theme="ebook"] .m16-act.pass{background:#fff;color:#000;box-shadow:inset 0 0 0 2px #000}
+
+@media (prefers-reduced-motion:reduce){
+  .m16-claim.m16-in{animation:none}
+  .m16-claim .m16-act.win{animation:none}
+}
+
 /* (v1.58.3:盤面頂端那條資訊列 .m16-bar / .m16-chip 整組拿掉了 ——
     「可吃 / 不可吃」是開局就定的房間設定、「牌山還剩幾張」玩的人不看,
     「第幾局」搬到房間框的 #mpBarGoal(麥克風左邊)、「莊」搬到每一家自己那一列。
@@ -2865,6 +2968,17 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .m16-foe .m16-foename{max-width:4em}
   .m16-fmelds{display:flex;flex-wrap:wrap;gap:2px}
   .m16-acts{min-height:34px;padding:2px 0}
+  /* ★ 宣告面板收一號(v1.111.0):橫向的盤面總高只有 ~161px,面板照直向那個尺寸
+     會從盤面上緣衝出去(board.js 的 placeClaim() 會夾住,但夾完就貼在頂上、
+     跟房間框黏成一塊)。牌面本身由 board.js 的 CLAIM_TW_LAND 收成 30px。
+     ⚠ .m16-acts.m16-hush 那條 min-height 要**在這裡重寫成 38** —— 橫向的內距是
+       2px,「環還在流裡」時這一列是 34+4 = 38,不是直向的 42(見那條的註解)。 */
+  .m16-claim{padding:7px 11px 8px;gap:5px;border-radius:14px;max-width:min(94vw,330px)}
+  .m16-chd{font-size:12px;gap:7px}
+  .m16-claim .m16-act{padding:8px 13px;font-size:14px;border-radius:11px}
+  .m16-claim .m16-more{font-size:10.5px}
+  .m16-crow{gap:6px}
+  .m16-acts.m16-hush{min-height:38px}
 }
 
 /* ==========================================================================
