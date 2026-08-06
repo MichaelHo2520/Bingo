@@ -50,9 +50,14 @@ const UNB = (function(){
     const two = lb.length > 1 ? " two" : "";
     let inner = '<span class="un-ov" aria-hidden="true"></span>';
     if(wild){
-      // Wild:白橢圓裡四色風車 + 中央一顆深色圓寫 W / +4
-      inner += '<span class="un-wq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' +
-               '<span class="un-lb wild' + two + '">' + lb + '</span>';
+      /* Wild:白橢圓裡四色風車。
+         ★★ 普通 Wild **不寫 W** —— 四色風車本身就是它的辨識點(而四色在任何主題下
+            都保持原值,電子書主題也是,所以「看形狀就知道」在每個主題都成立)。
+         ⚠⚠ 但 **+4 一定要留字** —— 風車是 Wild 與 Wild+4 **共用**的圖案,
+            兩張都不寫字的話它們會長得**一模一樣**,玩家分不出「只是換色」與
+            「吃 4 張」。這不是裝飾,是牌義:少了它 +4 砸過來看不出來。 */
+      inner += '<span class="un-wq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>';
+      if(UN.kindOf(id) === UN.K_W4) inner += '<span class="un-lb wild' + two + '">' + lb + '</span>';
     }else{
       inner += '<span class="un-lb' + two + '">' + lb + '</span>' +
                // ★ 色名字母(見檔頭):HTML 一律吐出來,CSS 只在電子書主題顯示

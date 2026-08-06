@@ -79,8 +79,12 @@ function unRuleVal(raw){ return String(raw) === "1"; }
 /* 一句話講「現在是什麼規則」——★ 面板底部 / 大廳摘要 / 單機第二層**共用這一支**(三份會走鐘)。 */
 function unRulesText(r){
   const rr = UN.normRules(r);
-  return (rr.stack ? "疊 +2 / +4:可以疊(同種)" : "疊 +2 / +4:不能疊(照官方)") + " · " +
-         (rr.unoCall ? "剩一張要喊 UNO,沒喊被抓罰抽 2 張" : "剩一張由系統自動公告,不必喊");
+  /* ★ 這一行是**一直看得到**的(大廳 / 單機第二層 / 面板底部),所以刻意寫短 ——
+     一項一個短句、不解釋後果。要知道細節的人會去開房規面板,那裡才有整句說明。
+     ⚠ 不要把面板的 set-sub 文案搬過來:三項乘上完整說明會變成一段公文。 */
+  return (rr.stack ? "可疊 +2 / +4" : "不可疊") + " · " +
+         (rr.unoCall ? "剩一張要喊 UNO" : "不必喊 UNO") + " · " +
+         (rr.playDrawn ? "抽到可馬上出" : "抽完就換人");
 }
 function syncRules(rules, editable){
   const r = UN.normRules(rules);

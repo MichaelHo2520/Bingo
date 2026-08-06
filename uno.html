@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.106.1 -->
-<meta name="version" content="1.106.1">
+<!-- UNO · v1.107.0 -->
+<meta name="version" content="1.107.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -80,7 +80,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="home-hint">
         108 張牌,<b>2~6 人</b>每人先發 <b>7 張</b>。出牌條件是<b>同色</b>或<b>同數字 / 同動作</b>;
         <b>Wild 隨時可出</b>,出的人指定接下來的顏色。<br>
-        出不了(或不想出)就<b>抽一張</b> —— <b>抽到的那張能出就可以馬上出</b>。<br>
+        <!-- ⚠ 這兩句與房規面板、rules.js 的 doDraw 是同一件事的三個說法,改一處要看另兩處 -->
+        手上有出得了的牌就<b>一定要出</b>;真的一張都出不了才<b>抽一張</b>,
+        抽完就換下一家(<b>可在房規改成「抽到的可以馬上出」</b>)。<br>
         動作牌:<b>⊘ 跳過</b>下一家 · <b>⇄ 迴轉</b>換方向(<b>2 人局等同跳過</b>)·
         <b>+2</b> 讓下一家抽兩張並跳過 · <b>+4</b> 換顏色再讓他抽四張。<br>
         <!-- ★ 這兩句是「為什麼我剩一張要按一顆鈕」的唯一說明。
@@ -312,7 +314,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="set-body" id="unRulesBody">
 
         <div class="set-group">
-          <div class="set-group-title">可以改的兩條</div>
+          <div class="set-group-title">可以改的三條</div>
           <div class="set-row col">
             <span class="set-lbl">疊 +2 / +4<span class="set-sub">被 +2 時可以再出 +2 把懲罰往下疊(同種才疊得上);關掉就照官方:抽 2 張並跳過</span></span>
             <div class="seg" id="unStackSeg" aria-label="疊 +2 / +4">
@@ -325,6 +327,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <div class="seg" id="unCallSeg" aria-label="沒喊 UNO 罰抽 2 張">
               <button class="on" data-rk="unoCall" data-rv="1">✔ 要喊</button>
               <button data-rk="unoCall" data-rv="0">✘ 不必喊</button>
+            </div>
+          </div>
+          <!-- ★★ 預設是**關**(抽完就換人)—— 與上面兩條的預設方向相反,
+               所以「✘ 抽完就換人」那顆才是帶 class="on" 的那一顆。 -->
+          <div class="set-row col">
+            <span class="set-lbl">抽到的牌可以馬上出<span class="set-sub">開:抽到能出的那張可以立刻出掉;關(預設):抽一張就結束這一回合</span></span>
+            <div class="seg" id="unDrawnSeg" aria-label="抽到的牌可以馬上出">
+              <button data-rk="playDrawn" data-rv="1">✔ 可以出</button>
+              <button class="on" data-rk="playDrawn" data-rv="0">✘ 抽完就換人</button>
             </div>
           </div>
         </div>
@@ -350,7 +361,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <li>108 張:四色各 <b>19 張數字</b>(0 一張、1~9 各兩張)+ 各 2 跳過 / 2 迴轉 / 2 抽兩張,再加 <b>Wild 4 張 + Wild +4 4 張</b>。</li>
             <li><b>2~6 人</b>,每人先發 <b>7 張</b>;起始牌一律翻到<b>第一張數字牌</b>為止。</li>
             <li>出牌條件:<b>同色</b>或<b>同數字 / 同動作</b>;<b>Wild 隨時可出</b>並指定顏色。</li>
-            <li>出不了(或不想出)就<b>抽一張</b>;<b>抽到的那張能出就可以馬上出</b>,否則換下一家。</li>
+            <li>手上有出得了的牌就<b>一定要出</b>(不能改抽牌);真的一張都出不了才<b>抽一張</b>。</li>
             <li><b>⇄ 迴轉在 2 人局等同跳過</b>(官方規則)。</li>
             <li><b>+4 隨時可出,而且不做挑戰驗牌</b> —— 這一版刻意簡化(這個 App 本來就不防作弊)。</li>
             <li>牌堆抽乾時,把<b>牌河除最上面那張</b>洗回牌堆繼續打。</li>
@@ -372,13 +383,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
          與「那個顏色的牌」對上,兩邊用不同的紅就對不上了。 -->
   <div class="veil" id="unColorVeil">
     <div class="set-card un-color-card">
+      <!-- ★ 標題一句就夠,**不要**再加一行說明小字 —— 玩家出了 Wild 才會看到這一層,
+           「為什麼跳出來」他自己知道;多寫一行反而像工程用的除錯畫面。
+           ⚠ 四顆鈕**只寫中文色名,不寫英文** —— 顏色本身就是答案,英文是多餘的。 -->
       <div class="set-head">選一個顏色</div>
-      <div class="un-rules-who">出了 Wild —— 接下來要出哪個顏色?</div>
       <div class="un-colors" id="unColors">
-        <button class="un-cbtn un-cb-r" type="button" data-col="0"><b>紅</b>Red</button>
-        <button class="un-cbtn un-cb-y" type="button" data-col="1"><b>黃</b>Yellow</button>
-        <button class="un-cbtn un-cb-g" type="button" data-col="2"><b>綠</b>Green</button>
-        <button class="un-cbtn un-cb-b" type="button" data-col="3"><b>藍</b>Blue</button>
+        <button class="un-cbtn un-cb-r" type="button" data-col="0"><b>紅</b></button>
+        <button class="un-cbtn un-cb-y" type="button" data-col="1"><b>黃</b></button>
+        <button class="un-cbtn un-cb-g" type="button" data-col="2"><b>綠</b></button>
+        <button class="un-cbtn un-cb-b" type="button" data-col="3"><b>藍</b></button>
       </div>
     </div>
   </div>

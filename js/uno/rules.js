@@ -199,12 +199,17 @@ const UN = (function(){
        ⚠ 值有一部分來自 DB / localStorage(舊房間沒有這個欄位、也可能被手改),
          所以一律**白名單**、認不出來就回預設 —— 同大老二 normRules 那條。
      ========================================================================== */
-  function defRules(){ return { stack: true, unoCall: true }; }
+  /* ⚠⚠ playDrawn 的**預設是 false**(抽完就換下一家)—— 它與另外兩條的預設方向相反。
+       v1.106.0 原本寫死成「抽到能出就可以馬上出」(官方規則),使用者要把它做成
+       可設定的房規、而且**預設關掉**。所以這裡不要「順手」把它跟著改成 true:
+       那不是筆誤,是刻意的。 */
+  function defRules(){ return { stack: true, unoCall: true, playDrawn: false }; }
   function normRules(r){
     const d = defRules();
     if(!r || typeof r !== "object") return d;
-    return { stack:   typeof r.stack   === "boolean" ? r.stack   : d.stack,
-             unoCall: typeof r.unoCall === "boolean" ? r.unoCall : d.unoCall };
+    return { stack:     typeof r.stack     === "boolean" ? r.stack     : d.stack,
+             unoCall:   typeof r.unoCall   === "boolean" ? r.unoCall   : d.unoCall,
+             playDrawn: typeof r.playDrawn === "boolean" ? r.playDrawn : d.playDrawn };
   }
 
   /* ==========================================================================
@@ -379,9 +384,13 @@ const UN = (function(){
     if(id < 0){ adv(st, 1); return true; }          // 真的一張都抽不到 → 只能過
     st.hands[seat].push(id);
     st.uno[seat] = false;                           // 抽了牌就不再是「剩一張」
-    /* ★ 抽到的牌能出 → **留在他的回合**讓他決定(官方規則);
-         出不了就直接換下一家,不必再多寫一手 "x" 進日誌。 */
-    if(legalOn(st, id)){ st.drew = true; st.drewCard = id; }
+    /* ★★ 抽到的牌能不能馬上出是**房規**(playDrawn,預設關)——
+         開:留在他的回合讓他決定(官方規則,他可以出、也可以送 "x" 不出);
+         關:抽完就直接換下一家(抽牌 = 這一回合結束,不必再多寫一手 "x")。
+       ⚠ 關的時候 st.drew **永遠不會立起來**,連帶三件事自動失效:
+         `legalOn` 的 drew 閘門、`doPass`("x")、以及 ai.js 的 v.drew 分支。
+         那三處都不必為這條房規加 if —— 這是刻意的(少三個分支就少三個走鐘點)。 */
+    if(st.rules.playDrawn && legalOn(st, id)){ st.drew = true; st.drewCard = id; }
     else adv(st, 1);
     return true;
   }

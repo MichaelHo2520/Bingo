@@ -329,7 +329,11 @@ const MP = MPCore.create((function(){
          ⚠ 守門一律走 normRules(白名單):手改 DB / 舊房間的值都要能用。 */
       if(k === "unRules"){
         const next = UN.normRules(v);
-        if(next.stack === rules.stack && next.unoCall === rules.unoCall) return;
+        /* ⚠⚠ 這個「有沒有真的變」的比對是**逐欄位**寫的,而房規有三項 ——
+           加房規忘了補這裡的症狀是「房主按了那一項,別人的畫面完全不動」
+           (寫進 DB 了,但這裡當成沒變就 return 掉)。同一份比對在下面 setRule 也有一份。 */
+        if(next.stack === rules.stack && next.unoCall === rules.unoCall &&
+           next.playDrawn === rules.playDrawn) return;
         rules = next;
         ctx.unreadyOnFieldChange();
         ctx.syncSetup(); ctx.updateGoal();
@@ -534,7 +538,9 @@ const MP = MPCore.create((function(){
       liveRules: () => UN.normRules(ctx.phase() === "playing" ? gRules : rules),
       setRule(key, val){
         const next = UN.normRules(Object.assign({}, rules, { [key]: val }));
-        if(next.stack === rules.stack && next.unoCall === rules.unoCall) return;
+        // ⚠ 三項都要比(見 onRoomField 那一份的說明)—— 漏一項 = 那一項按了沒反應
+        if(next.stack === rules.stack && next.unoCall === rules.unoCall &&
+           next.playDrawn === rules.playDrawn) return;
         if(!ctx.setRoomField("unRules", next, { lobbyOnly: true,
              denyMsg: "只有房主能改規則", busyMsg: "對戰中不能改規則 —— 這一局的規則已經定下來了" })) return;
         rules = next; ctx.syncSetup(); ctx.updateGoal(); savePrefs();

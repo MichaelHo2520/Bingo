@@ -5490,7 +5490,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     padding:18px 10px;border:none;border-radius:16px;cursor:pointer;
     font:800 17px/1 'Nunito',sans-serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
   .un-cbtn:active{transform:scale(.97)}
-  .un-cbtn b{font-size:22px}
+  /* ★ 色名(中文一個字)是這顆鈕**唯一**的內容 —— 英文那行拿掉之後字要放大一階,
+     不然 18px 的上下留白配 22px 的一個字看起來像「這顆鈕少了東西」。
+     ⚠ 上面 .un-cbtn 的 font-size / gap 現在沒有作用對象(只剩這一個子元素),
+       刻意留著:橫置那段的 override 還吃它,而且哪天要加回副標不必再找一次。 */
+  .un-cbtn b{font-size:27px}
   .un-cb-r{background:var(--un-r)}
   .un-cb-y{background:var(--un-y);color:#3a2a00;text-shadow:none}
   .un-cb-g{background:var(--un-g)}
