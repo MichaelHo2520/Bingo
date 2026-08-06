@@ -3009,9 +3009,23 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        不歸零的話 flex-shrink 根本不會發生,這條寫了等於沒寫。
      ⚠ 空間夠時(直向手機)flex-shrink 不作用 —— 一個像素都不會變,
        v1.75.2 驗收過的「26 張不用捲就看得完」原封不動。 */
+  /* ★★ 桌布是**賭場綠呢 + 內緣暗角**,與 21點(.bj-table)／大老二(.b2-trick)
+     **逐字同一份配方** —— 三頁都是撲克牌遊戲,桌面本來就該長一樣
+     (使用者:「21點跟大老二桌面的調整,麻煩排七也一起修改」)。
+     ⚠ 這三份要**一起改**:改一邊就變成「同一副牌擺在三種桌子上」。
+     ⚠⚠ 左右內距**只能是 var(--sv-tpad)** —— 格子寬度是從「容器寬 − 內距 − gap」
+       推回來的(見檔頭那三支變數),照抄 21點的 `padding:10px` 會讓格子裡的字算錯。
+     ⚠ 綠呢是**寫死的顏色**(不吃主題變數),同另外兩頁:牌桌的綠是撲克牌的辨識背景,
+       跟著主題變會讓象牙白牌面在某些主題下失去對比。電子書主題那條照舊翻成白底黑框。
+     ★ 軌道的暗格 / 亮紅字(--sv-redlit)畫在綠呢上仍然分得出來,但這件事**斷言測不到**
+       —— 驗收點在 `node tools/gen-sevens-shot.js` 的放大截圖。 */
   .sv-tracks{display:flex;flex-direction:column;gap:3px;flex:0 1 auto;min-height:0;overflow-y:auto;
-    background:rgba(0,0,0,.16);border-radius:12px;padding:6px var(--sv-tpad)}
-  :root[data-theme="ebook"] .sv-tracks{background:#fff;border:1px solid #000}
+    border-radius:14px;padding:6px var(--sv-tpad);
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%),
+      linear-gradient(180deg,#1d4c3a,#12332a 70%,#0e2822);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.07), inset 0 10px 26px rgba(0,0,0,.34)}
+  :root[data-theme="ebook"] .sv-tracks{background:#fff;border:1px solid #000;box-shadow:none}
   .sv-track{display:flex;align-items:center}
   /* ⚠⚠ `1fr` 的隱含最小值是 `auto`(= min-content),格子有 aspect-ratio 時那個
      min-content 會把 13 欄一起撐開 → **整條軌道橫向溢出,J/Q/K 直接被切掉**。
@@ -5610,8 +5624,19 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ---------- 選色盤那張卡 ---------- */
   .set-card.un-color-card{width:min(88vw,380px);max-width:none;text-align:center}
 
-  /* ---------- 對局中把牌桌放寬(大廳與選單維持 .panel 原本的寬度)---------- */
-  .un-play{width:min(96vw,720px);margin:0 auto}
+  /* ---------- 對局中把牌桌放寬(大廳與選單維持 .panel 原本的寬度)----------
+     ★★ 房間框(.un-room)一定要**跟著同一個數字放寬** —— 它預設吃 .panel 的
+        `min(92vw,520px)`,而牌桌是 720:桌機上兩塊的左右邊界差 100px 一邊,
+        使用者:「房間框跟中間的框好不搭配,寬度差很多」。
+        照排七 / 大老二 / 21點那三條的寫法(它們是 700/700),兩塊同寬才是一張桌子。
+     ⚠⚠ 兩邊都是 **92vw** 不是 96vw:.un-table 有底色、1px 邊框與 18px 圓角,
+        而 body 是 `padding:16px` + `overflow:hidden` → 96vw 在 800px 以下的視窗
+        比可用寬(100vw − 32px)還寬,兩側的圓角邊框會被靜靜削掉
+        (台灣麻將 v1.68.1 踩過的同一個坑;手牌那排是橫向捲動的,少那 4vw 不影響)。
+     ⚠ 上限 720 是這一頁自己的數字(牌堆 + 牌河兩疊 + 現在顏色那一列),
+        不要為了「跟另外三頁一樣」改成 700 —— 要改就兩條一起改。 */
+  .un-play{width:min(92vw,720px);margin:0 auto}
+  body.un-mp .un-room,body.un-solo .un-room{width:min(92vw,720px)}
 
   /* ---------- 橫置矮視窗 ----------
      ⚠ e2e 的 headless 視窗永遠是矮的(750×485)→ **直立版沒有 e2e 守門**,
