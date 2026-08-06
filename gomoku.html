@@ -9,13 +9,15 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="五子棋">
 <meta name="theme-color" content="#2a1136">
+<!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
+<meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>五子棋 ｜ 連線對戰 · 電腦對決</title>
-<!-- 五子棋連線對戰 + 電腦對決 · v1.104.0 -->
-<meta name="version" content="1.104.0">
+<!-- 五子棋連線對戰 + 電腦對決 · v1.105.0 -->
+<meta name="version" content="1.105.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -148,7 +150,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label gmk-room-title">房間 <b id="mpRoomTitle" class="display">–</b></span>
+      <!-- v1.105.0:拿掉「房間」字首(房名預設就是「XXX的房間」,前面再加一次是重複) -->
+      <span class="label gmk-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <!-- 盤面徽章與認輸鈕在同一個位置輪流出現:大廳看盤面大小,對戰中改放認輸(棋盤自己就看得出幾路) -->
       <span class="mp-goal" id="mpBarGoal" aria-label="盤面"></span>
       <button class="gmk-resign hidden" id="resignBtn" type="button" title="認輸">🏳 認輸</button>

@@ -1,3 +1,23 @@
+  /* ---------- 退出瀏覽器的「強制深色」(v1.105.0) ----------
+     ★ 症狀:手機系統開深色時,配色整個走鐘(回報:「跟正常不太一樣」)。實測
+       (headless Edge 加 --force-dark-mode --enable-features=WebContentsForceDark):
+         · 數獨插圖的數字 5/3/2/1 從深棕變淡灰藍,畫在米色盤面上幾乎看不見
+         · 標題「數獨」的橘黃漸層變成暗棕金、主鈕從亮橘變褐色
+         · 五子棋插圖的格線與黑子直接不見
+     ★ 元凶不是我們的 CSS,是 Chrome / Edge Android 的 Auto Dark Theme 與
+       Samsung Internet 的深色模式:它們會**自動反轉**「看起來沒有自己深色版」的網站。
+       我們八個主題全部是自己配好的(六個主題裡四個本來就是深色底),被再反轉一次
+       必然走鐘 —— 而且反轉是逐元素猜的,插圖那種「淺底深字」會兩邊一起動、對比崩掉。
+     ★ 解法就是宣告 color-scheme:那是給瀏覽器的一句「這頁的配色我自己管」。
+       用 `only light` 而不是 `light dark`:`only` 才是**完整**的退出(連原生元件都不准
+       被系統深色接手),而我們今天在淺色系統下渲染出來的就是 light 情境 ——
+       所以這一行在正常模式下**一個像素都不會變**,只把強制深色關掉。
+     ⚠ 九頁的 <head> 各有一份 <meta name="color-scheme" content="only light">,
+       **兩邊都要留**:meta 在 CSS 下載完成前就生效(不然會先閃一下反轉後的樣子),
+       CSS 這份則管 file:// 直開與 meta 被漏掉的情形。改一邊記得改另一邊。
+     ⚠ 這不影響 ebook 主題也不影響任何主題切換 —— 主題一律是我們自己的 data-theme。 */
+  :root{color-scheme:only light}
+
   /* ---------- Themes ---------- */
   :root[data-theme="sunset"]{
     --bg1:#2a1136; --bg2:#7a2d54; --bg3:#c85a3c;
@@ -2115,6 +2135,20 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
        被 overflow:hidden 削到的是看得見的一角(桌面沒事是因為它的內容置中,削到空白)
      ②窄螢幕照舊 = 只有寬螢幕會變,手機上一個 px 都沒動。 */
 body.m16-mp .mj-room{width:min(92vw,960px)}
+
+/* ---------- 對局中整桌不可選字(v1.105.0) ----------
+   桌機用滑鼠按住左鍵拖曳(打牌 / 想把牌河往上滑)時,拖過的牌名、台數、玩家暱稱會被
+   瀏覽器選成一片藍 —— 牌與晶片都是普通 DOM 文字,原生拖曳選取一定命中
+   (使用者回報:「滑鼠按著左鍵然後拖曳,有可能會把有些字給選起來」)。
+   ⚠ 只掛在對局中的那兩個 body class 上(由 js/mahjong16/main.js 的 showScreen 掛),
+     所以連線畫面的暱稱 / 房號輸入、進場選單、設定面板一律不受影響 ——
+     那是刻意的,別圖方便寫成 `body{user-select:none}`(那會跨到另外七頁去)。
+   ⚠⚠ input / textarea 一定要放回 text:表情面板的「一句話」在對局中開得到,
+     整片 none 之後那格連自己打的字都選不起來(改不掉錯字)。
+   user-select 不影響 pointer 事件,點牌 / 拖牌的手勢一個都沒動。 */
+body.m16-mp,body.m16-solo{user-select:none;-webkit-user-select:none}
+body.m16-mp input,body.m16-mp textarea,
+body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:text}
 
 /* 盤面容器。★ isolation:isolate —— 照 v1.56.0 那條紅線先把 stacking context 關起來,
    之後要加任何覆蓋層都掛在裡面,不會跑到根層去跟 .veil/.toast/.pwa-tip 比大小。

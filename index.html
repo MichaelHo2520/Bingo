@@ -10,6 +10,14 @@
 <!-- 加到主畫面的圖示名稱。iOS 大約 12 個字就截斷,所以短名只放「派對遊戲」 -->
 <meta name="apple-mobile-web-app-title" content="派對遊戲">
 <meta name="theme-color" content="#2a1136">
+<!-- 手機系統開深色時,Chrome / Edge Android 的 Auto Dark Theme 與 Samsung Internet 的深色模式
+     會**自動反轉**「看起來沒有自己深色版」的網站 —— 我們八個遊戲的配色全是自己配好的,
+     被再反轉一次就走鐘(實測:數獨插圖的數字幾乎看不見、五子棋的格線與黑子直接消失)。
+     這一行是給瀏覽器的「配色我自己管」;`only light` 才是完整的退出,而我們在淺色系統下
+     渲染出來的本來就是 light 情境 → 正常模式下一個像素都不會變。
+     ⚠ styles.css 開頭的 `:root{color-scheme:only light}` 是**同一件事的另一半**:
+       meta 在 CSS 下載完成前就生效(不然會先閃一下反轉後的樣子),兩邊都要留。 -->
+<meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
 <link rel="icon" type="image/svg+xml" href="icon.svg">
@@ -17,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.104.0 -->
-<meta name="version" content="1.104.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.105.0 -->
+<meta name="version" content="1.105.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -339,7 +347,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">房間 <b id="mpRoomTitle" class="display" style="font-size:18px">–</b></span>
+      <!-- v1.105.0:拿掉「房間」字首(房名預設就是「XXX的房間」,前面再加一次是重複) -->
+      <span class="label" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><b id="mpRoomTitle" class="display" style="font-size:18px">–</b></span>
       <!-- 目標線數移進標題列:遊戲中副標列會整列收起,替下方號碼格讓出高度 -->
       <span class="mp-goal" id="mpBarGoal" aria-label="目標線數"></span>
       <!-- 麥克風 + 表情:大廳/遊戲中都固定在房間框右上,不再浮在盤面(不會壓到號碼格),兩顆並排互不重疊 -->

@@ -8,12 +8,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="台灣麻將">
 <meta name="theme-color" content="#2a1136">
+<!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
+<meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.104.0 -->
-<meta name="version" content="1.104.0">
+<!-- 台灣 16 張麻將 · v1.105.0 -->
+<meta name="version" content="1.105.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -153,7 +155,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label mj-room-title">房間 <b id="mpRoomTitle" class="display">–</b></span>
+      <!-- v1.105.0:拿掉「房間」這個字首。房名預設就是「XXX的房間」(mp-core 的 createRoom),
+           前面再加一次 = 「房間 XXX的房間」,在返回鍵右邊那格白白吃掉四個字的寬
+           (窄機上房名本來就會被 ellipsis 切掉)。⚠ 八頁都有一份,要一起改。 -->
+      <span class="label mj-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="局數"></span>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">

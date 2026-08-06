@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="派對遊戲">
 <meta name="theme-color" content="#2a1136">
+<!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
+<meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <!-- 分頁與書籤圖示。Chrome/Edge 只認 rel="icon" —— manifest 的 icons 只給 PWA 安裝用,
      apple-touch-icon 只有 iOS 在用,兩者都不會變成 favicon;沒有這行就只會退回找網域根的
@@ -18,8 +20,8 @@
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v1.104.0 -->
-<meta name="version" content="1.104.0">
+<!-- 外殼(shell)· v1.105.0 -->
+<meta name="version" content="1.105.0">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
