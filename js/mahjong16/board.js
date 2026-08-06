@@ -202,6 +202,31 @@ const M16B = (function(){
   }
   const codeOf = t => R.codeOf(t);
 
+  /* ---------- ★★ 牌山還剩幾張(v1.104.0)-------------------------------------
+     使用者:「我想知道還剩幾張牌,不然突然間就說流局,有點奇怪」。
+     (v1.58.3 把盤面頂端的資訊列整條拿掉時,這一格是以「玩的人不看,流局本身就是提示」
+      為理由刪掉的 —— 上手之後推翻了:流局來得毫無預告才是真正的問題。)
+
+     ★★ 它是 **position:absolute 的覆蓋層**,不是版面裡的一個元素 —— 這是它唯一
+       可以存在的形式。盤面上任何「佔得到高度」的新東西都會讓整副牌小一級
+       (檔頭③、還有 discardHint 那條「五個字就從 27 掉到 25」的紀錄)。
+       絕對定位 = 不進高度計算 = 牌寬一個 px 都不會動。
+     ★ 貼在**牌河的右上角**,位置由 render() 用牌河的實際幾何算(直向牌河是第二塊、
+       橫向是 grid 的左欄,CSS 沒有一組 top/left 能同時說對兩種版面)。
+     ⚠ 牌河右側因此在 styles.css 保留了一條**等寬的空白**(.m16-pool 的 padding-right):
+       牌永遠排不進那條空白,所以這顆晶片不會蓋住任何一張打出去的牌。
+       牌河的高度是 board.js 算的 --m16ph、與寬度無關 → 保留那條空白**不影響牌寬**。
+     ⚠ 數字要用 MJT.drawsLeft() 而不是 wallLeft():差的正是海底那一墩(見那支的註解)。 */
+  const WALL_LOW = 16, WALL_CRIT = 4;      // 變色門檻:亮起來的那一刻每家還摸得到幾張
+  function wallHTML(){
+    const n = (typeof MJT !== "undefined" && MJT.drawsLeft) ? MJT.drawsLeft(st) : 0;
+    const cls = n<=WALL_CRIT ? " crit" : (n<=WALL_LOW ? " low" : "");
+    /* ⚠ 「牌山」兩個字不可以省成迷你牌背 + 數字:對手那一列的手牌張數(.m16-cnt)
+       用的正是同一顆牌背,只留數字會被看成「某一家手上還有幾張」。 */
+    return '<div class="m16-wall'+cls+'" title="牌山還可以摸幾張(摸完就流局)">'+
+      '<em>牌山</em><b>'+n+'</b></div>';
+  }
+
   /* ★★ 我的手牌**畫出來的順序**(玩家沒拖過的話就是照牌序)。
      ⚠ 這一支是**唯一**吃 ord 的地方 —— 打牌 / 吃碰槓胡一律走牌值,順序碰不到它們。
      ⚠ 但它有**兩個**呼叫端(render 與 claimOpts),而且兩邊一定要拿到同一份:
@@ -567,13 +592,45 @@ const M16B = (function(){
     host.classList.toggle("m16-myturn", canAct);
     paintNames();
     if(cb.onClaimUI) cb.onClaimUI(co, copt);             // 動作列跟著換(✔ / 胡 / 過)
+    placeWall(pool);                                     // ★ 一定是最後一步,見那一支
+  }
+
+  /* ---------- 牌山晶片的落點(v1.104.0)-------------------------------------
+     把 .m16-wall 貼到牌河**保留的那條空白**的左上角(空白 = .m16-pool 的 padding-right,
+     見 styles.css 的 --m16wl)。理由與紅線在 wallHTML();這裡只有兩條施工紀律:
+
+     ★★ ① 一定是 render() 的**最後一步** —— 比 paintNames() 與 onClaimUI 都晚。
+       這兩支都會在盤面畫完之後改變幾何:paintNames() 才把對手的名字填進去,而**橫向
+       版面的對手欄是 grid 的 auto 欄** → 名字一填,那一欄變寬、牌河(1fr)跟著變窄;
+       onClaimUI 換動作列的內容,列一長高盤面就矮一點(橫向是 align-content:safe end,
+       牌河會整塊往下移)。排在它們前面的話,晶片會停在**上一輪的位置**。
+       ⚠ 症狀非常刁鑽:直向的牌河是滿寬、名字填不填都一樣寬 → **只有橫置手機歪掉**,
+         而且只有牌河右緣附近那 20px 看得出來(實測 900×560 伸出牌河 17px)。
+     ★★ ② 用 getBoundingClientRect 相減,**不要用 pool.offsetLeft / offsetTop**。
+       offsetLeft 的原點與絕對定位 containing block 的原點在橫向那個 grid 版面下
+       相差 20px(捲軸保留區 + grid padding 兩層),直向恰好一致 —— 又是一個
+       「桌機與直向都對、只有橫置歪掉」的陷阱。先把 left/top 歸零量出 (0,0) 落在哪,
+       再補差值,就與原點無關。 */
+  function placeWall(pool){
+    if(!host) return;
+    const wl = host.querySelector(".m16-wall");
+    const pl = pool || host.querySelector(".m16-pool");
+    if(!wl || !pl) return;
+    const gut = parseFloat(getComputedStyle(pl).paddingRight) || 0;
+    wl.style.left = "0px"; wl.style.top = "0px";
+    const z = wl.getBoundingClientRect(), pr = pl.getBoundingClientRect();
+    wl.style.left = Math.max(0, Math.round(pr.right - gut - z.left)) + "px";
+    wl.style.top  = Math.round(pr.top + 4 - z.top) + "px";
   }
 
   /* 把整個盤面畫成 HTML 字串。抽出來是為了上面那道「量高度 → 縮小 → 再畫一次」——
      兩次畫的差別只有 tw,排法(幾排、摸的那張放哪排)刻意不重算,免得縮一下就跳版。 */
   function paint(plan, tw, hasDraw, canAct, co, myWin){
+    /* --- 牌山還剩幾張(覆蓋層,位置由 render() 貼到牌河右上角;見 wallHTML) --- */
+    let html = wallHTML();
+
     /* --- 對手 --- */
-    let html = '<div class="m16-foes">';
+    html += '<div class="m16-foes">';
     for(let k=1;k<st.seats;k++) html += foeHTML((me+k)%st.seats, tw);
     html += '</div>';
 

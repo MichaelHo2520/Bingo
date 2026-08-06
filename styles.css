@@ -2285,8 +2285,13 @@ body.m16-mp .mj-room{width:min(92vw,960px)}
    ②高度改成**寫死**(--m16ph 由 board.js 算,固定 POOL_ROWS 排)。
    原本 min~max 之間自由長高,每換一排就讓總高度跳一次 → 整副牌跟著縮一次,
    那正是「打牌的過程中會一直不停的變換牌的大小」的成因之一。滿了就捲。 */
+/* ★ v1.104.0:右邊那塊 padding 是**給牌山晶片讓出來的空白**(見底下 .m16-wall)——
+   牌只排在 content box 裡,所以那顆晶片永遠蓋在空白上,不會遮住任何一張打出去的牌。
+   ⚠ 只花寬度、不花高度:牌河的高度是 board.js 算的 --m16ph,與這條 padding 無關,
+     所以牌寬一個 px 都不會動(那是這顆晶片能加上來的前提)。
+   ⚠ --m16wl 與晶片的實際寬度要一起看:留太少會被蓋、留太多是白丟牌河的位置。 */
 .m16-pool{display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start;justify-content:flex-start;
-  padding:5px;border-radius:10px;background:rgba(0,0,0,.14);
+  padding:5px var(--m16wl,62px) 5px 5px;border-radius:10px;background:rgba(0,0,0,.14);
   height:var(--m16ph,auto);
   flex:none;overflow-y:auto;scrollbar-gutter:stable}
 .m16-pt{opacity:.8;align-self:flex-end}
@@ -2300,6 +2305,41 @@ body.m16-mp .mj-room{width:min(92vw,960px)}
 .m16-pslot{flex:none;align-self:flex-end;
   width:var(--m16w,36px);
   height:calc(var(--m16w,36px) * 1.32)}
+
+/* ---------- ★★ 牌山還剩幾張(v1.104.0)----------
+   使用者:「我想知道還剩幾張牌,不然突然間就說流局,有點奇怪」。
+   ★★ position:absolute 是**必要條件而不是排版偏好**:盤面上任何佔得到高度的新元素
+     都會讓整副牌小一級(board.js 檔頭③;那邊有「動作列只多五個字,牌寬就從 27
+     掉到 25」的紀錄)。絕對定位 = 不進高度計算 = 牌寬完全不受影響。
+   ★ 位置由 board.js 的 render() 貼到**牌河的右上角** —— 直向牌河是第二塊、橫向是
+     grid 的左欄,CSS 沒有一組 top/left 能同時說對兩種版面。
+   ⚠ 這裡只寫 left/top:同時給 left 與 right,寬度 auto 的它會被撐成兩邊之間那麼寬的
+     一長條(board.js 那邊也只設這兩個)。
+   ⚠ 牌河右側那條空白(上面 .m16-pool 的 --m16wl)就是給它的位置,兩處要一起看。
+   ⚠ 文字寫「牌山」而不是只放迷你牌背 + 數字:對手那一列的張數(.m16-cnt)用的正是
+     同一顆牌背,只有數字的話會被看成「某一家手上幾張」。 */
+.m16-wall{position:absolute;top:0;left:0;z-index:2;pointer-events:none;
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 7px;border-radius:8px;background:rgba(0,0,0,.34);
+  font:800 10.5px/1.6 'Nunito',sans-serif;color:var(--muted)}
+.m16-wall em{font-style:normal}
+.m16-wall b{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--text)}
+/* 快見底 → 琥珀(同 .mk-tune / .hl-badge[data-state="busy"] 那組警示色);
+   剩沒幾張 → 紅底(--mj-jz,與莊家記號 / 牌河最新那張同一組「看這裡」的語彙)。
+   ⚠ 刻意**不加閃爍動畫**:這一顆整局都在畫面上,會動的東西看一整晚是折磨
+     (消消樂的 .mj-count.mj-warm 會閃,是因為它只在卡住的時候才出現)。 */
+.m16-wall.low{background:rgba(249,115,22,.22);color:#fb923c}
+.m16-wall.low b{color:#fb923c}
+.m16-wall.crit{background:var(--mj-jz);color:#fff}
+.m16-wall.crit b{color:#fff}
+:root[data-theme="ebook"] .m16-wall{background:#eee;border:1px solid #999;color:#000}
+:root[data-theme="ebook"] .m16-wall b{color:#000}
+/* ⚠ ebook 沒有顏色可用,所以「快見底」改用**框粗**表示(琥珀在純黑白下與一般狀態
+   長得一模一樣 = 等於沒有警示)。真的剩沒幾張那一級照舊反黑,那個對比最強。 */
+:root[data-theme="ebook"] .m16-wall.low{background:#eee;color:#000;border-width:2px}
+:root[data-theme="ebook"] .m16-wall.low b{color:#000}
+:root[data-theme="ebook"] .m16-wall.crit{background:#000;color:#fff}
+:root[data-theme="ebook"] .m16-wall.crit b{color:#fff}
 
 /* ---------- 對手 ---------- */
 .m16-foes{display:flex;flex-direction:column;gap:4px;flex:none}
@@ -2731,7 +2771,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     align-content:start;
     align-content:safe end;
     gap:4px 8px;padding:4px 8px}
-  .m16-pool{grid-area:pool;min-width:0}
+  /* ⚠ --m16wl(牌山晶片讓出來的空白)跟著晶片一起收一號 —— 橫向的牌河窄得多,
+     留 62px 等於白丟四五張牌的位置。兩個數字一定要一起改(見下面 .m16-wall)。 */
+  .m16-pool{grid-area:pool;min-width:0;--m16wl:54px}
+  .m16-wall{padding:1px 6px;font-size:10px}
+  .m16-wall b{font-size:12px}
   .m16-foes{grid-area:foes;max-width:34vw}
   /* ★★ display:contents —— 這一行是「不改 board.js 的 paint() 就重排」的關鍵。
      `.m16-mine` 是「我的明牌 + 我的手牌」的外框(直向靠它 margin-top:auto 整組貼底)。

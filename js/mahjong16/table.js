@@ -503,6 +503,18 @@ const MJT = (function(){
     return R.winningTiles(R.toCounts(st.hands[seat]), needOf(st, seat));
   }
   function wallLeft(st){ return st.wall.length - st.pos; }
+  /* ★ 牌山「還剩幾張**可以摸**」(v1.104.0)—— 給畫面看的那個數字。
+     ⚠ 不是 wallLeft():最後那 rs.wallEnd 張(海底那一墩)是留著不摸的,
+       摸到只剩 wallEnd 張就流局(R.isExhausted)。所以拿 wallLeft() 去顯示,
+       畫面會在「還剩 16 張」的時候突然說流局 —— 正是使用者回報的那個「有點奇怪」。
+     ★ 這一支歸零的那一刻**就是**流局,所以盤面敢把它當「還剩幾張」直接顯示。
+     ⚠ 一摸不一定只減 1:補花與槓上補牌走同一條 draw(),pos 一樣往前走。
+       那不是 bug,而正是「怎麼會突然沒牌」的真正原因,顯示出來才看得懂。 */
+  function drawsLeft(st){
+    if(!st || !st.wall) return 0;
+    const rs = R.RULESETS[st.rs] || R.RULESETS.p4;
+    return Math.max(0, st.wall.length - st.pos - rs.wallEnd);
+  }
 
   /* ★ 下一局誰坐莊、連了幾拉幾(連莊,v1.102.0)——「一局結束」到「開新局」之間唯一的一條規則。
      本桌採用的是最常見的那一套:
@@ -586,7 +598,7 @@ const MJT = (function(){
     concealedKong, addKong, selfDrawWin, settleWin,
     // 宣告聽牌(v1.67.0)
     declareTing, canDeclareTing, tingTiles, tingTypeOf, tingOf, DI_TING_MAX,
-    ownActions, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft, nextDealerOf,
+    ownActions, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft, drawsLeft, nextDealerOf,
     seatWind, leftOf, nextOf, needOf, toPlay, holding, allTiles, enc, dec
   };
 })();
