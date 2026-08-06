@@ -2587,6 +2587,17 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 /* 「不防作弊」那句提醒:刻意不做成警告色的大框 —— 它是說明,不是錯誤 */
 .m16-warn{display:inline-block;margin-top:4px;opacity:.75;font-size:11px}
 
+/* ---------- 局間續局的腳註(v1.103.0) ----------
+   結果卡按鈕組**下面**那一行:「⏱ N 秒後自動開下一局」/「✓ 已看完 —— 還在等 N 人」。
+   ★ 刻意比按鈕與 .peek-link 都小一號、也不加底線 —— 它是**狀態**不是可按的東西,
+     長得像連結的話會有人去點它(而它下面 10px 就真的有一個連結「先看看牌桌」)。
+   ⚠ 只有秒數 / 人數那個數字用 --accent 放大,整行都上色會蓋過旁邊的主按鈕。 */
+.m16-next{margin:10px 0 -4px;text-align:center;
+  font:700 12px/1.5 'Nunito',sans-serif;color:var(--muted)}
+.m16-next b{font-weight:800;font-size:1.15em;color:var(--accent)}
+:root[data-theme="ebook"] .m16-next{color:#333}
+:root[data-theme="ebook"] .m16-next b{color:#000}
+
 /* ---------- 台灣 16 張:單機對電腦(v1.60.0) ----------
    ★ 這一段刻意只有一條規則:單機**整組畫面都是重用的** ——
      牌桌是同一個 .mj-play / .m16-stage / .m16-acts,上面那條列重用房間橫幅的

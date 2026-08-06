@@ -51,6 +51,18 @@ const MPCore = (function(){
        ⚠ 一共擋在四處:下面兩處 + join() 的硬擋 + **js/home-live.js 的 joinable()**。
          漏掉 home-live 那一份的症狀是「首頁把對戰中的房間列成不可加入」。 */
     const JOIN_MID = !!A.joinMidGame;
+    /* ★★ 局間續局(v1.103.0 為台灣麻將加,不帶就是舊行為)。
+       一場 = 很多個 MP round(打一圈 4 局 / 一將 16 局)時,每一局結束都把大家丟回大廳
+       再各按一次「準備好了」,現場的感覺是「沒有連續感」。開了這個旗標之後:
+         · 結果卡上按一下(或 adapter 自己倒數到期)→ readyUp():**不離開 playing 相位**
+           就把自己標成準備好,順手把 status 翻回 lobby 讓房主端的 updateStartBtn 動起來。
+         · 湊齊 → 房主 startGame() → 新的 roundId 進來 → 這裡靠 **roundId 變了** 判定
+           「是新的一局」(舊路徑是靠 curPhase 從 lobby 變 playing,而現在根本沒回過大廳)。
+       ⚠ 這是核心的第三個能力旗標。它加的是**能力**不是遊戲名字 —— 沒有帶的遊戲
+         `playedRound` 那一條永遠不會成立,行為與 v1.102.1 逐字相同。
+       ⚠ 「這一場打完了」不歸核心管:adapter 自己決定最後一局不要續(台灣麻將是
+         打滿 handsGoal 局),那時結果卡照舊是「下一局 = 回大廳」。 */
+    const CONT_ROUND = !!A.contRound;
 
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false, roomName="";
     let online=false;
@@ -64,6 +76,7 @@ const MPCore = (function(){
     let connRef=null, connected=null, resyncing=false, resyncTimer=null;
     let graceTimer=null, aloneTimer=null, aloneTick=null;
     let emotesReady=false;
+    let playedRound=null;                   // 已經 enterPlaying() 過的那個 roundId(見 CONT_ROUND)
 
     /* ---------- 基礎 ---------- */
     function configReady(){ return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0); }
@@ -358,7 +371,7 @@ const MPCore = (function(){
     function enterLobby(){
       online=true; ready=false; curPhase="lobby";
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
-      gameRev=0;   // ★ 進新房必歸零(見檔頭 #1)
+      gameRev=0; playedRound=null;   // ★ 進新房必歸零(見檔頭 #1)
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();
       stopRoomWatch();
       $("mpConnect").classList.add("hidden");
@@ -389,6 +402,12 @@ const MPCore = (function(){
     /* ---------- 相位:對戰中 ---------- */
     function enterPlaying(){
       curPhase="playing";
+      playedRound=roundId;
+      /* ★ 準備記號跟著清:startGame() 那一刻房主已經把全房每個人的 ready 寫成 false,
+         本地這一份不清就會與 DB 不一致。舊路徑每次都先經過 backToLobby()(那裡也清),
+         所以七個舊遊戲**行為逐字不變**;續局的遊戲沒回過大廳,只有這裡清得到 ——
+         漏掉的話下一局結束時 readyUp() 看到 ready 還是 true 就整個不動作(全房卡住)。 */
+      ready=false;
       outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false;
       closeWin();
       $("scrollArea").classList.add("hidden");
@@ -473,8 +492,12 @@ const MPCore = (function(){
       winner=nextWinner; status=nextStatus;
       const statusChanged=(nextStatus!==curPhase);
 
-      // 相位派發(★ 新局的本地狀態要在 enterPlaying 之前清掉,否則會拿上一局的殘留去畫)
-      if(status==="playing"){ if(curPhase!=="playing"){ A.resetRound && A.resetRound(); enterPlaying(); } }
+      /* 相位派發(★ 新局的本地狀態要在 enterPlaying 之前清掉,否則會拿上一局的殘留去畫)
+         ★ 第二個條件只有 CONT_ROUND 的遊戲成立:局間不回大廳 → curPhase 一直是 playing,
+           「新的一局來了」只剩 roundId 這一個記號(它由 startGame() 現配,一局內不會變)。 */
+      if(status==="playing"){
+        if(curPhase!=="playing" || (CONT_ROUND && roundId!==playedRound)){ A.resetRound && A.resetRound(); enterPlaying(); }
+      }
       else { if(curPhase!=="lobby" && !winner) backToLobby(); }
 
       // 遊戲狀態同步:交給 adapter(五子棋的 moves / 數獨的 fills 與進度)
@@ -483,7 +506,10 @@ const MPCore = (function(){
       if(winner){ onWinner(); }
       else if(hadWinner) closeWin();
       if(statusChanged && isHost) updateRoomIndex();
-      if(curPhase==="lobby") updateStartBtn();
+      /* ⚠ 續局時 curPhase 停在 playing,而 readyUp() 把 status 翻回 lobby 是**交易**——
+         「大家都準備好了」的 players 事件很可能比它先到(那時房主看到的 status 還是
+         playing → updateStartBtn 直接 return)。少了這一次補叫就是全房停在結果卡上。 */
+      if(curPhase==="lobby" || CONT_ROUND) updateStartBtn();
     }
     function onStatusTxt(t){ const el=$("mpStatusTxt"); if(el){ el.classList.remove("wait"); el.textContent=t; } }
 
@@ -512,6 +538,21 @@ const MPCore = (function(){
       ready=!ready;
       roomRef.child("players/"+meId).update({ ready:ready, name:meName });
       updateReadyBtn();
+    }
+    /* 局間續局的「我看完了」(只有 A.contRound 的遊戲用得到,見檔頭 CONT_ROUND)。
+       與 toggleReady 的差別有三:單向(只會變成準備好,不會取消)、**不必回大廳**、
+       而且**順手把 status 翻回 lobby** —— 房主端的 updateStartBtn 有 status!=="lobby"
+       這道門,不翻的話大家都準備好了也開不了下一局。
+       ★ 回傳「有沒有真的送出去」給 adapter 用(按過第二次要保持原樣、不要重畫成剛按下)。
+       ⚠ status 那一筆走一般交易(會本地樂觀套用)—— 它不碰 game.winner,
+         不在踩坑 #8 的射程內;而且第一個按的人先翻好,後面的人交易看到就中止。 */
+    function readyUp(){
+      if(!CONT_ROUND || !roomRef || !meId || ready) return false;
+      ready=true;
+      roomRef.child("players/"+meId).update({ ready:true, name:meName });
+      if(status!=="lobby") txGame(g=>{ if(g.status==="lobby")return false; g.status="lobby"; });
+      updateReadyBtn();
+      return true;
     }
     function updateReadyBtn(){
       const b=$("mpReadyBtn"); if(!b)return;
@@ -629,9 +670,17 @@ const MPCore = (function(){
       }
       renderScoreboard();
       showResult();
+      const firstShow=!outcomeShown;
       outcomeShown=true;
-      // 本局結束就把自己設為未準備(下一局要各自重新按準備)
-      if(meId && roomRef) { ready=false; roomRef.child("players/"+meId).update({ ready:false }); }
+      /* 本局結束就把自己設為未準備(下一局要各自重新按準備)。
+         ⚠⚠ 只在**這一局第一次**顯示結果時做。showOutcome() 會被反覆呼叫 ——
+           players / scores 任何一個節點一動,只要還在結果相位就再跑一次 ——
+           而續局的「我看完了」(readyUp)正是在這張卡上按的:不擋的話我按下去寫進去的
+           ready:true 會被自己**同一個 tick**抹回 false(症狀:按了完全沒反應,
+           而 status 已經翻成 lobby,像是只有一半生效)。
+         ★ 對七個舊遊戲逐字等價:那時 ready 只可能是 false(準備鈕在對戰中是收起來的),
+           重複寫的是同一個值,少寫幾次不改變任何行為。 */
+      if(firstShow && meId && roomRef) { ready=false; roomRef.child("players/"+meId).update({ ready:false }); }
       A.refresh && A.refresh();
     }
     function scoreOf(id){ return (scores[id]&&scores[id].n)||0; }
@@ -911,6 +960,7 @@ const MPCore = (function(){
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0; lastIndexSig=null; outcomeShown=false; abandoned=false;
       scoredThisRound=false; myRoundWin=false; autoStarting=false; emotesReady=false;
+      playedRound=null;    // 進新房要歸零(同 gameRev):不然新房第一局剛好同號就不會 enterPlaying
       closeLeaveAsk(); closeKick(); closeResign(); closeEmote(); closeWin();
       disarmBackGuard();   // 已經不在房裡:守衛連同它墊的那一筆歷史一起收掉(不然返回鍵要多按一次)
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();
@@ -973,7 +1023,7 @@ const MPCore = (function(){
       isHost:()=>isHost, phase:()=>curPhase, status:()=>status,
       winner:()=>winner, roundId:()=>roundId, abandoned:()=>abandoned,
       dispName, youTag, scoreOf,
-      setGame, patchGame, txGame, setRoomField, unreadyOnFieldChange,
+      setGame, patchGame, txGame, setRoomField, unreadyOnFieldChange, readyUp,
       renderPlayers, syncSetup, updateReadyBtn, updateGoal, onStatusTxt,
       maxPlayers:MAX_PLAYERS, minPlayers:MIN_PLAYERS,
       // adapter 自己要讀寫的房內節點(見 A.listen / A.extraNodes);沒進房時回 null
@@ -984,7 +1034,7 @@ const MPCore = (function(){
     /* ---------- 對外 API(通用部分 + adapter 自己的) ---------- */
     const api = {
       available, openConnect, scanRooms, create, join, joinFromHome, leave,
-      toggleReady, again,
+      toggleReady, again, readyUp,
       isOnline:()=>online, amHost:()=>isHost, amReady:()=>ready,
       setScoreMode, setWinGoal, resetScores,
       winGoal:()=>winGoal, scoreMode:()=>scoreMode,
@@ -1023,6 +1073,10 @@ const MPCore = (function(){
      scoreUnit/goalDefault/goalMax  計分的單位與目標值(v1.76.0 為大老二的名次分加)
      scoreSigned      ★ 分數是有正負的量(v1.84.0 為 21 點的淨籌碼加)——
                         不帶就是舊行為,七個舊遊戲一個字都不受影響。grep SIGNED 看落地的五處。
+     contRound        ★ 局間續局(v1.103.0 為台灣麻將加)—— 一局結束不回大廳,
+                        結果卡上按一下(或 adapter 倒數到期)就 MP.readyUp(),
+                        湊齊由房主開下一局。核心靠 roundId 變了認出新的一局。
+                        不帶就是舊行為;adapter 自己決定「最後一局不要續」。
      joinMidGame      ★ 允許對局中加入(v1.84.0 為 21 點加)——
                         同樣不帶就是舊行為。⚠ 要一起改 js/home-live.js 的 joinable()
      adoptId(old,now)  ★ 同名接續時,把遊戲自己那份「per-pid 的一場進度」從舊 pid 搬到新 pid

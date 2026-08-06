@@ -25,7 +25,7 @@
 const MP = MPCore.create((function(){
 
   const COLORS = ["p0","p1","p2","p3"];
-  /* 操作倒數(秒):房主可選,預設 12(v1.59.0 從寫死的 7 秒改過來 ——
+  /* 操作倒數(秒):房主可選,預設 30(v1.59.0 從寫死的 7 秒改過來 ——
      實際上手回報「8 秒太快了」,真牌桌上思考吃碰的時間本來就比這長)。
      ★ 一定要是**房間層級設定**、不能各人存自己的偏好:到期補「過」/ 自動打牌都是
        「誰的 timer 先響誰結算」,各台設不同秒數的話等於全房都被最短的那個決定。
@@ -44,9 +44,23 @@ const MP = MPCore.create((function(){
        通常是掛機的人、被罰的卻是下一家。**留一半不影響對稱性**:總長度仍然固定。
      ★ **0 = 關掉**(#m16SecSeg 的第一顆)。關掉之後兩邊都不限時 —— 沒有人催,
        但**某個人離開牌桌就會全桌一直等**(現場親友喊一聲就好,所以這是使用者的選擇)。
-     可選的值寫在 mahjong16.html 的 #m16SecSeg(關 / 8 / 12 / 20 / 30),這裡只守範圍。 */
-  const SEC_DEF = 12;
+     可選的值寫在 mahjong16.html 的 #m16SecSeg,這裡只守範圍。
+     ★★ v1.103.0 整組往上搬:關 / 8 / 12 / 20 / 30(預設 12)→ **關 / 15 / 30 / 45 / 60
+       (預設 30)**。使用者指定的值。這一份是**一手的總預算**(宣告 + 出牌兩段共用),
+       宣告階段最多只吃掉一半 —— 舊的預設 12 秒等於「吃碰 6 秒 + 出牌 6 秒」,
+       真牌桌上光是看清楚別人打了什麼就不只 6 秒。
+     ⚠ 別人開的**房間**送來 8 / 12 / 20 照樣照單全收(secOK 是**範圍**不是白名單)——
+       那是房主的設定,擅自換成鄰近值等於全房各算各的。段落列上沒有一顆亮著是正確的。
+     ⚠ 但**自己的偏好**要 snapSec():舊玩家的偏好裡存著 12,不吸附的話他永遠停在 12、
+       而且開房時看到的段落列一顆都沒亮(見 usePrefs)。 */
+  const SEC_DEF = 30;
+  const SEC_OPTS = [0, 15, 30, 45, 60];                   // ⚠ 要與 mahjong16.html 的 #m16SecSeg 一致
   const secOK = n => n === 0 || (n >= 5 && n <= 60);      // 守門用範圍,舊房間 / 手改 DB 的值也要能用
+  // 舊偏好吸附到最接近的一顆(0 是「關」,不要被 15 吸走 → 先擋掉)
+  function snapSec(n){
+    if(!(n > 0)) return 0;
+    return SEC_OPTS.slice(1).reduce((a,b)=> Math.abs(b-n) < Math.abs(a-n) ? b : a);
+  }
   /* 底幾台(v1.75.15,使用者:「底幾台要能被設定,預設為 2 台」)。
      ★ 一定是**房間層級設定**:底台是算收付用的,各人一份的話同一局四台會算出不同的錢
        (而且收付相加照樣是 0,零和斷言抓不到)。可選的值寫在 mahjong16.html 的 #m16BaseSeg。
@@ -602,7 +616,92 @@ const MP = MPCore.create((function(){
               有人離開牌桌就真的全桌卡著等。玩家要據此決定要不要設秒數 → 一定要明講。 */
            "<br><span class=\"m16-warn\">⚠ 有人離開牌桌,全桌會一直等他。</span><br>"))+
       "誰在考慮吃碰,其他人看不出來。<br>"+
-      "打滿 <b>"+handsGoal+" 局</b>後結算,台數最高的人贏。";
+      "打滿 <b>"+handsGoal+" 局</b>後結算,台數最高的人贏。"+
+      /* 續局是**規則以外但看得到**的流程改變(打一圈時中間不會回大廳),寫進說明裡 ——
+         不然房主會以為「怎麼沒有回到準備畫面」。只打 1 局就不提(它沒有中間局)。 */
+      (handsGoal > 1
+        ? "<br>中間每一局結束<b>不回大廳</b>:結果卡看完按一下就接著打(" +
+          Math.round(NEXT_MS/1000) + " 秒後自動)。"
+        : "");
+  }
+
+  /* ==========================================================================
+     局間續局(v1.103.0)—— 使用者:「玩完一局後,不用全部人都要再按準備好了,
+     這樣沒有連續感」。
+     ──────────────────────────────────────────────────────────────────────────
+     ★ 只有**中間那幾局**續(handsGoal > 1 且還沒打滿):
+       · 只打 1 局 —— 打完就是整場結束,本來就該回大廳談下一場的設定。
+       · 最後一局 —— 結果卡是**總結算**(誰奪冠 / 開新賽季),把人留在那張卡上才對。
+     ★ 機制在核心的 contRound 旗標(見 mp-core.js 檔頭):readyUp() 不離開 playing 相位,
+       所以**結果卡一路開著到新的一局發牌**,中間不會閃過大廳設定畫面 —— 那個閃動正是
+       「沒有連續感」的來源。房主端湊齊就 startGame()。
+     ★ 為什麼還留一顆按鈕:全部人都按完就**馬上**開下一局,不用等倒數。
+       ⚠ 鈕上的字一律「我看完了」而不是「下一局」—— 按下去不會馬上換局(要等其他人),
+         字與實際發生的事不一致的話,下一步會有人猛按(同 21 點 v1.95.0 的結論)。
+     ⚠ NEXT_MS 是**後備**,不是節奏:它擋的是「有人放著不管全桌乾等」。
+       台數表比 21 點那張過場密,所以比它的 6 秒長。
+     ⚠ 倒數是**各台自己的** setTimeout(不是伺服器時間):誰的先到誰先準備好,
+       全房的節奏由最慢的那台決定 —— 這與「到期補過」不同,不搶、不會有兩份真相。
+     ========================================================================== */
+  const NEXT_MS = 15000;
+  let nextKey = "";                 // 已經為哪一局 arm 過(outcome() 會被重複呼叫,見那裡)
+  let nextT = null, nextTick = null, nextEnd = 0;
+
+  /* 這一局結束之後要不要續。三個條件缺一不可:
+       · 打一圈以上(只打 1 局沒有「中間局」)
+       · 還沒打滿(最後一局的結果卡是總結算,要把人留在那裡)
+       · ⚠ 人還夠開下一局 —— 少了這一條,剩一個人時會停在「大家都看完了…」永遠開不了局
+         (房主端 updateStartBtn 有人數門檻,而房主獨自一人的自動回大廳只在**沒有 winner**
+         時才動;那時候正好有 winner)。人數不夠就退回原本的「下一局 = 回大廳」。
+     ★ outcome() 每次重跑都會重新問一次,所以中途有人離開會自己切回去。 */
+  function contOn(){
+    return handsGoal > 1 && handsDoneNow() < handsGoal &&
+           Object.keys(ctx.players()).length >= ctx.minPlayers;
+  }
+  function seenBy(id){ return !!(ctx.players()[id] || {}).ready; }
+  function waitCount(){ return Object.keys(ctx.players()).filter(id=>!seenBy(id)).length; }
+
+  function clearNext(){
+    if(nextT){ clearTimeout(nextT); nextT = null; }
+    if(nextTick){ clearInterval(nextTick); nextTick = null; }
+    nextKey = ""; nextEnd = 0;
+    const el = $("m16Next"); if(el){ el.classList.add("hidden"); el.innerHTML = ""; }
+  }
+  function armNext(){
+    nextEnd = performance.now() + NEXT_MS;
+    nextT = setTimeout(()=>{ nextT = null; ctx.readyUp(); paintNext(); }, NEXT_MS);
+    /* 半秒一次:整數秒的顯示才不會偶爾跳過一個數字(500ms 取樣、Math.ceil 換算)。
+       ⚠ 這裡只換一行字,不重畫結果卡 —— 重畫會把表情列的動畫與捲動位置洗掉。 */
+    nextTick = setInterval(paintNext, 500);
+    paintNext();
+  }
+  /* 腳註那一行。★ 兩種身分要講不同的事(而且是同一行,不要多長一列出來):
+       還沒按 —— 倒數剩幾秒 + 「大家看完就馬上開」(告訴他按了有用)
+       按過了 —— 還在等幾個人(不然按完之後那顆鈕變灰、畫面沒有任何交代) */
+  function paintNext(){
+    const el = $("m16Next"); if(!el) return;
+    if(!nextKey){ el.classList.add("hidden"); el.innerHTML = ""; return; }
+    const left = Math.max(0, Math.ceil((nextEnd - performance.now())/1000));
+    const mine = seenBy(ctx.me());
+    const wait = waitCount();
+    el.classList.remove("hidden");
+    el.innerHTML = mine
+      ? (wait > 0 ? "✓ 已看完 —— 還在等 <b>"+wait+"</b> 人…" : "✓ 大家都看完了,馬上開下一局…")
+      : "⏱ <b>"+left+"</b> 秒後自動開下一局 · 大家看完就馬上開";
+    const b = $("mpAgain");
+    if(b){
+      b.textContent = mine ? "✓ 已看完" : "✓ 我看完了";
+      b.classList.toggle("ghost", mine);
+      b.classList.toggle("primary", !mine);
+      b.disabled = mine;
+    }
+  }
+  /* 結果卡上那顆鈕按下去。回 true = 這一次由續局接手(不要再走核心的「回大廳」)。 */
+  function seeDone(){
+    if(!nextKey) return false;
+    ctx.readyUp();
+    paintNext();
+    return true;
   }
 
   return {
@@ -613,6 +712,9 @@ const MP = MPCore.create((function(){
     winCardId:"m16WinCard",
     hasResign:false,
     extraNodes:["tai"],
+    /* ★ 局間續局(v1.103.0):打一圈 / 一將的中間局結束**不回大廳**。
+       核心那一半見 mp-core.js 的 CONT_ROUND;這一頁的一半在上面那整段 + outcome()。 */
+    contRound:true,
 
     init(c){ ctx = c; },
 
@@ -701,6 +803,11 @@ const MP = MPCore.create((function(){
 
       const before = st;
       st = s;
+      /* 續局的倒數只在「這一局結束了」的狀態下才有意義 —— 收到一份沒有 over 的新狀態
+         (換局 / 上一局被整包覆寫 / 斷線重連補齊)就一定要收掉,不然計時器會活著跑到
+         下一局中間才開火(把人標成準備好)。⚠ enterPlaying 也清一次,兩邊都要:
+         這一條擋的是「winner 被清掉但 roundId 沒變」那種不會走 enterPlaying 的路徑。 */
+      if(!s.over) clearNext();
       /* ★ v1.65.0:「這一手」的錨點。整份操作倒數(宣告 + 出牌)都從這裡起算,所以
          **從有人打出一張牌到下一張牌落桌,總長度固定** —— 中間有沒有人在考慮吃碰,
          在時間上完全反映不出來(見檔頭與 isNewHand)。
@@ -747,7 +854,7 @@ const MP = MPCore.create((function(){
     enterLobby(){ showScreen("lobby"); $("mpBar").classList.remove("playing"); ruleHint(); },
     backToLobby(){
       showScreen("lobby"); $("mpBar").classList.remove("playing");
-      clearClaimT(); clearTurnT(); st=null; curRound=null; myBid=false; handAt=0;
+      clearClaimT(); clearTurnT(); clearNext(); st=null; curRound=null; myBid=false; handAt=0;
       wipeActs();
       ctx.renderPlayers();               // 台數在晶片上,回大廳要重畫(st 已清掉,風會收起來)
       ruleHint();
@@ -755,6 +862,9 @@ const MP = MPCore.create((function(){
     enterPlaying(){
       showScreen("play");
       $("mpBar").classList.add("playing");
+      /* ★ 續局時這支是**上一局的結果卡收掉、新的一局發牌**的那一刻(核心已經 closeWin)——
+         倒數與腳註一定要在這裡收乾淨,不然計時器會活到下一局的中間再開一次火。 */
+      clearNext();
       Sound.start();
       // ★ 這一局開打前大家各幾勝(排名表的「N 勝」欄要拿它 +1;見宣告處)
       baseWins = {}; lastGained = [];
@@ -762,7 +872,8 @@ const MP = MPCore.create((function(){
       M16Sfx.preload();          // 喊牌音檔先載好,第一次碰才有聲音(見 sfx.js 的 preload)
     },
     onLeave(){
-      clearClaimT(); clearTurnT(); st=null; curRound=null; tai={}; myBid=false; handAt=0;
+      clearClaimT(); clearTurnT(); clearNext();
+      st=null; curRound=null; tai={}; myBid=false; handAt=0;
       baseWins = {}; lastGained = []; lastDeal = null;   // 離房:連莊記錄跟著清(換房間就是新牌局)
       wipeActs();
     },
@@ -850,6 +961,21 @@ const MP = MPCore.create((function(){
       const last = done >= handsGoal;
       paintTaiTable(last);
 
+      /* 局間續局(見上面那一整段)。★ arm **一局只做一次**,但腳註**每一次都要重畫** ——
+         outcome() 會被反覆呼叫(核心的 players / scores 監聽一動就 showOutcome()),
+         而「還在等 N 人」正是靠那幾次重畫才會跟著別人按鈕動。
+         ⚠ 鑰匙用 roundId:用 `first` 那個旗標的話,重連 / 重畫時 arm 不回來。 */
+      if(contOn()){
+        if(nextKey !== (curRound || "-")){ clearNext(); nextKey = curRound || "-"; armNext(); }
+        else paintNext();
+      }else{
+        // 最後一局(或只打一局):回到原本的「下一局 = 回大廳重新準備」
+        clearNext();
+        const b = $("mpAgain");
+        if(b){ b.textContent = "下一局 ▸"; b.disabled = false;
+               b.classList.add("primary"); b.classList.remove("ghost"); }
+      }
+
       /* 大字:四種輸法分開講(v1.70.0)。文案表與挑選規則在 M16B.overWord() —— 單機那份
          叫的是同一支,所以這裡**不再是「兩份要一起改」**的其中一份。
          ★ 卡片配色順手覆寫:核心只知道「贏 / 沒贏」,而「別人放槍給別人胡」我一毛都不用付,
@@ -886,7 +1012,10 @@ const MP = MPCore.create((function(){
                          voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
-      if(o.claimSec!==undefined && secOK(+o.claimSec)) claimSec = +o.claimSec;
+      /* ⚠ 這裡要 snapSec():v1.103.0 換掉整組秒數之後,舊玩家偏好裡的 8 / 12 / 20
+         沒有對應的按鈕 —— 不吸附的話他開房時段落列一顆都不亮,而且永遠拿不到新預設。
+         (別人房間送來的值走 readRoom,那邊刻意**不**吸附:那是房主的設定。) */
+      if(o.claimSec!==undefined && secOK(+o.claimSec)) claimSec = snapSec(+o.claimSec);
       /* ⚠ 舊偏好沒有 baseTai → 用**新預設值 2**(這裡與 readRoom 相反:那邊是別人已經
          開好的房間,規則說明寫的是舊的;這裡是我自己下次開房要用的值)。 */
       if(o.baseTai!==undefined && baseOK(+o.baseTai)) baseTai = +o.baseTai;
@@ -928,6 +1057,9 @@ const MP = MPCore.create((function(){
         if(!ctx.setRoomField("baseTai", v, { lobbyOnly:true, denyMsg:"只有房主能改底台", busyMsg:"對戰中不能改底台" })) return;
         baseTai = v; ctx.syncSetup(); savePrefs();
       },
+      /* 結果卡那顆鈕:續局中是「我看完了」(回 true),最後一局才是原本的「下一局」。
+         ⚠ 判斷放在這裡而不是 main.js —— 「這一局是不是最後一局」只有 adapter 知道。 */
+      seeDone,
       taiOf, handsDone, goal:()=>handsGoal, sec:()=>claimSec, base:()=>baseTai,
       state:()=>st, seat:mySeat,
       // 盤面切換「要吃哪一組」之後,✔ 按鈕上的字要跟著換 → 回頭叫這支重畫動作列

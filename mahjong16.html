@@ -12,8 +12,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.102.1 -->
-<meta name="version" content="1.102.1">
+<!-- 台灣 16 張麻將 · v1.103.0 -->
+<meta name="version" content="1.103.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -221,12 +221,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
              是做為這次的完全操作倒數」。0 = 關掉(兩邊都不限時,見 adapter 的 secOn)
              v1.65.0:這個秒數是**一手的總預算**(從有人打出一張牌起算),不是兩段各給一份
              —— 兩段各起算的話,那一手拖了兩倍長就等於告訴出牌的人「有人吃得下你這張」 -->
+        <!-- v1.103.0:整組往上搬(關 / 8 / 12 / 20 / 30 → 關 / 15 / 30 / 45 / 60,預設 30)。
+             ⚠ 這五個值與 js/mahjong16/adapter.js 的 SEC_OPTS 是**兩份**,改一邊要改另一邊
+               (那邊拿它把舊偏好吸附到最接近的一顆)。 -->
         <div class="seg" id="m16SecSeg" aria-label="操作倒數">
           <button data-sec="0">關</button>
-          <button data-sec="8">8 秒</button>
-          <button class="on" data-sec="12">12 秒</button>
-          <button data-sec="20">20 秒</button>
-          <button data-sec="30">30 秒</button>
+          <button data-sec="15">15 秒</button>
+          <button class="on" data-sec="30">30 秒</button>
+          <button data-sec="45">45 秒</button>
+          <button data-sec="60">60 秒</button>
         </div>
       </div>
       <div class="field" id="scoreRow">
@@ -301,6 +304,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn primary" id="mpAgain">下一局 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
+      <!-- 局間續局的腳註(v1.103.0):倒數還剩幾秒 / 還在等幾個人。
+           連線、打一圈以上、而且不是最後一局才會出現(字全部由 adapter 的 paintNext 填)。
+           ★ #mpAgain 上面的字也是那支換的:續局中是「我看完了」,最後一局才是「下一局 ▸」。 -->
+      <div class="m16-next hidden" id="m16Next" aria-live="polite"></div>
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
            id 刻意與數獨 / 消消樂同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
       <div class="actions" id="soloWinBtns">
