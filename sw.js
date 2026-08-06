@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.105.0";
+const VERSION = "1.106.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -76,6 +76,18 @@ const CORE = [
   "./js/blackjack/solo.js",
   "./js/blackjack/adapter.js",
   "./js/blackjack/main.js",
+  /* UNO(第九個遊戲,v1.106.0;獨立頁面)。
+     ★ 牌面自繪在 js/uno/board.js 裡面,**沒有** shared 的 faces 檔 ——
+       UNO 牌只有這一頁用,而 js/shared/ 抽出去的理由是「兩個以上的遊戲共用」。
+     ★ 這一頁**不新增任何 mp3**:動作聲全是 Sound.tone() 的合成音,
+       所以下面 mp3 那一大段一行都不必動(也省掉「動 mp3 要四處一起改」那條耦合)。 */
+  "./uno.html",
+  "./js/uno/rules.js",
+  "./js/uno/ai.js",
+  "./js/uno/board.js",
+  "./js/uno/solo.js",
+  "./js/uno/adapter.js",
+  "./js/uno/main.js",
   "./mp3/bgm.mp3",
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",

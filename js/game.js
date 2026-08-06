@@ -618,6 +618,11 @@
                    // ★ 21 點的房規蓋板(v1.84.0)。只有 blackjack.html 有這個 id,
                    //   其他六頁自動跳過(見上面那條註解)—— 漏掉的話按返回會跳成「離開房間?」
                    ["bjRulesVeil",()=>closeRules()],
+                   /* ★ UNO 的兩個蓋板(v1.106.0)。只有 uno.html 有這兩個 id,其他八頁自動跳過。
+                      ⚠ 選色盤要排在**房規前面**:它是「出了 Wild 正在等你選顏色」的強制層,
+                        兩個同時開著的時候先關它。關掉 = 那一手 Wild 取消(牌回到手上)——
+                        安全,因為顏色還沒選就不會送進 moves。 */
+                   ["unColorVeil",()=>UNB.closeColor()],["unRulesVeil",()=>closeRules()],
                    ["resignVeil",()=>MP.cancelResign()],["leaveVeil",()=>MP.cancelLeave()]];
   function dismissTopLayer(){
     for(let i=0;i<BACK_LAYERS.length;i++){

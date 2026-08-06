@@ -1170,25 +1170,35 @@
      ⚠ 卡片的 margin-top 換成 grid 的 gap:兩者並存會讓第二列以後多一段空白。 */
   /* ⚠ grid-auto-rows:1fr = **每一列都一樣高**。不加的話「現在有人在玩」的徽章
      一出現就只把它那一列撐高 26px,八張卡高低不齊(截圖才看得出來)。 */
-  .gc-grid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:10px;margin-top:12px}
+  /* ★★ v1.106.0:**兩欄改三欄**(第九個遊戲 UNO 進來)。
+     兩欄 × 9 張 = 5 列,直立手機一定要捲才看得完 —— 而 v1.89.0 這一版的訴求
+     就是「不必捲」。9 剛好 3×3,所以改三欄同時把插圖與字級縮一階。
+     ⚠ 驗收點仍然是「**最後一張卡的下緣還在視窗裡嗎**」
+       (`getBoundingClientRect().bottom <= innerHeight`)——
+       **不可以問 `document.scrollHeight`**:捲的是 `#home`,壞掉時照樣回「不用捲」。 */
+  .gc-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:8px;margin-top:10px}
 
   /* 遊戲卡:插圖在上、名稱在下、整張居中(button 與 <a> 共用同一個外觀)。
      ⚠ 名稱**不設 nowrap** —— 「麻將消消樂」在窄機上要換行也好過被裁掉;
         grid 的同一列本來就等高,某張卡多一行不會把版面推歪。
      ⚠ justify-content:center 是搭配上面那條等高用的:卡片被拉高時內容要留在中間,
         靠上(flex-start)會在名稱底下留一塊空白。 */
+  /* ⚠ v1.106.0 三欄之後 padding 與 gap 都要收一階 —— 390px 手機一格只有約 118px 寬,
+     原本的 `14px 10px` 會讓「麻將消消樂」五個字擠成三行。 */
   .game-card{display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:8px;width:100%;text-align:center;
-    background:var(--panel);border:1px solid var(--panel-line);border-radius:20px;
-    padding:14px 10px;cursor:pointer;color:var(--text);
+    gap:6px;width:100%;text-align:center;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;
+    padding:10px 6px;cursor:pointer;color:var(--text);
     font-family:'Nunito',sans-serif;transition:transform .15s, border-color .2s}
   .game-card:hover{transform:translateY(-2px);border-color:var(--accent)}
   .game-card:active{transform:scale(.985)}
   /* 覆寫 .home-art 的大尺寸與置中(BINGO 卡直接重用那張賓果卡 svg 的 .bc-* 配色) */
-  .gc-art{width:58px;height:58px;flex:none;margin:0;display:block}
-  .gc-body{display:flex;flex-direction:column;align-items:center;gap:3px;
+  /* ⚠ v1.106.0:58 → 46(三欄)。★ 縮到 46px 之後「認不認得出來」是**斷言測不到**的,
+     只能放大截圖看(notes/13 第七節)—— 尤其數獨那張是 6×6 = 36 個獨立小方塊。 */
+  .gc-art{width:46px;height:46px;flex:none;margin:0;display:block}
+  .gc-body{display:flex;flex-direction:column;align-items:center;gap:2px;
     flex:1 1 auto;width:100%;min-width:0}
-  .gc-name{font-size:19px;font-weight:700;line-height:1.15;letter-spacing:.02em}
+  .gc-name{font-size:15.5px;font-weight:700;line-height:1.15;letter-spacing:0}
   /* 即時徽章在窄卡裡要跟著居中(它自己那條是 align-self:flex-start,給一列一張的版型用的) */
   .gc-body .hl-badge{align-self:center}
   :root[data-theme="ebook"] .game-card{background:#fff;border:1px solid #000}
@@ -1228,10 +1238,12 @@
        ⚠ 量的一定是「最後一張卡的下緣還在視窗裡嗎」——
          document.scrollHeight 在這裡永遠等於 innerHeight(捲的是 #home 不是頁面),
          拿它當「要不要捲」會報 needScroll=no 的假綠。 */
-    .gc-grid{grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px}
-    .game-card{padding:10px 8px;gap:6px}
-    .gc-art{width:44px;height:44px}
-    .gc-name{font-size:17px}
+    /* ⚠ v1.106.0:四欄 → **五欄**。九張卡在四欄是 3 列,橫置矮視窗(900×430)又要捲了;
+       五欄 = 2 列(5 + 4),連「現在有人在玩」看板一起出現都還有餘裕。 */
+    .gc-grid{grid-template-columns:repeat(5,1fr);gap:7px;margin-top:9px}
+    .game-card{padding:8px 5px;gap:5px}
+    .gc-art{width:40px;height:40px}
+    .gc-name{font-size:14px}
   }
 
   /* ==========================================================================
@@ -5201,3 +5213,409 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      (CLAUDE.md 的紅線:不用 disabled 讓點擊靜默消失;再按會跳「你已經按過了」)。 */
   .bj-hskip.voted{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;opacity:.72}
   :root[data-theme="ebook"] .bj-hskip.voted{background:#eee;color:#000;border:1px solid #000}
+
+  /* ==========================================================================
+     UNO(第九個遊戲,v1.106.0)—— 前綴一律 .un-*
+     ⚠ 這一段只追加在檔尾,前面八個遊戲一行都沒動(CLAUDE.md 紅線 6)。
+     ========================================================================== */
+
+  /* ---------- 四色 ----------
+     ★ 一副實體牌的顏色**不吃主題變數**(同數獨木框那組 --sk-* 與撲克的 --sv-face):
+       實體材質在每個主題下都該長一樣。
+     ⚠ 四個顏色要能在深色桌面上互相分辨,所以亮度刻意拉高於印刷值;
+       綠與藍之間最容易糊掉,取樣過的兩個值差 40 度色相以上。
+
+     ── ★★★ 電子書主題**不可以**把這四支塌成黑 ──────────────────────────────
+       其他八個遊戲的電子書主題一律轉黑白,因為顏色在它們身上只是裝潢。
+       **UNO 不是** —— 「能不能出這張牌」的規則本體就是顏色,四色一起變黑
+       = 這個遊戲在電子書主題下**直接不能玩**(不是變醜,是玩不了)。
+       所以這四支在每個主題下都保持原值,電子書只把「牌面以外」的東西轉黑白。
+       ★ 附帶好處:紅綠色盲的玩家也吃這條 —— 牌面另外會標色名字母(見 .un-cd 那段)。
+     ⚠ 因此圖示的電子書覆寫要寫在**圖示自己那幾條 class 上**,不是改變數。 */
+  :root{ --un-r:#e0322f; --un-y:#f2b01c; --un-g:#2ea94c; --un-b:#2470c4;
+         --un-face:#ffffff; --un-line:#f4f1ea; --un-blk:#1d2733; }
+
+  /* ---------- 小圖示 .un-ic-*:首頁遊戲卡與進場插圖共用 ----------
+     ★★ 牌的尺寸**沿用三個撲克牌遊戲那一組**(21×30 rx2.7 · viewBox 56×56)——
+        見 notes/13 第九節。九張首頁卡要看起來是同一套,所以不另訂一組牌寬。
+
+     ── ★★ 但構圖**不是**那三個的「兩張交疊」,而是四張扇形 ──────────────────
+       第一版照大老二 / 21點畫成兩張交疊(藍 9 + 紅 +2),使用者看了說
+       「**我希望是能看出是 uno 牌的感覺**」。兩張牌只講得出「兩個顏色的紙牌」,
+       而 UNO 的辨識點其實有兩個,兩個都要在:
+         ① **四個顏色一起出現** —— 那是這副牌的規則本體,也是它的識別色
+         ② **斜白橢圓裡的 UNO 字樣** —— 牌背上那個東西
+       所以定案是「黃 / 綠 / 藍 三張扇在後面 + 最前面一張紅牌,橢圓裡寫 UNO」。
+       ⚠ 最前面那張刻意**用紅牌而不是黑色牌背**:黑牌在深色首頁上幾乎沒有輪廓,
+         而且黑底上的小字比紅底上的難讀(46px 那一格看得最清楚)。
+
+     ── 扇形的幾何 ────────────────────────────────────────────────────────────
+       四張牌的 x/y **完全一樣**(17.5, 11),差別只在繞 **(28, 54)** 轉
+       -25 / -8.5 / 8.5 / 25 度 —— 支點在牌的下方,所以轉出來就是握在手上的扇形。
+       ⚠ 半徑約 28,±25 度 → 左右各外擴約 11.8px,總寬約 45px(viewBox 56 放得下)。
+         **角度再開大就會被裁掉**,而被裁掉的是最外側那張牌的圓角(截圖才看得出來)。
+
+     ── ★★ 為什麼數字畫成「牌色」而不是實體牌的「白字 + 黑描邊」 ──────────────
+       真牌的大數字是**白字帶深色描邊**,壓在彩色牌面與白橢圓**兩種底**上面,
+       描邊就是為了同時壓得住這兩種底。但那個做法在 21×30 的圖示裡會糊成一團
+       (描邊佔的比例太大)。這裡改成「白橢圓 + 橢圓裡填牌色的數字」——
+       對比最大、40px 也讀得出來,而且一眼還是 UNO。
+       ★ 這就是 js/shared/pk-faces.js 那條教訓的同一個推論:
+         **照抄實體物件的規格之前,先問它當初解決的是什麼問題,那個問題還在不在。**
+         真牌要解決的是「白字壓兩種底」,而我們把數字收進橢圓裡 = 那個問題不存在了。
+
+     ⚠ 顏色 class(.un-ic-r/y/g/b)**同時給 rect 與 text 用** —— 兩者都是 fill,
+       所以一個 class 兩處通吃,不必寫 .un-ic-bd.un-ic-r 那種組合。
+     ⚠ 白橢圓一律 --un-face,**不可以**寫死 #fff(電子書主題要跟著走)。 */
+  .un-ic-bd{stroke:var(--un-line);stroke-width:.9}
+  /* ⚠ 橢圓要**撐滿整張牌的對角**(rx 8.4 / ry 13 在 21×30 的牌上約佔八成)——
+     第一版取 7.2/11.4,截圖看起來像「牌中間有一小塊白斑」而不是 UNO 的橢圓。
+     斜 -30 度是實體牌的角度;它與外層 rotate(±16) 疊起來仍然讀得出是斜的。 */
+  .un-ic-ov{fill:var(--un-face)}
+  .un-ic-t{font:800 13px/1 'Nunito',sans-serif;text-anchor:middle}
+  /* ⚠ 兩個字的標籤(+2 / +4)要小一階,不然會頂穿橢圓的兩端 */
+  .un-ic-t.sm{font-size:10.2px}
+  /* ★ 橢圓長軸上的 UNO 字樣(最前面那張牌)。
+     ⚠ 字型用本專案的 Nunito,**刻意不去模仿 Mattel 那個斜體描邊字標**。
+     ⚠ 6.6px 是量出來的上限:再大一階,三個字母就會頂穿 rx=8.4 的橢圓兩端。 */
+  .un-ic-t.wm{font-size:6.6px;letter-spacing:.04em}
+  .un-ic-r{fill:var(--un-r)}
+  .un-ic-y{fill:var(--un-y)}
+  .un-ic-g{fill:var(--un-g)}
+  .un-ic-b{fill:var(--un-b)}
+  /* ★ 電子書主題:白牌 + 黑框 + 黑字(同其他八張卡的處理)。
+     ⚠ 走**圖示自己這幾條 class**,不是把 --un-* 塌成黑 —— 見上面那段 ★★★:
+       那四支變數是遊戲規則的一部分,任何主題都不准動它們。
+     ⚠ 這裡要壓過 .un-ic-r/y/g/b 的 fill,所以選擇器要更具體(兩層 class)。 */
+  :root[data-theme="ebook"] .un-ic-bd{fill:#fff;stroke:#000;stroke-width:1.1}
+  :root[data-theme="ebook"] .un-ic-ov{fill:#fff;stroke:#000;stroke-width:.9}
+  :root[data-theme="ebook"] .un-ic-t{fill:#000}
+
+  /* 進場插圖(uno.html 頂端那張大圖)。
+     ⚠⚠ 首頁那張遊戲卡掛的是 **.un-cart**,**絕對不可以**掛 .un-art ——
+        這條 96px 定義在 .gc-art{width:46px} **後面**,同權重後定義勝
+        → 首頁那張卡的圖會變成 96px、整張卡比另外八張高一截。
+        這是 21 點 v1.86.0 踩過的坑(notes/13 第九節第 4 條),原封不動照抄它的解法:
+        首頁與進場各用一個 class,共用的只有裡面那份逐字相同的 SVG。 */
+  .un-art{width:96px;height:96px;display:block;margin:0 auto}
+
+  /* ==========================================================================
+     UNO 的版面
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 這一頁的版面刻意**比大老二簡單一個量級**:UNO 只有「桌子中央 + 我的手牌」,
+         沒有繞桌分格子(大老二 notes/16 那三張 grid-template-areas 是最會出事的一段)。
+         對手的資訊全部走**既有的玩家晶片列** `.mp-players`(剩幾張寫在晶片尾巴)——
+         那是八個遊戲共用的元件,不必為 UNO 多畫一套。
+       ★ 手牌是**橫向捲動的一列**、卡片尺寸固定 → 「手牌不會上下跳」這件事不必寫
+         任何 JS 量尺寸(大老二 fitTrick 那一整套在這裡不需要)。
+     ========================================================================== */
+  /* 牌的尺寸:一組變數,三種大小都從它算(桌上那張 big、結果表那些 tiny)。
+     ⚠ 變數寫在 .un-play(不是 :root)—— 這一頁的東西不要汙染全域,
+        而且未來要按視窗覆寫時只改一個地方。 */
+  /* ⚠⚠⚠ 這裡**只放 --un-cw,不放算出來的高度** ——
+     custom property 在「**定義它的元素**」上就完成代換,所以如果寫成
+       .un-play{--un-cw:50px; --un-ch:calc(var(--un-cw)*1.45)}
+     那麼 `.un-card.big{--un-cw:78px}` 換掉的只有寬,**--un-ch 仍然是照 50px 算的**
+     → big / tiny 那兩種牌會**又寬又扁**(而且不報錯,只有放大截圖看得出來)。
+     ★ 所以牌高一律寫在 `.un-card` 自己身上的 calc(見下面) ——
+       那時 var(--un-cw) 讀的才是「這一張牌」的值。
+     這與大老二 `--b2-tcw` 那條教訓是同一件事(notes/16 版面第 4 條)。 */
+  .un-play{--un-cw:clamp(44px,12.5vw,58px);--un-acth:74px;
+    display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0}
+  .un-stage{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px;
+    overflow-y:auto;overflow-x:hidden}
+
+  /* ---------- 一張牌 ----------
+     結構:外框(牌色)+ 斜白橢圓 + 大字 + 角落色名字母。
+     ⚠ 橢圓用 ::before 不行 —— 它要能被 .un-wq 的四色風車蓋在上面,
+        所以是一個真的 <span>(層次:牌 → 橢圓 → 風車/字)。 */
+  /* ⚠ overflow:hidden 是必要的兜底 —— 橢圓是旋轉的,任何尺寸微調都可能讓它探出牌緣,
+     而探出去的那一塊會蓋在隔壁的牌上(看起來像牌破了)。 */
+  /* ★ 高度是**在這裡**算的(不是在 .un-play)—— 見上面那段 ⚠⚠⚠。
+     1.45 是實體 UNO 牌的長寬比(88×58mm ≈ 1.517,收成 1.45 讓手牌列矮一點)。 */
+  .un-card{position:relative;display:inline-block;flex:none;overflow:hidden;
+    width:var(--un-cw);height:calc(var(--un-cw) * 1.45);border-radius:calc(var(--un-cw) * .14);
+    background:var(--un-blk);border:2px solid var(--un-face);
+    box-shadow:0 2px 6px rgba(0,0,0,.28);cursor:pointer;
+    -webkit-tap-highlight-color:transparent;user-select:none;
+    transition:transform .12s, filter .15s, box-shadow .15s}
+  /* ★★ 這五條顏色 class **不只給牌用**,「現在顏色」那顆色塊也掛同一組 ——
+     所以它們**不可以**被後面任何一條 background 蓋掉。
+     ⚠⚠ 第一版就中了:`.un-swatch{background:var(--panel-line)}` 定義在這裡後面,
+       同權重後定義勝 → 色塊永遠是灰的(截圖才看得出來,色碼看不出來)。
+       這是 notes/13「CSS 會撞的四類」的第二類(權重 / 順序),而且是**自己撞自己**——
+       前綴防得了名字撞,防不了這個。
+     修法:**沒有顏色時也給一個 class**(.un-c-none),讓 .un-swatch 完全不碰 background。 */
+  .un-c-r{background:var(--un-r)}
+  .un-c-y{background:var(--un-y)}
+  .un-c-g{background:var(--un-g)}
+  .un-c-b{background:var(--un-b)}
+  .un-c-w{background:var(--un-blk)}
+  .un-c-none{background:var(--panel-line)}
+  /* ---------- 斜白橢圓 ----------
+     ★★ 尺寸是**算出來的**,不是調出來的。旋轉 θ 的橢圓(半軸 a 水平、b 垂直)
+        外接框半寬 = √(a²cos²θ + b²sin²θ)、半高 = √(a²sin²θ + b²cos²θ)。
+          θ=20°、a=.37w、b=.63w → 半寬 .409w ≤ .5w ✓ 半高 .607w ≤ .725w ✓(牌高 1.45w)
+     ★★ 傾角**刻意是 20° 而不是 30°**:30° 的外接框長得快,為了不溢出只能把橢圓壓到
+        牌寬的 54% —— 小尺寸下看起來像一片細葉子(截圖才看得出來),而真牌的橢圓
+        寬度大約是牌寬的四分之三。降到 20° 就放得寬(74%),而且與首頁圖示的比例一致。
+     ⚠⚠ 第一版寫 76% × 84%(= a .38w、b .609w)→ 外接框半寬 .445w… 其實還是
+        算得出來會爆:**百分比的高度是吃牌高(1.45w)的**,84% 等於 1.218w = b 0.609w,
+        半寬變成 √(.1444×.75 + .371×.25) = .445w,加上 2px 邊框就溢出去了,
+        整顆橢圓被裁成葉子形(截圖一眼看得出來,程式碼完全看不出來)。
+     ★ 所以這裡一律用 **calc(var(--un-cw) × 係數)**,不用百分比 ——
+       百分比在寬高兩軸吃的是不同的基準,旋轉之後就沒辦法心算了。 */
+  .un-ov{position:absolute;left:50%;top:50%;
+    width:calc(var(--un-cw) * .74);height:calc(var(--un-cw) * 1.26);
+    border-radius:50%;background:var(--un-face);
+    transform:translate(-50%,-50%) rotate(-20deg)}
+  /* 牌面的大字。⚠ 顏色用 currentColor 的來源是外框的 background 對應色 ——
+     但 background 取不到,所以各色各寫一條(四條,不可以省)。 */
+  .un-lb{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);
+    text-align:center;font:800 calc(var(--un-cw) * .46)/1 'Nunito',sans-serif;
+    letter-spacing:-.02em}
+  /* ⚠ 兩個字的標籤(+2 / +4)要小一階 —— 橢圓的可用寬度是 .74w,
+     0.46w 的字級兩個字約 0.5w 寬會頂到白邊(同圖示的 .un-ic-t.sm)。 */
+  .un-lb.two{font-size:calc(var(--un-cw) * .34)}
+  .un-c-r .un-lb{color:var(--un-r)}
+  .un-c-y .un-lb{color:var(--un-y)}
+  .un-c-g .un-lb{color:var(--un-g)}
+  .un-c-b .un-lb{color:var(--un-b)}
+  /* ★★ 色名字母:電子書主題與紅綠色盲都靠它(見 js/uno/board.js 檔頭)。
+     擺右下角、白字 —— 底是牌色所以對比一定夠。 */
+  .un-cl{position:absolute;right:calc(var(--un-cw) * .08);bottom:calc(var(--un-cw) * .04);
+    font:800 calc(var(--un-cw) * .22)/1 'Nunito',sans-serif;color:#fff;opacity:.92}
+  /* Wild:白橢圓裡四色風車 + 中央深色圓寫 W / +4 */
+  /* ★ Wild 的四色**填滿整顆橢圓**(與 .un-ov 同一組尺寸)—— 那才是真牌的畫法:
+     Wild 牌是黑底 + 一顆被切成四色的橢圓,不是「白橢圓裡放一個小風車」。
+     第一版做成小風車(.44w 的圓),放大截圖看起來又擠又髒。
+     ⚠ 尺寸一定要與 .un-ov **逐字相同**,不然會露出一圈白邊(改一邊要改另一邊)。 */
+  .un-wq{position:absolute;left:50%;top:50%;
+    width:calc(var(--un-cw) * .74);height:calc(var(--un-cw) * 1.26);
+    transform:translate(-50%,-50%) rotate(-20deg);
+    display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;
+    border-radius:50%;overflow:hidden}
+  .un-wq i{display:block}
+  .un-wq i:nth-child(1){background:var(--un-r)}
+  .un-wq i:nth-child(2){background:var(--un-y)}
+  .un-wq i:nth-child(3){background:var(--un-g)}
+  .un-wq i:nth-child(4){background:var(--un-b)}
+  .un-lb.wild{color:#fff;text-shadow:0 0 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.7);
+    font-size:calc(var(--un-cw) * .34)}
+  /* 牌背 */
+  .un-card.back{background:var(--un-blk);cursor:pointer}
+  /* 牌背:深色牌 + 一顆單純的白橢圓。
+     ⚠ 第一版加了 `inset box-shadow` 想做成「白圈」,放大截圖是一顆深色橢圓配一圈白邊
+       (與預期相反)。牌背只需要「一眼看出是蓋著的牌」,不必有花紋 —— 拿掉。 */
+  .un-bk{position:absolute;left:50%;top:50%;
+    width:calc(var(--un-cw) * .70);height:calc(var(--un-cw) * 1.20);border-radius:50%;
+    transform:translate(-50%,-50%) rotate(-20deg);
+    background:var(--un-face)}
+
+  /* 亮 / 暗。★ 暗的**照樣點得動**(只是會跳 toast 說原因)——
+     CLAUDE.md 的紅線:不用 disabled / pointer-events:none 讓點擊靜默消失。 */
+  .un-card.can{box-shadow:0 0 0 2px var(--accent),0 3px 10px rgba(0,0,0,.34)}
+  .un-card.can:hover{transform:translateY(-6px)}
+  .un-card.can:active{transform:translateY(-2px) scale(.97)}
+  /* ⚠⚠ 暗牌**不可以降飽和度** —— 第一版寫 `saturate(.35) brightness(.62)`,
+     紅 / 黃 / 綠三色全部塌成同一團土黃,連白橢圓都變灰綠(放大截圖才看得出來)。
+     而「手上有哪些顏色」是 UNO 玩家規劃下一手的唯一依據:看不出顏色 = 這一頁不能玩。
+     ★ 所以只降**亮度與不透明度**,色相一個度都不動 —— 一眼看得出是暗的,也還讀得出顏色。 */
+  .un-card.no{filter:brightness(.72);opacity:.72}
+  .un-card.big{--un-cw:clamp(58px,17vw,78px)}
+  .un-card.tiny{--un-cw:26px;border-width:1px;box-shadow:none}
+
+  /* ---------- 桌子中央 ---------- */
+  /* ⚠ 高度**要有上限**:第一版寫 flex:1 讓它吃掉整塊剩餘空間 → 直立手機上變成
+     「兩疊牌浮在一個很大的空盒子中間」(截圖一眼看得出來,程式碼看不出來)。
+     min 讓它在矮視窗不被壓扁,max 讓它在高視窗不無限長。 */
+  .un-table{flex:0 1 auto;min-height:200px;max-height:340px;
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:10px;
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.10));
+    border:1px solid var(--panel-line);border-radius:18px;padding:12px 10px}
+  .un-piles{display:flex;align-items:flex-start;justify-content:center;gap:clamp(14px,6vw,34px)}
+  .un-pile,.un-top{display:flex;flex-direction:column;align-items:center;gap:5px;
+    background:none;border:none;padding:0;cursor:pointer}
+  .un-pn{font:800 11px/1 'Nunito',sans-serif;color:var(--muted);white-space:nowrap}
+  /* ★★ 「現在顏色」一定要獨立畫一塊 —— Wild 打出去之後桌上那張是黑的,
+     顏色只存在 st.col 裡。漏了它玩家完全不知道現在該出什麼色(最容易漏的一格)。 */
+  .un-now{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+  /* ⚠⚠ 這裡**故意不寫 background** —— 顏色一律由 .un-c-* 那一組給
+     (沒顏色時掛 .un-c-none)。寫了就會蓋掉它們(見上面那段 ★★ 的教訓)。 */
+  .un-swatch{width:20px;height:20px;border-radius:6px;flex:none;
+    box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
+  .un-nowtxt{font:800 13px/1.2 'Nunito',sans-serif;color:var(--text)}
+  .un-dir{font:800 11.5px/1 'Nunito',sans-serif;color:var(--muted);
+    padding:3px 8px;border-radius:999px;background:rgba(0,0,0,.16)}
+  .un-pen{font:800 12.5px/1.3 'Nunito',sans-serif;color:var(--accent-2);text-align:center}
+
+  /* ---------- 手牌 ----------
+     ⚠ 橫向捲動 + nowrap:手牌可能到二十幾張,換行會把桌子擠掉。
+     ⚠ 一定要 padding-top —— .can:hover 會往上抬 6px,沒有留位置會被裁掉
+        (那是 notes/13 第三節「捲動容器裡會放大的東西」的同一類問題)。 */
+  /* ★★ margin-top:auto = **手牌貼著動作列**(桌子在上面、剩下的空間全給它們之間)。
+     ⚠ 第一版用 `.un-stage{justify-content:center}` 把「桌子 + 手牌」當一組垂直居中,
+       結果手牌與動作列之間空了 150px(截圖才看得出來)—— 而手牌應該在拇指附近。 */
+  .un-handwrap{flex:0 0 auto;margin-top:auto;display:flex;flex-direction:column;gap:4px}
+  .un-hlabel{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    font:800 12px/1.2 'Nunito',sans-serif;color:var(--muted)}
+  .un-drewtag{font-weight:800;color:var(--accent-2)}
+  .un-hand{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;
+    padding:8px 2px 4px;scrollbar-width:thin;touch-action:pan-x}
+
+  /* ---------- 動作列 ----------
+     ⚠ 寫死最小高度:內容會變(抓鈕 / UNO 鈕 / 提示各自出現),
+        不固定的話桌子會跟著一起上下跳(大老二 --b2-acth 的同一條理由)。 */
+  .un-acts{flex:0 0 auto;min-height:var(--un-acth);position:relative;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+  .un-wait{font:800 13.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
+  .un-hint{flex:1 1 100%;text-align:center;
+    font:700 11.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
+  .un-acts .btn{display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.15}
+  .un-acts .btn small{font-size:10px;font-weight:700;opacity:.85}
+  /* UNO! 切換鈕:按下去要看得出來「已經武裝」 */
+  .un-unobtn{background:rgba(255,255,255,.14);color:var(--text)}
+  .un-unobtn.on{background:var(--un-y);color:#3a2a00;box-shadow:0 0 0 2px var(--un-y)}
+  .un-catch{background:var(--un-r);color:#fff}
+  /* 出牌倒數的環:動作列底部一條(公開資訊,全桌都看得到還剩多久) */
+  .un-cd{position:absolute;left:6px;right:6px;bottom:0;height:4px;border-radius:3px;
+    background:rgba(255,255,255,.14);overflow:hidden}
+  .un-cd i{display:block;height:100%;background:var(--accent);border-radius:3px}
+
+  /* ---------- 選色盤 ---------- */
+  .un-colors{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+  .un-cbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    padding:18px 10px;border:none;border-radius:16px;cursor:pointer;
+    font:800 17px/1 'Nunito',sans-serif;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+  .un-cbtn:active{transform:scale(.97)}
+  .un-cbtn b{font-size:22px}
+  .un-cb-r{background:var(--un-r)}
+  .un-cb-y{background:var(--un-y);color:#3a2a00;text-shadow:none}
+  .un-cb-g{background:var(--un-g)}
+  .un-cb-b{background:var(--un-b)}
+
+  /* ---------- 結果表 ---------- */
+  .un-rtab{width:100%;border-collapse:collapse;font-family:'Nunito',sans-serif}
+  .un-rtab th{font-size:11px;font-weight:800;color:var(--muted);padding:3px 4px;text-align:left}
+  .un-rtab td{padding:4px;font-size:13px;font-weight:700;vertical-align:middle}
+  .un-rtab tr.me td{color:var(--accent)}
+  .un-rtab td.rk{width:2.4em;font-size:15px;font-weight:800;text-align:center}
+  .un-rtab td.nm{max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .un-rtab td.lf{font-size:11.5px;color:var(--muted);white-space:nowrap}
+  .un-rtab td.pt{text-align:right;white-space:nowrap}
+  .un-rtab td.pt small{display:block;font-size:10px;font-weight:700;color:var(--muted)}
+  .un-rtab tr.cd td{padding:0 4px 8px;border-bottom:1px solid var(--panel-line)}
+  /* ★ 結果表是唯一把手牌翻開的地方(牌情紅線的豁免點) */
+  .un-rcards{display:flex;gap:3px;flex-wrap:wrap}
+  .un-rout{font-size:11.5px;font-weight:800;color:var(--accent)}
+
+  /* ---------- 電子書主題 ----------
+     ★★ 四色**不動**(見上面那段 ★★★:顏色是 UNO 的規則本體,轉黑白等於玩不了)。
+     這裡只把「牌面以外」的裝潢轉黑白,並且把牌框加粗讓白底上的牌看得出邊界。 */
+  :root[data-theme="ebook"] .un-card{box-shadow:none;border-color:#000}
+  :root[data-theme="ebook"] .un-card.can{box-shadow:0 0 0 3px #000}
+  :root[data-theme="ebook"] .un-card.no{filter:saturate(.2) brightness(.85)}
+  :root[data-theme="ebook"] .un-table{background:#fff;border:1px solid #000}
+  :root[data-theme="ebook"] .un-dir{background:#eee;color:#000}
+  :root[data-theme="ebook"] .un-cd{background:#eee}
+  :root[data-theme="ebook"] .un-cd i{background:#000}
+  :root[data-theme="ebook"] .un-unobtn{background:#eee;color:#000;border:1px solid #000}
+
+  /* ==========================================================================
+     UNO 的外框(照 .b2-* 那一組做一份對應的)
+     ⚠ 這幾條**不可以**直接沿用 .b2-*:那些是大老二那一頁的,改動會波及它。
+        前綴分開是紅線 6;而「長得一樣」是靠**抄同一組數字**,不是靠共用 class。
+     ========================================================================== */
+  .un-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+    line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+  :root[data-theme="ebook"] .un-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+  .un-scroll{flex:1 1 auto}
+  .un-hero{text-align:center;margin:14px 0 4px}
+  /* 單機第二層的戰績那一行(照大老二的 .b2-warn) */
+  .un-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
+
+  /* ---------- 房間框 / 單機列 ---------- */
+  .un-room{padding:9px 12px}
+  .un-room .row{margin-top:0}
+  .un-room-top{flex-wrap:nowrap;gap:8px}
+  .un-room .un-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13px;font-weight:700;color:var(--muted)}
+  .un-room .un-room-title b{font-size:15px;color:var(--text)}
+  /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
+     不寫這條的話它們會是 42px、跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
+  .un-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .un-room .quick-voice,.un-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .un-room .quick-voice .qv-ico{font-size:18px}
+  .un-room .mp-subrow{margin-top:5px}
+  .un-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .un-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  /* 晶片尾巴的「剩幾張」。★★ 牌情紅線:對手**只給張數**,牌值要等結算。 */
+  .un-chn{display:inline-flex;align-items:center;gap:2px;font-size:11px;font-weight:800;color:var(--muted)}
+  .un-pip{width:7px;height:9px;border-radius:2px;background:var(--muted);display:inline-block;opacity:.8}
+  /* 「還剩一張」的記號 —— 只公開一個 bit(牌型 / 牌值一律不准,連 title 都不行) */
+  .un-chu{font-size:10px;font-weight:800;color:#3a2a00;background:var(--un-y);
+    padding:1px 5px;border-radius:999px;margin-right:3px}
+
+  /* ---------- 結果卡 ----------
+     ⚠ 權重要寫成 `.win-card.un-win`(0,2,0)才壓得過共用的 `.win-card .word` ——
+        只寫 `.un-win .word` 是同級,靠「誰在後面」贏,搬動段落順序就會回彈
+        (大老二那條註解記過同一件事)。 */
+  .win-card.un-win{width:min(88vw,520px);max-width:none;padding:26px 24px}
+  .win-card.un-win .word{font-size:clamp(28px,7.2vw,40px)}
+  .un-win p{margin:7px 0 14px}
+  .un-result{margin:2px 0 12px}
+  /* 賽後表情列(單機沒有對手可以送 → 整列收起來) */
+  .un-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  body.solo-on .un-react-row{display:none}
+
+  /* ---------- 房規面板 ----------
+     ⚠ 只有**中間那塊**會捲(卡片自己 overflow:hidden + .set-body flex:1/min-height:0)
+        —— 整張卡自己捲的話 position:sticky 的 ✕ 會一路壓在設定列上(21點 v1.87.0 踩過)。
+     ⚠ 選擇器一律用前綴 class,**不可以**寫 `#unRulesVeil .set-card` ——
+        那會波及另外八頁共用的那張設定卡。 */
+  .set-card.un-rules-card{width:min(92vw,480px);max-width:none;
+    display:flex;flex-direction:column;overflow:hidden}
+  .un-rules-card .set-body{flex:1 1 auto;min-height:0;overflow-y:auto;
+    overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .un-rules-who{flex:none;margin:-4px 0 8px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--accent-2)}
+  .un-rules-card .set-row.col{flex-direction:column;align-items:stretch;gap:5px}
+  .un-rules-card .set-row.col .set-lbl{text-align:left}
+  .un-rules-card .set-row.col .seg{width:100%}
+  .un-rules-card .set-row.col .seg button{flex:1 1 0;min-width:0;font-size:12.5px;padding:6px 4px}
+  /* 訪客:看得到但改不動。⚠ **不用 disabled / pointer-events:none** ——
+     CLAUDE.md 的紅線是「不用 disabled 讓點擊靜默消失」,按下去要跳
+     「只有房主能改規則」(擋在 MP.setRule,不是擋在 CSS)。 */
+  .un-rules-card .seg.readonly{opacity:.78}
+  .un-rules-list{margin:2px 0 0;padding:0;list-style:none;text-align:left}
+  .un-rules-list li{position:relative;padding:3px 0 3px 15px;
+    font:600 12px/1.55 'Nunito',sans-serif;color:var(--muted)}
+  .un-rules-list li::before{content:"";position:absolute;left:3px;top:10px;
+    width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .un-rules-list li b{color:var(--text)}
+  .un-rules-sum{flex:none;text-align:left;padding-top:8px;
+    font:700 12px/1.5 'Nunito',sans-serif;color:var(--accent-2)}
+  :root[data-theme="ebook"] .un-rules-list li::before{background:#000}
+  :root[data-theme="ebook"] .un-rules-list li b{color:#000;text-decoration:underline}
+
+  /* ---------- 選色盤那張卡 ---------- */
+  .set-card.un-color-card{width:min(88vw,380px);max-width:none;text-align:center}
+
+  /* ---------- 對局中把牌桌放寬(大廳與選單維持 .panel 原本的寬度)---------- */
+  .un-play{width:min(96vw,720px);margin:0 auto}
+
+  /* ---------- 橫置矮視窗 ----------
+     ⚠ e2e 的 headless 視窗永遠是矮的(750×485)→ **直立版沒有 e2e 守門**,
+       直立的驗收只能靠 tools/shot-uno.ps1 的截圖(notes/13 第八節同一條教訓)。 */
+  @media (max-height:560px){
+    .un-hero{margin:6px 0 2px}
+    .un-room{padding:6px 10px}
+    .un-room .mp-subrow,.un-room-foot{margin-top:3px}
+    .un-play{--un-cw:clamp(38px,9vw,48px);--un-acth:58px}
+    .un-table{padding:6px 8px;gap:6px}
+    .un-piles{gap:clamp(10px,4vw,24px)}
+    .un-hand{padding:6px 2px 3px}
+    .un-colors{grid-template-columns:repeat(4,1fr)}
+    .un-cbtn{padding:12px 6px;font-size:14px}
+  }

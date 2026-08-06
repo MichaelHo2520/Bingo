@@ -44,7 +44,13 @@ const HomeLive = (function(){
             列成「對戰中」(反過來則是列成可加入、點進去被擋)。 */
     /* ⚠ name 是**顯示名**(v1.86.0 從「21點」改成「台式21點」)——
        index / key / href 這三個是**資料與路徑**,一個字都不准跟著改。 */
-    { key:"bj",      index:"bj_index",      name:"台式21點", icon:"🎴", badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true }
+    { key:"bj",      index:"bj_index",      name:"台式21點", icon:"🎴", badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true },
+    /* ★ 第九個遊戲(v1.106.0)。max 必須與 js/uno/adapter.js 的 maxPlayers 一致(**6**)。
+       ⚠ icon 用 🌈(U+1F308)—— UNO 的識別就是四個顏色,而且它與另外八個都不撞。
+         **不可以用 🃏**(U+1F0CF):它落在 U+1F0A0–U+1F0FF 那段撲克牌字元裡,
+         多數字型沒有會變豆腐方框(CLAUDE.md 紅線 8)。
+       ⚠ UNO **不帶 joinMid** —— 一局就是一局(不像 21 點一場很多局),對戰中不給加入。 */
+    { key:"uno",     index:"uno_index",     name:"UNO",     icon:"🌈", badge:"hlBadgeUno",  max:6, href:"uno.html" }
   ];
 
   let refs=[];            // 掛著監聽的 firebase ref(stop 時逐一 off)

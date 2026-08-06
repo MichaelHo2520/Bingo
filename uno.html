@@ -6,33 +6,33 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="台灣麻將">
+<meta name="apple-mobile-web-app-title" content="UNO">
 <meta name="theme-color" content="#2a1136">
 <!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.106.0 -->
+<title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
+<!-- UNO · v1.106.0 -->
 <meta name="version" content="1.106.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
-  location.replace("app.html#mahjong16");
+  location.replace("app.html#uno");
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- 共用 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
-     id 與 class;牌面與盤面是檔尾追加的 .m16-* 段落 -->
+     id 與 class;牌面與手牌是檔尾追加的 .un-* 段落 -->
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <div class="topbar">
     <div class="brand">
-      <div class="mj-brand display">台灣麻將</div>
+      <div class="un-brand display">UNO</div>
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
@@ -42,11 +42,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
 
   <!-- ====== 進場選單(兩層)======
-       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度 / 人數 / 局數。
-       與消消樂 #mjHome、數獨 #sdkHome 同一套結構。 -->
-  <section class="panel" id="m16Home">
+       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度與人數。
+       與大老二 #b2Home、排七 #svHome 同一套結構。 -->
+  <section class="panel" id="unHome">
     <!-- 回 index.html 的返回列。只在第一層顯示 —— 第二層有自己的返回(回第一層) -->
-    <div class="mp-head" id="m16HomeHead">
+    <div class="mp-head" id="unHomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
@@ -54,70 +54,78 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
 
     <!-- 第一層:選怎麼玩 -->
-    <div id="m16PickMode">
-      <div class="mj-hero">
-        <svg class="mj-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌">
-          <rect class="mk-bd" x="3.5" y="9" width="23" height="31" rx="4.5"/>
-          <rect class="mk-bd" x="29.5" y="16" width="23" height="31" rx="4.5"/>
-          <text class="mk-r" x="15" y="31">中</text>
-          <text class="mk-g" x="41" y="38">發</text>
+    <div id="unPickMode">
+      <div class="un-hero">
+        <!-- ★★ 進場插圖:黃 / 綠 / 藍 三張扇在後面 + 最前面一張紅牌,斜白橢圓裡寫 UNO。
+             使用者:「我希望是能看出是 uno 牌的感覺」→ 兩張交疊只講得出「兩個顏色的紙牌」,
+             UNO 的辨識點是**四個顏色**與**橢圓裡的 UNO 字樣**,兩個都要在。
+             **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
+             (這裡是 .un-art 96px、首頁是 .gc-art.un-cart 46px)——
+             樣式在 styles.css 的 .un-ic-* 那幾條;tools/test-pages.js 的 E 節在守這對雙胞胎。
+             ⚠ 扇形的支點是 (28,54),四張牌的 x/y 完全一樣,差別只在轉幾度 -->
+        <svg class="un-art" viewBox="0 0 56 56" role="img" aria-label="UNO 牌">
+          <g transform="rotate(-25 28 54)"><rect class="un-ic-bd un-ic-y" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
+          <g transform="rotate(-8.5 28 54)"><rect class="un-ic-bd un-ic-g" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
+          <g transform="rotate(8.5 28 54)"><rect class="un-ic-bd un-ic-b" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
+          <g transform="rotate(25 28 54)">
+            <rect class="un-ic-bd un-ic-r" x="17.5" y="11" width="21" height="30" rx="2.7"/>
+            <ellipse class="un-ic-ov" cx="28" cy="26" rx="8.4" ry="13" transform="rotate(-30 28 26)"/>
+            <text class="un-ic-t un-ic-r wm" x="28" y="28.1" transform="rotate(-30 28 26)">UNO</text>
+          </g>
         </svg>
-        <div class="home-tagline">真的打麻將:摸打吃碰槓,湊 5 組面子 + 1 對將</div>
+        <div class="home-tagline">搶著把手上的牌出完,剩一張要喊 UNO</div>
       </div>
-      <button class="btn primary block-btn home-btn" id="m16GoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="m16GoSolo">🤖 單機對電腦</button>
+      <button class="btn primary block-btn home-btn" id="unGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="unGoSolo">🤖 電腦對決</button>
       <div class="home-hint">
-        <b>2~4 人</b>都能開:4 人用整副 144 張,<b>2~3 人去掉萬子</b>(108 張),3 人不能吃。<br>
-        計分照麻將的<b>相互算台</b>——自摸三家付、放槍一家付。<br>
-        單機湊不到人也打得起來,電腦分<b>三個強度</b>。
-        <br><span class="m16-warn">⚠ 連線時手牌與牌山在資料庫是明碼,只適合親友之間玩,不防作弊。</span>
+        108 張牌,<b>2~6 人</b>每人先發 <b>7 張</b>。出牌條件是<b>同色</b>或<b>同數字 / 同動作</b>;
+        <b>Wild 隨時可出</b>,出的人指定接下來的顏色。<br>
+        出不了(或不想出)就<b>抽一張</b> —— <b>抽到的那張能出就可以馬上出</b>。<br>
+        動作牌:<b>⊘ 跳過</b>下一家 · <b>⇄ 迴轉</b>換方向(<b>2 人局等同跳過</b>)·
+        <b>+2</b> 讓下一家抽兩張並跳過 · <b>+4</b> 換顏色再讓他抽四張。<br>
+        <!-- ★ 這兩句是「為什麼我剩一張要按一顆鈕」的唯一說明。
+             不寫的話玩家第一次被抓會以為是 bug(而它是房規,預設開著)。 -->
+        出到<b>剩一張</b>時要在出牌的同時按 <b>UNO!</b> ——
+        沒按而被別人抓到就<b>罰抽 2 張</b>(可在房規關掉)。<br>
+        有人打完最後一張,<b>這一局立刻結束</b>。名次照<b>手上剩牌的點數</b>排,
+        名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。
       </div>
     </div>
 
     <!-- 第二層:單機設定 -->
-    <div id="m16PickSolo" class="hidden">
+    <div id="unPickSolo" class="hidden">
       <div class="home-sub-head">
-        <button class="icon-btn" id="m16SoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+        <button class="icon-btn" id="unSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <span class="subtitle">單機對電腦</span>
+        <span class="subtitle">電腦對決</span>
       </div>
       <div class="field">
         <span class="field-label">電腦強度</span>
-        <div class="seg" id="m16LvSeg" aria-label="電腦強度">
+        <div class="seg" id="unLvSeg" aria-label="電腦強度">
           <button data-lv="easy">🙂 新手</button>
-          <button class="on" data-lv="normal">🤔 普通</button>
+          <button class="on" data-lv="mid">🤔 普通</button>
           <button data-lv="hard">😈 高手</button>
         </div>
       </div>
       <div class="field">
-        <span class="field-label">幾家</span>
-        <div class="seg" id="m16SeatSeg" aria-label="幾家">
+        <span class="field-label">幾個人玩</span>
+        <div class="seg" id="unSeatSeg" aria-label="幾個人玩">
           <button data-seats="2">2 人</button>
           <button data-seats="3">3 人</button>
           <button class="on" data-seats="4">4 人</button>
+          <button data-seats="5">5 人</button>
+          <button data-seats="6">6 人</button>
         </div>
       </div>
+      <!-- ★ 房規:與連線**共用同一個蓋板**(#unRulesVeil)。單機時「我就是房主」
+           (照大老二 / 21點那一套:兩邊各一顆入口鈕 → 一組 DOM、一支 syncRules) -->
       <div class="field">
-        <span class="field-label">打幾局</span>
-        <div class="seg" id="m16SoloGoalSeg" aria-label="打幾局">
-          <button data-goal="1">1 局</button>
-          <button class="on" data-goal="4">一圈 4 局</button>
-          <button data-goal="8">8 局</button>
-          <button data-goal="16">一將 16 局</button>
-        </div>
+        <span class="field-label">房規</span>
+        <button class="btn ghost block-btn" id="unSoloRules" type="button">⚙ 改規則</button>
       </div>
-      <div class="field">
-        <span class="field-label">底幾台</span>
-        <div class="seg" id="m16SoloBaseSeg" aria-label="底幾台">
-          <button data-base="1">底 1 台</button>
-          <button class="on" data-base="2">底 2 台</button>
-          <button data-base="3">底 3 台</button>
-          <button data-base="5">底 5 台</button>
-        </div>
-      </div>
-      <button class="btn primary block-btn home-btn" id="m16StartSolo">開始 ▸</button>
-      <div class="home-hint" id="m16SoloHint"></div>
+      <button class="btn primary block-btn home-btn" id="unStartSolo">開始對局 ▸</button>
+      <div class="home-hint" id="unSoloHint"></div>
     </div>
   </section>
 
@@ -150,16 +158,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </section>
 
   <!-- ====== 房間橫幅 ====== -->
-  <div class="panel mj-room hidden" id="mpBar">
-    <div class="row mj-room-top">
+  <div class="panel un-room hidden" id="mpBar">
+    <div class="row un-room-top">
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <!-- v1.105.0:拿掉「房間」這個字首。房名預設就是「XXX的房間」(mp-core 的 createRoom),
-           前面再加一次 = 「房間 XXX的房間」,在返回鍵右邊那格白白吃掉四個字的寬
-           (窄機上房名本來就會被 ellipsis 切掉)。⚠ 八頁都有一份,要一起改。 -->
-      <span class="label mj-room-title"><b id="mpRoomTitle" class="display">–</b></span>
-      <span class="mp-goal" id="mpBarGoal" aria-label="局數"></span>
+      <!-- v1.105.0:拿掉「房間」字首(房名預設就是「XXX的房間」,前面再加一次是重複) -->
+      <span class="label un-room-title"><b id="mpRoomTitle" class="display">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
@@ -170,72 +176,49 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
     </div>
-    <div class="mj-room-foot">
+    <div class="un-room-foot">
       <div id="mpPlayers" class="mp-players"></div>
     </div>
   </div>
 
   <!-- ====== 單機的牌桌列 ======
-       刻意沿用房間橫幅同一組 .mj-room / .mp-chip 外觀:連線與單機長得一樣才有一致感
-       (同 v1.58.2 把台數搬進房間框的理由)。晶片由 js/mahjong16/solo.js 自己畫 ——
-       mp-core 的 renderPlayers() 是連線專屬的,單機不經過它。 -->
-  <div class="panel mj-room hidden" id="m16SoloBar">
-    <div class="row mj-room-top">
-      <button class="icon-btn mp-leave-btn" id="m16SoloExit" title="離開牌桌" aria-label="離開牌桌">
+       刻意沿用房間橫幅同一組 .un-room / .mp-chip 外觀:連線與單機長得一樣才有一致感。
+       晶片由 js/uno/solo.js 自己畫 —— mp-core 的 renderPlayers() 是連線專屬的。 -->
+  <div class="panel un-room hidden" id="unSoloBar">
+    <div class="row un-room-top">
+      <button class="icon-btn mp-leave-btn" id="unSoloExit" title="離開牌桌" aria-label="離開牌桌">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label mj-room-title">單機 <b id="m16SoloLv" class="display">普通</b></span>
-      <span class="mp-goal" id="m16SoloGoal" aria-label="局數"></span>
+      <span class="label un-room-title">電腦對決 <b id="unSoloLv" class="display">普通</b></span>
+      <span class="mp-goal" id="unSoloRec" aria-label="戰績"></span>
     </div>
-    <div class="mj-room-foot">
-      <div id="m16SoloPlayers" class="mp-players"></div>
+    <div class="un-room-foot">
+      <div id="unSoloPlayers" class="mp-players"></div>
     </div>
   </div>
 
   <!-- ====== 大廳設定 ====== -->
-  <div class="scroll-area mj-scroll hidden" id="scrollArea">
-    <section class="panel hidden" id="m16Setup">
+  <div class="scroll-area un-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="unSetup">
       <div class="subtitle">對戰設定</div>
+      <!-- 出牌倒數:多人回合制沒有它,一個人切到 LINE 就全桌卡死(台灣麻將 v1.59.0 踩過)。
+           ★ 一定是**房間設定**不是各人偏好 —— 到期自動出牌是「誰的 timer 先響誰用交易搶」,
+             各自設定的話全房會被最短的那台決定(見 js/uno/adapter.js 檔頭)。
+           ⚠ 秒數比大老二短:UNO 一手只挑一張牌,不必湊組合。 -->
       <div class="field">
-        <span class="field-label" id="m16GoalLabel">打幾局</span>
-        <div class="seg" id="m16GoalSeg" aria-label="打幾局">
-          <button data-goal="1">1 局</button>
-          <button class="on" data-goal="4">一圈 4 局</button>
-          <button data-goal="8">8 局</button>
-          <button data-goal="16">一將 16 局</button>
-        </div>
-      </div>
-      <!-- 底幾台(v1.75.18)。★ 一定是房間設定:底台是算收付用的,各人一份的話
-           同一局四台會算出不同的錢(而且相加照樣是 0,零和斷言抓不到)。 -->
-      <div class="field">
-        <span class="field-label" id="m16BaseLabel">底幾台</span>
-        <div class="seg" id="m16BaseSeg" aria-label="底幾台">
-          <button data-base="1">底 1 台</button>
-          <button class="on" data-base="2">底 2 台</button>
-          <button data-base="3">底 3 台</button>
-          <button data-base="5">底 5 台</button>
-        </div>
-      </div>
-      <!-- 吃碰思考時間(v1.59.0):別人打出的牌你吃得下時,有幾秒可以決定。
-           ★ 一定是**房間設定**不是各人偏好 —— 到期補「過」是「誰的 timer 先響誰結算」,
-             各自設定的話全房會被最短的那台決定(見 js/mahjong16/adapter.js 檔頭常數)。 -->
-      <div class="field">
-        <span class="field-label" id="m16SecLabel">操作倒數</span>
-        <!-- v1.63.0:同一個秒數同時管「吃碰要不要」與「輪到你出牌」——
-             使用者的話是「後續的出牌也沒秒數限制,這樣不是很奇怪,應該是要倒數秒數
-             是做為這次的完全操作倒數」。0 = 關掉(兩邊都不限時,見 adapter 的 secOn)
-             v1.65.0:這個秒數是**一手的總預算**(從有人打出一張牌起算),不是兩段各給一份
-             —— 兩段各起算的話,那一手拖了兩倍長就等於告訴出牌的人「有人吃得下你這張」 -->
-        <!-- v1.103.0:整組往上搬(關 / 8 / 12 / 20 / 30 → 關 / 15 / 30 / 45 / 60,預設 30)。
-             ⚠ 這五個值與 js/mahjong16/adapter.js 的 SEC_OPTS 是**兩份**,改一邊要改另一邊
-               (那邊拿它把舊偏好吸附到最接近的一顆)。 -->
-        <div class="seg" id="m16SecSeg" aria-label="操作倒數">
+        <span class="field-label" id="unSecLabel">出牌倒數</span>
+        <div class="seg" id="unSecSeg" aria-label="出牌倒數">
           <button data-sec="0">關</button>
           <button data-sec="15">15 秒</button>
           <button class="on" data-sec="30">30 秒</button>
           <button data-sec="45">45 秒</button>
-          <button data-sec="60">60 秒</button>
         </div>
+      </div>
+      <!-- ★★ 房規:面板本體是共用蓋板 #unRulesVeil(單機也是它),
+           這裡只有一顆入口鈕 + 一行摘要。⚠ 對戰中不給改(規則在開局那一刻就凍了) -->
+      <div class="field">
+        <span class="field-label" id="unRulesLabel">房規</span>
+        <button class="btn ghost block-btn" id="unRulesOpen" type="button">⚙ 改規則</button>
       </div>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
@@ -247,31 +230,31 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="wg-group hidden" id="wgGroup">
             <span class="wg-lbl">先到</span>
             <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
-              <span class="target-val display" id="winGoalVal">3</span>
-              <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+              <button class="mini" id="wgMinus" aria-label="減少目標分數">−</button>
+              <span class="target-val display" id="winGoalVal">15</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標分數">＋</button>
             </div>
-            <span class="wg-lbl">勝奪冠</span>
+            <!-- ⚠ 這一版的計分是名次分(一局最多 5 分),所以單位是「分」不是「勝」。
+                 mp-core 的 A.scoreUnit 讓 JS 產出的那幾句(🎯 搶 N 分 / 先達 N 分)跟著換。 -->
+            <span class="wg-lbl">分奪冠</span>
           </div>
           <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
           <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
         </div>
       </div>
-      <div class="hint" id="m16RuleHint"></div>
+      <!-- ⚠ 規則摘要只有**一個** #unRuleHint(big2.html 那一頁不小心放了兩個同 id 的,
+           後面那個永遠不會被 $() 找到 —— 這裡刻意只放一個,在計分列後面) -->
+      <div class="hint" id="unRuleHint"></div>
     </section>
   </div>
 
-  <!-- ====== 牌桌 ====== -->
-  <!-- ⚠ v1.58.2 拿掉了獨立的比分列 #m16Hud:台數 / 風 / 輪到誰全部改顯示在**房間框**
-       的玩家晶片上(adapter 的 chipLead / chipTail / turnId),與其他三個遊戲一致。
-       ⚠ v1.58.3 又拿掉了盤面頂端的資訊列 #m16Bar:第幾局搬到房間框的徽章
-       (#mpBarGoal,麥克風左邊)、莊搬到每一家自己那一列,可吃 / 牌山直接刪掉。 -->
-  <!-- 單機與連線**共用這一整塊**(盤面 M16B + 動作列),差別只在上面那條列與
-       結果卡的按鈕組 —— 靠 body.solo-on 切換(同五子棋 / 數獨 / 消消樂)。 -->
-  <div class="mj-play hidden" id="m16Play">
-    <!-- 盤面:對手列 / 牌河 / 我的明牌 / 我的手牌,全部由 M16B.render() 畫 -->
-    <div class="m16-stage" id="m16Stage"></div>
-    <div class="m16-acts hidden" id="m16Acts"></div>
+  <!-- ====== 牌桌 ======
+       單機與連線**共用這一整塊**(桌子中央 + 手牌 UNB + 動作列),差別只在上面那條列與
+       結果卡的按鈕組 —— 靠 body.solo-on 切換(同其他八個遊戲)。 -->
+  <div class="un-play hidden" id="unPlay">
+    <!-- 牌堆 / 牌河 / 現在顏色 / 我的手牌,全部由 UNB.render() 畫 -->
+    <div class="un-stage" id="unStage"></div>
+    <div class="un-acts hidden" id="unActs"></div>
   </div>
 
   <!-- ====== 主要動作列 ====== -->
@@ -284,20 +267,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
   <!-- ====== 結果卡 ====== -->
   <div class="veil" id="veil">
-    <!-- ⚠ .mj-win 是**消消樂與這一頁共用**的 class(兩頁的結果卡都掛它),所以這一頁
-         專屬的樣式一律掛 .m16-win(v1.75.18 新增)—— 排名表的寬度與「收掉共用勝場表」
-         那兩條要是寫在 .mj-win 上,消消樂會跟著一起變。 -->
-    <div class="win-card mj-win m16-win" id="m16WinCard">
+    <div class="win-card un-win" id="unWinCard">
       <div class="word display" id="winWord">本局結束</div>
       <p id="winMsg"></p>
-      <!-- (v1.75.18 拿掉 #m16Win)攤牌改在**牌桌**上、而且是**每一家都攤** ——
-           使用者:「每一局結束的時候…不是在勝負頁顯示,而是在牌桌顯示,這樣還可以
-           回去看牌桌,看看到底牌在誰那裡」。落地點是 board.js 的 foeHTML。 -->
-      <!-- 相互算台的收付表:全桌相加必為 0 -->
-      <div class="m16-tai hidden" id="m16Tai"></div>
+      <!-- 排名表:★ 這裡是**唯一**會翻開別人手牌的地方(對局中一律只顯示張數) -->
+      <div class="un-result hidden" id="unResult"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
-      <div class="mj-react-row" id="m16ReactRow">
+      <div class="un-react-row" id="unReactRow">
         <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
         <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
         <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
@@ -309,20 +286,102 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn primary" id="mpAgain">下一局 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
-      <!-- 局間續局的腳註(v1.103.0):倒數還剩幾秒 / 還在等幾個人。
-           連線、打一圈以上、而且不是最後一局才會出現(字全部由 adapter 的 paintNext 填)。
-           ★ #mpAgain 上面的字也是那支換的:續局中是「我看完了」,最後一局才是「下一局 ▸」。 -->
-      <div class="m16-next hidden" id="m16Next" aria-live="polite"></div>
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
-           id 刻意與數獨 / 消消樂同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
+           id 刻意與數獨 / 消消樂 / 台灣麻將 / 排七 / 大老二同名 ——
+           樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
       <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="m16SoloAgain">下一局 ▸</button>
-        <button class="btn ghost" id="m16SoloHome">回選單</button>
+        <button class="btn primary" id="unSoloAgain">再來一局 ▸</button>
+        <button class="btn ghost" id="unSoloHome">回選單</button>
       </div>
       <button class="peek-link" id="winPeek">先看看牌桌 👀</button>
     </div>
   </div>
   <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
+
+  <!-- ====== 房規 —— 單機與連線**共用這一個蓋板** ======
+       ⚠ 只有**一組** DOM(單機第二層一顆鈕、大廳一顆鈕都開它)—— 塞兩份就是兩個 id。
+       ⚠ 卡片結構照大老二的 .b2-rules-card:**只有中間那塊會捲**
+         (`.un-rules-card{display:flex;overflow:hidden}` + `.set-body{flex:1;min-height:0;
+         overflow-y:auto}` 兩條要一起在)—— 整張卡自己捲的話 position:sticky 的 ✕
+         會一路壓在設定列上(21點 v1.87.0 踩過)。 -->
+  <div class="veil" id="unRulesVeil">
+    <div class="set-card un-rules-card">
+      <button class="card-x" id="unRulesClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">房規</div>
+      <div class="un-rules-who" id="unRulesWho"></div>
+      <div class="set-body" id="unRulesBody">
+
+        <div class="set-group">
+          <div class="set-group-title">可以改的兩條</div>
+          <div class="set-row col">
+            <span class="set-lbl">疊 +2 / +4<span class="set-sub">被 +2 時可以再出 +2 把懲罰往下疊(同種才疊得上);關掉就照官方:抽 2 張並跳過</span></span>
+            <div class="seg" id="unStackSeg" aria-label="疊 +2 / +4">
+              <button class="on" data-rk="stack" data-rv="1">✔ 可以疊</button>
+              <button data-rk="stack" data-rv="0">✘ 不能疊</button>
+            </div>
+          </div>
+          <div class="set-row col">
+            <span class="set-lbl">沒喊 UNO 罰抽 2 張<span class="set-sub">剩一張時要在出牌的同時按 UNO!;關掉就由系統自動公告「還剩一張」</span></span>
+            <div class="seg" id="unCallSeg" aria-label="沒喊 UNO 罰抽 2 張">
+              <button class="on" data-rk="unoCall" data-rv="1">✔ 要喊</button>
+              <button data-rk="unoCall" data-rv="0">✘ 不必喊</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ★ 出牌倒數:**連線專屬**(單機沒有倒數 —— 卡多久是自己的節奏)。
+             ⚠ 它不進房規物件:那個欄位(turnSec)不影響任何判定。 -->
+        <div class="set-group hidden" id="unSecGroup">
+          <div class="set-group-title">出牌倒數</div>
+          <div class="set-row col">
+            <span class="set-lbl">每一手幾秒<span class="set-sub">時間到系統會幫他出一手</span></span>
+            <div class="seg" id="unSecSeg2" aria-label="出牌倒數">
+              <button data-sec="0">關</button>
+              <button data-sec="15">15 秒</button>
+              <button data-sec="30">30 秒</button>
+              <button data-sec="45">45 秒</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">這一版的玩法(固定,不能改)</div>
+          <ul class="un-rules-list">
+            <li>108 張:四色各 <b>19 張數字</b>(0 一張、1~9 各兩張)+ 各 2 跳過 / 2 迴轉 / 2 抽兩張,再加 <b>Wild 4 張 + Wild +4 4 張</b>。</li>
+            <li><b>2~6 人</b>,每人先發 <b>7 張</b>;起始牌一律翻到<b>第一張數字牌</b>為止。</li>
+            <li>出牌條件:<b>同色</b>或<b>同數字 / 同動作</b>;<b>Wild 隨時可出</b>並指定顏色。</li>
+            <li>出不了(或不想出)就<b>抽一張</b>;<b>抽到的那張能出就可以馬上出</b>,否則換下一家。</li>
+            <li><b>⇄ 迴轉在 2 人局等同跳過</b>(官方規則)。</li>
+            <li><b>+4 隨時可出,而且不做挑戰驗牌</b> —— 這一版刻意簡化(這個 App 本來就不防作弊)。</li>
+            <li>牌堆抽乾時,把<b>牌河除最上面那張</b>洗回牌堆繼續打。</li>
+            <li>有人打完最後一張,<b>這一局立刻結束</b>。</li>
+            <li>名次照<b>手上剩牌的點數</b>排(數字照面值 · 跳過/迴轉/+2 各 <b>20</b> · Wild 各 <b>50</b>),
+                名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。</li>
+          </ul>
+        </div>
+
+      </div>
+      <div class="un-rules-sum" id="unRulesSum"></div>
+    </div>
+  </div>
+
+  <!-- ====== 選色盤 —— 出 Wild 要指定顏色 ======
+       ⚠ 這一層要列進 main.js 的 BACK_LAYERS,不然 Android 的返回鍵會直接離開房間
+         而不是關掉這一層(CLAUDE.md 紅線 7)。
+       ⚠ 四顆鈕的顏色走 --un-r/y/g/b(與牌面同一組變數)—— 玩家要能把「這顆鈕」
+         與「那個顏色的牌」對上,兩邊用不同的紅就對不上了。 -->
+  <div class="veil" id="unColorVeil">
+    <div class="set-card un-color-card">
+      <div class="set-head">選一個顏色</div>
+      <div class="un-rules-who">出了 Wild —— 接下來要出哪個顏色?</div>
+      <div class="un-colors" id="unColors">
+        <button class="un-cbtn un-cb-r" type="button" data-col="0"><b>紅</b>Red</button>
+        <button class="un-cbtn un-cb-y" type="button" data-col="1"><b>黃</b>Yellow</button>
+        <button class="un-cbtn un-cb-g" type="button" data-col="2"><b>綠</b>Green</button>
+        <button class="un-cbtn un-cb-b" type="button" data-col="3"><b>藍</b>Blue</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ====== 設定 ====== -->
   <div class="veil" id="setVeil">
@@ -341,11 +400,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           </div>
         </div>
 
-        <!-- ⚠ 「玩法輔助」整組已經拿掉(v1.68.0):兩顆開關都是替玩家算牌 ——
-             聽牌提醒(v1.66.0,系統偵測到就提示)在 v1.67.0 改成主動宣告時先拿掉,
-             聽牌提示(每張牌角落顯示打掉它之後聽幾張)v1.68.0 也拿掉。
-             這一頁的賣點是「真的打麻將」,算牌是玩家自己的事。理由見 notes/11。 -->
-
         <div class="set-group">
           <div class="set-group-title">音效</div>
           <div class="set-row">
@@ -359,22 +413,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="set-row" id="vibrateRow">
             <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
             <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
-          </div>
-          <!-- 這一頁專屬的兩列(v1.72.0 從一列拆開)。偏好都存在 mahjong16.prefs.v1,
-               綁定與同步在 js/mahjong16/main.js(ui-kit 的 syncSettingsUI 是共用的,不管這兩列)。
-               ★ 刻意分成兩件事:一顆管「有人碰了要不要喊出來」、一段管「打出去的牌要不要報」——
-               混成同一條軸的話「只有字牌」會被讀成「只有字牌會喊碰」(見 js/mahjong16/sfx.js 檔頭) -->
-          <div class="set-row">
-            <span class="set-lbl">喊牌語音<span class="set-sub">(碰 / 吃 / 槓 / 胡 / 補花)</span></span>
-            <button class="switch" id="m16SwVoice" role="switch" aria-checked="true" aria-label="喊牌語音"><span class="knob"></span></button>
-          </div>
-          <div class="set-row m16-vrow">
-            <span class="set-lbl">報牌名<span class="set-sub">(打出的牌)</span></span>
-            <div class="seg m16-vseg" id="m16TileSeg" aria-label="報牌名">
-              <button data-tv="off">關掉</button>
-              <button class="on" data-tv="honor">只有字牌</button>
-              <button data-tv="all">全部牌</button>
-            </div>
           </div>
         </div>
 
@@ -407,7 +445,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
       <button class="btn primary" id="setClose">完成</button>
-      <div class="set-foot">台灣 16 張麻將 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+      <div class="set-foot">UNO · <span id="setVer"></span> · 開發者 Michael Ho</div>
     </div>
   </div>
 
@@ -477,7 +515,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
 <script>
 /* ============================================================
-   與其他四個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 mj16_rooms / mj16_index。
+   與其他八個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 uno_rooms / uno_index。
    ⚠ 需在資料庫規則開放那兩段 —— 整份規則在 notes/firebase-rules.json,可直接複製貼上。
    ============================================================ */
 const FIREBASE_CONFIG = {
@@ -491,22 +529,19 @@ const FIREBASE_CONFIG = {
 };
 </script>
 
-<!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)→ mj-faces(牌面,與消消樂共用)
-     → rules(規則)→ scoring(台數)→ table(輪次狀態機)→ ai(電腦對手,只相依 rules)
-     → board(盤面)→ solo(單機,要 board 與 ai)
+<!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)
+     → rules(規則,純函式)→ ai(電腦對手,只相依 rules)
+     → board(盤面;牌面自繪在裡面,UNO 牌只有這一頁用 → 不進 js/shared/)
+     → solo(單機,要 board 與 ai)
      → adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <script src="js/shared/mp-core.js"></script>
-<script src="js/shared/mj-faces.js"></script>
-<script src="js/mahjong16/rules.js"></script>
-<script src="js/mahjong16/scoring.js"></script>
-<script src="js/mahjong16/table.js"></script>
-<script src="js/mahjong16/ai.js"></script>
-<script src="js/mahjong16/sfx.js"></script>
-<script src="js/mahjong16/board.js"></script>
-<script src="js/mahjong16/solo.js"></script>
-<script src="js/mahjong16/adapter.js"></script>
-<script src="js/mahjong16/main.js"></script>
+<script src="js/uno/rules.js"></script>
+<script src="js/uno/ai.js"></script>
+<script src="js/uno/board.js"></script>
+<script src="js/uno/solo.js"></script>
+<script src="js/uno/adapter.js"></script>
+<script src="js/uno/main.js"></script>
 </body>
 </html>

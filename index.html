@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.105.0 -->
-<meta name="version" content="1.105.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.106.0 -->
+<meta name="version" content="1.106.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -303,6 +303,34 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <span class="gc-body">
           <span class="gc-name display">台式21點</span>
           <span class="hl-badge hidden" id="hlBadgeBj"></span>
+        </span>
+      </a>
+
+      <!-- 第九個遊戲(v1.106.0):UNO。
+           ★★ 構圖與另外八張卡**不同一套**:黃 / 綠 / 藍 三張扇在後面 + 最前面一張紅牌,
+              斜白橢圓裡寫 UNO。使用者:「我希望是能看出是 uno 牌的感覺」——
+              兩張交疊(撲克牌那三張卡的作法)只講得出「兩個顏色的紙牌」,
+              而 UNO 的辨識點有兩個、兩個都要在:**四個顏色** + **橢圓裡的 UNO 字樣**。
+           ★ 牌的尺寸(21×30 rx2.7 · viewBox 56)仍然沿用 .un-ic-* / .pk-ic-* 同一組,
+              九張首頁卡才會看起來是同一套。
+           ⚠ 與 uno.html 進場插圖(.un-art 96px)**逐字相同的一份 SVG**,只有外層 class
+              不一樣;改一邊要改另一邊(tools/test-pages.js 的 E 節在守)
+           ⚠⚠ 這裡**不可以**掛 .un-art —— 那是進場插圖的 96px,它定義在 .gc-art(46px)
+               後面 → 會把這張卡撐得比另外八張高一截(21點 v1.86.0 踩過的坑) -->
+      <a class="game-card as-link" href="uno.html">
+        <svg class="gc-art un-cart" viewBox="0 0 56 56" role="img" aria-label="UNO 牌">
+          <g transform="rotate(-25 28 54)"><rect class="un-ic-bd un-ic-y" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
+          <g transform="rotate(-8.5 28 54)"><rect class="un-ic-bd un-ic-g" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
+          <g transform="rotate(8.5 28 54)"><rect class="un-ic-bd un-ic-b" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
+          <g transform="rotate(25 28 54)">
+            <rect class="un-ic-bd un-ic-r" x="17.5" y="11" width="21" height="30" rx="2.7"/>
+            <ellipse class="un-ic-ov" cx="28" cy="26" rx="8.4" ry="13" transform="rotate(-30 28 26)"/>
+            <text class="un-ic-t un-ic-r wm" x="28" y="28.1" transform="rotate(-30 28 26)">UNO</text>
+          </g>
+        </svg>
+        <span class="gc-body">
+          <span class="gc-name display">UNO</span>
+          <span class="hl-badge hidden" id="hlBadgeUno"></span>
         </span>
       </a>
       </div><!-- /.gc-grid -->
