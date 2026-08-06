@@ -5444,11 +5444,45 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ⚠ 高度**要有上限**:第一版寫 flex:1 讓它吃掉整塊剩餘空間 → 直立手機上變成
      「兩疊牌浮在一個很大的空盒子中間」(截圖一眼看得出來,程式碼看不出來)。
      min 讓它在矮視窗不被壓扁,max 讓它在高視窗不無限長。 */
+  /* ★★ 桌布是**賭場綠呢**,與 21點 `.bj-table` / 大老二 `.b2-trick` / 排七 `.sv-tracks`
+     **逐字相同的一份配方**(兩層漸層 + 兩道 inset 陰影)。四頁都是牌桌,長一樣才是同一張桌子。
+     ⚠ `styles.css` 裡有四份,**改一份要改四份** —— 沒有任何斷言守得到「四頁的桌子長不長一樣」。
+     ⚠⚠ 原本那條 `border:1px solid var(--panel-line)` **拿掉了**:框線改由
+       inset 的 `0 0 0 2px` 白線擔任(兩個一起留會變雙框)。border-radius 維持 18px
+       (UNO 這一塊比另外三頁圓,是它自己的樣子;radius 本來就沒跟著統一)。
+     ★ 綠底不會吃掉 UNO 的四色:每張牌都有 2px 白邊 + 斜白橢圓(見 .un-card),
+       綠牌 #2ea94c 壓在深綠桌布上仍然分得出來 —— 但這件事斷言測不到,
+       驗收點是 `node tools/gen-uno-shot.js` 的截圖(它吃 `?theme=`,
+       **bubblegum 與 ebook 一定要各看一次**)。 */
   .un-table{flex:0 1 auto;min-height:200px;max-height:340px;
     display:flex;flex-direction:column;align-items:center;
     justify-content:center;gap:10px;
-    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(0,0,0,.10));
-    border:1px solid var(--panel-line);border-radius:18px;padding:12px 10px}
+    border-radius:18px;padding:12px 10px;
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%),
+      linear-gradient(180deg,#1d4c3a,#12332a 70%,#0e2822);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.07), inset 0 10px 26px rgba(0,0,0,.34)}
+  /* ⚠ 電子書主題一定要覆寫回白底黑框(同另外三頁),而且要**補 box-shadow:none** ——
+     不補的話白底上壓著一圈暗角。 */
+  :root[data-theme="ebook"] .un-table{background:#fff;border:1px solid #000;box-shadow:none}
+  /* ⚠⚠ 桌布上的字**不可以吃 --text / --muted** —— 那兩支是跟著主題走的,
+     而桌布是寫死的深綠:bubblegum 主題的 --text 是 #6a1f57(深紫)、--muted 是 #a76b96,
+     壓在深綠上「現在顏色 黃」那一句幾乎看不見(對比 1.3),而那一句正是 Wild 之後
+     玩家唯一能知道該出什麼色的地方。桌布固定 → 上面的字也必須固定。
+     ⚠ 選擇器一律限定在 `.un-table` 裡面:同樣這幾條 class 在結果卡 / 蓋板上還會用到,
+       那些地方的底色**是**跟著主題的,不可以一起改。
+     ★ 這一條是 UNO 比另外三頁多做的(它們的桌上文字仍吃 --text/--muted,
+       在 bubblegum 下同樣偏暗)—— 之後那三頁要修,照這一段抄。 */
+  /* ★ 「現在顏色」那顆色塊在綠呢上要多一圈白邊 —— 綠色塊(#2ea94c)壓在深綠桌布上
+     邊界會糊掉,而它是 Wild 之後唯一的顏色線索(牌面靠的是同一招:2px 白邊)。
+     ⚠ 只加 box-shadow,**不准碰 background** —— 那條紅線見上面 .un-c-* 那一段。 */
+  .un-table .un-swatch{box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),0 0 0 2px rgba(255,255,255,.24)}
+  .un-table .un-pn{color:rgba(255,255,255,.72)}
+  .un-table .un-nowtxt{color:#fff}
+  .un-table .un-dir{color:rgba(255,255,255,.78);background:rgba(0,0,0,.26)}
+  :root[data-theme="ebook"] .un-table .un-pn{color:#555}
+  :root[data-theme="ebook"] .un-table .un-nowtxt{color:#000}
+  :root[data-theme="ebook"] .un-table .un-dir{color:#555;background:#eee}
   .un-piles{display:flex;align-items:flex-start;justify-content:center;gap:clamp(14px,6vw,34px)}
   .un-pile,.un-top{display:flex;flex-direction:column;align-items:center;gap:5px;
     background:none;border:none;padding:0;cursor:pointer}
