@@ -219,6 +219,16 @@ $("dcReactRow").addEventListener("click", e => {
   b.classList.remove("sent"); void b.offsetWidth; b.classList.add("sent");
 });
 
+/* ---------- 吃子欄開關(暗棋專屬的顯示偏好)----------
+   ★ 不是房規:不進 DB、兩邊各看各的。真相與存檔都在 DCB(darkchess.view.v1),
+     這裡只負責接線 + 把開關的 aria-checked 同步過去。
+   ★ 不塞進 ui-kit 的 syncSettingsUI() —— 那一支是九個遊戲共用的。 */
+function syncTraySw(){
+  const sw = $("swDcTray");
+  if(sw) sw.setAttribute("aria-checked", DCB.trayOn() ? "true" : "false");
+}
+$("swDcTray").addEventListener("click", () => { DCB.setTray(!DCB.trayOn()); syncTraySw(); });
+
 /* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */
 bindCommonUI();
 bindAudioLifecycle();
@@ -234,6 +244,7 @@ loadPrefs();       // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 暗棋的連�
 Solo.loadOwn();    // 電腦對決的難度 / 先手 / 房規 / 戰績(獨立 key,不與連線那組互相覆蓋)
 syncSettingsUI();
 DCB.init();        // 盤面 DOM + 點擊委派(舞台此時是 hidden,ResizeObserver 會在顯示後算方向)
+syncTraySw();      // ⚠ 一定要在 DCB.init() 之後 —— 吃子欄偏好是它讀進來的
 syncSoloSeg();
 paintSoloHint();
 showScreen("home");      // 進場先選玩法

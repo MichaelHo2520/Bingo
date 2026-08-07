@@ -193,12 +193,34 @@ const DCB = (function(){
          → **每走一手棋盤就上下跳一下**(v1.113.x 的症狀:輪到自己時多一行提示,
          換對手時那一行消失)。所以:
            · 第二行一律存在(輪到對手時是**空的**,不塞填充語)—— .dc-actline 撐高度
-           · 吃子欄兩列不論有沒有子都佔位(空的畫一個「—」)
+           · 吃子欄開著時,兩列不論有沒有子都佔位(空的畫一個「—」)
          高度由 CSS 的 min-height 給,這一支只負責「每一種狀態都畫出同樣多的列」。
+         ★ 「固定」的意思是**一整局裡不變**,不是「永遠是同一個數字」——
+           吃子欄開關是設定,切下去 setTray() 會走 paint() 重算一次(見下面)。
      ========================================================================== */
+  /* ---------- 吃子欄要不要顯示(各人偏好,預設關)----------
+     ★ 預設關掉:少兩列 = 舞台高兩列 = 棋子大一圈,而「誰吃了什麼」多數時候盤面上
+       自己看得出來;要清點的人在 ⚙️ 設定裡打開。
+     ★ 這是**顯示偏好不是房規** —— 兩邊各自看各自的,不進 DB、不影響任何判定。
+     ⚠ 存自己的 key(CLAUDE.md 紅線 12:遊戲專屬設定不塞共用的 bingo.prefs.v1)。
+     ⚠ 切換一定要走 paint() 而不是 toggle 一個 class:動作列高度變了,
+       fitBoard() 沒重算的話盤面會溢出舞台被靜靜削掉(見 paint() 末尾那條 ⚠⚠)。 */
+  const VIEW_KEY = "darkchess.view.v1";
+  let trayOn = false;
+  function loadView(){ trayOn = readJSON(VIEW_KEY).tray === true; }
+  function setTray(on){
+    trayOn = !!on;
+    try{ localStorage.setItem(VIEW_KEY, JSON.stringify({ tray: trayOn })); }catch(e){}
+    if(cur && cur.st) paint();
+  }
+
   /* 吃子欄:被吃掉的子一定都現過身(炮打暗子是**先翻開再吃**),攤開它們不違反牌情紅線。
-     ⚠ 顆數多的時候改成互相疊一點,不然一列排不下 16 顆(class 由這裡掛,尺寸在 CSS)。 */
-  const TRAY_TIGHT = 11;
+     ⚠ 顆數多的時候改成互相疊一點,不然一列排不下 16 顆(class 由這裡掛,尺寸在 CSS)。
+     ⚠⚠ v1.115.0 把子放大到 26px(原 20px)之後,**一段收緊不夠用了**:
+       疊到 16 顆排得下的那個量,9 顆的時候會疊到只看得見最後一顆(截圖看出來的)。
+       所以分兩段 —— 9~12 顆疊一點點、13 顆以上才真的疊很兇(那時本來就快分出勝負了)。
+     ⚠ 兩個門檻與 CSS 的 margin 是**一組算出來的數字**(算式寫在 CSS 那邊),改尺寸要一起改。 */
+  const TRAY_TIGHT = 9, TRAY_TIGHTER = 13;
   const byRank = (a, b) => DC.rankOf(b) - DC.rankOf(a);
   function trayRow(label, caps, self){
     const n = caps.length + self.length;
@@ -207,7 +229,7 @@ const DCB = (function(){
                                 self.slice().sort(byRank).map(pieceHTML).join("") + "</span>") : "");
     return '<div class="dc-tray-row">' +
              '<span class="dc-tray-lbl">' + esc(label) + "</span>" +
-             '<span class="dc-tray-pcs' + (n >= TRAY_TIGHT ? " tight" : "") + '">' +
+             '<span class="dc-tray-pcs' + (n >= TRAY_TIGHTER ? " tighter" : (n >= TRAY_TIGHT ? " tight" : "")) + '">' +
              (n ? pcs : '<span class="dc-none">—</span>') + "</span></div>";
   }
   function trayHTML(st){
@@ -229,7 +251,7 @@ const DCB = (function(){
       acts.innerHTML = "";
       return;
     }
-    bits.push(trayHTML(st));
+    if(trayOn) bits.push(trayHTML(st));
     const who = cur.turnName || "";
     const meTxt = mySide < 0 ? "未定" : ('<b class="' + (mySide === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' +
                                          DC.sideName(mySide) + "方</b>");
@@ -237,7 +259,12 @@ const DCB = (function(){
               (canAct ? '<b class="dc-you">輪到你</b>' : (who ? ("輪到 " + esc(who)) : "…")) +
               '<span class="dc-side">你是 ' + meTxt + "</span></div>");
 
-    // ★ 第二行:三種狀態(連吃 / 可以動 / 輪到對手)**都佔同一格高度**
+    /* ★ 第二行:兩種狀態(連吃 / 其它)**都佔同一格高度**。
+       ⚠ v1.115.0 起「其它」一律是**空的** —— 原本那句操作提示(「點暗棋翻開,
+         或點自己的棋子」)拿掉了:它每一手都在講同一件事,而暗棋本來就只有
+         「翻一顆」跟「動自己的子」兩種手,盤面的高亮已經說完了。
+       ⚠⚠ 容器本身**不可以**跟著拿掉:連吃那一列比它高一截,.dc-actline 的
+         min-height 撐著,少了它「進入連吃」的那一手棋盤會縮一下。 */
     let line = "";
     if(chainOn && canAct){
       const n = DC.chainTargets(st).length;
@@ -245,9 +272,6 @@ const DCB = (function(){
              '<span class="dc-chain-txt">連吃中 · 已吃 <b>' + st.chainLen + '</b> 顆' +
              (n ? (' · 還可吃 <b>' + n + "</b> 處") : "") + "</span>" +
              '<button type="button" class="btn dc-stop" data-act="stop">結束連吃</button></div>';
-    }else if(canAct){
-      line = '<div class="dc-tip">' +
-             (sel >= 0 ? "點亮起的格子移動或吃子" : "點暗棋翻開,或點自己的棋子") + "</div>";
     }
     bits.push('<div class="dc-actline">' + line + "</div>");
     if(cur.cdEnd) bits.push('<div class="dc-cd" id="dcCd"></div>');
@@ -363,6 +387,7 @@ const DCB = (function(){
      七、對外
      ========================================================================== */
   function init(){
+    loadView();        // 吃子欄開關(各人偏好)—— 要在第一次 paint() 之前讀進來
     stage = $("dcStage"); board = $("dcBoard"); acts = $("dcActs");
     if(!board) return;
     board.addEventListener("click", e => {
@@ -411,6 +436,7 @@ const DCB = (function(){
   return {
     init, setState, reset, paint,
     onAct(cb){ actCb = cb; },
+    setTray, trayOn: () => trayOn,
     clearSel(){ sel = -1; },
     sel: () => sel,
     isWide: () => wide,

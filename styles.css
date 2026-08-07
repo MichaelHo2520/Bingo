@@ -6200,21 +6200,30 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     font-size:14px;font-weight:800;color:var(--muted);line-height:22px;min-height:22px}
   .dc-you{color:var(--accent-2);font-size:16px}
   .dc-side{font-size:12px;font-weight:700;color:var(--muted)}
-  .dc-tip{font-size:12px;color:var(--muted);line-height:1.35}
-  /* 第二行的容器:連吃列 / 操作提示 / 輪到對手(空的)三種狀態同一個高度 */
+  /* 第二行的容器:連吃列 / 其它(空的)兩種狀態同一個高度。
+     ⚠ v1.115.0 拿掉了操作提示那一行,但**容器要留著** —— 連吃列比它高一截,
+        min-height 沒人撐的話「進入連吃」的那一手棋盤會縮一下。 */
   .dc-actline{width:100%;min-height:32px;display:flex;align-items:center;justify-content:center}
   /* ---------- 吃子欄(動作列的上半)----------
      ★ 被吃掉的子一定都現過身(炮打暗子是先翻開再吃)→ 攤開它們不違反牌情紅線。
-     ⚠ 兩列不論有沒有子都佔位(空的畫一個「—」),理由同上面那條 ⚠⚠⚠。 */
+     ★ v1.115.0 起**預設不顯示**(⚙️ 設定裡開;開關在 board.js 的 trayOn),
+       而開起來時棋子放大到 26px —— 原本 20px 在手機上認不太出是哪一顆。
+     ⚠ 開著時兩列不論有沒有子都佔位(空的畫一個「—」),理由同上面那條 ⚠⚠⚠。 */
   .dc-tray{width:100%;display:flex;flex-direction:column;gap:2px;
     padding-bottom:4px;border-bottom:1px solid var(--panel-line)}
-  .dc-tray-row{display:flex;align-items:center;gap:6px;min-height:22px}
+  .dc-tray-row{display:flex;align-items:center;gap:6px;min-height:28px}
   .dc-tray-lbl{flex:none;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-size:11px;font-weight:800;color:var(--muted)}
-  .dc-tray-pcs{--dc-cell:22px;flex:1;min-width:0;display:flex;align-items:center;overflow:hidden}
-  .dc-tray-pcs .dc-p{width:20px;height:20px;flex:none;margin-right:2px}
-  /* 顆數多的時候互相疊一點 —— 16 顆排不進一列(class 由 board.js 依顆數掛) */
-  .dc-tray-pcs.tight .dc-p{margin-right:-7px}
+  .dc-tray-pcs{--dc-cell:28px;flex:1;min-width:0;display:flex;align-items:center;overflow:hidden}
+  .dc-tray-pcs .dc-p{width:26px;height:26px;flex:none;margin-right:2px}
+  /* 顆數多的時候互相疊一點 —— 16 顆排不進一列(class 由 board.js 依顆數掛)。
+     ⚠⚠ **兩段**,不是一段:一段收緊時「16 顆排得下」的那個量,套在 9 顆上會疊到
+        只看得見最後一顆(v1.115.0 放大棋子之後截圖抓到的)。
+     ⚠ 疊多少是算出來的 —— 最窄的手機(390px)這一格約 249px(對手名字佔滿 84px 時):
+        · tight  (9~12 顆):步距 18 → 12 顆 = 11×18 + 26 = 224 ≤ 249 ✔
+        · tighter(13 顆以上):步距 13 → 16 顆 = 15×13 + 26 = 221 ≤ 249 ✔ */
+  .dc-tray-pcs.tight .dc-p{margin-right:-8px}
+  .dc-tray-pcs.tighter .dc-p{margin-right:-13px}
   .dc-tray-boom{display:flex;align-items:center;margin-left:6px;
     font-size:11px;font-weight:800;color:var(--daub)}
   .dc-chain-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
@@ -6298,11 +6307,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .dc-acts{padding:4px 8px;gap:3px}
     .dc-turn{font-size:13px;line-height:20px;min-height:20px}
     .dc-you{font-size:14px}
-    .dc-tip{font-size:11px}
     .dc-stop{height:26px;padding:0 13px;font-size:13px;min-width:86px}
     /* ⚠ 這兩條要跟著改小,但**仍然是固定值** —— 高度可以變小,不可以隨內容變 */
     .dc-actline{min-height:28px}
-    .dc-tray-row{min-height:19px}
-    .dc-tray-pcs{--dc-cell:19px}
-    .dc-tray-pcs .dc-p{width:17px;height:17px}
+    .dc-tray-row{min-height:24px}
+    .dc-tray-pcs{--dc-cell:24px}
+    .dc-tray-pcs .dc-p{width:22px;height:22px}
+    /* ★ 橫置時這一列**寬得多**(棋桌上限 720px),16 顆 22px 排一排才 352px ——
+       疊起來只是白白讓人認不出來。所以把收緊量放掉大半(class 還是照掛)。 */
+    .dc-tray-pcs.tight .dc-p{margin-right:2px}
+    .dc-tray-pcs.tighter .dc-p{margin-right:-4px}
   }

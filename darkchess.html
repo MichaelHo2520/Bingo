@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>象棋暗棋 ｜ 單機對電腦 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.114.0 -->
-<meta name="version" content="1.114.0">
+<!-- 象棋暗棋 · v1.115.0 -->
+<meta name="version" content="1.115.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -403,6 +403,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="set-row">
             <span class="set-lbl">電子書模式</span>
             <button class="switch" id="swEbook" role="switch" aria-checked="false" aria-label="電子書模式"><span class="knob"></span></button>
+          </div>
+        </div>
+
+        <!-- 暗棋專屬:吃子欄要不要顯示。
+             ★ 這是**各人的顯示偏好**不是房規 —— 不進 DB、兩邊可以不一樣、也不影響任何判定,
+               所以放在這張設定卡而不是房規面板。預設關(動作列少兩列 = 棋子大一圈)。
+             ★ 狀態存在 darkchess.view.v1(由 js/darkchess/board.js 管),接線在 js/darkchess/main.js。 -->
+        <div class="set-group">
+          <div class="set-group-title">對局畫面</div>
+          <div class="set-row">
+            <span class="set-lbl">吃子欄<span class="set-sub">顯示雙方被吃掉的棋子</span></span>
+            <button class="switch" id="swDcTray" role="switch" aria-checked="false" aria-label="顯示吃子欄"><span class="knob"></span></button>
           </div>
         </div>
 
