@@ -54,7 +54,7 @@ function paintSoloHint(){
   const L = MJ16AI.levelOf(Solo.level());
   const n = Solo.seats();
   el.innerHTML = "<b>"+L.emoji+" "+L.name+"</b>:"+esc(L.desc)+"<br>"+
-    (n===4 ? "4 家用整副 <b>144 張</b>" : (n+" 家<b>去掉萬子</b>(108 張)"+(n===3?",而且<b>不能吃</b>":"")))+
+    (n===4 ? "4 家用整副 <b>144 張</b>" : (n+" 家<b>去掉萬子</b>(108 張)"))+
     " · 你固定坐第一家。<br>"+
     "相互算台,<b>底 "+Solo.base()+" 台</b>;莊家胡牌或流局<b>連莊</b>(連 N 拉 N)。<br>"+
     "<span class=\"m16-warn\">🀄 "+esc(Solo.recText(Solo.level()))+"</span>";

@@ -61,6 +61,12 @@ const MJ16 = (function(){
   /* ---------- 三個變體 ----------
      ★ 2 人與 3 人**都選「去萬子」**,不是各去各的 —— 牌組只有兩種(144 / 108),
        測資矩陣小一半,而且台數表完全共用。
+     ★★ **`chow` 三個變體一律 true(v1.118.1)。** v1.58.0~v1.118.0 的三人局是 `false`
+       (照某些三人麻將的打法),而那是錯的決定:使用者「吃這個的規則,應該是一定要可以,
+       不能分是幾人就不行」。實測三人局 14905 次打牌裡有 4514 次(30%)其實吃得下卻不給 ——
+       玩起來就是「吃壞掉了」,而且**沒有任何測試會紅**(那本來就是「設定成這樣」)。
+       ⚠ 這個欄位留著不刪:`claimsFor()` 還是照它走,以後真的要做「三人不吃」的房規
+         時是加一個房規,不是把它寫死。
      ★ 手牌一律 16 張、melds 一律 5 —— 這是三案能共用同一支拆牌的前提,不要為了
        「兩人局比較快」去改成 13 張:那會讓平胡 / 碰碰胡的判定基準跟著變,等於多養一套。
        壓局時改用 wallEnd(牌山剩幾張就流局),那是純參數、零額外邏輯。 */
@@ -68,7 +74,7 @@ const MJ16 = (function(){
     p4: { seats:4, suits:["w","b","d"], honors:true, flowers:true,
           melds:5, hand:16, chow:true,  wallEnd:16, name:"四人(標準)" },
     p3: { seats:3, suits:["b","d"],     honors:true, flowers:true,
-          melds:5, hand:16, chow:false, wallEnd:16, name:"三人(去萬子)" },
+          melds:5, hand:16, chow:true,  wallEnd:16, name:"三人(去萬子)" },
     p2: { seats:2, suits:["b","d"],     honors:true, flowers:true,
           melds:5, hand:16, chow:true,  wallEnd:40, name:"二人(去萬子)" }
   };

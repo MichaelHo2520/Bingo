@@ -596,43 +596,71 @@ const M16B = (function(){
     hd.appendChild(wt);
     b.appendChild(hd);
 
-    /* --- 三顆鈕:✔ 送出目前這一組 / 胡! / 過 -----------------------------------
-       ★ 順序與底下那一列**完全一樣**(✔ → 胡 → 過),「過」永遠在最後、永遠在。
-       ★ 「胡!」刻意最顯眼(金色 + 脈動):它最少見、最不能錯過,而且不吃特定手牌。 */
-    const row = document.createElement("div");
-    row.className = "m16-crow";
+    /* --- 按鈕:★★★ 每一組選項各一顆(v1.118.1)+ 胡! + 過 ------------------------
+       ⚠⚠⚠ v1.111.0~v1.118.0 只畫**一顆** ✔(目前那一組),要換組得去點手牌。
+         選項的排序是 槓 → 碰 → 吃(見 claimOpts),所以**只要能碰,預設就永遠是碰,
+         畫面上一顆「吃」都沒有** —— 使用者回報的「吃這個功能不見了,明明可以吃的,
+         但沒跳出來」就是這個。實測 4 人局 611 個宣告視窗裡有 30 次撞到。
+       ★ 當年(v1.58.2)否決「吃 三四 / 吃 四五 / 碰 / 過」那一排按鈕的理由是
+         **「文字要玩家自己在腦中對回手牌」**;現在標籤畫的是**自繪牌面**,
+         那個理由已經不成立 —— 所以這一排回來了,而且比舊版更好認。
+       ★ 手牌上「站起來的那一組」仍然由 copt 決定、點手牌照舊可以換 ——
+         那是**預覽**(哪兩張會被拿走),不再是唯一的選擇途徑。有框的那顆鈕就是它。
+       ★ 「過」永遠在最後、永遠在(使用者當初的要求);「胡!」金色脈動最顯眼。
+       ⚠ 分兩列:選項一列、胡 / 過一列 —— 選項最多 5 組(槓+碰+3 種吃法),
+         擠在同一列時「過」的位置會隨選項數量跳來跳去。 */
     /* html 是**自己產生的**(固定的字 + tileHTML),沒有任何使用者資料 —— 名字那一格
        走的是上面的 textContent。⚠ 要在這裡加任何外來字串之前,先想清楚 esc。 */
-    const mk = (html, cls, fn) => {
+    const mk = (into, html, cls, fn) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "m16-act" + (cls ? " " + cls : "");
       btn.innerHTML = html;
       btn.addEventListener("click", fn);
-      row.appendChild(btn);
+      into.appendChild(btn);
+      return btn;
     };
+    /* ★ 「碰哪兩張」給**牌面**不給牌名(v1.111.0)—— 同「已宣告聽牌」那一排的理由:
+       自繪牌面一開始就是為了這種地方,而「5萬5萬」四個字要在腦裡再翻譯一次。
+       ⚠ 20px 是 READY_TW 那條驗過的下限(16px 放大三倍認得出、原尺寸要瞇眼)。 */
+    const tilesHTML = (ts, tw) => (F && R)
+      ? '<span class="m16-cmt" style="--m16w:'+(tw || READY_TW)+'px">'+
+        ts.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+'</span>'
+      : ts.map(t=>F.info(codeOf(t)).name).join("");
+
+    const co  = info.opts || [];
     const cur = info.cur;
-    if(cur){
-      const lbl = { chow:"吃", pong:"碰", kong:"槓" }[cur.type] || cur.type;
-      /* ★ 「碰哪兩張」給**牌面**不給牌名(v1.111.0)—— 同「已宣告聽牌」那一排的理由:
-         自繪牌面一開始就是為了這種地方,而「5萬5萬」四個字要在腦裡再翻譯一次。
-         ⚠ 20px 是 READY_TW 那條驗過的下限(16px 放大三倍認得出、原尺寸要瞇眼)。 */
-      const tiles = (F && R)
-        ? '<span class="m16-cmt" style="--m16w:'+READY_TW+'px">'+
-          cur.tiles.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+'</span>'
-        : cur.tiles.map(t=>F.info(codeOf(t)).name).join("");
-      mk("✔ " + lbl + tiles, "take", info.onTake || function(){});
+    /* ★★ 選項一多就整組收一號(v1.118.1)。最多會有 5 組(槓 + 碰 + 3 種吃法),
+       每一顆鈕都帶著自繪牌面 → 在 380px 的面板裡一顆佔一整列,面板長到
+       **蓋住手牌**(實測 520×780 的 5 組:面板底緣到手牌上緣 -6px)。
+       ⚠ 這一條不可以改成「蓋到就算了」:宣告的時候你正需要看自己的手牌,
+         而且手牌上還標著「這一組會拿走哪兩張」。 */
+    const many = co.length >= 3;
+    p.classList.toggle("m16-many", many);
+    const lblTw = many ? 16 : READY_TW;
+    if(co.length){
+      const opts = document.createElement("div");
+      opts.className = "m16-crow m16-copts";
+      co.forEach((o, i) => {
+        const lbl = { chow:"吃", pong:"碰", kong:"槓" }[o.type] || o.type;
+        mk(opts, "✔ " + lbl + tilesHTML(o.tiles, lblTw),
+           "take" + (o === cur ? " on" : ""),
+           function(){ if(info.onTakeAt) info.onTakeAt(i); });
+      });
+      b.appendChild(opts);
     }
-    if(info.canWin) mk("胡!", "win", info.onWin || function(){});
-    mk("過", "pass", info.onPass || function(){});
+    const row = document.createElement("div");
+    row.className = "m16-crow";
+    if(info.canWin) mk(row, "胡!", "win", info.onWin || function(){});
+    mk(row, "過", "pass", info.onPass || function(){});
     b.appendChild(row);
 
-    /* --- 還有別的吃法 → 說一次「點手牌換一組」(選擇在牌上,見上面 cycleTo) --- */
-    const co = info.opts || [];
+    /* --- 不只一組 → 說一次「手牌上亮的是哪一組」(有框的那顆鈕就是它) --- */
     if(co.length > 1 && cur){
       const n = document.createElement("div");
       n.className = "m16-more";
-      n.textContent = (co.indexOf(cur) + 1) + " / " + co.length + " · 點手牌換一組";
+      n.textContent = "手牌上站起來的是第 " + (co.indexOf(cur) + 1) + " / " + co.length +
+                      " 組 · 點手牌可以換";
       b.appendChild(n);
     }
 

@@ -383,7 +383,12 @@ const MP = MPCore.create((function(){
         opts: co,
         cur: cur,
         canWin: types.indexOf("win")>=0,
-        onTake: ()=>{ if(cur) sendBid(cur.type, cur.type==="chow" ? cur.tiles : null); },
+        /* ★ v1.118.1:每一組選項各一顆鈕 → 按哪一顆就送哪一組。
+           ⚠ 當場重新問 claimOpts():面板是持久節點,listener 活得比這個閉包久。 */
+        onTakeAt: (i)=>{
+          const list = M16B.claimOpts(), o = list[i];
+          if(o) sendBid(o.type, o.type==="chow" ? o.tiles : null);
+        },
         onWin: ()=>sendBid("win", null),
         onPass: ()=>sendBid("pass", null)
       });
@@ -616,13 +621,13 @@ const MP = MPCore.create((function(){
   }
 
   /* ---------- 大廳說明 ----------
-     ★ 這裡只寫**規則**:玩家要照著做的事。設計理由(為什麼 3 人不能吃)、
+     ★ 這裡只寫**規則**:玩家要照著做的事。設計理由(為什麼 2~3 人去萬子)、
      實作細節(倒數怎麼藏牌情、台數總和恆為 0)一律不進畫面 —— 那些在 notes/11。 */
   function ruleHint(){
     const el = $("m16RuleHint"); if(!el) return;
     el.innerHTML =
       "<b>台灣 16 張</b>:摸打吃碰槓,湊「5 組面子 + 1 對將」就胡。<br>"+
-      "<b>4 人</b>用整副 144 張;<b>2~3 人</b>去掉萬子(108 張),<b>3 人不能吃</b>。<br>"+
+      "<b>4 人</b>用整副 144 張;<b>2~3 人</b>去掉萬子(108 張)。<br>"+
       "<b>相互算台</b>:自摸三家付、放槍一家付,<b>底 "+baseTai+" 台</b>。<br>"+
       /* 連莊是規則,不是實作細節 —— 它直接改「下一局誰坐莊」與台數(連 N 拉 N),要寫出來。 */
       "莊家胡牌或流局<b>連莊</b>(連 N 拉 N,全桌加台)。<br>"+

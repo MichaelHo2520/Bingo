@@ -491,7 +491,13 @@ const Solo = (function(){
         opts: co,
         cur: cur,
         canWin: types.indexOf("win") >= 0,
-        onTake: function(){ if(cur) humanBid(cur.type, cur.type === "chow" ? cur.tiles : null); },
+        /* ★ v1.118.1:每一組選項各一顆鈕 → 按哪一顆就送哪一組(不再是「目前那一組」)。
+           ⚠ 一定要當場重新問 claimOpts():這顆鈕的 listener 活得比 co 這個閉包久
+             (面板是持久節點,只有 body 會重建)。 */
+        onTakeAt: function(i){
+          var list = M16B.claimOpts(), o = list[i];
+          if(o) humanBid(o.type, o.type === "chow" ? o.tiles : null);
+        },
         onWin:  function(){ humanBid("win", null); },
         onPass: function(){ humanBid("pass", null); }
       });

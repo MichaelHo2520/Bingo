@@ -2667,10 +2667,33 @@ body.m16-mp .mj-play,body.m16-solo .mj-play{position:relative}
 @keyframes m16chu{
   0%,100%{box-shadow:0 3px 0 rgba(0,0,0,.3),0 0 0 0 rgba(251,191,36,.42)}
   50%{box-shadow:0 3px 0 rgba(0,0,0,.3),0 0 17px 3px rgba(251,191,36,.42)}}
-.m16-claim .m16-more{opacity:.82;font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted)}
+/* 選項那一列(每一組吃 / 碰 / 槓各一顆)。★ 與底下「胡 / 過」那一列分開 ——
+   選項最多 5 組,擠在同一列時「過」的位置會隨選項數量跳來跳去。 */
+.m16-crow.m16-copts{gap:7px}
+/* ★ 3 組以上就整組收一號(board.js 的 many):牌面 16px、鈕與間距都縮 ——
+   不收的話 5 組會把面板撐到蓋住手牌(實測 520×780 差 -6px)。
+   ⚠ 16px 是 READY_TW 那條驗過的下限的下一階,放大截圖仍認得出筒條萬。 */
+.m16-claim.m16-many{gap:6px;padding:9px 12px 10px}
+.m16-claim.m16-many .m16-act{padding:7px 11px;font-size:14px;border-radius:11px}
+.m16-claim.m16-many .m16-crow{gap:6px}
+.m16-claim.m16-many .m16-chd{font-size:12px}
+/* 手牌上「站起來的那一組」對應的那顆鈕 —— 與 .m16-ht.opt 是同一件事的兩個記號。
+   ⚠ 這**不是**「選中了才會送出」:每一顆鈕都直接送自己那一組,這圈框只講「手牌現在亮的是我」。
+   ⚠⚠ 框**不可以**用 .m16-ht.opt 那個綠(--mj-jf):鈕本身就是綠底,綠框畫在綠底上
+     等於沒畫(第一版就是這樣,放大截圖才看出來)。用白框,兩個主題下都讀得出來。 */
+.m16-claim .m16-act.take.on{box-shadow:0 3px 0 rgba(0,0,0,.3),inset 0 0 0 2px rgba(255,255,255,.92)}
+:root[data-theme="ebook"] .m16-claim .m16-act.take.on{box-shadow:0 3px 0 rgba(0,0,0,.3),inset 0 0 0 3px #000}
+.m16-claim .m16-more{opacity:.82;font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted);
+  text-align:center;line-height:1.35}
 /* 跳出來那一下(只播一次 —— 見 board.js 紅線②)。
    ⚠ 每一格 keyframe 都要帶 translateX(-50%),不然彈跳過程中面板會往右偏半個身。 */
-.m16-claim.m16-in{animation:m16cin .3s cubic-bezier(.22,1.4,.4,1) both}
+/* ⚠⚠⚠ **不可以帶 fill-mode(both / backwards)**(v1.118.1)。
+   0% 的那一格是 opacity:0 —— 帶了 fill 之後只要這支動畫因為任何理由沒有推進
+   (元素當下不在 render tree、分頁在背景、瀏覽器省電暫停…),面板就**永遠停在
+   透明**:DOM 在、位置對、鈕也點得到,但玩家什麼都看不到 = 「宣告視窗沒跳出來」。
+   不帶 fill 的話最壞情況只是「沒有彈跳動畫,直接出現」—— 那是可以接受的壞法。
+   ⚠ headless 量不到這條:--dump-dom 模式下 CSS 動畫根本不推進,每一格都是 0%。 */
+.m16-claim.m16-in{animation:m16cin .3s cubic-bezier(.22,1.4,.4,1)}
 @keyframes m16cin{
   0%{transform:translateX(-50%) translateY(12px) scale(.84);opacity:0}
   60%{transform:translateX(-50%) translateY(0) scale(1.04);opacity:1}
