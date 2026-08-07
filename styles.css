@@ -1203,9 +1203,12 @@
   .gc-body .hl-badge{align-self:center}
   :root[data-theme="ebook"] .game-card{background:#fff;border:1px solid #000}
 
-  /* 熱門度排名徽章(v1.112.0):一~九,數字小的排前面(= 大家真的玩得最多的那幾個)。
+  /* 熱門度排名徽章(v1.112.0):1~10,數字小的排前面(= 大家真的玩得最多的那幾個)。
      編號文字與先後都由 js/home-live.js 的 applyRank() 寫進去(style.order + 這顆的文字),
-     HTML 裡寫死的一~九只是「還沒有任何統計」時的預設排名。
+     HTML 裡寫死的 1~10 只是「還沒有任何統計」時的預設排名。
+     ⚠ v1.113.1 由國字(一~十)改成阿拉伯數字:「10」是兩位數,所以 min-width 只是**下限**、
+       靠 padding 自己撐開 —— 不可以改成固定 width(第十名會被裁掉半個字)。
+       tabular-nums 是為了讓 1 與 10 的數字寬一致,一排看下來不會忽寬忽窄。
      ⚠ 絕對定位是**刻意**的:首頁的驗收點是「九張卡不必捲就看得完」,這顆一旦佔到
        版面高度,九張卡就會多出一列高度、最後一列被擠出視窗(notes/13 第八節)。
      ⚠ position:relative 另開一條掛在 [data-gk] 上,不去動既有的 .game-card 那一條
@@ -1213,7 +1216,7 @@
   .game-card[data-gk]{position:relative}
   .gc-rank{position:absolute;top:5px;left:6px;z-index:1;
     min-width:16px;padding:0 3px;border-radius:6px;text-align:center;
-    font:800 11px/16px 'Nunito',sans-serif;
+    font:800 11px/16px 'Nunito',sans-serif;font-variant-numeric:tabular-nums;
     background:rgba(0,0,0,.20);color:var(--muted)}
   /* 前三名點亮(金 / 銀 / 銅)—— 「哪幾個最常玩」才需要一眼看到,第四名以後灰的就夠 */
   .gc-rank[data-top="1"]{background:rgba(250,204,21,.22);color:#facc15}

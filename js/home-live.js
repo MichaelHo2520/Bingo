@@ -3,7 +3,7 @@
 /* ============================================================================
    首頁的兩件事 — ★ 只有 index.html 載入這支。
      ① 「現在有人在玩」即時看板(v1.52.0)
-     ② 九張遊戲卡的**熱門度排序 + 一~九編號**(v1.112.0,見下面那整段說明)
+     ② 十張遊戲卡的**熱門度排序 + 1~10 編號**(v1.112.0,見下面那整段說明)
    兩件事共用同一次 Firebase 載入,但**彼此獨立**:任一邊讀失敗都不可以拖垮另一邊。
 
    資料來源就是三個遊戲原有的大廳輕量索引:rooms_index / gomoku_index / sudoku_index
@@ -65,8 +65,8 @@ const HomeLive = (function(){
   ];
 
   /* ==========================================================================
-     熱門度排序(v1.112.0)—— 九張遊戲卡依「這個遊戲被真的玩過幾場」由多到少排,
-     卡片左上角標一~九。
+     熱門度排序(v1.112.0)—— 十張遊戲卡依「這個遊戲被真的玩過幾場」由多到少排,
+     卡片左上角標 1~10(v1.113.1 起是阿拉伯數字,原本是一~十的國字)。
 
      資料是 Firebase 的 game_stats/{key}/n:房主開房、**真的開局**、**撐過 30 秒**才 +1,
      一間房只記一次(寫入在 js/shared/mp-core.js 與 js/online.js 的 armPlayCount())。
@@ -86,7 +86,6 @@ const HomeLive = (function(){
           被這裡誤觸會連「現在有人在玩」整塊一起消失。
      ========================================================================== */
   const RANK_KEY="bingo.gamerank.v1";
-  const RANK_NUM=["一","二","三","四","五","六","七","八","九","十"];
   let rankHadCache=false;
 
   function cardOf(k){ return document.querySelector('.game-card[data-gk="'+k+'"]'); }
@@ -97,14 +96,17 @@ const HomeLive = (function(){
       .map(r=>[r[0],r[1]]);
   }
   /* 只設 style.order 與徽章文字,**不搬 DOM**:搬動節點會讓 hl-badge 那顆
-     與 :hover / :active 一起跳,而 .gc-grid 是 grid、order 完全夠用。 */
+     與 :hover / :active 一起跳,而 .gc-grid 是 grid、order 完全夠用。
+     ⚠ 編號是**阿拉伯數字**(v1.113.1 由一~十的國字改過來,使用者要求),
+       而且是**算出來的**不是查表 —— 原本那張 RANK_NUM 表每加一個遊戲就得補一個字,
+       漏補的症狀是最後那張卡的徽章變空白(v1.113.0 就差點漏掉「十」)。 */
   function applyRank(rows){
     const hot=rows.some(r=>r[1]>0);   // 一場都還沒玩過 → 不點亮前三名(那會是假的「最熱門」)
     rows.forEach((r,i)=>{
       const el=cardOf(r[0]); if(!el)return;
       el.style.order=String(i);
       const b=el.querySelector(".gc-rank");
-      if(b){ b.textContent=RANK_NUM[i]||""; b.setAttribute("data-top",(hot&&i<3)?String(i+1):"0"); }
+      if(b){ b.textContent=String(i+1); b.setAttribute("data-top",(hot&&i<3)?String(i+1):"0"); }
     });
   }
   // 快取要對得上目前這九個遊戲;加了新遊戲 / 改了 key 就整份作廢回預設(不然新遊戲沒有 order)
