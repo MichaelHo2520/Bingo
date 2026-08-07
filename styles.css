@@ -6031,3 +6031,242 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .un-colors{grid-template-columns:repeat(4,1fr)}
     .un-cbtn{padding:12px 6px;font-size:14px}
   }
+
+  /* ==========================================================================
+     象棋暗棋(darkchess.html 與 js 底下的 darkchess 那一組)—— 第十個遊戲
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 前綴一律 .dc-*(CLAUDE.md 紅線 6);這一段只追加,不動上面任何一行。
+       ★★ 這一頁的「紅 vs 黑」是**規則本體**(兩方就是靠顏色分的),所以:
+          任何主題都不准把兩方塌成同一種樣子。電子書主題沒有顏色可用 →
+          改用「紅方雙圈、黑方單圈」把辨識點補回來(同 UNO 給色盲補色名字母的做法)。
+          ⚠ 另一半的保險是**棋子上的字本來就不一樣**(帥仕相俥傌炮兵 / 將士象車馬包卒),
+            所以就算兩個機制都失效,玩家仍然分得出來 —— 但不要因此拿掉任何一個。
+     ========================================================================== */
+  /* 材質色:與數獨的 --sk-* 同一個做法 —— **刻意不吃主題變數**。
+     木頭就是木頭,五個主題各換一種顏色只會讓它看起來像塑膠。 */
+  :root{ --dc-wood:#f0d6a8; --dc-wood-e:#b98a4e; --dc-wood-in:#e3c390;
+         --dc-back:#c89055; --dc-back-e:#8a5c30; --dc-back-in:#b57f47;
+         --dc-red:#c62828; --dc-blk:#2b2622;
+         --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(0,0,0,.14);
+         --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6; }
+  :root[data-theme="ebook"]{ --dc-wood:#ffffff; --dc-wood-e:#000000; --dc-wood-in:#ffffff;
+         --dc-back:#ffffff; --dc-back-e:#000000; --dc-back-in:#ffffff;
+         --dc-red:#000000; --dc-blk:#000000;
+         --dc-well:#ffffff; --dc-well-e:#000000; --dc-slot:#f2f2f2;
+         --dc-tgt:#000000; --dc-tgt-eat:#000000; --dc-tgt-far:#000000; }
+
+  /* ---------- 首頁 icon / 進場插圖(逐字相同的一份 SVG,只有外層 class 不同) ----------
+     ⚠⚠ 首頁那張遊戲卡掛的是 **.dc-cart**,**絕對不可以**掛 .dc-art ——
+        下面那條 96px 定義在 .gc-art{width:46px} **後面**,同權重後定義勝
+        → 首頁那張卡的圖會變成 96px、整張卡比另外九張高一截(21點 v1.86.0 踩過)。
+     ⚠ 暗棋這張**刻意不做滿版底色** —— 十張卡裡只有台灣麻將是滿版的,那是它與
+        麻將消消樂分家的辨識點;多一張滿版就把那個唯一性洗掉了。 */
+  .dc-art{width:96px;height:96px;display:block;margin:0 auto}
+  .dc-ic-bd{stroke:var(--dc-wood-e);stroke-width:1.4}
+  .dc-ic-back{fill:var(--dc-back);stroke:var(--dc-back-e)}
+  .dc-ic-face{fill:var(--dc-wood)}
+  .dc-ic-in{fill:none;stroke-width:1.1}
+  .dc-ic-backin{stroke:var(--dc-back-e);opacity:.55}
+  .dc-ic-ring{stroke:var(--dc-red)}
+  /* ★ 牌背的三條紋是「這一顆還沒翻」的唯一線索 —— 它與正面那顆的差別要一眼看得出來 */
+  .dc-ic-grain{stroke:var(--dc-back-e);stroke-width:1.1;stroke-linecap:round;opacity:.5;fill:none}
+  .dc-ic-t{fill:var(--dc-red);font:800 15px/1 'Nunito',sans-serif;text-anchor:middle}
+  /* 電子書主題:白底黑框黑字,紅方那顆靠**雙圈**留住辨識點 */
+  :root[data-theme="ebook"] .dc-ic-ring{stroke:#000;stroke-width:1.6}
+  :root[data-theme="ebook"] .dc-ic-t{fill:#000}
+
+  /* ---------- 外框(照 .un-* 那一組做一份對應的)----------
+     ⚠ 這幾條**不可以**直接沿用 .un-*:那些是 UNO 那一頁的,改動會波及它。
+        前綴分開是紅線 6;而「長得一樣」是靠**抄同一組數字**,不是靠共用 class。 */
+  .dc-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+    line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+  :root[data-theme="ebook"] .dc-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+  .dc-scroll{flex:1 1 auto}
+  .dc-hero{text-align:center;margin:14px 0 4px}
+  .dc-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
+  .dc-solomsg{display:inline-block;margin-top:2px;font-size:13px;color:var(--muted)}
+  .dc-red-t{color:var(--dc-red)}
+  /* ⚠ --dc-blk(#2b2622)在深色面板上幾乎看不見 —— 「黑方」這兩個**字**寫在面板上,
+     與躺在木色底上的棋子是兩回事,所以文字版跟著面板走。 */
+  .dc-blk-t{color:var(--text);text-shadow:0 0 2px rgba(0,0,0,.35)}
+
+  /* ---------- 房間框 / 單機列 ---------- */
+  .dc-room{padding:9px 12px}
+  .dc-room .row{margin-top:0}
+  .dc-room-top{flex-wrap:nowrap;gap:8px}
+  .dc-room .dc-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:13px;font-weight:700;color:var(--muted)}
+  .dc-room .dc-room-title b{font-size:15px;color:var(--text)}
+  /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
+     不寫這條的話它們會是 42px、跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
+  .dc-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .dc-room .quick-voice,.dc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .dc-room .quick-voice .qv-ico{font-size:18px}
+  .dc-room .mp-subrow{margin-top:5px}
+  .dc-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .dc-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  /* 晶片尾巴:顏色 + 盤上還剩幾顆(★ 兩者都是公開資訊,見 adapter.js 的 chipTail) */
+  .dc-chip-side{font-size:10px;font-weight:800;padding:1px 5px;border-radius:999px;
+    background:rgba(255,255,255,.16);margin-left:3px}
+  .dc-chip-n{display:inline-flex;align-items:center;font-size:11px;font-weight:800;
+    color:var(--muted);margin-left:3px}
+
+  /* ==========================================================================
+     棋盤
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 尺寸(width / height / --dc-cell)由 js/darkchess/board.js 的 fitBoard()
+         寫成整數 px,這裡**不要**用 aspect-ratio —— 理由見那一支的註解。
+       ★ .dc-stage 一定是 flex:1 1 0(不是 auto):basis 0 = 尺寸只由父層分配,
+         子元素多大都回頭撐不到它 → ResizeObserver 不可能形成迴圈。
+     ========================================================================== */
+  .dc-play{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;
+    width:min(92vw,720px);margin:0 auto}
+  .dc-stage{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;
+    overflow:hidden}
+  .dc-board{display:grid;grid-template-columns:repeat(var(--dc-cols,8),1fr);
+    grid-auto-rows:1fr;gap:4px;padding:5px;border-radius:14px;
+    background:var(--dc-well);box-shadow:0 0 0 3px var(--dc-well-e),0 8px 22px rgba(0,0,0,.32)}
+  /* 一格。★ 空格也是一顆 button(要能當落點點下去),只是裡面沒有棋子 */
+  .dc-sq{position:relative;appearance:none;-webkit-appearance:none;border:0;padding:0;margin:0;
+    background:var(--dc-slot);border-radius:7px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  .dc-board:not(.dc-mine) .dc-sq{cursor:default}
+
+  /* ---------- 一顆棋子 ---------- */
+  .dc-p{position:relative;width:88%;height:88%;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 34% 28%,#fff8ea 0%,var(--dc-wood) 46%,var(--dc-wood-in) 100%);
+    box-shadow:0 0 0 1.5px var(--dc-wood-e),0 2px 0 rgba(0,0,0,.28),0 3px 6px rgba(0,0,0,.25)}
+  .dc-ring{position:absolute;inset:11%;border-radius:50%;border:1.5px solid currentColor;opacity:.75}
+  /* ⚠ 棋子的字用**襯線體**:象棋子上就是印宋體,用內文的 Nunito 會像貼紙。
+     取不到中文襯線體時退回 serif —— 那也還是襯線,不會變成另一種味道。 */
+  .dc-ch{position:relative;font-family:'Noto Serif TC','Songti TC','PMingLiU',serif;font-weight:800;
+    line-height:1;font-size:calc(var(--dc-cell,44px) * .46)}
+  .dc-red{color:var(--dc-red)}
+  .dc-blk{color:var(--dc-blk)}
+  /* ★★ 電子書主題:兩方都變黑字 → 紅方靠**雙圈**留住辨識點(見這一段開頭的 ★★) */
+  :root[data-theme="ebook"] .dc-p{background:#fff;box-shadow:0 0 0 2px #000}
+  :root[data-theme="ebook"] .dc-red .dc-ring{box-shadow:0 0 0 2.5px #fff,0 0 0 4px #000}
+
+  /* 牌背:與正面**明顯不同色**,而且沒有字。⚠ 不可以只降飽和度來表示「暗」——
+     那會看起來像 disabled(UNO 的暗牌踩過同一件事)。 */
+  .dc-back{color:var(--dc-back-e);
+    background:radial-gradient(circle at 34% 28%,#e2ac74 0%,var(--dc-back) 52%,var(--dc-back-in) 100%);
+    box-shadow:0 0 0 1.5px var(--dc-back-e),0 2px 0 rgba(0,0,0,.3),0 3px 6px rgba(0,0,0,.25)}
+  .dc-grain{position:absolute;width:52%;height:34%;border-radius:2px;
+    background:repeating-linear-gradient(180deg,currentColor 0 1.5px,transparent 1.5px 5px);opacity:.45}
+  :root[data-theme="ebook"] .dc-back{background:#fff;box-shadow:0 0 0 2px #000}
+
+  /* ---------- 可點 / 選中 / 落點 ----------
+     ⚠ 不能點的格**不給 disabled**(CLAUDE.md 的紅線)—— 點下去要看得到 toast 說原因。
+        這裡的高亮只是「幫忙指路」,不是權限。 */
+  /* ★ 這裡**刻意沒有**「可以翻」的高亮:暗棋一律都翻得動,標起來就是一次亮十幾顆 ——
+     那是雜訊不是資訊(截圖看得很清楚)。「現在能不能動」由動作列那句「輪到你」講。 */
+  .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),0 4px 10px rgba(0,0,0,.35)}
+  .dc-tgt{box-shadow:inset 0 0 0 3px var(--dc-tgt)}
+  .dc-tgt.dc-t-eat,.dc-tgt.dc-t-jump{box-shadow:inset 0 0 0 3px var(--dc-tgt-eat)}
+  /* 遠距離的兩種(車直衝 / 連吃翻暗棋)另給一個顏色 —— 它們是房規才有的手,
+     與一般吃子分開,玩家才看得出「這一步是因為開了房規才存在的」 */
+  .dc-tgt.dc-t-rush,.dc-tgt.dc-t-dark{box-shadow:inset 0 0 0 3px var(--dc-tgt-far)}
+  .dc-tgt.dc-empty::after{content:"";position:absolute;width:26%;height:26%;border-radius:50%;
+    background:var(--dc-tgt);opacity:.75}
+  /* 剛剛動過的兩格:落點彈一下,來源留一個淡框(看得出「他從哪走到哪」) */
+  .dc-hit .dc-p{animation:dcPop .28s ease-out}
+  .dc-from{box-shadow:inset 0 0 0 2px rgba(255,255,255,.34)}
+  @keyframes dcPop{ 0%{transform:scale(.72);opacity:.4} 70%{transform:scale(1.06)} 100%{transform:scale(1)} }
+
+  /* ---------- 動作列 ---------- */
+  .dc-acts{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:6px 10px;border-radius:14px;background:var(--panel);
+    border:1px solid var(--panel-line);text-align:center}
+  .dc-turn{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+    font-size:14px;font-weight:800;color:var(--muted)}
+  .dc-you{color:var(--accent-2);font-size:16px}
+  .dc-side{font-size:12px;font-weight:700;color:var(--muted)}
+  .dc-tip{font-size:12px;color:var(--muted);line-height:1.35}
+  .dc-chain-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+  .dc-chain-txt{font-size:13px;font-weight:800;color:var(--accent-2)}
+  .dc-chain-txt b{color:var(--text)}
+  /* ★ 「停在這裡」只在連吃還吃得到的時候出現 —— 沒得吃時規則層已經自動結束了 */
+  .dc-stop{padding:6px 15px;font-size:14px;min-width:96px}
+  .dc-cd{font-size:12px;font-weight:800;color:var(--muted)}
+  .dc-cd.hot{color:var(--daub)}
+
+  /* ---------- 結果卡 ----------
+     ⚠ 權重要寫成 `.win-card.dc-win`(0,2,0)才壓得過共用的 `.win-card .word` ——
+        只寫 `.dc-win .word` 是同級,靠「誰在後面」贏,搬動段落順序就會回彈。 */
+  .win-card.dc-win{width:min(88vw,520px);max-width:none;padding:26px 24px}
+  .win-card.dc-win .word{font-size:clamp(28px,7.2vw,40px)}
+  .dc-win p{margin:7px 0 14px}
+  .dc-result{margin:2px 0 12px}
+  .dc-endby{font-size:13px;font-weight:800;color:var(--accent-2);margin-bottom:7px}
+  .dc-table{width:100%;border-collapse:collapse;font-size:13px}
+  .dc-table th{font-size:11px;font-weight:800;color:var(--muted);padding:3px 5px;text-align:center}
+  .dc-table th:first-child{text-align:left}
+  .dc-table td{padding:5px;border-top:1px solid var(--panel-line);vertical-align:middle}
+  .dc-table tr.dc-w{background:rgba(255,210,74,.14)}
+  .dc-table tr.dc-me .dc-r-nm{color:var(--accent-2)}
+  .dc-r-nm{text-align:left;font-weight:800}
+  .dc-r-side{font-size:10px;font-weight:800;margin-left:5px;padding:1px 5px;border-radius:999px;
+    background:rgba(255,255,255,.14)}
+  .dc-r-n{text-align:center;font-weight:800}
+  .dc-plus{font-style:normal;font-size:11px;color:var(--accent-2);margin-left:2px}
+  /* 吃掉的子:小一號的棋子排一排(★ 這裡是唯一會把整局的子攤開的地方) */
+  .dc-r-caps{--dc-cell:22px;display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-start;
+    align-items:center;max-width:150px}
+  .dc-r-caps .dc-p{width:20px;height:20px;flex:none}
+  .dc-none{color:var(--muted);font-size:12px}
+  .dc-selfcap{font-size:11px;font-weight:800;color:var(--daub);margin-left:3px}
+  /* 賽後表情列(單機沒有對手可以送 → 整列收起來) */
+  .dc-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  body.solo-on .dc-react-row{display:none}
+
+  /* ---------- 房規面板 ----------
+     ⚠ 只有**中間那塊**會捲(卡片自己 overflow:hidden + .set-body flex:1/min-height:0)
+        —— 整張卡自己捲的話 position:sticky 的 ✕ 會一路壓在設定列上(21點 v1.87.0 踩過)。
+     ⚠ 選擇器一律用前綴 class,**不可以**寫 dcRulesVeil 那個 id 加 .set-card ——
+        那會波及另外九頁共用的那張設定卡。 */
+  .set-card.dc-rules-card{width:min(92vw,480px);max-width:none;
+    display:flex;flex-direction:column;overflow:hidden}
+  .dc-rules-card .set-body{flex:1 1 auto;min-height:0;overflow-y:auto;
+    -webkit-overflow-scrolling:touch}
+  .dc-rules-who{flex:none;margin:-4px 0 8px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--accent-2)}
+  .dc-rules-card .set-row.col{flex-direction:column;align-items:stretch;gap:5px}
+  .dc-rules-card .set-row.col .set-lbl{text-align:left}
+  .dc-rules-card .set-row.col .seg{width:100%}
+  .dc-rules-card .set-row.col .seg button{flex:1 1 0;min-width:0;font-size:12.5px;padding:6px 4px}
+  .dc-rules-card .seg.readonly{opacity:.78}
+  /* ★★ 巢狀的子選項:上層關著時整列壓暗。壓暗只是告訴玩家「先開上面那一項」——
+     真的守住巢狀關係的是 DC.normRules(),不是這條 CSS。 */
+  .dc-sub-row{margin-left:10px;border-left:2px solid var(--panel-line);padding-left:9px}
+  .dc-sub-row.dc-sub-off{opacity:.45}
+  .dc-rules-list{margin:2px 0 0;padding:0;list-style:none;text-align:left}
+  .dc-rules-list li{position:relative;padding:3px 0 3px 15px;
+    font-size:12.5px;line-height:1.5;color:var(--muted)}
+  .dc-rules-list li::before{content:"";position:absolute;left:3px;top:10px;
+    width:5px;height:5px;border-radius:50%;background:var(--accent)}
+  .dc-rules-list li b{color:var(--text)}
+  .dc-rules-sum{flex:none;text-align:left;padding-top:8px;
+    font:800 12px/1.4 'Nunito',sans-serif;color:var(--accent-2)}
+
+  /* ---------- 對局中把棋桌放寬(大廳與選單維持 .panel 原本的寬度) ----------
+     ★★ 房間框一定要**跟著同一個數字放寬**(同 UNO / 排七 / 大老二那三條):
+        兩塊不同寬看起來就不像同一張桌子。 */
+  body.dc-on .dc-room{width:min(92vw,720px)}
+
+  /* ---------- 橫置矮視窗 ----------
+     ⚠ e2e 的 headless 視窗永遠是矮的(750×485)→ **直立版沒有 e2e 守門**,
+       直立的驗收只能靠截圖(notes/13 第八節同一條教訓)。
+     ⚠ 盤面本身不必在這裡調 —— fitBoard() 依舞台實際尺寸算,矮視窗自然會選 8 欄那一種。 */
+  @media (max-height:560px){
+    .dc-hero{margin:6px 0 2px}
+    .dc-room{padding:6px 10px}
+    .dc-room .mp-subrow,.dc-room-foot{margin-top:3px}
+    .dc-acts{padding:4px 8px;gap:3px}
+    .dc-turn{font-size:13px}
+    .dc-you{font-size:14px}
+    .dc-tip{font-size:11px}
+    .dc-stop{padding:5px 13px;font-size:13px;min-width:86px}
+  }

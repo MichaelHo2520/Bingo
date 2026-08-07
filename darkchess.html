@@ -6,33 +6,33 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="大老二">
+<meta name="apple-mobile-web-app-title" content="暗棋">
 <meta name="theme-color" content="#2a1136">
 <!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>大老二 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 大老二 · v1.113.0 -->
+<title>象棋暗棋 ｜ 單機對電腦 + 2 人連線</title>
+<!-- 象棋暗棋 · v1.113.0 -->
 <meta name="version" content="1.113.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
-  location.replace("app.html#big2");
+  location.replace("app.html#darkchess");
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- 共用 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
-     id 與 class;牌河與手牌是檔尾追加的 .b2-* 段落 -->
+     id 與 class;棋盤與棋子是檔尾追加的 .dc-* 段落 -->
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <div class="topbar">
     <div class="brand">
-      <div class="b2-brand display">大老二</div>
+      <div class="dc-brand display">暗棋</div>
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
@@ -42,11 +42,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
 
   <!-- ====== 進場選單(兩層)======
-       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度與人數。
-       與排七 #svHome、台灣麻將 #m16Home 同一套結構。 -->
-  <section class="panel" id="b2Home">
+       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度與先手。
+       與 UNO #unHome、大老二 #b2Home 同一套結構。 -->
+  <section class="panel" id="dcHome">
     <!-- 回 index.html 的返回列。只在第一層顯示 —— 第二層有自己的返回(回第一層) -->
-    <div class="mp-head" id="b2HomeHead">
+    <div class="mp-head" id="dcHomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
@@ -54,89 +54,78 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
 
     <!-- 第一層:選怎麼玩 -->
-    <div id="b2PickMode">
-      <div class="b2-hero">
-        <!-- ⚠ 插圖只用數字與自繪花色,不用撲克牌 Unicode(U+1F0A0 那一段)——
-             多數字型沒有,會變豆腐方框(見 notes/13 的禁令)
-             ★★ v1.101.1:兩張交疊斜放的 2 —— ♥︎2 + ♠︎2(2 最大就是這個遊戲的全部;
-                黑桃 2 是這一版最大的一張牌 → 它疊在上面)。
-                **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
-                (這裡是 .b2-art 96px、首頁是 .gc-art.pk-art 58px)——
-                同一副牌本來就該長一樣,樣式在 styles.css 的 .pk-ic-* 那幾條
-                (三個撲克牌遊戲共用一組;tools/test-pages.js 的 E 節在守這對雙胞胎) -->
-        <svg class="b2-art pk-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 大老二">
-          <!-- 下層:♥︎2(往左斜) -->
-          <g transform="rotate(-16 19 30)">
-            <rect class="pk-ic-bd" x="8.5" y="15" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t pk-ic-red" x="19" y="28">2</text>
-            <g class="pk-ic-s pk-ic-red" transform="translate(15 30.4) scale(.08)">
-              <path d="M50 90S10 62 10 36C10 22 21 12 34 12c8 0 14 5 16 11 2-6 8-11 16-11 13 0 24 10 24 24 0 26-40 54-40 54z"/>
-            </g>
+    <div id="dcPickMode">
+      <div class="dc-hero">
+        <!-- ★★ 進場插圖:一顆**蓋著的**棋子在後、一顆翻開的紅帥在前。
+             「有一顆是蓋著的」是暗棋與五子棋 / 一般象棋唯一分得出來的辨識點,一定要在。
+             **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
+             (這裡是 .dc-art 96px、首頁是 .gc-art.dc-cart 46px)——
+             樣式在 styles.css 的 .dc-ic-* 那幾條;tools/test-pages.js 的 I 節在守這對雙胞胎。 -->
+        <svg class="dc-art" viewBox="0 0 56 56" role="img" aria-label="象棋暗棋">
+          <g transform="translate(18 34)">
+            <circle class="dc-ic-bd dc-ic-back" r="14"/>
+            <circle class="dc-ic-in dc-ic-backin" r="10"/>
+            <path class="dc-ic-grain" d="M-5.5 -3h11M-5.5 0h11M-5.5 3h11"/>
           </g>
-          <!-- 上層:♠︎2(往右斜、蓋在前面 —— 這一版最大的一張牌) -->
-          <g transform="rotate(16 37.5 29)">
-            <rect class="pk-ic-bd" x="27" y="14" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t" x="37.5" y="27">2</text>
-            <g class="pk-ic-s" transform="translate(33.5 29.4) scale(.08)">
-              <path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/>
-              <path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>
-            </g>
+          <g transform="translate(37 23)">
+            <circle class="dc-ic-bd dc-ic-face" r="15"/>
+            <circle class="dc-ic-in dc-ic-ring" r="11"/>
+            <text class="dc-ic-t" y="5.6">帥</text>
           </g>
         </svg>
-        <div class="home-tagline">2 最大,搶著把手上的牌出完</div>
+        <div class="home-tagline">32 顆象棋蓋著擺滿,翻到什麼算什麼</div>
       </div>
-      <button class="btn primary block-btn home-btn" id="b2GoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="b2GoSolo">🤖 電腦對決</button>
+      <button class="btn primary block-btn home-btn" id="dcGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="dcGoSolo">🤖 電腦對決</button>
       <div class="home-hint">
-        52 張全發給 <b>2~4 人</b>。<b>拿到 ♣︎3 的人先出,第一手一定要帶 ♣︎3</b>。<br>
-        可出 <b>1 張(單張)· 2 張(對子)· 5 張</b>;五張只有<b>順子 · 葫蘆 · 鐵支 · 同花順</b>。<br>
-        <b>同牌型才能互壓</b>(順子只壓順子、葫蘆只壓葫蘆),而<b>鐵支與同花順壓得過任何牌型</b>,
-        同花順又比鐵支大。壓不過就 <b>Pass</b>。<br>
-        出完的人退出、牌局繼續,打到只剩一家。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。<br>
-        <!-- ★ v1.83.0:智慧選取。⚠ 這兩句是「為什麼點一下會選好幾張」的唯一說明,
-             不寫的話玩家第一次點到葫蘆的三條會以為選錯了。見 notes/16 第六之七節。 -->
-        點牌會<b>整組一起選</b>(桌上是葫蘆時,點一張就自動選滿三條、再點一張補對子),
-        <b>再點一下整組取消</b>。<br>
-        <!-- ★ v1.81.1:「拉」。⚠ 一定要寫「不管幾張」與「3/4 張永遠不算」——
-             網路上最常見的說法是「剩一張才喊」(錯的),而這一版三條不能單出,
-             所以剩 3 張比標準大老二更晚才進入「最後一手」。見 notes/16 第六之六節。 -->
-        誰<b>剩最後一手</b>(不管幾張)時,系統會自動報一聲「<b>拉</b>」讓全桌知道 ——
-        這一版三條不能單出,所以<b>剩 3 張或 4 張永遠不算最後一手</b>。
+        象棋 32 顆<b>蓋著隨機擺滿 4×8</b>。輪流做一件事:<b>翻開一顆暗棋</b>,
+        或<b>動一顆自己的明棋</b>(上下左右一格,走空格或吃敵方明棋)。<br>
+        <b>先手第一次翻到什麼顏色,那個顏色就是他的。</b><br>
+        大小 <b>將 &gt; 士 &gt; 象 &gt; 車 &gt; 馬 &gt; 包 &gt; 卒</b>,大吃小、同級可吃 ——
+        但<b>卒吃得了將,將吃不了卒</b>。<br>
+        <!-- ★ 炮這三條是這一頁最常被問的:不寫清楚,玩家第一次點炮會以為壞掉了 -->
+        <b>炮不能貼身吃</b>:要沿直線隔<b>恰好一顆</b>子當炮架跳過去,距離不限、
+        <b>不受階級限制</b>(炮打得到將),而且<b>連暗棋都打得到</b> ——
+        翻開不論敵我都被吃掉,打到自己的算自己倒楣。<br>
+        把對方的子<b>吃光</b>,或讓對方<b>無子可動也無暗棋可翻</b>就贏。
+        連續 <b>40 步</b>沒吃沒翻就<b>比雙方剩下棋子的階級總和</b>,完全一樣才算和局。<br>
+        房規可以開<b>連吃</b>與<b>橫衝直撞</b>(兩者各有一個子選項)。
       </div>
     </div>
 
     <!-- 第二層:單機設定 -->
-    <div id="b2PickSolo" class="hidden">
+    <div id="dcPickSolo" class="hidden">
       <div class="home-sub-head">
-        <button class="icon-btn" id="b2SoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+        <button class="icon-btn" id="dcSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <span class="subtitle">電腦對決</span>
       </div>
       <div class="field">
         <span class="field-label">電腦強度</span>
-        <div class="seg" id="b2LvSeg" aria-label="電腦強度">
+        <div class="seg" id="dcLvSeg" aria-label="電腦強度">
           <button data-lv="easy">🙂 新手</button>
           <button class="on" data-lv="mid">🤔 普通</button>
           <button data-lv="hard">😈 高手</button>
         </div>
       </div>
       <div class="field">
-        <span class="field-label">幾個人玩</span>
-        <div class="seg" id="b2SeatSeg" aria-label="幾個人玩">
-          <button data-seats="2">2 人</button>
-          <button data-seats="3">3 人</button>
-          <button class="on" data-seats="4">4 人</button>
+        <!-- ★ 暗棋的先手權很實在:**先手第一次翻到什麼顏色就是他的** -->
+        <span class="field-label">誰先翻</span>
+        <div class="seg" id="dcFirstSeg" aria-label="誰先翻">
+          <button class="on" data-first="me">我先</button>
+          <button data-first="ai">電腦先</button>
+          <button data-first="random">隨機</button>
         </div>
       </div>
-      <!-- ★ 房規:與連線**共用同一個蓋板**(#b2RulesVeil)。單機時「我就是房主」
-           (照21點 v1.85.0 那一套:兩邊各一顆入口鈕 → 一組 DOM、一支 syncRules) -->
+      <!-- ★ 房規:與連線**共用同一個蓋板**(#dcRulesVeil)。單機時「我就是房主」
+           (照大老二 / 21點 / UNO 那一套:兩邊各一顆入口鈕 → 一組 DOM、一支 syncRules) -->
       <div class="field">
         <span class="field-label">房規</span>
-        <button class="btn ghost block-btn" id="b2SoloRules" type="button">⚙ 改規則</button>
+        <button class="btn ghost block-btn" id="dcSoloRules" type="button">⚙ 改規則</button>
       </div>
-      <button class="btn primary block-btn home-btn" id="b2StartSolo">開始對局 ▸</button>
-      <div class="home-hint" id="b2SoloHint"></div>
+      <button class="btn primary block-btn home-btn" id="dcStartSolo">開始對局 ▸</button>
+      <div class="home-hint" id="dcSoloHint"></div>
     </div>
   </section>
 
@@ -169,13 +158,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </section>
 
   <!-- ====== 房間橫幅 ====== -->
-  <div class="panel b2-room hidden" id="mpBar">
-    <div class="row b2-room-top">
+  <div class="panel dc-room hidden" id="mpBar">
+    <div class="row dc-room-top">
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <!-- v1.105.0:拿掉「房間」字首(房名預設就是「XXX的房間」,前面再加一次是重複) -->
-      <span class="label b2-room-title"><b id="mpRoomTitle" class="display">–</b></span>
+      <span class="label dc-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
@@ -187,51 +175,50 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
     </div>
-    <div class="b2-room-foot">
+    <div class="dc-room-foot">
       <div id="mpPlayers" class="mp-players"></div>
     </div>
   </div>
 
-  <!-- ====== 單機的牌桌列 ======
-       刻意沿用房間橫幅同一組 .b2-room / .mp-chip 外觀:連線與單機長得一樣才有一致感。
-       晶片由 js/big2/solo.js 自己畫 —— mp-core 的 renderPlayers() 是連線專屬的。 -->
-  <div class="panel b2-room hidden" id="b2SoloBar">
-    <div class="row b2-room-top">
-      <button class="icon-btn mp-leave-btn" id="b2SoloExit" title="離開牌桌" aria-label="離開牌桌">
+  <!-- ====== 單機的棋桌列 ======
+       刻意沿用房間橫幅同一組 .dc-room / .mp-chip 外觀:連線與單機長得一樣才有一致感。
+       晶片由 js/darkchess/solo.js 自己畫 —— mp-core 的 renderPlayers() 是連線專屬的。 -->
+  <div class="panel dc-room hidden" id="dcSoloBar">
+    <div class="row dc-room-top">
+      <button class="icon-btn mp-leave-btn" id="dcSoloExit" title="離開棋桌" aria-label="離開棋桌">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label b2-room-title">電腦對決 <b id="b2SoloLv" class="display">普通</b></span>
-      <span class="mp-goal" id="b2SoloRec" aria-label="戰績"></span>
+      <span class="label dc-room-title">電腦對決 <b id="dcSoloLv" class="display">普通</b></span>
+      <span class="mp-goal" id="dcSoloRec" aria-label="戰績"></span>
     </div>
-    <div class="b2-room-foot">
-      <div id="b2SoloPlayers" class="mp-players"></div>
+    <div class="dc-room-foot">
+      <div id="dcSoloPlayers" class="mp-players"></div>
     </div>
   </div>
 
   <!-- ====== 大廳設定 ====== -->
-  <div class="scroll-area b2-scroll hidden" id="scrollArea">
-    <section class="panel hidden" id="b2Setup">
+  <div class="scroll-area dc-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="dcSetup">
       <div class="subtitle">對戰設定</div>
-      <!-- 出牌倒數:多人回合制沒有它,一個人切到 LINE 就全桌卡死(台灣麻將 v1.59.0 踩過)。
-           ★ 一定是**房間設定**不是各人偏好 —— 到期自動出牌是「誰的 timer 先響誰用交易搶」,
-             各自設定的話全房會被最短的那台決定(見 js/big2/adapter.js 檔頭)。
-           ⚠ 秒數比排七長:大老二一手要在 13 張裡湊組合,15 秒根本來不及。 -->
+      <!-- 走棋倒數:回合制沒有它,一個人切到 LINE 就整局卡死(台灣麻將 v1.59.0 踩過)。
+           ★ 一定是**房間設定**不是各人偏好 —— 到期自動走棋是「誰的 timer 先響誰用交易搶」,
+             各自設定的話整房會被最短的那台決定(見 js/darkchess/adapter.js 檔頭)。
+           ⚠ 秒數比 UNO 長:暗棋一手要看整個盤面。 -->
       <div class="field">
-        <span class="field-label" id="b2SecLabel">出牌倒數</span>
-        <div class="seg" id="b2SecSeg" aria-label="出牌倒數">
+        <span class="field-label" id="dcSecLabel">走棋倒數</span>
+        <div class="seg" id="dcSecSeg" aria-label="走棋倒數">
           <button data-sec="0">關</button>
           <button data-sec="20">20 秒</button>
           <button class="on" data-sec="40">40 秒</button>
           <button data-sec="60">60 秒</button>
         </div>
       </div>
-      <!-- ★★ 房規(v1.100.0):面板本體是共用蓋板 #b2RulesVeil(單機也是它),
+      <!-- ★★ 房規:面板本體是共用蓋板 #dcRulesVeil(單機也是它),
            這裡只有一顆入口鈕 + 一行摘要。⚠ 對戰中不給改(規則在開局那一刻就凍了) -->
       <div class="field">
-        <span class="field-label" id="b2RulesLabel">房規</span>
-        <button class="btn ghost block-btn" id="b2RulesOpen" type="button">⚙ 改規則</button>
+        <span class="field-label" id="dcRulesLabel">房規</span>
+        <button class="btn ghost block-btn" id="dcRulesOpen" type="button">⚙ 改規則</button>
       </div>
-      <div class="hint" id="b2RuleHint"></div>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">
@@ -242,29 +229,31 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="wg-group hidden" id="wgGroup">
             <span class="wg-lbl">先到</span>
             <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標分數">−</button>
-              <span class="target-val display" id="winGoalVal">15</span>
-              <button class="mini" id="wgPlus" aria-label="增加目標分數">＋</button>
+              <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+              <span class="target-val display" id="winGoalVal">3</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
             </div>
-            <!-- ⚠ 這一版的計分是名次分(一局最多 5 分),所以單位是「分」不是「勝」。
-                 mp-core 的 A.scoreUnit 讓 JS 產出的那幾句(🎯 搶 N 分 / 先達 N 分)跟著換。 -->
-            <span class="wg-lbl">分奪冠</span>
+            <span class="wg-lbl">勝奪冠</span>
           </div>
           <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
           <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
         </div>
       </div>
-      <div class="hint" id="b2RuleHint"></div>
+      <!-- ⚠ 規則摘要只有**一個** #dcRuleHint(big2.html 那一頁不小心放了兩個同 id 的,
+           後面那個永遠不會被 $() 找到 —— 這裡刻意只放一個,在計分列後面) -->
+      <div class="hint" id="dcRuleHint"></div>
     </section>
   </div>
 
-  <!-- ====== 牌桌 ======
-       單機與連線**共用這一整塊**(牌河 + 手牌 B2B + 動作列),差別只在上面那條列與
-       結果卡的按鈕組 —— 靠 body.solo-on 切換(同其他六個遊戲)。 -->
-  <div class="b2-play hidden" id="b2Play">
-    <!-- 牌河 / 已出張數 / 我的手牌,全部由 B2B.render() 畫 -->
-    <div class="b2-stage" id="b2Stage"></div>
-    <div class="b2-acts hidden" id="b2Acts"></div>
+  <!-- ====== 棋盤 ======
+       單機與連線**共用這一整塊**(盤面 DCB + 動作列),差別只在上面那條列與
+       結果卡的按鈕組 —— 靠 body.solo-on 切換(同其他九個遊戲)。 -->
+  <div class="dc-play hidden" id="dcPlay">
+    <div class="dc-stage" id="dcStage">
+      <!-- 32 格由 DCB.setState() 整盤重畫;直立 4 欄 × 8 列、橫置 8 欄 × 4 列 -->
+      <div class="dc-board" id="dcBoard"></div>
+    </div>
+    <div class="dc-acts hidden" id="dcActs"></div>
   </div>
 
   <!-- ====== 主要動作列 ====== -->
@@ -277,14 +266,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
   <!-- ====== 結果卡 ====== -->
   <div class="veil" id="veil">
-    <div class="win-card b2-win" id="b2WinCard">
+    <div class="win-card dc-win" id="dcWinCard">
       <div class="word display" id="winWord">本局結束</div>
       <p id="winMsg"></p>
-      <!-- 排名表:★ 這裡是**唯一**會翻開別人手牌的地方(對局中一律只顯示張數) -->
-      <div class="b2-result hidden" id="b2Result"></div>
+      <div class="dc-result hidden" id="dcResult"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
-      <div class="b2-react-row" id="b2ReactRow">
+      <div class="dc-react-row" id="dcReactRow">
         <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
         <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
         <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
@@ -297,54 +285,69 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
-           id 刻意與數獨 / 消消樂 / 台灣麻將 / 排七同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
+           id 刻意與其他遊戲同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
       <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="b2SoloAgain">再來一局 ▸</button>
-        <button class="btn ghost" id="b2SoloHome">回選單</button>
+        <button class="btn primary" id="dcSoloAgain">再來一局 ▸</button>
+        <button class="btn ghost" id="dcSoloHome">回選單</button>
       </div>
-      <button class="peek-link" id="winPeek">先看看牌桌 👀</button>
+      <button class="peek-link" id="winPeek">先看看棋盤 👀</button>
     </div>
   </div>
   <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
 
-  <!-- ====== ★★★ 房規(v1.100.0)—— 單機與連線**共用這一個蓋板** ======
-       使用者:「我也希望能像21點那樣,建立一些遊戲規則,像是 A2345 跟 10JQKA 到底誰在大,
-                原本放在外面的規則,也可以放進去」
-
+  <!-- ====== 房規 —— 單機與連線**共用這一個蓋板** ======
        ⚠ 只有**一組** DOM(單機第二層一顆鈕、大廳一顆鈕都開它)—— 塞兩份就是兩個 id。
-       ⚠ 卡片結構照21點的 .bj-rules-card:**只有中間那塊會捲**
-         (`.b2-rules-card{display:flex;overflow:hidden}` + `.set-body{flex:1;min-height:0;
-         overflow-y:auto}` 兩條要一起在)—— 整張卡自己捲的話 position:sticky 的 ✕
-         會一路壓在設定列上(21點 v1.87.0 踩過)。
-       ⚠ 規則清單擺在**面板裡面**(不是只有進場選單那一份):使用者要的是「規則放進去」,
-         而順子大小這件事本來在任何地方都沒寫出來過。 -->
-  <div class="veil" id="b2RulesVeil">
-    <div class="set-card b2-rules-card">
-      <button class="card-x" id="b2RulesClose" type="button" aria-label="關閉">✕</button>
+       ⚠ 卡片結構照 UNO 的 .un-rules-card:**只有中間那塊會捲**
+         (卡片自己 overflow:hidden + .set-body flex:1/min-height:0 兩條要一起在)——
+         整張卡自己捲的話 position:sticky 的 ✕ 會一路壓在設定列上(21點 v1.87.0 踩過)。 -->
+  <div class="veil" id="dcRulesVeil">
+    <div class="set-card dc-rules-card">
+      <button class="card-x" id="dcRulesClose" type="button" aria-label="關閉">✕</button>
       <div class="set-head">房規</div>
-      <div class="b2-rules-who" id="b2RulesWho"></div>
-      <div class="set-body" id="b2RulesBody">
+      <div class="dc-rules-who" id="dcRulesWho"></div>
+      <div class="set-body" id="dcRulesBody">
 
         <div class="set-group">
-          <div class="set-group-title">牌型大小</div>
+          <div class="set-group-title">可以改的兩組(各有一個子選項)</div>
+          <!-- ★★ 連吃:預設**關**(標準暗棋)→ 所以「✘ 吃一顆就換手」那顆才帶 class="on" -->
           <div class="set-row col">
-            <!-- ★★★ 使用者:「把這三組的大小列出來,然後用選的,不過 23456 就固定為最大」
-                 → 所以選項本身就是**完整的排序**(玩家不必自己推),而 23456 不進選項。 -->
-            <span class="set-lbl">順子誰大<span class="set-sub">2-3-4-5-6 兩邊都固定最大;要選的是 A-2-3-4-5 排哪裡</span></span>
-            <div class="seg col" id="b2StrSeg" aria-label="順子誰大">
-              <button data-rk="str" data-rv="hi">23456 &gt; <b>A2345</b> &gt; 10JQKA &gt; … &gt; 34567</button>
-              <button data-rk="str" data-rv="lo">23456 &gt; 10JQKA &gt; … &gt; 34567 &gt; <b>A2345</b></button>
+            <span class="set-lbl">連吃<span class="set-sub">吃掉一顆之後,若落點的上下左右還有吃得動的敵方明棋,可以一路吃下去(可以轉彎、隨時能喊停);階級照常受限,炮的每一步一樣要隔子</span></span>
+            <div class="seg" id="dcChainSeg" aria-label="連吃">
+              <button data-rk="chain" data-rv="1">✔ 可以連吃</button>
+              <button class="on" data-rk="chain" data-rv="0">✘ 吃一顆就換手</button>
+            </div>
+          </div>
+          <!-- 子選項:連吃關著時整列壓暗(class 由 main.js 的 syncRules 掛) -->
+          <div class="set-row col dc-sub-row dc-sub-off" id="dcDarkRow">
+            <span class="set-lbl">↳ 連吃時可以翻暗棋<span class="set-sub">連吃鏈中也能翻攻相鄰的暗棋:翻開是吃得動的敵子就吃掉並繼續;<b>翻開是自己的子這一手就結束</b>;<b>翻開是吃不動的敵子,自己那顆反而被吃掉</b></span></span>
+            <div class="seg" id="dcDarkSeg" aria-label="連吃時可以翻暗棋">
+              <button data-rk="chainDark" data-rv="1">✔ 可以翻</button>
+              <button class="on" data-rk="chainDark" data-rv="0">✘ 只吃明棋</button>
+            </div>
+          </div>
+          <div class="set-row col">
+            <span class="set-lbl">橫衝直撞(車直衝)<span class="set-sub">只有<b>車 / 俥</b>能沿直線衝任意格數去吃遠處的子,中間不可有任何棋子;相鄰的照一般吃法走一格</span></span>
+            <div class="seg" id="dcRushSeg" aria-label="橫衝直撞">
+              <button data-rk="rush" data-rv="1">✔ 車可直衝</button>
+              <button class="on" data-rk="rush" data-rv="0">✘ 一次一格</button>
+            </div>
+          </div>
+          <div class="set-row col dc-sub-row dc-sub-off" id="dcBigRow">
+            <span class="set-lbl">↳ 直撞時可以吃大子<span class="set-sub">車直衝時<b>不受階級限制</b> —— 連將 / 帥都撞得掉。關著時直衝一樣要大吃小</span></span>
+            <div class="seg" id="dcBigSeg" aria-label="直撞時可以吃大子">
+              <button data-rk="rushBig" data-rv="1">✔ 什麼都撞得掉</button>
+              <button class="on" data-rk="rushBig" data-rv="0">✘ 照階級</button>
             </div>
           </div>
         </div>
 
-        <!-- ★ 出牌倒數:**連線專屬**(單機沒有倒數 —— 卡多久是自己的節奏)。
-             ⚠ 它不進房規物件:那個欄位(turnSec)早就在用,而且它不影響任何判定。 -->
-        <div class="set-group hidden" id="b2SecGroup">
-          <div class="set-group-title">出牌倒數</div>
+        <!-- ★ 走棋倒數:**連線專屬**(單機沒有倒數 —— 想多久是自己的節奏)。
+             ⚠ 它不進房規物件:那個欄位(turnSec)不影響任何判定。 -->
+        <div class="set-group hidden" id="dcSecGroup">
+          <div class="set-group-title">走棋倒數</div>
           <div class="set-row col">
-            <span class="set-lbl">每一手幾秒<span class="set-sub">時間到系統會幫他出一手</span></span>
-            <div class="seg" id="b2SecSeg2" aria-label="出牌倒數">
+            <span class="set-lbl">每一手幾秒<span class="set-sub">時間到系統會幫他走一手</span></span>
+            <div class="seg" id="dcSecSeg2" aria-label="走棋倒數">
               <button data-sec="0">關</button>
               <button data-sec="20">20 秒</button>
               <button data-sec="40">40 秒</button>
@@ -355,21 +358,25 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
         <div class="set-group">
           <div class="set-group-title">這一版的玩法(固定,不能改)</div>
-          <ul class="b2-rules-list">
-            <li>52 張全發給 <b>2~4 人</b>;拿到 ♣︎3 的人先出,<b>第一手一定要帶 ♣︎3</b>。</li>
-            <li>可出 <b>1 張 · 2 張 · 5 張</b>;五張只有<b>順子 · 葫蘆 · 鐵支 · 同花順</b>
-                (沒有三條單出、沒有同花、沒有兩對)。</li>
-            <li><b>同牌型才能互壓</b> —— 順子只壓順子、葫蘆只壓葫蘆。</li>
-            <li><b>鐵支與同花順壓得過任何牌型</b>,而同花順又比鐵支大。</li>
-            <li>單張 / 對子的大小:<b>2 最大</b>,接著 A、K…3;同點數比花色 ♠︎&gt;♥︎&gt;♦︎&gt;♣︎。</li>
-            <li>壓不過就 <b>Pass</b>;一輪只剩一個人沒 Pass → 他重新領出。</li>
-            <li>出完的人退出、牌局繼續,打到只剩一家。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。</li>
-            <li>誰<b>剩最後一手</b>(不管幾張)系統會自動報一聲「<b>拉</b>」。</li>
+          <ul class="dc-rules-list">
+            <li>象棋 32 顆<b>蓋著隨機擺滿 4×8</b>;一手二選一:<b>翻一顆</b>或<b>動一顆自己的明棋</b>。</li>
+            <li><b>先手第一次翻到什麼顏色,那個顏色就是他的。</b></li>
+            <li>階級 <b>將 7 &gt; 士 6 &gt; 象 5 &gt; 車 4 &gt; 馬 3 &gt; 包 2 &gt; 卒 1</b>;
+                大吃小、<b>同級可吃</b>(吃掉對方、自己佔住那格,不是同歸於盡)。</li>
+            <li><b>卒 / 兵吃得了將 / 帥,而將 / 帥吃不了卒 / 兵。</b></li>
+            <li><b>炮 / 包不能貼身吃</b>:沿直線隔<b>恰好一顆</b>子當炮架跳過去,<b>距離不限、不受階級限制</b>。</li>
+            <li><b>炮打得到暗棋</b> —— 翻開之後不論敵我一律吃掉(打到自己的算自己倒楣)。
+                沒有這一條,開局滿盤暗子時炮等於一顆廢子。</li>
+            <li>一般吃法<b>吃不到暗棋</b>(暗棋只能翻)—— 除非房規開了「連吃時可以翻暗棋」。</li>
+            <li><b>沒有砲翻山</b>(炮不能跳到空格)、<b>沒有長捉禁手</b>。</li>
+            <li>把對方的子<b>吃光</b>,或讓對方<b>無子可動也無暗棋可翻</b>就贏。</li>
+            <li>連續 <b>40 步</b>沒有吃子也沒有翻子 → <b>比雙方剩下棋子的階級總和</b>,高的贏;
+                完全一樣才是<b>和局</b>(和局雙方各得 1 勝)。</li>
           </ul>
         </div>
 
       </div>
-      <div class="b2-rules-sum" id="b2RulesSum"></div>
+      <div class="dc-rules-sum" id="dcRulesSum"></div>
     </div>
   </div>
 
@@ -435,7 +442,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
       <button class="btn primary" id="setClose">完成</button>
-      <div class="set-foot">大老二 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+      <div class="set-foot">象棋暗棋 · <span id="setVer"></span> · 開發者 Michael Ho</div>
     </div>
   </div>
 
@@ -505,7 +512,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
 <script>
 /* ============================================================
-   與其他六個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 big2_rooms / big2_index。
+   與其他九個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 dc_rooms / dc_index。
    ⚠ 需在資料庫規則開放那兩段 —— 整份規則在 notes/firebase-rules.json,可直接複製貼上。
    ============================================================ */
 const FIREBASE_CONFIG = {
@@ -519,19 +526,19 @@ const FIREBASE_CONFIG = {
 };
 </script>
 
-<!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)→ pk-faces(與排七共用的牌面)
+<!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)
      → rules(規則,純函式)→ ai(電腦對手,只相依 rules)
-     → board(盤面)→ solo(單機,要 board 與 ai)
+     → board(盤面;棋子自繪在裡面,象棋棋子只有這一頁用 → 不進 js/shared/)
+     → solo(單機,要 board 與 ai)
      → adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <script src="js/shared/mp-core.js"></script>
-<script src="js/shared/pk-faces.js"></script>
-<script src="js/big2/rules.js"></script>
-<script src="js/big2/ai.js"></script>
-<script src="js/big2/board.js"></script>
-<script src="js/big2/solo.js"></script>
-<script src="js/big2/adapter.js"></script>
-<script src="js/big2/main.js"></script>
+<script src="js/darkchess/rules.js"></script>
+<script src="js/darkchess/ai.js"></script>
+<script src="js/darkchess/board.js"></script>
+<script src="js/darkchess/solo.js"></script>
+<script src="js/darkchess/adapter.js"></script>
+<script src="js/darkchess/main.js"></script>
 </body>
 </html>

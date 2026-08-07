@@ -236,6 +236,8 @@ const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettin
                         兩個同時開著的時候先關它。關掉 = 那一手 Wild 取消(牌回到手上)——
                         安全,因為顏色還沒選就不會送進 moves。 */
                    ["unColorVeil",()=>UNB.closeColor()],["unRulesVeil",()=>closeRules()],
+                   // ★ 暗棋的房規蓋板(v1.113.0)。只有 darkchess.html 有這個 id,其他九頁自動跳過。
+                   ["dcRulesVeil",()=>closeRules()],
                    ["resignVeil",()=>MP.cancelResign()],["leaveVeil",()=>MP.cancelLeave()]];
 function dismissTopLayer(){
   for(let i=0;i<BACK_LAYERS.length;i++){

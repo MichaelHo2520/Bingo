@@ -53,7 +53,15 @@ const HomeLive = (function(){
          **不可以用 🃏**(U+1F0CF):它落在 U+1F0A0–U+1F0FF 那段撲克牌字元裡,
          多數字型沒有會變豆腐方框(CLAUDE.md 紅線 8)。
        ⚠ UNO **不帶 joinMid** —— 一局就是一局(不像 21 點一場很多局),對戰中不給加入。 */
-    { key:"uno",     index:"uno_index",     name:"UNO",     icon:"🌈", badge:"hlBadgeUno",  max:6, href:"uno.html" }
+    { key:"uno",     index:"uno_index",     name:"UNO",     icon:"🌈", badge:"hlBadgeUno",  max:6, href:"uno.html" },
+    /* ★ 第十個遊戲(v1.113.0):象棋暗棋。
+       max 必須與 js/darkchess/adapter.js 的 maxPlayers 一致(**2**)。
+       ⚠ icon 用 🔴(U+1F534 紅圓)—— 紅方是象棋兩方之一,而且它與另外九個都不撞
+         (五子棋已經是 ⚫)。**不可以用象棋 / 西洋棋那些符號**：
+         U+2654–U+265F 那一段在很多 Android 字型上是文字呈現、粗細跟周圍對不齊,
+         而 U+1F000 / U+1F0A0 那兩段直接是豆腐方框(CLAUDE.md 紅線 8)。
+       ⚠ 暗棋 **不帶 joinMid** —— 一局就是一局,對戰中不給加入。 */
+    { key:"darkchess", index:"dc_index",    name:"暗棋",   icon:"🔴", badge:"hlBadgeDc",   max:2, href:"darkchess.html" }
   ];
 
   /* ==========================================================================
@@ -78,7 +86,7 @@ const HomeLive = (function(){
           被這裡誤觸會連「現在有人在玩」整塊一起消失。
      ========================================================================== */
   const RANK_KEY="bingo.gamerank.v1";
-  const RANK_NUM=["一","二","三","四","五","六","七","八","九"];
+  const RANK_NUM=["一","二","三","四","五","六","七","八","九","十"];
   let rankHadCache=false;
 
   function cardOf(k){ return document.querySelector('.game-card[data-gk="'+k+'"]'); }

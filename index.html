@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.112.1 -->
-<meta name="version" content="1.112.1">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.113.0 -->
+<meta name="version" content="1.113.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -187,7 +187,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- 第五個遊戲(v1.58.0):真的打麻將,不是消牌。
            ⚠ 房間連結一律 <a href>(首頁跑在 app.html 外殼的 iframe 裡,
               寫成 top.location 會把外殼一起換掉、全螢幕當場沒了)
-           ★★ v1.112.1:改成**滿版深紅放射底 + 一張立體麻將牌,牌面直書「台灣」**
+           ★★ v1.113.0:改成**滿版深紅放射底 + 一張立體麻將牌,牌面直書「台灣」**
               (使用者附了一張參考圖:「台灣麻將的 icon,我想改成大概這種樣子」)。
               舊版是「中 · 發 · 胡 三張小牌立正站好」—— 那個構圖與第四張卡(麻將消消樂,
               中 · 發 兩張)幾乎一樣,首頁上兩張麻將卡分不出誰是誰;而這一頁的賣點是
@@ -368,6 +368,36 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <span class="gc-body">
           <span class="gc-name display">UNO</span>
           <span class="hl-badge hidden" id="hlBadgeUno"></span>
+        </span>
+      </a>
+
+      <!-- 第十個遊戲(v1.113.0):象棋暗棋。
+           ★★ 辨識點只有一個,而且非它不可:**有一顆是蓋著的**。
+              只畫兩顆翻開的棋子的話,那是一般象棋(或五子棋)的圖,看不出是暗棋。
+              所以構圖固定成「後面一顆牌背 + 前面一顆翻開的紅帥」。
+           ⚠ 與 darkchess.html 進場插圖(.dc-art 96px)**逐字相同的一份 SVG**,
+              只有外層 class 不一樣;改一邊要改另一邊(tools/test-pages.js 的 I 節在守)
+           ⚠⚠ 這裡**不可以**掛 .dc-art —— 那是進場插圖的 96px,它定義在 .gc-art(46px)
+               後面 → 會把這張卡撐得比另外九張高一截(21點 v1.86.0 踩過的坑)
+           ⚠ 這張卡**刻意沒有滿版底色**:十張裡只有台灣麻將是滿版的,那是它與
+              麻將消消樂分家的辨識點,多一張滿版就把那個唯一性洗掉了 -->
+      <a class="game-card as-link" href="darkchess.html" data-gk="darkchess">
+        <span class="gc-rank" aria-hidden="true">十</span>
+        <svg class="gc-art dc-cart" viewBox="0 0 56 56" role="img" aria-label="象棋暗棋">
+          <g transform="translate(18 34)">
+            <circle class="dc-ic-bd dc-ic-back" r="14"/>
+            <circle class="dc-ic-in dc-ic-backin" r="10"/>
+            <path class="dc-ic-grain" d="M-5.5 -3h11M-5.5 0h11M-5.5 3h11"/>
+          </g>
+          <g transform="translate(37 23)">
+            <circle class="dc-ic-bd dc-ic-face" r="15"/>
+            <circle class="dc-ic-in dc-ic-ring" r="11"/>
+            <text class="dc-ic-t" y="5.6">帥</text>
+          </g>
+        </svg>
+        <span class="gc-body">
+          <span class="gc-name display">象棋暗棋</span>
+          <span class="hl-badge hidden" id="hlBadgeDc"></span>
         </span>
       </a>
       </div><!-- /.gc-grid -->
