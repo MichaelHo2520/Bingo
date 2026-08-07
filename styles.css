@@ -1203,6 +1203,24 @@
   .gc-body .hl-badge{align-self:center}
   :root[data-theme="ebook"] .game-card{background:#fff;border:1px solid #000}
 
+  /* 熱門度排名徽章(v1.112.0):一~九,數字小的排前面(= 大家真的玩得最多的那幾個)。
+     編號文字與先後都由 js/home-live.js 的 applyRank() 寫進去(style.order + 這顆的文字),
+     HTML 裡寫死的一~九只是「還沒有任何統計」時的預設排名。
+     ⚠ 絕對定位是**刻意**的:首頁的驗收點是「九張卡不必捲就看得完」,這顆一旦佔到
+       版面高度,九張卡就會多出一列高度、最後一列被擠出視窗(notes/13 第八節)。
+     ⚠ position:relative 另開一條掛在 [data-gk] 上,不去動既有的 .game-card 那一條
+       (那一條也被別處沿用,改它的定位脈絡是會外溢的)。 */
+  .game-card[data-gk]{position:relative}
+  .gc-rank{position:absolute;top:5px;left:6px;z-index:1;
+    min-width:16px;padding:0 3px;border-radius:6px;text-align:center;
+    font:800 11px/16px 'Nunito',sans-serif;
+    background:rgba(0,0,0,.20);color:var(--muted)}
+  /* 前三名點亮(金 / 銀 / 銅)—— 「哪幾個最常玩」才需要一眼看到,第四名以後灰的就夠 */
+  .gc-rank[data-top="1"]{background:rgba(250,204,21,.22);color:#facc15}
+  .gc-rank[data-top="2"]{background:rgba(203,213,225,.24);color:#cbd5e1}
+  .gc-rank[data-top="3"]{background:rgba(251,146,60,.20);color:#fb923c}
+  :root[data-theme="ebook"] .gc-rank{background:#eee;border:1px solid #999;color:#000}
+
   /* 五子棋卡的小棋盤插圖(沿用棋盤那組 --gmk-* 配色,主題會一起變) */
   .gk-art .gk-bd{fill:var(--gmk-wood);stroke:var(--gmk-frame);stroke-width:2}
   .gk-art .gk-ln path{stroke:var(--gmk-line);stroke-width:1;fill:none}
@@ -1244,6 +1262,8 @@
     .game-card{padding:8px 5px;gap:5px}
     .gc-art{width:40px;height:40px}
     .gc-name{font-size:14px}
+    /* 卡片縮一階,排名徽章跟著縮(它是絕對定位、不佔高度,但 11px 在五欄的窄格裡顯得重) */
+    .gc-rank{top:4px;left:4px;min-width:14px;font-size:10px;line-height:14px}
   }
 
   /* ==========================================================================

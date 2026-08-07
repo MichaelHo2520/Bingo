@@ -167,6 +167,27 @@
       lastIndexSig=null;   // 強制重寫一次
       updateRoomIndex();
     }
+
+    /* ---------- 熱門度計數 game_stats(v1.112.0)----------
+       首頁九張遊戲卡依「這個遊戲被真的玩過幾場」自動排序,資料就只有這一個累加數。
+       判定是三個條件同時成立:**只有房主寫**(一場算一次,不是一場算 N 個人)、
+       **真的開局才起算**(開了房停在大廳沒打不算)、**撐過 30 秒**(濾掉點錯就退的誤觸)。
+       ★ 一間房只記一次,不是一局一次。
+       ⚠ 這一段(三支 + 兩個呼叫點)與 js/shared/mp-core.js 是**雙胞胎**:
+         Bingo 不載入 js/shared/,所以那邊有逐字對應的一份,改一邊要改另一邊(CLAUDE.md 紅線 4)。
+       ⚠ 寫入失敗(規則沒開放 game_stats)一律靜靜吞掉 —— 統計不可以打擾正在玩的人。 */
+    const STAT_MS = 30000, STAT_KEY = "bingo";
+    let statTimer=null, statDone=false;
+    function armPlayCount(){
+      if(!isHost || statDone || statTimer || !db) return;
+      statTimer=setTimeout(()=>{
+        statTimer=null;
+        if(!isHost || statDone || !state.online || !db) return;   // 30 秒內就離開 → 這場不算
+        statDone=true;
+        try{ db.ref("game_stats/"+STAT_KEY+"/n").transaction(n=>(n||0)+1); }catch(e){}
+      },STAT_MS);
+    }
+    function clearPlayCount(){ if(statTimer){ clearTimeout(statTimer); statTimer=null; } }
     // 🔍 手動重新偵測(重掛監聽,強制刷新一次)
     function scanRooms(){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
@@ -330,6 +351,7 @@
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0;   // ★ 進新房必歸零:MP 為常駐 IIFE,不重設會把上一間房累積的高 rev 帶進來,害新房快照被 onGame 的「rev<gameRev」全部誤丟 → 加入者卡在大廳、整房卡死
+      clearPlayCount(); statDone=false;   // 熱門度計數:一間房記一次 → 進新房要重新起算
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();   // 連線中:顯示快速語音浮動鈕
       stopRoomWatch();                                  // 已進房,卸載大廳的房間偵測監聽
       $("home").classList.add("hidden");
@@ -969,6 +991,7 @@
       updateMpGoal();   // 目標線數顯示在房間框
       setLock(false);
       resetMarquee(); render(); applyCalledMarks(); updateTurnUI(); refreshLines();
+      armPlayCount();   // 熱門度計數:從「真的開局」這一刻起算 30 秒(見上面那段)
       maybeAnnounceOrder();
       skipMissingTurn();   // 開局那一刻若 order[0] 已經離開,這裡是唯一還會檢查的地方(見該函式 ②)
       // (舊版此處有「order 停在 [] 就主動重讀 DB」的補救,因應舊拆分寫入被 coalesce 吃掉 order 事件。
@@ -1257,7 +1280,7 @@
           }
         }
       }catch(e){}
-      stopConn(); clearRecheck(); clearAloneCheck();   // 卸載連線監聽、清掉寬限計時器
+      stopConn(); clearRecheck(); clearAloneCheck(); clearPlayCount();   // 卸載連線監聽、清掉寬限計時器
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null;
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; scores={}; calledList=[];

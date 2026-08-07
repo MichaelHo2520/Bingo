@@ -367,11 +367,38 @@ const MPCore = (function(){
       lastIndexSig=null; updateRoomIndex();
     }
 
+    /* ---------- 熱門度計數 game_stats(v1.112.0)----------
+       首頁九張遊戲卡依「這個遊戲被真的玩過幾場」自動排序,資料就只有這一個累加數。
+       判定刻意訂成三個條件同時成立,少一個都會讓數字失去意義:
+         · **只有房主寫** → 一場算一次,不是一場算 N 個人(不然人多的遊戲天生佔便宜)
+         · **真的開局才起算** → 開了房停在大廳沒打就不算
+         · **撐過 30 秒** → 濾掉「點錯遊戲、進去馬上退」的誤觸
+       ★ 一間房只記一次,**不是一局一次** —— 21 點與台灣麻將一場是很多局,
+         一局一次會讓那兩個遊戲的數字灌水好幾倍。
+       ⚠ 這一段(三支 + 兩個呼叫點)與 js/online.js 是**雙胞胎**:Bingo 不載入 js/shared/,
+         所以那邊有逐字對應的一份,改一邊要改另一邊(CLAUDE.md 紅線 4)。
+       ⚠ 寫入失敗(規則沒開放 game_stats)一律靜靜吞掉 —— 這只是排序用的統計,
+         不可以因為它讓正在玩的人看到錯誤。 */
+    const STAT_MS  = 30000;
+    const STAT_KEY = INDEX.replace(/_index$/,"");   // gomoku_index → gomoku(與 home-live 的 key 一致)
+    let statTimer=null, statDone=false;
+    function armPlayCount(){
+      if(!isHost || statDone || statTimer || !db) return;
+      statTimer=setTimeout(()=>{
+        statTimer=null;
+        if(!isHost || statDone || !online || !db) return;   // 30 秒內就離開 → 這場不算
+        statDone=true;
+        try{ db.ref("game_stats/"+STAT_KEY+"/n").transaction(n=>(n||0)+1); }catch(e){}
+      },STAT_MS);
+    }
+    function clearPlayCount(){ if(statTimer){ clearTimeout(statTimer); statTimer=null; } }
+
     /* ---------- 相位:大廳 ---------- */
     function enterLobby(){
       online=true; ready=false; curPhase="lobby";
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0; playedRound=null;   // ★ 進新房必歸零(見檔頭 #1)
+      clearPlayCount(); statDone=false;   // 熱門度計數:一間房記一次 → 進新房要重新起算
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();
       stopRoomWatch();
       $("mpConnect").classList.add("hidden");
@@ -417,6 +444,7 @@ const MPCore = (function(){
       syncSubrow(); setActionHint("");
       A.enterPlaying && A.enterPlaying();
       updateGoal();
+      armPlayCount();   // 熱門度計數:從「真的開局」這一刻起算 30 秒(見上面那段)
       Sound.start();
     }
 
@@ -961,7 +989,7 @@ const MPCore = (function(){
           }
         }
       }catch(e){}
-      stopConn(); clearRecheck(); clearAloneCheck();
+      stopConn(); clearRecheck(); clearAloneCheck(); clearPlayCount();
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       roomRef=null; code=null; online=false; ready=false; isHost=false;
       players={}; scores={}; order=[]; winner=null; status="lobby"; curPhase="lobby";

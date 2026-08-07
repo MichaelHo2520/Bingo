@@ -1,7 +1,10 @@
 "use strict";
 
 /* ============================================================================
-   首頁「現在有人在玩」即時看板(v1.52.0)— ★ 只有 index.html 載入這支。
+   首頁的兩件事 — ★ 只有 index.html 載入這支。
+     ① 「現在有人在玩」即時看板(v1.52.0)
+     ② 九張遊戲卡的**熱門度排序 + 一~九編號**(v1.112.0,見下面那整段說明)
+   兩件事共用同一次 Firebase 載入,但**彼此獨立**:任一邊讀失敗都不可以拖垮另一邊。
 
    資料來源就是三個遊戲原有的大廳輕量索引:rooms_index / gomoku_index / sudoku_index
    (每房 4 個小欄位 name/status/count/host,由房主單方維護並掛 onDisconnect().remove())。
@@ -52,6 +55,68 @@ const HomeLive = (function(){
        ⚠ UNO **不帶 joinMid** —— 一局就是一局(不像 21 點一場很多局),對戰中不給加入。 */
     { key:"uno",     index:"uno_index",     name:"UNO",     icon:"🌈", badge:"hlBadgeUno",  max:6, href:"uno.html" }
   ];
+
+  /* ==========================================================================
+     熱門度排序(v1.112.0)—— 九張遊戲卡依「這個遊戲被真的玩過幾場」由多到少排,
+     卡片左上角標一~九。
+
+     資料是 Firebase 的 game_stats/{key}/n:房主開房、**真的開局**、**撐過 30 秒**才 +1,
+     一間房只記一次(寫入在 js/shared/mp-core.js 與 js/online.js 的 armPlayCount())。
+     ⚠ 這裡的 key 必須與那兩支寫進去的一致 —— 八個遊戲是 INDEX 去掉 "_index"
+       (gomoku_index → gomoku),Bingo 那一支寫死 "bingo"。
+
+     ★ 三個刻意的決定:
+       ① **同分維持 GAMES 的順序**(穩定排序)。全新的資料庫是九個都 0,那時版面必須
+          與改版前逐字相同 —— 不可以讓 sort 的不穩定造成「每次開首頁順序都不一樣」。
+       ② **不當場重排**:讀到的新排名先存進 localStorage,**下次進首頁**才套用。
+          九張卡在手指底下忽然換位置會按錯遊戲;而從遊戲頁回首頁走的是 <a href>
+          (整頁重載),所以「玩完一局回來就生效」,體感上仍然是自動的。
+          唯一的例外是「這台還沒有任何排名快取」(第一次用)→ 讀到就直接套,
+          否則第一次用的人永遠停在預設順序。
+       ③ **讀失敗一律安靜**:規則沒開放 game_stats 時就維持預設順序,而且
+          **不可以**去碰 failed / stop() —— 那是 *_index 看板的旗標,
+          被這裡誤觸會連「現在有人在玩」整塊一起消失。
+     ========================================================================== */
+  const RANK_KEY="bingo.gamerank.v1";
+  const RANK_NUM=["一","二","三","四","五","六","七","八","九"];
+  let rankHadCache=false;
+
+  function cardOf(k){ return document.querySelector('.game-card[data-gk="'+k+'"]'); }
+  // → [[key, 場數], …] 由多到少;同場數照 GAMES 的原順序
+  function rankRows(stats){
+    return GAMES.map((g,i)=>[g.key, (stats&&stats[g.key]&&stats[g.key].n)||0, i])
+      .sort((a,b)=>(b[1]-a[1])||(a[2]-b[2]))
+      .map(r=>[r[0],r[1]]);
+  }
+  /* 只設 style.order 與徽章文字,**不搬 DOM**:搬動節點會讓 hl-badge 那顆
+     與 :hover / :active 一起跳,而 .gc-grid 是 grid、order 完全夠用。 */
+  function applyRank(rows){
+    const hot=rows.some(r=>r[1]>0);   // 一場都還沒玩過 → 不點亮前三名(那會是假的「最熱門」)
+    rows.forEach((r,i)=>{
+      const el=cardOf(r[0]); if(!el)return;
+      el.style.order=String(i);
+      const b=el.querySelector(".gc-rank");
+      if(b){ b.textContent=RANK_NUM[i]||""; b.setAttribute("data-top",(hot&&i<3)?String(i+1):"0"); }
+    });
+  }
+  // 快取要對得上目前這九個遊戲;加了新遊戲 / 改了 key 就整份作廢回預設(不然新遊戲沒有 order)
+  function saneRank(rows){
+    if(!Array.isArray(rows) || rows.length!==GAMES.length) return null;
+    const seen={}; rows.forEach(r=>{ if(Array.isArray(r)) seen[r[0]]=1; });
+    return GAMES.every(g=>seen[g.key]) ? rows : null;
+  }
+  function readRank(){ try{ return saneRank(JSON.parse(localStorage.getItem(RANK_KEY))); }catch(e){ return null; } }
+  function saveRank(rows){ try{ localStorage.setItem(RANK_KEY,JSON.stringify(rows)); }catch(e){} }
+  // 讀一次就好:排名不必即時,常駐監聽只會讓卡片在手指底下跳(見上面的決定 ②)
+  function fetchRank(db){
+    try{
+      db.ref("game_stats").once("value", s=>{
+        const rows=rankRows(s.val()||{});
+        saveRank(rows);
+        if(!rankHadCache){ rankHadCache=true; applyRank(rows); }
+      }, ()=>{});
+    }catch(e){}
+  }
 
   let refs=[];            // 掛著監聽的 firebase ref(stop 時逐一 off)
   let rooms={};           // key → [{code,status,count,host,name}]
@@ -157,6 +222,7 @@ const HomeLive = (function(){
       loading=false;
       if(!onHomePick())return;                    // 載入期間人已經離開第一層 → 不掛監聽
       const db=MP.database(); if(!db){ failed=true; return; }
+      fetchRank(db);                              // 熱門度排名:一次性讀取,失敗不影響下面的看板
       GAMES.forEach(g=>{
         const ref=db.ref(g.index);
         refs.push(ref);
@@ -197,5 +263,18 @@ const HomeLive = (function(){
     else setTimeout(go,1200);
   }
 
-  return { boot, stop, sync };
+  /* 排名要在**首屏**就套上去,所以不等 boot():這支的 <script> 在 </body> 之前,
+     九張卡早就在 DOM 裡了。沒有快取(第一次用 / 剛清過)就照 GAMES 的預設順序,
+     與 index.html 裡寫死的那九個字逐一對上 → 首屏不會閃一下再重排。 */
+  function initRank(){
+    const rows=readRank();
+    rankHadCache=!!rows;
+    applyRank(rows || GAMES.map(g=>[g.key,0]));
+  }
+  initRank();
+
+  /* ⚠ initRank / applyRank / rankRows 是**為了守門而導出**的:排名的行為分岔在
+     「這台有沒有快取」,而 e2e 跑在 file:// 上、localStorage 會跨次數留著 ——
+     測試要能把它清掉再回到「第一次用」的狀態,否則那條路徑靜靜地永遠測不到。 */
+  return { boot, stop, sync, initRank, applyRank, rankRows };
 })();

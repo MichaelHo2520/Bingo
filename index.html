@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.111.1 -->
-<meta name="version" content="1.111.1">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.112.0 -->
+<meta name="version" content="1.112.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -78,8 +78,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            在手機上要捲才看得到(使用者:「主頁面不容易看到最下方的遊戲」)。
            ⚠ 兩欄是掛在這層 .gc-grid 上,**不可以**把 #homePick 設成 grid ——
               「現在有人在玩」看板 #hlLive 是它的兄弟,會被塞進格子變成半格寬。 -->
+      <!-- 熱門度排名(v1.112.0):每張卡帶 data-gk(= js/home-live.js 的 GAMES.key)與一顆
+           .gc-rank 編號徽章。實際的編號與先後由 HomeLive.applyRank() 改寫 —— 它只設
+           style.order 與徽章文字,**不搬 DOM**(搬 DOM 會讓 hl-badge 的監聽與 :hover 一起跳)。
+           ⚠ HTML 裡寫的一~九是**預設排名**(= GAMES 的順序):第一次用、沒有任何統計、
+              或 Firebase 讀不到時就停在這個順序,所以它必須與 GAMES 逐一對上。 -->
       <div class="gc-grid">
-      <button class="game-card" id="pickBingo" type="button">
+      <button class="game-card" id="pickBingo" type="button" data-gk="bingo">
+        <span class="gc-rank" aria-hidden="true">一</span>
         <svg class="home-art gc-art" viewBox="0 0 120 116" role="img" aria-label="賓果卡">
           <rect class="bc-card" x="3" y="3" width="114" height="110" rx="14"/>
           <g class="bc-hd" text-anchor="middle">
@@ -101,7 +107,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </span>
       </button>
 
-      <a class="game-card as-link" href="gomoku.html">
+      <a class="game-card as-link" href="gomoku.html" data-gk="gomoku">
+        <span class="gc-rank" aria-hidden="true">二</span>
         <svg class="gc-art gk-art" viewBox="0 0 56 56" role="img" aria-label="五子棋盤">
           <rect class="gk-bd" x="2" y="2" width="52" height="52" rx="6"/>
           <g class="gk-ln">
@@ -119,7 +126,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </span>
       </a>
 
-      <a class="game-card as-link" href="sudoku.html">
+      <a class="game-card as-link" href="sudoku.html" data-gk="sudoku">
+        <span class="gc-rank" aria-hidden="true">三</span>
         <!-- ★★ v1.101.2:木框 + 一格一格的米黃小方塊 + 右下一支鉛筆正在填(使用者附了一張
              參考圖:「數獨的 icon 我不喜歡,參考這個樣式」)。舊版是「一張紙 + 兩組線」的
              平面線稿,在深色首頁上最沒有質感;另外三張紙牌 / 麻將 / 棋盤卡本來就是實體材質感。
@@ -162,7 +170,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </span>
       </a>
 
-      <a class="game-card as-link" href="mahjong.html">
+      <a class="game-card as-link" href="mahjong.html" data-gk="mahjong">
+        <span class="gc-rank" aria-hidden="true">四</span>
         <svg class="gc-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌">
           <rect class="mk-bd" x="3.5" y="9" width="23" height="31" rx="4.5"/>
           <rect class="mk-bd" x="29.5" y="16" width="23" height="31" rx="4.5"/>
@@ -178,7 +187,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- 第五個遊戲(v1.58.0):真的打麻將,不是消牌。
            ⚠ 房間連結一律 <a href>(首頁跑在 app.html 外殼的 iframe 裡,
               寫成 top.location 會把外殼一起換掉、全螢幕當場沒了) -->
-      <a class="game-card as-link" href="mahjong16.html">
+      <a class="game-card as-link" href="mahjong16.html" data-gk="mj16">
+        <span class="gc-rank" aria-hidden="true">五</span>
         <svg class="gc-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌 十六張">
           <rect class="mk-bd" x="2.5" y="12" width="17" height="24" rx="3.5"/>
           <rect class="mk-bd" x="20" y="12" width="17" height="24" rx="3.5"/>
@@ -204,7 +214,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ★ 中間那張是 ♠︎7 —— 這一局就是從它開始接的,所以它疊在最上面而且比兩側高一點。
            ⚠ 與 sevens.html 進場插圖(.sv-art 96px)**逐字相同的一份 SVG**,只有外層 class
               不一樣;改一邊要改另一邊(tools/test-pages.js 的 E 節在守) -->
-      <a class="game-card as-link" href="sevens.html">
+      <a class="game-card as-link" href="sevens.html" data-gk="sevens">
+        <span class="gc-rank" aria-hidden="true">六</span>
         <svg class="gc-art pk-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 排七">
           <!-- 左:♦︎6 -->
           <rect class="pk-ic-bd" x="1" y="15" width="21" height="30" rx="2.7"/>
@@ -241,7 +252,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ★ 黑桃 2 是這一版最大的一張牌 → 它是疊在上面那張。
            ⚠ 與 big2.html 進場插圖(.b2-art 96px)**逐字相同的一份 SVG**,只有外層 class
               不一樣;改一邊要改另一邊(tools/test-pages.js 的 E 節在守) -->
-      <a class="game-card as-link" href="big2.html">
+      <a class="game-card as-link" href="big2.html" data-gk="big2">
+        <span class="gc-rank" aria-hidden="true">七</span>
         <svg class="gc-art pk-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 大老二">
           <!-- 下層:♥︎2(往左斜) -->
           <g transform="rotate(-16 19 30)">
@@ -280,7 +292,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠⚠ 這裡**不可以**掛 .bj-art —— 那是 blackjack.html 進場插圖的 96px,
                它定義在 .gc-art(54px)後面 → 會把這張卡撐得比另外七張高一截
                (v1.86.0 修掉的;理由記在 styles.css .bj-cart 那條旁邊) -->
-      <a class="game-card as-link" href="blackjack.html">
+      <a class="game-card as-link" href="blackjack.html" data-gk="bj">
+        <span class="gc-rank" aria-hidden="true">八</span>
         <svg class="gc-art bj-cart" viewBox="0 0 56 56" role="img" aria-label="撲克牌 台式21點">
           <!-- 下層:♦︎10(往左斜) -->
           <g transform="rotate(-16 19 30)">
@@ -317,7 +330,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               不一樣;改一邊要改另一邊(tools/test-pages.js 的 E 節在守)
            ⚠⚠ 這裡**不可以**掛 .un-art —— 那是進場插圖的 96px,它定義在 .gc-art(46px)
                後面 → 會把這張卡撐得比另外八張高一截(21點 v1.86.0 踩過的坑) -->
-      <a class="game-card as-link" href="uno.html">
+      <a class="game-card as-link" href="uno.html" data-gk="uno">
+        <span class="gc-rank" aria-hidden="true">九</span>
         <svg class="gc-art un-cart" viewBox="0 0 56 56" role="img" aria-label="UNO 牌">
           <g transform="rotate(-25 28 54)"><rect class="un-ic-bd un-ic-y" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
           <g transform="rotate(-8.5 28 54)"><rect class="un-ic-bd un-ic-g" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
