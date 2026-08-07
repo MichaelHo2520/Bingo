@@ -127,7 +127,9 @@ const DCAI = (function(){
       }
     }
     /* 被吃掉的也要算進來 —— 不然「對方的子被我吃光」與「對方的子還在盤上」同分。
-       ⚠ friendly(炮打到自己人)要扣,不然 AI 會覺得自打不虧。 */
+       ⚠ friendly(連吃翻攻踩到大子而自爆)要扣,不然 AI 會覺得亂賭不虧。
+         v1.118.0 以前這一欄裝的是「炮打到自己人」,而那條規則本身是錯的(見 rules.js
+         檔頭第 3 條);自爆改記在自己這一欄之後,這一行的意思反而更直接了。 */
     for(let k = 0; k < st.caps[me].length; k++) s += vt[st.caps[me][k]] * 0.15;
     for(let k = 0; k < st.friendly[me].length; k++) s -= vt[st.friendly[me][k]] * 0.15;
 
@@ -212,7 +214,12 @@ const DCAI = (function(){
     return total / tally.total + tally.total * 0.6;
   }
 
-  // 炮打 sq 那一格的暗子(★ 不論翻出什麼都被吃掉,打到自己人就是純虧)
+  /* 炮打 sq 那一格的暗子。★ 兩種下場(v1.118.0 起,見 rules.js 檔頭第 3 條):
+       · 翻出敵子   → 吃掉,不受階級限制
+       · 翻出自己人 → **只是把它翻開,兩顆都活**
+     ⚠ 打到自己人**不再是虧一顆子**(舊版寫成 -vt[p],那是照著錯的規則算的)——
+       但它仍然是虧的:白花一手,還順手把自己的一顆子攤給對手看。
+       係數 0.15 與 gambleDark 的②**刻意同一個** —— 兩邊是同一件事,不該給不同的價。 */
   function gambleCannon(st, sq, mover, vt, tally){
     if(!tally.total) return 0;
     const mySide = st.col[mover];
@@ -220,7 +227,7 @@ const DCAI = (function(){
     for(let p = 0; p < 14; p++){
       const n = tally[p];
       if(!n) continue;
-      total += n * ((DC.sideOf(p) === mySide) ? -vt[p] : vt[p]);
+      total += n * ((DC.sideOf(p) === mySide) ? -vt[p] * 0.15 : vt[p]);
     }
     return total / tally.total;
   }

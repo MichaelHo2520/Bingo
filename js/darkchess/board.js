@@ -68,7 +68,10 @@ const DCB = (function(){
     if(L.kind === "stop"){ sfx.stop(); return; }
     if(L.kind === "darkSelf"){ sfx.flip(); return; }
     if(L.kind === "darkLose"){ sfx.flip(); sfx.oops(); return; }
-    if(L.kind === "jump"){ sfx.cannon(); if(L.self) sfx.oops(); return; }
+    /* ★ 炮打到自己人(v1.118.0 起兩顆都活)—— 開了一炮、只翻開一顆,所以是
+       「炮聲 + 翻棋聲」而**不是** oops:沒有賠掉任何東西,只是白花一手。 */
+    if(L.kind === "jumpSelf"){ sfx.cannon(); sfx.flip(); return; }
+    if(L.kind === "jump"){ sfx.cannon(); return; }
     if(st.chainLen > 1) sfx.chain(st.chainLen);
     else sfx.eat();
   }
@@ -216,7 +219,7 @@ const DCB = (function(){
   function trayRow(label, caps, self){
     const n = caps.length + self.length;
     const pcs = caps.slice().sort(byRank).map(pieceHTML).join("") +
-                (self.length ? ('<span class="dc-tray-boom" title="自己打掉的">💥' +
+                (self.length ? ('<span class="dc-tray-boom" title="自己賠掉的">💥' +
                                 self.slice().sort(byRank).map(pieceHTML).join("") + "</span>") : "");
     return '<div class="dc-tray-row">' +
              '<span class="dc-tray-lbl">' + esc(label) + "</span>" +

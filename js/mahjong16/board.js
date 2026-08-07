@@ -183,10 +183,15 @@ const M16B = (function(){
      ⚠ 刻意做成**真的元素**而不是 ::before,理由只有一個:可測性。
        偽元素沒辦法用 elementFromPoint 驗「有沒有被牌面蓋住」,只驗得到「它存在」——
        實測過那條沒有牙齒(把 z-index 拿掉照樣全綠)。 */
+  /* ★ 第二個參數 true = 花牌畫右上角那個編號(春夏秋冬 / 梅蘭竹菊 各 1~4)。
+     **只有這一頁傳** —— 花要對上自己的門風才算正花,沒有編號就得先背「春是第幾個」
+     (使用者:「沒有那個數字不知道怎麼看台」)。消消樂那邊刻意不傳,見 mj-faces.js。
+     ⚠ 這一支是這一頁**唯一**畫牌面的地方(手牌 / 牌河 / 明牌 / 花 / 攤牌全走它),
+       所以只要改這一行,八種花牌到處都有編號 —— 不必去每個呼叫點補。 */
   function tileHTML(code, cls, extra, inner){
     const inf = F.info(code);
     return '<div class="m16-tile'+(cls?" "+cls:"")+'" data-suit="'+inf.cls+'"'+
-           (extra||"")+' aria-label="'+inf.name+'">'+F.faceHTML(code)+(inner||"")+'</div>';
+           (extra||"")+' aria-label="'+inf.name+'">'+F.faceHTML(code, true)+(inner||"")+'</div>';
   }
   function backTile(cls){
     return '<div class="m16-tile m16-back'+(cls?" "+cls:"")+'" aria-hidden="true">'+F.backHTML()+'</div>';

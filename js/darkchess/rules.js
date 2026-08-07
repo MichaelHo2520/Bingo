@@ -18,8 +18,13 @@
      1. **不能貼身吃** —— 相鄰的子炮一顆都吃不到。
      2. 沿直線隔**恰好一顆**子(任意顏色、明暗皆可)當炮架跳過去吃,
         **距離不限、不受階級限制**(炮可以吃將)。
-     3. **炮可以打暗子,而且翻開之後不論敵我一律吃掉** —— 打到自己的算自己倒楣。
-        沒有這一條,開局滿盤都是暗子時炮等於一顆廢子。
+     3. **炮可以打暗子** —— 沒有這一條,開局滿盤都是暗子時炮等於一顆廢子。
+        ★★ 但**翻開是自己人就只是翻開,兩顆都活**,不是吃掉 ——
+          規則來源(維基「暗棋」)寫得很死:「炮亦能隔一棋吃暗棋,**除翻開後為己棋外**,
+          只要是敵棋皆可吃」「若翻開後為己方棋子,**視為單純翻棋,二棋皆存活**」。
+          ⚠ v1.118.0 以前寫成「不論敵我一律吃掉」,那是自己想出來的,查無出處
+            (使用者:「哪有在吃自己人的」)。改回來之後炮打暗子的下場只剩兩種,
+            與連吃翻攻的②完全同構 —— 兩邊的「翻到自己人」都是白花一手。
 
    ── 這一支負責什麼 ────────────────────────────────────────────────────────
      • 棋子 / 格子 / 一手的編碼與 deal 字串
@@ -250,7 +255,12 @@ const DC = (function(){
       chainLen: 0,              // 這一手已經連吃幾顆(給畫面 / 音效)
       idle: 0,                  // 連續幾步沒吃沒翻
       caps: [[], []],           // 各座位吃掉的**敵方**子
-      friendly: [[], []],       // ★ 炮打暗子打到自己人 / 連吃翻到吃不動的敵子而被反吃
+      /* ★ 自己賠掉的己方子。**只有一條路進得來**:連吃翻攻踩到吃不動的敵子而自爆(③)。
+         ⚠ v1.118.0 以前還有「炮打暗子打到自己人」那一條,而那條規則本身是錯的
+           (見檔頭第 3 條)—— 現在炮打到自己人兩顆都活,不進這裡。
+         ⚠⚠ 自爆記在**自己這一欄**而不是對手的 caps:規則來源的字是「視同踩中地雷自爆」,
+           那是自己走進去的,不是對方吃到的。吃子欄的 💥 講的就是這一欄。 */
+      friendly: [[], []],
       over: false,
       winner: -1,               // 0 / 1;-1 = 和局(要配 over 才有意義)
       endBy: "",                // "wipe" | "stuck" | "count" | "draw" | "resign"
@@ -440,8 +450,10 @@ const DC = (function(){
       afterCapture(st, to);
       return true;
     }
-    st.cells[from] = null;                                    // ③ 被反吃
-    st.caps[1 - st.turn].push(me.p);
+    /* ③ 被反吃 —— 規則來源的字是「視同踩中地雷自爆」,所以記在**自己的 friendly**
+       而不是對手的 caps:那不是對方吃到的,是自己走進去的(見 blank() 那一段)。 */
+    st.cells[from] = null;
+    st.friendly[st.turn].push(me.p);
     st.last = { kind: "darkLose", seat: st.turn, from: from, to: to, p: me.p, got: vic.p };
     endTurn(st);
     return true;
@@ -472,16 +484,22 @@ const DC = (function(){
 
     // eat / jump / rush —— 都是「吃掉那一格,自己搬過去」
     const vic = st.cells[to];
-    if(!vic.up) vic.up = true;                     // ★ 炮打暗子:先翻開再吃掉
-    /* ⚠ 炮打到自己的子照樣吃掉(檔頭第 3 條),但要記在 friendly 而不是 caps ——
-       結果卡的「吃掉幾顆」指的是敵子,自打的算另一欄。 */
-    if(sideOf(vic.p) === mySide) st.friendly[st.turn].push(vic.p);
-    else st.caps[st.turn].push(vic.p);
+    if(!vic.up) vic.up = true;                     // ★ 炮打暗子:先翻開再看是誰
+    /* ★★ 炮打到自己人 = **視為單純翻棋,二棋皆存活**(檔頭第 3 條)。
+       炮留在原地、那顆子留在原地翻開,這一手就這樣沒了 —— 與連吃翻攻的②同構。
+       ⚠ 只有**暗子**走得到這裡:已經翻開的己方子 paoTargets() 一開始就排掉了
+         (而且它還把那條線擋死),所以這裡不必再判 kind。 */
+    if(sideOf(vic.p) === mySide){
+      st.idle = 0;
+      st.last = { kind: "jumpSelf", seat: st.turn, from: from, to: to, p: me.p, got: vic.p };
+      endTurn(st);
+      return true;
+    }
+    st.caps[st.turn].push(vic.p);
     st.cells[to] = me;
     st.cells[from] = null;
     st.idle = 0;
-    st.last = { kind: kind, seat: st.turn, from: from, to: to, p: me.p, got: vic.p,
-                self: sideOf(vic.p) === mySide };
+    st.last = { kind: kind, seat: st.turn, from: from, to: to, p: me.p, got: vic.p };
     afterCapture(st, to);
     return true;
   }
@@ -671,7 +689,7 @@ const DC = (function(){
       rows.push({
         seat: seat, side: side, left: left, sum: sum,
         eaten: st.caps[seat].slice(),              // 我吃掉的敵子
-        self: st.friendly[seat].slice()            // 我自己打掉 / 賠掉的己方子
+        self: st.friendly[seat].slice()            // 我自己賠掉的己方子(連吃翻攻自爆)
       });
     }
     return { winner: st.winner, endBy: st.endBy, rows: rows };

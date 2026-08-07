@@ -206,7 +206,17 @@ const MJFace = (function(){
     return out+'<circle class="mj-hole" cx="32" cy="32" r="4.6"/>';
   }
 
-  function draw(code){
+  /* 花牌的編號(真牌右上角就有這個數字):春夏秋冬 = 1234、梅蘭竹菊 = 1234。
+     ★ 它**不是裝飾** —— 花牌要與自己的門風對號才算「正花」(東家對 1、南家對 2…),
+       沒有數字就得先背「春是第幾個」才知道自己有沒有台(使用者:「沒有那個數字
+       不知道怎麼看台」)。 */
+  const FLOWER_NO = { ha:"1", hb:"2", hc:"3", hd:"4", pa:"1", pb:"2", pc:"3", pd:"4" };
+
+  /* no = 花牌要不要畫右上角那個編號。
+     ⚠ 只有台灣 16 張傳 true;**消消樂刻意不傳** —— 那邊是嚴格同款配對,
+       春(1) 與梅(1) 掛同一個數字會讓人以為配得起來(v1.55.0 就是為了這種
+       「長得像卻配不起來」才把花牌改成嚴格同款的)。 */
+  function draw(code, no){
     if(code==="jb") return white();
     const s=code.charAt(0), v=+code.charAt(1);
     if(s==="d") return pins(v);
@@ -214,16 +224,23 @@ const MJFace = (function(){
     // 萬:上面藍色漢字數字、下面紅「萬」,和實體牌一致
     if(s==="w") return chr(NUM[v-1]||"一",46,40,CU)+chr("萬",42,97,CR);
     const f=info(code);
-    // 花牌:圖案(左上)+ 單字(右下)+ 細框。真牌的花牌也有一圈框,同時和字牌區隔開。
+    // 花牌:圖案(左上)+ 編號(右上)+ 單字(右下)+ 細框。真牌的花牌也有一圈框。
     if(s==="h"||s==="p")
       return '<rect class="mj-frn" x="12" y="10" width="76" height="112" rx="10"/>'+
-             (s==="h"?chrysanth():plum())+chr(f.glyph,46,88,"",60);
+             (s==="h"?chrysanth():plum())+
+             /* ⚠ 位置是算過的、不是試出來的:圖案佔 x 13~51(繞著 32,32 半徑約 19),
+                大字 60px 置中在 x=46 佔 x 16~76、y 58~118 —— 右上角 x 55~88 / y 20~48
+                是整張牌唯一空著的地方。30px 置中在 (70,34) → x 55~85,兩邊都不碰。 */
+             (no ? chr(FLOWER_NO[code]||"",30,34,"",70) : "")+
+             chr(f.glyph,46,88,"",60);
     return chr(f.glyph,64,66);          // 東南西北 / 中 / 發
   }
 
-  function faceHTML(code){
-    return svgCache[code] ||
-      (svgCache[code]='<svg class="mj-svg" viewBox="0 0 100 132" aria-hidden="true">'+draw(code)+'</svg>');
+  function faceHTML(code, no){
+    // ⚠ 快取要分兩份:同一張春,消消樂沒編號、台灣麻將有編號
+    const key = no ? code+"#n" : code;
+    return svgCache[key] ||
+      (svgCache[key]='<svg class="mj-svg" viewBox="0 0 100 132" aria-hidden="true">'+draw(code, no)+'</svg>');
   }
 
   /* ---------- 牌背(v1.58.0,台灣 16 張才需要) ----------

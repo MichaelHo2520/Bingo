@@ -61,7 +61,7 @@ const HomeLive = (function(){
          U+2654–U+265F 那一段在很多 Android 字型上是文字呈現、粗細跟周圍對不齊,
          而 U+1F000 / U+1F0A0 那兩段直接是豆腐方框(CLAUDE.md 紅線 8)。
        ⚠ 暗棋 **不帶 joinMid** —— 一局就是一局,對戰中不給加入。
-       ⚠⚠ key 用 "dc" 不是 "darkchess"(v1.117.1 修正)——
+       ⚠⚠ key 用 "dc" 不是 "darkchess"(v1.118.0 修正)——
          game_stats 的 key 是 js/shared/mp-core.js 的 armPlayCount() 拿 INDEX 去掉
          "_index" 算出來的(dc_index → dc),這裡若寫 "darkchess" 兩邊對不上,
          暗棋的熱門度會永遠讀不到(dc:{n:1} 寫進資料庫,rankRows() 卻查
