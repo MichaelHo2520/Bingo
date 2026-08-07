@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.117.0 -->
-<meta name="version" content="1.117.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.117.1 -->
+<meta name="version" content="1.117.1">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -382,7 +382,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
                後面 → 會把這張卡撐得比另外九張高一截(21點 v1.86.0 踩過的坑)
            ⚠ 這張卡**刻意沒有滿版底色**:十張裡只有台灣麻將是滿版的,那是它與
               麻將消消樂分家的辨識點,多一張滿版就把那個唯一性洗掉了 -->
-      <a class="game-card as-link" href="darkchess.html" data-gk="darkchess">
+      <a class="game-card as-link" href="darkchess.html" data-gk="dc">
         <span class="gc-rank" aria-hidden="true">10</span>
         <svg class="gc-art dc-cart" viewBox="0 0 56 56" role="img" aria-label="象棋暗棋">
           <g transform="translate(18 34)">
