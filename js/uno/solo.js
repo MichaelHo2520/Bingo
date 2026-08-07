@@ -163,6 +163,10 @@ const Solo = (function(){
     showScreen("solo");
     paint();
     Sound.start();
+    /* ★ 語音音檔先載好(v1.117.0)—— 語音槽沒有合成音後備,懶載入的話「這一局第一次
+       喊 UNO / 第一次 +2」永遠沒聲音。這裡是 `開始對局` 那顆鈕點下來的路徑 =
+       一定有使用者手勢,正是 primeVoice 要的時機(見 board.js 那一段)。 */
+    UNB.primeVoice();
     saveOwn();
     // ★ 起始牌就攤在桌上,不必再唸一次 —— 只講「誰先出」這件看不出來的事
     showToast(st.turn === ME ? "你先出牌" : (seatName(st.turn) + " 先出牌"), 1500);

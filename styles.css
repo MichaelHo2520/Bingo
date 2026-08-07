@@ -5729,7 +5729,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   :root[data-theme="ebook"] .un-pen b{color:#000}
 
   /* ---------- 手牌 ----------
-     ⚠ 橫向捲動 + nowrap:手牌可能到二十幾張,換行會把桌子擠掉。
+     ⚠ 永遠**一列**(nowrap):手牌可能到二十幾張,換行會把桌子擠掉。
+       v1.117.0 起放不下就**把牌縮小**(board.js 的 fitHand),不是靠橫向捲動 ——
+       捲軸留著但藏起來,只有撞到 18px 下限的極端局面才真的需要滑。
      ⚠ padding-top 留著 —— 牌雖然不再上抬(見 .un-card.can),但亮牌的光圈是
         3px 的 box-shadow,貼著捲動容器的上緣一樣會被裁掉
         (那是 notes/13 第三節「捲動容器裡會放大的東西」的同一類問題)。 */
@@ -5744,15 +5746,35 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ★ 高度**寫死**(= 牌高 + 上下 padding)—— 不然手牌超過一列寬時瀏覽器會長出一條
      橫向捲軸,那條捲軸的厚度直接加在這一列上,整排牌就跟著上下挪一次。
      ⚠ 一定要用 calc(var(--un-cw) * 1.45 ...) 而不是寫死 px:牌寬是 clamp 出來的,
-       視窗一變牌就變高(同 .un-card 那條「牌高在牌自己身上算」的紀律)。 */
-  .un-hand{display:flex;gap:5px;overflow-x:auto;overflow-y:hidden;
+       視窗一變牌就變高(同 .un-card 那條「牌高在牌自己身上算」的紀律)。
+     ⚠⚠ 這個 height 吃的是 `.un-play` 那一層的 --un-cw —— 牌縮小時**列高不跟著縮**
+       (縮的是內層 .un-hrow 的 --un-cw,見 board.js 的 fitHand)。這是刻意的:
+       列高一變上面整組就跟著挪,而那正是要修掉的那種跳動。
+     ★★★ **捲軸一律不顯示**(v1.117.0)。使用者:「現在會跑出一條在下方的 bar,這很難看,
+        我希望不要有 bar 條,也不要需要滑動來看手牌」——
+        兩件事一起做才算修好:①這裡把 bar 藏掉 ②board.js 的 fitHand 把牌縮到放得下
+        (所以正常情形根本捲不動)。捲動能力刻意**留著**:三十幾張的極端局面
+        牌會撞到 18px 的下限,那時還是滑得動 —— 但那已經是「幾乎不會發生」的區間。 */
+  .un-hand{display:flex;overflow-x:auto;overflow-y:hidden;
     height:calc(var(--un-cw) * 1.45 + 12px);
-    padding:8px 2px 4px;scrollbar-width:thin;touch-action:pan-x}
+    padding:8px 2px 4px;touch-action:pan-x;
+    scrollbar-width:none;-ms-overflow-style:none}
+  .un-hand::-webkit-scrollbar{width:0;height:0;display:none}
+  /* ★★ 牌真正的容器 —— 「縮多小」設在**這一層**的 --un-cw 上(見上面 ⚠⚠ 與 fitHand)。
+     ⚠ width:100% 是量得準的前提:它撐滿 .un-hand 的內容寬,而牌是 flex:none 會溢出它
+       → row.clientWidth 就是「可用寬」,不會被牌的總寬帶著跑。
+     ⚠ gap 用 calc(var(--un-cw) × .09) 而不是寫死 5px:牌縮小時間隙要一起縮
+       (不然 18px 的牌配 5px 的縫看起來像散開的),而 fitHand 的 GAPR 就是這個 .09 ——
+       **兩邊要一起改**,不然算出來的寬會差一點點(症狀是最後一張被裁掉一條邊)。 */
+  .un-hrow{display:flex;align-items:center;width:100%;height:100%;
+    gap:calc(var(--un-cw) * .09)}
   /* ---------- 手牌 + 抽牌墊 那一列(v1.110.0) ----------
      ⚠ .un-hand 要 `min-width:0` 才縮得下去 —— flex 子元素的預設 min-width 是 auto,
-       手牌一多它會把抽牌墊擠出畫面右緣(而那一塊正是現在唯一的抽牌入口)。 */
+       手牌一多它會把抽牌墊擠出畫面右緣(而那一塊正是現在唯一的抽牌入口)。
+     ⚠ flex-basis 是 **0** 而不是 auto:auto 會讓它的理想寬跟著「所有牌的總寬」跑,
+       量 clientWidth 就變成一場循環(shrink 之後才收回來)。0 = 「就是剩下的空間」。 */
   .un-handrow{display:flex;align-items:center;gap:7px}
-  .un-handrow .un-hand{flex:1 1 auto;min-width:0}
+  .un-handrow .un-hand{flex:1 1 0;min-width:0}
   /* ---------- 抽牌墊:手牌右邊那一塊 ----------
      使用者:「如果要加牌的話,不要顯示在最下面,可以把他移到牌的例如右邊,
      不然這個字出的時候,牌還是會跳一下」。
@@ -5761,20 +5783,36 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ **刻意不畫牌背**:擺在手牌尾巴的牌背會被看成「我的第 N 張牌」
         (v1.108.0 把桌上那張牌背拿掉是同一條理由)。虛線框 + 兩行字才看得出
         「這不是我的牌,是牌堆」。
-     ⚠ 高度與牌**一樣**,寬度窄一階 → 它不會改變這一列的高度。 */
+     ⚠ 高度與牌**一樣**,寬度窄一階 → 它不會改變這一列的高度。
+     ★★★ 三行(v1.117.0):抽牌 / **這一下抽幾張** / 牌堆還剩幾張(見 board.js 的 drawPadHTML)。
+        寬度從 .72 放到 .92 就是為了第二行那個「2張」擺得下 —— 而寬度是**固定的**
+        (不隨罰抽出現變寬),手牌那一側自己會重算(fitHand),所以一格都不會挪。 */
   .un-drawpad{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:2px;padding:0;cursor:pointer;
-    width:calc(var(--un-cw) * .72);height:calc(var(--un-cw) * 1.45);
+    gap:1px;padding:0;cursor:pointer;
+    width:calc(var(--un-cw) * .92);height:calc(var(--un-cw) * 1.45);
     border:2px dashed var(--panel-line);border-radius:calc(var(--un-cw) * .14);
     background:rgba(255,255,255,.06);color:var(--muted)}
   .un-drawpad .un-dp-t{font:800 11px/1.1 'Nunito',sans-serif}
-  .un-drawpad .un-dp-n{font:800 12px/1 'Fredoka','Nunito',sans-serif;opacity:.75}
+  /* ★ 這一行是**手要點下去會發生什麼**,所以它是三行裡最大的那一個。
+     「張」小一階並排在數字後面(不換行)—— 兩行的話這一塊會超過牌高。 */
+  .un-drawpad .un-dp-n{font:800 16px/1 'Fredoka','Nunito',sans-serif;white-space:nowrap}
+  .un-drawpad .un-dp-n i{font:800 9.5px/1 'Nunito',sans-serif;font-style:normal;opacity:.8}
+  /* 牌堆張數退到第三行、字最小 —— 它是「順便知道」的資訊(v1.110.0 從桌上收進來的)。 */
+  .un-drawpad .un-dp-p{font:800 9.5px/1 'Nunito',sans-serif;opacity:.6}
   /* ★ 「現在只能抽」才亮 —— 只加光圈與顏色,位置一個像素都不動(同 .un-card.can) */
   .un-drawpad.can{border-style:solid;border-color:var(--accent);color:var(--accent);
     background:rgba(255,255,255,.12);box-shadow:0 0 0 3px rgba(255,255,255,.14)}
+  /* ★ 被罰抽時那個數字要跳出來(2 / 4 / 6 …)—— 只換色,不動任何尺寸。
+     ⚠ 用 **--un-r**(UNO 紅)而不是 --accent-2 也不是自己挑一個橘黃:
+       ① --accent 已經被 .can 占用,兩個狀態會同時成立(輪到我、又只能抽)→ 要分得出來
+       ② 這一頁的四色在**任何主題下都是原值**,所以它在深色與淺色主題都是同一個紅
+       ③ 第一版挑了 #ffb02e,在 bubblegum(淺粉底)上幾乎看不見 —— 而那正是
+          notes/18「桌布上的字不可以吃主題色」那條教訓的鏡像:淺色主題也要驗一次。 */
+  .un-drawpad.pen .un-dp-n{color:var(--un-r)}
   .un-drawpad:active{transform:scale(.96)}
   :root[data-theme="ebook"] .un-drawpad{border-color:#000;color:#000;background:#fff}
   :root[data-theme="ebook"] .un-drawpad.can{box-shadow:0 0 0 3px #000}
+  :root[data-theme="ebook"] .un-drawpad.pen .un-dp-n{color:#000;text-decoration:underline}
 
   /* ---------- 動作列 ----------
      ★★ 高度是**寫死的**(不是 min-height),而且裡面是固定的兩列:

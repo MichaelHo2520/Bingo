@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.116.0";
+const VERSION = "1.117.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -79,8 +79,10 @@ const CORE = [
   /* UNO(第九個遊戲,v1.106.0;獨立頁面)。
      ★ 牌面自繪在 js/uno/board.js 裡面,**沒有** shared 的 faces 檔 ——
        UNO 牌只有這一頁用,而 js/shared/ 抽出去的理由是「兩個以上的遊戲共用」。
-     ★ 這一頁**不新增任何 mp3**:動作聲全是 Sound.tone() 的合成音,
-       所以下面 mp3 那一大段一行都不必動(也省掉「動 mp3 要四處一起改」那條耦合)。 */
+     ★ 動作聲全是 Sound.tone() 的合成音,但 v1.117.0 起**多了七句語音音檔**
+       (使用者要「報 UNO / 加二 / 顏色」,而合成音唸不出字)—— 見下面 mp3 那一段的
+       `mp3/uno/voice-*.wav` 七行。改那七個檔的路徑要四處一起改(CLAUDE.md 的紅線):
+       board.js 的 ensureVoice、這裡、tools/gen-uno-voice.ps1。 */
   "./uno.html",
   "./js/uno/rules.js",
   "./js/uno/ai.js",
@@ -91,8 +93,9 @@ const CORE = [
   /* 象棋暗棋(第十個遊戲,v1.113.0;獨立頁面)。
      ★ 棋子自繪在 js/darkchess/board.js 裡面,**沒有** shared 的 faces 檔 ——
        象棋棋子只有這一頁用,而 js/shared/ 抽出去的理由是「兩個以上的遊戲共用」。
-     ★ 同 UNO,這一頁**不新增任何 mp3**:動作聲全是 Sound.tone() 的合成音,
-       所以下面 mp3 那一大段一行都不必動。 */
+     ★ 這一頁**不新增任何 mp3**:動作聲全是 Sound.tone() 的合成音,
+       所以下面 mp3 那一大段一行都不必動。
+       (⚠ 原本這裡寫「同 UNO」—— UNO 從 v1.117.0 起有語音音檔了,別再拿它當範本。) */
   "./darkchess.html",
   "./js/darkchess/rules.js",
   "./js/darkchess/ai.js",
@@ -152,6 +155,22 @@ const CORE = [
   "./mp3/bj/bj.wav",
   "./mp3/bj/dragon.wav",
   "./mp3/bj/grab.wav",
+  /* UNO 的語音(v1.117.0,tools/gen-uno-voice.ps1 產生)。
+     ★ 這一頁 v1.106.0~v1.116.0 刻意「不新增任何 mp3」,是使用者要語音才推翻的
+       (合成音唸不出字)——推翻的範圍只有這七句,動作聲全部維持 Sound.tone()。
+       uno = 有人剩一張 · d2 / d4 = 罰抽砸下去 · r/y/g/b = Wild 指定了哪個顏色。
+     ⚠⚠ 這一組**沒有東西可以墊**(語音槽的 synth 傳 null,見 board.js 的 ensureVoice)——
+       與大老二 / 21點那兩組不同:那兩組離線只是「少了人聲、音階還在」,
+       這裡離線抓不到就是**完全不講話**。所以這七行比那兩組更不能漏。
+     ⚠ 這七個檔一定要**與這幾行同一版進 repo**:addAll() 是全有全無的,
+       列了不存在的檔會讓整批快取失敗(離線變成整個不能玩)。 */
+  "./mp3/uno/voice-uno.wav",
+  "./mp3/uno/voice-d2.wav",
+  "./mp3/uno/voice-d4.wav",
+  "./mp3/uno/voice-r.wav",
+  "./mp3/uno/voice-y.wav",
+  "./mp3/uno/voice-g.wav",
+  "./mp3/uno/voice-b.wav",
   "./mp3/是要多久.m4a",
   "./mp3/啊西好了沒.m4a",
   "./mp3/快點，來不急啦.m4a",

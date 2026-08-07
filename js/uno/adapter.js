@@ -387,7 +387,13 @@ const MP = MPCore.create((function(){
       deal = g.deal || deal;
       moves = next.slice();
       if(!isPlaying){ st = null; return; }
-      if(fresh){ curRound = rid; lastLen = -1; unoArmed = false; pendWild = -1; UNB.closeColor(); }
+      if(fresh){
+        curRound = rid; lastLen = -1; unoArmed = false; pendWild = -1; UNB.closeColor();
+        /* ★ 語音音檔先載好(v1.117.0)—— 語音槽沒有合成音後備,不預載的話「這一局第一次
+           喊 UNO」永遠沒聲音(音檔那時才開始飛)。放在**開新局**這一格:
+           走到這裡玩家早就點過「準備 / 開始」了(有手勢),而 Sound.prime 自己會去重。 */
+        UNB.primeVoice();
+      }
 
       /* ★ 讀**這一局凍結的**那一份(不是房間欄位)。
          ⚠ 照 deal 那一行的模式用「有才蓋掉」:某一次快照少了這個欄位時,

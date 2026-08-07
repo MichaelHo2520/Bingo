@@ -27,10 +27,16 @@
      所以沒有 sel / clearSel / 群組選取那一整套(大老二 board.js 最複雜的部分)。
      唯一的兩段式是 **Wild 要先選顏色**(選色盤),而它由 askColor() 收斂成一個 callback。
 
-   ── ★ 音效全是合成音,**不新增任何 mp3** ──────────────────────────────────
-     CLAUDE.md:動 `mp3/` 的路徑要四處一起改(sfx 的 ensureDefs、sw.js 的 CORE、
-     兩支產生器)。UNO 的動作聲用 Sound.tone() 寫樂句就夠清楚了,
-     省掉那條耦合 —— 也省掉「離線抓不到音檔就啞掉」那一整類問題。
+   ── ★ 動作聲是合成音,**語音是七個音檔**(v1.117.0 起)────────────────────────
+     v1.106.0~v1.116.0 這一頁刻意「不新增任何 mp3」(省掉 CLAUDE.md 那條「動 mp3/ 的
+     路徑要四處一起改」與「離線抓不到音檔就啞掉」)。使用者要語音:「1.有人報UNO,
+     包含自己 2.加牌時,例如+2就要唸出加2 3.換顏色的時候,也要記得報顏色,例如黃色」——
+     **合成音唸不出字**,所以那一條只能推翻,而推翻的範圍刻意壓到最小:
+       · 動作聲(出牌 / 抽牌 / 跳過 / 迴轉 / 罰抽 / 換色 / 被抓)**全部維持 Sound.tone()**
+       · 只有那三件事是音檔,共七格:uno · d2 / d4 · r / y / g / b
+     所以「離線就啞掉」也只影響語音那一層(動作聲照樣有),而 sw.js 的 CORE 有列它們。
+     ⚠ 語音槽刻意**沒有合成音後備**(拿音階去墊會變成同一件事響兩次很像的聲音)——
+       代價是它必須**預載**(見 primeVoice),不然一局裡第一次喊 UNO 永遠是沒聲音的。
    ========================================================================== */
 
 const UNB = (function(){
@@ -94,9 +100,85 @@ const UNB = (function(){
     caught(){ [700, 520, 330].forEach((f, i) => toneSafe(f, { type:"square", dur:0.13, vol:0.16, delay:i*0.10 })); }
   };
 
+  /* ==========================================================================
+     二之二、語音(七個音檔;v1.117.0)
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 與動作聲是**分開的兩層**,刻意不互相取代(同台灣麻將的喊牌):動作聲是
+         「牌拍到桌上」,語音是喊出來的那句話 —— 真牌桌上兩個同時有。
+       ★ 只有**宣告類**的事件配語音:UNO / 加二 / 加四 / 顏色。
+         出牌 / 抽牌 / 跳過 / 迴轉一局要響幾十次,每次唸字就變成報帳機。
+       ⚠ 語音槽**沒有合成音後備**(def 的第三個參數傳 null):音檔取不到就是不講話。
+       ⚠ 開 HTMLAudio 後備(`el:true`)—— 音檔是跟程式一起發佈的,而用 file:// 直接開
+         網頁時 fetch 會被 CORS 擋,沒有這一層就完全沒聲音(見 audio.js 的 playClipEl)。
+     ========================================================================== */
+  const VOICE = { uno:"UNO", d2:"加二", d4:"加四", r:"紅色", y:"黃色", g:"綠色", b:"藍色" };
+  /* Wild 指定的顏色 → 語音格。⚠ 用 UN.COL_KEY 而不是自己再列一份 r/y/g/b:
+     那一組就是 move 字串裡的那個字元(見 rules.js 的 encPlay)。 */
+  const COL_VK = UN.COL_KEY;
+
+  /* ⚠ 發聲前一定要確認 Sound 這一版**有**音效槽那組 API(同 mj16/sfx.js 的理由):
+     sw.js 是 network-first,裝置有可能拿到新的 board.js 卻還吃著舊的 audio.js ——
+     那時直接呼叫會 TypeError,而這支是從 render() / moveSfx() 裡叫的,
+     一路炸上去等於整個盤面停止重畫。語音不見是小事,牌桌壞掉是大事。 */
+  function vReady(){
+    return typeof Sound !== "undefined" && typeof Sound.sfx === "function" && !!Sound.def;
+  }
+  let vDefed = false;
+  function ensureVoice(){
+    if(vDefed || !vReady()) return;
+    vDefed = true;
+    Object.keys(VOICE).forEach(k => Sound.def("unv" + k, ["mp3/uno/voice-" + k + ".wav"], null, { el:true }));
+  }
+  /* ★★ 一句一句排隊講,**不可以讓兩句疊在一起**(疊起來兩句都聽不清楚)。
+     同一手最多會有兩句(+4 = 「加四」+「藍色」),而 UNO 的公告又是另一條路徑進來的
+     → 用「下一句最早可以開口的時間」串起來,誰晚到誰排後面。
+     ⚠ VGAP 要 ≥ 最長那句的長度(產生器量到的是 0.49~0.71 秒)+ 一點呼吸。 */
+  const VGAP = 820;
+  let vFree = 0;
+  function say(key, lead){
+    if(!vReady() || !VOICE[key]) return;
+    ensureVoice();
+    const now = Date.now();
+    const at = Math.max(now + (lead || 0), vFree);
+    vFree = at + VGAP;
+    const d = at - now;
+    if(d <= 0) Sound.sfx("unv" + key);
+    else setTimeout(() => { if(vReady()) Sound.sfx("unv" + key); }, d);
+  }
+  /* 這一手要唸哪幾句(依序)。★ **純函式** —— 給試聽頁與診斷頁對答案用。
+     ⚠ UNO 那一句**不在這裡**:它走公告那條路(announce),理由見那裡的註解。 */
+  function voiceKeysOf(mv){
+    const out = [];
+    if(!UN.isPlay(mv)) return out;
+    const id = UN.moveCard(mv);
+    if(id < 0) return out;
+    const k = UN.kindOf(id);
+    if(k === UN.K_D2) out.push("d2");
+    else if(k === UN.K_W4) out.push("d4");
+    /* Wild / Wild+4 指定的顏色。⚠ 一定要從 move 字串讀(mv[3]),不可以讀 st.col:
+       這一支只拿到一手,而且 st.col 在「疊 +4」時還沒換過去。
+       ⚠ 非 Wild 的第 4 個字元可能是 "!"(宣告 UNO)→ 先看是不是 Wild 再讀。 */
+    if(UN.isWild(id)){
+      const ck = mv[3];                                 // COL_KEY 的代號就是語音格的 key
+      if(COL_VK.indexOf(ck) >= 0) out.push(ck);
+    }
+    return out;
+  }
+  /* 進對局時把七個音檔先載好。★ 這不是效能優化,是**正確性**:語音槽是懶載入的,
+     而它沒有合成音可以墊 —— 不預載的話「這一局第一次喊 UNO」永遠沒聲音
+     (音檔那時才開始飛),使用者只會覺得「有時候有、有時候沒有」。
+     ⚠ 呼叫時機要在已經有使用者手勢之後(開始對局 / 進房),不然只是白白建立 AudioContext。 */
+  function primeVoice(){
+    if(!vReady() || !Sound.prime) return;
+    ensureVoice();
+    Object.keys(VOICE).forEach(k => Sound.prime("unv" + k));
+  }
+
   /* 一手打出去之後該響什麼 —— **單機與連線共用這一支**。
      ⚠ 走「前後兩份的 diff」而不是在動作點插 sfx.xxx():單機與連線的動作路徑
-       完全不同,但「有人出了 +2」在兩邊是同一個 diff(同大老二 moveSfx 的理由)。 */
+       完全不同,但「有人出了 +2」在兩邊是同一個 diff(同大老二 moveSfx 的理由)。
+     ★ 語音壓在動作聲後面 200ms:太近會與罰抽那聲鋸齒糊成一團,太遠又像回音。
+       (罰抽的合成音本身 0.24~0.34 秒,所以這裡比麻將那 60ms 鬆很多。) */
   function moveSfx(mv, n){
     if(UN.isDraw(mv)){ sfx.draw(); return; }
     if(UN.isPass(mv)) return;
@@ -111,6 +193,7 @@ const UNB = (function(){
     else if(k === UN.K_WILD) sfx.color();
     else sfx.play();
     if(UN.moveDeclared(mv)) sfx.uno();
+    voiceKeysOf(mv).forEach(key => say(key, 200));
   }
 
   /* ==========================================================================
@@ -190,10 +273,77 @@ const UNB = (function(){
            畫面已經說完了;文字版留在動作列那一行(而且那一行是固定高度的)。 */
         '<div class="un-hlabel">你的手牌 <b>' + hand.length + '</b> 張</div>' +
         '<div class="un-handrow">' +
-          '<div class="un-hand" id="unHand">' + cards + '</div>' +
+          /* ⚠ 牌不是 .un-hand 的直接子元素,中間隔一層 .un-hrow —— 那一層才是
+             「牌要縮多小」的載體(見 fitHand)。委派看的是 `.closest(".un-hand")`,
+             多一層不影響。 */
+          '<div class="un-hand" id="unHand"><div class="un-hrow">' + cards + '</div></div>' +
           drawPadHTML(o, hot) +
         '</div>' +
       '</div>';
+    fitHand();
+    watchHand();
+  }
+
+  /* ---------- 手牌一多就把牌縮小,而**不捲、不換行**(v1.117.0)----------
+     使用者:「手牌如果太多,會變成要左右滑動,但現在會跑出一條在下方的 bar,這很難看,
+     我希望不要有 bar 條,也不要需要滑動來看手牌,可以考慮換行,或是把中間的牌域給縮小
+     一點點,不過這個還請你要評估看看,我不希望介面變很難看,也不希望固定的區域一直跳來跳去」。
+
+     ★★★ 三條路裡選了「縮牌」,理由是最後那半句:
+       · **換行** —— 兩列的高度只能二選一:要嘛預留(直立多浪費 80px、橫置 430px 高的視窗
+         直接把手牌擠出畫面下緣,notes/18 版面第 7 條量過),要嘛第 13 張牌出現的那一刻
+         整個手牌區長高一倍 → 那正是「固定的區域跳來跳去」最嚴重的一種。
+       · **縮中間的牌桌** —— 治不了病:牌桌讓出來的是**高度**,手牌不夠的是**寬度**。
+       · **縮牌** —— 只有牌自己變小,`.un-hand` 的高度、標籤、抽牌墊、動作列一格都不動。
+         而且**放得下的時候一個像素都不改**(≤ 12 張左右完全是原來的樣子)。
+
+     ★ 縮的方式是把 `--un-cw` 設在 `.un-hrow` 上 → 牌寬 / 牌高 / 白橢圓 / 字級 / 圓角
+       **整組跟著縮**(它們全都是 `calc(var(--un-cw) × 係數)`,見 notes/18 版面第 1 條)。
+       ⚠⚠ 一定要設在**內層**那個 .un-hrow 上,不可以設在 .un-hand 上 ——
+         .un-hand 的高度是 `calc(var(--un-cw) * 1.45 + 12px)`,設在它身上會連**列高**
+         一起縮 → 牌一多整條手牌區就變矮,又變成上下跳(要修的正是這件事)。
+     ⚠ 量之前先把上一次的覆寫**清掉**,量到的才是基準寬(不然會一路縮下去)。
+     ⚠ 量到 0 就什麼都不做 —— 容器還沒版面 / 是 hidden 的
+       (CLAUDE.md 紅線 17:「在 hidden 的容器上量尺寸,兩個 0 永遠相等」)。
+     ⚠⚠ 張數**從 DOM 數**而不是拿參數 —— 這一支還會被 ResizeObserver 叫(見 watchHand),
+       那時沒有人記得剛才畫了幾張;傳參數的版本遲早會與畫面不一致。 */
+  const GAPR = 0.09;        // 牌與牌的間隙 = 牌寬 × 這個係數(CSS 的 .un-hrow{gap} 同一個式子)
+  const MINCW = 18;         // 再小就認不出是什麼牌了(18px 寬 = 26px 高,標籤字 8px)
+  function fitHand(){
+    const box = $("unHand");
+    const row = box && box.firstElementChild;
+    if(!row) return;
+    row.style.removeProperty("--un-cw");             // ⚠ 先回到基準寬再量
+    const n = row.children.length;
+    if(!n) return;
+    const avail = row.clientWidth;
+    const first = row.firstElementChild;
+    if(!avail || !first) return;
+    const base = first.getBoundingClientRect().width;
+    if(!(base > 0)) return;                          // hidden / 還沒版面 → 不要亂設
+    const units = n + GAPR * (n - 1);                // 需要幾個「牌寬」(含間隙)
+    if(base * units <= avail) return;                // ★ 放得下就一個像素都不動
+    const cw = Math.max(MINCW, Math.floor(avail / units));
+    row.style.setProperty("--un-cw", cw + "px");
+  }
+  /* ★★ 兩種情形會讓「量好的那個寬」過期,而它們**都不會觸發 render()**:
+       ① 手機轉向 / 改視窗大小 —— 基準寬是 clamp(…,12.5vw,…),vw 一變基準就變
+       ② 這一次 render() 是在**還沒顯示**的畫面上做的(連線的第一份快照可能在切到
+          對局畫面之前就到了)—— 那時量到 0,fitHand 什麼都不做
+     ⚠⚠ ② 在 v1.117.0 之前無所謂(捲軸還在,滑一下就看到了),現在**捲軸藏起來了** →
+       沒補這一手的話那一瞬間會有牌被裁在畫面外而且看不出可以捲。
+     ★ 用 ResizeObserver 掛在 .un-hand 上一次解決兩個:它在「0 → 有寬度」與
+       「視窗變了」兩種情形都會叫一次。observe() 本身也會立刻叫一次(冪等,無妨)。
+     ⚠ 不會無限迴圈:fitHand 只改內層 .un-hrow 的 --un-cw,而 .un-hand 的寬(flex:1 1 0)
+       與高(吃 .un-play 的 --un-cw)兩軸都不受它影響。
+     ⚠ 每次 render() 都要重新 observe —— #unHand 是 innerHTML 重畫出來的新節點。 */
+  let handRO = null;
+  function watchHand(){
+    const box = $("unHand");
+    if(!box || !window.ResizeObserver) return;
+    if(!handRO) handRO = new ResizeObserver(() => fitHand());
+    handRO.disconnect();
+    handRO.observe(box);
   }
 
   /* ---------- 抽牌墊:手牌**右邊**那一塊(v1.110.0)----------
@@ -208,13 +358,29 @@ const UNB = (function(){
        會被看成「我的第 N 張牌」。v1.108.0 把桌上那張牌背拿掉的理由是同一條。
      ⚠ 沒輪到 / 有牌可出時**照樣點得動**(誤按跳 toast 講原因)——
        CLAUDE.md 的紅線:不用 disabled 讓點擊靜默消失。
-     ★ 只有「輪到我而且一張都出不了」時亮起來 —— 用 box-shadow 的光圈,不動位置。 */
+     ★ 只有「輪到我而且一張都出不了」時亮起來 —— 用 box-shadow 的光圈,不動位置。
+
+     ★★★ **「這一下會抽幾張」寫在這裡**(v1.117.0)。使用者:「抽牌要抽幾張,我們有顯示嗎?
+        如果沒有的話,我希望能在抽牌那裡,看到要抽幾張」。
+        原本只有桌子左上角那顆罰抽膠囊(.un-pen)在講,而**手要點的地方**沒講 ——
+        點下去才知道吃了幾張。三行由上到下是「動作 / 這一下抽幾張 / 牌堆還剩幾張」。
+        ⚠⚠ 罰抽那個數字只在**輪到我**的時候能算進來:st.pend 是「輪到誰誰就要抽」
+          (rules.js 的 K_D2 是 pend += 2 之後才 adv()),別人的回合掛著 pend
+          卻在我的抽牌墊寫「抽 2 張」是騙人的。
+        ⚠ 原本第二行是**牌堆張數**(v1.110.0 從桌上收進來的),它與「抽牌」兩個字上下相疊
+          本身就有點像「抽 87 張」。現在牌堆退到第三行、字更小,而且帶一個「堆」字。
+        ⚠ 三行都是**固定存在**的(數字換內容、不換行數)—— 一格都不許因為狀態出現 / 消失,
+          那正是 v1.110.0 把這一塊做成「永遠在」的理由。 */
   function drawPadHTML(o, hot){
     const must = !!(o.mine && !o.over && !(hot || []).length);
-    return '<button class="un-drawpad' + (must ? " can" : "") + '" id="unDraw" type="button"' +
-             ' aria-label="抽一張(牌堆還有 ' + o.pileLeft + ' 張)">' +
+    const pen = !!(o.mine && !o.over && o.pend > 0);
+    const dn = pen ? o.pend : 1;
+    return '<button class="un-drawpad' + (must ? " can" : "") + (pen ? " pen" : "") +
+             '" id="unDraw" type="button"' +
+             ' aria-label="抽 ' + dn + ' 張(牌堆還有 ' + o.pileLeft + ' 張)">' +
              '<span class="un-dp-t">抽牌</span>' +
-             '<span class="un-dp-n">' + o.pileLeft + '</span>' +
+             '<span class="un-dp-n">' + dn + '<i>張</i></span>' +
+             '<span class="un-dp-p">堆' + o.pileLeft + '</span>' +
            '</button>';
   }
 
@@ -509,6 +675,15 @@ const UNB = (function(){
         const seat = +s;
         const nm = (o.names && o.names[seat]) || ("玩家" + (seat + 1));
         sfx.uno();
+        /* ★★ 「UNO」那一句掛在**公告**這裡,不掛在 moveSfx 的 `!` 上(v1.117.0)——
+           使用者要的是「有人報UNO,包含自己」,而這一格剛好就是那個事件:
+             ① 剩一張一定是**出掉一張**造成的,所以它與宣告是同一個瞬間
+             ② 房規 unoCall **關掉**時沒有人會宣告(改成系統公告),掛在 `!` 上就不會唸
+             ③ 這條路徑本來就有 diff 去重(換局 / 重連 / 批次同步只記不響),
+                掛在這裡自然吃到那層保護 —— 而 moveSfx 只擋得住換局那一種
+           ⚠ 因此漏喊被抓的人也會被唸到 —— 那是對的:桌上就是「有人剩一張」了,
+             而 sfx.uno() 那一聲本來也是這樣響的(語音只是把它講成話)。 */
+        say("uno", 120);
         if(window.showToast) showToast((seat === o.me ? "你" : nm) + " 剩一張牌!", 1500);
       });
       unoPrev = now;
@@ -552,6 +727,10 @@ const UNB = (function(){
     askColor, closeColor, pickColor, colorOpen,
     announce, resetAnnounce,
     sfx, moveSfx, stopCd,
+    /* 語音(v1.117.0)。voiceKeysOf 是純函式 → 試聽 / 診斷頁對得了答案;
+       primeVoice 要在**有使用者手勢之後**叫(進對局那一刻),見它的註解。 */
+    say, voiceKeysOf, primeVoice, VOICE,
+    fitHand,                     // 手牌縮放(診斷頁要單獨量)
     COL_CLS
   };
 })();
