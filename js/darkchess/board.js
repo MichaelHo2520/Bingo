@@ -193,28 +193,19 @@ const DCB = (function(){
          → **每走一手棋盤就上下跳一下**(v1.113.x 的症狀:輪到自己時多一行提示,
          換對手時那一行消失)。所以:
            · 第二行一律存在(輪到對手時是**空的**,不塞填充語)—— .dc-actline 撐高度
-           · 吃子欄開著時,兩列不論有沒有子都佔位(空的畫一個「—」)
+           · 吃子欄的每一列不論有沒有子都佔位(空的畫一個「—」)
          高度由 CSS 的 min-height 給,這一支只負責「每一種狀態都畫出同樣多的列」。
          ★ 「固定」的意思是**一整局裡不變**,不是「永遠是同一個數字」——
-           吃子欄開關是設定,切下去 setTray() 會走 paint() 重算一次(見下面)。
+           吃子欄有幾列由 st.rules.foeCaps 決定,而房規**開局就凍結**(見 rules.js
+           的 RULE_LVS.caps),所以一局裡它不會變。
      ========================================================================== */
-  /* ---------- 吃子欄要不要顯示(各人偏好,預設關)----------
-     ★ 預設關掉:少兩列 = 舞台高兩列 = 棋子大一圈,而「誰吃了什麼」多數時候盤面上
-       自己看得出來;要清點的人在 ⚙️ 設定裡打開。
-     ★ 這是**顯示偏好不是房規** —— 兩邊各自看各自的,不進 DB、不影響任何判定。
-     ⚠ 存自己的 key(CLAUDE.md 紅線 12:遊戲專屬設定不塞共用的 bingo.prefs.v1)。
-     ⚠ 切換一定要走 paint() 而不是 toggle 一個 class:動作列高度變了,
-       fitBoard() 沒重算的話盤面會溢出舞台被靜靜削掉(見 paint() 末尾那條 ⚠⚠)。 */
-  const VIEW_KEY = "darkchess.view.v1";
-  let trayOn = false;
-  function loadView(){ trayOn = readJSON(VIEW_KEY).tray === true; }
-  function setTray(on){
-    trayOn = !!on;
-    try{ localStorage.setItem(VIEW_KEY, JSON.stringify({ tray: trayOn })); }catch(e){}
-    if(cur && cur.st) paint();
-  }
+  /* ---------- 吃子欄 ----------
+     ★★ 「自己吃掉的」**永遠顯示**(那是自己的戰果);
+        「對手吃掉的」由房規 foeCaps 決定 —— 那是情報,兩邊看到的必須一樣,
+        所以它是**房規不是各人偏好**(一邊看得到一邊看不到就不公平了)。
+     ⚠ 因此這裡讀的是 st.rules(這一局凍結的那一份),不是任何 localStorage。
 
-  /* 吃子欄:被吃掉的子一定都現過身(炮打暗子是**先翻開再吃**),攤開它們不違反牌情紅線。
+     吃子欄本身不違反牌情紅線:被吃掉的子一定都現過身(炮打暗子是**先翻開再吃**)。
      ⚠ 顆數多的時候改成互相疊一點,不然一列排不下 16 顆(class 由這裡掛,尺寸在 CSS)。
      ⚠⚠ v1.115.0 把子放大到 26px(原 20px)之後,**一段收緊不夠用了**:
        疊到 16 顆排得下的那個量,9 顆的時候會疊到只看得見最後一顆(截圖看出來的)。
@@ -236,9 +227,10 @@ const DCB = (function(){
     const names = cur.names || [];
     const me = (typeof cur.mySeat === "number" && cur.mySeat >= 0) ? cur.mySeat : 0;
     const foe = 1 - me;
+    const showFoe = !!(st.rules && st.rules.foeCaps);
     return '<div class="dc-tray">' +
              trayRow("你吃掉", st.caps[me], st.friendly[me]) +
-             trayRow((names[foe] || "對手") + "吃掉", st.caps[foe], st.friendly[foe]) +
+             (showFoe ? trayRow((names[foe] || "對手") + "吃掉", st.caps[foe], st.friendly[foe]) : "") +
            "</div>";
   }
 
@@ -251,7 +243,7 @@ const DCB = (function(){
       acts.innerHTML = "";
       return;
     }
-    if(trayOn) bits.push(trayHTML(st));
+    bits.push(trayHTML(st));
     const who = cur.turnName || "";
     const meTxt = mySide < 0 ? "未定" : ('<b class="' + (mySide === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' +
                                          DC.sideName(mySide) + "方</b>");
@@ -347,39 +339,43 @@ const DCB = (function(){
 
   /* ==========================================================================
      六、結果卡
+     ──────────────────────────────────────────────────────────────────────────
+       ★★ v1.116.0 起這張卡只回答兩件事:**誰贏、各幾勝**。
+         以前還列了剩子 / 階級和 / 吃掉哪幾顆,而那些是「這一局的過程」——
+         局都結束了沒有人在看,只是把重點稀釋掉。
+       ⚠ 「這一局是怎麼結束的」由 #winMsg 講(單機與連線各一份,措辭同一個格式),
+         **不要**在表格上面再寫一次 —— 那就是同一句話出現兩遍。
      ========================================================================== */
-  function capsHTML(list){
-    if(!list.length) return '<span class="dc-none">—</span>';
-    return list.slice().sort((a, b) => DC.rankOf(b) - DC.rankOf(a)).map(pieceHTML).join("");
-  }
-  function endText(st){
+  /* mySeat = 我坐哪(沒帶就是 -1);回傳「這一局是怎麼結束的」一句話。
+     ⚠ 認輸那一種**要看是誰認的** —— 其它幾種對兩邊講起來都一樣,只有它不是。 */
+  function endText(st, mySeat){
     if(st.endBy === "wipe")  return "吃光對方所有棋子";
     if(st.endBy === "stuck") return "對方無子可動,也無暗棋可翻";
     if(st.endBy === "count") return "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻 · 比階級總和";
     if(st.endBy === "draw")  return "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻 · 階級總和相同";
+    if(st.endBy === "resign"){
+      if(typeof mySeat !== "number" || mySeat < 0) return "有一方認輸";
+      return st.winner === mySeat ? "對手認輸" : "你認輸了";
+    }
     return "";
   }
-  /* names = 兩個座位的名字;mySeat = 我坐哪;wins = [{n, plus}] 累積分(可省略) */
+  /* names = 兩個座位的名字;mySeat = 我坐哪;wins = [{n, plus}] 累積勝場(可省略)。
+     ★ 只有兩欄:誰(+皇冠 + 紅黑)與幾勝。wins 沒帶就整張表不畫 —— 沒有勝場可講的
+       場合(理論上不存在)硬畫一張只有名字的表沒有意義。 */
   function resultHTML(st, names, mySeat, wins){
-    const sc = DC.score(st);
-    const rows = sc.rows.map(r => {
+    if(!wins) return "";
+    const rows = DC.score(st).rows.map(r => {
       const win = (st.winner === r.seat);
       return '<tr class="' + (win ? "dc-w" : "") + (r.seat === mySeat ? " dc-me" : "") + '">' +
              '<td class="dc-r-nm">' + (win ? "👑 " : "") + esc(names[r.seat] || ("玩家" + (r.seat + 1))) +
              '<span class="dc-r-side ' + (r.side === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' +
              (r.side < 0 ? "" : DC.sideName(r.side) + "方") + "</span></td>" +
-             '<td class="dc-r-n">' + r.left + "</td>" +
-             '<td class="dc-r-n">' + r.sum + "</td>" +
-             '<td class="dc-r-caps">' + capsHTML(r.eaten) +
-             (r.self.length ? ('<span class="dc-selfcap" title="自己打掉的">💥' + r.self.length + "</span>") : "") +
-             "</td>" +
-             (wins ? ('<td class="dc-r-n"><b>' + wins[r.seat].n + "</b>" +
-                      (wins[r.seat].plus ? ('<i class="dc-plus">+' + wins[r.seat].plus + "</i>") : "") + "</td>") : "") +
+             '<td class="dc-r-n"><b>' + wins[r.seat].n + "</b>" +
+             (wins[r.seat].plus ? ('<i class="dc-plus">+' + wins[r.seat].plus + "</i>") : "") + "</td>" +
              "</tr>";
     }).join("");
-    return '<div class="dc-endby">' + endText(st) + "</div>" +
-           '<table class="dc-table"><thead><tr>' +
-           "<th>玩家</th><th>剩子</th><th>階級和</th><th>吃掉</th>" + (wins ? "<th>勝</th>" : "") +
+    return '<table class="dc-table"><thead><tr>' +
+           "<th>玩家</th><th>勝</th>" +
            "</tr></thead><tbody>" + rows + "</tbody></table>";
   }
 
@@ -387,7 +383,6 @@ const DCB = (function(){
      七、對外
      ========================================================================== */
   function init(){
-    loadView();        // 吃子欄開關(各人偏好)—— 要在第一次 paint() 之前讀進來
     stage = $("dcStage"); board = $("dcBoard"); acts = $("dcActs");
     if(!board) return;
     board.addEventListener("click", e => {
@@ -436,11 +431,10 @@ const DCB = (function(){
   return {
     init, setState, reset, paint,
     onAct(cb){ actCb = cb; },
-    setTray, trayOn: () => trayOn,
     clearSel(){ sel = -1; },
     sel: () => sel,
     isWide: () => wide,
-    pieceHTML, backHTML, resultHTML, endText, capsHTML,
+    pieceHTML, backHTML, resultHTML, endText,
     moveSfx, sfx, stopCd
   };
 })();

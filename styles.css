@@ -6120,6 +6120,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-chip-n{display:inline-flex;align-items:center;font-size:11px;font-weight:800;
     color:var(--muted);margin-left:3px}
 
+  /* ---------- 投降鈕(單機列 / 房間橫幅各一顆,同一張確認卡)----------
+     ★ 刻意**不做成醒目的紅鈕**:它是一顆「不得已才按」的鈕,長得太搶眼會被誤按,
+        而誤按一下就是直接輸掉一局(所以另外還有確認卡擋一層)。
+     ⚠ 兩顆的底色由各自的 .icon-btn / .mp-act-btn 給,這裡只調字級與色調。 */
+  .dc-resign{font-size:15px;color:var(--muted)}
+  .dc-resign:hover{color:var(--daub)}
+
   /* ==========================================================================
      棋盤
      ──────────────────────────────────────────────────────────────────────────
@@ -6206,9 +6213,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-actline{width:100%;min-height:32px;display:flex;align-items:center;justify-content:center}
   /* ---------- 吃子欄(動作列的上半)----------
      ★ 被吃掉的子一定都現過身(炮打暗子是先翻開再吃)→ 攤開它們不違反牌情紅線。
-     ★ v1.115.0 起**預設不顯示**(⚙️ 設定裡開;開關在 board.js 的 trayOn),
-       而開起來時棋子放大到 26px —— 原本 20px 在手機上認不太出是哪一顆。
-     ⚠ 開著時兩列不論有沒有子都佔位(空的畫一個「—」),理由同上面那條 ⚠⚠⚠。 */
+     ★★ v1.116.0:**自己吃掉的那一列永遠在**,「對手吃掉」那一列由**房規** foeCaps 決定
+        (預設不顯示)。是房規不是各人偏好 —— 那是情報,兩邊看到的必須一樣才公平。
+     ★ 棋子 26px(v1.115.0 由 20px 放大)—— 原本在手機上認不太出是哪一顆。
+     ⚠ 有畫的那幾列不論有沒有子都佔位(空的畫一個「—」),理由同上面那條 ⚠⚠⚠;
+        列數由房規決定,而房規**開局凍結** → 一局裡不會變。 */
   .dc-tray{width:100%;display:flex;flex-direction:column;gap:2px;
     padding-bottom:4px;border-bottom:1px solid var(--panel-line)}
   .dc-tray-row{display:flex;align-items:center;gap:6px;min-height:28px}
@@ -6237,16 +6246,17 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 
   /* ---------- 結果卡 ----------
      ⚠ 權重要寫成 `.win-card.dc-win`(0,2,0)才壓得過共用的 `.win-card .word` ——
-        只寫 `.dc-win .word` 是同級,靠「誰在後面」贏,搬動段落順序就會回彈。 */
-  .win-card.dc-win{width:min(88vw,520px);max-width:none;padding:26px 24px}
+        只寫 `.dc-win .word` 是同級,靠「誰在後面」贏,搬動段落順序就會回彈。
+     ★ v1.116.0 起這張卡只回答「誰贏、各幾勝」:剩子 / 階級和 / 吃掉哪幾顆全部拿掉
+       (局都結束了沒有人在看那些,只是把重點稀釋掉)。表格因此只剩兩欄,卡也窄一截。 */
+  .win-card.dc-win{width:min(88vw,420px);max-width:none;padding:26px 24px}
   .win-card.dc-win .word{font-size:clamp(28px,7.2vw,40px)}
   .dc-win p{margin:7px 0 14px}
   .dc-result{margin:2px 0 12px}
-  .dc-endby{font-size:13px;font-weight:800;color:var(--accent-2);margin-bottom:7px}
-  .dc-table{width:100%;border-collapse:collapse;font-size:13px}
+  .dc-table{width:100%;border-collapse:collapse;font-size:14px}
   .dc-table th{font-size:11px;font-weight:800;color:var(--muted);padding:3px 5px;text-align:center}
   .dc-table th:first-child{text-align:left}
-  .dc-table td{padding:5px;border-top:1px solid var(--panel-line);vertical-align:middle}
+  .dc-table td{padding:7px 5px;border-top:1px solid var(--panel-line);vertical-align:middle}
   .dc-table tr.dc-w{background:rgba(255,210,74,.14)}
   .dc-table tr.dc-me .dc-r-nm{color:var(--accent-2)}
   .dc-r-nm{text-align:left;font-weight:800}
@@ -6254,12 +6264,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     background:rgba(255,255,255,.14)}
   .dc-r-n{text-align:center;font-weight:800}
   .dc-plus{font-style:normal;font-size:11px;color:var(--accent-2);margin-left:2px}
-  /* 吃掉的子:小一號的棋子排一排(★ 這裡是唯一會把整局的子攤開的地方) */
-  .dc-r-caps{--dc-cell:22px;display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-start;
-    align-items:center;max-width:150px}
-  .dc-r-caps .dc-p{width:20px;height:20px;flex:none}
   .dc-none{color:var(--muted);font-size:12px}
-  .dc-selfcap{font-size:11px;font-weight:800;color:var(--daub);margin-left:3px}
   /* 賽後表情列(單機沒有對手可以送 → 整列收起來) */
   .dc-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
   body.solo-on .dc-react-row{display:none}

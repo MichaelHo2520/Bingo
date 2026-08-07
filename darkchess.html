@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>象棋暗棋 ｜ 單機對電腦 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.115.0 -->
-<meta name="version" content="1.115.0">
+<!-- 象棋暗棋 · v1.116.0 -->
+<meta name="version" content="1.116.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -167,6 +167,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label dc-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
+        <!-- 投降(連線那一顆)。★ 與單機列那一顆是雙胞胎 —— 見 #dcSoloResign 的註解。 -->
+        <button class="mp-act-btn dc-resign" id="dcMpResign" type="button" title="投降" aria-label="投降">🏳</button>
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
         </button>
@@ -191,6 +193,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </button>
       <span class="label dc-room-title">電腦對決 <b id="dcSoloLv" class="display">普通</b></span>
       <span class="mp-goal" id="dcSoloRec" aria-label="戰績"></span>
+      <!-- 投降(單機那一顆)。★ 與房間橫幅那一顆是**雙胞胎**:兩顆都開同一張確認卡
+           #resignVeil,分流在 js/darkchess/main.js 的 confirmResign()。 -->
+      <button class="icon-btn dc-resign" id="dcSoloResign" type="button" title="投降" aria-label="投降">🏳</button>
     </div>
     <div class="dc-room-foot">
       <div id="dcSoloPlayers" class="mp-players"></div>
@@ -331,6 +336,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               <button data-rv="2">直衝吃大子</button>
             </div>
           </div>
+          <!-- ★★ 這一條是唯一**不影響任何判定**的房規,但它放在這裡不是偷懶 ——
+               「對手吃掉了什麼」是情報,兩邊看得到的必須一樣才公平,
+               所以它是房規不是各人偏好。⚠ 自己吃掉的永遠顯示,不受這條管。 -->
+          <div class="set-row col">
+            <!-- ⚠ 副標要短:兩行的話這一組會比上面兩組高一截(截圖看出來的);
+                 「自己吃的永遠看得到」寫在下面的房規說明裡。 -->
+            <span class="set-lbl">對手吃子<span class="set-sub">看不看得到對手吃了哪幾顆</span></span>
+            <div class="seg" id="dcCapsSeg" data-rp="caps" aria-label="對手吃子">
+              <button class="on" data-rv="0">不顯示</button>
+              <button data-rv="1">顯示</button>
+            </div>
+          </div>
         </div>
 
         <!-- ★ 走棋倒數:**連線專屬**(單機沒有倒數 —— 想多久是自己的節奏)。
@@ -361,6 +378,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <li><b>車直衝 · 車直衝</b>:車可沿直線衝任意格數吃遠處的子,中間不可有任何棋子;
                 相鄰的目標仍照一般吃法。</li>
             <li><b>車直衝 · 直衝吃大子</b>:直衝時不受階級限制,將 / 帥也撞得掉。</li>
+            <li><b>對手吃子 · 不顯示</b>:棋盤下方只列出自己吃掉的子,對手吃了什麼要自己記。</li>
+            <li><b>對手吃子 · 顯示</b>:雙方各一列,兩邊都看得到彼此吃掉哪幾顆。
+                被吃掉的子一定都翻開過,所以這不算洩露暗棋。</li>
           </ul>
         </div>
 
@@ -403,18 +423,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="set-row">
             <span class="set-lbl">電子書模式</span>
             <button class="switch" id="swEbook" role="switch" aria-checked="false" aria-label="電子書模式"><span class="knob"></span></button>
-          </div>
-        </div>
-
-        <!-- 暗棋專屬:吃子欄要不要顯示。
-             ★ 這是**各人的顯示偏好**不是房規 —— 不進 DB、兩邊可以不一樣、也不影響任何判定,
-               所以放在這張設定卡而不是房規面板。預設關(動作列少兩列 = 棋子大一圈)。
-             ★ 狀態存在 darkchess.view.v1(由 js/darkchess/board.js 管),接線在 js/darkchess/main.js。 -->
-        <div class="set-group">
-          <div class="set-group-title">對局畫面</div>
-          <div class="set-row">
-            <span class="set-lbl">吃子欄<span class="set-sub">顯示雙方被吃掉的棋子</span></span>
-            <button class="switch" id="swDcTray" role="switch" aria-checked="false" aria-label="顯示吃子欄"><span class="knob"></span></button>
           </div>
         </div>
 
@@ -513,6 +521,21 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="actions">
         <button class="btn ghost" id="leaveCancel">留在房間</button>
         <button class="btn danger" id="leaveConfirm">離開房間</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 投降確認。★ id 沿用五子棋那一組(#resignVeil / resignCancel / resignConfirm)——
+       ui-kit.js 的 BACK_LAYERS 已經列了 resignVeil,返回鍵自動先關它。
+       ⚠ 一定要有這張卡:誤按一下就是直接輸掉一局。 -->
+  <div class="veil" id="resignVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">🏳</div>
+      <div class="confirm-title">投降?</div>
+      <p>這局直接算對手贏,確定嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="resignCancel">再想想</button>
+        <button class="btn danger" id="resignConfirm">我投降</button>
       </div>
     </div>
   </div>

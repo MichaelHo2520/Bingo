@@ -107,6 +107,10 @@ const DC = (function(){
   const encFlip = sq => "f" + sqChr(sq);
   const encMove = (from, to) => "m" + sqChr(from) + sqChr(to);
   const STOP = "s";
+  /* 投降。★★ **要帶座位**,不可以像 STOP 那樣吃 st.turn ——
+     投降不必等輪到自己(對手在想的時候也按得下去),而 moves 是兩台共用的一條序列,
+     沒帶座位的話重播出來會變成「輪到誰誰就投降」。 */
+  const encResign = seat => "g" + (seat === 1 ? "1" : "0");
 
   /* ==========================================================================
      二、幾何
@@ -145,7 +149,7 @@ const DC = (function(){
           漏掉這一層的症狀是「連吃關著、暗棋連吃卻還在生效」。
      ========================================================================== */
   function defRules(){
-    return { chain: false, chainDark: false, rush: false, rushBig: false };
+    return { chain: false, chainDark: false, rush: false, rushBig: false, foeCaps: false };
   }
   function normRules(o){
     const r = defRules();
@@ -154,6 +158,7 @@ const DC = (function(){
       r.chainDark = !!o.chainDark && r.chain;
       r.rush     = !!o.rush;
       r.rushBig  = !!o.rushBig && r.rush;
+      r.foeCaps  = !!o.foeCaps;
     }
     return r;
   }
@@ -166,16 +171,25 @@ const DC = (function(){
             { chain: true,  chainDark: true }],
     rush:  [{ rush: false, rushBig: false },
             { rush: true,  rushBig: false },
-            { rush: true,  rushBig: true }]
+            { rush: true,  rushBig: true }],
+    /* ★ `foeCaps` 是唯一一條**不影響任何判定**的房規 —— 它只管畫面上看不看得到
+       「對手吃掉了什麼」。放在房規而不是各人偏好,是因為那關係到公平:
+       兩邊拿到的資訊必須一樣,不可以一邊看得到一邊看不到。
+       ⚠ 因此它也跟著 `game.rules` **開局凍結** —— 副作用剛好是好的:
+         動作列的高度在一局裡不會變(見 board.js 的 ⚠⚠⚠)。
+       ⚠ 自己吃掉的**永遠顯示**,不受這條管(那是自己的戰果,不是對手的情報)。 */
+    caps:  [{ foeCaps: false }, { foeCaps: true }]
   };
   const LV_TEXT = {
     chain: ["", "明棋連吃", "暗棋連吃"],
-    rush:  ["", "車直衝", "直衝吃大子"]
+    rush:  ["", "車直衝", "直衝吃大子"],
+    caps:  ["", "顯示對手吃子"]
   };
   function ruleLevel(o, kind){
     const r = normRules(o);
     if(kind === "chain") return r.chain ? (r.chainDark ? 2 : 1) : 0;
     if(kind === "rush")  return r.rush  ? (r.rushBig  ? 2 : 1) : 0;
+    if(kind === "caps")  return r.foeCaps ? 1 : 0;
     return 0;
   }
   function setRuleLevel(o, kind, lv){
@@ -186,9 +200,10 @@ const DC = (function(){
   }
   function rulesText(o){
     const r = normRules(o), on = [];
-    const c = ruleLevel(r, "chain"), u = ruleLevel(r, "rush");
+    const c = ruleLevel(r, "chain"), u = ruleLevel(r, "rush"), p = ruleLevel(r, "caps");
     if(c) on.push(LV_TEXT.chain[c]);
     if(u) on.push(LV_TEXT.rush[u]);
+    if(p) on.push(LV_TEXT.caps[p]);
     return on.length ? on.join(" · ") : "標準暗棋";
   }
 
@@ -238,7 +253,7 @@ const DC = (function(){
       friendly: [[], []],       // ★ 炮打暗子打到自己人 / 連吃翻到吃不動的敵子而被反吃
       over: false,
       winner: -1,               // 0 / 1;-1 = 和局(要配 over 才有意義)
-      endBy: "",                // "wipe" | "stuck" | "draw"
+      endBy: "",                // "wipe" | "stuck" | "count" | "draw" | "resign"
       last: null,
       bad: -1
     };
@@ -478,11 +493,26 @@ const DC = (function(){
     return true;
   }
 
+  /* 投降。★★ 三件事與其它手不一樣,少想一件就是一個洞:
+       ① **不必輪到自己** —— 帶座位就是為了這個(見 encResign)
+       ② **不進 legalMoves()** —— 那一支是給 AI 展開用的,列進去電腦會自己投降
+       ③ 連吃進行中照樣投得下去(直接結束整局,鏈的狀態由 finish 清掉) */
+  function doResign(st, seat){
+    if(seat !== 0 && seat !== 1) return false;
+    st.last = { kind: "resign", seat: seat };
+    finish(st, 1 - seat, "resign");
+    return true;
+  }
+
   /* 套用一手。回 true = 成功;false = 不合法(呼叫端要中止,不可以硬套下去)。 */
   function step(st, mv){
     if(st.over) return false;
     if(typeof mv !== "string" || !mv.length) return false;
     if(mv === STOP) return doStop(st);
+    if(mv[0] === "g"){
+      if(mv.length !== 2) return false;
+      return doResign(st, mv[1] === "0" ? 0 : (mv[1] === "1" ? 1 : -1));
+    }
     if(mv[0] === "f"){
       if(mv.length !== 2) return false;
       const sq = unSq(mv[1]);
@@ -718,7 +748,7 @@ const DC = (function(){
     // 編碼
     sideOf, rankOf, pieceOf, nameOf, sideName,
     pChr, pUnchr, sqChr, unSq, encodeDeal, decodeDeal,
-    encFlip, encMove, STOP,
+    encFlip, encMove, STOP, encResign,
     // 幾何
     rowOf, colOf, nbs, adjacent, ray, screensBetween, blockedBetween,
     // 房規

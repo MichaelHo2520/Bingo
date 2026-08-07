@@ -45,6 +45,15 @@ const MP = MPCore.create((function(){
   let rules = DC.defRules();
   let gRules = DC.defRules();
 
+  /* 「這份房規跟現在這份一不一樣」。★ **照 defRules() 的欄位一路比過去**,不逐項手寫 ——
+     v1.115.0 之前這個比對在 onRoomField 與 setRules 各手寫一份四個欄位,
+     加一條房規忘了補的症狀是「房主按了那一項,對手的畫面完全不動」
+     (值寫進 DB 了,但這裡當成沒變就 return 掉,而且**兩邊都不會報錯**)。 */
+  function sameRules(a, b){
+    const x = DC.normRules(a), y = DC.normRules(b);
+    return Object.keys(DC.defRules()).every(k => x[k] === y[k]);
+  }
+
   let deal = "", moves = [], st = null;
   let curRound = null;                 // ★ 新局判定一律用 roundId(不可以看 deal 變沒變)
   let lastLen = -1, turnAt = 0;
@@ -71,10 +80,15 @@ const MP = MPCore.create((function(){
   /* ==========================================================================
      一、畫面
      ========================================================================== */
+  /* ⚠⚠⚠ **renderPlayers() 一定要在 DCB.setState() 之前** —— 理由與 solo.js 的 paint()
+     逐字相同:setState 會量舞台高度算格子(fitBoard),而玩家晶片列會把上面那條列
+     撐高一截;順序反過來就是「開局第一拍盤面溢出舞台」,再靠 ResizeObserver 補救,
+     而那個補救是會漏的。**量尺寸的那一步一律放最後。** */
   function paint(){
     if(!st) return;
     const me = mySeat();
     if(me < 0) return;
+    ctx.renderPlayers();
     DCB.setState({
       st: st,
       mySide: st.col[me],
@@ -88,7 +102,6 @@ const MP = MPCore.create((function(){
       // 倒數環給雙方都看得到(誰還剩幾秒是公開資訊,對手才知道為什麼卡著)
       cdEnd: (secOn() && !st.over) ? (turnAt + turnSec * 1000) : 0
     });
-    ctx.renderPlayers();
   }
 
   /* ==========================================================================
@@ -119,6 +132,29 @@ const MP = MPCore.create((function(){
     if(!st || st.over) return;
     if(!isMyTurn()){ showToast("還沒輪到你"); return; }
     send(mv);
+  }
+
+  /* 投降。★ 刻意**不走 send()**,兩處不一樣:
+       ① 不檢查輪到誰 —— 投降不必等自己的回合(move 自己帶座位,見 DC.encResign)
+       ② 不檢查 `list.length !== step` —— 那道守衛是為了「這一手已經被推進」而設的,
+          但投降與別人走到第幾手無關;帶著它的話對手剛好同時落子就會把投降靜靜吃掉,
+          使用者看到的是「按了沒反應」。
+     ⚠ 這一筆**不必** { local:false }:它寫的是 moves 不是 winner,勝負仍然由
+       maybeSettle() 從 replay 算出來(那一支才是帶 local:false 的那個)。 */
+  function resign(){
+    const me = mySeat();
+    if(me < 0) return;
+    if(ctx.phase() !== "playing" || ctx.winner() || ctx.abandoned()) return;
+    if(!st || st.over) return;
+    const mv = DC.encResign(me);
+    ctx.txGame(g => {
+      if(g.status !== "playing" || g.winner) return false;
+      const list = Array.isArray(g.moves) ? g.moves : [];
+      const chk = DC.replay(g.deal, list, g.rules);
+      if(!chk || chk.over) return false;
+      if(!DC.step(chk, mv)) return false;
+      g.moves = list.concat(mv);
+    });
   }
 
   /* ==========================================================================
@@ -214,11 +250,7 @@ const MP = MPCore.create((function(){
     onRoomField(k, v){
       if(k === "dcRules"){
         const next = DC.normRules(v);
-        /* ⚠⚠ 這個「有沒有真的變」的比對是**逐欄位**寫的,而房規有四項 ——
-           加房規忘了補這裡的症狀是「房主按了那一項,對手的畫面完全不動」
-           (寫進 DB 了,但這裡當成沒變就 return 掉)。同一份比對在下面 setRules 也有一份。 */
-        if(next.chain === rules.chain && next.chainDark === rules.chainDark &&
-           next.rush === rules.rush && next.rushBig === rules.rushBig) return;
+        if(sameRules(next, rules)) return;
         rules = next;
         ctx.unreadyOnFieldChange();
         ctx.syncSetup(); ctx.updateGoal();
@@ -378,8 +410,9 @@ const MP = MPCore.create((function(){
       }
       paint();
       /* ⚠ 名字要自己 esc() —— msg 是當 HTML 塞進 #winMsg 的(notes/07 踩坑 #9)。
-         ⚠ 措辭與單機那份(solo.js 的 finish())刻意寫成同一個格式。 */
-      const how = (st && st.over) ? DCB.endText(st) : "";
+         ⚠ 措辭與單機那份(solo.js 的 finish())刻意寫成同一個格式:只講「怎麼結束的」,
+            幾勝由下面那張表說。 */
+      const how = (st && st.over) ? DCB.endText(st, me) : "";
       if(isDraw) return { word: "平手!", msg: esc(how) + " —— 兩邊各得 1 勝 🤝" };
       if(iWon)   return { word: "你贏了!", msg: esc(how) + " 🎉" };
       const ws = (w && w.ids || []).map(id => esc(ctx.dispName(id))).join("、");
@@ -397,7 +430,9 @@ const MP = MPCore.create((function(){
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
-      act, isMyTurn,
+      act, isMyTurn, resign,
+      // 投降鈕該不該出現 / 按得按不動(單機那份的條件在 main.js)
+      canResign: () => !!(st && !st.over && playing() && mySeat() >= 0),
       /* ---------- 房規:面板是單機連線共用的,分流點在 main.js ----------
          ⚠ `rules()` 回**房間欄位**那一份(下一局生效);這一局的真相在 `st.rules`。
          ⚠ 寫入走 ctx.setRoomField(整包一個欄位)—— lobbyOnly:對戰中不給改。 */
@@ -408,9 +443,7 @@ const MP = MPCore.create((function(){
          中間那一拍對手會看到不存在的組合)。 */
       setRules(next0){
         const next = DC.normRules(next0);
-        // ⚠ 四項都要比(見 onRoomField 那一份的說明)—— 漏一項 = 那一項按了沒反應
-        if(next.chain === rules.chain && next.chainDark === rules.chainDark &&
-           next.rush === rules.rush && next.rushBig === rules.rushBig) return;
+        if(sameRules(next, rules)) return;
         if(!ctx.setRoomField("dcRules", next, { lobbyOnly: true,
              denyMsg: "只有房主能改規則", busyMsg: "對戰中不能改規則 —— 這一局的規則已經定下來了" })) return;
         rules = next; ctx.syncSetup(); ctx.updateGoal(); savePrefs();

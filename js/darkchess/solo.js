@@ -85,8 +85,17 @@ const Solo = (function(){
     const p = $("dcSoloPlayers");
     if(p) p.innerHTML = st ? (chip(0) + chip(1)) : "";
   }
+  /* ⚠⚠⚠ **paintHud() 一定要在 DCB.setState() 之前** —— 這不是排版潔癖:
+     DCB 那一支會在 setState 裡量舞台高度算格子大小(fitBoard),而 paintHud 會把
+     兩顆玩家晶片塞進 #dcSoloPlayers → 上面那條列**長高 34px** → 舞台矮 34px。
+     順序反過來的話 fitBoard 量到的是「晶片還沒進版面」的舞台 → 算出大一號的格子 →
+     **開局第一拍盤面溢出舞台**(被 overflow:hidden 靜靜削掉),然後靠 ResizeObserver
+     在下一格補救。那個補救是會漏的:實測 e2e 有時候補得到、有時候整局都歪著
+     (時而綠時而紅的那種 bug)。**量尺寸的那一步一律放最後。**
+     ⚠ 連線那邊(adapter.js 的 paint)有一模一樣的一組,理由與寫法都相同。 */
   function paint(){
     if(!st) return;
+    paintHud();
     DCB.setState({
       st: st,
       mySide: st.col[mySeat],
@@ -98,7 +107,6 @@ const Solo = (function(){
       mySeat: mySeat,
       names: mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"]
     });
-    paintHud();
   }
 
   /* ---------- 一局的生命週期 ---------- */
@@ -148,6 +156,15 @@ const Solo = (function(){
     if(busy){ showToast("等電腦走完這一手"); return; }
     if(!st || st.turn !== mySeat) return;
     commit(mv);
+  }
+  /* 投降。★ 刻意**不走 act()** —— 那一支有「還沒輪到你 / 等電腦走完」兩道守衛,
+     而投降不必等輪到自己(電腦在想的時候也按得下去)。
+     ⚠ 要先把還在飛的 AI setTimeout 清掉:不清的話它會在局已經結束之後再走一手。 */
+  function resign(){
+    if(!active || over || !st || st.over) return;
+    clearAiT();
+    busy = false;
+    commit(DC.encResign(mySeat));
   }
 
   /* 電腦這一手。兩段 setTimeout 是刻意的(同五子棋):
@@ -201,15 +218,20 @@ const Solo = (function(){
     $("winWord").textContent = res === "win" ? "你贏了!" : res === "lose" ? "你輸了" : "平手!";
     const box = $("dcResult");
     if(box){
-      box.innerHTML = DCB.resultHTML(st, mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"], mySeat, null);
+      /* ★ 「幾勝」在單機就是**這個難度的累積戰績**(和局兩邊各記一勝,同連線的算法)。
+         ⚠ wins 要照座位排,不是照「我 / 電腦」—— resultHTML 是用 r.seat 去索引的。 */
+      const mine = { n: r.w + r.d, plus: (res === "lose") ? 0 : 1 };
+      const foe  = { n: r.l + r.d, plus: (res === "win")  ? 0 : 1 };
+      const wins = mySeat === 0 ? [mine, foe] : [foe, mine];
+      box.innerHTML = DCB.resultHTML(st, mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"], mySeat, wins);
       box.classList.remove("hidden");
     }
     /* ⚠ 措辭與連線那份(adapter.js 的 outcome())刻意寫成同一個格式:
-       第一行講「這一局是怎麼結束的」,第二行是這一場的資料。 */
+       **只講「這一局是怎麼結束的」** —— 幾勝由下面那張表說,難度 / 手數 / 戰績
+       不必再寫一遍(v1.116.0:重點是誰贏、幾勝)。 */
     $("winMsg").innerHTML =
-      esc(DCB.endText(st)) + (res === "win" ? " 🎉" : res === "draw" ? " 🤝" : "") +
-      '<br><span class="dc-solomsg">' + lv.emoji + lv.name + " · " + esc(DC.rulesText(rules)) +
-      " · 共 " + moves.length + " 手 · 戰績 " + recText(level) + "</span>";
+      esc(DCB.endText(st, mySeat)) + (res === "win" ? " 🎉" : res === "draw" ? " 🤝" : "") +
+      '<span class="dc-solomsg"> · ' + lv.emoji + lv.name + "</span>";
     if(res === "win"){ Sound.win(); burst(); }
     else if(res === "lose") Sound.lose();
     else Sound.win();                        // 平手沿用 win(同五子棋:不給挫敗音)
@@ -217,7 +239,7 @@ const Solo = (function(){
   }
 
   return {
-    start, quit, again, act, loadOwn, paintHud, paint,
+    start, quit, again, act, resign, loadOwn, paintHud, paint,
     LV, levelOf, recText, recLine,
     active: () => active,
     playing: () => active && !over,          // 給更新檢查:局中重載會把整局丟掉

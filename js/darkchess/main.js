@@ -27,6 +27,11 @@ function showScreen(which){
   }
   document.body.classList.toggle("solo-on", which === "solo");
   document.body.classList.toggle("dc-on", which === "play" || which === "solo");
+  /* 連線的投降鈕只在**真的在對局中**出現 —— 大廳用的也是 #mpBar,
+     不收掉就會在「等對手準備」的畫面上多一顆按了只會跳「現在不能投降」的鈕。
+     ⚠ 收在這裡而不是 adapter:相位切換只准有一個地方(見檔頭)。 */
+  const rs = $("dcMpResign");
+  if(rs) rs.classList.toggle("hidden", which !== "play");
   /* 對局中 ⛶/⚙️ 該住哪 —— ★ 決定權在 ui-kit 的 dockTools:**只有頂列真的被收掉才搬**
      (v1.75.10 立的規矩)。不可以在這裡自己判斷,條件只准有一份。 */
   if(which === "play") dockTools("mpBar");
@@ -99,7 +104,7 @@ function syncRules(rules, editable){
 /* 現在該對誰設定 —— 單機改 Solo 的、連線改房間的(★ 唯一的分流點就這三支) */
 function dcEditable(){ return !MP.isOnline() || MP.amHost(); }
 function dcRulesNow(){ return MP.isOnline() ? MP.rules() : Solo.rules(); }
-/* kind = "chain" | "rush";lv = 第幾段(0 無 / 1 / 2)。
+/* kind = "chain" | "rush" | "caps";lv = 第幾段(caps 只有 0/1,其餘 0/1/2)。
    ⚠ 一次送整份房規:一次一個 key 的寫法在連線會變成兩次 DB 寫入(見 adapter 的 setRules)。 */
 function dcSetRule(kind, lv){
   const next = DC.setRuleLevel(dcRulesNow(), kind, lv);
@@ -219,15 +224,32 @@ $("dcReactRow").addEventListener("click", e => {
   b.classList.remove("sent"); void b.offsetWidth; b.classList.add("sent");
 });
 
-/* ---------- 吃子欄開關(暗棋專屬的顯示偏好)----------
-   ★ 不是房規:不進 DB、兩邊各看各的。真相與存檔都在 DCB(darkchess.view.v1),
-     這裡只負責接線 + 把開關的 aria-checked 同步過去。
-   ★ 不塞進 ui-kit 的 syncSettingsUI() —— 那一支是九個遊戲共用的。 */
-function syncTraySw(){
-  const sw = $("swDcTray");
-  if(sw) sw.setAttribute("aria-checked", DCB.trayOn() ? "true" : "false");
+/* ==========================================================================
+   投降 —— 單機與連線**共用同一張確認卡** #resignVeil
+   ──────────────────────────────────────────────────────────────────────────
+     ★ 兩顆入口鈕(#dcSoloResign / #dcMpResign),一組 DOM,分流只在 confirmResign()。
+     ★ 一定要先跳確認卡:誤按一下就是直接輸掉一局。
+     ⚠ 關卡的路徑有兩條 —— 按鈕與**返回鍵**(ui-kit 的 BACK_LAYERS 已經列了
+       resignVeil,它呼叫的是 MP.cancelResign();那一支不管單機連線都只是把卡收掉)。
+     ⚠ 不用 mp-core 的 hasResign 那條路:暗棋的真相是 replay(deal, moves, rules),
+       投降要當成**一手 move** 走進去(才有 st.over / endBy="resign",單機也才共用得到)。
+   ========================================================================== */
+function openResign(){
+  const ok = Solo.active() ? Solo.playing() : MP.canResign();
+  if(!ok){ showToast("現在不能投降"); return; }
+  $("resignVeil").classList.add("show");
 }
-$("swDcTray").addEventListener("click", () => { DCB.setTray(!DCB.trayOn()); syncTraySw(); });
+function closeResignAsk(){ $("resignVeil").classList.remove("show"); }
+function confirmResign(){
+  closeResignAsk();
+  if(Solo.active()) Solo.resign();
+  else MP.resign();
+}
+$("dcSoloResign").addEventListener("click", openResign);
+$("dcMpResign").addEventListener("click", openResign);
+$("resignConfirm").addEventListener("click", confirmResign);
+$("resignCancel").addEventListener("click", closeResignAsk);
+$("resignVeil").addEventListener("click", e => { if(e.target === $("resignVeil")) closeResignAsk(); });
 
 /* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */
 bindCommonUI();
@@ -244,7 +266,6 @@ loadPrefs();       // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 暗棋的連�
 Solo.loadOwn();    // 電腦對決的難度 / 先手 / 房規 / 戰績(獨立 key,不與連線那組互相覆蓋)
 syncSettingsUI();
 DCB.init();        // 盤面 DOM + 點擊委派(舞台此時是 hidden,ResizeObserver 會在顯示後算方向)
-syncTraySw();      // ⚠ 一定要在 DCB.init() 之後 —— 吃子欄偏好是它讀進來的
 syncSoloSeg();
 paintSoloHint();
 showScreen("home");      // 進場先選玩法
