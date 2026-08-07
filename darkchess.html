@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>象棋暗棋 ｜ 單機對電腦 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.113.1 -->
-<meta name="version" content="1.113.1">
+<!-- 象棋暗棋 · v1.114.0 -->
+<meta name="version" content="1.114.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -77,19 +77,20 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </div>
       <button class="btn primary block-btn home-btn" id="dcGoOnline">🌐 連線對戰</button>
       <button class="btn ghost block-btn home-btn" id="dcGoSolo">🤖 電腦對決</button>
+      <!-- ★ 文案規格:條列、標籤在前、一行一件事。
+           進場這一段是玩家看到的第一份規則,寫成聊天口吻的話,第二次玩的人每次都得重讀。 -->
       <div class="home-hint">
-        象棋 32 顆<b>蓋著隨機擺滿 4×8</b>。輪流做一件事:<b>翻開一顆暗棋</b>,
-        或<b>動一顆自己的明棋</b>(上下左右一格,走空格或吃敵方明棋)。<br>
-        <b>先手第一次翻到什麼顏色,那個顏色就是他的。</b><br>
-        大小 <b>將 &gt; 士 &gt; 象 &gt; 車 &gt; 馬 &gt; 包 &gt; 卒</b>,大吃小、同級可吃 ——
-        但<b>卒吃得了將,將吃不了卒</b>。<br>
+        <b>盤面</b>:象棋 32 顆蓋著隨機擺滿 4×8。<br>
+        <b>回合</b>:翻開一顆暗棋,或移動一顆自己的明棋(上下左右一格,走空格或吃敵方明棋)。<br>
+        <b>分邊</b>:先手翻出的第一顆是什麼顏色,先手就是那一方。<br>
+        <b>階級</b>:將 &gt; 士 &gt; 象 &gt; 車 &gt; 馬 &gt; 包 &gt; 卒,大吃小、同級可吃;
+        例外只有一組 —— 卒吃將,將不吃卒。<br>
         <!-- ★ 炮這三條是這一頁最常被問的:不寫清楚,玩家第一次點炮會以為壞掉了 -->
-        <b>炮不能貼身吃</b>:要沿直線隔<b>恰好一顆</b>子當炮架跳過去,距離不限、
-        <b>不受階級限制</b>(炮打得到將),而且<b>連暗棋都打得到</b> ——
-        翻開不論敵我都被吃掉,打到自己的算自己倒楣。<br>
-        把對方的子<b>吃光</b>,或讓對方<b>無子可動也無暗棋可翻</b>就贏。
-        連續 <b>40 步</b>沒吃沒翻就<b>比雙方剩下棋子的階級總和</b>,完全一樣才算和局。<br>
-        房規可以開<b>連吃</b>與<b>橫衝直撞</b>(兩者各有一個子選項)。
+        <b>炮</b>:不能吃相鄰的子,要沿直線隔恰好一顆子跳過去吃,距離不限、不受階級限制;
+        暗棋也打得到,翻開後不分敵我一律吃掉。<br>
+        <b>勝負</b>:吃光對方的子,或對方無子可動也無暗棋可翻。<br>
+        <b>比子</b>:連續 40 步沒吃沒翻,改比雙方剩餘棋子的階級總和,完全相同才是和局。<br>
+        <b>房規</b>:連吃與車直衝各三段,開局前設定。
       </div>
     </div>
 
@@ -308,35 +309,26 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="set-body" id="dcRulesBody">
 
         <div class="set-group">
-          <div class="set-group-title">可以改的兩組(各有一個子選項)</div>
-          <!-- ★★ 連吃:預設**關**(標準暗棋)→ 所以「✘ 吃一顆就換手」那顆才帶 class="on" -->
+          <div class="set-group-title">開局前可調整</div>
+          <!-- ★★ 兩組各**三段**(0 無 / 1 / 2),不再讓玩家自己拼四個布林。
+               ⚠ 選項列只留一句話,每一段的完整下場寫在下面「房規說明」——
+                 規則細節塞進選項列,第二次玩的人每次都得重讀一遍。
+               ⚠ 段位表在 js/darkchess/rules.js 的 RULE_LVS;巢狀關係的最後一道
+                 仍然是 DC.normRules()(手改 DB 的怪組合照樣收得住)。 -->
           <div class="set-row col">
-            <span class="set-lbl">連吃<span class="set-sub">吃掉一顆之後,若落點的上下左右還有吃得動的敵方明棋,可以一路吃下去(可以轉彎、隨時能喊停);階級照常受限,炮的每一步一樣要隔子</span></span>
-            <div class="seg" id="dcChainSeg" aria-label="連吃">
-              <button data-rk="chain" data-rv="1">✔ 可以連吃</button>
-              <button class="on" data-rk="chain" data-rv="0">✘ 吃一顆就換手</button>
-            </div>
-          </div>
-          <!-- 子選項:連吃關著時整列壓暗(class 由 main.js 的 syncRules 掛) -->
-          <div class="set-row col dc-sub-row dc-sub-off" id="dcDarkRow">
-            <span class="set-lbl">↳ 連吃時可以翻暗棋<span class="set-sub">連吃鏈中也能翻攻相鄰的暗棋:翻開是吃得動的敵子就吃掉並繼續;<b>翻開是自己的子這一手就結束</b>;<b>翻開是吃不動的敵子,自己那顆反而被吃掉</b></span></span>
-            <div class="seg" id="dcDarkSeg" aria-label="連吃時可以翻暗棋">
-              <button data-rk="chainDark" data-rv="1">✔ 可以翻</button>
-              <button class="on" data-rk="chainDark" data-rv="0">✘ 只吃明棋</button>
+            <span class="set-lbl">連吃<span class="set-sub">吃掉一顆之後能不能接著吃</span></span>
+            <div class="seg" id="dcChainSeg" data-rp="chain" aria-label="連吃">
+              <button class="on" data-rv="0">無</button>
+              <button data-rv="1">明棋連吃</button>
+              <button data-rv="2">暗棋連吃</button>
             </div>
           </div>
           <div class="set-row col">
-            <span class="set-lbl">橫衝直撞(車直衝)<span class="set-sub">只有<b>車 / 俥</b>能沿直線衝任意格數去吃遠處的子,中間不可有任何棋子;相鄰的照一般吃法走一格</span></span>
-            <div class="seg" id="dcRushSeg" aria-label="橫衝直撞">
-              <button data-rk="rush" data-rv="1">✔ 車可直衝</button>
-              <button class="on" data-rk="rush" data-rv="0">✘ 一次一格</button>
-            </div>
-          </div>
-          <div class="set-row col dc-sub-row dc-sub-off" id="dcBigRow">
-            <span class="set-lbl">↳ 直撞時可以吃大子<span class="set-sub">車直衝時<b>不受階級限制</b> —— 連將 / 帥都撞得掉。關著時直衝一樣要大吃小</span></span>
-            <div class="seg" id="dcBigSeg" aria-label="直撞時可以吃大子">
-              <button data-rk="rushBig" data-rv="1">✔ 什麼都撞得掉</button>
-              <button class="on" data-rk="rushBig" data-rv="0">✘ 照階級</button>
+            <span class="set-lbl">車直衝<span class="set-sub">車能不能沿直線吃遠處的子</span></span>
+            <div class="seg" id="dcRushSeg" data-rp="rush" aria-label="車直衝">
+              <button class="on" data-rv="0">無</button>
+              <button data-rv="1">車直衝</button>
+              <button data-rv="2">直衝吃大子</button>
             </div>
           </div>
         </div>
@@ -346,7 +338,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="set-group hidden" id="dcSecGroup">
           <div class="set-group-title">走棋倒數</div>
           <div class="set-row col">
-            <span class="set-lbl">每一手幾秒<span class="set-sub">時間到系統會幫他走一手</span></span>
+            <span class="set-lbl">每一手幾秒<span class="set-sub">逾時由系統代走一手</span></span>
             <div class="seg" id="dcSecSeg2" aria-label="走棋倒數">
               <button data-sec="0">關</button>
               <button data-sec="20">20 秒</button>
@@ -357,21 +349,38 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
 
         <div class="set-group">
-          <div class="set-group-title">這一版的玩法(固定,不能改)</div>
+          <div class="set-group-title">房規說明</div>
           <ul class="dc-rules-list">
-            <li>象棋 32 顆<b>蓋著隨機擺滿 4×8</b>;一手二選一:<b>翻一顆</b>或<b>動一顆自己的明棋</b>。</li>
-            <li><b>先手第一次翻到什麼顏色,那個顏色就是他的。</b></li>
-            <li>階級 <b>將 7 &gt; 士 6 &gt; 象 5 &gt; 車 4 &gt; 馬 3 &gt; 包 2 &gt; 卒 1</b>;
-                大吃小、<b>同級可吃</b>(吃掉對方、自己佔住那格,不是同歸於盡)。</li>
-            <li><b>卒 / 兵吃得了將 / 帥,而將 / 帥吃不了卒 / 兵。</b></li>
-            <li><b>炮 / 包不能貼身吃</b>:沿直線隔<b>恰好一顆</b>子當炮架跳過去,<b>距離不限、不受階級限制</b>。</li>
-            <li><b>炮打得到暗棋</b> —— 翻開之後不論敵我一律吃掉(打到自己的算自己倒楣)。
-                沒有這一條,開局滿盤暗子時炮等於一顆廢子。</li>
-            <li>一般吃法<b>吃不到暗棋</b>(暗棋只能翻)—— 除非房規開了「連吃時可以翻暗棋」。</li>
-            <li><b>沒有砲翻山</b>(炮不能跳到空格)、<b>沒有長捉禁手</b>。</li>
-            <li>把對方的子<b>吃光</b>,或讓對方<b>無子可動也無暗棋可翻</b>就贏。</li>
-            <li>連續 <b>40 步</b>沒有吃子也沒有翻子 → <b>比雙方剩下棋子的階級總和</b>,高的贏;
-                完全一樣才是<b>和局</b>(和局雙方各得 1 勝)。</li>
+            <li><b>連吃 · 無</b>:吃掉一顆就換對方走。</li>
+            <li><b>連吃 · 明棋連吃</b>:吃掉一顆後,落點的上下左右還有吃得動的敵方明棋就能繼續吃。
+                可以轉彎、顆數不限、隨時可以停;階級限制照舊,炮的每一步一樣要隔子。</li>
+            <li><b>連吃 · 暗棋連吃</b>:連吃途中還能翻攻相鄰的暗棋,三種結果 ——
+                翻開是吃得動的敵子:吃掉並繼續;翻開是自己的子:該手結束;
+                翻開是吃不動的敵子:自己那顆被吃掉。</li>
+            <li><b>車直衝 · 無</b>:車一次走一格。</li>
+            <li><b>車直衝 · 車直衝</b>:車可沿直線衝任意格數吃遠處的子,中間不可有任何棋子;
+                相鄰的目標仍照一般吃法。</li>
+            <li><b>車直衝 · 直衝吃大子</b>:直衝時不受階級限制,將 / 帥也撞得掉。</li>
+          </ul>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">規則說明</div>
+          <ul class="dc-rules-list">
+            <li><b>盤面</b>:象棋 32 顆蓋著隨機擺滿 4 列 × 8 行。</li>
+            <li><b>回合</b>:二選一 —— 翻開一顆暗棋,或移動一顆自己的明棋
+                (上下左右一格,走空格或吃敵方明棋)。</li>
+            <li><b>分邊</b>:先手翻出的第一顆是什麼顏色,先手就是那一方。</li>
+            <li><b>階級</b>:將 7 &gt; 士 6 &gt; 象 5 &gt; 車 4 &gt; 馬 3 &gt; 包 2 &gt; 卒 1。
+                大吃小、同級可吃,吃掉後佔住該格。</li>
+            <li><b>例外</b>:卒 / 兵吃得了將 / 帥,將 / 帥吃不了卒 / 兵。</li>
+            <li><b>炮 / 包</b>:不能吃相鄰的子;沿直線隔恰好一顆子跳過去吃,距離不限、不受階級限制。</li>
+            <li><b>炮打暗棋</b>:炮打得到暗棋,翻開後不分敵我一律吃掉。</li>
+            <li><b>暗棋</b>:一般吃法吃不到暗棋,只能翻開(房規「暗棋連吃」除外)。</li>
+            <li><b>未採用</b>:砲翻山(炮跳到空格)、長捉禁手。</li>
+            <li><b>勝負</b>:吃光對方的子,或對方無子可動也無暗棋可翻。</li>
+            <li><b>比子</b>:連續 40 步沒有吃子也沒有翻子 → 比雙方剩餘棋子的階級總和,高者勝;
+                完全相同為和局(雙方各得 1 勝)。</li>
           </ul>
         </div>
 

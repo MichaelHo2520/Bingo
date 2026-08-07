@@ -42,17 +42,17 @@ function showHomeLayer(which){
   if(solo) solo.classList.toggle("hidden", which !== "solo");
   if(head) head.classList.toggle("hidden", which !== "pick");
 }
-/* 第二層的說明:難度文案直接讀 Solo 的難度表,不另外硬編一份 */
+/* 第二層的說明:難度文案直接讀 Solo 的難度表,不另外硬編一份。
+   ★ 文案規格與進場說明一致:標籤在前、一行一件事,不寫成對話。 */
 function paintSoloHint(){
   const el = $("dcSoloHint");
   if(!el) return;
   const L = Solo.levelOf(Solo.level());
   el.innerHTML = "<b>" + L.emoji + " " + L.name + "</b>:" + esc(L.desc) + "<br>" +
-    "32 顆蓋著擺滿 4×8,<b>先手第一次翻到的顏色就是他的</b>。<br>" +
     /* ★ 房規要講**現在設的是哪一種** —— 單機的房規存在自己的偏好裡、跨場黏著,
        不寫出來會忘記上次改過(同大老二 / UNO 第二層那條)。 */
-    "<b>" + esc(DC.rulesText(Solo.rules())) + "</b>(按上面「⚙ 改規則」可換)。<br>" +
-    '<span class="dc-warn">🎯 ' + esc(Solo.recLine(Solo.level())) + "</span>";
+    "<b>房規</b>:" + esc(DC.rulesText(Solo.rules())) + "(按上面「⚙ 改規則」調整)<br>" +
+    '<span class="dc-warn">' + esc(Solo.recLine(Solo.level())) + "</span>";
 }
 
 /* ==========================================================================
@@ -60,32 +60,22 @@ function paintSoloHint(){
    ──────────────────────────────────────────────────────────────────────────
      結構照大老二 / 21點 / UNO:
        · 面板本體是一個蓋板 #dcRulesVeil,單機第二層與大廳各一顆鈕打開它
-       · 每一列是 .seg,按鈕帶 data-rk(哪一項)/ data-rv(值)
+       · 一組房規一列 .seg[data-rp](哪一組),按鈕帶 data-rv = **第幾段**(0/1/2)
        · 分流點**只有下面三支**(dcEditable / dcRulesNow / dcSetRule)
+     ★★ 面板只送「第幾段」,翻成四個布林的是 DC.setRuleLevel ——
+        面板不必知道 chainDark 依賴 chain,巢狀關係仍然只在 DC.normRules 落地。
      ⚠ 不能改的時候給 .readonly(只是不亮)—— **不用 disabled**:
        CLAUDE.md 的紅線是「不用 disabled 讓點擊靜默消失」,訪客按下去要看得到
-       「只有房主能改規則」(擋在 MP.setRule / Solo 那一側,不是擋在 CSS)。
+       「只有房主能改規則」(擋在 MP.setRules / Solo 那一側,不是擋在 CSS)。
    ========================================================================== */
-/* ⚠⚠ 四項房規值都是**布林**,而 dataset 永遠是字串 ——
-   `"0"` 是 truthy,直接拿去比會讓「不能連吃」永遠亮不起來(UNO / 21點 踩過的同一個坑)。 */
-function dcRuleVal(raw){ return String(raw) === "1"; }
-
 function syncRules(rules, editable){
   const r = DC.normRules(rules);
-  document.querySelectorAll("#dcRulesBody .seg").forEach(seg => {
+  document.querySelectorAll("#dcRulesBody .seg[data-rp]").forEach(seg => {
+    const lv = DC.ruleLevel(r, seg.dataset.rp);
     seg.classList.toggle("readonly", !editable);
-    [...seg.children].forEach(b => {
-      const k = b.dataset.rk;
-      if(!k) return;
-      b.classList.toggle("on", dcRuleVal(b.dataset.rv) === r[k]);
-    });
+    // ⚠ dataset 永遠是字串 —— 一律 +b.dataset.rv 轉成數字再比(第 0 段不可以當 falsy 用)
+    [...seg.children].forEach(b => b.classList.toggle("on", (+b.dataset.rv) === lv));
   });
-  /* ★★ 兩組**巢狀**的子項:連吃關著就不該還亮著「可翻暗棋」,直衝關著同理。
-     ⚠ 真相層(DC.normRules)已經守住了,這裡只是讓畫面不要說謊 ——
-       兩邊都要,少了 normRules 是規則錯,少了這裡是畫面騙人。 */
-  const sub = (id, on) => { const el = $(id); if(el) el.classList.toggle("dc-sub-off", !on); };
-  sub("dcDarkRow", r.chain);
-  sub("dcBigRow", r.rush);
 
   /* ★ 走棋倒數那一組**只有連線才有**(單機沒有倒數 —— 想多久是自己的節奏)。
      ⚠ 它不在 rules 物件裡:那個房間欄位不影響任何判定。 */
@@ -102,17 +92,20 @@ function syncRules(rules, editable){
     }
   }
   const who = $("dcRulesWho");
-  if(who) who.textContent = editable ? "你是房主,規則由你決定" : "規則由房主決定(對戰中不能改)";
+  if(who) who.textContent = editable ? "房規在下一局開始時套用" : "房規由房主設定";
   const sum = $("dcRulesSum");
   if(sum) sum.textContent = DC.rulesText(r);
 }
 /* 現在該對誰設定 —— 單機改 Solo 的、連線改房間的(★ 唯一的分流點就這三支) */
 function dcEditable(){ return !MP.isOnline() || MP.amHost(); }
 function dcRulesNow(){ return MP.isOnline() ? MP.rules() : Solo.rules(); }
-function dcSetRule(key, val){
-  if(MP.isOnline()){ MP.setRule(key, val); syncRules(dcRulesNow(), dcEditable()); return; }
+/* kind = "chain" | "rush";lv = 第幾段(0 無 / 1 / 2)。
+   ⚠ 一次送整份房規:一次一個 key 的寫法在連線會變成兩次 DB 寫入(見 adapter 的 setRules)。 */
+function dcSetRule(kind, lv){
+  const next = DC.setRuleLevel(dcRulesNow(), kind, lv);
+  if(MP.isOnline()){ MP.setRules(next); syncRules(dcRulesNow(), dcEditable()); return; }
   if(Solo.playing()){ showToast("對局中不能改規則", 1600); return; }
-  Solo.setRule(key, val);
+  Solo.setRules(next);
   syncRules(Solo.rules(), true);
   paintSoloHint();
 }
@@ -176,8 +169,8 @@ $("dcRulesOpen").addEventListener("click", openRules);
 $("dcRulesClose").addEventListener("click", closeRules);
 $("dcRulesVeil").addEventListener("click", e => { if(e.target.id === "dcRulesVeil") closeRules(); });
 $("dcRulesBody").addEventListener("click", e => {
-  const b = e.target.closest("button[data-rk]");
-  if(b){ dcSetRule(b.dataset.rk, dcRuleVal(b.dataset.rv)); return; }
+  const b = e.target.closest(".seg[data-rp] button[data-rv]");
+  if(b){ dcSetRule(b.closest(".seg").dataset.rp, +b.dataset.rv); return; }
   // 走棋倒數那一組走既有的房間欄位(不是房規物件)——⚠ 兩處入口寫同一支 MP.setTurnSec
   const s = e.target.closest("#dcSecSeg2 button");
   if(s){ MP.setTurnSec(+s.dataset.sec); syncRules(dcRulesNow(), dcEditable()); }

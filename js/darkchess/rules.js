@@ -157,10 +157,38 @@ const DC = (function(){
     }
     return r;
   }
+  /* ★★ 三段式:面板一組只給玩家選「第幾段」(0 無 / 1 / 2),不再讓他自己拼四個布林。
+     ⚠ 巢狀關係**仍然只在 normRules() 落地** —— 這兩支只是把「段」翻成那四個布林,
+       手改 DB / 舊房間存的怪組合(chainDark 開著但 chain 關著)照樣由 normRules 收拾。 */
+  const RULE_LVS = {
+    chain: [{ chain: false, chainDark: false },
+            { chain: true,  chainDark: false },
+            { chain: true,  chainDark: true }],
+    rush:  [{ rush: false, rushBig: false },
+            { rush: true,  rushBig: false },
+            { rush: true,  rushBig: true }]
+  };
+  const LV_TEXT = {
+    chain: ["", "明棋連吃", "暗棋連吃"],
+    rush:  ["", "車直衝", "直衝吃大子"]
+  };
+  function ruleLevel(o, kind){
+    const r = normRules(o);
+    if(kind === "chain") return r.chain ? (r.chainDark ? 2 : 1) : 0;
+    if(kind === "rush")  return r.rush  ? (r.rushBig  ? 2 : 1) : 0;
+    return 0;
+  }
+  function setRuleLevel(o, kind, lv){
+    const set = RULE_LVS[kind];
+    if(!set) return normRules(o);
+    const n = Math.max(0, Math.min(set.length - 1, (+lv) || 0));
+    return normRules(Object.assign({}, normRules(o), set[n]));
+  }
   function rulesText(o){
     const r = normRules(o), on = [];
-    if(r.chain) on.push(r.chainDark ? "連吃(可翻暗棋)" : "連吃");
-    if(r.rush)  on.push(r.rushBig ? "橫衝直撞(可吃大子)" : "橫衝直撞");
+    const c = ruleLevel(r, "chain"), u = ruleLevel(r, "rush");
+    if(c) on.push(LV_TEXT.chain[c]);
+    if(u) on.push(LV_TEXT.rush[u]);
     return on.length ? on.join(" · ") : "標準暗棋";
   }
 
@@ -659,9 +687,9 @@ const DC = (function(){
     if(sideOf(tc.p) === mySide) return "那是自己的子";
     if(!adjacent(from, to)){
       if(myRank !== R_JU) return "一次只能走一格";
-      if(!st.rules.rush) return "沒開橫衝直撞 —— 車一次只能走一格";
+      if(!st.rules.rush) return "房規未開車直衝 —— 車一次只能走一格";
       if(blockedBetween(st, from, to)) return "中間有子擋住,衝不過去";
-      return "橫衝直撞吃不了" + nameOf(tc.p) + " —— 沒開「可吃大子」";
+      return "直衝吃不了" + nameOf(tc.p) + " —— 房規未開「直衝吃大子」";
     }
     if(myRank === R_JIANG && rankOf(tc.p) === R_ZU) return nameOf(me.p) + "吃不了" + nameOf(tc.p);
     return nameOf(me.p) + "比" + nameOf(tc.p) + "小,吃不動";
@@ -694,7 +722,7 @@ const DC = (function(){
     // 幾何
     rowOf, colOf, nbs, adjacent, ray, screensBetween, blockedBetween,
     // 房規
-    defRules, normRules, rulesText,
+    defRules, normRules, rulesText, ruleLevel, setRuleLevel, LV_TEXT,
     // 規則
     canBeat, sideAt, seatSide, seatOfSide,
     moveTargets, chainTargets, flipTargets, capTargets, legalMoves,

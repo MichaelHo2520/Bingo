@@ -183,11 +183,43 @@ const DCB = (function(){
   }
 
   /* ==========================================================================
-     四、動作列
+     四、動作列(吃子欄 + 輪到誰 + 這一手能做什麼)
      ──────────────────────────────────────────────────────────────────────────
        ★ 「停在這裡」只在**連吃進行中而且還吃得到**的時候出現 ——
          沒得吃時規則層已經自動幫他結束了(rules.js 的 afterCapture)。
+
+       ⚠⚠⚠ 這一塊的高度**必須固定**,而那是規格不是美觀:
+         舞台是 flex:1,動作列高一格舞台就矮一格 → fitBoard() 算出不同的格子大小
+         → **每走一手棋盤就上下跳一下**(v1.113.x 的症狀:輪到自己時多一行提示,
+         換對手時那一行消失)。所以:
+           · 第二行一律存在(輪到對手時是**空的**,不塞填充語)—— .dc-actline 撐高度
+           · 吃子欄兩列不論有沒有子都佔位(空的畫一個「—」)
+         高度由 CSS 的 min-height 給,這一支只負責「每一種狀態都畫出同樣多的列」。
      ========================================================================== */
+  /* 吃子欄:被吃掉的子一定都現過身(炮打暗子是**先翻開再吃**),攤開它們不違反牌情紅線。
+     ⚠ 顆數多的時候改成互相疊一點,不然一列排不下 16 顆(class 由這裡掛,尺寸在 CSS)。 */
+  const TRAY_TIGHT = 11;
+  const byRank = (a, b) => DC.rankOf(b) - DC.rankOf(a);
+  function trayRow(label, caps, self){
+    const n = caps.length + self.length;
+    const pcs = caps.slice().sort(byRank).map(pieceHTML).join("") +
+                (self.length ? ('<span class="dc-tray-boom" title="自己打掉的">💥' +
+                                self.slice().sort(byRank).map(pieceHTML).join("") + "</span>") : "");
+    return '<div class="dc-tray-row">' +
+             '<span class="dc-tray-lbl">' + esc(label) + "</span>" +
+             '<span class="dc-tray-pcs' + (n >= TRAY_TIGHT ? " tight" : "") + '">' +
+             (n ? pcs : '<span class="dc-none">—</span>') + "</span></div>";
+  }
+  function trayHTML(st){
+    const names = cur.names || [];
+    const me = (typeof cur.mySeat === "number" && cur.mySeat >= 0) ? cur.mySeat : 0;
+    const foe = 1 - me;
+    return '<div class="dc-tray">' +
+             trayRow("你吃掉", st.caps[me], st.friendly[me]) +
+             trayRow((names[foe] || "對手") + "吃掉", st.caps[foe], st.friendly[foe]) +
+           "</div>";
+  }
+
   function renderActs(chainOn, canAct, mySide){
     if(!acts) return;
     const st = cur.st;
@@ -197,24 +229,27 @@ const DCB = (function(){
       acts.innerHTML = "";
       return;
     }
+    bits.push(trayHTML(st));
     const who = cur.turnName || "";
-    const meTxt = mySide < 0 ? "還沒定" : ('<b class="' + (mySide === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' +
-                                           DC.sideName(mySide) + "方</b>");
+    const meTxt = mySide < 0 ? "未定" : ('<b class="' + (mySide === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' +
+                                         DC.sideName(mySide) + "方</b>");
     bits.push('<div class="dc-turn">' +
               (canAct ? '<b class="dc-you">輪到你</b>' : (who ? ("輪到 " + esc(who)) : "…")) +
               '<span class="dc-side">你是 ' + meTxt + "</span></div>");
 
+    // ★ 第二行:三種狀態(連吃 / 可以動 / 輪到對手)**都佔同一格高度**
+    let line = "";
     if(chainOn && canAct){
       const n = DC.chainTargets(st).length;
-      bits.push('<div class="dc-chain-row">' +
-                '<span class="dc-chain-txt">連吃中 · 已吃 <b>' + st.chainLen + '</b> 顆' +
-                (n ? (' · 還可以吃 <b>' + n + "</b> 處") : "") + "</span>" +
-                '<button type="button" class="btn dc-stop" data-act="stop">停在這裡</button></div>');
+      line = '<div class="dc-chain-row">' +
+             '<span class="dc-chain-txt">連吃中 · 已吃 <b>' + st.chainLen + '</b> 顆' +
+             (n ? (' · 還可吃 <b>' + n + "</b> 處") : "") + "</span>" +
+             '<button type="button" class="btn dc-stop" data-act="stop">結束連吃</button></div>';
     }else if(canAct){
-      bits.push('<div class="dc-tip">' +
-                (sel >= 0 ? "點亮起來的格子走 / 吃,點自己別顆子可以換選"
-                          : "點暗棋翻開,或點自己的子再選要去哪裡") + "</div>");
+      line = '<div class="dc-tip">' +
+             (sel >= 0 ? "點亮起的格子移動或吃子" : "點暗棋翻開,或點自己的棋子") + "</div>";
     }
+    bits.push('<div class="dc-actline">' + line + "</div>");
     if(cur.cdEnd) bits.push('<div class="dc-cd" id="dcCd"></div>');
     acts.innerHTML = bits.join("");
     acts.classList.remove("hidden");
@@ -251,7 +286,7 @@ const DCB = (function(){
     if(st.chainFrom >= 0){
       const t = DC.chainTargets(st);
       for(let k = 0; k < t.length; k++) if(t[k].to === i){ fire(DC.encMove(st.chainFrom, i)); return; }
-      showToast(i === st.chainFrom ? "點亮起來的格子繼續吃,或按「停在這裡」"
+      showToast(i === st.chainFrom ? "點亮起的格子繼續吃,或按「結束連吃」"
                                    : DC.whyNot(st, st.chainFrom, i), 1800);
       return;
     }
@@ -272,11 +307,11 @@ const DCB = (function(){
       return;
     }
 
-    if(!c){ showToast("那一格是空的,先點自己的子"); return; }
+    if(!c){ showToast("先點一顆自己的棋子"); return; }
     if(!c.up){ fire(DC.encFlip(i)); return; }                       // 翻開
     if(mySide < 0){ showToast("先翻一顆棋"); return; }
     if(DC.sideOf(c.p) !== mySide){ showToast("那是對方的子"); return; }
-    if(!DC.moveTargets(st, i).length){ showToast(DC.nameOf(c.p) + "這一步走不了,也沒得吃", 1600); return; }
+    if(!DC.moveTargets(st, i).length){ showToast(DC.nameOf(c.p) + "沒有可走的位置", 1600); return; }
     sel = i;
     paint();
   }
@@ -294,10 +329,10 @@ const DCB = (function(){
     return list.slice().sort((a, b) => DC.rankOf(b) - DC.rankOf(a)).map(pieceHTML).join("");
   }
   function endText(st){
-    if(st.endBy === "wipe")  return "把對方的子吃光了";
-    if(st.endBy === "stuck") return "對方走投無路(沒有子能動,也沒有暗棋能翻)";
-    if(st.endBy === "count") return "悶到第 " + DC.IDLE_DRAW + " 步 —— 比剩下的棋子階級總和";
-    if(st.endBy === "draw")  return "悶到第 " + DC.IDLE_DRAW + " 步,而且階級總和一模一樣";
+    if(st.endBy === "wipe")  return "吃光對方所有棋子";
+    if(st.endBy === "stuck") return "對方無子可動,也無暗棋可翻";
+    if(st.endBy === "count") return "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻 · 比階級總和";
+    if(st.endBy === "draw")  return "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻 · 階級總和相同";
     return "";
   }
   /* names = 兩個座位的名字;mySeat = 我坐哪;wins = [{n, plus}] 累積分(可省略) */
@@ -355,6 +390,8 @@ const DCB = (function(){
     }
   }
 
+  /* o = { st, mySide, mine, over, key, turnName, cdEnd, mySeat, names }
+     ★ mySeat / names 只給**吃子欄**用(誰吃掉了什麼);沒帶的話退回「你 / 對手」。 */
   function setState(o){
     cur = o || null;
     if(!cur || !cur.st) return;

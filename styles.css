@@ -6109,6 +6109,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-room .mp-subrow{margin-top:5px}
   .dc-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .dc-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  /* ⚠⚠ 晶片**高度寫死**,而這是規格不是美觀:共用的 .mp-chip.turn 會把字級 14 → 15,
+     輪到誰就換誰長高 1px → 房間框高 1px → 舞台矮 1px → fitBoard() 少一格 →
+     **每走一手盤面就跳一下**(這一頁的格子是整數 px,1px 就差一整格)。
+     ⚠ 只在 .dc-room 底下改,不波及另外九頁。 */
+  .dc-room .mp-chip{height:34px;padding:0 13px}
   /* 晶片尾巴:顏色 + 盤上還剩幾顆(★ 兩者都是公開資訊,見 adapter.js 的 chipTail) */
   .dc-chip-side{font-size:10px;font-weight:800;padding:1px 5px;border-radius:999px;
     background:rgba(255,255,255,.16);margin-left:3px}
@@ -6180,20 +6185,44 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-from{box-shadow:inset 0 0 0 2px rgba(255,255,255,.34)}
   @keyframes dcPop{ 0%{transform:scale(.72);opacity:.4} 70%{transform:scale(1.06)} 100%{transform:scale(1)} }
 
-  /* ---------- 動作列 ---------- */
+  /* ---------- 動作列 ----------
+     ⚠⚠⚠ 這一塊的高度**必須固定**,而那是規格不是美觀:舞台是 flex:1 1 0,
+        動作列高一格舞台就矮一格 → fitBoard() 算出不同的格子大小 →
+        **每走一手棋盤就上下跳一下**(v1.113.x 的症狀:輪到自己時多一行提示,
+        換對手時那一行消失)。落地是兩條 min-height(.dc-tray-row / .dc-actline)+
+        board.js 的 renderActs 每一種狀態都畫出同樣多的列。 */
   .dc-acts{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;
     padding:6px 10px;border-radius:14px;background:var(--panel);
     border:1px solid var(--panel-line);text-align:center}
+  /* ⚠ 行高寫成**固定 px**(不是倍數):子元素字級不一樣(輪到你 16px / 輪到對手 14px),
+     行高用倍數的話兩種狀態差 1px —— 盤面就會每走一手上下挪半格。 */
   .dc-turn{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
-    font-size:14px;font-weight:800;color:var(--muted)}
+    font-size:14px;font-weight:800;color:var(--muted);line-height:22px;min-height:22px}
   .dc-you{color:var(--accent-2);font-size:16px}
   .dc-side{font-size:12px;font-weight:700;color:var(--muted)}
   .dc-tip{font-size:12px;color:var(--muted);line-height:1.35}
+  /* 第二行的容器:連吃列 / 操作提示 / 輪到對手(空的)三種狀態同一個高度 */
+  .dc-actline{width:100%;min-height:32px;display:flex;align-items:center;justify-content:center}
+  /* ---------- 吃子欄(動作列的上半)----------
+     ★ 被吃掉的子一定都現過身(炮打暗子是先翻開再吃)→ 攤開它們不違反牌情紅線。
+     ⚠ 兩列不論有沒有子都佔位(空的畫一個「—」),理由同上面那條 ⚠⚠⚠。 */
+  .dc-tray{width:100%;display:flex;flex-direction:column;gap:2px;
+    padding-bottom:4px;border-bottom:1px solid var(--panel-line)}
+  .dc-tray-row{display:flex;align-items:center;gap:6px;min-height:22px}
+  .dc-tray-lbl{flex:none;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-size:11px;font-weight:800;color:var(--muted)}
+  .dc-tray-pcs{--dc-cell:22px;flex:1;min-width:0;display:flex;align-items:center;overflow:hidden}
+  .dc-tray-pcs .dc-p{width:20px;height:20px;flex:none;margin-right:2px}
+  /* 顆數多的時候互相疊一點 —— 16 顆排不進一列(class 由 board.js 依顆數掛) */
+  .dc-tray-pcs.tight .dc-p{margin-right:-7px}
+  .dc-tray-boom{display:flex;align-items:center;margin-left:6px;
+    font-size:11px;font-weight:800;color:var(--daub)}
   .dc-chain-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
   .dc-chain-txt{font-size:13px;font-weight:800;color:var(--accent-2)}
   .dc-chain-txt b{color:var(--text)}
-  /* ★ 「停在這裡」只在連吃還吃得到的時候出現 —— 沒得吃時規則層已經自動結束了 */
-  .dc-stop{padding:6px 15px;font-size:14px;min-width:96px}
+  /* ★ 「結束連吃」只在連吃還吃得到的時候出現 —— 沒得吃時規則層已經自動結束了。
+     ⚠ 高度寫死:它比操作提示那一行高,而 .dc-actline 的 min-height 要蓋得住它。 */
+  .dc-stop{height:28px;padding:0 15px;font-size:14px;min-width:96px}
   .dc-cd{font-size:12px;font-weight:800;color:var(--muted)}
   .dc-cd.hot{color:var(--daub)}
 
@@ -6241,10 +6270,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-rules-card .set-row.col .seg{width:100%}
   .dc-rules-card .set-row.col .seg button{flex:1 1 0;min-width:0;font-size:12.5px;padding:6px 4px}
   .dc-rules-card .seg.readonly{opacity:.78}
-  /* ★★ 巢狀的子選項:上層關著時整列壓暗。壓暗只是告訴玩家「先開上面那一項」——
-     真的守住巢狀關係的是 DC.normRules(),不是這條 CSS。 */
-  .dc-sub-row{margin-left:10px;border-left:2px solid var(--panel-line);padding-left:9px}
-  .dc-sub-row.dc-sub-off{opacity:.45}
+  /* ★ 房規改成一組三段(無 / 1 / 2)之後就沒有子選項列了 —— 巢狀關係收進段位表,
+     真的守住它的仍然是 DC.normRules()。三段的按鈕比兩段窄,字級再小一點才不會被截斷。 */
+  .dc-rules-card .seg[data-rp] button{font-size:12px;padding:6px 2px}
   .dc-rules-list{margin:2px 0 0;padding:0;list-style:none;text-align:left}
   .dc-rules-list li{position:relative;padding:3px 0 3px 15px;
     font-size:12.5px;line-height:1.5;color:var(--muted)}
@@ -6268,8 +6296,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .dc-room{padding:6px 10px}
     .dc-room .mp-subrow,.dc-room-foot{margin-top:3px}
     .dc-acts{padding:4px 8px;gap:3px}
-    .dc-turn{font-size:13px}
+    .dc-turn{font-size:13px;line-height:20px;min-height:20px}
     .dc-you{font-size:14px}
     .dc-tip{font-size:11px}
-    .dc-stop{padding:5px 13px;font-size:13px;min-width:86px}
+    .dc-stop{height:26px;padding:0 13px;font-size:13px;min-width:86px}
+    /* ⚠ 這兩條要跟著改小,但**仍然是固定值** —— 高度可以變小,不可以隨內容變 */
+    .dc-actline{min-height:28px}
+    .dc-tray-row{min-height:19px}
+    .dc-tray-pcs{--dc-cell:19px}
+    .dc-tray-pcs .dc-p{width:17px;height:17px}
   }

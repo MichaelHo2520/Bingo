@@ -82,6 +82,9 @@ const MP = MPCore.create((function(){
       over: !!ctx.winner() || st.over,
       key: moves.length,
       turnName: st.over ? "" : nameOfSeat(st.turn),
+      // ★ 吃子欄要知道「哪個座位是我」與兩個座位各叫什麼(見 board.js 的 setState)
+      mySeat: me,
+      names: ctx.order().map(id => ctx.dispName(id)),
       // 倒數環給雙方都看得到(誰還剩幾秒是公開資訊,對手才知道為什麼卡著)
       cdEnd: (secOn() && !st.over) ? (turnAt + turnSec * 1000) : 0
     });
@@ -178,19 +181,20 @@ const MP = MPCore.create((function(){
      五、mp-core 的 adapter 介面
      ========================================================================== */
   function ruleHint(){
-    /* ⚠ 這一格只寫**規則**,不寫設計理由也不寫感想(台灣麻將 v1.67.1 的教訓)。 */
-    const sec = secOn() ? ("每一手 <b>" + turnSec + " 秒</b>,時間到系統會幫他走一手")
-                        : "<b>不限時</b>——沒人催,有人離開棋盤會一直等";
-    return "32 顆象棋<b>蓋著擺滿 4×8</b>。輪流<b>翻一顆</b>或<b>動一顆自己的明棋</b>(上下左右一格);" +
-           "<b>先手第一次翻到的顏色就是他的</b>。<br>" +
-           "大小 <b>將 &gt; 士 &gt; 象 &gt; 車 &gt; 馬 &gt; 包 &gt; 卒</b>,大吃小、同級可吃," +
-           "而且<b>卒吃得了將、將吃不了卒</b>。<br>" +
-           "<b>炮不能貼身吃</b> —— 要沿直線隔<b>恰好一顆</b>子跳過去,距離不限、不受階級限制," +
-           "<b>連暗棋都打得到</b>(打到自己的算自己倒楣)。<br>" +
-           "<b>" + esc(DC.rulesText(rules)) + "</b>(房主可改)。<br>" +
-           "把對方吃光、或讓對方<b>無子可動也無暗棋可翻</b>就贏;" +
-           "連續 <b>" + DC.IDLE_DRAW + " 步</b>沒吃沒翻就<b>比剩下棋子的階級總和</b>。<br>" +
-           "走棋倒數:" + sec + "。";
+    /* ⚠ 這一格只寫**規則**,不寫設計理由也不寫感想(台灣麻將 v1.67.1 的教訓)。
+       ★ 文案規格與進場說明一致:條列、標籤在前、一行一件事。 */
+    const sec = secOn() ? ("每一手 <b>" + turnSec + " 秒</b>,逾時由系統代走一手")
+                        : "<b>不限時</b>,有人離開棋盤會一直等";
+    return "<b>盤面</b>:象棋 32 顆蓋著擺滿 4×8。<br>" +
+           "<b>回合</b>:翻開一顆暗棋,或移動一顆自己的明棋(上下左右一格)。<br>" +
+           "<b>分邊</b>:先手翻出的第一顆是什麼顏色,先手就是那一方。<br>" +
+           "<b>階級</b>:將 &gt; 士 &gt; 象 &gt; 車 &gt; 馬 &gt; 包 &gt; 卒,大吃小、同級可吃;" +
+           "例外只有一組 —— 卒吃將,將不吃卒。<br>" +
+           "<b>炮</b>:不能吃相鄰的子,沿直線隔恰好一顆子跳過去吃,不受階級限制,暗棋也打得到。<br>" +
+           "<b>勝負</b>:吃光對方的子,或對方無子可動也無暗棋可翻;" +
+           "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻,改比剩餘棋子的階級總和。<br>" +
+           "<b>房規</b>:" + esc(DC.rulesText(rules)) + "(房主設定)。<br>" +
+           "<b>走棋倒數</b>:" + sec + "。";
   }
 
   return {
@@ -212,7 +216,7 @@ const MP = MPCore.create((function(){
         const next = DC.normRules(v);
         /* ⚠⚠ 這個「有沒有真的變」的比對是**逐欄位**寫的,而房規有四項 ——
            加房規忘了補這裡的症狀是「房主按了那一項,對手的畫面完全不動」
-           (寫進 DB 了,但這裡當成沒變就 return 掉)。同一份比對在下面 setRule 也有一份。 */
+           (寫進 DB 了,但這裡當成沒變就 return 掉)。同一份比對在下面 setRules 也有一份。 */
         if(next.chain === rules.chain && next.chainDark === rules.chainDark &&
            next.rush === rules.rush && next.rushBig === rules.rushBig) return;
         rules = next;
@@ -399,8 +403,11 @@ const MP = MPCore.create((function(){
          ⚠ 寫入走 ctx.setRoomField(整包一個欄位)—— lobbyOnly:對戰中不給改。 */
       rules: () => DC.normRules(rules),
       liveRules: () => DC.normRules(ctx.phase() === "playing" ? gRules : rules),
-      setRule(key, val){
-        const next = DC.normRules(Object.assign({}, rules, { [key]: val }));
+      /* ⚠ 收的是**整份房規**:面板送的是「哪一組的第幾段」,翻成四個布林是
+         DC.setRuleLevel 的事(一次一個 key 的寫法會讓「暗棋連吃」變成兩次 DB 寫入,
+         中間那一拍對手會看到不存在的組合)。 */
+      setRules(next0){
+        const next = DC.normRules(next0);
         // ⚠ 四項都要比(見 onRoomField 那一份的說明)—— 漏一項 = 那一項按了沒反應
         if(next.chain === rules.chain && next.chainDark === rules.chainDark &&
            next.rush === rules.rush && next.rushBig === rules.rushBig) return;

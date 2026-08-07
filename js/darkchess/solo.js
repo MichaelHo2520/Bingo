@@ -28,9 +28,9 @@ const Solo = (function(){
   let rec = {};                       // 各難度戰績 { easy:{w,l,d}, ... }
 
   const LV = {
-    easy: { key: "easy", emoji: "🙂", name: "新手", desc: "有得吃就吃最大的,不管自己會不會被吃回去" },
-    mid:  { key: "mid",  emoji: "🤔", name: "普通", desc: "會算一層:不把子留在你吃得到的格上,翻棋也挑安全的" },
-    hard: { key: "hard", emoji: "😈", name: "高手", desc: "會算兩層,還會盯著「悶到底比階級總和」那條倒數" }
+    easy: { key: "easy", emoji: "🙂", name: "新手", desc: "只挑眼前最大的子吃,不考慮被吃回去" },
+    mid:  { key: "mid",  emoji: "🤔", name: "普通", desc: "會算一步,避開你吃得到的格子,翻棋也挑安全的" },
+    hard: { key: "hard", emoji: "😈", name: "高手", desc: "會算兩步,並盤算 40 步後的階級總和" }
   };
   const levelOf = k => LV[k] || LV.mid;
 
@@ -60,7 +60,7 @@ const Solo = (function(){
   }
   function recLine(k){
     const r = recOf(k);
-    return (r.w || r.l || r.d) ? ("你在這個難度的戰績 " + recText(k)) : "還沒跟這個難度下過";
+    return (r.w || r.l || r.d) ? ("此難度戰績 " + recText(k)) : "此難度尚無戰績";
   }
 
   /* ---------- HUD ---------- */
@@ -93,7 +93,10 @@ const Solo = (function(){
       mine: active && !over && !busy && st.turn === mySeat,
       over: over,
       key: moves.length,
-      turnName: st.turn === mySeat ? "你" : "電腦"
+      turnName: st.turn === mySeat ? "你" : "電腦",
+      // ★ 吃子欄要知道「哪個座位是我」與兩個座位各叫什麼(見 board.js 的 setState)
+      mySeat: mySeat,
+      names: mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"]
     });
     paintHud();
   }
@@ -201,10 +204,12 @@ const Solo = (function(){
       box.innerHTML = DCB.resultHTML(st, mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"], mySeat, null);
       box.classList.remove("hidden");
     }
+    /* ⚠ 措辭與連線那份(adapter.js 的 outcome())刻意寫成同一個格式:
+       第一行講「這一局是怎麼結束的」,第二行是這一場的資料。 */
     $("winMsg").innerHTML =
-      (res === "win" ? "漂亮 🎉" : res === "lose" ? "這局讓電腦拿下了" : "兩邊剩下的棋一樣強 🤝") +
+      esc(DCB.endText(st)) + (res === "win" ? " 🎉" : res === "draw" ? " 🤝" : "") +
       '<br><span class="dc-solomsg">' + lv.emoji + lv.name + " · " + esc(DC.rulesText(rules)) +
-      " · 第 " + moves.length + " 手 · 戰績 " + recText(level) + "</span>";
+      " · 共 " + moves.length + " 手 · 戰績 " + recText(level) + "</span>";
     if(res === "win"){ Sound.win(); burst(); }
     else if(res === "lose") Sound.lose();
     else Sound.win();                        // 平手沿用 win(同五子棋:不給挫敗音)
@@ -223,10 +228,10 @@ const Solo = (function(){
     setLevel(v){ if(LV[v]){ level = v; saveOwn(); paintHud(); } },
     setFirst(v){ if(["me", "ai", "random"].indexOf(v) >= 0){ first = v; saveOwn(); } },
     /* ★ 房規面板單機連線共用一組 DOM,分流點在 main.js。
-       ⚠ 一律走 normRules:巢狀關係(chainDark 依賴 chain)只在那裡落地一次。 */
-    setRule(key, val){
-      const next = DC.normRules(Object.assign({}, rules, { [key]: val }));
-      rules = next;
+       ⚠ 收的是**整份房規**(面板送的是「第幾段」,翻成四個布林是 DC.setRuleLevel 的事);
+         這裡一律再走一次 normRules —— 巢狀關係只在那一支落地。 */
+    setRules(next){
+      rules = DC.normRules(next);
       saveOwn();
     }
   };
