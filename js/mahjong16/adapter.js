@@ -620,6 +620,48 @@ const MP = MPCore.create((function(){
     }, { local:false });
   }
 
+  /* ---------- 聽牌後自動摸切(v1.119.0,個人偏好) ----------
+     使用者:「宣告聽牌後,可以設計一個選項自動出牌,但是如果有可以槓,也是需要停下來」。
+     ★ 與上面 armTurnT() 的到期自動摸切**故意分開**、不共用一顆 timer:
+       ①那顆是「懲罰掛機」的兜底,秒數是**房間設定**,關掉(claimSec=0)時完全不催人;
+         這顆是**個人偏好**,不管房主把倒數設成幾秒、甚至關掉都照樣生效
+         (宣告聽牌之後那一手本來就被規則鎖死,跟「有沒有人在催」無關)。
+       ②那顆到期會 toast「時間到,自動幫你打出一張」——語氣是提醒 / 懲罰;
+         這顆是玩家自己開的功能,不需要那句話。
+       混成一顆的話,關掉操作倒數就等於連這顆個人偏好也一起失效,那是另一條規則被誤改。
+     ★ 條件與 MJT.discard() 裡「宣告聽牌之後只能摸切」那條**完全對應**:已經宣告聽牌、
+       自摸 / 暗槓 / 加槓一個都選不到 → 唯一合法動作就是打掉摸到的那張,沒有第二種選法。
+     ⚠ 只管**自己這一家**:每台裝置各看自己的 M16B.autoTingOn(),互不影響 ——
+       這張牌打哪一張是規則鎖死的,不是「我在想什麼」那種牌情,不必顧慮洩漏。
+     ⚠ key 用 handAt + 座位(同 armTurnT):applyGame 可能因為同一份 state 重新廣播
+       而被叫第二次,沒有這道去重會不斷重排 timer / 疊出好幾顆。 */
+  let autoTingT = null, autoTingKey = "";
+  function clearAutoTingT(){
+    if(autoTingT){ clearTimeout(autoTingT); autoTingT=null; }
+    autoTingKey = "";
+  }
+  function armAutoTing(){
+    if(!M16B.autoTingOn() || !st || st.claim || st.over || ctx.phase()!=="playing"){ clearAutoTingT(); return; }
+    const me = mySeat();
+    if(st.turn!==me || !MJT.toPlay(st, me) || !MJT.tingOf(st, me) || st.drawn<0){ clearAutoTingT(); return; }
+    const a = MJT.ownActions(st, me);
+    if(a.win || a.ckong.length || a.akong.length){ clearAutoTingT(); return; }   // 有得選 → 停下來讓玩家自己按
+    const key = Math.round(handAt)+":"+me;
+    if(key === autoTingKey && autoTingT) return;
+    clearAutoTingT();
+    autoTingKey = key;
+    autoTingT = setTimeout(function(){
+      autoTingT = null;
+      const seat = mySeat();
+      if(!(st && !st.claim && !st.over && st.turn===seat && MJT.tingOf(st, seat) && st.drawn>=0)) return;
+      const a = MJT.ownActions(st, seat);
+      if(a.win || a.ckong.length || a.akong.length) return;   // 500ms 這段時間狀態變了 → 保險再擋一次
+      // ⚠ 打的一律是**交易裡那份 state** 剛摸到的那張(同 autoDiscard),不是外面的捕獲值 ——
+      // discard() 自己會驗一次合法性,真的不合法就中止,不會打錯牌。
+      doAct(s=>(s.turn===seat && s.drawn>=0) ? MJT.discard(s, seat, s.drawn) : null);
+    }, 500);
+  }
+
   /* ---------- 大廳說明 ----------
      ★ 這裡只寫**規則**:玩家要照著做的事。設計理由(為什麼 2~3 人去萬子)、
      實作細節(倒數怎麼藏牌情、台數總和恆為 0)一律不進畫面 —— 那些在 notes/11。 */
@@ -780,7 +822,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 一局的生命週期 ---------- */
     lobbyGame(){ return { wall:null, turn:0, over:null }; },
-    resetRound(){ clearClaimT(); clearTurnT(); stopCd(); st=null; curRound=null; myBid=false; handAt=0; },
+    resetRound(){ clearClaimT(); clearTurnT(); clearAutoTingT(); stopCd(); st=null; curRound=null; myBid=false; handAt=0; },
 
     newGame(ids, prev){
       // 座位每局輪換,顏色與莊家才不會永遠同一個人
@@ -873,6 +915,7 @@ const MP = MPCore.create((function(){
       /* 兩種倒數各自 arm(不會同時:有宣告視窗時沒有人在出牌) */
       if(s.claim && !s.over){ clearTurnT(); armClaimT(); }
       else { clearClaimT(); armTurnT(); }
+      armAutoTing();      // 聽牌後自動摸切(個人偏好,獨立於上面兩顆房間倒數,見那支的檔頭註解)
 
       // 一局結束 → 記台數(交易冪等,誰先到誰寫)
       if(s.over && rid){
@@ -892,7 +935,7 @@ const MP = MPCore.create((function(){
     enterLobby(){ showScreen("lobby"); $("mpBar").classList.remove("playing"); ruleHint(); },
     backToLobby(){
       showScreen("lobby"); $("mpBar").classList.remove("playing");
-      clearClaimT(); clearTurnT(); clearNext(); st=null; curRound=null; myBid=false; handAt=0;
+      clearClaimT(); clearTurnT(); clearAutoTingT(); clearNext(); st=null; curRound=null; myBid=false; handAt=0;
       wipeActs();
       ctx.renderPlayers();               // 台數在晶片上,回大廳要重畫(st 已清掉,風會收起來)
       ruleHint();
@@ -910,7 +953,7 @@ const MP = MPCore.create((function(){
       M16Sfx.preload();          // 喊牌音檔先載好,第一次碰才有聲音(見 sfx.js 的 preload)
     },
     onLeave(){
-      clearClaimT(); clearTurnT(); clearNext();
+      clearClaimT(); clearTurnT(); clearAutoTingT(); clearNext();
       st=null; curRound=null; tai={}; myBid=false; handAt=0;
       baseWins = {}; lastGained = []; lastDeal = null;   // 離房:連莊記錄跟著清(換房間就是新牌局)
       wipeActs();
@@ -991,7 +1034,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 結果 ---------- */
     outcome(w, { iWon, isDraw, mine, ids }){
-      clearClaimT(); clearTurnT();
+      clearClaimT(); clearTurnT(); clearAutoTingT();
       M16B.clearSel();
       renderHud(); renderActs();
       // 得分名單直接用核心給的 ids(它就是等一下要 +1 的那些人)—— 排名表的「N 勝」欄要
@@ -1048,7 +1091,8 @@ const MP = MPCore.create((function(){
     },
 
     ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, baseTai:baseTai,
-                         voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode() }; },
+                         voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode(),
+                         autoTing:M16B.autoTingOn() }; },
     usePrefs(o){
       if(+o.handsGoal>0) handsGoal = +o.handsGoal;
       /* ⚠ 這裡要 snapSec():v1.103.0 換掉整組秒數之後,舊玩家偏好裡的 8 / 12 / 20
@@ -1071,6 +1115,8 @@ const MP = MPCore.create((function(){
       M16Sfx.setTileMode(o.tileVoice || (call ? "honor" : "off"));
       /* ⚠ 舊偏好裡殘留的 `ready`(v1.66.0 的聽牌提醒)與 `hint`(v1.66.0~v1.67.2 的
          聽牌提示)沒有人讀了 —— 兩顆開關都已經拿掉,讀不到就忽略,無害。 */
+      // 聽牌後自動摸切(v1.119.0):舊偏好沒有這欄 → undefined → 預設**關**,不是新功能就自己幫人開了。
+      M16B.setAutoTing(!!o.autoTing);
     },
 
     api:{
@@ -1103,6 +1149,8 @@ const MP = MPCore.create((function(){
       state:()=>st, seat:mySeat,
       // 盤面切換「要吃哪一組」之後,✔ 按鈕上的字要跟著換 → 回頭叫這支重畫動作列
       refreshActs: renderActs,
+      // 設定面板剛把「聽牌後自動摸切」打開那一刻,順手踢一次(不必等下一手才生效)
+      kickAutoTing: armAutoTing,
       /* 盤面不知道玩家是誰(它只有座位號),名字由這裡餵。
          ⚠ 核心沒有把 order() 暴露到 MP 上(那是 ctx 的東西),所以一定要走這支 ——
             main.js 第一版寫成 MP.order() 直接是 undefined。 */

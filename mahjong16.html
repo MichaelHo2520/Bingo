@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.118.1 -->
-<meta name="version" content="1.118.1">
+<!-- 台灣 16 張麻將 · v1.119.0 -->
+<meta name="version" content="1.119.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -395,6 +395,17 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               <button class="on" data-tv="honor">只有字牌</button>
               <button data-tv="all">全部牌</button>
             </div>
+          </div>
+        </div>
+
+        <!-- 個人偏好,同時給單機與連線用(v1.119.0)。⚠ 不是「玩法輔助」那兩顆算牌開關 ——
+             宣告聽牌之後那一手已經被規則鎖死只能打摸到的那張,這裡只是省一次點擊,
+             遇到可以自摸 / 暗槓 / 加槓仍然會停下來讓玩家自己決定。理由見 notes/11。 -->
+        <div class="set-group">
+          <div class="set-group-title">聽牌</div>
+          <div class="set-row">
+            <span class="set-lbl">聽牌後自動摸切<span class="set-sub">(能自摸 / 槓仍會停下來)</span></span>
+            <button class="switch" id="m16SwAutoTing" role="switch" aria-checked="false" aria-label="聽牌後自動摸切"><span class="knob"></span></button>
           </div>
         </div>
 

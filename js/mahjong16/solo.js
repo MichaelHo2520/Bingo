@@ -183,8 +183,31 @@ const Solo = (function(){
     render();
     if(st.over){ finishHand(); return; }
     if(st.claim){ scheduleClaims(); return; }
-    if(st.turn === ME) return;                    // 等玩家動作
+    if(st.turn === ME){ maybeAutoTing(); return; }  // 等玩家動作(或幫他自動摸切)
     scheduleAI();
+  }
+
+  /* ==========================================================================
+     聽牌後自動摸切(v1.119.0,個人偏好 —— 開關與詳細理由見 board.js 檔頭)。
+     使用者:「宣告聽牌後,可以設計一個選項自動出牌,但是如果有可以槓,也是需要停下來」。
+     ★ 條件與 MJT.discard() 裡「宣告聽牌之後只能摸切」那條**完全對應**:已經宣告聽牌、
+       而且自摸 / 暗槓 / 加槓一個都選不到 —— 這時唯一合法的動作就是把摸到的那張打出去,
+       沒有第二種選法,自動幫他點掉不會改變任何決定。
+     ⚠ 有得選(自摸 / 暗槓 / 加槓)就**不碰**:那是玩家自己要不要的決定,不是被鎖死的動作。 */
+  function autoTingReady(){
+    if(!M16B.autoTingOn() || !active || !st || st.over || st.claim || st.turn !== ME) return false;
+    if(!MJT.tingOf(st, ME) || st.drawn < 0) return false;
+    const a = MJT.ownActions(st, ME);
+    return a.discard && !a.win && !a.ckong.length && !a.akong.length;
+  }
+  function maybeAutoTing(){
+    if(!autoTingReady()) return;
+    const tile = st.drawn;
+    later(function(){
+      // 保險:排隊等的這段時間狀態可能已經變了(例如玩家自己先點掉了),不要亂打
+      if(!autoTingReady() || st.drawn !== tile) return;
+      onDiscard(tile);
+    }, 500);
   }
 
   function render(){
@@ -622,6 +645,8 @@ const Solo = (function(){
     start, quit, again, newHand, loadOwn, saveOwn,
     onDiscard, onTing, onFoe, humanBid,
     refreshActs: paintActs,
+    // 設定面板剛把「聽牌後自動摸切」打開那一刻,順手踢一次(不必等下一手才生效)
+    kickAutoTing: maybeAutoTing,
     seatName, recText,
     active: function(){ return active; },
     playing: function(){ return active && !!st && !st.over; },

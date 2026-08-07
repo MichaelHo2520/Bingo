@@ -187,6 +187,21 @@ $("m16TileSeg").addEventListener("click", e=>{
   showToast(m==="off" ? "報牌名:關" : (m==="all" ? "報牌名:全部牌" : "報牌名:只有字牌"), 1200);
 });
 
+/* ---------- 設定:聽牌後自動摸切(v1.119.0) ----------
+   個人偏好,單機與連線共用一顆旗標(M16B.autoTingOn(),見 board.js 檔頭那段註解)。
+   ⚠ 這裡只負責存偏好與同步開關樣子 —— 真正「輪到我、已宣告聽牌、沒得選就自動打」
+     的判斷各自在 Solo.step() / MP 的 applyGame() 裡,兩邊都只讀這一顆旗標。 */
+function syncM16AutoTing(){
+  const b=$("m16SwAutoTing"); if(b) b.setAttribute("aria-checked", M16B.autoTingOn()?"true":"false");
+}
+$("m16SwAutoTing").addEventListener("click",()=>{
+  M16B.setAutoTing(!M16B.autoTingOn());
+  savePrefs(); syncM16AutoTing();
+  showToast(M16B.autoTingOn()?"聽牌後自動摸切:開":"聽牌後自動摸切:關",1200);
+  // 開的那一刻如果剛好就卡在「已經可以自動打」的那一手,順手踢一次,不必等下一手才生效
+  if(Solo.active()) Solo.kickAutoTing(); else MP.kickAutoTing();
+});
+
 /* (v1.58.2:比分列 #m16Hud 已移除 —— 台數改顯示在房間框的玩家晶片上,
     點晶片傳表情那個入口是核心 renderPlayers() 自己綁的,這裡不必再接一次) */
 
@@ -246,6 +261,7 @@ loadPrefs();
 Solo.loadOwn();
 syncSettingsUI();
 syncM16Voice();      // ⚠ loadPrefs() 之後才同步(偏好裡的喊牌語音開關要先讀進來)
+syncM16AutoTing();   // 同上,聽牌後自動摸切的開關樣子也要等偏好讀進來才同步
 syncSoloSeg();
 showScreen("home");
 autoJoinFromQuery(MP);

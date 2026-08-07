@@ -119,6 +119,17 @@ const M16B = (function(){
        真要卡在 true,連線那支的動作列本來就不讓我表態了。
      ⚠ 單機**用不到也不該用**:MJT.bid() 當場就回一個新 state,bids[me] 立刻是實的。 */
   let bidDone = false;
+  /* 聽牌後自動摸切(個人偏好,v1.119.0)。使用者:「宣告聽牌後,可以設計一個選項自動出牌,
+     但是如果有可以槓,也是需要停下來」。
+     ★ 放在這裡而不是 Solo 或 MP 各自的私有變數 —— 這是**跨單機與連線共用**的一份狀態
+       (同 M16Sfx 的 voice / tileVoice):solo.js 的 step() 與 adapter.js 的 applyGame()
+       各自只讀這一顆旗標,誰都不用去問對方現在是不是連線中。
+     ★ 存在 mahjong16.prefs.v1(adapter.js 的 ownPrefs/usePrefs 負責讀寫,設定面板的
+       開關也接在那裡)—— 個人偏好,不是房間設定:宣告聽牌之後那一手本來就被規則鎖死
+       只能打摸到的那張,自動幫忙點下去不影響任何人算的台數,不必像 claimSec 那樣凍結。
+     ⚠ **不要**跟著 clearSel() 一起清掉:那支在「換局 / 吃碰成立 / 我表態完」都會被叫到,
+       它們與「我要不要自動摸切」這個人偏好無關(同 fitTw / ord 那兩條紅線的理由)。 */
+  let autoTing = false;
   /* 「只縮不放」的地板(見檔頭④):fitTw = 目前用的牌寬,一局裡單調不遞增。
      ★ v1.70.1 拿掉了原本一起記的 fitKey(容器寬 × 高,一變就把地板放掉)——
        「盤面變矮」有兩種,而尺寸值分不出來:
@@ -1516,6 +1527,10 @@ const M16B = (function(){
     /* 宣告聽牌的選牌模式。動作列那顆鈕開 / 關它,宣告成立或取消都要關掉。 */
     setTingPick(v){ tingPick = !!v; sel=""; render(); },
     tingPicking(){ return tingPick; },
+    /* 聽牌後自動摸切(見上面 let autoTing 的註解)。★ 純粹的旗標讀寫,不碰 render ——
+       呼叫端(solo.js / adapter.js)自己決定看到 true 之後要不要排一次延遲打牌。 */
+    autoTingOn(){ return autoTing; },
+    setAutoTing(v){ autoTing = !!v; },
     /* 宣告視窗:動作列問「現在是哪一組」,按下 ✔ 時回頭拿它送出 */
     claimOpts(){ return claimOpts(); },
     claimCur(){ const co=claimOpts(); return co.length ? co[Math.min(copt,co.length-1)] : null; },
