@@ -63,6 +63,13 @@ const MPCore = (function(){
        ⚠ 「這一場打完了」不歸核心管:adapter 自己決定最後一局不要續(台灣麻將是
          打滿 handsGoal 局),那時結果卡照舊是「下一局 = 回大廳」。 */
     const CONT_ROUND = !!A.contRound;
+    /* ★★ 回大廳之後,晶片上的台數標籤(chipTail)不要跟著收掉(v1.125.0 為台灣麻將加,
+       不帶就是舊行為)。使用者:「戰績也繼續保留著,顯示在房間框裡面」——那份資料
+       本來就沒被清掉(打滿一場之後 tai 節點要等真的開下一場才歸零,見
+       js/mahjong16/adapter.js 的 newGame()),缺的只是晶片肯不肯畫。
+       ⚠ 只放寬 chipTail,chipLead 不用跟著放寬:回大廳 order 會被清空([]),
+       chipLead 依賴座位號算不出來就回傳 null,晶片照舊退回準備圓點,不必特別擋。 */
+    const CHIP_TAIL_IN_LOBBY = !!A.chipTailInLobby;
 
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false, roomName="";
     let online=false;
@@ -787,7 +794,7 @@ const MPCore = (function(){
         /* ★ SIGNED 的遊戲不畫這顆 🏆N —— 有正負的數字不是「累積勝場」,
            而且 21 點的 chipTail 自己已經畫了籌碼(同一格位置兩個數字會讀不出誰是誰)。 */
         const scoreBadge=(!SIGNED && sc>0)?'<span class="score-badge" title="累積勝場">🏆'+sc+'</span>':'';
-        const extra=(curPhase==="playing" && A.chipTail) ? (A.chipTail(id)||"") : "";
+        const extra=((curPhase==="playing" || CHIP_TAIL_IN_LOBBY) && A.chipTail) ? (A.chipTail(id)||"") : "";
         chip.innerHTML=side+'<span class="gmk-nm">'+esc(dispName(id))+'</span>'+youTag(id)+extra+scoreBadge;
         if(isHost && status==="lobby" && id!==meId){
           const k=document.createElement("button");

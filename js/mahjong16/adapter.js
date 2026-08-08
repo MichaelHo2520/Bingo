@@ -809,6 +809,10 @@ const MP = MPCore.create((function(){
     /* ★ 局間續局(v1.103.0):打一圈 / 一將的中間局結束**不回大廳**。
        核心那一半見 mp-core.js 的 CONT_ROUND;這一頁的一半在上面那整段 + outcome()。 */
     contRound:true,
+    /* ★ 回大廳後晶片上的台數標籤(chipTail)繼續顯示(v1.125.0)—— 使用者:「戰績也
+       繼續保留著,顯示在房間框裡面」。核心那一半見 mp-core.js 的 CHIP_TAIL_IN_LOBBY;
+       這一頁的一半是上面 chipTail() 多擋的「從沒打過就先顯示 0台」那一種情況。 */
+    chipTailInLobby:true,
 
     init(c){ ctx = c; },
 
@@ -1058,7 +1062,13 @@ const MP = MPCore.create((function(){
              // ★ 連莊記號跟著莊家記號走(v1.108.0),三個地方共用 M16B.lianHTML()
              (st && s===st.dealer ? '<span class="m16-dz">莊</span>' + M16B.lianHTML(st.dealerStreak) : '');
     },
+    /* ★ v1.125.0:回大廳(打滿一場 / 中途有人離開退回)之後這支還會被叫到(見下面
+       chipTailInLobby)——這裡才要多擋一種情況:**從沒打過任何一手**的全新房間,
+       不要在大廳晶片上先掛一顆「0台」佔位(那不是戰績,是還沒發生的事)。
+       ⚠ 對局中(ctx.phase()==="playing")完全不受影響 —— 一局才剛開打、台數都是 0
+         的那段本來就會照畫,那是既有行為。 */
     chipTail(id){
+      if(ctx.phase()!=="playing" && !handsDone()) return "";
       const t = taiOf(id);
       return '<span class="m16-pts'+(t<0?" neg":"")+'">'+(t>0?"+":"")+t+'<em>台</em></span>';
     },
