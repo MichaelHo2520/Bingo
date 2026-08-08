@@ -6302,8 +6302,35 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ★ 「結束連吃」只在連吃還吃得到的時候出現 —— 沒得吃時規則層已經自動結束了。
      ⚠ 高度寫死:它比操作提示那一行高,而 .dc-actline 的 min-height 要蓋得住它。 */
   .dc-stop{height:28px;padding:0 15px;font-size:14px;min-width:96px}
-  .dc-cd{font-size:12px;font-weight:800;color:var(--muted)}
-  .dc-cd.hot{color:var(--daub)}
+
+  /* ---------- 走棋倒數的環(v1.120.0 起與台灣麻將同一顆)----------
+     使用者:「倒數秒數的方式,請參考台灣麻將的顯示方式」。舊版是一行純文字
+     「⏱ N 秒」;現在與 .m16-cd 是同一份配方(SVG 環圈 + 中間秒數,最後 3 秒轉紅脈動)。
+     ★ 幾何與關鍵影格逐字沿用 m16(viewBox 40 · r=17 · dasharray 107 ·
+       m16cd / m16beat / m16cdhot)—— 同一件事只有一種畫法,不再定義一份同名的環
+       (同 21 點 .bj-cd / UNO .un-cd 那份紀律)。
+     ⚠ 這裡的環是**每次 renderActs() 都重建的節點**(同 21 點,不是 m16 的持久節點)——
+       接得上靠負的 animation-delay,見 board.js 的 syncCd()。 */
+  .dc-cdwrap{display:flex;align-items:center;justify-content:center}
+  .dc-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+  .dc-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .dc-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  .dc-cdbg{stroke:rgba(255,255,255,.16)}
+  /* 107 ≈ 2πr(r=17)。從 0 排到滿 = 環圈整圈消失 */
+  .dc-cdfg{stroke:var(--accent-2);stroke-dasharray:107;stroke-dashoffset:0;
+    animation:m16cd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .dc-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .dc-cdn.dc-beat{animation:m16beat .34s ease-out}
+  .dc-cd.dc-hot .dc-cdfg{stroke:var(--daub)}
+  .dc-cd.dc-hot .dc-cdn{color:var(--daub)}
+  .dc-cd.dc-hot{animation:m16cdhot .9s ease-in-out infinite}
+  :root[data-theme="ebook"] .dc-cdbg{stroke:rgba(0,0,0,.18)}
+  :root[data-theme="ebook"] .dc-cdfg{stroke:#000}
+  /* 會動的東西一律尊重系統的「減少動態效果」(同 m16 那條) */
+  @media (prefers-reduced-motion:reduce){
+    .dc-cd.dc-hot{animation:none}
+    .dc-cdn.dc-beat{animation:none}
+  }
 
   /* ---------- 結果卡 ----------
      ⚠ 權重要寫成 `.win-card.dc-win`(0,2,0)才壓得過共用的 `.win-card .word` ——

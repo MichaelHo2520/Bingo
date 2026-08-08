@@ -34,7 +34,7 @@ const DCB = (function(){
   let cur = null;                     // 最近一次 setState 的參數
   let lastKey = -1;                   // 上一次畫的手數(決定要不要播翻牌動畫)
   let wide = true;                    // 目前是不是橫向排法(8 欄)
-  let cdT = null;
+  let cdT = null, cdKey = "", cdEnd = 0;   // 走棋倒數的環:用 key 去重,不看 timer(見 syncCd)
 
   /* ==========================================================================
      一、音效 —— 全部用合成音,不進 mp3/
@@ -244,6 +244,7 @@ const DCB = (function(){
     if(st.over || cur.over){
       acts.classList.add("hidden");
       acts.innerHTML = "";
+      stopCd();
       return;
     }
     bits.push(trayHTML(st));
@@ -269,25 +270,64 @@ const DCB = (function(){
              '<button type="button" class="btn dc-stop" data-act="stop">結束連吃</button></div>';
     }
     bits.push('<div class="dc-actline">' + line + "</div>");
-    if(cur.cdEnd) bits.push('<div class="dc-cd" id="dcCd"></div>');
+    bits.push('<div class="dc-cdwrap" id="dcCdWrap"></div>');
     acts.innerHTML = bits.join("");
     acts.classList.remove("hidden");
-    if(cur.cdEnd) startCd(); else stopCd();
+    syncCd(cur.cdMs, cur.cdEnd);
   }
 
-  function startCd(){
-    stopCd();
-    const tick = () => {
-      const el = $("dcCd");
-      if(!el || !cur || !cur.cdEnd){ stopCd(); return; }
-      const left = Math.max(0, Math.ceil((cur.cdEnd - Date.now()) / 1000));
-      el.textContent = "⏱ " + left + " 秒";
-      el.classList.toggle("hot", left <= 5);
-    };
-    tick();
-    cdT = setInterval(tick, 250);
+  /* ---------- 走棋倒數的環 ----------
+     使用者:「倒數秒數的方式,請參考台灣麻將的顯示方式」—— 與 .m16-cd 是同一份配方
+     (SVG 環圈 + 中間秒數,最後 3 秒轉紅脈動),幾何與關鍵影格逐字沿用 m16,見 styles.css。
+     ⚠ 兩個從台灣麻將 / 21 點繼承的坑:
+       ① 用**負的 animation-delay** 接續播放,duration 永遠是這一手的總長
+          (這樣 e2e 才量得到設定值)。
+       ② 去重的 key **不可以看 cdT 還在不在**:數字走到 0 之後 tickCd() 就把 interval
+          停了,而 timer 本身還有幾百毫秒沒響;那段空窗裡只要再叫一次 renderActs()
+          環就會彈回滿格,而那個彈跳本身就是雜訊。
+     ⚠ 與 m16 的持久節點不同,這裡的環是**每次 renderActs 都重建的節點**(同 21 點)——
+       重建照樣接得上,靠的就是①那個負延遲。 */
+  const CD_HOT = 3000;
+  function syncCd(cdMs, endAt){
+    const box = $("dcCdWrap");
+    if(!box) return;
+    if(!cdMs || !endAt){ stopCd(); return; }
+    const left = endAt - Date.now();
+    if(left <= 0){ stopCd(); return; }
+    const key = cdMs + ":" + endAt;
+    cdEnd = endAt;
+    box.innerHTML =
+      '<span class="dc-cd' + (left <= CD_HOT ? " dc-hot" : "") + '" id="dcCd" aria-hidden="true"' +
+        ' style="--cd-dur:' + (cdMs / 1000) + 's;--cd-delay:' + (-(cdMs - left) / 1000) + 's">' +
+        '<svg viewBox="0 0 40 40"><circle class="dc-cdbg" cx="20" cy="20" r="17"/>' +
+        '<circle class="dc-cdfg" cx="20" cy="20" r="17"/></svg>' +
+        '<b class="dc-cdn" id="dcCdN">' + Math.ceil(left / 1000) + '</b>' +
+      '</span>';
+    if(key === cdKey && cdT) return;          // 同一段倒數:重畫畫面不重跑動畫
+    cdKey = key;
+    if(cdT) clearInterval(cdT);
+    cdT = setInterval(tickCd, 200);
   }
-  function stopCd(){ if(cdT){ clearInterval(cdT); cdT = null; } }
+  /* 只換中間那個數字與 hot 狀態 —— 環圈本身完全交給 CSS 動畫(理由見上面①)。 */
+  function tickCd(){
+    const el = $("dcCd");
+    if(!el){ if(cdT){ clearInterval(cdT); cdT = null; } return; }
+    const left = cdEnd - Date.now();
+    const n = el.querySelector(".dc-cdn");
+    const s = String(Math.max(0, Math.ceil(left / 1000)));
+    if(n && n.textContent !== s){
+      n.textContent = s;
+      n.classList.remove("dc-beat"); void n.offsetWidth; n.classList.add("dc-beat");
+    }
+    el.classList.toggle("dc-hot", left <= CD_HOT);
+    if(left <= 0){ clearInterval(cdT); cdT = null; }
+  }
+  function stopCd(){
+    if(cdT){ clearInterval(cdT); cdT = null; }
+    cdKey = ""; cdEnd = 0;
+    const box = $("dcCdWrap");
+    if(box) box.innerHTML = "";
+  }
 
   /* ==========================================================================
      五、點擊流程
@@ -413,8 +453,9 @@ const DCB = (function(){
     }
   }
 
-  /* o = { st, mySide, mine, over, key, turnName, cdEnd, mySeat, names }
-     ★ mySeat / names 只給**吃子欄**用(誰吃掉了什麼);沒帶的話退回「你 / 對手」。 */
+  /* o = { st, mySide, mine, over, key, turnName, cdMs, cdEnd, mySeat, names }
+     ★ mySeat / names 只給**吃子欄**用(誰吃掉了什麼);沒帶的話退回「你 / 對手」。
+     ★ cdMs / cdEnd 只有連線(adapter.js)會帶 —— 單機沒有走棋倒數,環不會出現。 */
   function setState(o){
     cur = o || null;
     if(!cur || !cur.st) return;

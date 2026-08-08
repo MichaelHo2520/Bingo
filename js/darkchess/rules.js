@@ -285,7 +285,7 @@ const DC = (function(){
          "eat"   吃相鄰的敵方明棋
          "jump"  炮隔子跳吃(目標可以是暗棋)
          "rush"  車直衝(房規 rush;距離 >= 2、中間全空、目標是敵方明棋)
-         "dark"  連吃鏈中翻攻相鄰暗棋(房規 chainDark;只在鏈中出現)
+         "dark"  翻攻相鄰暗棋(房規 chainDark;第一步或連吃鏈中皆可,見 capTargets())
      ========================================================================== */
 
   // 炮:沿四方向找「炮架之後的第一顆子」
@@ -331,8 +331,10 @@ const DC = (function(){
   }
 
   /* 純吃子的落點(不含走空格)。連吃鏈續吃、以及一般吃子都吃這一支。
-     inChain = 這是連吃鏈中的一步(只有這時候 chainDark 才給暗棋當目標)。 */
-  function capTargets(st, from, mySide, inChain){
+     ★ chainDark 開著時,翻攻相鄰暗棋**不限定在鏈中**(使用者:「連吃要可以吃沒有
+       打開的牌,現在是第一張一定要是明牌,但我要的是第一步暗牌也可以吃」)——
+       第一步也能拿它當暗殺用,吃得動就照樣啟動連吃(見 afterCapture())。 */
+  function capTargets(st, from, mySide){
     const cell = st.cells[from];
     if(!cell || !cell.up || sideOf(cell.p) !== mySide) return [];
     const myRank = rankOf(cell.p);
@@ -345,7 +347,7 @@ const DC = (function(){
       if(!c) continue;
       if(c.up){
         if(sideOf(c.p) !== mySide && canBeat(myRank, rankOf(c.p))) out.push({ to: t, kind: "eat" });
-      }else if(inChain && st.rules.chainDark){
+      }else if(st.rules.chainDark){
         /* ★ 翻攻:合不合法在**這裡**不看底下是什麼(看了就是作弊)——
            賭的結果在 applyDark() 才揭曉。 */
         out.push({ to: t, kind: "dark" });
@@ -365,7 +367,7 @@ const DC = (function(){
     if(!cell || !cell.up || sideOf(cell.p) !== mySide) return [];
     if(st.chainFrom >= 0) return from === st.chainFrom ? chainTargets(st) : [];
 
-    const out = capTargets(st, from, mySide, false);
+    const out = capTargets(st, from, mySide);
     // 走空格:一律相鄰一格(炮也是;車直衝**只**用來吃子,不能當移動)
     nbs(from).forEach(t => { if(!st.cells[t]) out.push({ to: t, kind: "move" }); });
     return out;
@@ -374,7 +376,7 @@ const DC = (function(){
   // 連吃進行中還能續吃哪幾格(空陣列 = 只能停,而 step 會自動幫他停)
   function chainTargets(st){
     if(st.over || st.chainFrom < 0) return [];
-    return capTargets(st, st.chainFrom, seatSide(st, st.turn), true);
+    return capTargets(st, st.chainFrom, seatSide(st, st.turn));
   }
 
   // 可以翻的格
@@ -578,7 +580,7 @@ const DC = (function(){
     for(let i = 0; i < NSQ; i++){
       const c = st.cells[i];
       if(!c || !c.up || sideOf(c.p) !== side) continue;
-      if(capTargets(st, i, side, false).length) return true;
+      if(capTargets(st, i, side).length) return true;
       const list = nbs(i);
       for(let k = 0; k < list.length; k++) if(!st.cells[list[k]]) return true;
     }
@@ -601,7 +603,7 @@ const DC = (function(){
        連吃還沒結束時後兩條恆為假,而且是結構上的:
          • idle —— 剛剛才吃掉一顆,一定是 0
          • hasAnyMove —— 續吃的目標若是暗棋,它自己就是一顆「還可以翻的暗棋」;
-           若是明棋,那個落點在 capTargets(inChain=false) 裡也照樣算得到
+           若是明棋,那個落點在 capTargets() 裡也照樣算得到
        多寫那一條就是一段**永遠到不了的碼**(拿掉它突變測試會存活),所以改成
        L 節的一條不變量斷言 —— 這是 UNO 那邊「測不到的碼拿掉、前提改成斷言」的同一招。 */
     if(!hasAnyMove(st, st.turn)){ finish(st, 1 - st.turn, "stuck"); return; }
@@ -727,11 +729,9 @@ const DC = (function(){
     if(!tc){
       return adjacent(from, to) ? "那一格走得到" : "一次只能走一格";
     }
-    if(!tc.up){
-      return st.rules.chain && st.rules.chainDark
-        ? "暗棋只能翻 —— 連吃鏈中才打得到暗棋"
-        : "暗棋只能翻,不能吃";
-    }
+    /* ⚠ 走到這裡 chainDark 一定是關的 —— 開著的話 capTargets() 早就把它收進
+       moveTargets() / chainTargets() 了,不會落到「點不了」這一支。 */
+    if(!tc.up) return "暗棋只能翻,不能吃";
     if(sideOf(tc.p) === mySide) return "那是自己的子";
     if(!adjacent(from, to)){
       if(myRank !== R_JU) return "一次只能走一格";

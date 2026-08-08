@@ -100,6 +100,7 @@ const MP = MPCore.create((function(){
       mySeat: me,
       names: ctx.order().map(id => ctx.dispName(id)),
       // 倒數環給雙方都看得到(誰還剩幾秒是公開資訊,對手才知道為什麼卡著)
+      cdMs: secOn() ? turnSec * 1000 : 0,
       cdEnd: (secOn() && !st.over) ? (turnAt + turnSec * 1000) : 0
     });
   }

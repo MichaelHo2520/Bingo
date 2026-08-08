@@ -278,11 +278,16 @@ const DCAI = (function(){
     return isDark(st, DC.unSq(mv[2]));
   }
 
-  // 會翻牌的那一手,對「走這一手的人」值多少
+  /* 會翻牌的那一手,對「走這一手的人」值多少。
+     ⚠ 炮 vs 翻攻要看**這顆子是不是炮**,不能看 st.chainFrom >= 0 —— chainDark 開著時
+       翻攻第一步就能發生(rules.js 的 capTargets() 不再限定在鏈中),用「在不在鏈中」
+       判斷會把第一步的翻攻誤判成炮打暗子(兩者的下場公式完全不同)。 */
   function gambleOf(st, mv, mover, vt, tally){
     if(mv[0] === "f") return gambleFlip(st, DC.unSq(mv[1]), mover, vt, tally);
-    if(st.chainFrom >= 0) return gambleDark(st, st.chainFrom, DC.unSq(mv[2]), mover, vt, tally);
-    return gambleCannon(st, DC.unSq(mv[2]), mover, vt, tally);
+    const from = DC.unSq(mv[1]);
+    const mine = knownAt(st, from);
+    if(mine !== null && DC.rankOf(mine) === DC.R_PAO) return gambleCannon(st, DC.unSq(mv[2]), mover, vt, tally);
+    return gambleDark(st, from, DC.unSq(mv[2]), mover, vt, tally);
   }
 
   // 排序用的「立即收益」(不是估值)
