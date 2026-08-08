@@ -727,8 +727,11 @@
      .set-card 的 width:100% 先被 .veil 的 grid area 夾住,max-width 比它大時不會撐出橫向捲動。 */
   .emote-card{max-width:clamp(340px,44vw,460px);position:relative;overscroll-behavior:contain;touch-action:pan-y}  /* 只有卡片內部可上下捲,不外溢到背景 */
   #emoteVeil{touch-action:none}   /* 手指在卡片外(背景)滑動時,不捲動背景頁 */
-  /* 右上角關閉 ✕:sticky 固定在卡片可視區右上,卡片內部捲動時也不會捲走 */
-  .card-x{position:sticky;top:0;margin:-6px -4px -32px auto;z-index:4;
+  /* 右上角關閉 ✕:sticky 固定在卡片可視區右上,卡片內部捲動時也不會捲走。
+     ⚠ flex-shrink:0 不可省:房規卡是 display:flex;flex-direction:column(見 .dc-rules-card 等),
+       內容一長、卡片被 max-height 夾住,這顆鈕沒設的話會跟著被壓扁高度(寬不變、高被壓到剩一半),
+       圓形變橢圓——Chromium 才會顯這個症狀,WebKit 量不出來,別只用一顆引擎驗。 */
+  .card-x{position:sticky;top:0;margin:-6px -4px -32px auto;z-index:4;flex-shrink:0;
     width:34px;height:34px;border-radius:50%;border:1px solid var(--panel-line);
     background:rgba(255,255,255,.12);color:var(--text);font-size:15px;font-weight:800;line-height:1;
     cursor:pointer;display:grid;place-items:center;transition:background .15s,transform .1s}
