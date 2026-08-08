@@ -123,6 +123,11 @@ const MP = MPCore.create((function(){
      ⚠ 連線的桌次每局輪換座位(newGame 的 ord),座位編號對不上「圈裡第幾位」,所以不能像
        單機那樣直接拿 dealerSeat 推,只能另外存這個跨局計數。 */
   let dealerPass = 0;
+  /* ⚠ applyGame() 對同一個 rid 不保證只收到一次 over 快照(房主中途重連就會重收一次,
+     見上面 lastDeal 那條註解)。lastDeal 重算是冪等的(同一個 over 永遠算出同一個答案),
+     但 dealerPass++ 不是 —— 沒有這個記號的話,每重連一次、圈數就多算一次,「兩圈」
+     沒打幾局就打完了。跟 commitTai() 的 _r[roundId] 是同一個道理,只是這裡是本機變數。 */
+  let dealerPassRid = null;
 
   const secOn   = () => claimSec > 0;                     // 操作倒數有沒有開
   const budgetMs = () => claimSec * 1000;                 // 一手的總預算(從 handAt 起算)
@@ -876,7 +881,7 @@ const MP = MPCore.create((function(){
       if(finished){
         const tr = ctx.ref("tai");
         if(tr) tr.remove();
-        tai = {}; done = 0; lastDeal = null; dealerPass = 0;   // 新的一場:連莊與圈數也跟著歸零
+        tai = {}; done = 0; lastDeal = null; dealerPass = 0; dealerPassRid = null;   // 新的一場:連莊與圈數也跟著歸零
       }
       /* 誰坐莊:連莊(v1.102.0)—— 上一局算出來的那個人,換算成他在**新座位表**的位子。
          ⚠ 找不到人(第一局 / 他離開了 / 房主是這局結束後才進來的)一律退回「局數 % 家數」,
@@ -957,7 +962,11 @@ const MP = MPCore.create((function(){
         const nx = MJT.nextDealerOf(s);
         const nid = nx ? idOfSeat(nx.dealer) : "";
         if(nid){
-          if(nx.streak === 0) dealerPass++;   // 真的換人才算一次「過位」(v1.122.0,圈數的量尺)
+          // 這一局(rid)算過圈數了就不再算第二次(重連補送同一份 over 快照時擋下來)
+          if(dealerPassRid !== rid){
+            dealerPassRid = rid;
+            if(nx.streak === 0) dealerPass++;   // 真的換人才算一次「過位」(v1.122.0,圈數的量尺)
+          }
           lastDeal = { id:nid, streak:nx.streak };
         }
       }
@@ -989,7 +998,7 @@ const MP = MPCore.create((function(){
       clearClaimT(); clearTurnT(); clearAutoTingT(); clearNext();
       st=null; curRound=null; tai={}; myBid=false; handAt=0;
       // 離房:連莊與圈數記錄跟著清(換房間就是新牌局)
-      baseWins = {}; lastGained = []; lastDeal = null; dealerPass = 0;
+      baseWins = {}; lastGained = []; lastDeal = null; dealerPass = 0; dealerPassRid = null;
       wipeActs();
     },
 

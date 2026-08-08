@@ -384,7 +384,8 @@ const CLIPS=[
   { id:"hurry",   label:"快點來不及啦",  src:"mp3/快點，來不急啦.m4a" },
   { id:"gofast",  label:"你就趕快啦",    src:"mp3/你就趕快啦.m4a" },
   { id:"crying",  label:"你是在哭喔",    src:"mp3/你是在哭喔.m4a" },
-  { id:"verify",  label:"我要驗牌",      src:"mp3/我要驗牌.m4a" }
+  { id:"verify",  label:"我要驗牌",      src:"mp3/我要驗牌.m4a" },
+  { id:"fine",    label:"牌沒問題",      src:"mp3/牌沒問題.m4a" }
 ];
 let emoteTarget="all";
 function openEmote(target){
