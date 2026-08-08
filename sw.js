@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.125.0";
+const VERSION = "1.126.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -179,6 +179,7 @@ const CORE = [
   "./mp3/你是在哭喔.m4a",
   "./mp3/我要驗牌.m4a",
   "./mp3/牌沒問題.m4a",
+  "./mp3/沒禮貌.m4a",
   "./manifest.json",
   "./icon.svg"
 ];
