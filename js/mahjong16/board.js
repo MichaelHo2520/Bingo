@@ -1443,7 +1443,10 @@ const M16B = (function(){
   /* rows:[{ name, me, total, delta, role, wins }] —— 順序不拘,這裡自己照台數排
        total 累積台數 · delta 這一局的增減 · role 上面那支算的 ·
        wins { n, plus } 或 **null(單機沒有勝場,整欄消失)**
-     opts:{ done 打完幾局, goal 這一場幾局, final 是不是最後一局 } */
+     opts:{ progressText 還在打時的表頭後半, finalText 打完時的表頭後半, final 是不是最後一局 }
+     ⚠ v1.122.0:「打幾局」可以改成「打幾圈」,兩種目標的文案完全不同(局數版是
+       「第 3/4 局結束」,圈數版要講圈風)——這裡不管單位是什麼,字串一律由呼叫端
+       (solo.js / adapter.js 各自的 goalProgressText / goalFinalText)算好再傳進來。 */
   function rankHTML(rows, opts){
     const o = opts || {};
     const hasWin = rows.some(r => r.wins);
@@ -1452,8 +1455,8 @@ const M16B = (function(){
        (`#m16Tai` 的 textContent),而它們本來就是最準的說法。 */
     /* ⚠ 這裡曾經還掛一句「收付相加為 0」(v1.75.15 拿掉)——
        使用者:「對使用者沒有用」。那是**開發時的不變量**(零和斷言),不是玩家要看的。 */
-    const head = o.final ? '<b>總結算</b> · ' + o.goal + ' 局打完'
-                         : '<b>目前台數</b> · 第 ' + o.done + ' / ' + o.goal + ' 局結束';
+    const head = o.final ? '<b>總結算</b> · ' + o.finalText
+                         : '<b>目前台數</b> · ' + o.progressText;
     let rank = 0, prev = 0;
     return '<div class="m16-taih">' + head + '</div>' +
       sorted.map((r, i) => {

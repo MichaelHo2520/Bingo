@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.121.1 -->
-<meta name="version" content="1.121.1">
+<!-- 台灣 16 張麻將 · v1.122.0 -->
+<meta name="version" content="1.122.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -120,11 +120,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </div>
       <div class="field">
         <span class="field-label">打幾局</span>
+        <!-- v1.122.0:除了「1 局」,其它都改成算圈數(每個人都當完一次莊家、且下莊後
+             才算數),不再是單純的發牌手數——data-goal 是負數就代表圈數(見 solo.js 的
+             GOALS)。與 #m16GoalSeg 是兩份,要一起改。 -->
         <div class="seg" id="m16SoloGoalSeg" aria-label="打幾局">
           <button data-goal="1">1 局</button>
-          <button class="on" data-goal="4">一圈 4 局</button>
-          <button data-goal="8">8 局</button>
-          <button data-goal="16">一將 16 局</button>
+          <button class="on" data-goal="-1">1 圈</button>
+          <button data-goal="-2">2 圈</button>
+          <button data-goal="-4">一將(4圈)</button>
         </div>
       </div>
       <div class="field">
@@ -218,11 +221,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="subtitle">對戰設定</div>
       <div class="field">
         <span class="field-label" id="m16GoalLabel">打幾局</span>
+        <!-- v1.122.0:除了「1 局」,其它都改成算圈數(每個人都當完一次莊家、且下莊後
+             才算數),不再是單純的發牌手數——data-goal 是負數就代表圈數(見 adapter.js
+             的 GOALS)。與 #m16SoloGoalSeg 是兩份,要一起改。 -->
         <div class="seg" id="m16GoalSeg" aria-label="打幾局">
           <button data-goal="1">1 局</button>
-          <button class="on" data-goal="4">一圈 4 局</button>
-          <button data-goal="8">8 局</button>
-          <button data-goal="16">一將 16 局</button>
+          <button class="on" data-goal="-1">1 圈</button>
+          <button data-goal="-2">2 圈</button>
+          <button data-goal="-4">一將(4圈)</button>
         </div>
       </div>
       <!-- 底幾台(v1.75.18)。★ 一定是房間設定:底台是算收付用的,各人一份的話
@@ -329,9 +335,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn primary" id="mpAgain">下一局 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
-      <!-- 局間續局的腳註(v1.103.0):倒數還剩幾秒 / 還在等幾個人。
-           連線、打一圈以上、而且不是最後一局才會出現(字全部由 adapter 的 paintNext 填)。
-           ★ #mpAgain 上面的字也是那支換的:續局中是「我看完了」,最後一局才是「下一局 ▸」。 -->
+      <!-- 局間續局的腳註(v1.103.0,v1.122.0 拿掉自動倒數):還在等幾個人。
+           連線、打超過 1 局、而且不是最後一局才會出現(字全部由 adapter 的 paintNext 填)。
+           ★ #mpAgain 上面的字也是那支換的:續局中是「我看完了」,最後一局才是「下一局 ▸」。
+           ⚠ 不再自動繼續——沒人按就一直等,見 adapter.js「局間續局」那一段的檔頭。 -->
       <div class="m16-next hidden" id="m16Next" aria-live="polite"></div>
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
            id 刻意與數獨 / 消消樂同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->

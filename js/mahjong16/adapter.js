@@ -11,6 +11,8 @@
    ── ★ 一個 MP round = 一「局」 ────────────────────────────────────────────
      刻意這樣對映,核心那套(roundId 冪等 / 繼續下一局 / 斷線重建)就原封不動能用。
      「打幾局」= 房間設定 handsGoal,打滿了結果卡就換成總結算 + 開新賽季。
+     ⚠ v1.122.0 起 handsGoal 可能是負數:那時目標是「打幾圈」(每個人都當完一次莊家、
+       且下莊之後才算數),不是「發過幾手牌」——見 goalLabel() / seasonRemaining() 的檔頭。
 
    ── ★ 宣告裁決不指定房主 ──────────────────────────────────────────────────
      手牌明碼 → 每台裝置都能用純函式算出「誰有資格宣告什麼」,所以誰都可以結算,
@@ -68,8 +70,28 @@ const MP = MPCore.create((function(){
   const BASE_DEF = 2;
   const baseOK = n => n >= 1 && n <= 10;
 
+  /* 打幾局(v1.122.0 起改成「除了 1 局,其它都算圈數」—— 使用者:「一圈是要指每一個人都
+     當完莊家,並且下莊後才算」。★ 負數 = 圈數,正數 = 局數,兩種目標刻意共用同一個欄位、
+     用正負號分岔(button 的 data-goal 直接就是這個數字,不必另開一個「單位」欄位)。 */
+  const GOALS = [1, -1, -2, -4];                          // ⚠ 要與 mahjong16.html 的 #m16GoalSeg 一致
+  const goalOK = n => GOALS.indexOf(n) >= 0;
+  function goalLabel(g){
+    if(g > 0) return g + " 局";
+    return (-g === 4) ? "一將(4圈)" : ((-g) + " 圈");
+  }
+  /* 對局中房間框那顆徽章。局數版沿用舊字;圈數版顯示目前圈風 + 第幾圈。
+     ⚠ 要在 face()/idOfSeat() 等其他 helper 定義好之後才能用,呼叫端(updateGoal)
+       本來就在那之後才會用到,不必特別搬動宣告順序。 */
+  function goalBadgeText(){
+    if(handsGoal > 0) return "第 "+Math.min(handsGoal, handsDone()+1)+"/"+handsGoal+" 局";
+    const rGoal = -handsGoal;
+    const idx = st ? MJT.WINDS.indexOf(st.roundWind) : 0;
+    const w = st ? face(st.roundWind).name : "東";
+    return w+"圈 · 第 "+(idx+1)+"/"+rGoal+" 圈";
+  }
+
   let ctx = null;
-  let handsGoal = 4;                // 打幾局(房間設定)
+  let handsGoal = -1;                // 打幾局 / 打幾圈(房間設定,負數 = 圈數)
   let claimSec = SEC_DEF;           // 宣告視窗幾秒(房間設定)
   let baseTai = BASE_DEF;           // 底幾台(房間設定)
   let st = null;                    // 目前這一局的 MJT state(解碼後)
@@ -95,6 +117,12 @@ const MP = MPCore.create((function(){
        playing 是 false 但 winner 有值,照樣進得來)。真的問不到(例如房主是這一局
        結束後才進房的)就退回原本的「局數 % 家數」,不會壞掉、只是不連莊。 */
   let lastDeal = null;              // { id:下一局的莊家 playerId, streak:連莊數 }
+  /* 這一場「莊家真的換過幾次人」(v1.122.0,圈數的量尺)。★ 只有 nextDealerOf() 回傳
+     streak===0(換人,不是連莊/拉莊)才 +1,在 applyGame() 見到 over 那一刻跟 lastDeal
+     一起算——每台都會算,但只有房主叫得到 newGame() 才用得到它,理由與 lastDeal 同一條。
+     ⚠ 連線的桌次每局輪換座位(newGame 的 ord),座位編號對不上「圈裡第幾位」,所以不能像
+       單機那樣直接拿 dealerSeat 推,只能另外存這個跨局計數。 */
+  let dealerPass = 0;
 
   const secOn   = () => claimSec > 0;                     // 操作倒數有沒有開
   const budgetMs = () => claimSec * 1000;                 // 一手的總預算(從 handAt 起算)
@@ -166,6 +194,15 @@ const MP = MPCore.create((function(){
      這一局,否則「我明明自摸 24 台,表上卻沒加」與「最後一局沒寫本場結束」都會偶發。 */
   function taiCounted(){ return !!(tai._r && curRound && tai._r[curRound]); }
   function handsDoneNow(){ return handsDone() + ((!taiCounted() && st && st.over) ? 1 : 0); }
+  /* 打完幾圈了(v1.122.0)。★ 不必像 handsDoneNow() 那樣補「這一局還沒記進去」的樂觀值 ——
+     dealerPass 是本機變數,applyGame() 見到 over 就同步 +1 過,不像 handsDone() 要等
+     commitTai() 的交易回來,沒有時間差可補。 */
+  function roundsDoneNow(){ return MJT.roundsOf((st && st.seats) || 4, dealerPass); }
+  /* 這一場還沒打完(v1.122.0)。★ handsGoal>0 是舊的「打幾局」,<0 是新的「打幾圈」——
+     兩者刻意共用同一個判斷,contOn() / outcome() 都不必先問清楚自己是哪一種。 */
+  function seasonRemaining(){
+    return handsGoal > 0 ? (handsGoal - handsDoneNow() > 0) : ((-handsGoal) - roundsDoneNow() > 0);
+  }
 
   /* ---------- 比分列 ----------
      ★ v1.58.2 拿掉了獨立的 .m16-hud 大卡片,改成走**房間框裡的玩家晶片**
@@ -681,78 +718,65 @@ const MP = MPCore.create((function(){
               有人離開牌桌就真的全桌卡著等。玩家要據此決定要不要設秒數 → 一定要明講。 */
            "<br><span class=\"m16-warn\">⚠ 有人離開牌桌,全桌會一直等他。</span><br>"))+
       "誰在考慮吃碰,其他人看不出來。<br>"+
-      "打滿 <b>"+handsGoal+" 局</b>後結算,台數最高的人贏。"+
-      /* 續局是**規則以外但看得到**的流程改變(打一圈時中間不會回大廳),寫進說明裡 ——
-         不然房主會以為「怎麼沒有回到準備畫面」。只打 1 局就不提(它沒有中間局)。 */
-      (handsGoal > 1
-        ? "<br>中間每一局結束<b>不回大廳</b>:結果卡看完按一下就接著打(" +
-          Math.round(NEXT_MS/1000) + " 秒後自動)。"
+      "打滿 <b>"+goalLabel(handsGoal)+"</b>後結算,台數最高的人贏。"+
+      /* 續局是**規則以外但看得到**的流程改變(打超過 1 局時中間不會回大廳),寫進說明裡 ——
+         不然房主會以為「怎麼沒有回到準備畫面」。只打 1 局就不提(它沒有中間局)。
+         ⚠ v1.122.0 拿掉了「N 秒後自動」:續局不再倒數,要等全部人都按過(見下面那一整段)。 */
+      (handsGoal !== 1
+        ? "<br>中間每一局結束<b>不回大廳</b>:結果卡看完按一下「✓ 我看完了」,"+
+          "等大家都按了就接著打下一局。"
         : "");
   }
 
   /* ==========================================================================
-     局間續局(v1.103.0)—— 使用者:「玩完一局後,不用全部人都要再按準備好了,
-     這樣沒有連續感」。
+     局間續局(v1.103.0,v1.122.0 拿掉自動倒數)—— 使用者:「玩完一局後,不用全部人都要
+     再按準備好了,這樣沒有連續感」;後來使用者又說:「勝負畫面不要有倒數,我們就等每個人
+     要按繼續下一局才開始」——原本的 15 秒到期自動 readyUp() 是為了「不能讓全房等一個人」,
+     現在使用者的選擇是寧可等,所以整個到期動作拿掉,只留純粹的「等大家都按過」。
      ──────────────────────────────────────────────────────────────────────────
-     ★ 只有**中間那幾局**續(handsGoal > 1 且還沒打滿):
+     ★ 只有**中間那幾局**續(handsGoal 不是 1 且還沒打滿):
        · 只打 1 局 —— 打完就是整場結束,本來就該回大廳談下一場的設定。
        · 最後一局 —— 結果卡是**總結算**(誰奪冠 / 開新賽季),把人留在那張卡上才對。
      ★ 機制在核心的 contRound 旗標(見 mp-core.js 檔頭):readyUp() 不離開 playing 相位,
        所以**結果卡一路開著到新的一局發牌**,中間不會閃過大廳設定畫面 —— 那個閃動正是
        「沒有連續感」的來源。房主端湊齊就 startGame()。
-     ★ 為什麼還留一顆按鈕:全部人都按完就**馬上**開下一局,不用等倒數。
-       ⚠ 鈕上的字一律「我看完了」而不是「下一局」—— 按下去不會馬上換局(要等其他人),
-         字與實際發生的事不一致的話,下一步會有人猛按(同 21 點 v1.95.0 的結論)。
-     ⚠ NEXT_MS 是**後備**,不是節奏:它擋的是「有人放著不管全桌乾等」。
-       台數表比 21 點那張過場密,所以比它的 6 秒長。
-     ⚠ 倒數是**各台自己的** setTimeout(不是伺服器時間):誰的先到誰先準備好,
-       全房的節奏由最慢的那台決定 —— 這與「到期補過」不同,不搶、不會有兩份真相。
+     ⚠ 沒有到期兜底了:有人放著結果卡不管,全桌就真的一直等 —— 這是使用者明確要的行為,
+       不是遺漏(親友聚會現場喊一聲就好,同操作倒數關掉時的那條選擇)。
+     ⚠ 腳註**不是**倒數,不需要 timer:「還在等幾個人」靠 outcome() 被反覆呼叫來更新
+       (核心的 players 監聽 readyUp() 一寫就會叫),不必自己排 setInterval。
      ========================================================================== */
-  const NEXT_MS = 15000;
-  let nextKey = "";                 // 已經為哪一局 arm 過(outcome() 會被重複呼叫,見那裡)
-  let nextT = null, nextTick = null, nextEnd = 0;
+  let nextKey = "";                 // 這一局要不要顯示續局腳註(outcome() 會被重複呼叫,見那裡)
 
   /* 這一局結束之後要不要續。三個條件缺一不可:
-       · 打一圈以上(只打 1 局沒有「中間局」)
+       · 打超過 1 局(只打 1 局沒有「中間局」)
        · 還沒打滿(最後一局的結果卡是總結算,要把人留在那裡)
        · ⚠ 人還夠開下一局 —— 少了這一條,剩一個人時會停在「大家都看完了…」永遠開不了局
          (房主端 updateStartBtn 有人數門檻,而房主獨自一人的自動回大廳只在**沒有 winner**
          時才動;那時候正好有 winner)。人數不夠就退回原本的「下一局 = 回大廳」。
      ★ outcome() 每次重跑都會重新問一次,所以中途有人離開會自己切回去。 */
   function contOn(){
-    return handsGoal > 1 && handsDoneNow() < handsGoal &&
+    return handsGoal !== 1 && seasonRemaining() &&
            Object.keys(ctx.players()).length >= ctx.minPlayers;
   }
   function seenBy(id){ return !!(ctx.players()[id] || {}).ready; }
   function waitCount(){ return Object.keys(ctx.players()).filter(id=>!seenBy(id)).length; }
 
   function clearNext(){
-    if(nextT){ clearTimeout(nextT); nextT = null; }
-    if(nextTick){ clearInterval(nextTick); nextTick = null; }
-    nextKey = ""; nextEnd = 0;
+    nextKey = "";
     const el = $("m16Next"); if(el){ el.classList.add("hidden"); el.innerHTML = ""; }
   }
-  function armNext(){
-    nextEnd = performance.now() + NEXT_MS;
-    nextT = setTimeout(()=>{ nextT = null; ctx.readyUp(); paintNext(); }, NEXT_MS);
-    /* 半秒一次:整數秒的顯示才不會偶爾跳過一個數字(500ms 取樣、Math.ceil 換算)。
-       ⚠ 這裡只換一行字,不重畫結果卡 —— 重畫會把表情列的動畫與捲動位置洗掉。 */
-    nextTick = setInterval(paintNext, 500);
-    paintNext();
-  }
   /* 腳註那一行。★ 兩種身分要講不同的事(而且是同一行,不要多長一列出來):
-       還沒按 —— 倒數剩幾秒 + 「大家看完就馬上開」(告訴他按了有用)
+       還沒按 —— 提示「按了就會接著打」
        按過了 —— 還在等幾個人(不然按完之後那顆鈕變灰、畫面沒有任何交代) */
   function paintNext(){
     const el = $("m16Next"); if(!el) return;
     if(!nextKey){ el.classList.add("hidden"); el.innerHTML = ""; return; }
-    const left = Math.max(0, Math.ceil((nextEnd - performance.now())/1000));
     const mine = seenBy(ctx.me());
     const wait = waitCount();
     el.classList.remove("hidden");
     el.innerHTML = mine
       ? (wait > 0 ? "✓ 已看完 —— 還在等 <b>"+wait+"</b> 人…" : "✓ 大家都看完了,馬上開下一局…")
-      : "⏱ <b>"+left+"</b> 秒後自動開下一局 · 大家看完就馬上開";
+      : "按「✓ 我看完了」,大家都按了就接著打下一局";
     const b = $("mpAgain");
     if(b){
       b.textContent = mine ? "✓ 已看完" : "✓ 我看完了";
@@ -788,7 +812,7 @@ const MP = MPCore.create((function(){
     onRoomField(k,v){
       const n = +v;
       if(k==="handsGoal"){
-        if(!(n>0) || n===handsGoal) return;
+        if(!goalOK(n) || n===handsGoal) return;
         handsGoal = n;
         ctx.unreadyOnFieldChange(); ctx.syncSetup(); ctx.updateGoal(); ruleHint();
         return;
@@ -807,7 +831,7 @@ const MP = MPCore.create((function(){
       }
     },
     readRoom(r){
-      if(+r.handsGoal>0) handsGoal = +r.handsGoal;
+      if(goalOK(+r.handsGoal)) handsGoal = +r.handsGoal;
       if(r.claimSec!==undefined && secOK(+r.claimSec)) claimSec = +r.claimSec;
       /* ⚠ 舊房間沒有 baseTai → 維持 1 台(= v1.75.14 以前的行為),不要套用新預設值:
          那些人開房時看到的規則說明寫的是「底 1 台」。 */
@@ -840,14 +864,19 @@ const MP = MPCore.create((function(){
            · `contOn()` 恆 false → **每打完一手就「本場結束」**,續局倒數永遠不出現
          使用者的回報就是這個:「玩了 4 局後又繼續玩 4 局,朋友感覺只玩了兩局,
          程式說 4 局了」。
-         ⚠ 判斷式是 `done >= handsGoal`(不是 `> 0`):中途有人離開退回大廳、房主再開,
-           那是**同一場續打**(局數要接下去),不可以歸零。
-         ⚠ 本地的 tai 也要當場清掉 —— remove() 是非同步的,而下面 done 立刻要用。 */
+         ⚠ 判斷式是「這一場打完了沒」(不是 `> 0`):中途有人離開退回大廳、房主再開,
+           那是**同一場續打**(局數 / 圈數要接下去),不可以歸零。
+         ⚠ 本地的 tai 也要當場清掉 —— remove() 是非同步的,而下面 done 立刻要用。
+         ⚠ v1.122.0:「打幾局」可以改成「打幾圈」(handsGoal 為負數)——這裡刻意不叫共用的
+           seasonRemaining(),那支看的是 st(上一局的狀態),而 st 這一刻可能已經被
+           resetRound() 清掉;圈數只要看 dealerPass(跨局的本機變數)與**這一場**的座位數 n,
+           兩者都不必問 st。 */
       let done = handsDone();
-      if(done >= handsGoal){
+      const finished = handsGoal > 0 ? (done >= handsGoal) : (MJT.roundsOf(n, dealerPass) >= -handsGoal);
+      if(finished){
         const tr = ctx.ref("tai");
         if(tr) tr.remove();
-        tai = {}; done = 0; lastDeal = null;      // 新的一場:連莊也跟著歸零
+        tai = {}; done = 0; lastDeal = null; dealerPass = 0;   // 新的一場:連莊與圈數也跟著歸零
       }
       /* 誰坐莊:連莊(v1.102.0)—— 上一局算出來的那個人,換算成他在**新座位表**的位子。
          ⚠ 找不到人(第一局 / 他離開了 / 房主是這局結束後才進來的)一律退回「局數 % 家數」,
@@ -861,7 +890,8 @@ const MP = MPCore.create((function(){
         rs: "p"+n,
         dealer: dealer,
         dealerStreak: streak,
-        roundWind: MJ16.idxOf("fe"),
+        // 圈風跟著「打完幾圈」走(v1.122.0),不再永遠是東(見 dealerPass 的檔頭註解)
+        roundWind: MJT.windOfRounds(MJT.roundsOf(n, dealerPass)),
         handNo: done+1,
         base: baseTai
       });
@@ -926,7 +956,10 @@ const MP = MPCore.create((function(){
              節點才會換,所以這一刻換算才對得上。重算幾次都是同一個答案(冪等)。 */
         const nx = MJT.nextDealerOf(s);
         const nid = nx ? idOfSeat(nx.dealer) : "";
-        if(nid) lastDeal = { id:nid, streak:nx.streak };
+        if(nid){
+          if(nx.streak === 0) dealerPass++;   // 真的換人才算一次「過位」(v1.122.0,圈數的量尺)
+          lastDeal = { id:nid, streak:nx.streak };
+        }
       }
     },
 
@@ -955,7 +988,8 @@ const MP = MPCore.create((function(){
     onLeave(){
       clearClaimT(); clearTurnT(); clearAutoTingT(); clearNext();
       st=null; curRound=null; tai={}; myBid=false; handAt=0;
-      baseWins = {}; lastGained = []; lastDeal = null;   // 離房:連莊記錄跟著清(換房間就是新牌局)
+      // 離房:連莊與圈數記錄跟著清(換房間就是新牌局)
+      baseWins = {}; lastGained = []; lastDeal = null; dealerPass = 0;
       wipeActs();
     },
 
@@ -987,16 +1021,15 @@ const MP = MPCore.create((function(){
     },
     /* 房間框那顆徽章(麥克風左邊)。
        ★ v1.58.3:對戰中改成「第 n/N 局」—— 使用者的話是「原來那裡寫 4 局之類的內容,
-         我覺得沒什麼意義,就換成第多局的內容」。大廳還是只寫目標局數(還沒開始打,
-         沒有「第幾局」可言,而且那裡正是房主在設定的那個數字)。
+         我覺得沒什麼意義,就換成第多局的內容」。大廳還是只寫目標(還沒開始打,
+         沒有「第幾局/第幾圈」可言,而且那裡正是房主在設定的那個數字)。
        ⚠ 進度來自 tai._r 的筆數,而 tai 一變就會 renderPlayers() → updateGoal(),
-         所以這裡不必自己訂閱;applyGame() 也補叫一次(同一局內換手也要更新)。 */
+         所以這裡不必自己訂閱;applyGame() 也補叫一次(同一局內換手也要更新)。
+       ★ v1.122.0:handsGoal 可能是負數(打幾圈),對戰中要換成「圈風 · 第幾圈」——
+         見 goalBadgeText() / goalLabel() 的檔頭。 */
     updateGoal(){
       const g = $("mpBarGoal"); if(!g) return;
-      const n = Math.min(handsGoal, handsDone()+1);
-      g.textContent = (ctx.phase()==="playing")
-        ? "🀄 第 "+n+"/"+handsGoal+" 局"
-        : "🀄 "+handsGoal+" 局";
+      g.textContent = "🀄 " + (ctx.phase()==="playing" ? goalBadgeText() : goalLabel(handsGoal));
       g.classList.remove("hidden");
     },
 
@@ -1039,17 +1072,16 @@ const MP = MPCore.create((function(){
       renderHud(); renderActs();
       // 得分名單直接用核心給的 ids(它就是等一下要 +1 的那些人)—— 排名表的「N 勝」欄要
       lastGained = ids || [];
-      const done = handsDoneNow();
-      const last = done >= handsGoal;
+      const last = !seasonRemaining();
       paintTaiTable(last);
 
-      /* 局間續局(見上面那一整段)。★ arm **一局只做一次**,但腳註**每一次都要重畫** ——
+      /* 局間續局(見上面那一整段)。★ 腳註**每一次都要重畫** ——
          outcome() 會被反覆呼叫(核心的 players / scores 監聽一動就 showOutcome()),
          而「還在等 N 人」正是靠那幾次重畫才會跟著別人按鈕動。
-         ⚠ 鑰匙用 roundId:用 `first` 那個旗標的話,重連 / 重畫時 arm 不回來。 */
+         ⚠ 鑰匙用 roundId:用 `first` 那個旗標的話,重連 / 重畫時腳註認不出「這是新的一局」。 */
       if(contOn()){
-        if(nextKey !== (curRound || "-")){ clearNext(); nextKey = curRound || "-"; armNext(); }
-        else paintNext();
+        nextKey = curRound || "-";
+        paintNext();
       }else{
         // 最後一局(或只打一局):回到原本的「下一局 = 回大廳重新準備」
         clearNext();
@@ -1094,7 +1126,7 @@ const MP = MPCore.create((function(){
                          voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode(),
                          autoTing:M16B.autoTingOn() }; },
     usePrefs(o){
-      if(+o.handsGoal>0) handsGoal = +o.handsGoal;
+      if(goalOK(+o.handsGoal)) handsGoal = +o.handsGoal;
       /* ⚠ 這裡要 snapSec():v1.103.0 換掉整組秒數之後,舊玩家偏好裡的 8 / 12 / 20
          沒有對應的按鈕 —— 不吸附的話他開房時段落列一顆都不亮,而且永遠拿不到新預設。
          (別人房間送來的值走 readRoom,那邊刻意**不**吸附:那是房主的設定。) */
@@ -1123,7 +1155,7 @@ const MP = MPCore.create((function(){
       onDiscard(t){ doAct(s=>MJT.discard(s, mySeat(), t)); },
       onTing,                                  // 宣告聽牌 + 打出那一張(v1.67.0)
       setGoal(v){
-        v = +v; if(!(v>0)) return;
+        v = +v; if(!goalOK(v)) return;
         if(!ctx.setRoomField("handsGoal", v, { lobbyOnly:true, denyMsg:"只有房主能改局數", busyMsg:"對戰中不能改局數" })) return;
         handsGoal = v; ctx.syncSetup(); ctx.updateGoal(); savePrefs();
       },
@@ -1199,8 +1231,15 @@ const MP = MPCore.create((function(){
                role: M16B.roleOf(over, s),
                wins: { n: base + (plus?1:0), plus: plus } };
     });
-    box.innerHTML = M16B.rankHTML(rows, { done:handsDoneNow(), goal:handsGoal, final:final });
+    box.innerHTML = M16B.rankHTML(rows, { progressText:goalProgressText(), finalText:goalFinalText(), final:final });
   }
+  /* 排名表表頭文案(v1.122.0)。局數版與圈數版共用同一支,呼叫端不必先問清楚是哪一種。 */
+  function goalProgressText(){
+    if(handsGoal > 0) return "第 " + handsDoneNow() + " / " + handsGoal + " 局結束";
+    const w = st ? face(st.roundWind).name : "東";
+    return w + "圈 · 已完成 " + roundsDoneNow() + " / " + (-handsGoal) + " 圈";
+  }
+  function goalFinalText(){ return goalLabel(handsGoal) + "打完"; }
   function seasonMsg(){
     const ord = ctx.order();
     if(!ord.length) return "";

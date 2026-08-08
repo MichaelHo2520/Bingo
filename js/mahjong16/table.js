@@ -533,6 +533,16 @@ const MJT = (function(){
                 : { dealer: nextOf(st.dealer, st.seats), streak: 0 };
   }
 
+  /* ★ 圈數與圈風(v1.122.0)——「莊家真的換過幾次人」才是圈數的量尺,連莊 / 流局都不算換人
+     (那正是 nextDealerOf 回傳 streak>0 的那一種)。呼叫端只要在每次看到 streak 歸零那一刻
+     把自己的累計換人次數 +1,就能拿這裡的兩支純函式換算「打完幾圈」與「現在第幾圈的風」。
+     ⚠ 累計次數本身**不歸這裡管**:單機座位固定,直接用 nextOf() 走過的次數就對;連線的桌次每局
+       輪換(newGame 的 ord 會轉一位),座位編號對不上「圈裡第幾位」,只能由呼叫端自己存一個
+       跨局的計數(solo.js 的 dealerPass / adapter.js 的 dealerPass),跟 lastDeal 存法同一個道理
+       (見 nextDealerOf 上面那條註解)。 */
+  function roundsOf(seats, passes){ return Math.floor((passes||0) / (seats||1)); }
+  function windOfRounds(rounds){ return WINDS[((rounds||0) % 4 + 4) % 4]; }
+
   /* ---------- 序列化:整包寫進 Firebase 的 game 節點 ----------
      ★ 陣列一律轉成字串:RTDB 的稀疏陣列很難纏(中間有 null 就變成物件),
        而且整局的 wall 有 144 個數字,字串短很多。 */
@@ -599,6 +609,7 @@ const MJT = (function(){
     // 宣告聽牌(v1.67.0)
     declareTing, canDeclareTing, tingTiles, tingTypeOf, tingOf, DI_TING_MAX,
     ownActions, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft, drawsLeft, nextDealerOf,
+    roundsOf, windOfRounds, WINDS,
     seatWind, leftOf, nextOf, needOf, toPlay, holding, allTiles, enc, dec
   };
 })();

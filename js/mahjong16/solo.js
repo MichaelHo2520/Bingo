@@ -34,14 +34,17 @@ const Solo = (function(){
      結果卡與收付表上一排「電腦 1 / 電腦 2」讀起來像除錯畫面。 */
   const AI_NAMES = ["小碰", "阿槓", "老胡"];
   const SEATS_OK = [2,3,4];
-  const GOALS = [1,4,8,16];
+  /* 打幾局(v1.122.0 起改成「除了 1 局,其它都算圈數」—— 使用者:「一圈是要指每一個人都
+     當完莊家,並且下莊後才算」。★ 負數 = 圈數,正數 = 局數,兩種目標刻意共用同一個欄位、
+     用正負號分岔,不必另開一個「單位」欄位(button 的 data-goal 直接就是這個數字)。 */
+  const GOALS = [1,-1,-2,-4];
   /* 底幾台(v1.75.15,使用者:「底幾台要能被設定,預設為 2 台」)。
      ★ 預設值放在這裡而不是 MJT.newRound:那一層是規則,底台是**一場的設定**
        (同 goal / seats)。連線那份是房間設定,見 adapter.js 的 BASE_DEF。 */
   const BASES = [1,2,3,5];
   const BASE_DEF = 2;
 
-  let level = "normal", seats = 4, goal = 4, base = BASE_DEF;
+  let level = "normal", seats = 4, goal = -1, base = BASE_DEF;
   let rec = {};                                   // 各難度戰績 { easy:{g,w,best}, … }
 
   let st = null;                                  // 這一局的 MJT state
@@ -51,6 +54,11 @@ const Solo = (function(){
      這裡只是把它算出來的東西存到下一次 newHand()。單機座位固定,所以直接存座位編號
      (連線那份要換算成玩家 id,見 adapter.js 的 lastDeal)。 */
   let dealerSeat = 0, dealerStreak = 0;
+  /* 這一場「莊家真的換過幾次人」(v1.122.0,圈數的量尺)。★ 只有 nextDealerOf() 回傳
+     streak===0(換人,不是連莊/拉莊)才 +1 —— MJT.roundsOf(seats, dealerPass) 就是打完幾圈,
+     MJT.windOfRounds(...) 就是下一局該用的圈風。單機座位固定,不必像 adapter.js 那樣
+     另外換算「桌次輪換」的問題。 */
+  let dealerPass = 0;
   let active = false, settled = false;
   let claimDone = "";                             // 這個宣告視窗的電腦表態排過了沒
   let sfxPrev = null;                             // 上一次餵給音效的 state(見 sfxTick)
@@ -114,6 +122,28 @@ const Solo = (function(){
   }
   const face = function(t){ return MJFace.info(MJ16.codeOf(t)); };
 
+  /* ---------- 打幾局 / 打幾圈的文案(v1.122.0) ----------
+     ★ 只有這裡知道 goal 的正負號意思,呼叫端(paintBar / paintTai)只管拿字串來用。 */
+  function goalLabel(g){
+    if(g > 0) return g + " 局";
+    return (-g === 4) ? "一將(4圈)" : ((-g) + " 圈");
+  }
+  /* 對局中房間框那顆徽章。局數版沿用舊字;圈數版顯示目前圈風 + 第幾圈。 */
+  function goalBadgeText(){
+    if(goal > 0) return "第 " + Math.min(goal, handNo+1) + "/" + goal + " 局";
+    const rGoal = -goal;
+    const idx = st ? MJT.WINDS.indexOf(st.roundWind) : 0;
+    const w = st ? face(st.roundWind).name : "東";
+    return w + "圈 · 第 " + (idx+1) + "/" + rGoal + " 圈";
+  }
+  /* 結果卡排名表表頭(見 M16B.rankHTML 的 progressText / finalText)。 */
+  function goalProgressText(){
+    if(goal > 0) return "第 " + handNo + " / " + goal + " 局結束";
+    const w = st ? face(st.roundWind).name : "東";
+    return w + "圈 · 已完成 " + MJT.roundsOf(seats, dealerPass) + " / " + (-goal) + " 圈";
+  }
+  function goalFinalText(){ return goalLabel(goal) + "打完"; }
+
   /* ==========================================================================
      一場的生命週期
      ========================================================================== */
@@ -124,7 +154,7 @@ const Solo = (function(){
     handNo = 0;
     /* 新的一場:玩家先坐莊、連莊歸零。★ 一定要在這裡重設 —— 上一場打到誰連莊都不能
        帶進新的一場,而且家數可能改過(舊的 dealerSeat 會超出新的座位數)。 */
-    dealerSeat = ME; dealerStreak = 0;
+    dealerSeat = ME; dealerStreak = 0; dealerPass = 0;
     saveOwn();
     showScreen("solo");
     closeWin();
@@ -147,7 +177,8 @@ const Solo = (function(){
       rs: "p" + seats,
       dealer: dealerSeat,                         // 誰坐莊由上一局的結果決定(連莊,見 finishHand)
       dealerStreak: dealerStreak,
-      roundWind: MJ16.idxOf("fe"),
+      // 圈風跟著「打完幾圈」走(v1.122.0),不再永遠是東(見 dealerPass 的檔頭註解)
+      roundWind: MJT.windOfRounds(MJT.roundsOf(seats, dealerPass)),
       handNo: handNo + 1,
       base: base
     });
@@ -170,8 +201,13 @@ const Solo = (function(){
     showScreen("home");
     showHomeLayer("solo");                        // 回到「單機」那一層,方便換難度再來
   }
+  /* 這一場打完了沒(v1.122.0)。★ `goal>0` 是舊的「打幾局」,`goal<0` 是新的「打幾圈」——
+     兩者刻意共用同一個判斷,呼叫端不必先問清楚自己是哪一種。 */
+  function seasonDone(){
+    return goal > 0 ? (handNo >= goal) : (MJT.roundsOf(seats, dealerPass) >= -goal);
+  }
   function again(){
-    if(handNo >= goal) start();                   // 整場打完了 → 重開一場
+    if(seasonDone()) start();                      // 整場打完了 → 重開一場
     else newHand();
   }
 
@@ -382,10 +418,13 @@ const Solo = (function(){
     /* 連莊(v1.102.0):下一局的莊與連莊數由這一局的結果決定。
        ⚠ 一定要在這裡算而不是 newHand():那時 st 已經被新的一局蓋掉了。 */
     const nx = MJT.nextDealerOf(st);
-    if(nx){ dealerSeat = nx.dealer; dealerStreak = nx.streak; }
+    if(nx){
+      dealerSeat = nx.dealer; dealerStreak = nx.streak;
+      if(nx.streak === 0) dealerPass++;             // 真的換人才算一次「過位」(v1.122.0)
+    }
     paintBar();
 
-    const last = handNo >= goal;
+    const last = seasonDone();
     if(last){
       const r = recOf(level);
       r.g++;
@@ -425,7 +464,7 @@ const Solo = (function(){
       box.innerHTML = h;
     }
     const g = $("m16SoloGoal");
-    if(g) g.textContent = "🀄 第 " + Math.min(goal, handNo+1) + "/" + goal + " 局";
+    if(g) g.textContent = "🀄 " + goalBadgeText();
     const lv = $("m16SoloLv");
     if(lv){
       const L = MJ16AI.levelOf(level);
@@ -618,7 +657,7 @@ const Solo = (function(){
                   delta: dz ? (dz[s]||0) : 0,
                   role: M16B.roleOf(over, s), wins:null });
     }
-    box.innerHTML = M16B.rankHTML(rows, { done:handNo, goal:goal, final:last });
+    box.innerHTML = M16B.rankHTML(rows, { progressText:goalProgressText(), finalText:goalFinalText(), final:last });
   }
   function seasonMsg(){
     let best = -Infinity, top = [];
