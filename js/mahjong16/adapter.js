@@ -449,10 +449,17 @@ const MP = MPCore.create((function(){
        那一刻要回答的問題只有一個「打哪一張來宣告」,留著自摸 / 槓只會讓人分心。
        ⚠ 倒數環照舊(syncCd 已經在開頭跑過)—— 宣告不該讓這一手變長。 */
     if(tingPicking(me)){
-      const tag = document.createElement("span");
-      tag.className = "m16-timer";
-      tag.textContent = "點一張亮起來的牌打出 → 宣告聽牌";
-      box.appendChild(tag);
+      /* ★ 點一次先浮起來(兩段式的第一段)→ 同步顯示「打了它會聽哪張」,
+         第二次點同一張才真的送出宣告。沒有浮起任何一張時退回原本的操作提示。 */
+      const pv = M16B.tingPreviewHTML ? M16B.tingPreviewHTML() : "";
+      if(pv){
+        box.insertAdjacentHTML("beforeend", pv);
+      }else{
+        const tag = document.createElement("span");
+        tag.className = "m16-timer";
+        tag.textContent = "點一張亮起來的牌打出 → 宣告聽牌";
+        box.appendChild(tag);
+      }
       box.appendChild(actBtn("取消", "pass", ()=>{ M16B.setTingPick(false); renderActs(); }));
       return;
     }

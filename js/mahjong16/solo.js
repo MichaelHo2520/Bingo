@@ -572,7 +572,10 @@ const Solo = (function(){
     /* --- 我的回合 --- */
     /* ★ 宣告聽牌的選牌模式(v1.67.0):這一列只留提示與取消(理由同 adapter 那份)。 */
     if(tingPicking()){
-      tag("點一張亮起來的牌打出 → 宣告聽牌");
+      /* ★ 點一次先浮起來(兩段式的第一段)→ 同步顯示「打了它會聽哪張」(理由同 adapter 那份)。 */
+      var pv = M16B.tingPreviewHTML ? M16B.tingPreviewHTML() : "";
+      if(pv) box.insertAdjacentHTML("beforeend", pv);
+      else tag("點一張亮起來的牌打出 → 宣告聽牌");
       box.appendChild(actBtn("取消", "pass", function(){ M16B.setTingPick(false); paintActs(); }));
       return;
     }

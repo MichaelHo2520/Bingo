@@ -101,7 +101,7 @@ const M16B = (function(){
   const POOL_ROWS = 3;         // 牌河固定留幾排(見檔頭②;超過就捲)
   const POOL_ROWS_LAND = 2;    // 橫向手機:高度是唯一稀缺資源,牌河讓一排出來(見檔頭⑥)
 
-  let host=null, cb={}, st=null, me=0, sel="", lastSig="";
+  let host=null, cb={}, st=null, me=0, sel="", lastSig="", tingSelTile=-1;
   /* ★ 玩家自己拖出來的顯示順序(牌值陣列;沒拖過 = null)。見最後一節。
      ⚠ 它只在 viewHand() 一個地方被讀 —— 送去規則層 / 動作的一律是原始的手牌。 */
   let ord = null;
@@ -498,6 +498,26 @@ const M16B = (function(){
     '</span>';
   }
 
+  /* ---------- 宣告聽牌選牌時,「打了這張會聽哪張」的即時預覽(v1.127.0) ----------
+     使用者:「按宣告聽牌,選擇要打出一隻牌時,希望可以同步看到,會聽哪張」。
+     ★ 借用既有兩段式點擊的第一段(牌浮起來、還沒送出)當預覽時機,不必新增手勢 ——
+       tap() 第一次點只是把 sel 抬起來,這裡多記一個 tingSelTile 就問得到 MJT.tenpaiAfter()。
+     ⚠ 滑鼠(oneTap)一點就直接送出宣告,沒有「浮起來」那個中間狀態可以借,
+       所以這一支天然只服務觸控裝置 —— 與整頁「滑鼠沒有兩段式」的既有不對稱一致。
+     ⚠ 樣式整支照抄 readyHTML():20px / 最多 READY_MAX 張 / 同一顆 .m16-ready,
+       那份尺寸早就量過塞得進 .m16-acts 的 min-height,另起一套等於重新踩一次
+       檔頭③「任何讓總高變一點的東西都會讓整副牌換一次大小」那條紅線。 */
+  function tingPreviewHTML(){
+    if(!tingPick || tingSelTile<0 || typeof MJT==="undefined" || !MJT.tenpaiAfter || !st) return "";
+    const w = MJT.tenpaiAfter(st, me, tingSelTile);
+    if(!w.length) return "";
+    const show = w.slice(0, READY_MAX);
+    return '<span class="m16-ready" style="--m16w:'+READY_TW+'px" aria-label="打這張後會聽">'+
+      '<b>會聽</b>'+show.map(t=>tileHTML(codeOf(t), "m16-mt")).join("")+
+      (w.length > show.length ? '<i>+'+(w.length-show.length)+'</i>' : "")+
+    '</span>';
+  }
+
   /* ==========================================================================
      ★★ 宣告面板 —— 吃 / 碰 / 槓 / 胡 **跳在盤面中間**(v1.111.0)
      ──────────────────────────────────────────────────────────────────────────
@@ -750,7 +770,7 @@ const M16B = (function(){
     const cl = st.claim;
     const sig = me+"|"+hand.join(",")+"|"+(hasDraw?st.drawn:"")+
                 "|"+(cl?cl.t+"@"+cl.from:"");
-    if(sig!==lastSig){ lastSig=sig; sel=""; copt=0; }   // 換一張別人打的牌 → 選項從第一組重來
+    if(sig!==lastSig){ lastSig=sig; sel=""; copt=0; tingSelTile=-1; }   // 換一張別人打的牌 → 選項從第一組重來
 
     const canAct = MJT.ownActions(st, me).discard;
     const co = claimOpts();                              // 宣告視窗:可吃 / 碰 / 槓的組合
@@ -1098,8 +1118,8 @@ const M16B = (function(){
     if(tingPick){
       const tt = MJT.tingTiles(st, me);
       if(tt.indexOf(t) < 0) return;                   // 打了它並不會聽牌 → 不理
-      if(!oneTap() && sel !== k){ sel = k; render(); return; }
-      sel = "";
+      if(!oneTap() && sel !== k){ sel = k; tingSelTile = t; render(); return; }
+      sel = ""; tingSelTile = -1;
       if(cb.onTing) cb.onTing(t);
       return;
     }
@@ -1274,7 +1294,7 @@ const M16B = (function(){
              順序一換 sig 就變、sel 本來就會被清掉 —— 所以把這一行拿掉的突變
              **殺不掉**(實測存活)。刻意留著:sel 是「第幾格」,而
              「兩段式的第二下打錯牌」是這一頁最不可逆的錯,不靠另一個機制的副作用。 */
-        sel = ""; opts = null;
+        sel = ""; opts = null; tingSelTile = -1;
       }
     }
     /* 換過位置要重畫(兩排重新分 + 格位鍵重編);拖曳中被擋掉的那次也在這裡補回來。
@@ -1496,7 +1516,7 @@ const M16B = (function(){
   }
 
   return {
-    mount, render, revealHTML, readyHTML, overWord, roleOf, rankHTML, lianHTML,
+    mount, render, revealHTML, readyHTML, tingPreviewHTML, overWord, roleOf, rankHTML, lianHTML,
     /* 宣告面板(v1.111.0,單機與連線共用一份)—— 呼叫規矩見那一節的四條紅線。
        ⚠ 清動作列時要用 isClaim() 跳過它(同倒數環):它是持久節點,
          每次重建就是每次重播進場動畫。兩邊的 clearActs / paintActs 各一行。 */
@@ -1511,7 +1531,7 @@ const M16B = (function(){
          這一支在「吃碰成立」「我表態完」「結算」都會被叫到,順手清掉等於
          每碰一次就把玩家排好的手牌打散 —— 而那只有真的玩才看得出來。
          換局 / 離開牌桌請叫 resetOrder()。 */
-    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; tingPick=false; bidDone=false; },
+    clearSel(){ sel=""; opts=null; copt=0; lastSig=""; tingPick=false; bidDone=false; tingSelTile=-1; },
     /* 「我這一輪已經表態了」(**只有連線該叫**,見上面那個旗標的註解):
        按下「過 / ✔ 碰」→ true,宣告視窗換了一輪 → false。
        ⚠ 呼叫端要與它的 myBid **寫在同一行**,兩者分家就會出現「動作列說已表態、
@@ -1528,7 +1548,7 @@ const M16B = (function(){
          上一局縮下去的牌寬不該背著走。(視窗 resize / 轉向由 mount() 自己接。) */
     resetFit,
     /* 宣告聽牌的選牌模式。動作列那顆鈕開 / 關它,宣告成立或取消都要關掉。 */
-    setTingPick(v){ tingPick = !!v; sel=""; render(); },
+    setTingPick(v){ tingPick = !!v; sel=""; tingSelTile=-1; render(); },
     tingPicking(){ return tingPick; },
     /* 聽牌後自動摸切(見上面 let autoTing 的註解)。★ 純粹的旗標讀寫,不碰 render ——
        呼叫端(solo.js / adapter.js)自己決定看到 true 之後要不要排一次延遲打牌。 */
