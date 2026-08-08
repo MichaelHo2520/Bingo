@@ -110,14 +110,24 @@ const MP = MPCore.create((function(){
      ──────────────────────────────────────────────────────────────────────────
        交易內原子 append:即使兩端同時點也不會覆蓋彼此。
        ⚠ 交易裡一定要拿**伺服器的 moves** 重跑一次規則再寫 —— 本地畫面對不代表
-         伺服器上對(同大老二 send() / UNO send() 的守衛)。
-     ========================================================================== */
+         伺服器上對。
+
+     ⚠⚠⚠ v1.121.x 修 bug:**刻意不做 `list.length !== step` 那道「這一手已被推進」
+       守衛**(大老二 / UNO 的 send() 有這一條,這裡拿掉了)。理由跟下面 resign() 的
+       ②一樣:那道守衛防的是「世界已經變了,我這一手的前提不成立」,但連吃時同一個人
+       會在**自己的回合裡**連續送出好幾手 —— 每一手都還沒等到上一手的快照回來、
+       本地 `moves.length` 就已經跟伺服器脫鉤,守衛會把這些完全合法的連續攻擊**靜靜擋掉**
+       (使用者回報:「連吃了好幾個然後停下來,結果對方那邊卻是我還沒吃之前,卡住了」——
+       連最後那聲「結束連吃」都被同一道守衛擋下,回合永遠留在我這邊)。
+       ⚠ 真正需要的保護一項都沒少:`chk.turn !== me` 擋得住「輪到誰」,
+       `DC.step(chk, mv)` 用**伺服器上最新的真值**重驗一次合法性 —— 連吃的每一手都是
+       座標式的(吃哪一格),不是索引式的,伺服器真值一驗就知道這一手還算不算數,
+       不需要額外比對「手數對不對」。 */
   function send(mv){
-    const step = moves.length, me = mySeat();
+    const me = mySeat();
     ctx.txGame(g => {
       if(g.status !== "playing" || g.winner) return false;
       const list = Array.isArray(g.moves) ? g.moves : [];
-      if(list.length !== step) return false;             // 這一手已被推進 → 中止,等快照
       const chk = DC.replay(g.deal, list, g.rules);       // ⚠ 用**伺服器上凍結的**房規
       if(!chk || chk.over) return false;
       if(chk.turn !== me) return false;
