@@ -6294,8 +6294,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         · tighter(13 顆以上):步距 13 → 16 顆 = 15×13 + 26 = 221 ≤ 249 ✔ */
   .dc-tray-pcs.tight .dc-p{margin-right:-8px}
   .dc-tray-pcs.tighter .dc-p{margin-right:-13px}
-  .dc-tray-boom{display:flex;align-items:center;margin-left:6px;
-    font-size:11px;font-weight:800;color:var(--daub)}
   .dc-chain-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
   .dc-chain-txt{font-size:13px;font-weight:800;color:var(--accent-2)}
   .dc-chain-txt b{color:var(--text)}

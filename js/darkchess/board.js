@@ -52,9 +52,6 @@ const DCB = (function(){
               Sound.tone(f, { type: "triangle", dur: 0.10, vol: 0.24, slideTo: f * 1.5 }); },
     cannon(){ Sound.tone(180, { type: "sawtooth", dur: 0.16, vol: 0.26, slideTo: 70 });
               Sound.tone(1200, { type: "square", dur: 0.04, vol: 0.10 }); },
-    // 賠了一顆(炮打到自己人 / 翻攻被反吃)—— 往下掉的兩音
-    oops(){ Sound.tone(420, { type: "sine", dur: 0.13, vol: 0.22, slideTo: 190 });
-            Sound.tone(300, { type: "sine", dur: 0.18, vol: 0.18, slideTo: 130, delay: 0.10 }); },
     stop(){ Sound.tone(440, { type: "sine", dur: 0.10, vol: 0.14, slideTo: 330 }); }
   };
 
@@ -67,7 +64,9 @@ const DCB = (function(){
     if(L.kind === "move"){ sfx.move(); return; }
     if(L.kind === "stop"){ sfx.stop(); return; }
     if(L.kind === "darkSelf"){ sfx.flip(); return; }
-    if(L.kind === "darkLose"){ sfx.flip(); sfx.oops(); return; }
+    /* ★ 翻攻吃不動(v1.120.x 起兩顆都活,不再被反吃)—— 跟 darkSelf 一樣是
+       「白花一手,沒有賠掉任何東西」,不是 oops。 */
+    if(L.kind === "darkMiss"){ sfx.flip(); return; }
     /* ★ 炮打到自己人(v1.118.0 起兩顆都活)—— 開了一炮、只翻開一顆,所以是
        「炮聲 + 翻棋聲」而**不是** oops:沒有賠掉任何東西,只是白花一手。 */
     if(L.kind === "jumpSelf"){ sfx.cannon(); sfx.flip(); return; }
@@ -216,11 +215,9 @@ const DCB = (function(){
      ⚠ 兩個門檻與 CSS 的 margin 是**一組算出來的數字**(算式寫在 CSS 那邊),改尺寸要一起改。 */
   const TRAY_TIGHT = 9, TRAY_TIGHTER = 13;
   const byRank = (a, b) => DC.rankOf(b) - DC.rankOf(a);
-  function trayRow(label, caps, self){
-    const n = caps.length + self.length;
-    const pcs = caps.slice().sort(byRank).map(pieceHTML).join("") +
-                (self.length ? ('<span class="dc-tray-boom" title="自己賠掉的">💥' +
-                                self.slice().sort(byRank).map(pieceHTML).join("") + "</span>") : "");
+  function trayRow(label, caps){
+    const n = caps.length;
+    const pcs = caps.slice().sort(byRank).map(pieceHTML).join("");
     return '<div class="dc-tray-row">' +
              '<span class="dc-tray-lbl">' + esc(label) + "</span>" +
              '<span class="dc-tray-pcs' + (n >= TRAY_TIGHTER ? " tighter" : (n >= TRAY_TIGHT ? " tight" : "")) + '">' +
@@ -232,8 +229,8 @@ const DCB = (function(){
     const foe = 1 - me;
     const showFoe = !!(st.rules && st.rules.foeCaps);
     return '<div class="dc-tray">' +
-             trayRow("你吃掉", st.caps[me], st.friendly[me]) +
-             (showFoe ? trayRow((names[foe] || "對手") + "吃掉", st.caps[foe], st.friendly[foe]) : "") +
+             trayRow("你吃掉", st.caps[me]) +
+             (showFoe ? trayRow((names[foe] || "對手") + "吃掉", st.caps[foe]) : "") +
            "</div>";
   }
 

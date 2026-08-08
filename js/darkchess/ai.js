@@ -65,10 +65,7 @@ const DCAI = (function(){
       const p = knownAt(st, i);
       if(p !== null) tally[p]--;
     }
-    for(let s = 0; s < 2; s++){
-      st.caps[s].forEach(p => tally[p]--);
-      st.friendly[s].forEach(p => tally[p]--);
-    }
+    for(let s = 0; s < 2; s++) st.caps[s].forEach(p => tally[p]--);
     let n = 0;
     for(let p = 0; p < 14; p++) n += tally[p];
     tally.total = n;
@@ -126,12 +123,8 @@ const DCAI = (function(){
         if(threatMask(st, i, atk) & (1 << DC.rankOf(p))) s += (mine ? -1 : 1) * vt[p] * 0.45;
       }
     }
-    /* 被吃掉的也要算進來 —— 不然「對方的子被我吃光」與「對方的子還在盤上」同分。
-       ⚠ friendly(連吃翻攻踩到大子而自爆)要扣,不然 AI 會覺得亂賭不虧。
-         v1.118.0 以前這一欄裝的是「炮打到自己人」,而那條規則本身是錯的(見 rules.js
-         檔頭第 3 條);自爆改記在自己這一欄之後,這一行的意思反而更直接了。 */
+    // 被吃掉的也要算進來 —— 不然「對方的子被我吃光」與「對方的子還在盤上」同分。
     for(let k = 0; k < st.caps[me].length; k++) s += vt[st.caps[me][k]] * 0.15;
-    for(let k = 0; k < st.friendly[me].length; k++) s -= vt[st.friendly[me][k]] * 0.15;
 
     /* ★★ 悶局壓力:idle 逼近門檻時,分數要從「子力」平滑轉向「誰的階級總和大」——
        因為那才是悶到底時真正的結果(見 rules.js 的 IDLE_DRAW)。
@@ -232,20 +225,22 @@ const DCAI = (function(){
     return total / tally.total;
   }
 
-  // 連吃鏈中翻攻 sq 那一格的暗子(三種下場,見 rules.js 的 applyDark)
+  /* 翻攻 sq 那一格的暗子(三種下場,見 rules.js 的 applyDark)。
+     ⚠ ③ 吃不動時 v1.120.x 起**不再被反吃**(兩顆都活,白花一手)——
+       跟②(翻到自己人)一樣沒有材料損益,估值給 0。 */
   function gambleDark(st, from, sq, mover, vt, tally){
     if(!tally.total) return 0;
     const mySide = st.col[mover];
     const mine = knownAt(st, from);
     if(mine === null) return 0;
-    const myRank = DC.rankOf(mine), myVal = vt[mine];
+    const myRank = DC.rankOf(mine);
     let total = 0;
     for(let p = 0; p < 14; p++){
       const n = tally[p];
       if(!n) continue;
       if(DC.sideOf(p) === mySide)                    total += n * (-vt[p] * 0.15);  // ② 白翻一顆
       else if(DC.canBeat(myRank, DC.rankOf(p)))      total += n * vt[p];            // ① 吃掉
-      else                                           total += n * (-myVal);         // ③ 被反吃
+      // ③ 吃不動 → 白花一手,兩顆都活,不加不扣(total += 0)
     }
     return total / tally.total;
   }
@@ -266,7 +261,6 @@ const DCAI = (function(){
       rules: st.rules, cells: cells, col: [st.col[0], st.col[1]], turn: st.turn,
       chainFrom: st.chainFrom, chainLen: st.chainLen, idle: st.idle,
       caps: [st.caps[0].slice(), st.caps[1].slice()],
-      friendly: [st.friendly[0].slice(), st.friendly[1].slice()],
       over: st.over, winner: st.winner, endBy: st.endBy, last: st.last, bad: st.bad
     };
   }

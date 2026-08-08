@@ -255,12 +255,6 @@ const DC = (function(){
       chainLen: 0,              // 這一手已經連吃幾顆(給畫面 / 音效)
       idle: 0,                  // 連續幾步沒吃沒翻
       caps: [[], []],           // 各座位吃掉的**敵方**子
-      /* ★ 自己賠掉的己方子。**只有一條路進得來**:連吃翻攻踩到吃不動的敵子而自爆(③)。
-         ⚠ v1.118.0 以前還有「炮打暗子打到自己人」那一條,而那條規則本身是錯的
-           (見檔頭第 3 條)—— 現在炮打到自己人兩顆都活,不進這裡。
-         ⚠⚠ 自爆記在**自己這一欄**而不是對手的 caps:規則來源的字是「視同踩中地雷自爆」,
-           那是自己走進去的,不是對方吃到的。吃子欄的 💥 講的就是這一欄。 */
-      friendly: [[], []],
       over: false,
       winner: -1,               // 0 / 1;-1 = 和局(要配 over 才有意義)
       endBy: "",                // "wipe" | "stuck" | "count" | "draw" | "resign"
@@ -429,11 +423,13 @@ const DC = (function(){
     return true;
   }
 
-  /* 連吃鏈中的翻攻(kind === "dark")。★ 三種下場,而它們是這條房規的全部風險:
+  /* 連吃鏈中的翻攻(kind === "dark")。★ 三種下場:
        ① 翻開是敵子而且吃得動 → 照吃,鏈可以繼續
        ② 翻開是**自己的子**   → 那顆子留在原地翻開,這一手到此為止
-       ③ 翻開是敵子但**吃不動** → 攻擊方的子被反吃掉(傳統「暗殺」的下場)
-     ⚠ ③ 是刻意的:少了它,chainDark 就變成純賺的免費偵查,開不開沒有取捨。 */
+       ③ 翻開是敵子但**吃不動** → 白花一手,**兩顆都留在原地**,這一手到此為止
+     ⚠ v1.120.x 以前③是「攻擊方的子被反吃掉」(傳統「暗殺」玩法,規則來源查證過)——
+       使用者:「連吃的時候,遇到比你大的,請不要直接被對方吃掉」,改成跟②完全同構:
+       這一手單純是「賭輸了,沒抓到,但也沒賠上」,不吃也不損。 */
   function applyDark(st, from, to){
     const me = st.cells[from], vic = st.cells[to];
     vic.up = true;
@@ -452,11 +448,7 @@ const DC = (function(){
       afterCapture(st, to);
       return true;
     }
-    /* ③ 被反吃 —— 規則來源的字是「視同踩中地雷自爆」,所以記在**自己的 friendly**
-       而不是對手的 caps:那不是對方吃到的,是自己走進去的(見 blank() 那一段)。 */
-    st.cells[from] = null;
-    st.friendly[st.turn].push(me.p);
-    st.last = { kind: "darkLose", seat: st.turn, from: from, to: to, p: me.p, got: vic.p };
+    st.last = { kind: "darkMiss", seat: st.turn, from: from, to: to, p: me.p, got: vic.p };  // ③
     endTurn(st);
     return true;
   }
@@ -690,8 +682,7 @@ const DC = (function(){
       }
       rows.push({
         seat: seat, side: side, left: left, sum: sum,
-        eaten: st.caps[seat].slice(),              // 我吃掉的敵子
-        self: st.friendly[seat].slice()            // 我自己賠掉的己方子(連吃翻攻自爆)
+        eaten: st.caps[seat].slice()                // 我吃掉的敵子
       });
     }
     return { winner: st.winner, endBy: st.endBy, rows: rows };
