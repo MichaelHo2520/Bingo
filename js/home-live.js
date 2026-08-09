@@ -383,6 +383,9 @@ const HomeLive = (function(){
       list+btnRow+'</div>';
   }
 
+  // 排序權重 = 大廳現役 + 殘留房 + 累積場次,三個「有資料」的來源不分輕重全部算進去。
+  // 同分照 GAMES 的原順序(比照 rankRows 的做法,不依賴 sort 的穩定性)。
+  function svWeight(r){ return r.activeN+r.staleInfo.length+r.n; }
   // 打開面板時抓一次快照就好(比照 fetchRank 的一次性讀取),不掛常駐監聽 —— 這是給自己排查用,不必即時
   async function refreshStatusPanel(){
     if(svBusy)return;
@@ -395,6 +398,8 @@ const HomeLive = (function(){
       if(ping)ping.textContent="✅ 連線正常("+(Date.now()-t0)+" ms)";
       const rows=[];
       for(const g of GAMES) rows.push(await svLoadGame(g,stats&&stats[g.key]&&stats[g.key].n));
+      // 有資料(現役房 / 殘留房 / 累積場次)的排前面,方便一眼看出要處理誰
+      rows.sort((a,b)=>svWeight(b)-svWeight(a)||GAMES.indexOf(a.g)-GAMES.indexOf(b.g));
       svRows=rows;
       if(body)body.innerHTML=rows.map(svRowHtml).join("");
       if(clearAll){
