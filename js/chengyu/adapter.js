@@ -11,8 +11,9 @@
    不是 CYB 畫面上洗牌過的字卡順序,否則兩台裝置洗牌結果不同,同一個整數會
    解出不同字元,直接對不上。
 
-   ⚠ 不需要任何能力旗標:一場一局、搶字模式、不扣分、對局中不可加入,
-     跟數獨一樣完全不碰 js/shared/mp-core.js 一行。
+   ⚠ 只用了一個能力旗標:一場一局、搶字模式、不扣分、對局中不可加入,
+     跟數獨一樣不碰 js/shared/mp-core.js 一行 —— 唯一例外是 contRound(v1.136.0,
+     局間續局,比照台灣麻將):結果卡按「我看完了」不回大廳,湊齊直接接下一盤。
    ========================================================================== */
 
 const MP = MPCore.create((function () {
@@ -24,6 +25,7 @@ const MP = MPCore.create((function () {
   let ctx = null;
   let puzKey = null, holes = 0, fills = [], tally = [];
   let charList = [];               // 規範順序的字元清單,每個端算出來都一樣
+  let nextKey = "";                 // 這一局要不要顯示續局腳註(outcome() 會被重複呼叫,見那裡)
 
   /* ---------- fills 的整數編碼 ---------- */
   function encFill(i, v, seat, ok) { return ((i * V_MAX + v) * 8 + seat) * 2 + (ok ? 1 : 0); }
@@ -124,6 +126,43 @@ const MP = MPCore.create((function () {
     });
   }
 
+  /* ---------- 局間續局:結果卡按「我看完了」直接接下一盤,不回大廳(比照台灣麻將)。
+     使用者:「按繼續是直接接下一句,而不是調回選單然後還要再按一次準備好了」——
+     成語接龍沒有台灣麻將「打幾局」那種季末結算,所以永遠續局,不必像那邊分兩種文案。 */
+  function seenBy(id) { return !!(ctx.players()[id] || {}).ready; }
+  function waitCount() { return Object.keys(ctx.players()).filter(id => !seenBy(id)).length; }
+  function clearNext() {
+    nextKey = "";
+    const el = $("cyNext"); if (el) { el.classList.add("hidden"); el.innerHTML = ""; }
+  }
+  /* 腳註那一行。★ 兩種身分要講不同的事(而且是同一行,不要多長一列出來):
+       還沒按 —— 提示「按了就會接著玩」
+       按過了 —— 還在等幾個人(不然按完之後那顆鈕變灰、畫面沒有任何交代) */
+  function paintNext() {
+    const el = $("cyNext"); if (!el) return;
+    if (!nextKey) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+    const mine = seenBy(ctx.me());
+    const wait = waitCount();
+    el.classList.remove("hidden");
+    el.innerHTML = mine
+      ? (wait > 0 ? "✓ 已看完 —— 還在等 <b>" + wait + "</b> 人…" : "✓ 大家都看完了,馬上換下一盤…")
+      : "按「✓ 我看完了」,大家都按了就接著玩下一盤";
+    const b = $("mpAgain");
+    if (b) {
+      b.textContent = mine ? "✓ 已看完" : "✓ 我看完了";
+      b.classList.toggle("ghost", mine);
+      b.classList.toggle("primary", !mine);
+      b.disabled = mine;
+    }
+  }
+  /* 結果卡上那顆鈕按下去。回 true = 這一次由續局接手(不要再走核心的「回大廳」)。 */
+  function seeDone() {
+    if (!nextKey) return false;
+    ctx.readyUp();
+    paintNext();
+    return true;
+  }
+
   /* ---------- 大廳設定 ---------- */
   function ruleHint() {
     const el = $("cyRuleHint"); if (!el) return;
@@ -141,6 +180,9 @@ const MP = MPCore.create((function () {
     winCardId: "cyWinCard",
     hasResign: false,               // 限時解謎,中途認輸沒有意義
     extraNodes: [],
+    /* ★ 局間續局(v1.136.0)—— 一盤結束不回大廳,結果卡按「我看完了」就 MP.readyUp(),
+       湊齊由房主開下一盤。沒有台灣麻將的「打幾局」季末結算,永遠續局。 */
+    contRound: true,
 
     init(c) { ctx = c; },
 
@@ -227,6 +269,7 @@ const MP = MPCore.create((function () {
       $("mpBar").classList.remove("playing");
       puzKey = null; fills = []; tally = []; charList = [];
       CYB.setEnabled(false); CYB.unfreeze();
+      clearNext();
       const box = $("cyHud"); if (box) { box.classList.add("hidden"); box.innerHTML = ""; }
       ruleHint();
     },
@@ -234,11 +277,15 @@ const MP = MPCore.create((function () {
       showScreen("play");
       $("mpBar").classList.add("playing");
       CYB.unfreeze();
+      /* ★ 續局時這支是上一盤的結果卡收掉、新的一盤開打的那一刻(核心已經 closeWin)——
+         腳註一定要在這裡收乾淨,不然文案會活到下一盤的結果卡再多畫一次舊的。 */
+      clearNext();
       Sound.start();
     },
     onLeave() {
       puzKey = null; fills = []; tally = []; charList = [];
       CYB.setEnabled(false); CYB.unfreeze();
+      clearNext();
       const box = $("cyHud"); if (box) { box.classList.add("hidden"); box.innerHTML = ""; }
     },
 
@@ -284,6 +331,11 @@ const MP = MPCore.create((function () {
       CYB.setEnabled(false); CYB.unfreeze();
       renderHud(); renderWinnerRow(w, isDraw);
       const box = $("cyStats"); if (box) { box.classList.add("hidden"); box.innerHTML = ""; }
+      /* 局間續局的腳註。★ 每一次都要重畫 —— outcome() 會被反覆呼叫(核心的 players / scores
+         監聽一動就 showOutcome()),而「還在等 N 人」正是靠那幾次重畫才會跟著別人按鈕動。
+         ⚠ 鑰匙用 roundId:重連 / 重畫時腳註才認得出「這是同一盤」而不是重新歸零。 */
+      nextKey = ctx.roundId() || "-";
+      paintNext();
       if (isDraw) return { word: "平手!", msg: "盤面填滿,最高分同分 🤝 各得 1 勝" };
       if (iWon) return { word: "你贏了!", msg: "拿下最高分,漂亮 🎉(" + (w.pts || 0) + " 分)" };
       return { word: "你輸了", msg: esc(w.name || "對手") + " 拿下 " + (w.pts || 0) + " 分" };
@@ -295,7 +347,7 @@ const MP = MPCore.create((function () {
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
-      play, erase,
+      play, erase, seeDone,
       diff: () => diff, gameDiff: () => gDiff,
       setDiff(v) {
         if (!CYGen.LEVELS[v]) return;

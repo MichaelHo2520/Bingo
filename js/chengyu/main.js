@@ -104,7 +104,7 @@ $("kickCancel").addEventListener("click", () => MP.cancelKick());
 $("kickVeil").addEventListener("click", e => { if (e.target === $("kickVeil")) MP.cancelKick(); });
 
 /* ---------- 結果卡 ---------- */
-$("mpAgain").addEventListener("click", () => MP.again());
+$("mpAgain").addEventListener("click", () => { if (!MP.seeDone()) MP.again(); });
 $("mpLeaveWin").addEventListener("click", () => MP.askLeave());
 $("mpNewSeason").addEventListener("click", () => { MP.resetScores(); MP.again(); });
 $("winPeek").addEventListener("click", peekBoard);

@@ -6346,9 +6346,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 
   /* 賽後表情列(沿用五子棋的 .gmk-react 外觀,只換容器 class) */
   .cy-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  /* 局間續局的腳註(比照台灣麻將 .m16-next):按鈕上面那一行「還在等幾個人」。
+     ★ 刻意比按鈕與 .peek-link 都小一號、也不加底線 —— 它是狀態不是可按的東西。 */
+  .cy-next{margin:10px 0 -4px;text-align:center;font:700 12px/1.5 'Nunito',sans-serif;color:var(--muted)}
+  .cy-next b{font-weight:800;font-size:1.15em;color:var(--accent)}
   /* 單機 / 連線的結果卡內容切換:單機沒有排行榜與表情,連線沒有單機統計。
      這裡的 #id 只存在於 chengyu.html,不會影響其他頁。 */
-  body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .cy-react-row,body.solo-on #mpWinBtns{display:none}
+  body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .cy-react-row,body.solo-on #mpWinBtns,body.solo-on #cyNext{display:none}
   body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .cy-stats{display:none}
 
   /* ---------- 矮視窗(橫向手機):盤面優先,周邊全部再壓一號 ---------- */
