@@ -209,70 +209,141 @@ const DCB = (function(){
   }
 
   /* ==========================================================================
-     三之一、吃子 / 翻攻的動畫與明確圖示
+     三之一、吃子 / 翻攻的動畫
      ──────────────────────────────────────────────────────────────────────────
        ★ 使用者原話:「吃的時候可以有動畫,類似把自己的移到別人身上吃掉」
-         「連吃的時候,如果旁邊的還是蓋著,成功的吃掉每次都會不知道到底吃了什麼」。
-       落地成兩件事:
-         ① slidePiece():攻擊方那顆子從 from 格「滑」到 to 格(不是瞬移)——
-            算法是 FLIP 技巧的簡化版:兩格在 grid 上的位置本來就是固定的(gridAt() 只認
-            i,不會因為這一手變動),所以不必記「動之前」的 rect,直接拿 from 格現在的
-            rect 當「看起來還在那裡」的起點,對 to 格裡剛畫好的那顆子套 translate 差值,
-            下一幀再補一個 transition 收回 0,就是滑過去的效果。
-         ② eatBadge() / missBadge():貼在 to 格底部的小標籤,把「吃了誰 / 翻到誰但吃不動 /
-            翻到自己人」用文字 + icon 講清楚 —— 每一步連吃各自彈一次,不必回頭看吃子欄。
-            ⚠ 被吃掉 / 翻到的子一定都現過身(炮打暗子、翻攻都是先翻開再判定),
-              標籤上寫名字不違反牌情紅線。
+         「連吃的時候,如果旁邊的還是蓋著,成功的吃掉每次都會不知道到底吃了什麼」
+         「吃掉加棋子名字這個方法有點糟,效果很差,一點都不像是正式發行的遊戲,
+          麻煩要以商業化考量」。
+       ⚠⚠ v1.137.1 起**拿掉文字標籤**(浮出來寫「⚔️ 吃掉 X」那一版)——
+         文字 + emoji 的浮動小標籤是「除錯用的標記」的手感,不是「正式遊戲」的手感。
+         改成純視覺的三件事,「吃了誰」靠**被吃的子本身飛出去**回答,不必寫字:
+         ① slidePiece():攻擊方那顆子從 from 格滑到 to 格(FLIP 技巧簡化版,見下)。
+         ② burstFx():命中的瞬間炸開一圈金色震波 + 幾點火花(遊戲界通用的「打中了」語彙)。
+         ③ knockAway():被吃的那顆子(pieceHTML(got),牌面本身就是答案)往攻擊方前進
+            的方向被撞飛出去,邊轉邊縮邊淡出 —— 玩家看到的是「一顆看得清清楚楚的棋子
+            飛出棋盤」,而不是一行字。
+         「翻到自己人 / 打不穿」這兩種**沒有東西被吃掉**,不套震波/飛出,改用不同色系
+         的一圈脈動(綠色系 = 安全、紅色系 = 被擋下)區分,打不穿那顆再讓攻擊方的子
+         往前彈一下又彈回來(像撞到盾牌彈開)。
        ⚠ 這裡**不處理**「flip / darkSelf / darkMiss / jumpSelf」的翻牌本身
          (那是 pieceHTML() 的 pendingFlip 那條路),只處理「有沒有東西被吃掉 / 移動」。
+       ⚠ knockAway() 會暫時多畫一顆 pieceHTML(got)(被吃的子一定都先翻開過,不違反
+         牌情紅線),~500ms 後自動移除 —— 不影響 tools/gen-dc-solo-e2e.js 對 #dcBoard
+         的計數斷言(那些斷言都不在「剛吃完子」的那個時間點量)。
      ========================================================================== */
   // 這一手的 kind → 要不要播位移動畫、有沒有東西被吃掉(見 rules.js 六節的 kind 表)
   const REVEAL_KINDS = { flip: 1, darkSelf: 1, darkMiss: 1, jumpSelf: 1 };
   const SLIDE_KINDS  = { move: 1, eat: 1, jump: 1, rush: 1, darkEat: 1 };
   const EAT_KINDS    = { eat: 1, jump: 1, rush: 1, darkEat: 1 };
+  const SPARKS = 7;
 
   function sqEl(i){ return board.querySelector('.dc-sq[data-sq="' + i + '"]'); }
 
-  function slidePiece(fromIdx, toIdx){
+  // 兩格之間畫面上的方向(單位向量),量不到就給預設值 —— 給 slide / knockback / bounce 共用
+  function dirBetween(fromIdx, toIdx, fallback){
     const fromSq = sqEl(fromIdx), toSq = sqEl(toIdx);
-    const p = toSq && toSq.querySelector(".dc-p");
-    if(!fromSq || !toSq || !p) return;
+    if(!fromSq || !toSq) return fallback;
     const fr = fromSq.getBoundingClientRect(), tr = toSq.getBoundingClientRect();
-    const dx = fr.left - tr.left, dy = fr.top - tr.top;
-    if(!dx && !dy) return;
+    const dx = tr.left - fr.left, dy = tr.top - fr.top;
+    const len = Math.hypot(dx, dy);
+    return len ? { x: dx / len, y: dy / len, fr, tr } : fallback;
+  }
+
+  function slidePiece(fromIdx, toIdx){
+    const toSq = sqEl(toIdx);
+    const p = toSq && toSq.querySelector(".dc-p");
+    const d = dirBetween(fromIdx, toIdx, null);
+    if(!p || !d) return;
+    const dx = d.fr.left - d.tr.left, dy = d.fr.top - d.tr.top;
     p.classList.add("dc-sliding");
     p.style.transition = "none";
     p.style.transform = "translate(" + dx + "px," + dy + "px)";
     void p.offsetWidth;                          // 強制 reflow,下面的 transition 才生效
     requestAnimationFrame(() => {
-      p.style.transition = "transform .3s cubic-bezier(.22,.68,.32,1.08)";
+      p.style.transition = "transform .26s cubic-bezier(.22,.68,.32,1.08)";
       p.style.transform = "translate(0,0)";
     });
     setTimeout(() => {
       p.classList.remove("dc-sliding");
       p.style.transition = ""; p.style.transform = "";
-    }, 320);
+    }, 300);
   }
 
-  // 貼一顆浮出來的小標籤在 to 格底部;got 給了才寫名字(色系跟著紅黑方走)。
-  function fxBadge(toIdx, cls, icon, label, got){
+  // 命中震波 + 火花 —— 純視覺的「打中了」回饋,不寫字。
+  function burstFx(toIdx){
     const sq = sqEl(toIdx);
     if(!sq) return;
-    const b = document.createElement("span");
-    b.className = "dc-fx " + cls;
-    const nm = (got != null)
-      ? ('<b class="' + (DC.sideOf(got) === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' + esc(DC.nameOf(got)) + "</b>")
-      : "";
-    b.innerHTML = icon + esc(label) + nm;
-    sq.appendChild(b);
-    setTimeout(() => { if(b.parentNode) b.parentNode.removeChild(b); }, 780);
+    const wrap = document.createElement("span");
+    wrap.className = "dc-burst";
+    sq.appendChild(wrap);
+    for(let i = 0; i < SPARKS; i++){
+      const ang = (Math.PI * 2 * i / SPARKS) + (Math.random() * 0.5 - 0.25);
+      const dist = 20 + Math.random() * 16;
+      const s = document.createElement("span");
+      s.className = "dc-spark";
+      s.style.setProperty("--sx", (Math.cos(ang) * dist).toFixed(1) + "px");
+      s.style.setProperty("--sy", (Math.sin(ang) * dist).toFixed(1) + "px");
+      s.style.animationDelay = Math.round(Math.random() * 30) + "ms";
+      sq.appendChild(s);
+    }
+    // ⚠ 移除的時間要蓋過 CSS 動畫本身的長度(震波 .46s、火花 .5s)——
+    //   曾經誤寫成 60ms,震波的圈只轉了一瞬間就被拔掉,只剩火花播得完整。
+    setTimeout(() => { if(wrap.parentNode) wrap.parentNode.removeChild(wrap); }, 500);
+    setTimeout(() => { sq.querySelectorAll(".dc-spark").forEach(s => { if(s.parentNode) s.parentNode.removeChild(s); }); }, 560);
+  }
+
+  // 被吃的子往攻擊方前進的方向飛出去、邊轉邊淡出 —— 「吃了誰」靠牌面本身回答。
+  function knockAway(fromIdx, toIdx, got){
+    const sq = sqEl(toIdx);
+    if(!sq || got == null) return;
+    const d = dirBetween(fromIdx, toIdx, { x: 0, y: -1 });
+    const el = document.createElement("span");
+    el.className = "dc-knock";
+    el.style.setProperty("--kx", (d.x * 50).toFixed(1) + "px");
+    el.style.setProperty("--ky", (d.y * 50).toFixed(1) + "px");
+    el.style.setProperty("--kr", Math.round(Math.random() * 70 - 35) + "deg");
+    el.innerHTML = pieceHTML(got);
+    sq.appendChild(el);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 520);
+  }
+
+  // 翻到自己人 / 打不穿:沒有東西被吃掉,用色系區分的一圈脈動(綠=安全、紅=被擋下)。
+  function pulseFx(toIdx, kind){
+    const sq = sqEl(toIdx);
+    if(!sq) return;
+    const el = document.createElement("span");
+    el.className = "dc-pulse dc-pulse-" + kind;
+    sq.appendChild(el);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 560);
+  }
+
+  // 打不穿:攻擊方那顆子朝目標方向輕彈一下又彈回來,像撞到盾牌。
+  function bounceOff(fromIdx, toIdx){
+    const fromSq = sqEl(fromIdx);
+    const p = fromSq && fromSq.querySelector(".dc-p");
+    const d = dirBetween(fromIdx, toIdx, null);
+    if(!p || !d) return;
+    p.style.setProperty("--bx", (d.x * 9).toFixed(1) + "px");
+    p.style.setProperty("--by", (d.y * 9).toFixed(1) + "px");
+    p.classList.add("dc-bounce");
+    setTimeout(() => {
+      p.classList.remove("dc-bounce");
+      p.style.removeProperty("--bx"); p.style.removeProperty("--by");
+    }, 320);
   }
 
   function playMoveFx(L){
     if(SLIDE_KINDS[L.kind]) slidePiece(L.from, L.to);
-    if(EAT_KINDS[L.kind]) fxBadge(L.to, "dc-fx-eat", "⚔️", "吃掉", L.got);
-    else if(L.kind === "darkSelf" || L.kind === "jumpSelf") fxBadge(L.to, "dc-fx-miss", "🤝", "翻到自己人");
-    else if(L.kind === "darkMiss") fxBadge(L.to, "dc-fx-miss", "🛡️", "打不穿·", L.got);
+    if(EAT_KINDS[L.kind]){
+      // 對齊滑入抵達的時間點:攻擊方的子先滑過去,「打中」那一刻才炸開 + 飛子
+      setTimeout(() => { burstFx(L.to); knockAway(L.from, L.to, L.got); }, 190);
+    }else if(L.kind === "darkSelf" || L.kind === "jumpSelf"){
+      pulseFx(L.to, "safe");
+    }else if(L.kind === "darkMiss"){
+      pulseFx(L.to, "block");
+      bounceOff(L.from, L.to);
+    }
   }
 
   /* ==========================================================================
