@@ -25,20 +25,20 @@ const HomeLive = (function(){
   // max = 可加入的人數上限(要與各遊戲 adapter.js 的 maxPlayers 一致;Bingo 沒有上限 → 0)
   // href = 別頁的遊戲;沒有 href 的就是本頁(Bingo)
   const GAMES=[
-    { key:"bingo",   index:"rooms_index",   name:"BINGO",  icon:"🎲", badge:"hlBadgeBingo",   max:0 },
-    { key:"gomoku",  index:"gomoku_index",  name:"五子棋", icon:"⚫", badge:"hlBadgeGomoku",  max:2, href:"gomoku.html" },
-    { key:"sudoku",  index:"sudoku_index",  name:"數獨",   icon:"🔢", badge:"hlBadgeSudoku",  max:6, href:"sudoku.html" },
-    { key:"mahjong", index:"mahjong_index", name:"麻將",   icon:"🀄", badge:"hlBadgeMahjong", max:6, href:"mahjong.html" },
+    { key:"bingo",   index:"rooms_index",   rooms:"rooms",         name:"BINGO",  icon:"🎲", badge:"hlBadgeBingo",   max:0 },
+    { key:"gomoku",  index:"gomoku_index",  rooms:"gomoku_rooms",  name:"五子棋", icon:"⚫", badge:"hlBadgeGomoku",  max:2, href:"gomoku.html" },
+    { key:"sudoku",  index:"sudoku_index",  rooms:"sudoku_rooms",  name:"數獨",   icon:"🔢", badge:"hlBadgeSudoku",  max:6, href:"sudoku.html" },
+    { key:"mahjong", index:"mahjong_index", rooms:"mahjong_rooms", name:"麻將",   icon:"🀄", badge:"hlBadgeMahjong", max:6, href:"mahjong.html" },
     // ★ max 必須與 js/mahjong16/adapter.js 的 maxPlayers 一致(4)——
     //   不一致的話首頁會把滿房列成「可加入」,點進去才被 claimSeat 交易擋下
-    { key:"mj16",    index:"mj16_index",    name:"台灣麻將", icon:"🀄", badge:"hlBadgeMj16", max:4, href:"mahjong16.html" },
+    { key:"mj16",    index:"mj16_index",    rooms:"mj16_rooms",    name:"台灣麻將", icon:"🀄", badge:"hlBadgeMj16", max:4, href:"mahjong16.html" },
     // ★ max 必須與 js/sevens/adapter.js 的 maxPlayers 一致(6)
-    { key:"sevens",  index:"sevens_index",  name:"排七", icon:"🎴", badge:"hlBadgeSevens", max:6, href:"sevens.html" },
+    { key:"sevens",  index:"sevens_index",  rooms:"sevens_rooms",  name:"排七", icon:"🎴", badge:"hlBadgeSevens", max:6, href:"sevens.html" },
     // ★ max 必須與 js/big2/adapter.js 的 maxPlayers 一致(4)—— 大老二每人 13 張,4 人剛好用完 52 張
     // ⚠ icon 用 🎴(U+1F3B4),**不是**小丑牌那顆(U+1F0CF)—— 後者落在
     //   U+1F0A0–U+1F0FF 那段撲克牌字元裡,多數字型沒有會變豆腐方框(CLAUDE.md 的禁令)。
     //   與排七同一個圖示是刻意的 —— 同一副撲克牌,而消消樂與台灣麻將本來也共用 🀄。
-    { key:"big2",    index:"big2_index",    name:"大老二", icon:"🎴", badge:"hlBadgeBig2", max:4, href:"big2.html" },
+    { key:"big2",    index:"big2_index",    rooms:"big2_rooms",    name:"大老二", icon:"🎴", badge:"hlBadgeBig2", max:4, href:"big2.html" },
     /* ★ max 必須與 js/blackjack/adapter.js 的 maxPlayers 一致(v1.86.0 起是 **6**)。
        ★★ joinMid:true 是這張表的**第一個遊戲專屬能力旗標**(v1.84.0)——
           21 點一場 = 很多局,對戰中也可以加入(新人下一局進場),
@@ -47,13 +47,13 @@ const HomeLive = (function(){
             列成「對戰中」(反過來則是列成可加入、點進去被擋)。 */
     /* ⚠ name 是**顯示名**(v1.86.0 從「21點」改成「台式21點」)——
        index / key / href 這三個是**資料與路徑**,一個字都不准跟著改。 */
-    { key:"bj",      index:"bj_index",      name:"台式21點", icon:"🎴", badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true },
+    { key:"bj",      index:"bj_index",      rooms:"bj_rooms",      name:"台式21點", icon:"🎴", badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true },
     /* ★ 第九個遊戲(v1.106.0)。max 必須與 js/uno/adapter.js 的 maxPlayers 一致(**6**)。
        ⚠ icon 用 🌈(U+1F308)—— UNO 的識別就是四個顏色,而且它與另外八個都不撞。
          **不可以用 🃏**(U+1F0CF):它落在 U+1F0A0–U+1F0FF 那段撲克牌字元裡,
          多數字型沒有會變豆腐方框(CLAUDE.md 紅線 8)。
        ⚠ UNO **不帶 joinMid** —— 一局就是一局(不像 21 點一場很多局),對戰中不給加入。 */
-    { key:"uno",     index:"uno_index",     name:"UNO",     icon:"🌈", badge:"hlBadgeUno",  max:6, href:"uno.html" },
+    { key:"uno",     index:"uno_index",     rooms:"uno_rooms",     name:"UNO",     icon:"🌈", badge:"hlBadgeUno",  max:6, href:"uno.html" },
     /* ★ 第十個遊戲(v1.113.0):象棋暗棋。
        max 必須與 js/darkchess/adapter.js 的 maxPlayers 一致(**2**)。
        ⚠ icon 用 🔴(U+1F534 紅圓)—— 紅方是象棋兩方之一,而且它與另外九個都不撞
@@ -66,7 +66,7 @@ const HomeLive = (function(){
          "_index" 算出來的(dc_index → dc),這裡若寫 "darkchess" 兩邊對不上,
          暗棋的熱門度會永遠讀不到(dc:{n:1} 寫進資料庫,rankRows() 卻查
          stats["darkchess"])。其他九個遊戲的 index 縮寫本來就等於 key,只有這裡曾經例外。 */
-    { key:"dc", index:"dc_index",    name:"暗棋",   icon:"🔴", badge:"hlBadgeDc",   max:2, href:"darkchess.html" }
+    { key:"dc", index:"dc_index",    rooms:"dc_rooms",      name:"暗棋",   icon:"🔴", badge:"hlBadgeDc",   max:2, href:"darkchess.html" }
   ];
 
   /* ==========================================================================
@@ -288,8 +288,151 @@ const HomeLive = (function(){
   }
   initRank();
 
+  /* ==========================================================================
+     伺服器狀態(隱藏管理面板)—— 點 7 下首頁「派對遊戲」字樣開啟
+     (仿 Android「連按版本號 7 下」開發者選項的手勢),只給自己排查資料庫用,
+     不出現在任何一般玩家會走到的路徑上。
+
+     ★ 內容:十個遊戲各自「大廳現役房數 / 殘留房數 / 累積人氣場次」,
+       外加「清除殘留房間」——每個遊戲一顆、外加一顆全部清除。
+     ★ 讀取一律走**公開 REST**(fetch databaseURL/*.json),不透過 Firebase SDK:
+       這幾個節點的 .read 本來就是 true(見 notes/firebase-rules.json),REST 不必
+       等 SDK 下載/初始化,開面板不會被「還沒連線對戰過」卡住。清除也是同一顆
+       REST 的 DELETE method,跟 App 本來刪房間(leave() 裡的 roomRef.remove())
+       走的是同一條規則,不必也不會改資料庫規則。
+     ★ 「殘留房間」= 房間節點裡有、但大廳 index 裡已經沒有的房間代碼 —— 這是設計上的
+       必然結果,不是 game_stats 計數邏輯的 bug:armRoomIndex() 只把
+       onDisconnect().remove() 掛在 INDEX 上(見上面 ★★ 那段),房間本體只有房主
+       明確按「離開房間」(leave() 裡的 roomRef.remove())才會被刪掉;斷線 / 關分頁 /
+       砍視窗只會讓大廳項目消失,房間資料本身留著。game_stats 的人氣計數是完全獨立的
+       另一件事(armPlayCount(),只認「真的開局撐過 30 秒」),兩邊本來就對不上,
+       不必因為對不起來就懷疑計數邏輯壞了。
+     ★ 只刪「殘留」那一批(index 裡已經沒有的 code),絕不會動到還掛在大廳裡的現役房間。
+     ========================================================================== */
+  const SV_TAP_MS=1500, SV_TAP_GOAL=7;
+  let svTapN=0, svTapAt=0, svBusy=false, svRows=[];
+
+  function svBase(){
+    return (typeof FIREBASE_CONFIG!=="undefined" && FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL) || "";
+  }
+  function svGet(path,qs){
+    return fetch(svBase()+"/"+path+".json"+(qs?("?"+qs):"")).then(r=>r.json());
+  }
+  function svDelete(path){
+    return fetch(svBase()+"/"+path+".json",{method:"DELETE"});
+  }
+  function svAgo(ms){
+    if(!ms) return "時間不明";
+    const s=Math.max(0,Math.round((Date.now()-ms)/1000));
+    if(s<60) return s+" 秒前";
+    const m=Math.round(s/60); if(m<60) return m+" 分鐘前";
+    const h=Math.round(m/60); if(h<48) return h+" 小時前";
+    return Math.round(h/24)+" 天前";
+  }
+
+  function tapBrand(){
+    const now=Date.now();
+    if(now-svTapAt>SV_TAP_MS) svTapN=0;
+    svTapAt=now; svTapN++;
+    if(svTapN>=SV_TAP_GOAL){ svTapN=0; openStatusPanel(); }
+    else if(svTapN>=SV_TAP_GOAL-2) showToast("再按 "+(SV_TAP_GOAL-svTapN)+" 下開啟伺服器狀態",900);
+  }
+
+  function openStatusPanel(){
+    const v=$("svVeil"); if(!v||!svBase())return;
+    v.classList.add("show");
+    refreshStatusPanel();
+  }
+  function closeStatusPanel(){ const v=$("svVeil"); if(v)v.classList.remove("show"); }
+
+  // 單一遊戲的現況:現役房數(index)、殘留房代碼(rooms 有、index 沒有)+ 各自的房名/建立時間、累積人氣
+  async function svLoadGame(g,statsN){
+    let idx={},rms={};
+    try{ idx=(await svGet(g.index,"shallow=true"))||{}; }catch(e){}
+    try{ rms=(await svGet(g.rooms,"shallow=true"))||{}; }catch(e){}
+    const idxKeys=Object.keys(idx), rmKeys=Object.keys(rms);
+    const staleCodes=rmKeys.filter(c=>idxKeys.indexOf(c)<0);
+    const staleInfo=[];
+    for(const code of staleCodes.slice(0,30)){
+      let d=null; try{ d=await svGet(g.rooms+"/"+code); }catch(e){}
+      staleInfo.push({ code, name:(d&&d.roomName)||("房間 "+code), ago:svAgo(d&&d.createdAt) });
+    }
+    return { g, activeN:idxKeys.length, staleInfo, n:statsN||0 };
+  }
+
+  function svRowHtml(row){
+    const g=row.g;
+    const clearBtn=row.staleInfo.length
+      ? '<button class="btn ghost svs-clear" type="button" data-key="'+g.key+'">清除這 '+row.staleInfo.length+' 間殘留</button>'
+      : "";
+    const list=row.staleInfo.length
+      ? '<div class="svs-stale">'+row.staleInfo.map(s=>"🏠 "+esc(s.name)+" · "+s.ago).join("<br>")+'</div>'
+      : "";
+    return '<div class="svs-row">'+
+      '<div class="svs-row-head"><span class="svs-name">'+g.icon+' '+esc(g.name)+'</span>'+
+      '<span class="svs-nums">大廳 '+row.activeN+' 間 · 殘留 '+row.staleInfo.length+' 間 · 累積 '+row.n+' 場</span></div>'+
+      list+clearBtn+'</div>';
+  }
+
+  // 打開面板時抓一次快照就好(比照 fetchRank 的一次性讀取),不掛常駐監聽 —— 這是給自己排查用,不必即時
+  async function refreshStatusPanel(){
+    if(svBusy)return;
+    svBusy=true;
+    const ping=$("svPing"), body=$("svBody"), clearAll=$("svClearAll");
+    if(ping)ping.textContent="連線中…";
+    const t0=Date.now();
+    try{
+      const stats=await svGet("game_stats");
+      if(ping)ping.textContent="✅ 連線正常("+(Date.now()-t0)+" ms)";
+      const rows=[];
+      for(const g of GAMES) rows.push(await svLoadGame(g,stats&&stats[g.key]&&stats[g.key].n));
+      svRows=rows;
+      if(body)body.innerHTML=rows.map(svRowHtml).join("");
+      if(clearAll){
+        const total=rows.reduce((n,r)=>n+r.staleInfo.length,0);
+        clearAll.disabled=!total;
+        clearAll.textContent="🗑 清除全部殘留房間("+total+")";
+      }
+    }catch(e){
+      if(ping)ping.textContent="⚠️ 讀取失敗,檢查網路或稍後再試";
+    }
+    svBusy=false;
+  }
+
+  async function svClearKey(key){
+    const row=svRows.find(r=>r.g.key===key); if(!row||!row.staleInfo.length)return;
+    if(!confirm("確定要清除「"+row.g.name+"」的 "+row.staleInfo.length+" 間殘留房間嗎?此動作無法復原。"))return;
+    for(const s of row.staleInfo){ try{ await svDelete(row.g.rooms+"/"+s.code); }catch(e){} }
+    showToast("已清除「"+row.g.name+"」的殘留房間 🗑");
+    refreshStatusPanel();
+  }
+  async function svClearAllRooms(){
+    const total=svRows.reduce((n,r)=>n+r.staleInfo.length,0);
+    if(!total)return;
+    if(!confirm("確定要清除全部遊戲、共 "+total+" 間殘留房間嗎?此動作無法復原。"))return;
+    for(const row of svRows) for(const s of row.staleInfo){ try{ await svDelete(row.g.rooms+"/"+s.code); }catch(e){} }
+    showToast("已清除全部殘留房間 🗑");
+    refreshStatusPanel();
+  }
+
+  // 事件綁定自己管(比照上面 visibilitychange 監聽的自包含風格),元素早就在 DOM 裡(這支 <script> 排在 body 尾端)
+  (function(){
+    const bh=$("brandHome"); if(bh)bh.addEventListener("click",tapBrand);
+    const close=$("svClose"); if(close)close.addEventListener("click",closeStatusPanel);
+    const veil=$("svVeil"); if(veil)veil.addEventListener("click",e=>{ if(e.target===veil)closeStatusPanel(); });
+    const refresh=$("svRefresh"); if(refresh)refresh.addEventListener("click",refreshStatusPanel);
+    const clearAll=$("svClearAll"); if(clearAll)clearAll.addEventListener("click",svClearAllRooms);
+    const body=$("svBody");
+    if(body)body.addEventListener("click",e=>{
+      const b=e.target.closest(".svs-clear"); if(!b)return;
+      svClearKey(b.dataset.key);
+    });
+  })();
+
   /* ⚠ initRank / applyRank / rankRows 是**為了守門而導出**的:排名的行為分岔在
      「這台有沒有快取」,而 e2e 跑在 file:// 上、localStorage 會跨次數留著 ——
-     測試要能把它清掉再回到「第一次用」的狀態,否則那條路徑靜靜地永遠測不到。 */
-  return { boot, stop, sync, initRank, applyRank, rankRows };
+     測試要能把它清掉再回到「第一次用」的狀態,否則那條路徑靜靜地永遠測不到。
+     closeStatusPanel 是**為了 BACK_LAYERS 導出**的(見 js/game.js)——手機返回鍵
+     要能關掉這個面板,而不是把使用者導出首頁。 */
+  return { boot, stop, sync, initRank, applyRank, rankRows, closeStatusPanel };
 })();

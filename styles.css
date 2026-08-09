@@ -931,6 +931,25 @@
   }
 
   /* ==========================================================================
+     伺服器狀態面板(隱藏管理工具,.svs-*)— v1.129.0
+     點 7 下首頁「派對遊戲」字樣開啟(js/home-live.js 檔尾),只給自己排查資料庫用。
+     沿用 .veil / .set-card / .card-x 既有元件樣式,這裡只補特有的幾條。
+     ========================================================================== */
+  .svs-card{max-width:420px}
+  .svs-ping{text-align:center;font-size:12.5px;color:var(--muted);margin:-6px 0 12px}
+  .svs-actions{display:flex;gap:8px;margin-bottom:14px}
+  .svs-actions .btn{width:auto;flex:1;margin-top:0;padding:11px 8px;font-size:13.5px}
+  .svs-actions .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .svs-row{border:1px solid var(--panel-line);border-radius:14px;padding:10px 12px;margin-top:10px}
+  .svs-row:first-child{margin-top:0}
+  .svs-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .svs-name{font-weight:800}
+  .svs-nums{font-size:12px;color:var(--muted);font-weight:700}
+  .svs-stale{margin-top:6px;font-size:12px;color:var(--muted);max-height:88px;overflow-y:auto;line-height:1.6}
+  .svs-row .btn.ghost{width:auto;margin-top:8px;padding:7px 12px;font-size:13px}
+  :root[data-theme="ebook"] .svs-row{border-color:#000}
+
+  /* ==========================================================================
      五子棋(gomoku.html 專用) — v1.37.0
      ★ 這一段只「追加」,不修改上面任何既有規則:Bingo 的 DOM 沒有 .gmk-* / .as-link
        這些 class,所以本段對 Bingo 完全無作用。反之五子棋頁刻意沿用 .panel / .btn /

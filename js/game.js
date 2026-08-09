@@ -623,6 +623,8 @@
        順序 = 疊在上面的先關;這一頁沒有的 id(投降只有五子棋、猜拳只有 Bingo)自動跳過。 */
   const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettings()],
                    ["emoteVeil",()=>closeEmote()],["kickVeil",()=>MP.cancelKick()],
+                   // ★ 伺服器狀態隱藏面板(js/home-live.js 檔尾,點 7 下首頁「派對遊戲」開)
+                   ["svVeil",()=>HomeLive.closeStatusPanel()],
                    // ★ 21 點的房規蓋板(v1.84.0)。只有 blackjack.html 有這個 id,
                    //   其他六頁自動跳過(見上面那條註解)—— 漏掉的話按返回會跳成「離開房間?」
                    ["bjRulesVeil",()=>closeRules()],
