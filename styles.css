@@ -5931,7 +5931,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* 一格。★ 空格也是一顆 button(要能當落點點下去),只是裡面沒有棋子 */
   .dc-sq{position:relative;appearance:none;-webkit-appearance:none;border:0;padding:0;margin:0;
     background:var(--dc-slot);border-radius:7px;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;
+    display:flex;align-items:center;justify-content:center;perspective:340px;
     -webkit-tap-highlight-color:transparent;touch-action:manipulation}
   .dc-board:not(.dc-mine) .dc-sq{cursor:default}
 
@@ -5949,12 +5949,28 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-blk{color:var(--dc-blk)}
 
   /* 牌背:與正面**明顯不同色**,而且沒有字。⚠ 不可以只降飽和度來表示「暗」——
-     那會看起來像 disabled(UNO 的暗牌踩過同一件事)。 */
-  .dc-back{color:var(--dc-back-e);
-    background:radial-gradient(circle at 34% 28%,#e2ac74 0%,var(--dc-back) 52%,var(--dc-back-in) 100%);
-    box-shadow:0 0 0 1.5px var(--dc-back-e),0 2px 0 rgba(0,0,0,.3),0 3px 6px rgba(0,0,0,.25)}
-  .dc-grain{position:absolute;width:52%;height:34%;border-radius:2px;
-    background:repeating-linear-gradient(180deg,currentColor 0 1.5px,transparent 1.5px 5px);opacity:.45}
+     那會看起來像 disabled(UNO 的暗牌踩過同一件事)。
+     ★ v1.137.0 改成「木頭雕刻圓牌」的樣子:年輪紋(同心圓 radial-gradient 多層 color-stop,
+     不是印刷感的橫紋)+ 斜角光影(inset 高光在左上、暗角在右下,像車床車出來的弧面)+
+     中央一枚雙圈浮雕紋章(.dc-grain,取代原本的一排橫紋)。
+     ⚠ 視覺規則獨立成 .dc-backface(見下),.dc-back 只留語意標記(牌情紅線的計數靠它) ——
+     翻牌動畫的「背面那一格」共用同一份視覺,但**不掛 .dc-back**,才不會被
+     tools/gen-dc-solo-e2e.js 的「還蓋著幾顆」計數誤算進去(那顆其實已經翻開了)。 */
+  .dc-backface{color:var(--dc-back-e);
+    background:
+      radial-gradient(circle at 50% 50%,
+        transparent 0 56%, rgba(110,68,32,.4) 56% 59%, transparent 59% 69%,
+        rgba(110,68,32,.32) 69% 72%, transparent 72% 100%),
+      radial-gradient(circle at 30% 24%, rgba(255,255,255,.4) 0%, transparent 42%),
+      radial-gradient(circle at 52% 56%, var(--dc-back) 0%, var(--dc-back-in) 100%);
+    box-shadow:inset 0 2px 2px rgba(255,255,255,.3),inset 0 -4px 6px rgba(0,0,0,.32),
+      0 0 0 1.5px var(--dc-back-e),0 2px 0 rgba(0,0,0,.28),0 3px 6px rgba(0,0,0,.25)}
+  /* 中央紋章:雙圈浮雕(border 一圈 + ::after 實心小圓),比原本的橫紋更像雕出來的圖案。 */
+  .dc-grain{position:absolute;width:30%;height:30%;border-radius:50%;
+    border:1.5px solid currentColor;opacity:.55;
+    box-shadow:0 1px 0 rgba(255,255,255,.35),inset 0 1px 1px rgba(0,0,0,.25)}
+  .dc-grain::after{content:"";position:absolute;inset:32%;border-radius:50%;
+    background:currentColor;opacity:.4}
 
   /* ---------- 可點 / 選中 / 落點 ----------
      ⚠ 不能點的格**不給 disabled**(CLAUDE.md 的紅線)—— 點下去要看得到 toast 說原因。
@@ -5969,10 +5985,55 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-tgt.dc-t-rush,.dc-tgt.dc-t-dark{box-shadow:inset 0 0 0 3px var(--dc-tgt-far)}
   .dc-tgt.dc-empty::after{content:"";position:absolute;width:26%;height:26%;border-radius:50%;
     background:var(--dc-tgt);opacity:.75}
-  /* 剛剛動過的兩格:落點彈一下,來源留一個淡框(看得出「他從哪走到哪」) */
-  .dc-hit .dc-p{animation:dcPop .28s ease-out}
+  /* 剛剛動過的兩格:落點亮一下光暈,來源留一個淡框(看得出「他從哪走到哪」)。
+     ⚠ v1.137.0 起改成只動 box-shadow(不動 transform)—— 落點這顆子現在還可能在
+     board.js 用 JS 滑過來(見下面「吃子 / 移動的滑入動畫」),兩邊都動 transform 的話
+     CSS animation 會贏過 JS 的 transition,把滑動效果整個蓋掉。 */
+  .dc-hit .dc-p{animation:dcHitGlow .5s ease-out}
   .dc-from{box-shadow:inset 0 0 0 2px rgba(255,255,255,.34)}
-  @keyframes dcPop{ 0%{transform:scale(.72);opacity:.4} 70%{transform:scale(1.06)} 100%{transform:scale(1)} }
+  @keyframes dcHitGlow{
+    0%{box-shadow:0 0 0 3px var(--dc-tgt-eat),0 0 16px 5px var(--dc-tgt-eat)}
+    100%{box-shadow:0 0 0 0 transparent}
+  }
+
+  /* ---------- 翻牌動畫(3D 雙面翻轉)----------
+     ⚠⚠⚠ 牌情紅線:這裡**不新增任何會漏牌情的路徑** —— board.js 只在 c.up 已經是
+       true(這一手剛把它翻開)才會套這個包裝,pieceHTML(p) 的呼叫點與參數完全沒變
+       (見 tools/test-pages.js H 節那條逐字比對的斷言),只是 pieceHTML 內部多消費
+       一個模組變數 pendingFlip 來決定要不要包一層。
+     ★ 標準雙面卡片翻轉:.dc-flip3d 轉整颗(0→180deg),兩張臉各自 backface-visibility
+       隱藏、且已經預先錯開 180 度 —— 轉到一半背面藏起來,轉完換正面對著鏡頭。
+     ⚠ 背面那張臉(.dc-face-b)**不掛 .dc-back**,只掛 .dc-backface 拿視覺——
+       它已經翻開了,不能被算進「還蓋著幾顆」(見 .dc-backface 那段註解)。 */
+  .dc-flip3d{position:relative;width:88%;height:88%;transform-style:preserve-3d;
+    animation:dcFlipIn .42s cubic-bezier(.32,.85,.4,1.05) both}
+  .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
+    -webkit-backface-visibility:hidden}
+  .dc-face-f{transform:rotateY(180deg)}
+  @keyframes dcFlipIn{ from{transform:rotateY(0)} to{transform:rotateY(180deg)} }
+
+  /* ---------- 吃子 / 移動的滑入動畫(board.js 算完 rect 後用 JS 補 transform)----------
+     ⚠ 這裡只放「滑動中」需要的殼:實際的 translate 由 board.js 的 slidePiece() 寫成
+       inline style(算兩格的 getBoundingClientRect 差,不靠 CSS 猜位移量)。 */
+  .dc-p.dc-sliding{z-index:5}
+
+  /* ---------- 連吃時「吃了什麼 / 翻到什麼」的明確圖示(浮出來的小標籤)----------
+     ★ 使用者原話:「連吃的時候,如果旁邊的還是蓋著,成功的吃掉每次都會不知道到底
+       吃了什麼」——這裡用一顆貼在格子底部、色系對應紅黑方的小標籤把答案講清楚,
+       每一步連吃各自彈一次,不必回頭看吃子欄才知道剛剛吃了誰。
+     ⚠ 被吃掉/翻到的子一定都現過身(見〇節「吃子欄」的說明),標籤上寫名字不違反牌情紅線。 */
+  .dc-fx{position:absolute;left:50%;bottom:3%;transform:translateX(-50%);
+    display:flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;
+    font-size:11px;font-weight:800;white-space:nowrap;pointer-events:none;z-index:8;
+    background:rgba(20,14,8,.85);color:#fff;box-shadow:0 3px 8px rgba(0,0,0,.35);
+    animation:dcFxPop .76s ease-out forwards}
+  .dc-fx-miss{background:rgba(28,38,52,.87)}
+  @keyframes dcFxPop{
+    0%{opacity:0;transform:translate(-50%,4px) scale(.82)}
+    14%{opacity:1;transform:translate(-50%,-1px) scale(1)}
+    78%{opacity:1;transform:translate(-50%,-9px) scale(1)}
+    100%{opacity:0;transform:translate(-50%,-13px) scale(.96)}
+  }
 
   /* ---------- 動作列 ----------
      ⚠⚠⚠ 這一塊的高度**必須固定**,而那是規格不是美觀:舞台是 flex:1 1 0,

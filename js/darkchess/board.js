@@ -35,6 +35,10 @@ const DCB = (function(){
   let lastKey = -1;                   // 上一次畫的手數(決定要不要播翻牌動畫)
   let wide = true;                    // 目前是不是橫向排法(8 欄)
   let cdT = null, cdKey = "", cdEnd = 0;   // 走棋倒數的環:用 key 去重,不看 timer(見 syncCd)
+  /* ★ 翻牌動畫的一次性開關:見 pieceHTML() 的註解 —— 由 paint() 在畫到「這一手剛翻開
+     的那一格」之前設成 true,pieceHTML() 讀到就消費掉(改回 false),避免吃子欄 /
+     結果卡之後再呼叫 pieceHTML() 時被誤套上翻牌動畫。 */
+  let pendingFlip = false;
 
   /* ==========================================================================
      一、音效 —— 全部用合成音,不進 mp3/
@@ -81,15 +85,29 @@ const DCB = (function(){
        ★ 用的是「帥仕相俥傌炮兵 / 將士象車馬包卒」這些**常用漢字** ——
          不是 CLAUDE.md 紅線 8 禁的 U+1F000 那一段(那些多數字型沒有,會變豆腐)。
      ========================================================================== */
+  /* ★ pendingFlip 是「這一格是不是這一手剛翻開的」的一次性開關(見上面宣告處的註解)。
+     ⚠⚠⚠ 牌情紅線的守門(tools/test-pages.js H 節)逐字比對畫格子那一行是
+       `c.up ? pieceHTML(c.p) : backHTML()`,所以**不能**改成 pieceHTML(p, flip) 這種
+       多帶一個參數的寫法 —— 呼叫點的字要原封不動。改用模組變數讓 pieceHTML 自己讀,
+       paint() 只在要畫「剛翻開那一格」的前一刻把它撥成 true,畫完立刻被這裡消費掉。 */
   function pieceHTML(p){
     const side = DC.sideOf(p);
-    return '<span class="dc-p ' + (side === DC.RED ? "dc-red" : "dc-blk") + '">' +
-             '<i class="dc-ring"></i><b class="dc-ch">' + DC.nameOf(p) + '</b>' +
+    const face = '<span class="dc-p ' + (side === DC.RED ? "dc-red" : "dc-blk") + '">' +
+                   '<i class="dc-ring"></i><b class="dc-ch">' + DC.nameOf(p) + '</b>' +
+                 '</span>';
+    if(!pendingFlip) return face;
+    pendingFlip = false;                       // 消費一次:吃子欄 / 結果卡再畫同一顆子不會誤套
+    /* 雙面卡片翻轉:背面那張臉**不掛 .dc-back**(它已經翻開了,不能被算進還蓋著幾顆),
+       只掛 .dc-backface 拿視覺 —— 兩張臉共用同一份「木頭牌背」樣式,見 styles.css。 */
+    return '<span class="dc-flip3d dc-flip-in">' +
+             '<span class="dc-face dc-face-b dc-p dc-backface" aria-hidden="true">' +
+               '<i class="dc-ring"></i><b class="dc-grain"></b></span>' +
+             '<span class="dc-face dc-face-f" aria-hidden="true">' + face + '</span>' +
            '</span>';
   }
   // 牌背。★ 這裡**碰都不要碰** c.p —— 見檔頭的牌情紅線
   function backHTML(){
-    return '<span class="dc-p dc-back" aria-label="暗棋"><i class="dc-ring"></i><b class="dc-grain"></b></span>';
+    return '<span class="dc-p dc-back dc-backface" aria-label="暗棋"><i class="dc-ring"></i><b class="dc-grain"></b></span>';
   }
 
   /* ==========================================================================
@@ -167,11 +185,14 @@ const DCB = (function(){
       if(tgtMap[i]) cls.push("dc-tgt", "dc-t-" + tgtMap[i]);
       if(L && fresh && (L.to === i)) cls.push("dc-hit");
       if(L && L.from === i && !c) cls.push("dc-from");
+      // ★ 這一格是不是「這一手剛翻開」——pieceHTML() 讀這個模組變數決定要不要播翻牌動畫
+      pendingFlip = !!(c && c.up && fresh && L && REVEAL_KINDS[L.kind] && L.to === i);
       out.push('<button type="button" class="' + cls.join(" ") + '" data-sq="' + i +
                '" style="grid-row:' + g.row + ';grid-column:' + g.col + '">' +
                (c ? (c.up ? pieceHTML(c.p) : backHTML()) : "") +
                "</button>");
     }
+    pendingFlip = false;           // ⚠ 迴圈外的 pieceHTML() 呼叫(吃子欄、結果卡)一律不套
     board.innerHTML = out.join("");
     board.classList.toggle("dc-mine", canAct);
     lastKey = cur.key;
@@ -182,6 +203,76 @@ const DCB = (function(){
        溢出的那一截**被靜靜削掉**(截圖才看得出來,量 rect 也看得出來)。
        ⚠ 不能只靠 ResizeObserver 兜底:那要等下一個 frame,中間會閃一下。 */
     fitBoard();
+    /* ★ 吃子 / 翻攻的動畫與明確圖示 —— 一定要放在 fitBoard() 之後(算 rect 要用最終尺寸),
+       而且只在「這一手真的是新的」時播(fresh),不然每次 setState 都重播一次。 */
+    if(fresh && L) playMoveFx(L);
+  }
+
+  /* ==========================================================================
+     三之一、吃子 / 翻攻的動畫與明確圖示
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 使用者原話:「吃的時候可以有動畫,類似把自己的移到別人身上吃掉」
+         「連吃的時候,如果旁邊的還是蓋著,成功的吃掉每次都會不知道到底吃了什麼」。
+       落地成兩件事:
+         ① slidePiece():攻擊方那顆子從 from 格「滑」到 to 格(不是瞬移)——
+            算法是 FLIP 技巧的簡化版:兩格在 grid 上的位置本來就是固定的(gridAt() 只認
+            i,不會因為這一手變動),所以不必記「動之前」的 rect,直接拿 from 格現在的
+            rect 當「看起來還在那裡」的起點,對 to 格裡剛畫好的那顆子套 translate 差值,
+            下一幀再補一個 transition 收回 0,就是滑過去的效果。
+         ② eatBadge() / missBadge():貼在 to 格底部的小標籤,把「吃了誰 / 翻到誰但吃不動 /
+            翻到自己人」用文字 + icon 講清楚 —— 每一步連吃各自彈一次,不必回頭看吃子欄。
+            ⚠ 被吃掉 / 翻到的子一定都現過身(炮打暗子、翻攻都是先翻開再判定),
+              標籤上寫名字不違反牌情紅線。
+       ⚠ 這裡**不處理**「flip / darkSelf / darkMiss / jumpSelf」的翻牌本身
+         (那是 pieceHTML() 的 pendingFlip 那條路),只處理「有沒有東西被吃掉 / 移動」。
+     ========================================================================== */
+  // 這一手的 kind → 要不要播位移動畫、有沒有東西被吃掉(見 rules.js 六節的 kind 表)
+  const REVEAL_KINDS = { flip: 1, darkSelf: 1, darkMiss: 1, jumpSelf: 1 };
+  const SLIDE_KINDS  = { move: 1, eat: 1, jump: 1, rush: 1, darkEat: 1 };
+  const EAT_KINDS    = { eat: 1, jump: 1, rush: 1, darkEat: 1 };
+
+  function sqEl(i){ return board.querySelector('.dc-sq[data-sq="' + i + '"]'); }
+
+  function slidePiece(fromIdx, toIdx){
+    const fromSq = sqEl(fromIdx), toSq = sqEl(toIdx);
+    const p = toSq && toSq.querySelector(".dc-p");
+    if(!fromSq || !toSq || !p) return;
+    const fr = fromSq.getBoundingClientRect(), tr = toSq.getBoundingClientRect();
+    const dx = fr.left - tr.left, dy = fr.top - tr.top;
+    if(!dx && !dy) return;
+    p.classList.add("dc-sliding");
+    p.style.transition = "none";
+    p.style.transform = "translate(" + dx + "px," + dy + "px)";
+    void p.offsetWidth;                          // 強制 reflow,下面的 transition 才生效
+    requestAnimationFrame(() => {
+      p.style.transition = "transform .3s cubic-bezier(.22,.68,.32,1.08)";
+      p.style.transform = "translate(0,0)";
+    });
+    setTimeout(() => {
+      p.classList.remove("dc-sliding");
+      p.style.transition = ""; p.style.transform = "";
+    }, 320);
+  }
+
+  // 貼一顆浮出來的小標籤在 to 格底部;got 給了才寫名字(色系跟著紅黑方走)。
+  function fxBadge(toIdx, cls, icon, label, got){
+    const sq = sqEl(toIdx);
+    if(!sq) return;
+    const b = document.createElement("span");
+    b.className = "dc-fx " + cls;
+    const nm = (got != null)
+      ? ('<b class="' + (DC.sideOf(got) === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' + esc(DC.nameOf(got)) + "</b>")
+      : "";
+    b.innerHTML = icon + esc(label) + nm;
+    sq.appendChild(b);
+    setTimeout(() => { if(b.parentNode) b.parentNode.removeChild(b); }, 780);
+  }
+
+  function playMoveFx(L){
+    if(SLIDE_KINDS[L.kind]) slidePiece(L.from, L.to);
+    if(EAT_KINDS[L.kind]) fxBadge(L.to, "dc-fx-eat", "⚔️", "吃掉", L.got);
+    else if(L.kind === "darkSelf" || L.kind === "jumpSelf") fxBadge(L.to, "dc-fx-miss", "🤝", "翻到自己人");
+    else if(L.kind === "darkMiss") fxBadge(L.to, "dc-fx-miss", "🛡️", "打不穿·", L.got);
   }
 
   /* ==========================================================================
