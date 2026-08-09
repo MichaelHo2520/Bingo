@@ -44,10 +44,23 @@ function showHomeLayer(which){
 }
 // 難度說明:直接讀 GAI 的難度表,不另外硬編一份文案;戰績另起一行 —— 接在同一行後面,
 // 窄螢幕會斷在「戰／績」中間(這是截圖才看得出來的)
+// 朋友模式沒有難度可講,改講怎麼玩(輪流點同一支手機)+ 這一節的黑白戰績。
 function paintAiHint(){
   const el=$("gmkAiHint"); if(!el)return;
+  if(Solo.opponent()==="friend"){
+    el.innerHTML="👤 跟旁邊的朋友輪流點同一支手機,黑棋先下。<br>"+esc(Solo.friendRecText());
+    return;
+  }
   const lv=GAI.levelOf(Solo.level());
   el.innerHTML=esc(lv.emoji+" "+lv.name+":"+lv.desc)+"<br>"+esc(Solo.recLine(lv.key));
+}
+// 對手欄位切換:電腦 ↔ 朋友時,難度與先手兩塊只有電腦對決用得到,收起來給朋友模式的說明騰空間
+function syncOppFields(){
+  const friend = Solo.opponent()==="friend";
+  const aiField=$("gmkAiField"), firstField=$("gmkFirstField"), sub=$("gmkLevelSubtitle");
+  if(aiField) aiField.classList.toggle("hidden", friend);
+  if(firstField) firstField.classList.toggle("hidden", friend);
+  if(sub) sub.textContent = friend ? "本機對戰 · 朋友" : "本機對戰 · 選難度";
 }
 // 膠囊列高亮(三個 seg 共用):資料屬性的值對得上就亮
 function segOn(segId, key, val){
@@ -64,8 +77,12 @@ $("gmkZoomFit").addEventListener("click",()=>GB.fit());
 
 /* ---------- 進場選單 ---------- */
 $("gmkGoOnline").addEventListener("click",()=>MP.openConnect());
-$("gmkPickSolo").addEventListener("click",()=>{ paintAiHint(); showHomeLayer("solo"); });
+$("gmkPickSolo").addEventListener("click",()=>{ syncOppFields(); paintAiHint(); showHomeLayer("solo"); });
 $("gmkLevelBack").addEventListener("click",()=>showHomeLayer("pick"));
+$("gmkOppSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  Solo.setOpponent(b.dataset.opp); segOn("gmkOppSeg","opp",Solo.opponent()); syncOppFields(); paintAiHint();
+});
 $("gmkAiSeg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   Solo.setLevel(b.dataset.ai); segOn("gmkAiSeg","ai",Solo.level()); paintAiHint();
@@ -153,9 +170,11 @@ loadPrefs();       // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 五子棋的�
 Solo.loadOwn();    // 電腦對決的難度 / 盤面 / 先手 / 戰績(獨立 key,不與連線那組互相覆蓋)
 syncSettingsUI();
 GB.init();         // 棋盤 DOM + 手勢(舞台此時是 hidden,ResizeObserver 會在顯示後算 fit)
+segOn("gmkOppSeg","opp",Solo.opponent());
 segOn("gmkAiSeg","ai",Solo.level());
 segOn("gmkSoloSizeSeg","size",Solo.size());
 segOn("gmkFirstSeg","first",Solo.first());
+syncOppFields();
 paintAiHint();
 showScreen("home");   // 進場先選玩法(五子棋現在有連線也有電腦對決)
 autoJoinFromQuery(MP);   // 從主選單的「現在有人在玩」點過來(?join=1234)→ 直接進那間房

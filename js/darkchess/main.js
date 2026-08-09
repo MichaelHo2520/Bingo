@@ -48,16 +48,31 @@ function showHomeLayer(which){
   if(head) head.classList.toggle("hidden", which !== "pick");
 }
 /* 第二層的說明:難度文案直接讀 Solo 的難度表,不另外硬編一份。
-   ★ 文案規格與進場說明一致:標籤在前、一行一件事,不寫成對話。 */
+   ★ 文案規格與進場說明一致:標籤在前、一行一件事,不寫成對話。
+   朋友模式沒有難度可講,改講怎麼玩(輪流動同一支手機)+ 這一節的紅黑戰績。 */
 function paintSoloHint(){
   const el = $("dcSoloHint");
   if(!el) return;
+  if(Solo.opponent() === "friend"){
+    el.innerHTML = "👤 跟旁邊的朋友輪流動同一支手機,翻到什麼算什麼。<br>" +
+      "<b>房規</b>:" + esc(DC.rulesText(Solo.rules())) + "(按上面「⚙ 改規則」調整)<br>" +
+      '<span class="dc-warn">' + esc(Solo.friendRecText()) + "</span>";
+    return;
+  }
   const L = Solo.levelOf(Solo.level());
   el.innerHTML = "<b>" + L.emoji + " " + L.name + "</b>:" + esc(L.desc) + "<br>" +
     /* ★ 房規要講**現在設的是哪一種** —— 單機的房規存在自己的偏好裡、跨場黏著,
        不寫出來會忘記上次改過(同大老二 / UNO 第二層那條)。 */
     "<b>房規</b>:" + esc(DC.rulesText(Solo.rules())) + "(按上面「⚙ 改規則」調整)<br>" +
     '<span class="dc-warn">' + esc(Solo.recLine(Solo.level())) + "</span>";
+}
+// 對手欄位切換:電腦 ↔ 朋友時,難度與先手兩塊只有電腦對決用得到,收起來給朋友模式的說明騰空間
+function syncOppFields(){
+  const friend = Solo.opponent() === "friend";
+  const lvField = $("dcLvField"), firstField = $("dcFirstField"), sub = $("dcSoloSubtitle");
+  if(lvField) lvField.classList.toggle("hidden", friend);
+  if(firstField) firstField.classList.toggle("hidden", friend);
+  if(sub) sub.textContent = friend ? "本機對戰 · 朋友" : "本機對戰 · 選難度";
 }
 
 /* ==========================================================================
@@ -143,8 +158,10 @@ function syncSoloSeg(){
     if(!seg) return;
     [...seg.children].forEach(b => b.classList.toggle("on", String(b.dataset[attr]) === String(val)));
   };
+  set("dcOppSeg", "opp", Solo.opponent());
   set("dcLvSeg", "lv", Solo.level());
   set("dcFirstSeg", "first", Solo.first());
+  syncOppFields();
 }
 
 /* ---------- 盤面 ----------
@@ -154,8 +171,14 @@ DCB.onAct(mv => { if(Solo.active()) Solo.act(mv); else MP.act(mv); });
 
 /* ---------- 進場選單 ---------- */
 $("dcGoOnline").addEventListener("click", () => MP.openConnect());
-$("dcGoSolo").addEventListener("click", () => { paintSoloHint(); showHomeLayer("solo"); });
+$("dcGoSolo").addEventListener("click", () => { syncOppFields(); paintSoloHint(); showHomeLayer("solo"); });
 $("dcSoloCfgBack").addEventListener("click", () => showHomeLayer("pick"));
+$("dcOppSeg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if(!b) return;
+  Solo.setOpponent(b.dataset.opp);
+  [...$("dcOppSeg").children].forEach(x => x.classList.toggle("on", x === b));
+  syncOppFields(); paintSoloHint();
+});
 segPick("dcLvSeg", "lv", v => Solo.setLevel(v));
 segPick("dcFirstSeg", "first", v => Solo.setFirst(v));
 $("dcStartSolo").addEventListener("click", () => Solo.start());

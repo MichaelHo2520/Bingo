@@ -20,12 +20,15 @@ const Solo = (function(){
   const AI_CHAIN_MS = 420;            // 連吃的每一步之間停這麼久(要看得見它在吃)
 
   let level = "mid", first = "me";    // first: me | ai | random
+  let opponent = "ai";                // ai | friend(本機雙人,朋友坐旁邊輪流動同一支手機)
   let rules = DC.defRules();
   let deal = "", moves = [], st = null;
   let mySeat = 0, aiSeat = 1;
   let active = false, over = false, busy = false;
   let aiT = null;
   let rec = {};                       // 各難度戰績 { easy:{w,l,d}, ... }
+  let friendRec = { [DC.RED]: 0, [DC.BLACK]: 0, d: 0 };   // 朋友模式:這一節的紅黑勝場 —— 不存 localStorage,重開 App 不留
+  function isFriend(){ return opponent === "friend"; }
 
   const LV = {
     easy: { key: "easy", emoji: "🙂", name: "新手", desc: "只挑眼前最大的子吃,不考慮被吃回去" },
@@ -44,13 +47,14 @@ const Solo = (function(){
       const o = JSON.parse(localStorage.getItem(OWN_KEY)) || {};
       if(LV[o.level]) level = o.level;
       if(["me", "ai", "random"].indexOf(o.first) >= 0) first = o.first;
+      if(["ai", "friend"].indexOf(o.opponent) >= 0) opponent = o.opponent;
       if(o.rules) rules = DC.normRules(o.rules);        // ⚠ 一律 normRules:舊版存的值可能認不得
       rec = (o.rec && typeof o.rec === "object") ? o.rec : {};
     }catch(e){}
     Object.keys(LV).forEach(k => { if(!rec[k]) rec[k] = blank(); });
   }
   function saveOwn(){
-    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, first, rules: DC.normRules(rules), rec })); }catch(e){}
+    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, first, opponent, rules: DC.normRules(rules), rec })); }catch(e){}
   }
   const recOf = k => rec[k] || blank();
   function recText(k){
@@ -62,13 +66,18 @@ const Solo = (function(){
     const r = recOf(k);
     return (r.w || r.l || r.d) ? ("此難度戰績 " + recText(k)) : "此難度尚無戰績";
   }
+  function friendRecText(){
+    const r = friendRec;
+    if(!(r[DC.RED] || r[DC.BLACK] || r.d)) return "尚無戰績";
+    return DC.sideName(DC.RED) + "方 " + (r[DC.RED] || 0) + " 勝 · " + DC.sideName(DC.BLACK) + "方 " + (r[DC.BLACK] || 0) + " 勝" + (r.d ? " · " + r.d + " 和" : "");
+  }
 
   /* ---------- HUD ---------- */
   function chip(seat){
     const side = st ? st.col[seat] : -1;
     const left = (st && side >= 0) ? DC.countSide(st, side) : 16;
     const isMe = (seat === mySeat);
-    const nm = isMe ? "你" : (levelOf(level).emoji + " 電腦");
+    const nm = isFriend() ? ("P" + (seat + 1)) : (isMe ? "你" : (levelOf(level).emoji + " 電腦"));
     return '<div class="mp-chip' + (st && !st.over && st.turn === seat ? " turn" : "") + '">' +
              '<span class="nm">' + nm + "</span>" +
              (side >= 0 ? ('<span class="dc-chip-side ' + (side === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' +
@@ -79,9 +88,9 @@ const Solo = (function(){
   function paintHud(){
     const lv = levelOf(level);
     const t = $("dcSoloLv");
-    if(t) t.textContent = lv.emoji + " " + lv.name;
+    if(t) t.textContent = isFriend() ? "👤 本機雙人" : (lv.emoji + " " + lv.name);
     const r = $("dcSoloRec");
-    if(r) r.textContent = recText(level);
+    if(r) r.textContent = isFriend() ? friendRecText() : recText(level);
     const p = $("dcSoloPlayers");
     if(p) p.innerHTML = st ? (chip(0) + chip(1)) : "";
   }
@@ -96,23 +105,27 @@ const Solo = (function(){
   function paint(){
     if(!st) return;
     paintHud();
+    const friend = isFriend();
+    /* ★★ 朋友模式沒有固定的「我」:mySide 要跟著 st.turn 走(現在誰的回合就是誰的顏色),
+       不然座位 1 那位朋友輪到自己時,mySide 還停在座位 0 的顏色,board.js 的點擊守衛
+       (只准動 mySide 那色的子)會把他自己的子都擋成「那是對方的子」。 */
     DCB.setState({
       st: st,
-      mySide: st.col[mySeat],
-      mine: active && !over && !busy && st.turn === mySeat,
+      mySide: friend ? st.col[st.turn] : st.col[mySeat],
+      mine: friend ? (active && !over && !busy) : (active && !over && !busy && st.turn === mySeat),
       over: over,
       key: moves.length,
-      turnName: st.turn === mySeat ? "你" : "電腦",
+      turnName: friend ? ("P" + (st.turn + 1)) : (st.turn === mySeat ? "你" : "電腦"),
       // ★ 吃子欄要知道「哪個座位是我」與兩個座位各叫什麼(見 board.js 的 setState)
       mySeat: mySeat,
-      names: mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"]
+      names: friend ? ["P1", "P2"] : (mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"])
     });
   }
 
   /* ---------- 一局的生命週期 ---------- */
   function start(){
     clearAiT();
-    mySeat = (first === "me") ? 0 : (first === "ai") ? 1 : (Math.random() < 0.5 ? 0 : 1);
+    mySeat = isFriend() ? 0 : (first === "me") ? 0 : (first === "ai") ? 1 : (Math.random() < 0.5 ? 0 : 1);
     aiSeat = 1 - mySeat;
     deal = DC.newDeal();
     moves = [];
@@ -124,7 +137,7 @@ const Solo = (function(){
     paint();
     Sound.start();
     saveOwn();
-    if(st.turn !== mySeat) aiTurn();
+    if(!isFriend() && st.turn !== mySeat) aiTurn();
   }
   function quit(){
     clearAiT();
@@ -132,8 +145,9 @@ const Solo = (function(){
     deal = ""; moves = []; st = null;
     closeWin();
     DCB.reset();
+    friendRec = { [DC.RED]: 0, [DC.BLACK]: 0, d: 0 };   // 離桌歸零:戰績只在「這一節本機雙人」裡累積
     showScreen("home");
-    showHomeLayer("solo");             // 回到「電腦對決」那一層,方便換難度再來
+    showHomeLayer("solo");             // 回到「本機對戰」那一層,方便換設定再來
   }
   function again(){ closeWin(); start(); }
 
@@ -145,26 +159,29 @@ const Solo = (function(){
     st = nx;
     DCB.moveSfx(st);
     paint();
-    if(st.over){ finish(); return true; }
-    if(st.turn !== mySeat) aiTurn();
+    if(st.over){ if(isFriend()) finishFriend(); else finish(); return true; }
+    if(!isFriend() && st.turn !== mySeat) aiTurn();
     return true;
   }
-  // 玩家這一手(由 DCB 的點擊流程送進來,合法性 DCB 已經先問過 rules 了)
+  // 玩家這一手(由 DCB 的點擊流程送進來,合法性 DCB 已經先問過 rules 了)。
+  // 朋友模式兩邊都是人、共用同一支手機 —— 不必檢查「輪到誰」,DCB 自己會用 mySide 擋錯色。
   function act(mv){
     if(!active) return;
     if(over){ showToast("這局已經結束了"); return; }
     if(busy){ showToast("等電腦走完這一手"); return; }
-    if(!st || st.turn !== mySeat) return;
+    if(!st) return;
+    if(!isFriend() && st.turn !== mySeat) return;
     commit(mv);
   }
   /* 投降。★ 刻意**不走 act()** —— 那一支有「還沒輪到你 / 等電腦走完」兩道守衛,
      而投降不必等輪到自己(電腦在想的時候也按得下去)。
-     ⚠ 要先把還在飛的 AI setTimeout 清掉:不清的話它會在局已經結束之後再走一手。 */
+     ⚠ 要先把還在飛的 AI setTimeout 清掉:不清的話它會在局已經結束之後再走一手。
+     朋友模式沒有固定的「我」,投降的一律是現在輪到走的那一方(認輸不必等輪到自己反而奇怪)。 */
   function resign(){
     if(!active || over || !st || st.over) return;
     clearAiT();
     busy = false;
-    commit(DC.encResign(mySeat));
+    commit(DC.encResign(isFriend() ? st.turn : mySeat));
   }
 
   /* 電腦這一手。兩段 setTimeout 是刻意的(同五子棋):
@@ -237,18 +254,47 @@ const Solo = (function(){
     else Sound.win();                        // 平手沿用 win(同五子棋:不給挫敗音)
     showResult();
   }
+  /* 朋友模式的結算:沒有「你/電腦」視角 —— 兩邊都是人、共用一支手機,沒有人是輸家視角,
+     不放挫敗音、卡片也不套 lose 樣式(同五子棋 finishFriend / 暗棋平手一貫的處理)。
+     戰績改記「紅方 / 黑方」各贏幾次(這局誰紅誰黑是隨機翻出來的,同五子棋記黑白不記你我)。
+     ⚠ endText/resultHTML 帶 mySeat = -1 就是它們本來就支援的「中立視角」文案。 */
+  function finishFriend(){
+    clearAiT();
+    over = true; busy = false;
+    const draw = st.winner < 0;
+    if(draw) friendRec.d++; else friendRec[st.col[st.winner]]++;
+    paint();
+
+    const card = $("dcWinCard");
+    if(card){ card.classList.remove("win", "lose", "draw"); card.classList.add(draw ? "draw" : "win"); }
+    $("winWord").textContent = draw ? "平手!" : (DC.sideName(st.col[st.winner]) + "方獲勝!");
+    const box = $("dcResult");
+    if(box){
+      const wins = [0, 1].map(seat => ({ n: friendRec[st.col[seat]] || 0, plus: (!draw && seat === st.winner) ? 1 : 0 }));
+      box.innerHTML = DCB.resultHTML(st, ["P1", "P2"], -1, wins);
+      box.classList.remove("hidden");
+    }
+    $("winMsg").innerHTML =
+      esc(DCB.endText(st, -1)) + (draw ? " 🤝" : " 🎉") +
+      '<span class="dc-solomsg"> · 本機雙人 · ' + esc(friendRecText()) + "</span>";
+    Sound.win();
+    if(!draw) burst();
+    showResult();
+  }
 
   return {
     start, quit, again, act, resign, loadOwn, paintHud, paint,
-    LV, levelOf, recText, recLine,
+    LV, levelOf, recText, recLine, friendRecText,
     active: () => active,
     playing: () => active && !over,          // 給更新檢查:局中重載會把整局丟掉
     level: () => level,
     first: () => first,
+    opponent: () => opponent, isFriend,
     rules: () => DC.normRules(rules),
     st: () => st,                            // 給 e2e 用
     setLevel(v){ if(LV[v]){ level = v; saveOwn(); paintHud(); } },
     setFirst(v){ if(["me", "ai", "random"].indexOf(v) >= 0){ first = v; saveOwn(); } },
+    setOpponent(v){ if(["ai", "friend"].indexOf(v) >= 0){ opponent = v; saveOwn(); } },
     /* ★ 房規面板單機連線共用一組 DOM,分流點在 main.js。
        ⚠ 收的是**整份房規**(面板送的是「第幾段」,翻成四個布林是 DC.setRuleLevel 的事);
          這裡一律再走一次 normRules —— 巢狀關係只在那一支落地。 */

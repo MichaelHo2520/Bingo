@@ -17,12 +17,15 @@ const Solo = (function(){
   const AI_MIN_MS = 280;                    // 電腦最快也要「想」這麼久:秒回會讓人以為是自己誤觸
 
   let level = "normal", size = 19, first = "me";   // first: me | ai | random
-  let human = "b";                          // 這一局玩家執什麼色(黑一定先手,由 first 推出來)
+  let opponent = "ai";                      // ai | friend(本機雙人,朋友坐旁邊輪流點同一支手機)
+  let human = "b";                          // 這一局玩家執什麼色(電腦對決才有意義,黑一定先手,由 first 推出來)
   let mv = [], occ = null;
-  let active = false, over = false, busy = false;  // busy = 電腦思考中(這期間不收點擊)
+  let active = false, over = false, busy = false;  // busy = 電腦思考中(這期間不收點擊;朋友模式恆為 false)
   let rec = {};                             // 各難度戰績 { easy:{w,l,d}, ... }
+  let friendRec = { b:0, w:0, d:0 };        // 朋友模式:這台裝置這一節的黑白勝場 —— 刻意不存 localStorage,重開 App 不留
 
   function n(){ return GB.size(); }
+  function isFriend(){ return opponent === "friend"; }
   function aiColor(){ return human === "b" ? "w" : "b"; }
   function cOf(step){ return step % 2 === 0 ? "b" : "w"; }      // 與 GB.colorOfStep 同一個規則
   function turnColor(){ return cOf(mv.length); }
@@ -40,14 +43,20 @@ const Solo = (function(){
       if(GAI.LEVELS[o.level]) level = o.level;
       if(SIZES.indexOf(o.size) >= 0) size = o.size;
       if(["me","ai","random"].indexOf(o.first) >= 0) first = o.first;
+      if(["ai","friend"].indexOf(o.opponent) >= 0) opponent = o.opponent;
       rec = (o.rec && typeof o.rec === "object") ? o.rec : {};
     }catch(e){}
     Object.keys(GAI.LEVELS).forEach(k=>{ if(!rec[k]) rec[k] = blank(); });
   }
   function saveOwn(){
-    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, size, first, rec })); }catch(e){}
+    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, size, first, opponent, rec })); }catch(e){}
   }
   function recOf(k){ return rec[k] || blank(); }
+  function friendRecText(){
+    const r = friendRec;
+    if(!(r.b || r.w || r.d)) return "尚無戰績";
+    return "⚫" + r.b + "勝 · ⚪" + r.w + "勝" + (r.d ? " · " + r.d + "和" : "");
+  }
 
   /* ---------- HUD ---------- */
   function recText(k){
@@ -63,28 +72,30 @@ const Solo = (function(){
   function paintHud(){
     const lv = GAI.levelOf(level);
     const tag = $("gmkSoloTag");
-    if(tag) tag.textContent = size + "×" + size + " · " + lv.emoji + " " + lv.name;
+    if(tag) tag.textContent = size + "×" + size + " · " + (isFriend() ? "👤 本機雙人" : (lv.emoji + " " + lv.name));
     const r = $("gmkSoloRec");
-    if(r) r.textContent = recText(level);
+    if(r) r.textContent = isFriend() ? friendRecText() : recText(level);
     const u = $("gmkUndoBtn");
     if(u) u.disabled = !canUndo();
   }
-  // 「輪到誰」膠囊:單機沿用連線那顆(#gmkTurn),只是文案換成電腦
+  // 「輪到誰」膠囊:單機沿用連線那顆(#gmkTurn),電腦對決文案換成電腦、朋友模式換成黑白棋
   function paintTurn(){
     const cap = $("gmkTurn"), txt = $("gmkTurnTxt");
     if(!cap || !txt) return;
     const dot = cap.querySelector(".gmk-dot");
-    if(dot) dot.className = "gmk-dot " + (over ? (human === "b" ? "b" : "w") : turnColor());
-    if(over)      txt.textContent = "這局結束";
+    const overColor = isFriend() ? (mv.length ? cOf(mv.length - 1) : "b") : human;
+    if(dot) dot.className = "gmk-dot " + (over ? overColor : turnColor());
+    if(over) txt.textContent = "這局結束";
+    else if(isFriend()) txt.textContent = "輪到" + (turnColor() === "b" ? "⚫ 黑棋" : "⚪ 白棋");
     else if(busy) txt.textContent = "電腦思考中…";
-    else          txt.textContent = myTurn() ? "輪到你" : "電腦下棋中…";
-    cap.classList.toggle("mine", !over && !busy && myTurn());
-    GB.setInteractive(active && !over && !busy && myTurn(), human);
+    else txt.textContent = myTurn() ? "輪到你" : "電腦下棋中…";
+    cap.classList.toggle("mine", !over && !busy && (isFriend() || myTurn()));
+    GB.setInteractive(active && !over && !busy && (isFriend() || myTurn()), isFriend() ? turnColor() : human);
   }
 
   /* ---------- 一局的生命週期 ---------- */
   function start(){
-    human = (first === "me") ? "b" : (first === "ai") ? "w" : (Math.random() < 0.5 ? "b" : "w");
+    human = isFriend() ? "b" : (first === "me") ? "b" : (first === "ai") ? "w" : (Math.random() < 0.5 ? "b" : "w");
     mv = []; over = false; busy = false; active = true;
     GB.setSize(size);                 // 內含 reset():舊棋子與勝利標記一起清掉
     occ = GAI.occFrom(mv, size);
@@ -94,15 +105,16 @@ const Solo = (function(){
     paintHud(); paintTurn();
     Sound.start();
     saveOwn();
-    if(!myTurn()) aiTurn();           // 電腦執黑 → 它先下天元
+    if(!isFriend() && !myTurn()) aiTurn();   // 電腦執黑 → 它先下天元(朋友模式兩邊都是人,不必電腦代下)
   }
   function quit(){
     active = false; over = false; busy = false;
     mv = []; occ = null;
     closeWin();
     GB.reset(); GB.setInteractive(false);
+    friendRec = { b:0, w:0, d:0 };     // 離桌歸零:戰績只在「這一節本機雙人」裡累積
     showScreen("home");
-    showHomeLayer("solo");            // 回到「電腦對決」那一層,方便換難度再來
+    showHomeLayer("solo");            // 回到「本機對戰」那一層,方便換設定再來
   }
   function again(){ closeWin(); start(); }
 
@@ -121,17 +133,24 @@ const Solo = (function(){
       // 收尾那一手不報座標:結果卡才是主角,兩個東西同時彈出來會疊在一起(截圖才看得出來)
       if(!line && !GB.isFull()) showToast((cOf(step) === "b" ? "⚫" : "⚪") + " 電腦下在 " + GB.coordName(i), 1200);
     }
-    if(line){ finish(cOf(step) === human ? "win" : "lose", line); return true; }
-    if(GB.isFull()){ finish("draw", null); return true; }
+    if(line){
+      const wc = cOf(step);
+      if(isFriend()) finishFriend(wc, line); else finish(wc === human ? "win" : "lose", line);
+      return true;
+    }
+    if(GB.isFull()){
+      if(isFriend()) finishFriend(null, null); else finish("draw", null);
+      return true;
+    }
     paintHud(); paintTurn();
-    if(!myTurn()) aiTurn();
+    if(!isFriend() && !myTurn()) aiTurn();
     return true;
   }
   function tap(i){
     if(!active) return;
     if(over){ showToast("這局已經結束了"); return; }
     if(busy){ showToast("等電腦下完這一手"); return; }
-    if(!myTurn()) return;
+    if(!isFriend() && !myTurn()) return;
     if(GB.occupied(i)){ showToast("這裡已經有子了"); return; }
     commit(i, false);
   }
@@ -163,18 +182,26 @@ const Solo = (function(){
   }
 
   /* ---------- 悔棋 ----------
-     退到「自己最後那一手之前」:連對手的回應一起收回(只退一手會變成換對手下,等於白退)。 */
+     電腦對決:退到「自己最後那一手之前」,連對手的回應一起收回(只退一手會變成換對手下,等於白退)。
+     朋友模式:兩邊都是人,悔棋就是單純收回最後一手(誰誤按都是同一支手指按下一步)。 */
   function canUndo(){
     if(!active || over || busy) return false;
+    if(isFriend()) return mv.length > 0;
     for(let k = mv.length - 1; k >= 0; k--) if(cOf(k) === human) return true;
     return false;
   }
   function undo(){
     if(!active || busy) return;
     if(over){ showToast("這局結束了,按「再來一局」重開"); return; }
-    let k = mv.length - 1;
-    while(k >= 0 && cOf(k) !== human) k--;
-    if(k < 0){ showToast("還沒有可以收回的棋"); return; }
+    let k;
+    if(isFriend()){
+      if(!mv.length){ showToast("還沒有可以收回的棋"); return; }
+      k = mv.length - 1;
+    }else{
+      k = mv.length - 1;
+      while(k >= 0 && cOf(k) !== human) k--;
+      if(k < 0){ showToast("還沒有可以收回的棋"); return; }
+    }
     mv.length = k;                    // 截到自己那手之前 → 截完必定又輪到自己
     occ = GAI.occFrom(mv, n());
     GB.applyMoves(mv);                // 變短 → 內部走整盤重建
@@ -215,15 +242,39 @@ const Solo = (function(){
     else Sound.lose();
     showResult();
   }
+  // 朋友模式的結算:沒有「你/電腦」視角,只講黑白哪邊拿下這局 —— 兩人都在看同一支手機,
+  // 沒有人是「輸家視角」,所以不放挫敗音、卡片也不套 lose 樣式(同暗棋平手的處理方式)。
+  function finishFriend(winColor, line){
+    over = true; busy = false;
+    if(line) GB.markWin(line);
+    GB.setInteractive(false);
+    friendRec[winColor === null ? "d" : winColor]++;
+    paintHud(); paintTurn();
+
+    const card = $("gmkWinCard");
+    if(card){ card.classList.remove("win","lose","draw"); card.classList.add(winColor === null ? "draw" : "win"); }
+    $("winWord").textContent = winColor === null ? "平手!" : (winColor === "b" ? "⚫ 黑棋獲勝!" : "⚪ 白棋獲勝!");
+    const wEl = $("gmkWinner");
+    if(wEl){
+      if(winColor === null) wEl.innerHTML = '<span class="gw-tag">🤝 棋盤下滿,這局和局</span>';
+      else wEl.innerHTML = '<span class="gmk-seat ' + winColor + '"><i></i>' + (winColor === "b" ? "黑" : "白") + '</span><span class="gw-tag">拿下這局</span>';
+    }
+    $("winMsg").innerHTML = (winColor === null ? "雙方都沒能連成五子 🤝" : "五子連線,漂亮 🎉")
+      + '<br><span class="gmk-solomsg">' + size + "×" + size + " · 本機雙人 · 第 " + mv.length + " 手 · " + friendRecText() + "</span>";
+    if(winColor !== null) burst();
+    Sound.win();
+    showResult();
+  }
 
   return {
     start, quit, again, tap, undo, loadOwn, paintHud,
     active:()=>active,
     playing:()=>active && !over,      // 給更新檢查:局中重載會把整盤丟掉
-    level:()=>level, size:()=>size, first:()=>first,
-    recText, recLine,
+    level:()=>level, size:()=>size, first:()=>first, opponent:()=>opponent, isFriend,
+    recText, recLine, friendRecText,
     setLevel(v){ if(GAI.LEVELS[v]){ level = v; saveOwn(); paintHud(); } },
     setSize(v){ if(SIZES.indexOf(v) >= 0){ size = v; saveOwn(); } },
-    setFirst(v){ if(["me","ai","random"].indexOf(v) >= 0){ first = v; saveOwn(); } }
+    setFirst(v){ if(["me","ai","random"].indexOf(v) >= 0){ first = v; saveOwn(); } },
+    setOpponent(v){ if(["ai","friend"].indexOf(v) >= 0){ opponent = v; saveOwn(); } }
   };
 })();

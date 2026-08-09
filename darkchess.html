@@ -13,9 +13,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>象棋暗棋 ｜ 單機對電腦 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.129.3 -->
-<meta name="version" content="1.129.3">
+<title>象棋暗棋 ｜ 本機對戰 + 2 人連線</title>
+<!-- 象棋暗棋 · v1.130.0 -->
+<meta name="version" content="1.130.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -76,7 +76,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="home-tagline">32 顆象棋蓋著擺滿,翻到什麼算什麼</div>
       </div>
       <button class="btn primary block-btn home-btn" id="dcGoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="dcGoSolo">🤖 電腦對決</button>
+      <button class="btn ghost block-btn home-btn" id="dcGoSolo">🎮 本機對戰</button>
       <!-- ★ 文案規格:條列、標籤在前、一行一件事。
            進場這一段是玩家看到的第一份規則,寫成聊天口吻的話,第二次玩的人每次都得重讀。 -->
       <div class="home-hint">
@@ -100,9 +100,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="icon-btn" id="dcSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <span class="subtitle">電腦對決</span>
+        <span class="subtitle" id="dcSoloSubtitle">本機對戰</span>
       </div>
       <div class="field">
+        <span class="field-label">對手</span>
+        <div class="seg" id="dcOppSeg" aria-label="對手">
+          <button class="on" data-opp="ai">🤖 電腦</button>
+          <button data-opp="friend">👤 朋友</button>
+        </div>
+      </div>
+      <div class="field" id="dcLvField">
         <span class="field-label">電腦強度</span>
         <div class="seg" id="dcLvSeg" aria-label="電腦強度">
           <button data-lv="easy">🙂 新手</button>
@@ -110,7 +117,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-lv="hard">😈 高手</button>
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="dcFirstField">
         <!-- ★ 暗棋的先手權很實在:**先手第一次翻到什麼顏色就是他的** -->
         <span class="field-label">誰先翻</span>
         <div class="seg" id="dcFirstSeg" aria-label="誰先翻">

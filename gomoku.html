@@ -15,9 +15,9 @@
 <!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>五子棋 ｜ 連線對戰 · 電腦對決</title>
-<!-- 五子棋連線對戰 + 電腦對決 · v1.129.3 -->
-<meta name="version" content="1.129.3">
+<title>五子棋 ｜ 連線對戰 · 本機對戰</title>
+<!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v1.130.0 -->
+<meta name="version" content="1.130.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -72,19 +72,26 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="home-tagline">橫、豎、斜任一方向連成 5 顆就贏</div>
       </div>
       <button class="btn primary block-btn home-btn" id="gmkGoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="gmkPickSolo">🤖 電腦對決</button>
-      <div class="home-hint">連線 1 對 1 跟朋友下;電腦對決一個人也能玩,對手有 <b>新手 / 普通 / 高手</b> 三個強度</div>
+      <button class="btn ghost block-btn home-btn" id="gmkPickSolo">🎮 本機對戰</button>
+      <div class="home-hint">連線 1 對 1 跟朋友下;本機對戰不用連線,對手可以是電腦(<b>新手 / 普通 / 高手</b> 三個強度)或坐旁邊的朋友(輪流點同一支手機)</div>
     </div>
 
-    <!-- 第二層:電腦對決的設定(難度 / 盤面 / 先手)。這些只影響單機,不動連線那組房間設定 -->
+    <!-- 第二層:本機對戰的設定(對手 / 難度 / 盤面 / 先手)。這些只影響單機,不動連線那組房間設定 -->
     <div id="gmkPickLevel" class="hidden">
       <div class="home-sub-head">
         <button class="icon-btn" id="gmkLevelBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <span class="subtitle">電腦對決 · 選難度</span>
+        <span class="subtitle" id="gmkLevelSubtitle">本機對戰 · 選設定</span>
       </div>
       <div class="field">
+        <span class="field-label">對手</span>
+        <div class="seg" id="gmkOppSeg" aria-label="對手">
+          <button class="on" data-opp="ai">🤖 電腦</button>
+          <button data-opp="friend">👤 朋友</button>
+        </div>
+      </div>
+      <div class="field" id="gmkAiField">
         <span class="field-label">對手強度</span>
         <div class="seg" id="gmkAiSeg" aria-label="電腦強度">
           <button data-ai="easy">🙂 新手</button>
@@ -100,7 +107,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-size="25">25×25</button>
         </div>
       </div>
-      <div class="field">
+      <div class="field" id="gmkFirstField">
         <span class="field-label">誰先下</span>
         <div class="seg" id="gmkFirstSeg" aria-label="誰先下">
           <button class="on" data-first="me">⚫ 我先</button>
