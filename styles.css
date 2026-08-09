@@ -6227,11 +6227,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .cy-tool:disabled{opacity:.4;cursor:default}
 
   /* ---------- 盤面 + 字卡區的整體版面 ----------
-     .cy-stage 透明置中容器,尺寸完全由 .cy-boardbox(flex:1 1 auto)分配;
-     .cy-board 是看得到的矩形,寬高由 js/chengyu/board.js 的 fitStage() 算成整數 px。 */
+     .cy-stage 是 .cy-play(欄式排版)的直接子項,靠 flex:1 1 0 吃掉剩餘高度;
+     .cy-board 是看得到的矩形,寬高由 js/chengyu/board.js 的 fitStage() 算成整數 px。
+     ⚠ 不可以像數獨那樣中間再包一層 .cy-boardbox——那層預設是「列」排版,
+       .cy-stage 的 flex:1 1 0 會吃到橫向而不是直向的剩餘空間,盤面被壓成 MIN_CELL
+       保底值那麼小(比照暗棋 .dc-stage 直接掛在 .dc-play 底下的作法)。 */
   .cy-play{flex:1 1 auto;min-height:0;width:min(92vw,520px);
     display:flex;flex-direction:column;align-items:center;gap:10px}
-  .cy-boardbox{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
   .cy-stage{flex:1 1 0;min-height:0;width:100%;position:relative;
     display:flex;align-items:center;justify-content:center;overflow:hidden}
   .cy-stage.locked{opacity:.75}

@@ -83,8 +83,9 @@ const CYB = (function () {
   /* ★ 盤面尺寸用 JS 算成整數 px,不靠 CSS 的 aspect-ratio(比照 js/darkchess/board.js
      的 fitBoard):字謎盤 rows/cols 不像數獨永遠是正方形,aspect-ratio 同時吃
      max-width 與 max-height 時,被夾住的那一邊不會把另一邊帶著縮,盤面比例會被壓歪。
-     .cy-stage 本身是透明的置中容器,尺寸完全由父層(.cy-boardbox)分配;.cy-board
-     才是看得到的那個矩形,顯式寫死 width/height,fr 才能照這個尺寸平分出等寬的格子。 */
+     .cy-stage 本身是透明的置中容器,直接掛在 .cy-play(欄式排版)底下用 flex:1 1 0
+     吃掉剩餘高度;.cy-board 才是看得到的那個矩形,顯式寫死 width/height,fr 才能
+     照這個尺寸平分出等寬的格子。 */
   const GAP = 3, PAD = 4, MIN_CELL = 20;
   function fitStage() {
     if (!board || !wrap || !rows || !cols) return;
