@@ -6023,17 +6023,32 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      查過幾款主流暗棋 / 棋牌 App 的共同語彙後改成這一版:**吃子跟移動用同一種語彙**
      (平滑位移,不是爆炸特效)——被吃的子只是「被移去吃子欄」,像收進戰績區,
      不是被打飛。「翻到自己人 / 打不穿」這兩種沒有東西被吃掉,翻牌動畫本身已經講完了,
-     刻意**不疊加任何效果**(以前每一種結果都配一圈特效,疊在一起才是「太亂」的元兇)。 */
-  .dc-fly{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    pointer-events:none;z-index:7;
-    animation:dcFlyToTray .4s cubic-bezier(.3,.06,.28,1) forwards}
+     刻意**不疊加任何效果**(以前每一種結果都配一圈特效,疊在一起才是「太亂」的元兇)。
+     ★ v1.137.3:飛去吃子欄的動畫**不再是進場就自動播**,改成掛 `.dc-fly-go` /
+       `.dc-fly-fade` 才觸發(board.js 的 collectToTray())——「翻攻吃得動」那一種
+       (.dc-reveal,見下)要先翻開停留一下讓人看清楚,才輪到起飛,兩者共用同一份
+       起飛動畫,只是觸發的時間點不同。 */
+  .dc-fly, .dc-reveal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    pointer-events:none;z-index:7}
+  .dc-fly.dc-fly-go, .dc-reveal.dc-fly-go{animation:dcFlyToTray .38s cubic-bezier(.3,.06,.28,1) forwards}
   @keyframes dcFlyToTray{
     0%{transform:translate(0,0) scale(1);opacity:1}
     100%{transform:translate(var(--fx,0),var(--fy,0)) scale(.42);opacity:.15}
   }
   /* 對手那一列房規沒開(看不到目的地)時沒有 --fx/--fy,原地縮小淡出就好,不硬飛。 */
-  .dc-fly.dc-fly-fade{animation-name:dcFlyFade}
+  .dc-fly.dc-fly-fade, .dc-reveal.dc-fly-fade{animation:dcFlyFade .38s ease-in forwards}
   @keyframes dcFlyFade{ 0%{transform:scale(1);opacity:1} 100%{transform:scale(.5);opacity:0} }
+
+  /* ---------- 翻攻吃得動:先翻開讓人看清楚,再收走(對應「放上去/拿起來看/收走」)----------
+     ★ 使用者原話:「我不希望吃了之後,結果是要去下面看才知道吃了什麼…真正下棋時
+       我把自己的棋子放到那一顆還沒翻開的上面,然後會把它拿起來看,如果可以吃就收走」。
+     ⚠⚠ .dc-reveal 的 z-index **比攻擊方的 .dc-sliding(5)高**——攻擊方雖然已經滑
+       到位,但這一層蓋在它上面,直到起飛(收走)那一刻才「露出」攻擊方安穩落地的
+       畫面。這正是先蓋住、掀開看、再拿走的順序,不是兩個東西擠在一起搶注意力。
+     裡面包的 .dc-flip3d(翻開的那一下)沿用翻牌動畫那一份,原地翻完就停在正面,
+     停留期間 .dc-reveal 本身不動 —— 直到 board.js 幫它加上 .dc-fly-go/.dc-fly-fade
+     才開始位移,兩段動畫互不干擾(外層平移縮放、內層轉的是自己的 rotateY)。 */
+  .dc-reveal{z-index:8}
 
   /* ---------- 動作列 ----------
      ⚠⚠⚠ 這一塊的高度**必須固定**,而那是規格不是美觀:舞台是 flex:1 1 0,

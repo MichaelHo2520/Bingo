@@ -85,25 +85,34 @@ const DCB = (function(){
        ★ 用的是「帥仕相俥傌炮兵 / 將士象車馬包卒」這些**常用漢字** ——
          不是 CLAUDE.md 紅線 8 禁的 U+1F000 那一段(那些多數字型沒有,會變豆腐)。
      ========================================================================== */
+  // 一顆棋子的正面(不含翻牌動畫判斷)——pieceHTML() 與 board.js 三之一節的動畫共用。
+  function pieceFaceHTML(p){
+    const side = DC.sideOf(p);
+    return '<span class="dc-p ' + (side === DC.RED ? "dc-red" : "dc-blk") + '">' +
+             '<i class="dc-ring"></i><b class="dc-ch">' + DC.nameOf(p) + '</b>' +
+           '</span>';
+  }
+  /* 雙面卡片翻轉的殼:背面那張臉**不掛 .dc-back**(它已經翻開了,不能被算進還蓋著幾顆),
+     只掛 .dc-backface 拿視覺 —— 兩張臉共用同一份「木頭牌背」樣式,見 styles.css。
+     faceHTML 帶什麼進來就翻出什麼(pieceHTML() 的 pendingFlip 分支、以及三之一節
+     「翻攻:先翻開看清楚再收走」的動畫,兩處共用這一支)。 */
+  function flipWrapHTML(faceHTML){
+    return '<span class="dc-flip3d dc-flip-in">' +
+             '<span class="dc-face dc-face-b dc-p dc-backface" aria-hidden="true">' +
+               '<i class="dc-ring"></i><b class="dc-grain"></b></span>' +
+             '<span class="dc-face dc-face-f" aria-hidden="true">' + faceHTML + '</span>' +
+           '</span>';
+  }
   /* ★ pendingFlip 是「這一格是不是這一手剛翻開的」的一次性開關(見上面宣告處的註解)。
      ⚠⚠⚠ 牌情紅線的守門(tools/test-pages.js H 節)逐字比對畫格子那一行是
        `c.up ? pieceHTML(c.p) : backHTML()`,所以**不能**改成 pieceHTML(p, flip) 這種
        多帶一個參數的寫法 —— 呼叫點的字要原封不動。改用模組變數讓 pieceHTML 自己讀,
        paint() 只在要畫「剛翻開那一格」的前一刻把它撥成 true,畫完立刻被這裡消費掉。 */
   function pieceHTML(p){
-    const side = DC.sideOf(p);
-    const face = '<span class="dc-p ' + (side === DC.RED ? "dc-red" : "dc-blk") + '">' +
-                   '<i class="dc-ring"></i><b class="dc-ch">' + DC.nameOf(p) + '</b>' +
-                 '</span>';
+    const face = pieceFaceHTML(p);
     if(!pendingFlip) return face;
     pendingFlip = false;                       // 消費一次:吃子欄 / 結果卡再畫同一顆子不會誤套
-    /* 雙面卡片翻轉:背面那張臉**不掛 .dc-back**(它已經翻開了,不能被算進還蓋著幾顆),
-       只掛 .dc-backface 拿視覺 —— 兩張臉共用同一份「木頭牌背」樣式,見 styles.css。 */
-    return '<span class="dc-flip3d dc-flip-in">' +
-             '<span class="dc-face dc-face-b dc-p dc-backface" aria-hidden="true">' +
-               '<i class="dc-ring"></i><b class="dc-grain"></b></span>' +
-             '<span class="dc-face dc-face-f" aria-hidden="true">' + face + '</span>' +
-           '</span>';
+    return flipWrapHTML(face);
   }
   // 牌背。★ 這裡**碰都不要碰** c.p —— 見檔頭的牌情紅線
   function backHTML(){
@@ -216,32 +225,40 @@ const DCB = (function(){
          ②「連吃的時候,如果旁邊的還是蓋著,成功的吃掉每次都會不知道到底吃了什麼」
          ③「吃掉加棋子名字這個方法有點糟,效果很差,一點都不像是正式發行的遊戲」
          ④「現在這樣也很糟,看起來太亂了,參考一下網路上比較流行的暗棋遊戲」——
-           針對③改的「震波 + 火花 + 亂飛亂轉」版又被推翻,查了幾款主流暗棋 /
-           棋牌 App(暗棋2、暗棋大戰Online、chess.com 的說明)跟一般棋牌類手遊的
-           共同語彙:**移動一律用滑的**(不瞬移),**吃掉的子送去戰績區**(不是炸開)——
-           越正式的棋類 App 動畫越收斂,花俏的粒子特效反而是這一類受眾不買單的東西。
-       落地成兩件事,而且只有兩件事(刻意剋制,不再疊加第三種效果):
-         ① slidePiece():攻擊方那顆子從 from 格滑到 to 格(FLIP 技巧簡化版,見下)。
-         ② flyToTray():被吃的子(pieceHTML(got),牌面本身就是答案)平滑地飛向
-            吃子欄裡它真正的新位置(那一欄這時候已經重新畫過,飛的目的地是**它在
-            吃子欄裡實際的座標**,不是隨便一個方向)、邊縮小邊淡出,像是「這顆子被
-            收進戰績區了」——不是被打飛,是被移走,跟移動棋子的滑動動畫走同一種語彙
-            (都是「平滑位移」,不是「爆炸特效」)。
-       「翻到自己人 / 打不穿」這兩種**沒有東西被吃掉**,不套任何額外效果 ——
-         翻牌動畫本身(pieceHTML() 的 pendingFlip 那條路)已經把「翻到誰」講清楚了,
-         再疊視覺只是雜訊(這正是④那次回報「太亂了」的原因之一:好幾層效果同時疊
-         在一個 32 格的小盤面上)。
-       ⚠ knockAway 世代(v1.137.1)拿掉的震波 / 火花 / 色環脈動 / 彈開全部一起刪掉,
-         不留死碼 —— 那一版的教訓是「拿掉一個問題不能只換一批新特效」,先想清楚
-         真正需要傳達的資訊是什麼(這一步吃了誰),再挑**一種**乾淨的做法講完就好。
-       ⚠ flyToTray() 會暫時多畫一顆 pieceHTML(got)(被吃的子一定都先翻開過,不違反
-         牌情紅線),飛完就移除 —— 不影響 tools/gen-dc-solo-e2e.js 對 #dcBoard 的
-         計數斷言(那些斷言都不在「剛吃完子」的那個時間點量)。
+           查了幾款主流暗棋 App 跟一般棋牌類手遊的共同語彙:**移動一律用滑的**
+           (不瞬移),**吃掉的子送去戰績區**(不是炸開),越正式的棋類 App 動畫越收斂。
+         ⑤「對於那種還沒有翻開來的,我想要再修改一下…我不希望吃了之後,結果是要去
+           下面看才知道吃了什麼…真正下棋時我把自己的棋子放到那一顆還沒翻開的上面,
+           然後會把它拿起來看,如果可以吃就收走」——④的版本(移動→直接飛去吃子欄)
+           對「翻攻吃得動」(`darkEat`)這一種**不夠**:被吃的子在飛之前**從來沒有
+           被清楚翻開讀過**(飛的時候雖然畫的是正確牌面,但那個瞬間玩家的視線還在
+           看攻擊方的子滑過去,根本沒注意到),逼玩家要盯著吃子欄才知道吃了誰。
+       ⑤ 落地成兩條路,依「這顆子在這一步之前玩家看不看得到」分岔:
+         ★ **明棋吃明棋**(`eat`/`jump`/`rush`):被吃的子在這一步之前就是翻開的,
+           玩家早就知道是誰 —— 維持 slidePiece() + flyToTray() 這一套(飛向吃子欄
+           裡它真正的新位置、邊縮邊淡出),不需要再翻一次給他看。
+         ★★ **翻攻吃得動**(`darkEat`,唯一「這一步才知道底下是誰」的情況)——
+           改成三段式,對應使用者說的「放上去 → 拿起來看 → 收走」:
+           ① slidePiece() 攻擊方的子滑過去(放上去);
+           ② revealThenCollect() 在原地把被吃的子**翻開**(拿起來看,重用
+              flipWrapHTML() 那份雙面翻轉,z-index 蓋在攻擊方上面,不是跟攻擊方
+              擠在一起讓人分心)、**停留一下**讓玩家真的看清楚是哪一顆,
+           ③ 停留結束後才飛向吃子欄(收走)。
+       「翻到自己人 / 打不穿」(`darkSelf`/`jumpSelf`/`darkMiss`)這三種都是**沒有
+       東西被吃掉、而且那顆子留在原地**——pieceHTML() 的 pendingFlip 翻牌動畫已經是
+       「翻開讓你看清楚,而且它一直留在畫面上」,不必再疊 collect 這一段(沒有東西
+       要收走)。
+       ⚠ knockAway 世代(v1.137.1)拿掉的震波 / 火花 / 色環脈動 / 彈開全部刪乾淨,
+         不留死碼。
+       ⚠ flyToTray()/revealThenCollect() 都會暫時多畫一顆 pieceHTML(got)(被吃的子
+         一定都先翻開過,不違反牌情紅線),播完就移除 —— 不影響
+         tools/gen-dc-solo-e2e.js 對 #dcBoard 的計數斷言(那些斷言都不在「剛吃完子」
+         的那個時間點量)。
      ========================================================================== */
   // 這一手的 kind → 要不要播位移動畫、有沒有東西被吃掉(見 rules.js 六節的 kind 表)
   const REVEAL_KINDS = { flip: 1, darkSelf: 1, darkMiss: 1, jumpSelf: 1 };
   const SLIDE_KINDS  = { move: 1, eat: 1, jump: 1, rush: 1, darkEat: 1 };
-  const EAT_KINDS    = { eat: 1, jump: 1, rush: 1, darkEat: 1 };
+  const EAT_KINDS    = { eat: 1, jump: 1, rush: 1 };          // ⚠ darkEat 不在這裡,見下面 playMoveFx
 
   function sqEl(i){ return board.querySelector('.dc-sq[data-sq="' + i + '"]'); }
 
@@ -280,29 +297,55 @@ const DCB = (function(){
     return (last || pcs).getBoundingClientRect();
   }
 
-  // 被吃的子平滑飛向吃子欄裡它真正的新位置、邊縮邊淡出 —— 「吃了誰」靠牌面本身回答。
-  function flyToTray(toIdx, seat, got){
-    const sq = sqEl(toIdx);
-    if(!sq || got == null) return;
+  // 把 el 裡的東西朝吃子欄裡它真正的新位置飛過去、邊縮邊淡出;沒有目的地就原地淡出。
+  function collectToTray(sq, el, seat){
     const tRect = trayTargetRect(seat);
-    const el = document.createElement("span");
-    el.className = "dc-fly";
-    el.innerHTML = pieceHTML(got);
-    sq.appendChild(el);
     if(tRect){
       const sRect = sq.getBoundingClientRect();
       el.style.setProperty("--fx", (tRect.left + tRect.width / 2 - sRect.left - sRect.width / 2).toFixed(1) + "px");
       el.style.setProperty("--fy", (tRect.top + tRect.height / 2 - sRect.top - sRect.height / 2).toFixed(1) + "px");
+      el.classList.add("dc-fly-go");
     }else{
       el.classList.add("dc-fly-fade");            // 沒有目的地(對手那欄沒開)→ 原地淡出就好
     }
+  }
+
+  // 明棋吃明棋:被吃的子(早就翻開過,玩家已經知道是誰)直接飛向吃子欄。
+  function flyToTray(toIdx, seat, got){
+    const sq = sqEl(toIdx);
+    if(!sq || got == null) return;
+    const el = document.createElement("span");
+    el.className = "dc-fly";
+    el.innerHTML = pieceHTML(got);
+    sq.appendChild(el);
+    collectToTray(sq, el, seat);
     setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 420);
+  }
+
+  /* 翻攻吃得動(darkEat):這一步才第一次知道底下是誰,對應使用者說的
+     「放上去 → 拿起來看 → 收走」—— 先翻開、停留讓人看清楚,再飛去吃子欄。
+     ⚠ z-index 比攻擊方的子高(見 CSS 的 .dc-reveal),攻擊方雖然已經滑到位,
+       但視覺上被這一層蓋著,直到收走的那一刻才「露出」攻擊方安穩落地的畫面 ——
+       這正是「棋子放上去、掀開看、拿走」的順序,不是兩個東西擠在一起搶注意力。 */
+  const DARK_REVEAL_MS = 420, DARK_HOLD_MS = 420, DARK_FLY_MS = 380;
+  function revealThenCollect(toIdx, seat, got){
+    const sq = sqEl(toIdx);
+    if(!sq || got == null) return;
+    const el = document.createElement("span");
+    el.className = "dc-reveal";
+    el.innerHTML = flipWrapHTML(pieceFaceHTML(got));
+    sq.appendChild(el);
+    setTimeout(() => { collectToTray(sq, el, seat); }, DARK_REVEAL_MS + DARK_HOLD_MS);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); },
+               DARK_REVEAL_MS + DARK_HOLD_MS + DARK_FLY_MS);
   }
 
   function playMoveFx(L){
     if(SLIDE_KINDS[L.kind]) slidePiece(L.from, L.to);
-    if(EAT_KINDS[L.kind]){
-      // 對齊滑入抵達的時間點:攻擊方的子先滑過去,「落地」那一刻被吃的子才起飛
+    if(L.kind === "darkEat"){
+      // 對齊滑入抵達的時間點:攻擊方的子先滑過去,「放上去」那一刻才翻開被吃的子
+      setTimeout(() => { revealThenCollect(L.to, L.seat, L.got); }, 220);
+    }else if(EAT_KINDS[L.kind]){
       setTimeout(() => { flyToTray(L.to, L.seat, L.got); }, 190);
     }
     // darkSelf / jumpSelf / darkMiss:翻牌動畫本身已經講完了,不再疊加任何效果。
