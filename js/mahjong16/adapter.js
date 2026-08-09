@@ -1057,10 +1057,15 @@ const MP = MPCore.create((function(){
        ⚠ 進度來自 tai._r 的筆數,而 tai 一變就會 renderPlayers() → updateGoal(),
          所以這裡不必自己訂閱;applyGame() 也補叫一次(同一局內換手也要更新)。
        ★ v1.122.0:handsGoal 可能是負數(打幾圈),對戰中要換成「圈風 · 第幾圈」——
-         見 goalBadgeText() / goalLabel() 的檔頭。 */
+         見 goalBadgeText() / goalLabel() 的檔頭。
+       ★ v1.133.0:圖示改成 🎯(原本借用 🀄,使用者:「那邊是在表示第幾局的地方,
+         如果要放小圖案的話我希望可以有相關聯的」)——這裡講的是「打幾局/打幾圈」這個
+         目標的進度,🎯 與 mp-core.js 的 winGoal 徽章同一顆,語意上與「目標」相關聯,
+         跟紅中(🀄)完全無關。⚠ 不算違反 Unicode 麻將字元禁令(見 notes/13 第六節)——
+         🎯 本來就不在 U+1F000 那一段裡。 */
     updateGoal(){
       const g = $("mpBarGoal"); if(!g) return;
-      g.textContent = "🀄 " + (ctx.phase()==="playing" ? goalBadgeText() : goalLabel(handsGoal));
+      g.textContent = "🎯 " + (ctx.phase()==="playing" ? goalBadgeText() : goalLabel(handsGoal));
       g.classList.remove("hidden");
     },
 

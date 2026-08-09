@@ -471,8 +471,10 @@ const Solo = (function(){
       }
       box.innerHTML = h;
     }
+    // 🎯 而不是 🀄(v1.133.0):這裡講的是「打幾局/打幾圈」的目標進度,理由與 adapter.js
+    // 的 updateGoal() 同一條(grep 🎯 找另一份)。
     const g = $("m16SoloGoal");
-    if(g) g.textContent = "🀄 " + goalBadgeText();
+    if(g) g.textContent = "🎯 " + goalBadgeText();
     const lv = $("m16SoloLv");
     if(lv){
       const L = MJ16AI.levelOf(level);
