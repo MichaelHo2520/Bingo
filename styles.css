@@ -6017,51 +6017,23 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        inline style(算兩格的 getBoundingClientRect 差,不靠 CSS 猜位移量)。 */
   .dc-p.dc-sliding{z-index:5}
 
-  /* ---------- 吃子命中特效(震波 + 火花 + 被吃的子飛出去)----------
-     ⚠⚠ v1.137.1 起拿掉了「浮出文字標籤講吃了誰」的做法(使用者:「吃掉加棋子名字
-       這個方法有點糟,效果很差,一點都不像是正式發行的遊戲」)。改成三層純視覺特效,
-       「吃了誰」靠**被吃的子本身飛出去**回答,不寫字:
-         .dc-burst  命中瞬間的一圈金色震波(遊戲界通用的「打中了」語彙)
-         .dc-spark  震波同時炸開的幾點火花(board.js 用 --sx/--sy 決定飛去哪)
-         .dc-knock  被吃的子(牌面本身)朝攻擊方前進的方向飛出去、邊轉邊縮邊淡出
-     ⚠ 這三顆都是 pointer-events:none 的裝飾層,疊在 .dc-sq 上不影響點擊。 */
-  .dc-burst{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    pointer-events:none;z-index:9}
-  .dc-burst::before{content:"";position:absolute;width:66%;height:66%;border-radius:50%;
-    border:2px solid rgba(255,221,140,.92);box-shadow:0 0 10px 2px rgba(255,196,102,.5);
-    animation:dcBurstRing .46s cubic-bezier(.15,.7,.4,1) forwards}
-  @keyframes dcBurstRing{ 0%{transform:scale(.32);opacity:.95} 100%{transform:scale(1.85);opacity:0} }
-  .dc-spark{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:50%;
-    background:#ffd98a;box-shadow:0 0 4px 1px rgba(255,208,120,.85);
-    pointer-events:none;z-index:9;animation:dcSparkFly .5s cubic-bezier(.15,.6,.35,1) forwards}
-  @keyframes dcSparkFly{
+  /* ---------- 吃子:被吃的子飛向吃子欄(不再用震波/火花/彈開那一套)----------
+     ⚠⚠ v1.137.1 做了「浮出文字標籤講吃了誰」被否決(除錯標記的手感);
+     v1.137.2 換成「震波 + 火花 + 亂飛亂轉」又被使用者打回票:「看起來太亂了」。
+     查過幾款主流暗棋 / 棋牌 App 的共同語彙後改成這一版:**吃子跟移動用同一種語彙**
+     (平滑位移,不是爆炸特效)——被吃的子只是「被移去吃子欄」,像收進戰績區,
+     不是被打飛。「翻到自己人 / 打不穿」這兩種沒有東西被吃掉,翻牌動畫本身已經講完了,
+     刻意**不疊加任何效果**(以前每一種結果都配一圈特效,疊在一起才是「太亂」的元兇)。 */
+  .dc-fly{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    pointer-events:none;z-index:7;
+    animation:dcFlyToTray .4s cubic-bezier(.3,.06,.28,1) forwards}
+  @keyframes dcFlyToTray{
     0%{transform:translate(0,0) scale(1);opacity:1}
-    100%{transform:translate(var(--sx),var(--sy)) scale(.25);opacity:0}
+    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(.42);opacity:.15}
   }
-  .dc-knock{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    pointer-events:none;z-index:7;animation:dcKnockAway .48s cubic-bezier(.24,.4,.4,1) forwards}
-  @keyframes dcKnockAway{
-    0%{transform:translate(0,0) rotate(0) scale(1);opacity:1}
-    30%{transform:translate(var(--kx),var(--ky)) rotate(calc(var(--kr) * .5)) scale(1.04);opacity:1}
-    100%{transform:translate(calc(var(--kx) * 1.9),calc(var(--ky) * 1.9 + 16px)) rotate(var(--kr)) scale(.35);opacity:0}
-  }
-
-  /* ---------- 翻到自己人 / 打不穿:沒有東西被吃掉的一圈脈動 ----------
-     ★ 沒有子飛出去(沒東西被吃掉),用色系區分兩種結果:綠色系 = 安全(翻到自己人)、
-       紅色系 = 被擋下(翻到吃不動的敵子)。牌面本身(翻牌動畫已經顯示)已經回答了
-       「翻到誰」,這裡只負責講「然後呢」。 */
-  .dc-pulse{position:absolute;inset:0;pointer-events:none;z-index:9}
-  .dc-pulse::before{content:"";position:absolute;inset:8%;border-radius:50%;
-    animation:dcPulseRing .55s ease-out forwards}
-  .dc-pulse-safe::before{border:2px solid rgba(122,222,192,.9);box-shadow:0 0 10px 2px rgba(122,222,192,.4)}
-  .dc-pulse-block::before{border:2px solid rgba(224,96,84,.9);box-shadow:0 0 10px 2px rgba(224,96,84,.4)}
-  @keyframes dcPulseRing{ 0%{transform:scale(.55);opacity:1} 100%{transform:scale(1.55);opacity:0} }
-  /* 打不穿:攻擊方那顆子朝目標方向輕彈一下又彈回來,像撞到盾牌彈開(board.js 用 --bx/--by 給方向)。 */
-  .dc-p.dc-bounce{animation:dcBounceOff .32s ease-out}
-  @keyframes dcBounceOff{
-    0%{transform:translate(0,0)} 35%{transform:translate(var(--bx),var(--by))}
-    65%{transform:translate(calc(var(--bx) * -.35),calc(var(--by) * -.35))} 100%{transform:translate(0,0)}
-  }
+  /* 對手那一列房規沒開(看不到目的地)時沒有 --fx/--fy,原地縮小淡出就好,不硬飛。 */
+  .dc-fly.dc-fly-fade{animation-name:dcFlyFade}
+  @keyframes dcFlyFade{ 0%{transform:scale(1);opacity:1} 100%{transform:scale(.5);opacity:0} }
 
   /* ---------- 動作列 ----------
      ⚠⚠⚠ 這一塊的高度**必須固定**,而那是規格不是美觀:舞台是 flex:1 1 0,

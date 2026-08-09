@@ -185,14 +185,22 @@ const Solo = (function(){
   }
 
   /* 電腦這一手。兩段 setTimeout 是刻意的(同五子棋):
-     第一段讓「電腦思考中」先畫出來(搜尋是同步的,會把主執行緒佔住);
      第二段補到最短時間,免得新手難度算完只花 0.1ms、子跟著手指瞬間跳走。
-     ★ 連吃時它會再排一次自己 —— 一步一步演,不要一次演完。 */
+     ★ 連吃時它會再排一次自己 —— 一步一步演,不要一次演完。
+     ⚠⚠⚠ v1.137.2 起**拿掉了這裡原本的即時 `paint()`**(舊註解寫「讓電腦思考中先畫
+     出來」)——它會踩死剛觸發的翻牌/滑動/吃子動畫:call 進來的時候 `commit()` 剛
+     replay 完、`st.turn` 已經換成電腦,`commit()` 自己那次 `paint()` 早就把 `mine`
+     畫成 false 了,`busy` 再設一次 true**不會讓任何畫面上的東西不一樣**
+     (`busy` 唯一的另一個讀者是 `act()` 那道「等電腦走完這一手」的守衛,那是**點擊當下
+     直接讀變數**,不是靠 paint() 反映)。但這裡的 `paint()` 跟 `commit()` 那次是**同一拍**
+     (同步呼叫鏈,瀏覽器連一幀都還沒畫出來)、`cur.key` 也一樣 —— board.js 的
+     `fresh` 判斷會把這次當成「這個 key 已經畫過」,不重播翻牌動畫,而 `board.innerHTML`
+     照樣整段重建,直接把剛才那次animation 的節點連根拔掉。使用者反饋:「自己翻棋子的
+     時候,我也希望有翻棋子的動畫」——查出來是這個重複呼叫在搞鬼,不是動畫本身沒接上。 */
   function clearAiT(){ if(aiT){ clearTimeout(aiT); aiT = null; } }
   function aiTurn(){
     if(!active || over || !st || st.turn !== aiSeat) return;
     busy = true;
-    paint();
     const chaining = st.chainFrom >= 0;
     const t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
     clearAiT();
