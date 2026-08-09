@@ -252,36 +252,30 @@ const DCB = (function(){
               (canAct ? '<b class="dc-you">輪到你</b>' : (who ? ("輪到 " + esc(who)) : "…")) +
               '<span class="dc-side">你是 ' + meTxt + "</span></div>");
 
-    /* ★ 第二行:兩種狀態(連吃 / 其它)**同一局裡都佔同一格高度**。
-       ⚠ v1.115.0 起「其它」一律是**空的** —— 原本那句操作提示(「點暗棋翻開,
-         或點自己的棋子」)拿掉了:它每一手都在講同一件事,而暗棋本來就只有
-         「翻一顆」跟「動自己的子」兩種手,盤面的高亮已經說完了。
-       ⚠⚠ 容器**同一局裡不可以**跟著拿掉:連吃那一列比它高一截,.dc-actline 的
-         min-height 撐著,少了它「進入連吃」的那一手棋盤會縮一下。
-       ★★ 但這一行**整個要不要畫**是房規「連吃」決定的,而房規開局就凍結
-         (rules.js 的 normRules)—— 沒開連吃的那一局,這一行永遠是空的,
-         乾脆不畫,把 min-height 佔的空間讓給棋盤(手機上這一截很值錢)。
-         ⚠ 只准用 st.rules.chain 這種**一整局不會變**的旗標當開關;絕對不可以
-           用 chainOn(是不是正在連吃)去決定要不要畫這個容器 —— 那會回到
-           v1.113.x 那個「輪到自己多一行、換對手少一行」的老毛病。 */
-    if(st.rules && st.rules.chain){
-      let line = "";
-      if(chainOn && canAct){
-        const n = DC.chainTargets(st).length;
-        line = '<div class="dc-chain-row">' +
-               '<span class="dc-chain-txt">連吃中 · 已吃 <b>' + st.chainLen + '</b> 顆' +
-               (n ? (' · 還可吃 <b>' + n + "</b> 處") : "") + "</span>" +
-               '<button type="button" class="btn dc-stop" data-act="stop">結束連吃</button></div>';
+    /* ★ 第二行:連吃提示 + 走棋倒數環**合併成同一行**(v1.129.x 起)——
+       兩個都是「有時候有內容、有時候空」的東西,各佔一份 min-height 太浪費,
+       使用者回報「乾脆整合成一行,把空間留給棋盤」。
+       ⚠⚠ 容器**同一局裡不可以**忽有忽無:連吃那一列比空的時候高一截,
+         min-height 撐著,少了它「進入連吃」的那一手盤面會縮一下。
+       ★★ 這一行**整個要不要畫**是房規決定的,而房規開局就凍結(rules.js 的
+         normRules / adapter.js 的 setRoomField("turnSec",…,{lobbyOnly:true}))——
+         連吃沒開、這局也沒有走棋倒數(單機永遠沒有),整行不畫,把空間讓給棋盤。
+         ⚠ 只准用 st.rules.chain / cur.cdMs 這種**一整局不會變**的旗標當開關;
+           絕對不可以用 chainOn(是不是正在連吃)去決定要不要畫這個容器 ——
+           那會回到 v1.113.x「輪到自己多一行、換對手少一行」的老毛病。
+       ★ 連吃中的文字**故意只寫「連吃中」**,不報「已吃幾顆 / 還可吃幾處」——
+         那兩個數字棋盤上的高亮已經講完了(哪幾格還能繼續吃看得到),文字重複
+         一次只是佔字數,使用者要的就是把這幾個字省下來。 */
+    const hasChainUI = !!(st.rules && st.rules.chain);
+    const hasTimer = !!cur.cdMs;
+    if(hasChainUI || hasTimer){
+      let inner = "";
+      if(hasChainUI && chainOn && canAct){
+        inner += '<span class="dc-chain-txt">連吃中</span>' +
+                 '<button type="button" class="btn dc-stop" data-act="stop">結束連吃</button>';
       }
-      bits.push('<div class="dc-actline">' + line + "</div>");
-    }
-    /* ★★ 走棋倒數的環:同樣是房規凍結(對局中不能改,見 adapter.js 的
-       setRoomField("turnSec", …, {lobbyOnly:true}))—— cur.cdMs 這一局裡
-       要嘛從頭到尾是 0、要嘛從頭到尾是同一個數字,不會中途變動。
-       ⚠ 單機從來沒有這個欄位(cur.cdMs 永遠是 undefined,見 solo.js)——
-         「單機沒有倒數,想多久是自己的節奏」本來就是規格,這裡順便省掉空位。 */
-    if(cur.cdMs){
-      bits.push('<div class="dc-cdwrap" id="dcCdWrap"></div>');
+      if(hasTimer) inner += '<div class="dc-cdwrap" id="dcCdWrap"></div>';
+      bits.push('<div class="dc-actline' + (hasTimer ? " has-cd" : "") + '">' + inner + "</div>");
     }
     acts.innerHTML = bits.join("");
     acts.classList.remove("hidden");

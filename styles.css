@@ -6306,10 +6306,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     font-size:14px;font-weight:800;color:var(--muted);line-height:22px;min-height:22px}
   .dc-you{color:var(--accent-2);font-size:16px}
   .dc-side{font-size:12px;font-weight:700;color:var(--muted)}
-  /* 第二行的容器:連吃列 / 其它(空的)兩種狀態同一個高度。
+  /* 第二行的容器:連吃提示 + 走棋倒數環**合併成同一行**(v1.129.x 起,原本是分開
+     兩行,使用者回報「整合成一行、把空間留給棋盤」)。連吃列 / 其它(空的)/
+     只有倒數環三種狀態同一局裡都要同一個高度。
      ⚠ v1.115.0 拿掉了操作提示那一行,但**容器要留著** —— 連吃列比它高一截,
-        min-height 沒人撐的話「進入連吃」的那一手棋盤會縮一下。 */
-  .dc-actline{width:100%;min-height:32px;display:flex;align-items:center;justify-content:center}
+        min-height 沒人撐的話「進入連吃」的那一手棋盤會縮一下。
+     ⚠ 這一局有沒有走棋倒數會影響這一行要多高(環 34px 比連吃列高)——
+        由 board.js 掛的 `.has-cd` 決定,兩個都是房規凍結,不會同一局裡忽高忽低。 */
+  .dc-actline{width:100%;min-height:28px;display:flex;align-items:center;justify-content:center;
+    gap:8px;flex-wrap:wrap}
+  .dc-actline.has-cd{min-height:34px}
   /* ---------- 吃子欄(動作列的上半)----------
      ★ 被吃掉的子一定都現過身(炮打暗子是先翻開再吃)→ 攤開它們不違反牌情紅線。
      ★★ v1.116.0:**自己吃掉的那一列永遠在**,「對手吃掉」那一列由**房規** foeCaps 決定
@@ -6332,7 +6338,8 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         · tighter(13 顆以上):步距 13 → 16 顆 = 15×13 + 26 = 221 ≤ 249 ✔ */
   .dc-tray-pcs.tight .dc-p{margin-right:-8px}
   .dc-tray-pcs.tighter .dc-p{margin-right:-13px}
-  .dc-chain-row{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+  /* ⚠ 沒有獨立的包裝 div 了(舊的 .dc-chain-row)—— 文字與按鈕直接是 .dc-actline
+     的 flex 子項,跟走棋倒數環同一行並排,間距靠 .dc-actline 的 gap。 */
   .dc-chain-txt{font-size:13px;font-weight:800;color:var(--accent-2)}
   .dc-chain-txt b{color:var(--text)}
   /* ★ 「結束連吃」只在連吃還吃得到的時候出現 —— 沒得吃時規則層已經自動結束了。
@@ -6437,8 +6444,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .dc-turn{font-size:13px;line-height:20px;min-height:20px}
     .dc-you{font-size:14px}
     .dc-stop{height:26px;padding:0 13px;font-size:13px;min-width:86px}
-    /* ⚠ 這兩條要跟著改小,但**仍然是固定值** —— 高度可以變小,不可以隨內容變 */
-    .dc-actline{min-height:28px}
+    /* ⚠ 這一條要跟著改小,但**仍然是固定值** —— 高度可以變小,不可以隨內容變。
+       ⚠ .dc-actline 的無環版本本來就是 28px(見基準規則),這裡不必再覆寫一次;
+         有環版本(.has-cd)由環的 34px 撐住,矮視窗沒有把環縮小,所以也不用覆寫。 */
     .dc-tray-row{min-height:24px}
     .dc-tray-pcs{--dc-cell:24px}
     .dc-tray-pcs .dc-p{width:22px;height:22px}
