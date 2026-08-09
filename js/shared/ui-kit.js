@@ -388,15 +388,27 @@ const CLIPS=[
   { id:"fine",    label:"牌沒問題",     src:"mp3/牌沒問題.m4a" },
   { id:"rude",    label:"沒禮貌",       src:"mp3/沒禮貌.m4a" },
 ];
-/* ---------- 罐頭面板拖曳排序(v1.128.0) ----------
+/* ---------- 罐頭面板拖曳排序(v1.128.0,觸發方式 v1.128.x 改成按住不放) ----------
    使用者:「語音罐頭 / emoji 想要自己拖曳排序」。四個罐頭區塊(表情 / 一句話 / 內建語音 / 我的語音)
    都能直接用手指拖曳調順序,不必另外進「編輯模式」。
 
-   手法照抄 js/big2/board.js 排手牌那套(那裡踩過的坑照樣會踩到,細節見它的第八節):
-     · 用**位移量**(PD_SLOP)分辨拖曳與點擊,不是長按計時、也不是 elementFromPoint
-       —— 拖曳中用 insertBefore 搬動被捕獲的元素,WebKit / Blink 都會因此觸發
-          lostpointercapture,必須判斷「節點還在不在面板裡」而不是當成手勢中斷,
-          否則排序活不過第一次換位(按鈕會彈回原位)。
+   ⚠⚠ v1.128.0 原本是照抄 js/big2/board.js 排手牌那套「位移量分辨拖曳」(移動超過門檻
+      就算拖曳)。但這個面板本身**卡在會上下捲動的卡片裡**,大老二的手牌不必兼顧這件事
+      (拖不拖得動都不影響 .b2-stage 這個捲動容器,靠縫隙照樣捲得動)。使用者實測回報:
+      「上下滑動的時候不小心就拉到了物件」—— 按鈕原本設了 touch-action:none(單純位移
+      判斷的必要條件),等於手指一碰到按鈕移動就直接判定成拖曳,原生捲動完全沒機會贏。
+   ★ 改成**按住不放一段時間(PD_HOLD_MS)才解鎖拖曳資格**;解鎖前位移超過 PD_HOLD_TOL
+     就當作「其實是想捲動」,直接放棄這次候選、不吃掉手勢。同時把 touch-action:none 從
+     按鈕上拿掉(styles.css),讓等待期間瀏覽器原生的上下捲動搶得到這個手勢 ——
+     快速滑一下的捲動,位移在等到 PD_HOLD_MS 之前就已經超過 PD_HOLD_TOL,永遠不會被
+     判定成拖曳;真的按著不太動一下子才開始移動,才會觸發拖曳。
+   ⚠ setPointerCapture **延到解鎖那一刻才做**(不是 pointerdown 當下就搶):搶太早,
+     瀏覽器連判斷「這其實是原生捲動」的機會都沒有,等待期間就失去意義了。
+
+   手法照抄 js/big2/board.js 排手牌那套的其餘部分(那裡踩過的坑照樣會踩到,細節見它的第八節):
+     · 拖曳中用 insertBefore 搬動被捕獲的元素,WebKit / Blink 都會因此觸發
+       lostpointercapture,必須判斷「節點還在不在面板裡」而不是當成手勢中斷,
+       否則排序活不過第一次換位(按鈕會彈回原位)。
      · move / up / cancel 一律掛在 window,不是掛在個別區塊,才不受「捕獲元素被誰收著」影響。
      · 換位一律 insertBefore,排版交給 grid / flex 自己算,不自己量座標。
    ⚠ js/game.js 有另一份(Bingo 不載入 js/shared/)—— 改一邊要改另一邊。
@@ -418,7 +430,8 @@ function orderByKey(defaults, saved, keyFn){
   return out;
 }
 const PD_BOXES="#emoteGrid,#emotePhrases,#emoteClips,#emoteMyClips";
-const PD_SLOP=11;
+const PD_HOLD_MS=300;   // 按住不放這麼久才解鎖拖曳資格(太短擋不住快速滑動,太長按起來會覺得卡)
+const PD_HOLD_TOL=6;    // 解鎖前位移超過這麼多 px 就當作想捲動,放棄這次拖曳候選
 let pdDrag=null, pdSuppressClick=false;
 function pdItems(box){ return Array.from(box.children).filter(el=>el.tagName==="BUTTON"); }
 function pdDropAt(x,y){
@@ -448,12 +461,23 @@ function pdSaveOrder(box){
     if(next.length===myClips.length){ myClips=next; if(!saveMyClips(myClips)) showToast("排序存不進去,本機空間不足"); }
   }
 }
+// 按住滿 PD_HOLD_MS(而且期間位移沒超過 PD_HOLD_TOL)才會叫到這裡:正式解鎖拖曳。
+function pdArm(){
+  if(!pdDrag)return;
+  pdDrag.holdT=null; pdDrag.on=true;
+  pdDrag.el.classList.add("pd-drag");
+  try{ pdDrag.el.setPointerCapture(pdDrag.id); }catch(err){}
+  pdFollow(pdDrag.x0,pdDrag.y0);   // 解鎖當下就先套一次 inline transform(即使手指還沒移動),提供「拿起來了」的即時視覺回饋
+  if(typeof vibrateOn!=="undefined" && vibrateOn && navigator.vibrate){ try{ navigator.vibrate(12); }catch(e){} }
+}
 function pdEndDrag(root,cancel){
   if(!pdDrag)return;
   const d=pdDrag; pdDrag=null;
+  if(d.holdT) clearTimeout(d.holdT);
+  if(!d.on)return;   // 還沒解鎖(仍在等按住不放)就放手/中斷 → 什麼都沒發生,照一般點擊處理
   d.el.classList.remove("pd-drag"); d.el.style.transform="";
   try{ d.el.releasePointerCapture(d.id); }catch(e){}
-  if(!cancel && d.on && root.contains(d.el)){ pdSuppressClick=true; pdSaveOrder(d.box); }
+  if(!cancel && root.contains(d.el)){ pdSuppressClick=true; pdSaveOrder(d.box); }
 }
 function bindEmoteDrag(){
   const root=$("emoteVeil"); if(!root || root.dataset.dragBound)return;
@@ -464,16 +488,18 @@ function bindEmoteDrag(){
     const el=e.target.closest("button"); if(!el || el.parentElement!==box)return;
     const r=el.getBoundingClientRect();
     pdDrag={ id:e.pointerId, el:el, box:box, x0:e.clientX, y0:e.clientY,
-             gx:e.clientX-r.left, gy:e.clientY-r.top, on:false };
-    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+             gx:e.clientX-r.left, gy:e.clientY-r.top, on:false, holdT:null };
+    pdDrag.holdT=setTimeout(pdArm, PD_HOLD_MS);
   });
   addEventListener("pointermove",e=>{
     if(!pdDrag || e.pointerId!==pdDrag.id)return;
-    if(!root.contains(pdDrag.el)){ pdEndDrag(root,true); return; }
     if(!pdDrag.on){
-      if(Math.hypot(e.clientX-pdDrag.x0,e.clientY-pdDrag.y0)<PD_SLOP)return;
-      pdDrag.on=true; pdDrag.el.classList.add("pd-drag");
+      if(Math.hypot(e.clientX-pdDrag.x0,e.clientY-pdDrag.y0)>PD_HOLD_TOL){
+        clearTimeout(pdDrag.holdT); pdDrag=null;   // 解鎖前位移太多 → 當成想捲動,交還給瀏覽器
+      }
+      return;
     }
+    if(!root.contains(pdDrag.el)){ pdEndDrag(root,true); return; }
     const t=pdDropAt(e.clientX,e.clientY);
     if(t) pdDrag.box.insertBefore(pdDrag.el, t.before?t.el:t.el.nextSibling);
     pdFollow(e.clientX,e.clientY);
