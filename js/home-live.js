@@ -3,7 +3,7 @@
 /* ============================================================================
    首頁的兩件事 — ★ 只有 index.html 載入這支。
      ① 「現在有人在玩」即時看板(v1.52.0)
-     ② 十張遊戲卡的**熱門度排序 + 1~10 編號**(v1.112.0,見下面那整段說明)
+     ② 遊戲卡的**熱門度排序 + 編號**(v1.112.0,見下面那整段說明)
    兩件事共用同一次 Firebase 載入,但**彼此獨立**:任一邊讀失敗都不可以拖垮另一邊。
 
    資料來源就是三個遊戲原有的大廳輕量索引:rooms_index / gomoku_index / sudoku_index
@@ -66,12 +66,18 @@ const HomeLive = (function(){
          "_index" 算出來的(dc_index → dc),這裡若寫 "darkchess" 兩邊對不上,
          暗棋的熱門度會永遠讀不到(dc:{n:1} 寫進資料庫,rankRows() 卻查
          stats["darkchess"])。其他九個遊戲的 index 縮寫本來就等於 key,只有這裡曾經例外。 */
-    { key:"dc", index:"dc_index",    rooms:"dc_rooms",      name:"暗棋",   icon:"🔴", badge:"hlBadgeDc",   max:2, href:"darkchess.html" }
+    { key:"dc", index:"dc_index",    rooms:"dc_rooms",      name:"暗棋",   icon:"🔴", badge:"hlBadgeDc",   max:2, href:"darkchess.html" },
+    /* ★ 第十一個遊戲(v1.135.0):成語接龍(交叉填字盤)。
+       max 必須與 js/chengyu/adapter.js 的 maxPlayers 一致(**6**)。
+       ⚠ icon 用 🧩(U+1F9E9 拼圖片)—— 呼應「交叉填字」,且與另外十個都不撞
+         (🎲⚫🔢🀄🀄🎴🎴🌈🔴)。不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
+       ⚠ 成語接龍 **不帶 joinMid** —— 一場一局,對戰中不給加入(比照 UNO / 暗棋)。 */
+    { key:"chengyu", index:"chengyu_index", rooms:"chengyu_rooms", name:"成語接龍", icon:"🧩", badge:"hlBadgeChengyu", max:6, href:"chengyu.html" }
   ];
 
   /* ==========================================================================
-     熱門度排序(v1.112.0)—— 十張遊戲卡依「這個遊戲被真的玩過幾場」由多到少排,
-     卡片左上角標 1~10(v1.113.1 起是阿拉伯數字,原本是一~十的國字)。
+     熱門度排序(v1.112.0)—— 遊戲卡依「這個遊戲被真的玩過幾場」由多到少排,
+     卡片左上角標編號(v1.113.1 起是阿拉伯數字,原本是一~十的國字;人數隨遊戲增加自動跟著長)。
 
      資料是 Firebase 的 game_stats/{key}/n:房主開房、**真的開局**、**撐過 30 秒**才 +1,
      一間房只記一次(寫入在 js/shared/mp-core.js 與 js/online.js 的 armPlayCount())。

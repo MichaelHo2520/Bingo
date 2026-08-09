@@ -6132,3 +6132,244 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .dc-tray-pcs.tight .dc-p{margin-right:2px}
     .dc-tray-pcs.tighter .dc-p{margin-right:-4px}
   }
+
+  /* ==========================================================================
+     成語接龍(chengyu.html 專用) — 第十一個遊戲
+     ★ 同一條鐵則:只「追加」,選擇器一律 .cy-*(掃過 styles.css,.cy- 零命中)。
+       進場選單刻意沿用既有的 .panel / .field / .seg / .home-btn / .home-hint /
+       .home-sub-head / .home-tagline(與數獨 #sdkHome 同一套模板)。
+       玩家六色沿用數獨已經定義在 :root 的 --sp0~--sp5(通用變數,不是 .sdk-* 專屬)。
+
+     與數獨盤面(SB)的關鍵差異:
+     • 盤面不是齊次的 n×n,是 rows×cols 的交叉字謎盤,格子分三種:
+       block(裝飾底紋)/ given(黑字)/ blank(待填,填對變玩家色)。
+     • 沒有候選/peer/同數字三層高亮(字謎盤沒有那種推理空間),只有選中格一層。
+     • 沒有筆記(pencil marks)。
+     • 鍵盤不是固定 1~9,是這盤字卡去重清單的字元磚。
+     • 盤面尺寸用 JS 算成整數 px(見 js/chengyu/board.js 的 fitStage,比照暗棋的
+       fitBoard)——rows/cols 不保證正方形,CSS 的 aspect-ratio 在這種情況下
+       容易被 max-width/max-height 夾歪。
+     ========================================================================== */
+
+  :root{ --cy-paper:#fff6ec; --cy-line:rgba(74,43,31,.22); --cy-thick:rgba(74,43,31,.62);
+         --cy-given:#4a2b1f; --cy-sel:rgba(255,138,61,.30); --cy-block:rgba(74,43,31,.12); }
+  :root[data-theme="midnight"]{ --cy-paper:#141a33; --cy-line:rgba(140,190,255,.20); --cy-thick:rgba(140,190,255,.55);
+         --cy-given:#dbe6ff; --cy-sel:rgba(34,224,255,.26); --cy-block:rgba(140,190,255,.10); }
+  :root[data-theme="bubblegum"]{ --cy-paper:#ffffff; --cy-line:rgba(122,43,99,.20); --cy-thick:rgba(122,43,99,.55);
+         --cy-given:#7a2b63; --cy-sel:rgba(255,79,163,.24); --cy-block:rgba(122,43,99,.10); }
+  :root[data-theme="meadow"]{ --cy-paper:#f7fbec; --cy-line:rgba(39,66,36,.20); --cy-thick:rgba(39,66,36,.58);
+         --cy-given:#274224; --cy-sel:rgba(108,192,74,.28); --cy-block:rgba(39,66,36,.10); }
+  :root[data-theme="arcade"]{ --cy-paper:#0e0e12; --cy-line:rgba(255,230,0,.18); --cy-thick:rgba(255,230,0,.5);
+         --cy-given:#f5f5f5; --cy-sel:rgba(255,230,0,.24); --cy-block:rgba(255,230,0,.08); }
+
+  .cy-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
+    line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .cy-scroll{flex:1 1 auto}
+
+  /* ---------- 進場插圖(交叉字磚:一橫一縱兩個成語交叉,兩格露出給定字) ---------- */
+  .cy-hero{text-align:center;margin:14px 0 4px}
+  .cy-art{width:92px;height:92px;display:block;margin:0 auto 8px}
+  /* .cy-ic-* 是首頁卡(46px)與本頁進場插圖(92px)**逐字相同的一份 SVG**,只有外層
+     class 不同(這裡是 .cy-art、首頁是 .gc-art.cy-cart)。材質色刻意不吃 --cy-* 主題
+     變數(與數獨插圖 .sk-* 同一條路線 —— 實體材質在每個主題下都長一樣)。 */
+  :root{ --cy-ic-plate:#7a4321; --cy-ic-edge:#5c3016; --cy-ic-well:#a8601f;
+         --cy-ic-given:#f4c65a; --cy-ic-blank:#fbe7b0; --cy-ic-blank-e:#d9a94a; --cy-ic-text:#3a2210; }
+  .cy-ic-plate{fill:var(--cy-ic-plate);stroke:var(--cy-ic-edge);stroke-width:1.4}
+  .cy-ic-well{fill:var(--cy-ic-well)}
+  .cy-ic-tile.cy-ic-given{fill:var(--cy-ic-given)}
+  .cy-ic-tile.cy-ic-blank{fill:var(--cy-ic-blank);stroke:var(--cy-ic-blank-e);stroke-width:.6}
+  .cy-ic-text text{fill:var(--cy-ic-text);font-family:'Fredoka',sans-serif;font-weight:700;
+    font-size:7.4px;text-anchor:middle}
+
+  /* ---------- 房間框(比照數獨的瘦身版:把高度讓給盤面) ---------- */
+  .cy-room{padding:9px 12px}
+  .cy-room .row{margin-top:0}
+  .cy-room-top{flex-wrap:nowrap;gap:8px}
+  .cy-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
+  .cy-room-title b{font-size:15px;color:var(--text)}
+  .cy-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .cy-room .quick-voice,.cy-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .cy-room .quick-voice .qv-ico{font-size:18px}
+  .cy-room .mp-subrow{margin-top:5px}
+  .cy-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .cy-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  .cy-room-foot .mp-players.oneline .mp-chip{flex:0 0 auto;min-width:0;padding:4px 9px;gap:5px}
+  /* 對戰中收起名單列:比分 HUD 講的是同一件事、還更清楚,這 30px 讓給盤面 */
+  .cy-room.playing .cy-room-foot{display:none}
+  .cy-hcard{cursor:pointer}
+  .cy-hcard:active{transform:scale(.97)}
+  /* 玩家色點(晶片與 HUD 共用),沿用數獨已定義的 --sp0~--sp5 */
+  .cy-seat{width:12px;height:12px;border-radius:50%;flex:none;display:inline-block}
+  .cy-seat.p0{background:var(--sp0)} .cy-seat.p1{background:var(--sp1)}
+  .cy-seat.p2{background:var(--sp2)} .cy-seat.p3{background:var(--sp3)}
+  .cy-seat.p4{background:var(--sp4)} .cy-seat.p5{background:var(--sp5)}
+  .cy-pts{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--accent);flex:none}
+
+  /* ---------- 單機 HUD ---------- */
+  .cy-solobar{padding:9px 12px}
+  .cy-solobar .row{margin-top:0}
+  .cy-solobar .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .cy-lvtag{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-weight:800;font-size:13px;color:var(--muted)}
+  .cy-timer{font-size:19px;font-weight:700;letter-spacing:.5px;flex:none}
+  .cy-miss{font-weight:800;font-size:13px;color:var(--daub);flex:none}
+  .cy-mini{width:34px;height:34px;border-radius:11px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.08);color:var(--text);font-size:15px;cursor:pointer;flex:none;
+    display:grid;place-items:center}
+  .cy-mini:active{transform:scale(.9)}
+  .cy-solotools{display:flex;gap:8px;margin-top:7px}
+  .cy-tool{flex:1;border:1px solid var(--panel-line);border-radius:11px;padding:7px 10px;
+    background:rgba(255,255,255,.06);color:var(--text);font-family:'Nunito',sans-serif;
+    font-weight:800;font-size:13px;cursor:pointer;transition:.15s}
+  .cy-tool:hover{background:rgba(255,255,255,.12)}
+  .cy-tool:active{transform:scale(.96)}
+  .cy-tool:disabled{opacity:.4;cursor:default}
+
+  /* ---------- 盤面 + 字卡區的整體版面 ----------
+     .cy-stage 透明置中容器,尺寸完全由 .cy-boardbox(flex:1 1 auto)分配;
+     .cy-board 是看得到的矩形,寬高由 js/chengyu/board.js 的 fitStage() 算成整數 px。 */
+  .cy-play{flex:1 1 auto;min-height:0;width:min(92vw,520px);
+    display:flex;flex-direction:column;align-items:center;gap:10px}
+  .cy-boardbox{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+  .cy-stage{flex:1 1 0;min-height:0;width:100%;position:relative;
+    display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .cy-stage.locked{opacity:.75}
+  .cy-stage.frozen .cy-board{filter:grayscale(.5) brightness(.85)}
+
+  .cy-board{position:relative;display:grid;
+    grid-template-columns:repeat(var(--cyc,9),1fr);
+    grid-template-rows:repeat(var(--cyr,9),1fr);
+    gap:3px;padding:4px;border-radius:14px;
+    background:var(--cy-paper);box-shadow:0 0 0 3px var(--cy-thick),0 10px 30px rgba(0,0,0,.22)}
+  .cy-cell{position:relative;border:0;padding:0;margin:0;cursor:pointer;
+    background:var(--cy-paper);border-radius:3px;
+    font-family:'Fredoka',sans-serif;font-weight:600;
+    display:grid;place-items:center;
+    box-shadow:inset 0 0 0 1px var(--cy-line);
+    transition:background .12s}
+  .cy-cell.block{background:var(--cy-block);box-shadow:none;cursor:default}
+  .cy-v{font-size:calc(var(--cy-cell,28px) * .58);line-height:1;color:var(--cy-given)}
+  .cy-cell.sel{background:var(--cy-sel);box-shadow:inset 0 0 0 2px var(--accent)}
+  .cy-cell.given .cy-v{color:var(--cy-given);font-weight:700}
+  .cy-cell.filled.p0 .cy-v{color:var(--sp0)}
+  .cy-cell.filled.p1 .cy-v{color:var(--sp1)}
+  .cy-cell.filled.p2 .cy-v{color:var(--sp2)}
+  .cy-cell.filled.p3 .cy-v{color:var(--sp3)}
+  .cy-cell.filled.p4 .cy-v{color:var(--sp4)}
+  .cy-cell.filled.p5 .cy-v{color:var(--sp5)}
+  .cy-cell.filled.me .cy-v{color:var(--accent)}
+  .cy-cell.filled.hintfill .cy-v{color:var(--accent-2);font-style:italic}
+
+  /* 填錯:紅底閃一下再淡出 */
+  .cy-cell.wrong{animation:cyWrong .6s ease-out}
+  @keyframes cyWrong{ 0%{background:var(--daub)} 60%{background:var(--daub)} 100%{background:var(--cy-paper)} }
+  /* 被別人搶走:脈動一下,讓別人的動作看得見 */
+  .cy-cell.taken{animation:cyTaken .7s ease-out}
+  @keyframes cyTaken{ 0%{transform:scale(1)} 35%{transform:scale(1.18)} 100%{transform:scale(1)} }
+
+  /* 凍結倒數:蓋在盤面中央 */
+  .cy-freeze{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:34px;
+    background:rgba(0,0,0,.62);color:#fff;border-radius:16px;padding:10px 20px;
+    pointer-events:none;animation:cyFreezePulse .8s ease-in-out infinite alternate}
+  @keyframes cyFreezePulse{ from{opacity:.82} to{opacity:1} }
+
+  /* ---------- 字卡區(這盤所有空格用到的字,去重 + 洗牌過的清單) ---------- */
+  .cy-pad{flex:none;width:100%;display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:7px}
+  .cy-key{position:relative;border:1px solid var(--panel-line);border-radius:13px;
+    background:var(--panel);color:var(--text);cursor:pointer;
+    padding:9px 0;display:grid;place-items:center;transition:.12s;
+    backdrop-filter:blur(6px)}
+  .cy-key:hover{background:rgba(255,255,255,.16)}
+  .cy-key:active{transform:scale(.93)}
+  .cy-kc{font-family:'Fredoka',sans-serif;font-weight:700;font-size:21px;line-height:1.1}
+  /* 角標:這個字在剩下的空格裡還要用幾次(用光就整顆變淡,不代表是哪一格) */
+  .cy-kleft{position:absolute;top:3px;right:6px;font-size:10px;font-weight:800;color:var(--muted)}
+  .cy-key.done{opacity:.34}
+
+  /* ---------- 即時比分 HUD(連線對戰中,盤面上方那一列) ---------- */
+  .cy-hud{flex:none;width:100%;display:grid;gap:6px;
+    grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+  .cy-hud.cy-hud-two{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cy-hud.cy-hud-two .cy-hcard{padding:4px 7px 5px}
+  .cy-hud.cy-hud-two .cy-hname{font-size:11px}
+  .cy-hud.cy-hud-two .cy-hval{font-size:16px}
+  .cy-hcard{position:relative;overflow:hidden;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;
+    padding:5px 8px 7px;display:flex;flex-direction:column;gap:2px;min-width:0}
+  .cy-hcard.me{border-color:var(--accent)}
+  .cy-hname{display:flex;align-items:center;gap:5px;font-weight:800;font-size:11.5px;
+    color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cy-hname b{color:var(--accent);font-size:10px}
+  .cy-hval{font-family:'Fredoka',sans-serif;font-weight:700;font-size:19px;line-height:1;color:var(--text)}
+  .cy-hval em{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
+  .cy-bar{display:block;height:3px;border-radius:2px;background:rgba(0,0,0,.18);overflow:hidden;margin-top:2px}
+  .cy-bar i{display:block;height:100%;border-radius:2px;transition:width .25s}
+  .cy-hcard.p0 .cy-bar i{background:var(--sp0)} .cy-hcard.p1 .cy-bar i{background:var(--sp1)}
+  .cy-hcard.p2 .cy-bar i{background:var(--sp2)} .cy-hcard.p3 .cy-bar i{background:var(--sp3)}
+  .cy-hcard.p4 .cy-bar i{background:var(--sp4)} .cy-hcard.p5 .cy-bar i{background:var(--sp5)}
+
+  /* 分數變動飄字 */
+  .cy-pop{position:absolute;right:7px;top:6px;pointer-events:none;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;line-height:1;
+    animation:cyPop .9s ease-out forwards}
+  .cy-pop.up{color:#5fe08a}
+  @keyframes cyPop{
+    0%{opacity:0;transform:translateY(6px)}
+    22%{opacity:1;transform:translateY(0)}
+    100%{opacity:0;transform:translateY(-10px)}
+  }
+
+  /* ---------- 結果卡 ---------- */
+  .cy-win{padding:30px 22px}
+  .cy-win p{margin:8px 0 16px}
+  .cy-win.lose .word{background:none;color:#ff8f8f;-webkit-text-fill-color:#ff8f8f}
+  .cy-win.draw .word{background:none;color:var(--muted);-webkit-text-fill-color:var(--muted)}
+  .cy-win.win{border-color:var(--accent);box-shadow:0 0 26px rgba(0,0,0,.25),0 0 0 1px var(--accent)}
+  .cy-winner{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap;
+    margin-top:8px;padding:5px 12px;border-radius:999px;
+    background:rgba(255,255,255,.10);border:1px solid var(--panel-line)}
+  .cy-winner:empty{display:none}
+  .cy-winner .gw-name{font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px;color:var(--text)}
+  .cy-winner .gw-tag{font-size:13px;color:var(--muted)}
+  .cy-win.win .cy-winner{background:var(--accent);border-color:var(--accent)}
+  .cy-win.win .cy-winner .gw-name,.cy-win.win .cy-winner .gw-tag{color:#1c1008}
+  /* 單機統計(時間 / 填錯 / 提示) */
+  .cy-stats{display:flex;justify-content:center;gap:10px;margin:14px 0 4px;flex-wrap:wrap}
+  .cy-stat{background:rgba(255,255,255,.08);border:1px solid var(--panel-line);border-radius:12px;
+    padding:7px 13px;display:flex;flex-direction:column;gap:2px;min-width:74px}
+  .cy-stat .ss-k{font-size:11px;color:var(--muted);font-weight:800}
+  .cy-stat .ss-v{font-family:'Fredoka',sans-serif;font-weight:700;font-size:17px;color:var(--text)}
+
+  /* 賽後表情列(沿用五子棋的 .gmk-react 外觀,只換容器 class) */
+  .cy-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  /* 單機 / 連線的結果卡內容切換:單機沒有排行榜與表情,連線沒有單機統計。
+     這裡的 #id 只存在於 chengyu.html,不會影響其他頁。 */
+  body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .cy-react-row,body.solo-on #mpWinBtns{display:none}
+  body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .cy-stats{display:none}
+
+  /* ---------- 矮視窗(橫向手機):盤面優先,周邊全部再壓一號 ---------- */
+  @media (max-height:620px){
+    .cy-hero{margin:6px 0 2px}
+    .cy-art{width:64px;height:64px}
+    .cy-solotools{margin-top:5px}
+    .cy-tool{padding:5px 8px;font-size:12px}
+    .cy-pad{gap:5px}
+    .cy-key{padding:6px 0;border-radius:11px}
+    .cy-kc{font-size:18px}
+    .cy-hud{gap:4px}
+    .cy-hcard{padding:4px 6px 5px}
+    .cy-hval{font-size:16px}
+    .cy-play{gap:7px}
+  }
+  @media (max-height:620px) and (min-width:600px){
+    .cy-hud.cy-hud-two{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+  }
+  /* 盤面被鎖住(未開打 / 已結束)時,字卡跟著失效並變淡 */
+  .cy-play:has(.cy-stage.locked) .cy-pad{opacity:.4;pointer-events:none}
+
+  /* ---------- 手機沒進全螢幕時,玩的時候收掉頂列(比照數獨/五子棋) ---------- */
+  @media (max-height:780px) and (pointer:coarse){
+    body:has(#cyPlay:not(.hidden)) .topbar{display:none}
+  }

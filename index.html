@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.134.0 -->
-<meta name="version" content="1.134.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.135.0 -->
+<meta name="version" content="1.135.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -399,6 +399,38 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <span class="gc-body">
           <span class="gc-name display">象棋暗棋</span>
           <span class="hl-badge hidden" id="hlBadgeDc"></span>
+        </span>
+      </a>
+
+      <!-- 第十一個遊戲(v1.135.0):成語接龍(交叉填字盤)。
+           ★ 一橫一縱兩個成語交叉(說一不二 × 一心一意,共用「一」字),兩格露出給定字
+             (一 / 心),呼應「部分黑字、部分待填」的填字盤玩法本體。
+           ⚠ 與 chengyu.html 進場插圖(.cy-art 92px)**逐字相同的一份 SVG**,
+              只有外層 class 不一樣;改一邊要改另一邊。
+           ⚠⚠ 這裡**不可以**掛 .cy-art —— 那是進場插圖的 92px,它定義在 .gc-art(46px)
+               後面 → 會把這張卡撐得比其他張高一截(21點 v1.86.0 踩過的坑) -->
+      <a class="game-card as-link" href="chengyu.html" data-gk="chengyu">
+        <span class="gc-rank" aria-hidden="true">11</span>
+        <svg class="gc-art cy-cart" viewBox="0 0 56 56" role="img" aria-label="成語填字盤">
+          <rect class="cy-ic-plate" x="0.7" y="0.7" width="54.6" height="54.6" rx="7.5"/>
+          <rect class="cy-ic-well" x="3.4" y="3.4" width="49.2" height="49.2" rx="4.5"/>
+          <g class="cy-ic-tiles">
+            <rect class="cy-ic-tile cy-ic-blank" x="6.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-given" x="17.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-blank" x="28.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-blank" x="39.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-blank" x="17.8" y="6.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-given" x="17.8" y="17.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-blank" x="17.8" y="39.8" width="9.5" height="9.5" rx="1.4"/>
+          </g>
+          <g class="cy-ic-text">
+            <text x="22.55" y="36.3">一</text>
+            <text x="22.55" y="25.3">心</text>
+          </g>
+        </svg>
+        <span class="gc-body">
+          <span class="gc-name display">成語接龍</span>
+          <span class="hl-badge hidden" id="hlBadgeChengyu"></span>
         </span>
       </a>
       </div><!-- /.gc-grid -->

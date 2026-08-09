@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.134.0";
+const VERSION = "1.135.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -103,6 +103,17 @@ const CORE = [
   "./js/darkchess/solo.js",
   "./js/darkchess/adapter.js",
   "./js/darkchess/main.js",
+  /* 成語接龍(第十一個遊戲,v1.135.0;獨立頁面)。
+     ★ 交叉填字盤,單機 + 連線搶字(比照數獨的搶格模式,拿掉競速/候選提示)。
+     ★ js/chengyu/data.js(成語原料池)只給離線生成器 tools/gen-chengyu-seeds.js 用,
+       執行期的 gen.js 已經內含產好的版面庫,**不列進來**(瀏覽器不需要載它)。
+     ★ 這一頁不新增任何 mp3:動作聲全是 Sound.tone() 的合成音。 */
+  "./chengyu.html",
+  "./js/chengyu/gen.js",
+  "./js/chengyu/board.js",
+  "./js/chengyu/solo.js",
+  "./js/chengyu/adapter.js",
+  "./js/chengyu/main.js",
   "./mp3/bgm.mp3",
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",

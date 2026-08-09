@@ -7,34 +7,33 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="五子棋">
-<meta name="theme-color" content="#2a1136">
+<meta name="apple-mobile-web-app-title" content="成語接龍">
+<meta name="theme-color" content="#3d2410">
 <!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
-<!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>五子棋 ｜ 連線對戰 · 本機對戰</title>
-<!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v1.135.0 -->
+<title>成語接龍 ｜ 單機練習與連線對戰</title>
+<!-- 成語接龍 · v1.135.0 -->
 <meta name="version" content="1.135.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
-  location.replace("app.html#gomoku");
+  location.replace("app.html#chengyu");
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- 共用 Bingo 的 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
-     id 與 class,樣式 100% 重用;棋盤與縮放是檔尾追加的 .gmk-* 段落 -->
+     id 與 class,樣式 100% 重用;盤面與字卡區是檔尾追加的 .cy-* 段落 -->
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <div class="topbar">
     <div class="brand">
-      <div class="gmk-brand display">五子棋</div>
+      <div class="cy-brand display">成語接龍</div>
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
@@ -43,87 +42,67 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 進場選單(兩層):先選玩法,點電腦對決才挑難度 ======
-       與數獨 #sdkHome 同一個模式(第一層兩顆鈕、第二層才問設定)—— 三個遊戲進門的操作一致。 -->
-  <section class="panel" id="gmkHome">
-    <!-- 回 index.html 的返回列。只在第一層顯示:第二層有自己的返回(回第一層),
-         兩個返回鈕同時出現會分不清誰是誰 -->
-    <div class="mp-head" id="gmkHomeHead">
+  <!-- ====== 進場選單(兩層):先選玩法(連線在上),點單機練習才挑難度 ====== -->
+  <section class="panel" id="cyHome">
+    <div class="mp-head" id="cyHomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
       <div class="subtitle">選擇玩法</div>
     </div>
 
-    <!-- 第一層:選怎麼玩(連線在上,與數獨同順序) -->
-    <div id="gmkPickMode">
-      <div class="gmk-hero">
-        <svg class="gmk-art gk-art" viewBox="0 0 56 56" role="img" aria-label="五子棋盤">
-          <rect class="gk-bd" x="2" y="2" width="52" height="52" rx="6"/>
-          <g class="gk-ln">
-            <path d="M9 9H47M9 18.5H47M9 28H47M9 37.5H47M9 47H47"/>
-            <path d="M9 9V47M18.5 9V47M28 9V47M37.5 9V47M47 9V47"/>
+    <div id="cyPickMode">
+      <div class="cy-hero">
+        <!-- ★ 首頁卡(46px)與這裡(92px)逐字相同的一份 SVG,只有外層 class 不同 ——
+             一橫一縱兩個成語交叉(說一不二 × 一心一意,共用「一」字),兩格露出給定字
+             (一 / 心),其餘是待填的空白磚,呼應交叉填字盤的玩法本體。 -->
+        <svg class="cy-art" viewBox="0 0 56 56" role="img" aria-label="成語填字盤">
+          <rect class="cy-ic-plate" x="0.7" y="0.7" width="54.6" height="54.6" rx="7.5"/>
+          <rect class="cy-ic-well" x="3.4" y="3.4" width="49.2" height="49.2" rx="4.5"/>
+          <g class="cy-ic-tiles">
+            <rect class="cy-ic-tile cy-ic-blank" x="6.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-given" x="17.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-blank" x="28.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-blank" x="39.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-blank" x="17.8" y="6.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-given" x="17.8" y="17.8" width="9.5" height="9.5" rx="1.4"/>
+            <rect class="cy-ic-tile cy-ic-blank" x="17.8" y="39.8" width="9.5" height="9.5" rx="1.4"/>
           </g>
-          <circle class="gk-b" cx="28" cy="28" r="4.4"/>
-          <circle class="gk-w" cx="18.5" cy="18.5" r="4.4"/>
-          <circle class="gk-b" cx="37.5" cy="18.5" r="4.4"/>
-          <circle class="gk-w" cx="18.5" cy="37.5" r="4.4"/>
+          <g class="cy-ic-text">
+            <text x="22.55" y="36.3">一</text>
+            <text x="22.55" y="25.3">心</text>
+          </g>
         </svg>
-        <div class="home-tagline">橫、豎、斜任一方向連成 5 顆就贏</div>
+        <div class="home-tagline">交叉字謎盤,從字卡區選字填空</div>
       </div>
-      <button class="btn primary block-btn home-btn" id="gmkGoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="gmkPickSolo">🎮 本機對戰</button>
-      <div class="home-hint">連線 1 對 1 跟朋友下;本機對戰不用連線,對手可以是電腦(<b>新手 / 普通 / 高手</b> 三個強度)或坐旁邊的朋友(輪流點同一支手機)</div>
+      <button class="btn primary block-btn home-btn" id="cyGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="cyPickSolo">🎯 單機練習</button>
+      <div class="home-hint">連線 2~6 人:<b>搶字</b>(同一張填字盤搶著填);單機自己練一題</div>
     </div>
 
-    <!-- 第二層:本機對戰的設定(對手 / 難度 / 盤面 / 先手)。這些只影響單機,不動連線那組房間設定 -->
-    <div id="gmkPickLevel" class="hidden">
+    <div id="cyPickLevel" class="hidden">
       <div class="home-sub-head">
-        <button class="icon-btn" id="gmkLevelBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+        <button class="icon-btn" id="cyLevelBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <span class="subtitle" id="gmkLevelSubtitle">本機對戰 · 選設定</span>
+        <span class="subtitle">單機練習 · 選難度</span>
       </div>
       <div class="field">
-        <span class="field-label">對手</span>
-        <div class="seg" id="gmkOppSeg" aria-label="對手">
-          <button class="on" data-opp="ai">🤖 電腦</button>
-          <button data-opp="friend">👤 朋友</button>
+        <span class="field-label">難度</span>
+        <div class="seg" id="cyHomeDiffSeg" aria-label="單機難度">
+          <button data-diff="easy">簡單</button>
+          <button class="on" data-diff="std">標準</button>
+          <button data-diff="hard">困難</button>
         </div>
       </div>
-      <div class="field" id="gmkAiField">
-        <span class="field-label">對手強度</span>
-        <div class="seg" id="gmkAiSeg" aria-label="電腦強度">
-          <button data-ai="easy">🙂 新手</button>
-          <button class="on" data-ai="normal">🤔 普通</button>
-          <button data-ai="hard">😈 高手</button>
-        </div>
-      </div>
-      <div class="field">
-        <span class="field-label">棋盤大小</span>
-        <div class="seg" id="gmkSoloSizeSeg" aria-label="棋盤大小">
-          <button data-size="15">15×15</button>
-          <button class="on" data-size="19">19×19</button>
-          <button data-size="25">25×25</button>
-        </div>
-      </div>
-      <div class="field" id="gmkFirstField">
-        <span class="field-label">誰先下</span>
-        <div class="seg" id="gmkFirstSeg" aria-label="誰先下">
-          <button class="on" data-first="me">⚫ 我先</button>
-          <button data-first="ai">⚪ 電腦先</button>
-          <button data-first="random">🎲 隨機</button>
-        </div>
-      </div>
-      <button class="btn primary block-btn home-btn" id="gmkStartSolo">開始對局 ▸</button>
-      <div class="home-hint" id="gmkAiHint"></div>
+      <button class="btn primary block-btn home-btn" id="cyStartSolo">開始練習 ▸</button>
+      <div class="home-hint" id="cyLevelHint"></div>
     </div>
   </section>
 
   <!-- ====== 連線畫面(暱稱 / 建房 / 大廳清單)====== -->
   <section class="panel hidden" id="mpConnect">
     <div class="mp-head">
-      <!-- 返回上一層(選擇玩法);回 index.html 的入口在第一層的 #gmkHomeHead -->
       <button class="icon-btn" id="mpConnBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
@@ -151,17 +130,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="hint" id="mpConnMsg"></div>
   </section>
 
-  <!-- ====== 房間橫幅(沿用 Bingo 的 #mpBar 樣式;.gmk-room 再把它壓矮、把認輸鈕收進來)====== -->
-  <div class="panel gmk-room hidden" id="mpBar">
-    <div class="row gmk-room-top">
+  <!-- ====== 房間橫幅(沿用 Bingo 的 #mpBar;.cy-room 再把它壓矮)====== -->
+  <div class="panel cy-room hidden" id="mpBar">
+    <div class="row cy-room-top">
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <!-- v1.105.0:拿掉「房間」字首(房名預設就是「XXX的房間」,前面再加一次是重複) -->
-      <span class="label gmk-room-title"><b id="mpRoomTitle" class="display">–</b></span>
-      <!-- 盤面徽章與認輸鈕在同一個位置輪流出現:大廳看盤面大小,對戰中改放認輸(棋盤自己就看得出幾路) -->
-      <span class="mp-goal" id="mpBarGoal" aria-label="盤面"></span>
-      <button class="gmk-resign hidden" id="resignBtn" type="button" title="認輸">🏳 認輸</button>
+      <span class="label cy-room-title"><b id="mpRoomTitle" class="display">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="玩法與難度"></span>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
@@ -169,35 +145,25 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
       </div>
     </div>
-    <!-- 狀態列:大廳時說明在等什麼;對戰中收起來(棋盤上的「輪到誰」膠囊已經在講同一件事),
-         只有落單倒數那種棋盤上看不到的訊息才臨時放出來(見 net.js syncSubrow) -->
     <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
     </div>
-    <div class="gmk-room-foot">
+    <div class="cy-room-foot">
       <div id="mpPlayers" class="mp-players"></div>
     </div>
   </div>
 
-  <!-- ====== 大廳設定(房主可改,訪客唯讀)====== -->
-  <div class="scroll-area gmk-scroll hidden" id="scrollArea">
-    <section class="panel hidden" id="gmkSetup">
+  <!-- ====== 連線大廳設定(房主可改,訪客唯讀)====== -->
+  <div class="scroll-area cy-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="cySetup">
       <div class="subtitle">對戰設定</div>
 
       <div class="field">
-        <span class="field-label" id="gmkSizeLabel">棋盤大小</span>
-        <div class="seg" id="gmkSizeSeg" aria-label="棋盤大小">
-          <button data-size="15">15×15</button>
-          <button class="on" data-size="19">19×19</button>
-          <button data-size="25">25×25</button>
-        </div>
-      </div>
-
-      <div class="field">
-        <span class="field-label" id="gmkSwapLabel">每局換先手</span>
-        <div class="seg" id="gmkSwapSeg" aria-label="每局換先手">
-          <button class="on" data-swap="1">🔄 每局換邊</button>
-          <button data-swap="0">🎲 每局重抽</button>
+        <span class="field-label" id="cyDiffLabel">難度</span>
+        <div class="seg" id="cyDiffSeg" aria-label="難度">
+          <button data-diff="easy">簡單</button>
+          <button class="on" data-diff="std">標準</button>
+          <button data-diff="hard">困難</button>
         </div>
       </div>
 
@@ -222,42 +188,40 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
 
-      <div class="hint" id="gmkRuleHint">規則:黑棋先下,橫、豎、斜任一方向連成 5 顆即勝(無禁手)。棋盤下滿判和。<br>盤面越大越不容易頂到邊界;開局會自動放大到中央,雙指縮放或按 ⤢ 可看全盤。</div>
+      <div class="hint" id="cyRuleHint"></div>
     </section>
   </div>
 
-  <!-- ====== 電腦對決的 HUD(單機才顯示;連線那排在 #mpBar)======
-       「輪到誰」不放這裡 —— 棋盤上緣的 #gmkTurn 膠囊單機也沿用,同一件事只講一次 -->
-  <div class="panel gmk-solobar hidden" id="gmkSoloBar">
-    <div class="row gmk-room-top">
-      <button class="icon-btn" id="gmkSoloBack" type="button" title="回選單" aria-label="回選單">
+  <!-- ====== 單機 HUD(時間 / 錯誤 / 提示)====== -->
+  <div class="panel cy-solobar hidden" id="cySoloBar">
+    <div class="row cy-room-top">
+      <button class="icon-btn" id="cySoloBack" type="button" title="回選單" aria-label="回選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="gmk-lvtag" id="gmkSoloTag">19×19 · 🤔 普通</span>
-      <span class="gmk-rec" id="gmkSoloRec">尚無戰績</span>
+      <span class="cy-lvtag" id="cyLevelTag">標準</span>
+      <span class="cy-timer display" id="cyTime">00:00</span>
+      <span class="cy-miss" id="cyMiss">✗ 0</span>
+      <button class="cy-mini" id="cyPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
     </div>
-    <div class="gmk-solotools">
-      <button class="gmk-tool" id="gmkUndoBtn" type="button" title="收回自己上一手(電腦的回應一起收回)">↩ 悔棋</button>
-      <button class="gmk-tool" id="gmkRestartBtn" type="button" title="這盤重下">↻ 重新一局</button>
+    <div class="cy-solotools">
+      <button class="cy-tool" id="cyHintBtn" type="button">💡 提示 3</button>
     </div>
   </div>
 
-  <!-- ====== 棋盤舞台(遊戲中顯示;縮放/平移全由 board.js 處理)====== -->
-  <div class="gmk-stage hidden" id="gmkStage">
-    <div class="gmk-canvas" id="gmkCanvas">
-      <div class="gmk-board" id="gmkBoard">
-        <div class="gmk-ghost" id="gmkGhost" aria-hidden="true"></div>
+  <!-- ====== 盤面 + 字卡區(單機與連線共用)====== -->
+  <div class="cy-play hidden" id="cyPlay">
+    <!-- 即時比分:連線才顯示 -->
+    <div class="cy-hud hidden" id="cyHud"></div>
+    <div class="cy-boardbox">
+      <div class="cy-stage" id="cyStage">
+        <div class="cy-board" id="cyBoard"></div>
+        <div class="cy-freeze hidden" id="cyFreeze">🥶 3</div>
       </div>
     </div>
-    <div class="gmk-turn" id="gmkTurn"><span class="gmk-dot b"></span><span id="gmkTurnTxt">準備中…</span></div>
-    <div class="gmk-zoom">
-      <button type="button" id="gmkZoomIn" title="放大" aria-label="放大棋盤">＋</button>
-      <button type="button" id="gmkZoomFit" title="整盤" aria-label="顯示整個棋盤">⤢</button>
-      <button type="button" id="gmkZoomOut" title="縮小" aria-label="縮小棋盤">－</button>
-    </div>
+    <div class="cy-pad" id="cyPad"></div>
   </div>
 
-  <!-- ====== 主要動作列(只剩大廳的「準備好了」;認輸鈕已搬進房間框,對戰中整列收起來讓給棋盤)====== -->
+  <!-- ====== 主要動作列(連線大廳的「準備好了」)====== -->
   <div class="primary-bar hidden" id="primaryBar">
     <div class="action-hint hidden" id="actionHint"></div>
     <div class="actions" id="primaryActions">
@@ -265,17 +229,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 結果卡(沿用 Bingo 的 #veil / .win-card;.gmk-win 再補「誰贏」與賽後表情列)====== -->
+  <!-- ====== 結果卡(單機與連線共用;按鈕組靠 body.solo-on 切換)====== -->
   <div class="veil" id="veil">
-    <div class="win-card gmk-win" id="gmkWinCard">
-      <div class="word display" id="winWord">你贏了!</div>
-      <!-- 這局是誰拿下:棋色徽章 + 名字 +(你)。大字只講「對我而言」的輸贏,這一列才是客觀事實 -->
-      <div class="gmk-winner" id="gmkWinner"></div>
-      <p id="winMsg">五子連線 🎉</p>
+    <div class="win-card cy-win" id="cyWinCard">
+      <div class="word display" id="winWord">完成!</div>
+      <div class="cy-winner" id="cyWinner"></div>
+      <p id="winMsg"></p>
+      <div class="cy-stats hidden" id="cyStats"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
-      <!-- 賽後嘴砲:一鍵送表情給全部人;😀 開完整面板(表情蓋板 DOM 在後面,同 z-index 會疊在結果卡之上) -->
-      <div class="gmk-react-row" id="gmkReactRow">
+      <div class="cy-react-row" id="cyReactRow">
         <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
         <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
         <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
@@ -287,16 +250,23 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn primary" id="mpAgain">繼續 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
-      <!-- 電腦對決的按鈕組(與連線那組在同一格位置輪流出現,靠 body.solo-on 切換;
-           id 刻意與數獨的同名 —— 兩個獨立頁面,樣式那條 body:not(.solo-on) 規則直接重用) -->
       <div class="actions" id="soloWinBtns">
         <button class="btn primary" id="soloAgain">再來一局 ▸</button>
         <button class="btn ghost" id="soloHome">回選單</button>
       </div>
-      <button class="peek-link" id="winPeek">先看看棋盤 👀</button>
+      <button class="peek-link" id="winPeek">先看看盤面 👀</button>
     </div>
   </div>
   <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
+
+  <!-- 單機暫停 -->
+  <div class="veil" id="cyPauseVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">⏸</div>
+      <div class="confirm-title">暫停中</div>
+      <p>點畫面任一處繼續</p>
+    </div>
+  </div>
 
   <!-- ====== 設定(沿用 Bingo 的設定蓋板;偏好與 Bingo 共用,寫入採 merge)====== -->
   <div class="veil" id="setVeil">
@@ -323,8 +293,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <input class="rng" id="sfxVol" type="range" min="0" max="100" value="100" aria-label="音效音量(含勝敗音效)">
           </div>
           <div class="set-row" id="vibrateRow">
-            <span class="set-lbl">輪到你時震動<span class="set-sub">(手機)</span></span>
-            <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="輪到你時震動"><span class="knob"></span></button>
+            <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
+            <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
           </div>
         </div>
 
@@ -358,7 +328,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       </div>
       <button class="btn primary" id="setClose">完成</button>
-      <div class="set-foot">五子棋 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+      <div class="set-foot">成語接龍 · <span id="setVer"></span> · 開發者 Michael Ho</div>
     </div>
   </div>
 
@@ -373,7 +343,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="emote-phrases" id="emotePhrases"></div>
       <div class="emote-sub">🔊 語音短訊</div>
       <div class="emote-phrases" id="emoteClips"></div>
-      <!-- 自訂語音:沒錄過就整區隱藏(buildMyClips 控制),面板不會多一塊空的 -->
       <div class="emote-sub hidden" id="myClipsSub">⭐ 我的語音</div>
       <div class="emote-phrases hidden" id="emoteMyClips"></div>
       <div class="emote-input">
@@ -384,9 +353,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
 
-  <!-- 自訂語音的編輯浮層(由設定卡的「我的語音 → 編輯」開啟)
-       自己錄 3 秒短語音存在本機 localStorage(bingo.myclips.v1,三個遊戲共用同一批),
-       連線時在互動面板當按鈕送出;走既有的 kind="voice" 管道 = 把音訊本身傳過去,對方不需要有任何檔案。 -->
   <div class="veil" id="myVoiceVeil">
     <div class="set-card mvc-card">
       <button class="card-x" id="mvClose" type="button" aria-label="關閉">✕</button>
@@ -417,19 +383,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- 認輸確認 -->
-  <div class="veil" id="resignVeil">
-    <div class="win-card confirm-card">
-      <div class="confirm-ico">🏳</div>
-      <div class="confirm-title">認輸?</div>
-      <p>這局就直接算對手贏,確定嗎?</p>
-      <div class="actions">
-        <button class="btn ghost" id="resignCancel">再想想</button>
-        <button class="btn danger" id="resignConfirm">我認輸</button>
-      </div>
-    </div>
-  </div>
-
   <!-- 房主移出玩家確認 -->
   <div class="veil" id="kickVeil">
     <div class="win-card confirm-card">
@@ -449,10 +402,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
 <script>
 /* ============================================================
-   連線對戰設定 — 與 index.html(Bingo)使用同一個 Firebase 專案,
-   但五子棋的資料放在獨立的頂層節點 gomoku_rooms / gomoku_index,
-   與 bingo 的 rooms / rooms_index 完全隔離(見 notes/06-五子棋連線對戰.md)。
-   ⚠ 需在 Firebase 規則開放 gomoku_rooms 與 gomoku_index 的讀寫。
+   連線對戰設定 — 與 index.html(Bingo)等頁共用同一個 Firebase 專案,
+   但成語接龍的資料放在獨立的頂層節點 chengyu_rooms / chengyu_index。
+   ⚠ 需在 Firebase 規則開放 chengyu_rooms 與 chengyu_index 的讀寫。
    ============================================================ */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBVBN3hRMSFq7KwWmyf3IR01Y82XmfhLQ0",
@@ -465,16 +417,15 @@ const FIREBASE_CONFIG = {
 };
 </script>
 
-<!-- 載入順序固定:ui-kit(定義 $ 與介面工具)→ mp-core(連線核心)→ board(棋盤引擎)
-     → ai(電腦對手,純函式)→ solo(電腦對決)→ adapter(連線規則,在這裡 const MP = MPCore.create(...))
-     → main(綁定,必須最後) -->
+<!-- 載入順序固定:ui-kit(定義 $ 與介面工具)→ mp-core(連線核心)→ gen(出題)→ board(盤面)
+     → solo(單機)→ adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <script src="js/shared/mp-core.js"></script>
-<script src="js/gomoku/board.js"></script>
-<script src="js/gomoku/ai.js"></script>
-<script src="js/gomoku/solo.js"></script>
-<script src="js/gomoku/adapter.js"></script>
-<script src="js/gomoku/main.js"></script>
+<script src="js/chengyu/gen.js"></script>
+<script src="js/chengyu/board.js"></script>
+<script src="js/chengyu/solo.js"></script>
+<script src="js/chengyu/adapter.js"></script>
+<script src="js/chengyu/main.js"></script>
 </body>
 </html>
