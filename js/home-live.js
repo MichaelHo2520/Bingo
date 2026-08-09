@@ -294,7 +294,9 @@ const HomeLive = (function(){
      不出現在任何一般玩家會走到的路徑上。
 
      ★ 內容:十個遊戲各自「大廳現役房數 / 殘留房數 / 累積人氣場次」,
-       外加「清除殘留房間」——每個遊戲一顆、外加一顆全部清除。
+       外加兩組**各自獨立**的清除——「清除殘留房間」與「清除統計紀錄」,
+       每個遊戲各一顆、外加各一顆全部清除,互不影響:對戰結束、房間變殘留
+       之後不會自動清掉統計,想留著回顧就留著,要清哪一種自己按。
      ★ 讀取一律走**公開 REST**(fetch databaseURL/*.json),不透過 Firebase SDK:
        這幾個節點的 .read 本來就是 true(見 notes/firebase-rules.json),REST 不必
        等 SDK 下載/初始化,開面板不會被「還沒連線對戰過」卡住。清除也是同一顆
@@ -362,23 +364,24 @@ const HomeLive = (function(){
 
   function svRowHtml(row){
     const g=row.g;
-    const clearBtn=row.staleInfo.length
-      ? '<button class="btn ghost svs-clear" type="button" data-key="'+g.key+'">清除這 '+row.staleInfo.length+' 間殘留</button>'
-      : "";
+    const btns=[];
+    if(row.staleInfo.length) btns.push('<button class="btn ghost svs-clear" type="button" data-key="'+g.key+'">清除這 '+row.staleInfo.length+' 間殘留</button>');
+    if(row.n) btns.push('<button class="btn ghost svs-clear-stats" type="button" data-key="'+g.key+'">清除統計('+row.n+' 場)</button>');
+    const btnRow=btns.length ? '<div class="svs-row-actions">'+btns.join("")+'</div>' : "";
     const list=row.staleInfo.length
       ? '<div class="svs-stale">'+row.staleInfo.map(s=>"🏠 "+esc(s.name)+" · "+s.ago).join("<br>")+'</div>'
       : "";
     return '<div class="svs-row">'+
       '<div class="svs-row-head"><span class="svs-name">'+g.icon+' '+esc(g.name)+'</span>'+
       '<span class="svs-nums">大廳 '+row.activeN+' 間 · 殘留 '+row.staleInfo.length+' 間 · 累積 '+row.n+' 場</span></div>'+
-      list+clearBtn+'</div>';
+      list+btnRow+'</div>';
   }
 
   // 打開面板時抓一次快照就好(比照 fetchRank 的一次性讀取),不掛常駐監聽 —— 這是給自己排查用,不必即時
   async function refreshStatusPanel(){
     if(svBusy)return;
     svBusy=true;
-    const ping=$("svPing"), body=$("svBody"), clearAll=$("svClearAll");
+    const ping=$("svPing"), body=$("svBody"), clearAll=$("svClearAll"), clearStatsAll=$("svClearStatsAll");
     if(ping)ping.textContent="連線中…";
     const t0=Date.now();
     try{
@@ -393,12 +396,21 @@ const HomeLive = (function(){
         clearAll.disabled=!total;
         clearAll.textContent="🗑 清除全部殘留房間("+total+")";
       }
+      if(clearStatsAll){
+        const totalN=rows.reduce((n,r)=>n+r.n,0);
+        clearStatsAll.disabled=!totalN;
+        clearStatsAll.textContent="🧹 清除全部統計紀錄("+totalN+" 場)";
+      }
     }catch(e){
       if(ping)ping.textContent="⚠️ 讀取失敗,檢查網路或稍後再試";
     }
     svBusy=false;
   }
 
+  /* ★ 房間與統計紀錄是兩件獨立的事,分開清:房間清掉只是收垃圾,統計紀錄
+     (game_stats/{key}/n,首頁熱門度排序的來源)則是使用者想留著回顧的資料 ——
+     所以連線對戰結束、房間變成「殘留」之後不會自動清,也不會跟著房間一起被清掉,
+     全部要靠這裡兩顆各自獨立的按鈕手動按。 */
   async function svClearKey(key){
     const row=svRows.find(r=>r.g.key===key); if(!row||!row.staleInfo.length)return;
     if(!confirm("確定要清除「"+row.g.name+"」的 "+row.staleInfo.length+" 間殘留房間嗎?此動作無法復原。"))return;
@@ -414,6 +426,21 @@ const HomeLive = (function(){
     showToast("已清除全部殘留房間 🗑");
     refreshStatusPanel();
   }
+  async function svClearStatsKey(key){
+    const row=svRows.find(r=>r.g.key===key); if(!row||!row.n)return;
+    if(!confirm("確定要清除「"+row.g.name+"」的統計紀錄("+row.n+" 場)嗎?此動作無法復原,首頁熱門度排序會受影響。"))return;
+    try{ await svDelete("game_stats/"+key+"/n"); }catch(e){}
+    showToast("已清除「"+row.g.name+"」的統計紀錄 🧹");
+    refreshStatusPanel();
+  }
+  async function svClearAllStats(){
+    const total=svRows.reduce((n,r)=>n+r.n,0);
+    if(!total)return;
+    if(!confirm("確定要清除全部遊戲、共 "+total+" 場的統計紀錄嗎?此動作無法復原,首頁熱門度排序會歸零重來。"))return;
+    try{ await svDelete("game_stats"); }catch(e){}
+    showToast("已清除全部統計紀錄 🧹");
+    refreshStatusPanel();
+  }
 
   // 事件綁定自己管(比照上面 visibilitychange 監聽的自包含風格),元素早就在 DOM 裡(這支 <script> 排在 body 尾端)
   (function(){
@@ -422,10 +449,11 @@ const HomeLive = (function(){
     const veil=$("svVeil"); if(veil)veil.addEventListener("click",e=>{ if(e.target===veil)closeStatusPanel(); });
     const refresh=$("svRefresh"); if(refresh)refresh.addEventListener("click",refreshStatusPanel);
     const clearAll=$("svClearAll"); if(clearAll)clearAll.addEventListener("click",svClearAllRooms);
+    const clearStatsAll=$("svClearStatsAll"); if(clearStatsAll)clearStatsAll.addEventListener("click",svClearAllStats);
     const body=$("svBody");
     if(body)body.addEventListener("click",e=>{
-      const b=e.target.closest(".svs-clear"); if(!b)return;
-      svClearKey(b.dataset.key);
+      const clearBtn=e.target.closest(".svs-clear"); if(clearBtn){ svClearKey(clearBtn.dataset.key); return; }
+      const statsBtn=e.target.closest(".svs-clear-stats"); if(statsBtn){ svClearStatsKey(statsBtn.dataset.key); return; }
     });
   })();
 
