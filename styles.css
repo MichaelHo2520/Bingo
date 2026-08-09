@@ -750,11 +750,18 @@
   :root[data-theme="ebook"] .emote-to-btn.on{background:#000;color:#fff}
   .emote-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
   .emote-btn{aspect-ratio:1;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);
-    border-radius:12px;font-size:clamp(26px,3vw,36px);line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .1s,background .15s}
+    border-radius:12px;font-size:clamp(26px,3vw,36px);line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .1s,background .15s;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
   /* ⚠ 刻意**不**設 touch-action:none(v1.128.0 設過、v1.128.x 拿掉):拖曳排序改成按住不放
      一小段時間才解鎖(見 js 檔「罐頭面板拖曳排序」),等待期間要讓瀏覽器原生的上下捲動贏得了
      這個手勢——設 none 的話原生捲動從觸點一開始就被完全擋死,快速滑一下也滑不動,
-     使用者實測回報「上下滑動時不小心就拉到了物件」正是這個原因。 */
+     使用者實測回報「上下滑動時不小心就拉到了物件」正是這個原因。
+     ⚠ user-select:none / -webkit-touch-callout:none 是另一條必要條件(v1.128.x):按住不放
+     那段等待期間,按鈕上的文字/emoji 一樣會被瀏覽器原生的長按選字或 iOS 的複製/分享
+     callout 搶走(這兩個跟 touch-action 是不同機制,拿掉 touch-action:none 救不了它們)。
+     使用者實測回報:「長按然後在滑動的時候,有可能會選到文字,或者是跳出網頁的什麼其他功能」。
+     同款修法照抄 mahjong16 那條(見下面 body.m16-mp 那則,同一個病根:普通 DOM 文字被長按/
+     拖曳原生選取命中)。 */
   /* ↑ 表情格是 aspect-ratio:1,卡片變寬 → 6 格跟著變大;字級不跟著長就會變成「大方框裝小 emoji」 */
   .emote-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .emote-btn:active{transform:scale(.9)}
@@ -764,7 +771,9 @@
   .emote-phrases{display:flex;flex-wrap:wrap;gap:8px}
   .phrase-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
     border-radius:999px;padding:9px 15px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
-    cursor:pointer;transition:transform .1s,background .15s}   /* 不設 touch-action:none,理由同上 .emote-btn 那則註解 */
+    cursor:pointer;transition:transform .1s,background .15s;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+    /* 不設 touch-action:none、但要設 user-select:none / touch-callout:none,理由同上 .emote-btn 那則註解 */
   .phrase-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .phrase-btn:active{transform:scale(.94)}
   :root[data-theme="ebook"] .phrase-btn{background:#fff;border:1px solid #000}
