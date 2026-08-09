@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.132.0 -->
-<meta name="version" content="1.132.0">
+<!-- 台灣 16 張麻將 · v1.133.0 -->
+<meta name="version" content="1.133.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -121,13 +121,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="field">
         <span class="field-label">打幾局</span>
         <!-- v1.122.0:除了「1 局」,其它都改成算圈數(每個人都當完一次莊家、且下莊後
-             才算數),不再是單純的發牌手數——data-goal 是負數就代表圈數(見 solo.js 的
-             GOALS)。與 #m16GoalSeg 是兩份,要一起改。 -->
+             才算數),不再是單純的發牌手數——data-goal 是負數就代表圈數,0 代表無限制
+             (見 solo.js 的 GOALS)。與 #m16GoalSeg 是兩份,要一起改。 -->
         <div class="seg" id="m16SoloGoalSeg" aria-label="打幾局">
           <button data-goal="1">1 局</button>
           <button class="on" data-goal="-1">1 圈</button>
           <button data-goal="-2">2 圈</button>
           <button data-goal="-4">一將(4圈)</button>
+          <button data-goal="0">無限制</button>
         </div>
       </div>
       <div class="field">
@@ -222,13 +223,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="field">
         <span class="field-label" id="m16GoalLabel">打幾局</span>
         <!-- v1.122.0:除了「1 局」,其它都改成算圈數(每個人都當完一次莊家、且下莊後
-             才算數),不再是單純的發牌手數——data-goal 是負數就代表圈數(見 adapter.js
-             的 GOALS)。與 #m16SoloGoalSeg 是兩份,要一起改。 -->
+             才算數),不再是單純的發牌手數——data-goal 是負數就代表圈數,0 代表無限制
+             (見 adapter.js 的 GOALS)。與 #m16SoloGoalSeg 是兩份,要一起改。 -->
         <div class="seg" id="m16GoalSeg" aria-label="打幾局">
           <button data-goal="1">1 局</button>
           <button class="on" data-goal="-1">1 圈</button>
           <button data-goal="-2">2 圈</button>
           <button data-goal="-4">一將(4圈)</button>
+          <button data-goal="0">無限制</button>
         </div>
       </div>
       <!-- 底幾台(v1.75.18)。★ 一定是房間設定:底台是算收付用的,各人一份的話

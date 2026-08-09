@@ -36,8 +36,9 @@ const Solo = (function(){
   const SEATS_OK = [2,3,4];
   /* 打幾局(v1.122.0 起改成「除了 1 局,其它都算圈數」—— 使用者:「一圈是要指每一個人都
      當完莊家,並且下莊後才算」。★ 負數 = 圈數,正數 = 局數,兩種目標刻意共用同一個欄位、
-     用正負號分岔,不必另開一個「單位」欄位(button 的 data-goal 直接就是這個數字)。 */
-  const GOALS = [1,-1,-2,-4];
+     用正負號分岔,不必另開一個「單位」欄位(button 的 data-goal 直接就是這個數字)。
+     0 = 無限制(想玩到自己離開牌桌為止,見 seasonDone() 的檔頭)。 */
+  const GOALS = [1,-1,-2,-4,0];
   /* 底幾台(v1.75.15,使用者:「底幾台要能被設定,預設為 2 台」)。
      ★ 預設值放在這裡而不是 MJT.newRound:那一層是規則,底台是**一場的設定**
        (同 goal / seats)。連線那份是房間設定,見 adapter.js 的 BASE_DEF。 */
@@ -125,11 +126,13 @@ const Solo = (function(){
   /* ---------- 打幾局 / 打幾圈的文案(v1.122.0) ----------
      ★ 只有這裡知道 goal 的正負號意思,呼叫端(paintBar / paintTai)只管拿字串來用。 */
   function goalLabel(g){
+    if(g === 0) return "無限制";
     if(g > 0) return g + " 局";
     return (-g === 4) ? "一將(4圈)" : ((-g) + " 圈");
   }
-  /* 對局中房間框那顆徽章。局數版沿用舊字;圈數版顯示目前圈風 + 第幾圈。 */
+  /* 對局中房間框那顆徽章。局數版沿用舊字;圈數版顯示目前圈風 + 第幾圈;無限制版只報第幾局。 */
   function goalBadgeText(){
+    if(goal === 0) return "第 " + (handNo+1) + " 局";
     if(goal > 0) return "第 " + Math.min(goal, handNo+1) + "/" + goal + " 局";
     const rGoal = -goal;
     const idx = st ? MJT.WINDS.indexOf(st.roundWind) : 0;
@@ -138,6 +141,7 @@ const Solo = (function(){
   }
   /* 結果卡排名表表頭(見 M16B.rankHTML 的 progressText / finalText)。 */
   function goalProgressText(){
+    if(goal === 0) return "已打 " + handNo + " 局(不限)";
     if(goal > 0) return "第 " + handNo + " / " + goal + " 局結束";
     const w = st ? face(st.roundWind).name : "東";
     return w + "圈 · 已完成 " + MJT.roundsOf(seats, dealerPass) + " / " + (-goal) + " 圈";
@@ -201,9 +205,13 @@ const Solo = (function(){
     showScreen("home");
     showHomeLayer("solo");                        // 回到「單機」那一層,方便換難度再來
   }
-  /* 這一場打完了沒(v1.122.0)。★ `goal>0` 是舊的「打幾局」,`goal<0` 是新的「打幾圈」——
-     兩者刻意共用同一個判斷,呼叫端不必先問清楚自己是哪一種。 */
+  /* 這一場打完了沒(v1.122.0)。★ `goal>0` 是舊的「打幾局」,`goal<0` 是新的「打幾圈」,
+     `goal===0` 是無限制(永遠沒打完,直到玩家自己按離開)——三者刻意共用同一個判斷,
+     呼叫端不必先問清楚自己是哪一種。
+     ⚠ goal===0 一定要提前擋掉:少了這條會落進圈數分支,`MJT.roundsOf(...) >= -0` 恆真,
+       每打完一局都會被當成「整場打完」,again() 就會一直重開新的一場而不是接著打。 */
   function seasonDone(){
+    if(goal === 0) return false;
     return goal > 0 ? (handNo >= goal) : (MJT.roundsOf(seats, dealerPass) >= -goal);
   }
   function again(){
