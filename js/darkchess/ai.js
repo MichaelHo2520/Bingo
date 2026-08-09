@@ -245,6 +245,28 @@ const DCAI = (function(){
     return total / tally.total;
   }
 
+  /* 車直衝打到還沒翻開的暗子(三種下場,見 rules.js 的 applyRushDark)。
+     ⚠ 跟 gambleDark() 幾乎一樣,差別只有一個:rushBig 開著時①(吃得動)不看階級 ——
+       呼應 applyRushDark() 的判定,兩支數字對不起來的話 AI 會低估 rushBig 開著時
+       車直衝打暗子的價值(明明吃得動卻估成吃不動)。 */
+  function gambleRushDark(st, from, sq, mover, vt, tally){
+    if(!tally.total) return 0;
+    const mySide = st.col[mover];
+    const mine = knownAt(st, from);
+    if(mine === null) return 0;
+    const myRank = DC.rankOf(mine);
+    const rushBig = !!(st.rules && st.rules.rushBig);
+    let total = 0;
+    for(let p = 0; p < 14; p++){
+      const n = tally[p];
+      if(!n) continue;
+      if(DC.sideOf(p) === mySide)                              total += n * (-vt[p] * 0.15);  // ② 白翻一顆
+      else if(rushBig || DC.canBeat(myRank, DC.rankOf(p)))    total += n * vt[p];              // ① 吃掉
+      // ③ 吃不動 → 白花一手,兩顆都活,不加不扣(total += 0)
+    }
+    return total / tally.total;
+  }
+
   /* ==========================================================================
      五、搜尋
      ──────────────────────────────────────────────────────────────────────────
@@ -275,13 +297,21 @@ const DCAI = (function(){
   /* 會翻牌的那一手,對「走這一手的人」值多少。
      ⚠ 炮 vs 翻攻要看**這顆子是不是炮**,不能看 st.chainFrom >= 0 —— chainDark 開著時
        翻攻第一步就能發生(rules.js 的 capTargets() 不再限定在鏈中),用「在不在鏈中」
-       判斷會把第一步的翻攻誤判成炮打暗子(兩者的下場公式完全不同)。 */
+       判斷會把第一步的翻攻誤判成炮打暗子(兩者的下場公式完全不同)。
+     ⚠⚠ v1.137.5 起多一種要分辨:**車直衝打暗子**(rules.js 的 rushDark)——判準是
+       「這顆子是車,而且 to 不是 from 的鄰居」(車直衝規則本身就要求距離 >= 2,
+       鄰格的暗子一定是走 dark 那條鄰格翻攻,不是 rushDark)。跟炮/翻攻分岔同一個
+       道理:三條的下場估值公式**不一樣**(rushDark 多一個 rushBig 不看階級的出口),
+       混到哪一條估值都會算錯。 */
   function gambleOf(st, mv, mover, vt, tally){
     if(mv[0] === "f") return gambleFlip(st, DC.unSq(mv[1]), mover, vt, tally);
-    const from = DC.unSq(mv[1]);
+    const from = DC.unSq(mv[1]), to = DC.unSq(mv[2]);
     const mine = knownAt(st, from);
-    if(mine !== null && DC.rankOf(mine) === DC.R_PAO) return gambleCannon(st, DC.unSq(mv[2]), mover, vt, tally);
-    return gambleDark(st, from, DC.unSq(mv[2]), mover, vt, tally);
+    if(mine !== null && DC.rankOf(mine) === DC.R_PAO) return gambleCannon(st, to, mover, vt, tally);
+    if(mine !== null && DC.rankOf(mine) === DC.R_JU && DC.nbs(from).indexOf(to) < 0){
+      return gambleRushDark(st, from, to, mover, vt, tally);
+    }
+    return gambleDark(st, from, to, mover, vt, tally);
   }
 
   // 排序用的「立即收益」(不是估值)
@@ -410,7 +440,7 @@ const DCAI = (function(){
     CFG, LEVELS, BASE,
     knownAt, occupied, isDark, unseenTally,
     vals, evalPos, threatMask,
-    gambleFlip, gambleCannon, gambleDark,
+    gambleFlip, gambleCannon, gambleDark, gambleRushDark, gambleOf,
     cloneSt, reveals, search,
     pickEasy, pick, autoMove
   };

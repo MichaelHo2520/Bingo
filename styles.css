@@ -5925,7 +5925,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     width:min(92vw,720px);margin:0 auto}
   .dc-stage{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;
     overflow:hidden}
-  .dc-board{display:grid;grid-template-columns:repeat(var(--dc-cols,8),1fr);
+  /* ⚠ position:relative 是給下面「翻攻吃得動:飛到正中央」那顆 .dc-reveal 當定位基準——
+     它現在掛在 .dc-board 底下(不是掛在某一格的 .dc-sq 裡),用 left/top 換算成
+     board 座標,飛到板子中間才不會被單一格的 stacking context 卡住。 */
+  .dc-board{position:relative;display:grid;grid-template-columns:repeat(var(--dc-cols,8),1fr);
     grid-auto-rows:1fr;gap:4px;padding:5px;border-radius:14px;
     background:var(--dc-well);box-shadow:0 0 0 3px var(--dc-well-e),0 8px 22px rgba(0,0,0,.32)}
   /* 一格。★ 空格也是一顆 button(要能當落點點下去),只是裡面沒有棋子 */
@@ -5995,6 +5998,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     0%{box-shadow:0 0 0 3px var(--dc-tgt-eat),0 0 16px 5px var(--dc-tgt-eat)}
     100%{box-shadow:0 0 0 0 transparent}
   }
+  /* ⚠⚠ v1.137.5:翻牌那一格**不要**再疊這個光暈 —— box-shadow 動畫要逐格重繪,跟
+     .dc-flip3d 的 3D 旋轉(transform,靠合成器)同時搶主執行緒,使用者反饋「翻開子
+     的時候最後都會好像卡了一下」,這是原因之一(另一半是下面 dcFlipIn 的回彈曲線)。
+     翻牌動畫本身已經是「這裡剛剛發生了什麼」的訊號,不必再疊一層。 */
+  .dc-hit .dc-flip3d .dc-p{animation:none}
 
   /* ---------- 翻牌動畫(3D 雙面翻轉)----------
      ⚠⚠⚠ 牌情紅線:這裡**不新增任何會漏牌情的路徑** —— board.js 只在 c.up 已經是
@@ -6004,9 +6012,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ★ 標準雙面卡片翻轉:.dc-flip3d 轉整颗(0→180deg),兩張臉各自 backface-visibility
        隱藏、且已經預先錯開 180 度 —— 轉到一半背面藏起來,轉完換正面對著鏡頭。
      ⚠ 背面那張臉(.dc-face-b)**不掛 .dc-back**,只掛 .dc-backface 拿視覺——
-       它已經翻開了,不能被算進「還蓋著幾顆」(見 .dc-backface 那段註解)。 */
+       它已經翻開了,不能被算進「還蓋著幾顆」(見 .dc-backface 那段註解)。
+     ⚠⚠ v1.137.5:easing 原本是 `cubic-bezier(.32,.85,.4,1.05)`——第四個控制點
+       (y=1.05)讓 rotateY 轉過 180deg 再彈回來,使用者反饋「最後都會好像卡了一下,
+       這樣看起來一點都不順暢」——那個回彈就是「卡一下」的主因,換成不回彈的
+       ease-out 曲線,轉到 180deg 就停,不再多轉再修正。 */
   .dc-flip3d{position:relative;width:88%;height:88%;transform-style:preserve-3d;
-    animation:dcFlipIn .42s cubic-bezier(.32,.85,.4,1.05) both}
+    animation:dcFlipIn .38s cubic-bezier(.22,.61,.36,1) both}
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
     -webkit-backface-visibility:hidden}
   .dc-face-f{transform:rotateY(180deg)}
@@ -6017,26 +6029,39 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        inline style(算兩格的 getBoundingClientRect 差,不靠 CSS 猜位移量)。 */
   .dc-p.dc-sliding{z-index:5}
 
-  /* ---------- 翻攻 / 炮打暗子:先翻開讓人看清楚,再原地淡出消失 ----------
-     ⚠⚠ 施工紀錄(拿掉的兩批做法都不留死碼,免得下次又走回頭路):
+  /* ---------- 翻攻 / 炮打暗子:飛到棋盤正中央翻開讓人看清楚,再淡出消失 ----------
+     ⚠⚠ 施工紀錄(拿掉的做法都不留死碼,免得下次又走回頭路):
        v1.137.1「浮出文字標籤講吃了誰」→ 除錯標記的手感,否決。
        v1.137.2「震波 + 火花 + 亂飛亂轉」→「看起來太亂了」,否決。
-       v1.137.3「翻開 → 停留 → 飛去吃子欄」→ 使用者:「我不喜歡吃完跑去下面的
-         動畫,那個取消掉吧」,否決最後那一段(飛去吃子欄的部分)。
-     ★ v1.137.4 定案:翻開、停留讓人看清楚、**就地淡出消失**——不飛去任何地方。
-     ⚠⚠ .dc-reveal 的 z-index **比攻擊方的 .dc-sliding(5)高**——攻擊方雖然已經滑
-       到位,但這一層蓋在它上面,直到淡出消失那一刻才「露出」攻擊方安穩落地的
-       畫面。這正是先蓋住、掀開看、再收走的順序,不是兩個東西擠在一起搶注意力。
-     裡面包的 .dc-flip3d(翻開的那一下)沿用翻牌動畫那一份,原地翻完就停在正面,
-     停留期間 .dc-reveal 本身不動 —— 直到 board.js 幫它加上 .dc-reveal-gone
-     才開始淡出(兩段動畫互不干擾:外層縮小淡出、內層轉的是自己的 rotateY)。
+       v1.137.3「翻開 → 停留 → 飛去吃子欄」→「我不喜歡吃完跑去下面的動畫」,
+         否決最後那一段(飛去吃子欄的部分),v1.137.4 改成原地淡出。
+     ★ v1.137.5 使用者再提一次:「移動過去後,如果是可以吃的,那隻就變成用動畫
+       翻到中正中央」——原地淡出「看得清楚」但不夠**顯眼**,棋盤小格子本來就擠。
+       改成:被吃的子一邊翻開一邊飛到棋盤正中央、放大到看得清清楚楚,停留一下,
+       再淡出消失。★ 這次「飛」跟 v1.137.3 的「飛去吃子欄」不一樣 ——
+       方向、目的地、放大縮小的意圖都不同,不是走回頭路。
+     ⚠⚠⚠ .dc-reveal 掛在 **`.dc-board` 底下**(不是掛在某一格的 `.dc-sq` 裡)——
+       它要飛越好幾格的距離到棋盤中央,若掛在原本那一格,會被那一格所在的
+       stacking context 卡住(疊不到隔壁格上面)。board.js 用 `getBoundingClientRect()`
+       算出「原本那一格」相對 `.dc-board` 的 left/top,先讓它疊在正確的起點,
+       再用 `--fx`/`--fy` 給位移量。
+     ⚠ 裡面包的 .dc-flip3d(翻開的那一下)沿用翻牌動畫那一份,轉的是它自己的
+       rotateY,跟外層 .dc-reveal 的位移+放大是兩個獨立的 transform,互不干擾。
      ⚠⚠⚠ 要不要套這一段**不是看 kind**(炮打暗子跟炮打明棋都是 `"jump"`,分不出
        來)——是看 board.js 的 `wasHiddenAtTo`(這一步的目標,在這一步之前是不是
        還蓋著),所以「炮打到暗子」跟「翻攻吃得動」用的是同一段動畫,不必各寫一次。 */
-  .dc-reveal{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    pointer-events:none;z-index:8}
-  .dc-reveal.dc-reveal-gone{animation:dcRevealGone .26s ease-in forwards}
-  @keyframes dcRevealGone{ 0%{transform:scale(1);opacity:1} 100%{transform:scale(.55);opacity:0} }
+  .dc-reveal{position:absolute;display:flex;align-items:center;justify-content:center;
+    pointer-events:none;z-index:8;
+    animation:dcRevealToCenter .38s cubic-bezier(.24,.44,.32,1) both}
+  @keyframes dcRevealToCenter{
+    0%{transform:translate(0,0) scale(1)}
+    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.6)}
+  }
+  .dc-reveal.dc-reveal-gone{animation:dcRevealFade .28s ease-in forwards}
+  @keyframes dcRevealFade{
+    0%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.6);opacity:1}
+    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.15);opacity:0}
+  }
 
   /* ---------- 動作列 ----------
      ⚠⚠⚠ 這一塊的高度**必須固定**,而那是規格不是美觀:舞台是 flex:1 1 0,

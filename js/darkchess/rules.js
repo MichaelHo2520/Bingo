@@ -278,11 +278,13 @@ const DC = (function(){
      六、這顆子能去哪 / 能吃誰
      ──────────────────────────────────────────────────────────────────────────
        回傳 [{ to, kind }],kind:
-         "move"  走到相鄰空格(不吃)
-         "eat"   吃相鄰的敵方明棋
-         "jump"  炮隔子跳吃(房規 chain 開著時目標也可以是暗棋)
-         "rush"  車直衝(房規 rush;距離 >= 2、中間全空、目標是敵方明棋)
-         "dark"  翻攻相鄰暗棋(房規 chainDark;第一步或連吃鏈中皆可,見 capTargets())
+         "move"     走到相鄰空格(不吃)
+         "eat"      吃相鄰的敵方明棋
+         "jump"     炮隔子跳吃(房規 chain 開著時目標也可以是暗棋)
+         "rush"     車直衝(房規 rush;距離 >= 2、中間全空、目標是敵方明棋)
+         "rushDark" 車直衝打到還沒翻開的暗子(房規 rush 就能用,不必開 rushBig;
+                    v1.137.5 新增,見 applyRushDark())
+         "dark"     翻攻相鄰暗棋(房規 chainDark;第一步或連吃鏈中皆可,見 capTargets())
      ========================================================================== */
 
   // 炮:沿四方向找「炮架之後的第一顆子」
@@ -310,7 +312,12 @@ const DC = (function(){
     return out;
   }
 
-  // 車直衝:沿四方向,中間全空、距離 >= 2 的第一顆敵方明棋
+  /* 車直衝:沿四方向,中間全空、距離 >= 2 的第一顆子。
+     ★★ v1.137.5 起**目標也可以是還沒翻開的暗子**(使用者:「車有開啟橫衝直撞時,
+     對於沒有翻開的也需要可以使用」,而且明確選了「rush 開就能打暗子,吃不吃得動
+     照階級判定」——不必額外開 rushBig,吃不吃得動的判定見 applyRushDark())。
+     ⚠ 合不合法在這裡不看底下是什麼(看了就是作弊),賭的結果在 applyRushDark() 才
+       揭曉,跟 capTargets() 的「dark」kind 同一個原則。 */
   function rushTargets(st, from, mySide){
     if(!st.rules.rush) return [];
     const out = [];
@@ -322,9 +329,14 @@ const DC = (function(){
         /* ⚠ k === 0 = 貼身 —— 相鄰的照一般吃法走一格,不算直衝
              (規則來源明寫「不能相鄰」;少了這一條,rushBig 開著時車會變成
               「隨手撞掉旁邊的將」,一般吃法那條階級限制形同虛設)。 */
-        if(k > 0 && cell.up && sideOf(cell.p) !== mySide &&
-           (st.rules.rushBig || canBeat(R_JU, rankOf(cell.p)))){
-          out.push({ to: line[k], kind: "rush" });
+        if(k > 0){
+          if(cell.up){
+            if(sideOf(cell.p) !== mySide && (st.rules.rushBig || canBeat(R_JU, rankOf(cell.p)))){
+              out.push({ to: line[k], kind: "rush" });
+            }
+          }else{
+            out.push({ to: line[k], kind: "rushDark" });
+          }
         }
         break;                                     // 不論吃不吃得到,第一顆子就擋住了
       }
@@ -461,6 +473,38 @@ const DC = (function(){
     return true;
   }
 
+  /* 車直衝打到還沒翻開的暗子(kind === "rushDark")。★ 跟 applyDark() 幾乎同構
+     (三種下場一樣:翻到自己人 / 吃得動 / 吃不動),差別只有**一個**:吃不吃得動
+     多一個 rushBig 的「不限階級」出口,呼應直衝對明棋本來就有的規則(rushTargets()
+     的「rush」那一支)——使用者選的是「rush 開就能打暗子,照階級判定」,rushBig
+     沒特別要求要不要延伸到暗子,但**不延伸的話會不一致**(直衝吃大子對明棋不限
+     階級,對暗子卻要看階級,同一個房規兩種行為)——所以延伸過去,判定式跟明棋那一支
+     逐字一樣。★ 獨立成一支而不與 applyDark() 共用,是因為共用要多帶一個「要不要看
+     rushBig」的參數,拆開更好懂,而且兩支的呼叫端(doMove() 的 kind 分派)本來就是
+     分開的。 */
+  function applyRushDark(st, from, to){
+    const me = st.cells[from], vic = st.cells[to];
+    vic.up = true;
+    st.idle = 0;
+    const mySide = sideOf(me.p);
+    if(sideOf(vic.p) === mySide){
+      st.last = { kind: "darkSelf", seat: st.turn, from: from, to: to, p: me.p, got: vic.p };
+      endTurn(st);
+      return true;
+    }
+    if(st.rules.rushBig || canBeat(rankOf(me.p), rankOf(vic.p))){
+      st.caps[st.turn].push(vic.p);
+      st.cells[to] = me;
+      st.cells[from] = null;
+      st.last = { kind: "darkEat", seat: st.turn, from: from, to: to, p: me.p, got: vic.p };
+      afterCapture(st, to);
+      return true;
+    }
+    st.last = { kind: "darkMiss", seat: st.turn, from: from, to: to, p: me.p, got: vic.p };
+    endTurn(st);
+    return true;
+  }
+
   function doMove(st, from, to){
     const mySide = seatSide(st, st.turn);
     if(mySide < 0) return false;
@@ -474,6 +518,7 @@ const DC = (function(){
 
     const me = st.cells[from];
     if(kind === "dark") return applyDark(st, from, to);
+    if(kind === "rushDark") return applyRushDark(st, from, to);
 
     if(kind === "move"){
       st.cells[to] = me;
@@ -729,16 +774,26 @@ const DC = (function(){
     if(!tc){
       return adjacent(from, to) ? "那一格走得到" : "一次只能走一格";
     }
+    /* ⚠⚠⚠ v1.137.5 起「不鄰格」要先分兩層問:
+       ① 這顆子夠不夠資格談車直衝 —— 一定要**是車**而且 to 跟 from **同行或同列**
+          (screensBetween()回 -1 = 不同行不同列,連候選都算不上)。不夠資格的話
+          (不是車,或是車但方向不對)一律回到「暗棋只能翻 / 一次只能走一格」這種
+          跟直衝無關的通用說法 —— 不能因為車直衝現在也打得到暗子,就讓每一顆
+          不鄰格的暗子都套上一句聽起來像「差一點就打得到」的直衝解釋。
+       ② 夠資格才進車直衝那一段(房規沒開 / 中間擋住 / 吃不動),這裡 tc 一定是明棋
+          (暗子的話 rushTargets() 早就把它收進合法手了,不會落到 whyNot)。 */
+    if(!adjacent(from, to)){
+      const rushEligible = (myRank === R_JU) && (screensBetween(st, from, to) >= 0);
+      if(!rushEligible) return tc.up ? "一次只能走一格" : "暗棋只能翻,不能吃";
+      if(!st.rules.rush) return "房規未開車直衝 —— 車一次只能走一格";
+      if(blockedBetween(st, from, to)) return "中間有子擋住,衝不過去";
+      if(sideOf(tc.p) === mySide) return "那是自己的子";
+      return "直衝吃不了" + nameOf(tc.p) + " —— 房規未開「直衝吃大子」";
+    }
     /* ⚠ 走到這裡 chainDark 一定是關的 —— 開著的話 capTargets() 早就把它收進
        moveTargets() / chainTargets() 了,不會落到「點不了」這一支。 */
     if(!tc.up) return "暗棋只能翻,不能吃";
     if(sideOf(tc.p) === mySide) return "那是自己的子";
-    if(!adjacent(from, to)){
-      if(myRank !== R_JU) return "一次只能走一格";
-      if(!st.rules.rush) return "房規未開車直衝 —— 車一次只能走一格";
-      if(blockedBetween(st, from, to)) return "中間有子擋住,衝不過去";
-      return "直衝吃不了" + nameOf(tc.p) + " —— 房規未開「直衝吃大子」";
-    }
     if(myRank === R_JIANG && rankOf(tc.p) === R_ZU) return nameOf(me.p) + "吃不了" + nameOf(tc.p);
     return nameOf(me.p) + "比" + nameOf(tc.p) + "小,吃不動";
   }

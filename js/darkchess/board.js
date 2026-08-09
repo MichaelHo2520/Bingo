@@ -252,14 +252,18 @@ const DCB = (function(){
              結構上就把炮/車(理論上車不會打到暗子,但邏輯統一)/翻攻三種一次照顧到,
              不必每加一種新規則就重新想一次判準。
            - 拿掉整段「翻開之後飛去吃子欄」的收尾:改成翻開、停留讓人看清楚,
-             **就地淡出消失**——不再算吃子欄的座標、不再有東西「跑去下面」。
+             就地淡出消失。
+         ⑦「移動過去後,如果是可以吃的,那隻就變成用動畫翻到中正中央」——⑥的
+           「就地淡出」看得清楚但不夠**顯眼**(棋盤格子本來就小)。改成:被吃的子
+           一邊翻開一邊飛到棋盤正中央、放大,停留讓人看清楚,再淡出消失
+           (revealAtCenter(),見下方 CSS 的 dcRevealToCenter)。
        「明棋吃明棋」(被吃的子在這一步之前就已經翻開,玩家早就知道是誰:`eat`、
        `rush`、以及打到明棋的 `jump`)不套翻開動畫 —— slidePiece() 滑過去、被吃的子
        瞬間被攻擊方蓋掉就講完了,不需要再翻一次給他看。
        「翻到自己人 / 打不穿」(`darkSelf`/`jumpSelf`/`darkMiss`)這三種都是**沒有
        東西被吃掉、而且那顆子留在原地**——pieceHTML() 的 pendingFlip 翻牌動畫已經是
        「翻開讓你看清楚,而且它一直留在畫面上」,不必再疊任何效果。
-       ⚠ revealThenVanish() 會暫時多畫一顆 pieceHTML(got)(被吃的子一定都先翻開過,
+       ⚠ revealAtCenter() 會暫時多畫一顆 pieceHTML(got)(被吃的子一定都先翻開過,
          不違反牌情紅線),播完就移除 —— 不影響 tools/gen-dc-solo-e2e.js 對 #dcBoard
          的計數斷言(那些斷言都不在「剛吃完子」的那個時間點量)。
      ========================================================================== */
@@ -292,20 +296,34 @@ const DCB = (function(){
     }, 300);
   }
 
-  /* 「這一步吃 / 翻攻的目標,之前玩家看不看得到」→ 才需要播:先翻開、停留讓人看清楚、
-     就地淡出消失(不飛去吃子欄 —— 使用者:「我不喜歡吃完跑去下面的動畫」)。
+  /* 「這一步吃 / 翻攻的目標,之前玩家看不看得到」→ 才需要播:一邊翻開一邊飛到棋盤
+     正中央放大、停留讓人看清楚,再淡出消失(使用者:「移動過去後,如果是可以吃的,
+     那隻就變成用動畫翻到中正中央」)。
      ⚠ z-index 比攻擊方的子高(見 CSS 的 .dc-reveal),攻擊方雖然已經滑到位,
-       但視覺上被這一層蓋著,直到淡出消失那一刻才「露出」攻擊方安穩落地的畫面 ——
-       對應「棋子放上去、掀開看、收走」的順序,不是兩個東西擠在一起搶注意力。
-     ⚠⚠ 明棋吃明棋(打之前就翻開過)不叫這一支 —— 玩家早就知道是誰,滑過去就講完了。 */
-  const DARK_REVEAL_MS = 420, DARK_HOLD_MS = 420, DARK_VANISH_MS = 260;
-  function revealThenVanish(toIdx, got){
+       但視覺上被這一層蓋著,直到淡出消失那一刻才「露出」攻擊方安穩落地的畫面。
+     ⚠⚠ 明棋吃明棋(打之前就翻開過)不叫這一支 —— 玩家早就知道是誰,滑過去就講完了。
+     ⚠⚠⚠ 掛的節點是 `.dc-board`(不是那一格的 `.dc-sq`)——要飛好幾格到棋盤中央,
+       掛在原本那一格會被那一格的 stacking context 卡住,疊不到別格上面。用
+       getBoundingClientRect() 量出「原本那一格」相對 `.dc-board` 的 left/top,
+       先讓它疊在正確的起點(元素本身用 inline left/top/width/height 定住),
+       再用 --fx/--fy(位移到板子中心的量)交給 CSS 的 dcRevealToCenter 動畫。 */
+  const DARK_REVEAL_MS = 380, DARK_HOLD_MS = 420, DARK_VANISH_MS = 280;
+  function revealAtCenter(toIdx, got){
     const sq = sqEl(toIdx);
-    if(!sq || got == null) return;
+    if(!sq || got == null || !board) return;
+    const sRect = sq.getBoundingClientRect(), bRect = board.getBoundingClientRect();
     const el = document.createElement("span");
     el.className = "dc-reveal";
+    el.style.left = (sRect.left - bRect.left) + "px";
+    el.style.top  = (sRect.top  - bRect.top)  + "px";
+    el.style.width  = sRect.width  + "px";
+    el.style.height = sRect.height + "px";
     el.innerHTML = flipWrapHTML(pieceFaceHTML(got));
-    sq.appendChild(el);
+    board.appendChild(el);
+    const dx = (bRect.width  / 2) - (sRect.left - bRect.left) - sRect.width  / 2;
+    const dy = (bRect.height / 2) - (sRect.top  - bRect.top)  - sRect.height / 2;
+    el.style.setProperty("--fx", dx.toFixed(1) + "px");
+    el.style.setProperty("--fy", dy.toFixed(1) + "px");
     setTimeout(() => { el.classList.add("dc-reveal-gone"); }, DARK_REVEAL_MS + DARK_HOLD_MS);
     setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); },
                DARK_REVEAL_MS + DARK_HOLD_MS + DARK_VANISH_MS);
@@ -314,8 +332,8 @@ const DCB = (function(){
   function playMoveFx(L, wasHiddenAtTo){
     if(SLIDE_KINDS[L.kind]) slidePiece(L.from, L.to);
     if(EAT_KINDS[L.kind] && wasHiddenAtTo){
-      // 對齊滑入抵達的時間點:攻擊方的子先滑過去,「放上去」那一刻才翻開被吃的子
-      setTimeout(() => { revealThenVanish(L.to, L.got); }, 220);
+      // 對齊滑入抵達的時間點:攻擊方的子先滑過去,「放上去」那一刻被吃的子才起飛翻開
+      setTimeout(() => { revealAtCenter(L.to, L.got); }, 220);
     }
     // 明棋吃明棋(wasHiddenAtTo 是 false):滑過去本身就講完了,不疊加任何效果。
     // darkSelf / jumpSelf / darkMiss:翻牌動畫本身已經講完了,不疊加任何效果。
