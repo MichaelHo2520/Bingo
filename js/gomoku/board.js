@@ -220,6 +220,9 @@ const GB = (function(){
     const mid  = (a,b)=>({ x:(a.x+b.x)/2, y:(a.y+b.y)/2 });
 
     stage.addEventListener("pointerdown", e=>{
+      // 放大/縮小/整盤鈕是 stage 的子元素(疊在右下角),按下時 pointerdown 會冒泡到這裡 →
+      // 沒擋掉的話按鈕那個座標會被當成點擊落子。
+      if(e.target.closest(".gmk-zoom")) return;
       pts.set(e.pointerId, { x:e.clientX, y:e.clientY });
       if(pts.size === 1){
         drag = { x:e.clientX, y:e.clientY, tx, ty, t:Date.now() };
