@@ -468,6 +468,10 @@
   let voiceVol=1.5;               // 收到語音的播放音量倍率(1=原音,可 >1 放大);預設 150%,範圍 0~3
   let sfxVol=1;                   // 音效總音量(0~1);預設 100%,含點格/連線/勝敗等所有音效
   let vibrateOn=true;             // 連線「輪到你」時震動(僅支援 navigator.vibrate 的裝置;iOS Safari 不支援會自動略過);由 online.js 讀取
+  // 互動面板罐頭的自訂順序(拖曳排序,見下方「罐頭面板拖曳排序」);與 bgmVol 等其他偏好同一套 loadPrefs/savePrefs
+  // 迴圈,不能像 js/shared/ui-kit.js 那樣繞過去直接 saveShared() merge —— 這裡的 savePrefs() 是整包覆寫
+  // (見它自己的註解),不進這三個欄位的話,使用者下一次隨便調個音量就會把排序整個洗掉。
+  let emoteOrder=[], phraseOrder=[], clipOrder=[];
   // 背景音樂可選曲目(檔案放 mp3/;第一個為預設)。新增曲目只要放檔 + 在這裡加一列
   const BGM_TRACKS=[
     { id:"sunday", name:"Sunday Morning(預設)", src:"mp3/Sunday_Morning.mp3" },
@@ -493,6 +497,7 @@
         vibrate:vibrateOn,
         scoreMode:(MP&&MP.scoreMode)?MP.scoreMode():"rank",   // 記住連線計分偏好(建房預設用)
         winGoal:(MP&&MP.winGoal)?MP.winGoal():3,
+        emoteOrder:emoteOrder, phraseOrder:phraseOrder, clipOrder:clipOrder,
         name:nameEl?nameEl.value.trim():""
       }));
     }catch(e){/* storage unavailable -> just don't persist */}
@@ -517,6 +522,9 @@
     if(typeof p.sfxVol==="number"){ sfxVol=Math.max(0,Math.min(1,p.sfxVol)); }
     Sound.setVolume(sfxVol);
     if(typeof p.vibrate==="boolean"){ vibrateOn=p.vibrate; }
+    if(Array.isArray(p.emoteOrder)) emoteOrder=p.emoteOrder;
+    if(Array.isArray(p.phraseOrder)) phraseOrder=p.phraseOrder;
+    if(Array.isArray(p.clipOrder)) clipOrder=p.clipOrder;
     if(MP&&MP.usePrefs){ MP.usePrefs(p.scoreMode, p.winGoal); }   // 帶回記住的連線計分偏好(建房預設)
     if(p.bgmOn){ bgmOn=true; }   // 記住「想開」;實際播放等首次使用者互動(繞過自動播放限制)
     if(p.ebook){ setEbook(true,true); }
@@ -815,11 +823,107 @@
     // 「聽牌」為連線遊戲自動觸發(有人只差一號就達標),不放進手動表情選單 → auto:true 讓 buildVoiceClips 略過
     { id:"reach",   label:"聽牌",         src:"mp3/聽牌.m4a", auto:true },
   ];
+  /* ---------- 罐頭面板拖曳排序(v1.128.0) ----------
+     使用者:「語音罐頭 / emoji 想要自己拖曳排序」。四個罐頭區塊(表情 / 一句話 / 內建語音 / 我的語音)
+     都能直接用手指拖曳調順序,不必另外進「編輯模式」。
+
+     手法照抄 js/big2/board.js 排手牌那套(那裡踩過的坑照樣會踩到,細節見它的第八節):
+       · 用**位移量**(PD_SLOP)分辨拖曳與點擊,不是長按計時、也不是 elementFromPoint
+         —— 拖曳中用 insertBefore 搬動被捕獲的元素,WebKit / Blink 都會因此觸發
+            lostpointercapture,必須判斷「節點還在不在面板裡」而不是當成手勢中斷,
+            否則排序活不過第一次換位(按鈕會彈回原位)。
+       · move / up / cancel 一律掛在 window,不是掛在個別區塊,才不受「捕獲元素被誰收著」影響。
+       · 換位一律 insertBefore,排版交給 grid / flex 自己算,不自己量座標。
+     ⚠ js/shared/ui-kit.js 有另一份 —— 改一邊要改另一邊。
+     ⚠ 兩份的 pdSaveOrder 刻意不同:這裡(Bingo)寫進 emoteOrder/phraseOrder/clipOrder
+       這三個模組變數再呼叫整包覆寫的 savePrefs();ui-kit.js 那份是直接 saveShared() merge
+       —— 兩邊的 bingo.prefs.v1 寫法本來就不一樣(見 savePrefs() 開頭那則註解),照抄會被洗掉。
+     ⚠ 我的語音本身就是有序陣列,拖曳直接改 myClips 順序後 saveMyClips,不必另外存一份 order。 */
+  function orderByKey(defaults, saved, keyFn){
+    keyFn = keyFn || (x=>x);
+    if(!Array.isArray(saved) || !saved.length) return defaults.slice();
+    const by=new Map(defaults.map(d=>[keyFn(d),d]));
+    const out=[];
+    saved.forEach(k=>{ const d=by.get(k); if(d){ out.push(d); by.delete(k); } });
+    by.forEach(d=>out.push(d));   // 使用者存的順序裡沒有的(新加的預設項目)接在後面
+    return out;
+  }
+  const PD_BOXES="#emoteGrid,#emotePhrases,#emoteClips,#emoteMyClips";
+  const PD_SLOP=11;
+  let pdDrag=null, pdSuppressClick=false;
+  function pdItems(box){ return Array.from(box.children).filter(el=>el.tagName==="BUTTON"); }
+  function pdDropAt(x,y){
+    const kids=pdItems(pdDrag.box);
+    for(const el of kids){
+      if(el===pdDrag.el)continue;
+      const r=el.getBoundingClientRect();
+      if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom) return { el:el, before:(x<r.left+r.width/2) };
+    }
+    return null;
+  }
+  function pdSlotRect(el){ const t=el.style.transform; el.style.transform=""; const r=el.getBoundingClientRect(); el.style.transform=t; return r; }
+  function pdFollow(x,y){
+    const r=pdSlotRect(pdDrag.el), cb=pdDrag.box.getBoundingClientRect();
+    const nx=Math.max(cb.left,Math.min(x-pdDrag.gx,cb.right-r.width));
+    const ny=Math.max(cb.top,Math.min(y-pdDrag.gy,cb.bottom-r.height));
+    pdDrag.el.style.transform="translate("+(nx-r.left)+"px,"+(ny-r.top)+"px)";
+  }
+  function pdSaveOrder(box){
+    const items=pdItems(box);
+    if(box.id==="emoteGrid"){ emoteOrder=items.map(b=>b.textContent); savePrefs(); }
+    else if(box.id==="emotePhrases"){ phraseOrder=items.map(b=>b.textContent); savePrefs(); }
+    else if(box.id==="emoteClips"){ clipOrder=items.map(b=>b.dataset.clipId); savePrefs(); }
+    else if(box.id==="emoteMyClips"){
+      const byId=new Map(myClips.map(c=>[c.id,c]));
+      const next=items.map(b=>byId.get(b.dataset.clipId)).filter(Boolean);
+      if(next.length===myClips.length){ myClips=next; if(!saveMyClips(myClips)) showToast("排序存不進去,本機空間不足"); }
+    }
+  }
+  function pdEndDrag(root,cancel){
+    if(!pdDrag)return;
+    const d=pdDrag; pdDrag=null;
+    d.el.classList.remove("pd-drag"); d.el.style.transform="";
+    try{ d.el.releasePointerCapture(d.id); }catch(e){}
+    if(!cancel && d.on && root.contains(d.el)){ pdSuppressClick=true; pdSaveOrder(d.box); }
+  }
+  function bindEmoteDrag(){
+    const root=$("emoteVeil"); if(!root || root.dataset.dragBound)return;
+    root.dataset.dragBound="1";
+    root.addEventListener("pointerdown",e=>{
+      if(pdDrag || e.button>0)return;
+      const box=e.target.closest(PD_BOXES); if(!box)return;
+      const el=e.target.closest("button"); if(!el || el.parentElement!==box)return;
+      const r=el.getBoundingClientRect();
+      pdDrag={ id:e.pointerId, el:el, box:box, x0:e.clientX, y0:e.clientY,
+               gx:e.clientX-r.left, gy:e.clientY-r.top, on:false };
+      try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    });
+    addEventListener("pointermove",e=>{
+      if(!pdDrag || e.pointerId!==pdDrag.id)return;
+      if(!root.contains(pdDrag.el)){ pdEndDrag(root,true); return; }
+      if(!pdDrag.on){
+        if(Math.hypot(e.clientX-pdDrag.x0,e.clientY-pdDrag.y0)<PD_SLOP)return;
+        pdDrag.on=true; pdDrag.el.classList.add("pd-drag");
+      }
+      const t=pdDropAt(e.clientX,e.clientY);
+      if(t) pdDrag.box.insertBefore(pdDrag.el, t.before?t.el:t.el.nextSibling);
+      pdFollow(e.clientX,e.clientY);
+    });
+    addEventListener("pointerup",e=>{ if(pdDrag && e.pointerId===pdDrag.id) pdEndDrag(root,false); });
+    addEventListener("pointercancel",e=>{ if(pdDrag && e.pointerId===pdDrag.id) pdEndDrag(root,true); });
+    root.addEventListener("lostpointercapture",e=>{
+      if(!pdDrag || e.pointerId!==pdDrag.id)return;
+      if(root.contains(pdDrag.el))return;
+      pdEndDrag(root,true);
+    });
+  }
+
   let emoteTarget="all";                       // 目前要傳給誰:"all" 或某玩家 id
   function openEmote(target){
     if(!state.online)return;
     const roster=MP.roster();
     emoteTarget = (target && target!=="all" && roster.some(p=>p.id===target)) ? target : "all";
+    bindEmoteDrag();
     buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases(); buildVoiceClips(); buildMyClips();
     const inp=$("emoteText"); if(inp)inp.value="";
     resetVoiceBtn(); const vh=$("voiceHint"); if(vh)vh.textContent="";
@@ -1088,7 +1192,11 @@
     myClips.forEach(c=>{
       const b=document.createElement("button");
       b.type="button"; b.className="phrase-btn mvc-btn"; b.textContent="🎤 "+c.label;
-      b.addEventListener("click",()=>sendMyClip(c.id));
+      b.dataset.clipId=c.id;
+      b.addEventListener("click",()=>{
+        if(pdSuppressClick){ pdSuppressClick=false; return; }
+        sendMyClip(c.id);
+      });
       g.appendChild(b);
     });
   }
@@ -1252,30 +1360,37 @@
   }
   function buildEmoteGrid(){
     const g=$("emoteGrid"); if(!g)return; g.innerHTML="";
-    EMOTES.forEach(em=>{
+    orderByKey(EMOTES, emoteOrder).forEach(em=>{
       const b=document.createElement("button");
       b.type="button"; b.className="emote-btn"; b.textContent=em;
-      b.addEventListener("click",()=>{ MP.sendEmote(emoteTarget,em); closeEmote(); });
+      b.addEventListener("click",()=>{
+        if(pdSuppressClick){ pdSuppressClick=false; return; }   // 剛拖完的放手不算送出
+        MP.sendEmote(emoteTarget,em); closeEmote();
+      });
       g.appendChild(b);
     });
   }
   function buildEmotePhrases(){
     const g=$("emotePhrases"); if(!g)return; g.innerHTML="";
-    PHRASES.forEach(tx=>{
+    orderByKey(PHRASES, phraseOrder).forEach(tx=>{
       const b=document.createElement("button");
       b.type="button"; b.className="phrase-btn"; b.textContent=tx;
-      b.addEventListener("click",()=>{ MP.sendEmote(emoteTarget,tx,"text"); closeEmote(); });
+      b.addEventListener("click",()=>{
+        if(pdSuppressClick){ pdSuppressClick=false; return; }
+        MP.sendEmote(emoteTarget,tx,"text"); closeEmote();
+      });
       g.appendChild(b);
     });
   }
   // 語音短訊按鈕:文字選單,點擊只送代號(kind="clip"),各端播自己本地的 m4a;送出者本人也聽得到(v1.69.0)
   function buildVoiceClips(){
     const g=$("emoteClips"); if(!g)return; g.innerHTML="";
-    CLIPS.forEach(clip=>{
-      if(clip.auto) return;   // 自動觸發的語音(如聽牌)不放進手動選單
+    orderByKey(CLIPS.filter(c=>!c.auto), clipOrder, c=>c.id).forEach(clip=>{
       const b=document.createElement("button");
       b.type="button"; b.className="phrase-btn clip-btn"; b.textContent="🔊 "+clip.label;
+      b.dataset.clipId=clip.id;
       b.addEventListener("click",()=>{
+        if(pdSuppressClick){ pdSuppressClick=false; return; }
         markAudioArmed(); Sound.wake();   // 點按鈕=手勢,順手解鎖音訊(利於同回合收到別人的語音能自動播)
         MP.sendEmote(emoteTarget, "🔊", "clip", clip.id);
         closeEmote();

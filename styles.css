@@ -750,7 +750,8 @@
   :root[data-theme="ebook"] .emote-to-btn.on{background:#000;color:#fff}
   .emote-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
   .emote-btn{aspect-ratio:1;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);
-    border-radius:12px;font-size:clamp(26px,3vw,36px);line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .1s,background .15s}
+    border-radius:12px;font-size:clamp(26px,3vw,36px);line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .1s,background .15s;
+    touch-action:none}   /* 拖曳排序的必要條件(見 js 檔「罐頭面板拖曳排序」註解);代價是手指按在按鈕上時面板捲不動,縫隙處仍捲得動 */
   /* ↑ 表情格是 aspect-ratio:1,卡片變寬 → 6 格跟著變大;字級不跟著長就會變成「大方框裝小 emoji」 */
   .emote-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .emote-btn:active{transform:scale(.9)}
@@ -760,13 +761,16 @@
   .emote-phrases{display:flex;flex-wrap:wrap;gap:8px}
   .phrase-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
     border-radius:999px;padding:9px 15px;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
-    cursor:pointer;transition:transform .1s,background .15s}
+    cursor:pointer;transition:transform .1s,background .15s;touch-action:none}   /* touch-action:同上 .emote-btn 那則註解 */
   .phrase-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .phrase-btn:active{transform:scale(.94)}
   :root[data-theme="ebook"] .phrase-btn{background:#fff;border:1px solid #000}
   .clip-btn{background:rgba(120,190,255,.14)}                                   /* 語音短訊:藍調底色,與「一句話」稍作區隔 */
   .clip-btn:hover{background:rgba(120,190,255,.26)}
   :root[data-theme="ebook"] .clip-btn{background:#fff;border:1px solid #000}
+  /* 罐頭面板拖曳排序(v1.128.0):拖曳中用 inline transform 跟著手指走(壓過上面 :hover/:active 那兩條),
+     加陰影 + 半透明 + z-index 讓「正在拖哪一顆」一眼可辨。四個罐頭區塊(.emote-btn / .phrase-btn 系列)共用。 */
+  .pd-drag{position:relative;z-index:50;opacity:.92;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grabbing;transition:none!important}
   /* 自訂文字輸入 */
   .emote-input{display:flex;align-items:stretch;gap:8px;margin-top:16px}
   #emoteText{flex:1 1 auto;min-width:0;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
