@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.133.0 -->
-<meta name="version" content="1.133.0">
+<!-- UNO · v1.134.0 -->
+<meta name="version" content="1.134.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -81,7 +81,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         108 張牌,<b>2~6 人</b>每人先發 <b>7 張</b>。出牌條件是<b>同色</b>或<b>同數字 / 同動作</b>;
         <b>Wild 隨時可出</b>,出的人指定接下來的顏色。<br>
         <!-- ⚠ 這兩句與房規面板、rules.js 的 doDraw 是同一件事的三個說法,改一處要看另兩處 -->
-        手上有出得了的牌就<b>一定要出</b>;真的一張都出不了才<b>抽一張</b>,
+        手上有出得了的牌<b>預設一定要出</b>(可在房規改成「有牌也能抽」);
+        真的一張都出不了才<b>抽一張</b>,
         抽完就換下一家(<b>可在房規改成「抽到的可以馬上出」</b>)。<br>
         動作牌:<b>⊘ 跳過</b>下一家 · <b>⇄ 迴轉</b>換方向(2 人局就是<b>換對手出</b>)·
         <b>+2</b> 讓下一家抽兩張並跳過 · <b>+4</b> 換顏色再讓他抽四張。<br>
@@ -315,7 +316,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="set-body" id="unRulesBody">
 
         <div class="set-group">
-          <div class="set-group-title">可以改的四條</div>
+          <div class="set-group-title">可以改的五條</div>
           <div class="set-row col">
             <span class="set-lbl">疊 +2 / +4<span class="set-sub">被 +2 時可以再出 +2 把懲罰往下疊(同種才疊得上);關掉就照官方:抽 2 張並跳過</span></span>
             <div class="seg" id="unStackSeg" aria-label="疊 +2 / +4">
@@ -349,6 +350,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               <button class="on" data-rk="toLast" data-rv="0">✘ 出完就結束</button>
             </div>
           </div>
+          <!-- ★★ 有牌能出時仍可以抽牌(v1.134.0):預設**關**(照原本的強制出牌)。
+               開了之後,即使手上有出得了的牌,也能選擇按抽牌墊多抽一張。 -->
+          <div class="set-row col">
+            <span class="set-lbl">有牌能出時仍可以抽牌<span class="set-sub">開:即使手上有出得了的牌,也可以選擇抽一張(被罰抽時能疊也可以選擇直接抽掉整份罰抽);關(預設):有牌可出就一定要出,不能用抽牌代替</span></span>
+            <div class="seg" id="unFreeDrawSeg" aria-label="有牌能出時仍可以抽牌">
+              <button data-rk="freeDraw" data-rv="1">✔ 可以抽</button>
+              <button class="on" data-rk="freeDraw" data-rv="0">✘ 有牌必須出</button>
+            </div>
+          </div>
         </div>
 
         <!-- ★ 出牌倒數:**連線專屬**(單機沒有倒數 —— 卡多久是自己的節奏)。
@@ -372,7 +382,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <li>108 張:四色各 <b>19 張數字</b>(0 一張、1~9 各兩張)+ 各 2 跳過 / 2 迴轉 / 2 抽兩張,再加 <b>Wild 4 張 + Wild +4 4 張</b>。</li>
             <li><b>2~6 人</b>,每人先發 <b>7 張</b>;起始牌一律翻到<b>第一張數字牌</b>為止。</li>
             <li>出牌條件:<b>同色</b>或<b>同數字 / 同動作</b>;<b>Wild 隨時可出</b>並指定顏色。</li>
-            <li>手上有出得了的牌就<b>一定要出</b>(不能改抽牌);真的一張都出不了才<b>抽一張</b>。</li>
+            <li>手上有出得了的牌<b>預設一定要出</b>(可以在房規裡開放成「有牌也能抽」);真的一張都出不了才<b>抽一張</b>。</li>
             <li><b>⇄ 迴轉</b>反轉出牌方向;<b>2 人局就是換對手出</b>(官方是「等同跳過」,這一桌改成換人)。</li>
             <li><b>+4 隨時可出,而且不做挑戰驗牌</b> —— 這一版刻意簡化(這個 App 本來就不防作弊)。</li>
             <li>牌堆抽乾時,把<b>牌河除最上面那張</b>洗回牌堆繼續打。</li>

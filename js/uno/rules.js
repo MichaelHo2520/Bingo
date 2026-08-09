@@ -21,7 +21,7 @@
      **有人打完最後一張,這一局立刻結束** —— 除非房規 `toLast` 開著,那就打到
      **只剩一個人手上還有牌**為止(像大老二),名次照出完的先後排。
 
-     ★ 四條房規(房主設定,開局那一刻凍結):
+     ★ 五條房規(房主設定,開局那一刻凍結):
          stack     疊 +2 / +4 —— **同種才疊得上**(+2 疊 +2、+4 疊 +4);
                    關掉就照官方:被 +2 就抽 2 張並跳過。
          unoCall   沒喊 UNO 罰抽 2 張 —— 出到剩 1 張要在**同一手**宣告(見第五節);
@@ -29,6 +29,7 @@
          playDrawn 抽到的那張能出就可以馬上出(**預設關**)。
          toLast    **打到只剩一個人手上還有牌**才結束(預設關)——
                    開了之後每個人都有自己的名次,名次分改成看人數(見第六節)。
+         freeDraw  手上有牌能出時仍然可以**選擇**抽牌(**預設關**,照原本的強制出牌)。
 
      ★ 兩件刻意做成固定行為、不進房規面板的(規則清單裡有寫給玩家看):
          ① 「抽到能出的牌可以馬上出」= 官方規則,固定開啟。
@@ -214,14 +215,15 @@ const UN = (function(){
   /* ⚠ toLast 的預設也是 **false**(有人打完就結束 = 官方規則)——
        它是 v1.110.0 加的第四條房規:開了之後**打到只剩一個人手上還有牌**才結束,
        每個人都有自己的名次(名次分改成看人數,見第六節)。 */
-  function defRules(){ return { stack: true, unoCall: true, playDrawn: false, toLast: false }; }
+  function defRules(){ return { stack: true, unoCall: true, playDrawn: false, toLast: false, freeDraw: false }; }
   function normRules(r){
     const d = defRules();
     if(!r || typeof r !== "object") return d;
     return { stack:     typeof r.stack     === "boolean" ? r.stack     : d.stack,
              unoCall:   typeof r.unoCall   === "boolean" ? r.unoCall   : d.unoCall,
              playDrawn: typeof r.playDrawn === "boolean" ? r.playDrawn : d.playDrawn,
-             toLast:    typeof r.toLast    === "boolean" ? r.toLast    : d.toLast };
+             toLast:    typeof r.toLast    === "boolean" ? r.toLast    : d.toLast,
+             freeDraw:  typeof r.freeDraw  === "boolean" ? r.freeDraw  : d.freeDraw };
   }
 
   /* ==========================================================================
@@ -411,17 +413,20 @@ const UN = (function(){
 
   function doDraw(st){
     const seat = st.turn;
-    /* ★★★ 手上有合法牌可出時不准抽 —— 強制出牌。
+    /* ★★★ 手上有合法牌可出時**預設**不准抽 —— 強制出牌,是否放行是房規 freeDraw
+       (預設關,照原本的強制出牌)。
        這裡刻意用 canPlay(),與「疊牌」共用同一個閘門:被罰抽時如果手上有同種牌
-       能疊上去,也一樣不准直接抽來吃掉罰抽(能疊就必須疊)。
-       ⚠ ai.js 一路都是這樣寫的(pl.length 才回 DRAW)——這條讓規則層與 AI 的假設對齊,
-       不是新規則,是把原本只有 AI 遵守的界線也套到人類玩家身上。
+       能疊上去,也一樣不准直接抽來吃掉罰抽(能疊就必須疊)—— freeDraw 開著時這條
+       也一起放行(能疊也可以選擇直接抽掉整份罰抽)。
+       ⚠ ai.js 不受這條房規影響 —— 它一路都是 pl.length 才回 DRAW(見 notes/18 AI 節:
+       屯牌 / 白白放棄能出的牌都是負收益),freeDraw 只多給**人類玩家**一個選項。
        ⚠⚠ 「一個回合只能抽一次」**不必再寫成獨立的一條**(`if(st.drew) return false`)——
        抽到的那張只要合法,legalOn() 就會把 st.drew 的 gate 套在它身上,讓它自己也算
        canPlay 為真的其中一張;換句話說 st.drew 為真時 canPlay 必然為真,這一行會先
-       擋下來。第一版寫了獨立那一行,突變測試證明它是**測不到的等價碼**(拿掉照樣
+       擋下來(freeDraw 開著也一樣 —— 這一行只管「有沒有牌能出」,不管想不想出)。
+       第一版寫了獨立那一行,突變測試證明它是**測不到的等價碼**(拿掉照樣
        全綠,因為上面這行永遠先擋),所以直接拿掉,不留一層沒有牙齒的檢查。 */
-    if(canPlay(st.hands[seat], st)) return false;
+    if(!st.rules.freeDraw && canPlay(st.hands[seat], st)) return false;
     if(st.pend > 0){
       for(let i = 0; i < st.pend; i++){ const id = drawOne(st); if(id < 0) break; st.hands[seat].push(id); }
       st.pend = 0; st.pendK = 0;

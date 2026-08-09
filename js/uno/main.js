@@ -85,7 +85,8 @@ function unRulesText(r){
   return (rr.stack ? "可疊 +2 / +4" : "不可疊") + " · " +
          (rr.unoCall ? "剩一張要喊 UNO" : "不必喊 UNO") + " · " +
          (rr.playDrawn ? "抽到可馬上出" : "抽完就換人") + " · " +
-         (rr.toLast ? "打到最後一個" : "出完就結束");
+         (rr.toLast ? "打到最後一個" : "出完就結束") + " · " +
+         (rr.freeDraw ? "有牌也能抽" : "有牌必須出");
 }
 function syncRules(rules, editable){
   const r = UN.normRules(rules);

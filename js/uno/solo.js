@@ -259,10 +259,11 @@ const Solo = (function(){
       return;
     }
     if(a === "draw"){
-      /* ★★ 手上有合法牌可出時不准抽(強制出牌,見 rules.js 的 doDraw)——
+      /* ★★ 手上有合法牌可出時預設不准抽(強制出牌,見 rules.js 的 doDraw)——
          按鈕在這個狀態下本來就不畫,但牌堆圖示(#unDraw)一直可以點,
-         誤按要跳 toast 講原因,不能讓 commit() 就地靜默失敗。 */
-      if(UN.canPlay(st.hands[ME], st)){ showToast("有牌可以出,不能抽", 1600); return; }
+         誤按要跳 toast 講原因,不能讓 commit() 就地靜默失敗。
+         ⚠ 房規 freeDraw 開著時放行(有牌也能選擇抽)。 */
+      if(!st.rules.freeDraw && UN.canPlay(st.hands[ME], st)){ showToast("有牌可以出,不能抽", 1600); return; }
       commit(UN.DRAW);
       return;
     }
