@@ -22,6 +22,29 @@
    ========================================================================== */
 const HomeLive = (function(){
 
+  /* 排七 / 大老二 / 台式21點三個撲克牌遊戲原本共用同一顆 🎴,清單裡三行長得一模一樣、
+     只能靠名字分(使用者:「這三個的表示圖我不是很喜歡」)。改成各一張迷你撲克牌 SVG
+     (跟首頁大圖 .pk-ic-* 同一套畫法、同一份花色 path,只是縮成單張小卡),
+     牌面挑遊戲最具代表性的那張:排七=起始牌 ♠︎7、大老二=最大牌 ♥︎2、21點=關鍵牌 ♦︎A。
+     座標公式抄自首頁大圖(見 index.html 排七/大老二/21點那三段 SVG 的註解):
+     card 在 (X,Y)、21×30、rx2.7 時,點數文字在 (X+10.5, Y+13),
+     花色 <g> 是 translate(X+6.5, Y+15.4) scale(.08)——這裡固定用 (1.5,2) 當 X,Y,
+     viewBox 「0 0 24 34」四邊留白對稱。★ class 沿用既有的 .pk-ic-*(styles.css 排七
+     那一段),不必新增卡面樣式;只有外層 .hl-card-ic 是新的,管行內對齊與間距。 */
+  const PK_SUIT={
+    spade:'<path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/><path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>',
+    heart:'<path d="M50 90S10 62 10 36C10 22 21 12 34 12c8 0 14 5 16 11 2-6 8-11 16-11 13 0 24 10 24 24 0 26-40 54-40 54z"/>',
+    diamond:'<path d="M50 6 86 50 50 94 14 50z"/>'
+  };
+  function miniCard(rank,suit,red){
+    const cls=red?" pk-ic-red":"";
+    return '<svg class="hl-card-ic" viewBox="0 0 24 34" width="15" height="21" aria-hidden="true">'+
+      '<rect class="pk-ic-bd" x="1.5" y="2" width="21" height="30" rx="2.7"/>'+
+      '<text class="pk-ic-t'+cls+'" x="12" y="15">'+rank+'</text>'+
+      '<g class="pk-ic-s'+cls+'" transform="translate(8 17.4) scale(.08)">'+PK_SUIT[suit]+'</g>'+
+    '</svg>';
+  }
+
   // max = 可加入的人數上限(要與各遊戲 adapter.js 的 maxPlayers 一致;Bingo 沒有上限 → 0)
   // href = 別頁的遊戲;沒有 href 的就是本頁(Bingo)
   const GAMES=[
@@ -33,12 +56,12 @@ const HomeLive = (function(){
     //   不一致的話首頁會把滿房列成「可加入」,點進去才被 claimSeat 交易擋下
     { key:"mj16",    index:"mj16_index",    rooms:"mj16_rooms",    name:"台灣麻將", icon:"🀄", badge:"hlBadgeMj16", max:4, href:"mahjong16.html" },
     // ★ max 必須與 js/sevens/adapter.js 的 maxPlayers 一致(6)
-    { key:"sevens",  index:"sevens_index",  rooms:"sevens_rooms",  name:"排七", icon:"🎴", badge:"hlBadgeSevens", max:6, href:"sevens.html" },
+    // icon 是迷你 ♠︎7(見上面 miniCard 那段說明)—— 起始牌,呼應「排七」這個名字
+    { key:"sevens",  index:"sevens_index",  rooms:"sevens_rooms",  name:"排七", icon:miniCard("7","spade",false), badge:"hlBadgeSevens", max:6, href:"sevens.html" },
     // ★ max 必須與 js/big2/adapter.js 的 maxPlayers 一致(4)—— 大老二每人 13 張,4 人剛好用完 52 張
-    // ⚠ icon 用 🎴(U+1F3B4),**不是**小丑牌那顆(U+1F0CF)—— 後者落在
-    //   U+1F0A0–U+1F0FF 那段撲克牌字元裡,多數字型沒有會變豆腐方框(CLAUDE.md 的禁令)。
-    //   與排七同一個圖示是刻意的 —— 同一副撲克牌,而消消樂與台灣麻將本來也共用 🀄。
-    { key:"big2",    index:"big2_index",    rooms:"big2_rooms",    name:"大老二", icon:"🎴", badge:"hlBadgeBig2", max:4, href:"big2.html" },
+    // icon 是迷你 ♥︎2 —— 2 是這個遊戲最大的牌。三個撲克牌遊戲原本共用 🎴(v1.136.1 以前),
+    // 使用者反饋「三個表示圖不喜歡」才各自換成獨立牌面(v1.136.2)。
+    { key:"big2",    index:"big2_index",    rooms:"big2_rooms",    name:"大老二", icon:miniCard("2","heart",true), badge:"hlBadgeBig2", max:4, href:"big2.html" },
     /* ★ max 必須與 js/blackjack/adapter.js 的 maxPlayers 一致(v1.86.0 起是 **6**)。
        ★★ joinMid:true 是這張表的**第一個遊戲專屬能力旗標**(v1.84.0)——
           21 點一場 = 很多局,對戰中也可以加入(新人下一局進場),
@@ -47,7 +70,8 @@ const HomeLive = (function(){
             列成「對戰中」(反過來則是列成可加入、點進去被擋)。 */
     /* ⚠ name 是**顯示名**(v1.86.0 從「21點」改成「台式21點」)——
        index / key / href 這三個是**資料與路徑**,一個字都不准跟著改。 */
-    { key:"bj",      index:"bj_index",      rooms:"bj_rooms",      name:"台式21點", icon:"🎴", badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true },
+    // icon 是迷你 ♦︎A —— 21 點裡最關鍵的一張牌
+    { key:"bj",      index:"bj_index",      rooms:"bj_rooms",      name:"台式21點", icon:miniCard("A","diamond",true), badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true },
     /* ★ 第九個遊戲(v1.106.0)。max 必須與 js/uno/adapter.js 的 maxPlayers 一致(**6**)。
        ⚠ icon 用 🌈(U+1F308)—— UNO 的識別就是四個顏色,而且它與另外八個都不撞。
          **不可以用 🃏**(U+1F0CF):它落在 U+1F0A0–U+1F0FF 那段撲克牌字元裡,

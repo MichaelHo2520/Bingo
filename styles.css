@@ -1672,6 +1672,11 @@
   /* 哪個遊戲的房間 —— 首頁三個遊戲混在一起列,沒有這顆會分不出來 */
   .hl-tag{flex:none;font-size:12px;font-weight:800;color:var(--muted);
     padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.14);white-space:nowrap}
+  /* 排七/大老二/21點的迷你撲克牌圖示(js/home-live.js 的 miniCard())——
+     行內 svg 預設 baseline 對齊會偏低,拉回文字中線;牌面樣式借用 .pk-ic-*(styles.css
+     排七那一段),這裡只管尺寸小圖跟文字之間的對齊與間距,同時給 .svs-name(伺服器狀態
+     面板)共用。 */
+  .hl-card-ic{vertical-align:middle;margin:-2px 2px 0 0}
   /* 遊戲卡上的即時徽章:接在 .gc-name 下面自成一行(.gc-body 是 column)。
      ⚠ v1.89.0 首頁改成一行兩張的窄卡之後,居中那條在上面
        (.gc-body .hl-badge{align-self:center},兩層 → 蓋掉這裡的 flex-start)。 */
