@@ -47,7 +47,6 @@
   $("quickVoiceBtn").addEventListener("click",toggleQuickVoice);   // 快速語音:直接錄→送全部人(表情面板內的錄音鈕已移除,語音改由房間框的🎤)
   $("emoteOpenBtn").addEventListener("click",()=>openEmote("all"));   // 房間框的表情鈕:開互動面板(預設傳全部人,面板內可改對象)
   $("voiceGate").addEventListener("click",playVoiceGate);          // 「點我播放語音」膠囊:手勢喚醒音訊後補播佇列
-  $("swEbook").addEventListener("click",()=>{ toggleEbook(); });
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));                       // 背景音樂開關
   $("bgmTrackSel").addEventListener("change",e=>setBgmTrack(e.target.value));    // 切換背景音樂曲目

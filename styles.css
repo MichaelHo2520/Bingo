@@ -6,7 +6,7 @@
          · 五子棋插圖的格線與黑子直接不見
      ★ 元凶不是我們的 CSS,是 Chrome / Edge Android 的 Auto Dark Theme 與
        Samsung Internet 的深色模式:它們會**自動反轉**「看起來沒有自己深色版」的網站。
-       我們八個主題全部是自己配好的(六個主題裡四個本來就是深色底),被再反轉一次
+       我們八個主題全部是自己配好的(五個主題裡四個本來就是深色底),被再反轉一次
        必然走鐘 —— 而且反轉是逐元素猜的,插圖那種「淺底深字」會兩邊一起動、對比崩掉。
      ★ 解法就是宣告 color-scheme:那是給瀏覽器的一句「這頁的配色我自己管」。
        用 `only light` 而不是 `light dark`:`only` 才是**完整**的退出(連原生元件都不准
@@ -15,7 +15,7 @@
      ⚠ 九頁的 <head> 各有一份 <meta name="color-scheme" content="only light">,
        **兩邊都要留**:meta 在 CSS 下載完成前就生效(不然會先閃一下反轉後的樣子),
        CSS 這份則管 file:// 直開與 meta 被漏掉的情形。改一邊記得改另一邊。
-     ⚠ 這不影響 ebook 主題也不影響任何主題切換 —— 主題一律是我們自己的 data-theme。 */
+     ⚠ 這不影響任何主題切換 —— 主題一律是我們自己的 data-theme。 */
   :root{color-scheme:only light}
 
   /* ---------- Themes ---------- */
@@ -55,35 +55,6 @@
     --text:#ffffff; --muted:#8a8a92; --marquee:#ffe600;
   }
   /* E-book / e-ink: pure monochrome, flat, no motion */
-  :root[data-theme="ebook"]{
-    --bg1:#ffffff; --bg2:#ffffff; --bg3:#ffffff;
-    --panel:#ffffff; --panel-line:#000000;
-    --cell:#ffffff; --cell-edge:#000000; --cell-text:#000000;
-    --accent:#000000; --accent-2:#000000; --daub:#000000; --daub-ink:#ffffff;
-    --text:#000000; --muted:#555555; --marquee:#000000;
-  }
-  :root[data-theme="ebook"] *{animation:none!important;transition:none!important;text-shadow:none!important;backdrop-filter:none!important}
-  :root[data-theme="ebook"] body{background:#fff!important}
-  :root[data-theme="ebook"] .panel,
-  :root[data-theme="ebook"] .status,
-  :root[data-theme="ebook"] .icon-btn{background:#fff;box-shadow:none}
-  :root[data-theme="ebook"] .cell{box-shadow:none;border-width:2px}
-  :root[data-theme="ebook"] .cell .daub{display:none}
-  :root[data-theme="ebook"] .cell.marked{background:#000;border-color:#000}
-  :root[data-theme="ebook"] .cell.marked .num{color:#fff;transform:none}
-  :root[data-theme="ebook"] .cell.inline{box-shadow:inset 0 0 0 3px #fff;border-color:#000}
-  :root[data-theme="ebook"] .seg{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .seg button.on{background:#000;color:#fff}
-  :root[data-theme="ebook"] .btn.primary{background:#000;color:#fff}
-  :root[data-theme="ebook"] .btn.ghost,
-  :root[data-theme="ebook"] .mini{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .marquee .bulb{color:#bbb;opacity:1}
-  :root[data-theme="ebook"] .marquee .bulb.lit{color:#000;transform:none}
-  :root[data-theme="ebook"] .veil{background:rgba(255,255,255,.9)}
-  :root[data-theme="ebook"] .win-card{background:#fff;border:2px solid #000}
-  :root[data-theme="ebook"] .win-card .word{background:none;color:#000;-webkit-text-fill-color:#000}
-  :root[data-theme="ebook"] .cell.empty-cell{background:#fff;border:2px dashed #999;color:#999}
-
 
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   /* 隱藏捲軸(手機往下滑不再出現白色位置索引條),仍可正常捲動 */
@@ -183,7 +154,7 @@
   .icon-btn:active{transform:scale(.94)}
   .icon-btn.active{background:var(--accent);border-color:var(--accent)}
   .icon-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
-  :root[data-theme="ebook"] .icon-btn.active{background:#000;border-color:#000}
+
   .icon-btn:focus-visible,.btn:focus-visible,.cell:focus-visible,.mini:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
 
   /* ---------- Panel ---------- */
@@ -206,7 +177,7 @@
   .seg.readonly button{cursor:default}
   .seg.readonly button:not(.on){opacity:.32}
   .seg.readonly button.on{background:rgba(0,0,0,.16);color:var(--text);box-shadow:none}
-  :root[data-theme="ebook"] .seg.readonly button.on{background:#eee;color:#000}
+
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
 
@@ -220,7 +191,6 @@
   .stepper-bar .mini{flex:0 0 auto;width:56px;height:auto;min-height:34px;border:0;background:transparent;border-radius:9px;font-size:20px}
   .stepper-bar .mini:hover{background:rgba(255,255,255,.08)}
   .stepper-bar .target-val{flex:1;font-size:20px}
-  :root[data-theme="ebook"] .stepper-bar{background:#fff;border:1px solid #000}
 
   /* .row 保留給房間橫幅(mpBar)使用 */
   .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
@@ -328,7 +298,7 @@
   .win-champ .champ-name{font-family:'Fredoka';font-weight:700;font-size:clamp(24px,8vw,34px);color:var(--accent);
     max-width:100%;overflow-wrap:anywhere}
   .win-champ .champ-goal{font-size:12.5px;font-weight:800;color:var(--muted);opacity:.85}
-  :root[data-theme="ebook"] .win-champ .champ-name{color:#000}
+
   .win-scores{width:100%;display:flex;flex-direction:column;gap:6px;margin:0 0 20px}
   .win-scores .ws-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;
     background:rgba(255,255,255,.08);border:1px solid var(--panel-line);font-weight:800;font-size:15px}
@@ -340,9 +310,7 @@
   /* 搶勝模式:排行頂端的「🎯 搶 N 勝」小標,點出這局在拼幾勝 */
   .win-scores .ws-goal{font-family:'Fredoka';font-weight:700;font-size:14px;color:var(--accent-2);
     text-align:center;margin:-2px 0 2px}
-  :root[data-theme="ebook"] .win-scores .ws-goal{color:#000}
-  :root[data-theme="ebook"] .win-scores .ws-row{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .win-scores .ws-row.lead{background:#000;color:#fff}
+
   /* 猜拳/揭曉蓋板:比勝利卡稍寬,容得下橫排手勢卡 */
   .mp-veil-card{max-width:min(92vw,440px)}
   .mp-veil-title{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:8px}
@@ -368,8 +336,7 @@
     font-family:'Fredoka';font-weight:700;font-size:16px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
   :root[data-theme="midnight"] .peek-reopen,
   :root[data-theme="arcade"] .peek-reopen{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .peek-link{color:#555}
-  :root[data-theme="ebook"] .peek-reopen{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
+
   canvas.confetti{position:fixed;inset:0;pointer-events:none;z-index:60}
   /* 房主移出玩家:確認小卡 */
   .confirm-card{max-width:340px}
@@ -377,7 +344,6 @@
   .confirm-title{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:8px}
   .btn.danger{background:#e03131;color:#fff}
   .btn.danger:hover{filter:brightness(1.08)}
-  :root[data-theme="ebook"] .btn.danger{background:#000;color:#fff;border:1px solid #000}
 
   /* ---------- Settings sheet ---------- */
   .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
@@ -401,7 +367,6 @@
     padding:0;transition:transform .12s}
   .swatch:hover{transform:scale(1.12)}
   .swatch.on{border-color:var(--text);box-shadow:0 0 0 2px var(--accent)}
-  .swatches.locked{opacity:.3;pointer-events:none}
   .switch{width:52px;height:30px;border-radius:999px;border:1px solid var(--panel-line);
     background:rgba(255,255,255,.12);cursor:pointer;padding:0;position:relative;transition:background .2s}
   .switch .knob{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
@@ -417,14 +382,7 @@
   .set-select{font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;color:var(--text);
     background:rgba(255,255,255,.12);border:1px solid var(--panel-line);border-radius:12px;
     padding:8px 12px;cursor:pointer;max-width:62%}
-  :root[data-theme="ebook"] .set-select{background:#fff;color:#000;border:1px solid #000}
-  :root[data-theme="ebook"] .set-group{border-color:#000;background:none}
-  :root[data-theme="ebook"] .set-group-title{color:#000}
-  :root[data-theme="ebook"] .set-card{background:#fff;border:2px solid #000}
-  :root[data-theme="ebook"] .switch{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .switch[aria-checked="true"]{background:#000}
-  :root[data-theme="ebook"] .switch .knob{background:#000}
-  :root[data-theme="ebook"] .switch[aria-checked="true"] .knob{background:#fff}
+
   /* 背景音樂音量條 */
   .rng{-webkit-appearance:none;appearance:none;width:132px;height:6px;border-radius:999px;
     background:var(--panel-line);outline:none;cursor:pointer}
@@ -432,10 +390,6 @@
     border-radius:50%;background:var(--accent);border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.3)}
   .rng::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--accent);border:none;cursor:pointer}
   .set-row.dim{opacity:.45}   /* 背景音樂關閉時,音量列淡化 */
-  :root[data-theme="ebook"] .rng{background:#ccc}
-  :root[data-theme="ebook"] .rng::-webkit-slider-thumb{background:#000}
-  :root[data-theme="ebook"] .rng::-moz-range-thumb{background:#000}
-  :root[data-theme="ebook"] .swatch.on{border-color:#000;box-shadow:0 0 0 2px #000}
 
   .hidden{display:none!important}
   /* 房間分頁切換專用:與 .hidden 分開,離開 setup/大廳時各流程仍用 .hidden 做完整隱藏,兩者互不干擾 */
@@ -445,15 +399,14 @@
   .room-tabs button{flex:1;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;
     padding:11px 8px 12px;font-family:'Nunito';font-weight:800;font-size:15.5px;color:var(--muted);cursor:pointer;transition:.15s}
   .room-tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
-  :root[data-theme="ebook"] .room-tabs{border-bottom-color:#000}
-  :root[data-theme="ebook"] .room-tabs button.on{color:#000;border-bottom-color:#000}
+
   /* 填號方式列:移到號碼格下方,寬度對齊;內部就是選項膠囊 .seg */
   #fillRow{width:min(92vw,520px);margin-top:0}
   /* 主要動作列(準備/開始 + 現在該做什麼提示):在 app-shell 裡是 .scroll-area「下方」的固定列,不再 position:fixed 浮蓋內容 */
   .primary-bar{width:min(92vw,520px);display:flex;flex-direction:column;gap:8px;padding-top:4px}
   .action-hint{text-align:center;font-weight:800;font-size:14px;line-height:1.45;color:var(--text);
     background:rgba(0,0,0,.10);border-radius:12px;padding:9px 12px}
-  :root[data-theme="ebook"] .action-hint{background:#fff;border:1px solid #000;color:#000}
+
   /* multiplayer */
   .mp-input{
     flex:1;min-width:0;background:rgba(255,255,255,.12);border:1px solid var(--panel-line);
@@ -478,7 +431,7 @@
   /* 加入房間:外框式次要主鈕,與實心橘色的「建立房間」明顯區分 */
   .btn.outline{background:transparent;border:2px solid var(--accent);color:var(--accent)}
   .btn.outline:not(:disabled):hover{background:rgba(255,255,255,.06)}
-  :root[data-theme="ebook"] .btn.outline{border-color:#000;color:#000}
+
   .btn:disabled,.btn[disabled]{opacity:.42;cursor:not-allowed;transform:none;box-shadow:none}
   .btn:disabled:hover,.btn[disabled]:hover{transform:none;background:transparent}
   .room-list{display:flex;flex-direction:column;gap:8px}
@@ -510,21 +463,14 @@
   .room-item .busy-tag{flex:none;display:inline-flex;align-items:center;gap:4px;padding:8px 13px;border-radius:999px;
     background:rgba(255,255,255,.08);border:1px solid var(--panel-line);color:var(--muted);font-size:13px;font-weight:800;white-space:nowrap}
   .room-empty{color:var(--muted);font-size:13px;padding:6px 2px}
-  :root[data-theme="ebook"] .room-item{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .room-item .meta{color:#555}
-  :root[data-theme="ebook"] .room-item .host{color:#000}
-  :root[data-theme="ebook"] .room-group.joinable .room-group-title{color:#000}
-  :root[data-theme="ebook"] .room-group.joinable .room-group-title .gt-dot{background:#000;box-shadow:none}
-  :root[data-theme="ebook"] .room-item.joinable{background:#fff;border:2px solid #000}
-  :root[data-theme="ebook"] .room-item .join-cta{background:#000;color:#fff}
-  :root[data-theme="ebook"] .room-item .busy-tag{background:#eee;border:1px solid #999;color:#555}
+
   /* 加入區:即時偵測膠囊 + 重新偵測鈕同一列 */
   .mp-detect-row{display:flex;align-items:center;gap:8px;margin:0 2px}
   .mp-detect-row .mp-live{flex:1;justify-content:flex-start;margin:0}
   .mp-rescan{flex:none;width:40px;height:38px;border:1px solid var(--panel-line);border-radius:12px;
     background:rgba(255,255,255,.06);color:var(--muted);font-size:18px;cursor:pointer;display:grid;place-items:center;transition:.15s}
   .mp-rescan:hover{background:rgba(255,255,255,.12);color:var(--text);border-color:var(--accent)}
-  :root[data-theme="ebook"] .mp-rescan{background:#fff;border:1px solid #000;color:#000}
+
   /* 大廳即時房間狀態膠囊:一眼看出現在有沒有人開房,不必一直按🔍 */
   .mp-live{display:inline-flex;align-items:center;gap:9px;max-width:100%;margin:0 2px;
     padding:8px 14px;border-radius:999px;background:rgba(255,255,255,.06);
@@ -535,7 +481,7 @@
   .mp-live[data-state="busy"]{color:var(--accent-2)}
   .mp-live[data-state="error"]{color:var(--daub)}
   @keyframes mpPulse{0%{box-shadow:0 0 0 0 currentColor}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
-  :root[data-theme="ebook"] .mp-live{background:#fff;border:1px solid #000}
+
   .mp-status{font-weight:800;font-size:13px;color:var(--accent)}
   .mp-players{display:flex;flex-wrap:wrap;gap:14px 12px;margin-top:12px}
   /* 玩家晶片單列橫向捲動(不換行,大廳/遊戲中都套用,見 renderPlayers)。房間橫幅高度因此固定在
@@ -570,16 +516,14 @@
     box-shadow:0 1px 3px rgba(0,0,0,.28);transition:background .15s,transform .1s}
   .mp-chip .mp-kick svg{display:block}
   .mp-chip .mp-kick:hover{background:#e03131;transform:scale(1.1)}
-  :root[data-theme="ebook"] .mp-chip .mp-kick{background:#000;color:#fff;border:1px solid #000;box-shadow:none}
-  :root[data-theme="ebook"] .mp-chip .mp-kick:hover{background:#333}
+
   .mp-chip .seat-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;
     border-radius:10px;background:var(--accent);color:#1c1008;font-family:'Fredoka';font-weight:700;font-size:12.5px}
   :root[data-theme="midnight"] .mp-chip .seat-badge,
   :root[data-theme="midnight"] .mp-chip .ln,
   :root[data-theme="arcade"] .mp-chip .seat-badge,
   :root[data-theme="arcade"] .mp-chip .ln{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .mp-chip .seat-badge,
-  :root[data-theme="ebook"] .mp-chip .ln{background:#000;color:#fff}
+
   /* 目前輪到的玩家:高對比 + 放大 + 脈動,一眼看出換誰 */
   .mp-chip.turn{background:var(--accent);color:#1c1008;border-color:var(--accent);transform:scale(1.04);
     font-size:15px;animation:turnpulse 1.2s ease-in-out infinite}
@@ -587,16 +531,12 @@
   .mp-chip.turn .ln{background:#1c1008;color:var(--accent)}   /* 輪到時晶片底色是 accent,線數膠囊反白成深底亮字才看得清 */
   .mp-chip.turn .seat-badge{background:#1c1008;color:var(--accent)}
   @keyframes turnpulse{0%,100%{box-shadow:0 0 0 2px var(--accent)}50%{box-shadow:0 0 0 2px var(--accent),0 0 16px var(--accent)}}
-  :root[data-theme="ebook"] .mp-chip.turn{background:#000;color:#fff}
-  :root[data-theme="ebook"] .mp-chip.turn .dot{background:#fff}
-  :root[data-theme="ebook"] .mp-chip.turn .ln{background:#fff;color:#000}
-  :root[data-theme="ebook"] .mp-chip.turn .seat-badge{background:#fff;color:#000}
+
   /* 連線計分:玩家晶片上的累積勝場徽章 🏆N(只在有分數時顯示) */
   .mp-chip .score-badge{display:inline-flex;align-items:center;gap:1px;margin-left:2px;
     font-family:'Fredoka';font-weight:700;font-size:12.5px;color:var(--accent-2)}
   .mp-chip.turn .score-badge{color:#1c1008}
-  :root[data-theme="ebook"] .mp-chip .score-badge{color:#000}
-  :root[data-theme="ebook"] .mp-chip.turn .score-badge{color:#fff}
+
   /* 連線計分附加設定(搶勝目標 stepper + 重設戰績):改成上下留白的直式排列,不再擠成一行 */
   .score-extra{display:flex;flex-direction:column;gap:12px;margin-top:12px}
   .score-extra .wg-group{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
@@ -616,9 +556,7 @@
     padding:10px 22px;font-size:13.5px;font-weight:800;border-radius:11px;cursor:pointer;
     background:transparent;border:1px solid var(--panel-line);color:var(--muted)}
   .score-extra .score-reset:hover{border-color:var(--accent);color:var(--text)}
-  :root[data-theme="ebook"] .score-extra .wg-group{background:#f0f0f0}
-  :root[data-theme="ebook"] .score-extra .wg-stepper{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .score-extra .score-reset{border:1px solid #000;color:#000}
+
   /* 叫號框(連線遊戲 HUD):整體再調小一點,替號碼格多擠出縱向空間,避免盤面被擠到要上下捲 */
   .mp-play{
     width:min(92vw,520px);display:flex;align-items:center;gap:12px;flex-wrap:wrap;
@@ -634,8 +572,7 @@
   .mp-turn{margin-left:auto;text-align:center;font-weight:800;font-size:13px;color:var(--accent);
     background:rgba(0,0,0,.16);padding:6px 12px;border-radius:999px}
   .mp-turn.wait{color:var(--muted)}
-  :root[data-theme="ebook"] .mp-ball{box-shadow:none;border:1px solid #000}
-  :root[data-theme="ebook"] .mp-turn{background:#fff;border:1px solid #000}
+
   .cell.callable{box-shadow:0 0 0 3px var(--accent) inset;cursor:pointer}
   .mp-panel{
     width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
@@ -680,12 +617,7 @@
   .reveal-champ{font-weight:900;font-size:15px;line-height:1.35}
   .reveal-champ .nm{color:var(--accent);font-size:24px;font-weight:900;word-break:break-word}
   .reveal-seq{color:var(--muted);font-size:13px;font-weight:700;margin-top:6px}
-  :root[data-theme="ebook"] .reveal-hand{background:#fff;border:2px solid #000}
-  :root[data-theme="ebook"] .reveal-hand.win{background:#000;color:#fff}
-  :root[data-theme="ebook"] .reveal-hand.win .rk,
-  :root[data-theme="ebook"] .reveal-hand.win .nm,
-  :root[data-theme="ebook"] .reveal-hand.win .txt{color:#fff}
-  :root[data-theme="ebook"] .reveal-champ .nm{color:#000}
+
   /* 「你」徽章:醒目膠囊,晶片/揭曉/名單一眼認出自己 */
   .you-badge{display:inline-block;background:var(--accent-2);color:#1c1008;font-family:'Fredoka';
     font-weight:700;font-size:11px;line-height:1;padding:3px 8px;border-radius:999px;margin-left:6px;
@@ -693,7 +625,7 @@
   .reveal-hand .you-badge{position:absolute;top:-9px;right:-6px;margin:0;font-size:10.5px;padding:3px 8px}
   :root[data-theme="midnight"] .you-badge,
   :root[data-theme="arcade"] .you-badge{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .you-badge{background:#000;color:#fff}
+
   .order-list{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
   .order-item{
     display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.10);
@@ -707,19 +639,7 @@
     background:rgba(255,255,255,.12);color:var(--text);cursor:pointer;font-size:14px;
   }
   .order-item .mv button:disabled{opacity:.3;cursor:default}
-  :root[data-theme="ebook"] .mp-input,
-  :root[data-theme="ebook"] .mp-chip,
-  :root[data-theme="ebook"] .mp-play{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .mp-status{color:#000}
-  :root[data-theme="ebook"] .mp-chip.ready .dot{background:#000}
-  :root[data-theme="ebook"] .mp-panel,
-  :root[data-theme="ebook"] .rps-btn,
-  :root[data-theme="ebook"] .order-item,
-  :root[data-theme="ebook"] .order-item .mv button{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .mp-turn,
-  :root[data-theme="ebook"] .order-item .seat{color:#000}
-  :root[data-theme="ebook"] .rps-btn.chosen{background:#000;color:#fff}
-  :root[data-theme="ebook"] .cell.callable{box-shadow:0 0 0 3px #000 inset}
+
   /* ---------- 好友互動表情 ---------- */
   /* 互動鈕已改放右上工具列(.tools),不再用浮動鈕,盤面數字不會被蓋到 */
   /* 寬度依解析度放大(v1.70.2):窄螢幕維持原本的「填滿扣掉 .veil 那 20px 邊」,寬螢幕才放到 460px
@@ -737,7 +657,7 @@
     cursor:pointer;display:grid;place-items:center;transition:background .15s,transform .1s}
   .card-x:hover{background:rgba(255,255,255,.22);transform:scale(1.06)}
   .card-x:active{transform:scale(.9)}
-  :root[data-theme="ebook"] .card-x{background:#fff;border:1px solid #000}
+
   .emote-card .set-head{padding:0 34px}   /* 標題兩側留空,長名字不會被 ✕ 蓋到 */
   .emote-to{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
   .emote-to-btn{border:1px solid var(--panel-line);background:rgba(255,255,255,.10);color:var(--text);
@@ -746,8 +666,7 @@
   .emote-to-btn.on{background:var(--accent);color:#1c1008;border-color:var(--accent)}
   :root[data-theme="midnight"] .emote-to-btn.on,
   :root[data-theme="arcade"] .emote-to-btn.on{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .emote-to-btn{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .emote-to-btn.on{background:#000;color:#fff}
+
   .emote-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
   .emote-btn{aspect-ratio:1;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);
     border-radius:12px;font-size:clamp(26px,3vw,36px);line-height:1;cursor:pointer;display:grid;place-items:center;transition:transform .1s,background .15s;
@@ -765,7 +684,7 @@
   /* ↑ 表情格是 aspect-ratio:1,卡片變寬 → 6 格跟著變大;字級不跟著長就會變成「大方框裝小 emoji」 */
   .emote-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .emote-btn:active{transform:scale(.9)}
-  :root[data-theme="ebook"] .emote-btn{background:#fff;border:1px solid #000}
+
   /* 罐頭文字訊息(一句話) */
   .emote-sub{font-family:'Nunito',sans-serif;font-weight:800;font-size:12px;color:var(--muted);letter-spacing:.3px;margin:16px 0 8px}
   .emote-phrases{display:flex;flex-wrap:wrap;gap:8px}
@@ -776,10 +695,10 @@
     /* 不設 touch-action:none、但要設 user-select:none / touch-callout:none,理由同上 .emote-btn 那則註解 */
   .phrase-btn:hover{transform:translateY(-2px);background:rgba(255,255,255,.18)}
   .phrase-btn:active{transform:scale(.94)}
-  :root[data-theme="ebook"] .phrase-btn{background:#fff;border:1px solid #000}
+
   .clip-btn{background:rgba(120,190,255,.14)}                                   /* 語音短訊:藍調底色,與「一句話」稍作區隔 */
   .clip-btn:hover{background:rgba(120,190,255,.26)}
-  :root[data-theme="ebook"] .clip-btn{background:#fff;border:1px solid #000}
+
   /* 罐頭面板拖曳排序(v1.128.0):拖曳中用 inline transform 跟著手指走(壓過上面 :hover/:active 那兩條),
      加陰影 + 半透明 + z-index 讓「正在拖哪一顆」一眼可辨。四個罐頭區塊(.emote-btn / .phrase-btn 系列)共用。 */
   .pd-drag{position:relative;z-index:50;opacity:.92;box-shadow:0 6px 16px rgba(0,0,0,.35);cursor:grabbing;transition:none!important}
@@ -791,7 +710,7 @@
   #emoteText:focus{border-color:var(--accent)}
   /* 覆蓋 .set-card .btn 的 width:100%/margin-top,讓送出鈕縮成內容寬、與輸入框同排對齊 */
   .emote-card #emoteSend{flex:0 0 auto;width:auto;margin-top:0;padding:11px 20px;font-size:14px}
-  :root[data-theme="ebook"] #emoteText{background:#fff;border:1px solid #000}
+
   /* 錄音中脈動動畫:表情面板內的錄音鈕已移除,此 keyframe 仍供房間框的快速語音鈕 .quick-voice.rec 使用 */
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
   /* (v1.36.2:獨立的「換一組」鈕已移除 —— 改由「🎲 自動填號」選中後變成「🎲 換一組號碼」再按一次,
@@ -813,15 +732,13 @@
   .quick-voice:disabled{opacity:.6;cursor:default}
   :root[data-theme="midnight"] .quick-voice,:root[data-theme="midnight"] .mp-act-btn,
   :root[data-theme="arcade"] .quick-voice,:root[data-theme="arcade"] .mp-act-btn{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .quick-voice,:root[data-theme="ebook"] .mp-act-btn{background:#fff;border:1px solid #000;color:#000}
-  :root[data-theme="ebook"] .quick-voice.rec{background:#000;color:#fff}
 
   /* 房間框副標列:狀態文字(輪到誰 / 等待中)+ 目標線數 🎯N線 */
   .mp-subrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
   .mp-subrow .mp-status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mp-goal{flex:none;font-weight:800;font-size:13px;color:var(--accent-2)}
   .mp-status.wait{color:var(--muted)}
-  :root[data-theme="ebook"] .mp-goal{color:#000}
+
   /* 「🔊 點我播放語音」膠囊:收到語音但音訊未解鎖(iOS 切背景回來)時浮在頂端中央,點一下(手勢)喚醒並補播 */
   .voice-gate{position:fixed;z-index:66;left:50%;top:calc(10px + env(safe-area-inset-top));transform:translateX(-50%);
     display:inline-flex;align-items:center;gap:6px;max-width:92vw;
@@ -833,7 +750,7 @@
   @keyframes voiceGateIn{from{opacity:0;transform:translateX(-50%) translateY(-12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
   :root[data-theme="midnight"] .voice-gate,
   :root[data-theme="arcade"] .voice-gate{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .voice-gate{background:#000;color:#fff;box-shadow:none}
+
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
   /* --ef-dx / --ef-dur 由 showEmote 逐則寫入(發位越外側漂越多、時長微擾),沒寫時就是原本的正中央 2.2s */
   .emote-fly{position:absolute;--ef-dx:0px;transform:translate(-50%,-50%);display:flex;flex-direction:column;
@@ -847,7 +764,7 @@
     white-space:nowrap;line-height:1.25;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
   :root[data-theme="midnight"] .emote-fly.is-text .ef-emo,
   :root[data-theme="arcade"] .emote-fly.is-text .ef-emo{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .emote-fly.is-text .ef-emo{background:#fff;color:#000;border:1px solid #000}
+
   /* 語音訊息飛出時:麥克風圖示輕微脈動,暗示正在播放 */
   .emote-fly.is-voice .ef-emo{animation:voicePulse .55s ease-in-out infinite alternate}
   @keyframes voicePulse{from{transform:scale(1)}to{transform:scale(1.14)}}
@@ -862,7 +779,7 @@
     32%{transform:translate(calc(-50% + var(--ef-dx) * .35),-140%) scale(1)}
     100%{opacity:0;transform:translate(calc(-50% + var(--ef-dx)),-360%) scale(1)}
   }
-  :root[data-theme="ebook"] .emote-fly .ef-cap{background:#000}
+
   #toast{
     position:fixed;top:68px;left:50%;transform:translateX(-50%) translateY(-14px);
     background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-weight:600;
@@ -871,11 +788,11 @@
     box-shadow:0 6px 18px rgba(0,0,0,.25);
   }
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-  :root[data-theme="ebook"] #toast{background:#000;color:#fff;box-shadow:none;border:1px solid #000}
+
   /* 設定頁最下面的版本 + 開發者(取代原本主畫面的 footer) */
   .set-foot{margin-top:14px;text-align:center;color:var(--muted);opacity:.7;
     font-size:12px;font-weight:700;letter-spacing:.02em}
-  :root[data-theme="ebook"] .set-foot{color:#000;opacity:.6}
+
   /* 主選單(進場先選單機 / 連線) */
   #home{text-align:center;padding-top:8px}
   /* 進場插圖區:數值與數獨的 .sdk-hero / .sdk-art 對齊(96×116 的卡片在 96px 寬時高度 ≈ 92px,
@@ -889,11 +806,7 @@
   .home-art .bc-cell{fill:rgba(255,255,255,.06);stroke:var(--panel-line);stroke-width:1}
   .home-art .bc-daub{fill:var(--accent-2)}
   .home-art .bc-star{fill:var(--accent)}
-  :root[data-theme="ebook"] .home-art .bc-card{fill:#fff;stroke:#000}
-  :root[data-theme="ebook"] .home-art .bc-hd{fill:#000}
-  :root[data-theme="ebook"] .home-art .bc-cell{fill:#fff;stroke:#000}
-  :root[data-theme="ebook"] .home-art .bc-daub{fill:#000}
-  :root[data-theme="ebook"] .home-art .bc-star{fill:#000}
+
   /* 註:第二層原本還有一個 .home-title 的巨大「BINGO」,已移除 —— 頂列跑馬燈就是 BINGO,
      同一頁不需要第二個;拿掉後版面也與數獨的「選擇玩法」一致(插圖 + 一行說明 + 兩顆鈕) */
   .home-tagline{color:var(--muted);font-weight:700;margin-top:10px;font-size:15px}
@@ -957,7 +870,6 @@
   .svs-stale{margin-top:6px;font-size:12px;color:var(--muted);max-height:88px;overflow-y:auto;line-height:1.6}
   .svs-row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .svs-row .btn.ghost{width:auto;margin-top:0;padding:7px 12px;font-size:13px}
-  :root[data-theme="ebook"] .svs-row{border-color:#000}
 
   /* ==========================================================================
      五子棋(gomoku.html 專用) — v1.37.0
@@ -974,7 +886,6 @@
   :root[data-theme="bubblegum"]{ --gmk-wood:#fff0f8; --gmk-line:rgba(150,70,130,.4); --gmk-star:rgba(150,70,130,.65); --gmk-edge:rgba(150,70,130,.22); --gmk-frame:#c07aa8; }
   :root[data-theme="meadow"]{ --gmk-wood:#e6dfb8; --gmk-line:rgba(40,66,36,.5); --gmk-star:rgba(40,66,36,.72); --gmk-edge:rgba(40,66,36,.26); --gmk-frame:#5d7038; }
   :root[data-theme="arcade"]{ --gmk-wood:#0d0d12; --gmk-line:rgba(255,230,0,.3); --gmk-star:rgba(255,230,0,.55); --gmk-edge:rgba(255,230,0,.18); --gmk-frame:#6b6220; }
-  :root[data-theme="ebook"]{ --gmk-wood:#ffffff; --gmk-line:#000000; --gmk-star:#000000; --gmk-edge:#000000; --gmk-frame:#000000; }
 
   /* 大廳的捲動區撐滿剩餘高度,讓「準備好了」鈕固定在畫面最底 —— 與對戰中的「認輸」鈕同位置,
      切換相位時按鈕不會跳。★ 只能用 .gmk-* class 選擇器:若寫成 #scrollArea 就會連 Bingo 一起改到。 */
@@ -1050,9 +961,6 @@
   .gmk-ghost{position:absolute;width:calc(var(--gcell,40px) * .88);height:calc(var(--gcell,40px) * .88);
     border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;opacity:.34;display:none}
   .gmk-ghost.show{display:block}
-  :root[data-theme="ebook"] .gmk-stone.b{background:#000;box-shadow:none}
-  :root[data-theme="ebook"] .gmk-stone.w{background:#fff;box-shadow:inset 0 0 0 2px #000}
-  :root[data-theme="ebook"] .gmk-stone.win{box-shadow:inset 0 0 0 2px #000, 0 0 0 3px #000}
 
   /* 縮放列:浮在舞台右下 */
   .gmk-zoom{position:absolute;right:8px;bottom:8px;z-index:3;display:flex;flex-direction:column;gap:6px}
@@ -1062,7 +970,6 @@
   .gmk-zoom button:active{transform:scale(.9)}
   .gmk-zoom button:disabled{opacity:.35;cursor:default}
   :root[data-theme="bubblegum"] .gmk-zoom button{background:rgba(255,255,255,.55)}
-  :root[data-theme="ebook"] .gmk-zoom button{background:#fff;border:1px solid #000;color:#000;backdrop-filter:none}
 
   /* 輪到誰:浮在舞台上緣的小膠囊(取代 Bingo 的副標列文字) */
   .gmk-turn{position:absolute;left:50%;top:8px;transform:translateX(-50%);z-index:3;
@@ -1074,8 +981,7 @@
   @keyframes gmkTurnPulse{ 0%,100%{transform:translateX(-50%) scale(1)} 50%{transform:translateX(-50%) scale(1.045)} }
   :root[data-theme="midnight"] .gmk-turn.mine,:root[data-theme="arcade"] .gmk-turn.mine{color:var(--daub-ink)}
   :root[data-theme="bubblegum"] .gmk-turn{background:rgba(255,255,255,.6)}
-  :root[data-theme="ebook"] .gmk-turn{background:#fff;border:1px solid #000;color:#000;backdrop-filter:none}
-  :root[data-theme="ebook"] .gmk-turn.mine{background:#000;color:#fff}
+
   /* 棋子色小圖示(⚫/⚪ 用實心圓畫,不靠 emoji 避免各平台字型差異) */
   .gmk-dot{width:13px;height:13px;border-radius:50%;flex:none;display:inline-block}
   .gmk-dot.b{background:#111;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
@@ -1112,7 +1018,6 @@
     transition:transform .1s,background .15s}
   .gmk-resign:hover{background:rgba(255,90,90,.28)}
   .gmk-resign:active{transform:scale(.94)}
-  :root[data-theme="ebook"] .gmk-resign{background:#fff;border:1px solid #000;color:#000}
 
   /* ---------- 結果卡(五子棋,v1.41.0) ----------
      問題:`.win-card .word` 不論輸贏都是同一組金色漸層,「你輸了」看起來跟「你贏了」一樣喜氣,
@@ -1137,15 +1042,12 @@
   .gmk-win.win .gmk-winner .gw-tag{color:#1c1008;opacity:.75}
   :root[data-theme="midnight"] .gmk-win.win .gmk-winner,
   :root[data-theme="arcade"] .gmk-win.win .gmk-winner{color:var(--daub-ink)}
-  :root[data-theme="ebook"] .gmk-winner{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .gmk-win.win .gmk-winner{background:#000;color:#fff}
-  :root[data-theme="ebook"] .gmk-win.win .gmk-winner .gw-tag{color:#fff}
+
   /* 排行榜上本局 +1 的人(把「分數怎麼變的」講出來,而不是只給一個總數) */
   .win-scores .gw-plus{flex:none;font-family:'Fredoka',sans-serif;font-weight:700;font-size:12.5px;
     padding:2px 7px;border-radius:999px;background:var(--accent-2);color:#1c1008}
   .win-scores .ws-row.lead .gw-plus{background:#1c1008;color:var(--accent)}
-  :root[data-theme="ebook"] .win-scores .gw-plus{background:#000;color:#fff}
-  :root[data-theme="ebook"] .win-scores .ws-row.lead .gw-plus{background:#fff;color:#000}
+
   /* 賽後表情列:一鍵送給全部人,最後一顆 😀 開完整面板。
      只放 4 顆快捷 + 😀 —— 卡片內寬最窄約 260px(360px 手機),再多一顆就會換行、剩 😀 孤零零在第二排 */
   .gmk-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 18px}
@@ -1158,8 +1060,6 @@
   .gmk-react.more{background:var(--accent);border-color:var(--accent);color:#1c1008}
   .gmk-react.sent{animation:gmkReactPop .32s ease-out}
   @keyframes gmkReactPop{ 0%{transform:scale(1)} 40%{transform:scale(1.35)} 100%{transform:scale(1)} }
-  :root[data-theme="ebook"] .gmk-react{background:#fff;border:1px solid #000;color:#000}
-  :root[data-theme="ebook"] .gmk-react.more{background:#000;color:#fff}
 
   /* 玩家晶片裡的執子標示:實心棋子 + 「黑 / 白」兩個字,直接貼在名字前面。
      原本只有一顆 13px 小圓點,黑底主題下幾乎看不出誰是誰(v1.40.0) */
@@ -1172,8 +1072,6 @@
   .gmk-seat.w{background:#f4f1ea;color:#1c1008}
   .gmk-seat.w i{background:radial-gradient(circle at 34% 28%,#ffffff 0%,#f2ede4 45%,#c3bcb0 100%);
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.32)}
-  :root[data-theme="ebook"] .gmk-seat.b{background:#000;color:#fff}
-  :root[data-theme="ebook"] .gmk-seat.w{background:#fff;color:#000;box-shadow:inset 0 0 0 1px #000}
 
   /* 五子棋頂列標題(取代 BINGO 跑馬燈) */
   .gmk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
@@ -1197,7 +1095,7 @@
   .home-pick-title{font-family:'Fredoka';font-weight:700;font-size:clamp(26px,8vw,36px);line-height:1.1;
     background:linear-gradient(135deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .home-pick-title{background:none;color:#000;-webkit-text-fill-color:#000}
+
   .home-pick-head .home-tagline{margin-top:8px}
 
   /* ---------- 精簡首頁(v1.89.0):一行兩張卡,只有插圖 + 名稱 ----------
@@ -1240,7 +1138,6 @@
   .gc-name{font-size:15.5px;font-weight:700;line-height:1.15;letter-spacing:0}
   /* 即時徽章在窄卡裡要跟著居中(它自己那條是 align-self:flex-start,給一列一張的版型用的) */
   .gc-body .hl-badge{align-self:center}
-  :root[data-theme="ebook"] .game-card{background:#fff;border:1px solid #000}
 
   /* 熱門度排名徽章(v1.112.0):1~10,數字小的排前面(= 大家真的玩得最多的那幾個)。
      編號文字與先後都由 js/home-live.js 的 applyRank() 寫進去(style.order + 這顆的文字),
@@ -1261,15 +1158,12 @@
   .gc-rank[data-top="1"]{background:rgba(250,204,21,.22);color:#facc15}
   .gc-rank[data-top="2"]{background:rgba(203,213,225,.24);color:#cbd5e1}
   .gc-rank[data-top="3"]{background:rgba(251,146,60,.20);color:#fb923c}
-  :root[data-theme="ebook"] .gc-rank{background:#eee;border:1px solid #999;color:#000}
 
   /* 五子棋卡的小棋盤插圖(沿用棋盤那組 --gmk-* 配色,主題會一起變) */
   .gk-art .gk-bd{fill:var(--gmk-wood);stroke:var(--gmk-frame);stroke-width:2}
   .gk-art .gk-ln path{stroke:var(--gmk-line);stroke-width:1;fill:none}
   .gk-art .gk-b{fill:#141414}
   .gk-art .gk-w{fill:#fff;stroke:rgba(0,0,0,.35);stroke-width:.7}
-  :root[data-theme="ebook"] .gk-art .gk-b{fill:#000}
-  :root[data-theme="ebook"] .gk-art .gk-w{fill:#fff;stroke:#000;stroke-width:1.2}
 
   /* 選遊戲主選單的頂列品牌字(取代 B-I-N-G-O 跑馬燈,見 index.html #brandHome)。
      漸層與 .home-pick-title / .sdk-brand 同一組,字級對齊五子棋 .gmk-brand,三頁頂列高度才一致。 */
@@ -1279,7 +1173,6 @@
     line-height:1;display:inline-flex;align-items:flex-end;min-height:clamp(28px,9vw,44px);
     background:linear-gradient(135deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .home-brand{background:none;color:#000;-webkit-text-fill-color:#000}
 
   /* 第二層(選玩法)的返回列 */
   .home-sub-head{display:flex;align-items:center;gap:10px;text-align:left}
@@ -1336,24 +1229,18 @@
   :root[data-theme="arcade"]{ --sdk-paper:#0e0e12; --sdk-line:rgba(255,230,0,.18); --sdk-thick:rgba(255,230,0,.5);
          --sdk-given:#f5f5f5; --sdk-sel:rgba(255,230,0,.24); --sdk-peer:rgba(255,230,0,.08);
          --sdk-same:rgba(255,45,85,.26); --sdk-note:rgba(245,245,245,.45); }
-  :root[data-theme="ebook"]{ --sdk-paper:#ffffff; --sdk-line:#999999; --sdk-thick:#000000;
-         --sdk-given:#000000; --sdk-sel:#dddddd; --sdk-peer:#f2f2f2;
-         --sdk-same:#e6e6e6; --sdk-note:#666666; }
 
   /* 玩家顏色:六人各一色(v1.47.0 由四色擴到六色),刻意不用主題變數 —— 不同主題下也要能穩定分辨誰是誰。
-     選色被兩件事同時夾住:同一組變數會畫在**淺色紙面**(sunset/bubblegum/meadow/ebook 的盤面數字)
+     選色被兩件事同時夾住:同一組變數會畫在**淺色紙面**(sunset/bubblegum/meadow 的盤面數字)
      也會畫在**深色面板**(色點、HUD 進度條),所以只能取中明度。
      · 避開黃色帶:黃色明度天生高,放在近白的紙面上等於消失(這也是六色不能均分色相環的原因)
      · 六個色相繞一圈散開:橘 22° → 綠 131° → 青 172° → 藍 218° → 紫 270° → 粉 337°
      · 前四個維持原本的橘/藍/綠/紫,2~4 人的觀感不變;青與粉是這次新增的 */
   :root{ --sp0:#ff7a33; --sp1:#3d8bff; --sp2:#3fc45a; --sp3:#b06bff; --sp4:#ff4d8d; --sp5:#00bfa8; }
-  /* e-ink 只有灰階可用:六階等距拉開。最淺的兩階靠色點自己的黑框(見 .sdk-seat)才站得住 */
-  :root[data-theme="ebook"]{ --sp0:#000; --sp1:#3a3a3a; --sp2:#6b6b6b; --sp3:#949494; --sp4:#b8b8b8; --sp5:#d8d8d8; }
 
   .sdk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .sdk-brand{background:none;color:#000;-webkit-text-fill-color:#000}
 
   .sdk-scroll{flex:1 1 auto}
   /* 註:進場選單原本用 margin:auto 垂直居中,已拿掉 —— 三個遊戲的進場畫面一律貼齊頂列下方
@@ -1373,9 +1260,9 @@
         沒有任何陰影 / 濾鏡。⚠ 格縫 0.9 / **宮縫 1.8**(6×6 盤面的宮是 2×2)是一組數字,
         改一個就要重算 x/y 那六個座標(格寬 = (48 − 2×1.8 − 3×0.9) / 6 = 6.95)。
      ⚠⚠ 材質色**刻意不吃 `--sdk-*` 主題變數**(那組會讓 midnight 變深藍紙、arcade 變黑紙):
-        它與 `--sv-face`(撲克)/ 麻將牌面同一個路線 —— **實體材質在每個主題下都長一樣**,
-        只有電子書主題覆寫成黑白。⚠ ebook 的格縫靠 `--sk-well:#000` 撐出來(白格子 + 黑縫),
-        不是給格子加 stroke(36 個 rect 各描一次邊,線寬在 44px 下會糊成一團)。
+        它與 `--sv-face`(撲克)/ 麻將牌面同一個路線 —— **實體材質在每個主題下都長一樣**。
+        格縫靠顏色對比撐出來(見下面 `--sk-well`),不是給格子加 stroke(36 個 rect 各描一次邊,
+        線寬在 44px 下會糊成一團)。
      ⚠ 6×6 盤面**只能用 1~6**:舊插圖寫了 7 與 9(遊戲裡不可能出現),這一版順手改對,
        而且九個數字擺成同列 / 同行 / 同宮都不重複的合法局面。
      ⚠⚠ 三個「放大截圖才看得出來」的調整(第一版三樣都不及格,而 DOM 量起來完全正常):
@@ -1390,9 +1277,7 @@
   :root{ --sk-frame:#cfa86e; --sk-edge:#a3763f; --sk-well:#a2743d; --sk-cell:#f7e9c9;
          --sk-num:#3d3833; --sk-hl:#fffdf2; --sk-hlline:#e8a127;
          --sk-barrel:#d3872a; --sk-shine:#f0b458; --sk-wood:#f6ddb2; --sk-tip:#463d36; }
-  :root[data-theme="ebook"]{ --sk-frame:#ffffff; --sk-edge:#000000; --sk-well:#000000;
-         --sk-cell:#ffffff; --sk-num:#000000; --sk-hl:#dddddd; --sk-hlline:#000000;
-         --sk-barrel:#ffffff; --sk-shine:#ffffff; --sk-wood:#ffffff; --sk-tip:#000000; }
+
   .sk-bd{fill:var(--sk-frame);stroke:var(--sk-edge);stroke-width:1.4}
   .sk-well{fill:var(--sk-well)}
   .sk-c{fill:var(--sk-cell)}
@@ -1405,9 +1290,6 @@
   .sk-wood{fill:var(--sk-wood)}
   .sk-barrel{fill:var(--sk-barrel)}
   .sk-shine{fill:var(--sk-shine);stroke:none}
-  /* ebook:鉛筆變成白底黑線的線稿(不然整支是白的、看不見) */
-  :root[data-theme="ebook"] .sk-pen path,:root[data-theme="ebook"] .sk-pen rect{
-    stroke:#000;stroke-width:.5}
 
   /* ---------- 房間框(比照五子棋的瘦身版:把高度讓給盤面) ---------- */
   .sdk-room{padding:9px 12px}
@@ -1433,10 +1315,9 @@
   .sdk-seat.p0{background:var(--sp0)} .sdk-seat.p1{background:var(--sp1)}
   .sdk-seat.p2{background:var(--sp2)} .sdk-seat.p3{background:var(--sp3)}
   .sdk-seat.p4{background:var(--sp4)} .sdk-seat.p5{background:var(--sp5)}
-  :root[data-theme="ebook"] .sdk-seat{box-shadow:inset 0 0 0 1px #000}
+
   /* 晶片上的即時分數 / 進度 */
   .sdk-pts{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--accent);flex:none}
-  :root[data-theme="ebook"] .sdk-pts{color:#000}
 
   /* ---------- 單機 HUD ---------- */
   .sdk-solobar{padding:9px 12px}
@@ -1458,8 +1339,6 @@
   .sdk-tool:active{transform:scale(.96)}
   .sdk-tool.on{background:var(--accent);border-color:var(--accent);color:#1c1008}
   .sdk-tool:disabled{opacity:.4;cursor:default}
-  :root[data-theme="ebook"] .sdk-tool{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .sdk-tool.on{background:#000;color:#fff}
 
   /* ---------- 盤面 + 鍵盤的整體版面 ----------
      boardbox 吃掉剩餘高度,盤面用 height:min(100%,92vw,460px) 自己夾成正方形 →
@@ -1502,7 +1381,7 @@
   .sdk-cell.filled.p5 .sdk-v{color:var(--sp5)}
   .sdk-cell.filled.me .sdk-v{color:var(--accent)}
   .sdk-cell.filled.hintfill .sdk-v{color:var(--accent-2);font-style:italic}
-  :root[data-theme="ebook"] .sdk-cell.filled .sdk-v{color:#000;text-decoration:underline}
+
   /* 填錯:紅底閃一下再淡出(不留痕跡,錯的數字本來就沒填進去) */
   .sdk-cell.wrong{animation:sdkWrong .6s ease-out}
   @keyframes sdkWrong{ 0%{background:var(--daub)} 60%{background:var(--daub)} 100%{background:transparent} }
@@ -1522,7 +1401,7 @@
      用膠囊底色而不是純文字 —— 選中格本身有底色、旁邊還有同列同行的高亮,
      裸著放一個小數字會跟格子裡填的值糊在一起(而且它不是「這格的答案」,更不能像)。
      配色用 given(題目字色)當底、paper(紙色)當字 —— 這兩個變數每個主題都是一對高對比,
-     反白後在任何主題的盤面上都跳得出來,連 ebook 純黑白也不必特例。外圈再描一圈紙色,
+     反白後在任何主題的盤面上都跳得出來。外圈再描一圈紙色,
      壓在選中格的橘底 / 同列同行高亮上才不會糊掉。 */
   .sdk-cnt{position:absolute;top:2px;right:2px;z-index:2;display:none;
     font-family:'Fredoka',sans-serif;font-weight:700;line-height:1;
@@ -1555,7 +1434,6 @@
   .sdk-kleft{position:absolute;top:3px;right:6px;font-size:10px;font-weight:800;color:var(--muted)}
   .sdk-key.done{opacity:.34}
   .sdk-key.erase .sdk-kn{font-size:19px}
-  :root[data-theme="ebook"] .sdk-key{background:#fff;border:1px solid #000}
 
   /* ---------- 即時比分 HUD(連線對戰中,盤面上方那一列) ---------- */
   .sdk-hud{flex:none;width:100%;display:grid;gap:6px;
@@ -1582,9 +1460,9 @@
   .sdk-hcard.p0 .sdk-bar i{background:var(--sp0)} .sdk-hcard.p1 .sdk-bar i{background:var(--sp1)}
   .sdk-hcard.p2 .sdk-bar i{background:var(--sp2)} .sdk-hcard.p3 .sdk-bar i{background:var(--sp3)}
   .sdk-hcard.p4 .sdk-bar i{background:var(--sp4)} .sdk-hcard.p5 .sdk-bar i{background:var(--sp5)}
-  :root[data-theme="ebook"] .sdk-hcard{background:#fff;border:1px solid #000}
+
   /* e-ink:進度條底色原本是 rgba(0,0,0,.18),最淺的兩階灰(p4/p5)壓上去會整條看不見 → 改白底黑框 */
-  :root[data-theme="ebook"] .sdk-bar{background:#fff;box-shadow:inset 0 0 0 1px #000}
+
   /* 分數變動飄字:計分規則靠回饋教,不靠說明文字去佔盤面上方的版面。
      .sdk-hcard 是 overflow:hidden,所以只在卡片內短距離飄(飄出去會被裁掉)。 */
   .sdk-pop{position:absolute;right:7px;top:6px;pointer-events:none;
@@ -1592,8 +1470,7 @@
     animation:sdkPop .9s ease-out forwards}
   .sdk-pop.up{color:#5fe08a}
   .sdk-pop.down{color:#ff8f8f}
-  :root[data-theme="ebook"] .sdk-pop.up{color:#0a7a3a}
-  :root[data-theme="ebook"] .sdk-pop.down{color:#b00020}
+
   @keyframes sdkPop{
     0%{opacity:0;transform:translateY(6px)}
     22%{opacity:1;transform:translateY(0)}
@@ -1621,7 +1498,7 @@
     padding:7px 13px;display:flex;flex-direction:column;gap:2px;min-width:74px}
   .sdk-stat .ss-k{font-size:11px;color:var(--muted);font-weight:800}
   .sdk-stat .ss-v{font-family:'Fredoka',sans-serif;font-weight:700;font-size:17px;color:var(--text)}
-  :root[data-theme="ebook"] .sdk-stat{background:#fff;border:1px solid #000}
+
   /* 賽後表情列(沿用五子棋的 .gmk-react 外觀,只換容器 class) */
   .sdk-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
   /* 單機 / 連線的結果卡內容切換:單機沒有排行榜與表情,連線沒有單機統計。
@@ -1676,7 +1553,7 @@
   .pwa-tip p{margin:0 0 10px;font-size:13px;line-height:1.6;color:var(--muted)}
   .pwa-tip ol{margin:0 0 13px;padding-left:20px;font-size:13.5px;line-height:1.85;color:var(--text)}
   .pwa-tip .pwa-ok{width:100%}
-  :root[data-theme="ebook"] .pwa-tip{background:#fff;border-top:1px solid #000}
+
   @keyframes pwaTipUp{ from{transform:translateY(100%)} to{transform:translateY(0)} }
 
   /* ---------- 自訂語音(三個遊戲共用,v1.49.0) ----------
@@ -1731,15 +1608,6 @@
   .mvc-btn{background:rgba(255,205,90,.16)}
   .mvc-btn:hover{background:rgba(255,205,90,.3)}
 
-  /* 電子書模式:全白底黑框(比照 .phrase-btn / .clip-btn 的處理) */
-  :root[data-theme="ebook"] .mvc-btn,
-  :root[data-theme="ebook"] .mvc-play,
-  :root[data-theme="ebook"] .mvc-del,
-  :root[data-theme="ebook"] .mvc-name,
-  :root[data-theme="ebook"] .mvc-save input,
-  :root[data-theme="ebook"] .mvc-rec{background:#fff;color:#000;border:1px solid #000}
-  :root[data-theme="ebook"] .mvc-rec.rec{background:#000;color:#fff}
-
   /* ==========================================================================
      五子棋 · 電腦對決(v1.51.0)
      ★ 同一條鐵則:只「追加」,選擇器一律 .gmk-* —— Bingo 與數獨的 DOM 沒有這些 class。
@@ -1767,7 +1635,6 @@
   .gmk-tool:hover{background:rgba(255,255,255,.12)}
   .gmk-tool:active{transform:scale(.96)}
   .gmk-tool:disabled{opacity:.4;cursor:default;transform:none}
-  :root[data-theme="ebook"] .gmk-tool{background:#fff;border:1px solid #000;color:#000}
 
   /* 結果卡:單機沒有對手可以嘴砲,賽後表情列收起來。
      (連線的 #mpWinBtns / #winScores / #winChamp 已由數獨那段既有的 body.solo-on 規則一併隱藏,
@@ -1812,13 +1679,6 @@
     padding:2px 8px;border-radius:999px;white-space:nowrap;
     background:rgba(34,197,94,.16);color:#22c55e}
   .hl-badge[data-state="busy"]{background:rgba(249,115,22,.16);color:#f97316}
-  :root[data-theme="ebook"] .hl-live{border:1px solid #000;background:#fff}
-  :root[data-theme="ebook"] .hl-head{color:#000}
-  :root[data-theme="ebook"] .hl-dot{background:#000;box-shadow:none;animation:none}
-  :root[data-theme="ebook"] .hl-item{color:#000}
-  :root[data-theme="ebook"] .hl-tag{background:#eee;border:1px solid #999;color:#000}
-  :root[data-theme="ebook"] .hl-badge{background:#eee;border:1px solid #999;color:#000}
-  :root[data-theme="ebook"] .hl-badge[data-state="busy"]{background:#eee;color:#555}
 
   @media (max-height:560px){
     .hl-live{margin-bottom:10px;padding:9px}
@@ -1839,38 +1699,31 @@
   /* ---------- 牌面配色 ----------
      ★ 牌面在所有彩色主題下都維持象牙白,只有背景(桌面)跟著主題變。
        理由:萬紅 / 條綠 / 筒藍是這遊戲唯一的辨識線索,牌面一變色就得重配九組花色色,
-       而且深底淺字在 30px 的牌上根本讀不出來。真實麻將牌本來就是象牙白,看起來反而最對。
-       電子書模式例外(只有黑白可用)。 */
+       而且深底淺字在 30px 的牌上根本讀不出來。真實麻將牌本來就是象牙白,看起來反而最對。 */
   /* 東南西北照實體牌是**藍**的(v1.55.0 從墨色改過來,970 那張花色表也是藍);
      中=紅、發=綠、白=藍框,這三個本來就對。 */
   :root{ --mj-face:#fdf6ea; --mj-edge:#d9bb9d; --mj-side:#c19a72; --mj-ink:#3b2a1c;
          --mj-z:#3f5896;
          --mj-jz:#d0342c; --mj-jf:#1f7a4d; --mj-jb:#3f5896; }
-  :root[data-theme="ebook"]{ --mj-face:#ffffff; --mj-edge:#000000; --mj-side:#888888; --mj-ink:#000000;
-         --mj-z:#000;
-         --mj-jz:#000; --mj-jf:#333; --mj-jb:#666; }
+
   /* ---------- 花牌:8 種各一色(v1.56.0)----------
      v1.55.0 是兩個群色(--mj-h 橘 / --mj-p 紫),因為那時同群的四張可以互相配。
      改成**嚴格同款**之後那樣最糟:四張同色同圖案的牌互相消不掉,看起來就是 bug。
      所以拆成 8 色 —— 顏色是 30px 下最快的線索,圖案類別(菊形/梅形)與大字再各補一層。
-     ⚠ 春(亮綠)與竹(墨綠)、秋(亮橙)與菊(暗金)刻意留不同明度,別把它們調近。
-     電子書模式只有黑白 → 只能靠字區分,灰階輪替只是讓相鄰的兩張不完全一樣。 */
+     ⚠ 春(亮綠)與竹(墨綠)、秋(亮橙)與菊(暗金)刻意留不同明度,別把它們調近。 */
   :root{ --mj-ha:#34a853; --mj-hb:#e0533f; --mj-hc:#e8890c; --mj-hd:#3f5896;   /* 春 夏 秋 冬 */
          --mj-pa:#d6417a; --mj-pb:#8b5cf6; --mj-pc:#15803d; --mj-pd:#a16207; } /* 梅 蘭 竹 菊 */
-  :root[data-theme="ebook"]{ --mj-ha:#000; --mj-hb:#444; --mj-hc:#222; --mj-hd:#555;
-         --mj-pa:#333; --mj-pb:#000; --mj-pc:#555; --mj-pd:#222; }
+
   /* ---------- 數字牌的傳統三色(v1.55.0)----------
      萬 / 條 / 筒的配色在真牌上是固定的(三筒藍紅綠斜排、九索三欄各一色、萬子藍字紅「萬」),
-     所以**刻意不跟主題變** —— 那是牌的一部分,不是我們的配色。
-     電子書模式例外(只有黑白):三色降成三階灰,圖案的分色關係才不會整片糊掉。 */
+     所以**刻意不跟主題變** —— 那是牌的一部分,不是我們的配色。 */
   :root{ --mj-c-u:#3f5896; --mj-c-r:#c9524f; --mj-c-g:#3a8b69; }
-  :root[data-theme="ebook"]{ --mj-c-u:#000; --mj-c-r:#555; --mj-c-g:#333; }
 
   /* ---------- 頂列品牌字 / 進場插圖 ---------- */
   .mj-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
     line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .mj-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+
   .mj-scroll{flex:1 1 auto}
   .mj-hero{text-align:center;margin:14px 0 4px}
   .mj-art{width:92px;height:92px;display:block;margin:0 auto 8px}
@@ -1879,7 +1732,7 @@
   .mk-bd{fill:var(--mj-face);stroke:var(--mj-side);stroke-width:2}
   .mk-r{fill:var(--mj-jz);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
   .mk-g{fill:var(--mj-jf);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
-  :root[data-theme="ebook"] .mk-bd{fill:#fff;stroke:#000}
+
   /* 「調校中」標記(v1.58.1):台灣麻將進場頁在用(首頁那張卡 v1.89.0 精簡掉了)。
      .gc-body 是 flex column,所以接在 .gc-name 後面會自成一行(同 .hl-badge 的作法)。
      用 align-self:flex-start,不然在 column 裡會被拉滿整列、色塊變成一長條。
@@ -1888,7 +1741,6 @@
   .mk-tune{align-self:flex-start;padding:1px 8px;border-radius:8px;
     background:rgba(249,115,22,.18);color:#fb923c;
     font:800 11.5px/1.7 'Nunito',sans-serif}
-  :root[data-theme="ebook"] .mk-tune{background:#eee;border:1px solid #999;color:#000}
 
   /* ---------- 房間橫幅 / 單機列(壓矮,把高度讓給盤面)----------
      .mj-room .mj-room-title 刻意寫成兩層:既有的 .row .label 是 (0,2,0),
@@ -2066,8 +1918,6 @@
     18%{opacity:1;transform:translate(-50%,-50%) scale(1)}
     72%{opacity:1;transform:translate(-50%,-50%) scale(1)}
     100%{opacity:0;transform:translate(-50%,-58%) scale(.96)}}
-  :root[data-theme="ebook"] .mj-zone{border-color:#000;background:rgba(0,0,0,.06)}
-  :root[data-theme="ebook"] .mj-sweep-txt{background:#000}
 
   /* ---------- 工具列(單機與連線共用一列)---------- */
   .mj-tools{flex:none;width:100%;display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
@@ -2091,12 +1941,6 @@
   /* 連線沒有提示與悔棋:提示等於直接送分,悔棋在全房共用的盤面上根本沒有意義
      → 連線時這一列只剩兩顆讀數(v1.54.0 把「重洗」也拿掉了,死局自動洗) */
   body.mj-mp .mj-solo-only{display:none}
-  :root[data-theme="ebook"] .mj-tool{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .mj-count{background:#eee;border:1px solid #999;color:#000}
-  :root[data-theme="ebook"] .mj-count.dead{background:#000;color:#fff}
-  /* 電子書只有黑白 → 脈動改走灰階(上面那組 keyframes 的 rgba 疊在 #eee 上幾乎看不出來) */
-  :root[data-theme="ebook"] .mj-count.mj-warm{animation:mj-warm-e 1.5s ease-in-out infinite}
-  @keyframes mj-warm-e{0%,100%{background:#eee}50%{background:#c4c4c4}}
 
   /* ---------- 即時比分 HUD(盤面上方那一列)---------- */
   .mj-hud{flex:none;width:100%;display:grid;gap:6px;
@@ -2124,9 +1968,9 @@
   .mj-seat.p0{background:var(--sp0)} .mj-seat.p1{background:var(--sp1)}
   .mj-seat.p2{background:var(--sp2)} .mj-seat.p3{background:var(--sp3)}
   .mj-seat.p4{background:var(--sp4)} .mj-seat.p5{background:var(--sp5)}
-  :root[data-theme="ebook"] .mj-seat{box-shadow:inset 0 0 0 1px #000}
+
   .mj-pts{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--accent);flex:none}
-  :root[data-theme="ebook"] .mj-pts{color:#000}
+
   /* 分數飄字:renderHud() 會重建 innerHTML,所以一定要在它之後才掛 */
   .mj-pop{position:absolute;right:8px;top:4px;font-family:'Fredoka',sans-serif;font-weight:700;
     font-size:15px;pointer-events:none;animation:mj-pop-up .9s ease forwards}
@@ -2201,7 +2045,6 @@
 
    ★ 材質色(紅底 光芒 綠側 毛筆字)**寫死在這幾條 class 上,刻意不吃主題變數** ——
      同數獨木框那組 .sk-* 的理由:那是「一張實體麻將牌長什麼樣」,不是介面色。
-     電子書主題的黑白改寫在下面各自那幾條上(不是把變數塌成黑)。
    ⚠ 唯一吃變數的是牌面 --mj-face —— 圖示上的牌與牌桌上的牌本來就該同一個白。
 
    ⚠⚠ 放射光芒是 8 個三角形(底色自己補滿另外 8 道 → 視覺上 16 道),支點 (28,26) 藏在牌後面。
@@ -2223,14 +2066,6 @@
 .m16-ic-w{fill:#7d2b21;stroke:#7d2b21;stroke-width:.45;paint-order:stroke fill;
   font-size:17px;font-weight:900;text-anchor:middle;
   font-family:"標楷體","DFKai-SB","BiauKai","KaiTi","Kaiti TC","Noto Serif CJK TC","Noto Serif TC","Songti TC",serif}
-/* 電子書主題:白底 + 黑框 + 黑字(同另外八張卡)。光芒留一階淺灰,不然整塊糊成一片白 */
-:root[data-theme="ebook"] .m16-ic-bg{fill:#fff}
-:root[data-theme="ebook"] .m16-ic-ray path{fill:#e2e2e2}
-:root[data-theme="ebook"] .m16-ic-side{fill:#bdbdbd;stroke:#000}
-:root[data-theme="ebook"] .m16-ic-face{fill:#fff;stroke:#000}
-/* ⚠ stroke 一定要跟著改 —— 只改 fill 的話會變成「黑字 + 紅色描邊」,
-   而那在 46px 上看起來就是「字的邊緣髒髒的」(截圖才看得出來,色碼看不出來)。 */
-:root[data-theme="ebook"] .m16-ic-w{fill:#000;stroke:#000}
 
 /* 進場插圖(mahjong16.html 頂端那張大圖)。尺寸與消消樂 .mj-art 對齊 ——
    兩頁的「選擇玩法」看起來才是同一套介面。
@@ -2244,7 +2079,7 @@
 /* 牌背(消消樂用不到,只有真麻將要畫別人的手牌)。刻意不吃 currentColor:
    牌背不該跟著花色變。 */
 :root{ --m16-back:#2f6f52; --m16-backl:#7fc4a3; }
-:root[data-theme="ebook"]{ --m16-back:#555; --m16-backl:#fff; }
+
 .mj-bk{fill:var(--m16-back)}
 .mj-bkl{fill:none;stroke:var(--m16-backl);stroke-width:3;stroke-linejoin:round}
 
@@ -2379,7 +2214,7 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
      (同大老二的 .b2-drag),整頁只有它沒有別的意思。 */
 .m16-hand .m16-ht.m16-drag{transition:none;z-index:6;cursor:grabbing;
   box-shadow:inset 0 0 0 2px var(--accent),0 8px 16px rgba(0,0,0,.45)}
-:root[data-theme="ebook"] .m16-hand .m16-ht.m16-drag{box-shadow:inset 0 0 0 3px #000,0 4px 10px rgba(0,0,0,.35)}
+
 /* ★★ 拖曳中才擋掉橫向捲軸。拖曳途中某一排會暫時多一張、超出 --m16hw,
    不擋的話盤面會冒出一條橫向捲軸 → clientWidth 變 → 整副牌換一次大小
    (檔頭那條「任何讓總寬變一點的東西都會讓整副牌換大小」)。
@@ -2491,14 +2326,6 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
 .m16-wall.low b{color:#fb923c}
 .m16-wall.crit{background:var(--mj-jz);color:#fff}
 .m16-wall.crit b{color:#fff}
-:root[data-theme="ebook"] .m16-wall{background:#eee;border:1px solid #999;color:#000}
-:root[data-theme="ebook"] .m16-wall b{color:#000}
-/* ⚠ ebook 沒有顏色可用,所以「快見底」改用**框粗**表示(琥珀在純黑白下與一般狀態
-   長得一模一樣 = 等於沒有警示)。真的剩沒幾張那一級照舊反黑,那個對比最強。 */
-:root[data-theme="ebook"] .m16-wall.low{background:#eee;color:#000;border-width:2px}
-:root[data-theme="ebook"] .m16-wall.low b{color:#000}
-:root[data-theme="ebook"] .m16-wall.crit{background:#000;color:#fff}
-:root[data-theme="ebook"] .m16-wall.crit b{color:#fff}
 
 /* ---------- 對手 ---------- */
 .m16-foes{display:flex;flex-direction:column;gap:4px;flex:none}
@@ -2538,7 +2365,6 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
 .m16-lz{display:inline-grid;place-items:center;height:17px;padding:0 5px;flex:none;
   border-radius:6px;background:var(--accent-2);color:#1c1008;
   font:800 11px/1 'Nunito',sans-serif;margin-left:3px}
-:root[data-theme="ebook"] .m16-lz{background:#fff;color:#000;border:1px solid #000}
 
 /* ---------- 動作列(吃 / 碰 / 槓 / 胡 / 過) ----------
    ★ min-height(v1.58.3):這一列在「一行 12px 提示字」與「一排 30px 按鈕」之間跳,
@@ -2591,8 +2417,8 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
 /* ---------- 宣告聽牌(v1.67.0) ----------
    規則照明星三缺一:自己按下宣告,之後手牌鎖死只能摸切,胡了多算台(聽牌 1 / 地聽 4 / 天聽 8)。
    ★ 全套用發財綠(--mj-jf),與上面那一排、牌角的聽牌數字同一組語彙。
-   ⚠ 撞名檢查:`locked` 這個裸名專案裡用過 5 次,但**全部都是兩層**
-     (.swatches.locked / .mj-stage.locked / .sdk-stage.locked …),第一層都不是 .m16-hand
+   ⚠ 撞名檢查:`locked` 這個裸名專案裡用過多次,但**全部都是兩層**
+     (.mj-stage.locked / .sdk-stage.locked …),第一層都不是 .m16-hand
      → 兩個方向都不會撞(CLAUDE.md「反方向也會撞」那條)。 */
 .m16-act.ting{background:var(--mj-jf)}
 
@@ -2641,7 +2467,7 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
 .m16-cd.m16-hot .m16-cdn{color:var(--mj-jz)}
 .m16-cd.m16-hot{animation:m16cdhot .9s ease-in-out infinite}
 @keyframes m16cdhot{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
-:root[data-theme="ebook"] .m16-cdbg{stroke:rgba(0,0,0,.18)}
+
 /* 會動的東西一律尊重系統的「減少動態效果」 */
 @media (prefers-reduced-motion:reduce){
   .m16-cd.m16-hot{animation:none}
@@ -2721,7 +2547,7 @@ body.m16-mp .mj-play,body.m16-solo .mj-play{position:relative}
    ⚠⚠ 框**不可以**用 .m16-ht.opt 那個綠(--mj-jf):鈕本身就是綠底,綠框畫在綠底上
      等於沒畫(第一版就是這樣,放大截圖才看出來)。用白框,兩個主題下都讀得出來。 */
 .m16-claim .m16-act.take.on{box-shadow:0 3px 0 rgba(0,0,0,.3),inset 0 0 0 2px rgba(255,255,255,.92)}
-:root[data-theme="ebook"] .m16-claim .m16-act.take.on{box-shadow:0 3px 0 rgba(0,0,0,.3),inset 0 0 0 3px #000}
+
 .m16-claim .m16-more{opacity:.82;font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted);
   text-align:center;line-height:1.35}
 /* 跳出來那一下(只播一次 —— 見 board.js 紅線②)。
@@ -2763,19 +2589,6 @@ body.m16-mp .mj-play,body.m16-solo .mj-play{position:relative}
   background:radial-gradient(closest-side,rgba(9,15,12,.94) 68%,rgba(9,15,12,0));
   border-radius:50%}
 
-/* 純黑白主題:發光與金色都不存在 → 靠實框與反黑撐辨識度(同 .m16-wall 那一組的做法) */
-:root[data-theme="ebook"] .m16-claim{background:#fff;backdrop-filter:none;
-  box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 2px #000}
-:root[data-theme="ebook"] .m16-claim::before{display:none}
-:root[data-theme="ebook"] .m16-chd{color:#000}
-:root[data-theme="ebook"] .m16-claim .m16-act.win{background:#000;color:#fff;animation:none}
-:root[data-theme="ebook"] .m16-acts.m16-hush .m16-cd{background:#fff;box-shadow:0 0 0 1px #000}
-/* ⚠⚠ 「過」在 ebook 下**原本會整顆消失**(放大截圖才看出來):它的底是半透明白 +
-   半透明白內框,而這個主題的底色是純白 —— 白上白。而「過」正是最不能找不到的一顆
-   (使用者當初的要求就是「要放棄的話也要有一個比較容易看到的」)。
-   ★ 刻意寫成不帶 .m16-claim 的通則:底下那條動作列上的同一顆鈕有一樣的毛病。 */
-:root[data-theme="ebook"] .m16-act.pass{background:#fff;color:#000;box-shadow:inset 0 0 0 2px #000}
-
 @media (prefers-reduced-motion:reduce){
   .m16-claim.m16-in{animation:none}
   .m16-claim .m16-act.win{animation:none}
@@ -2802,7 +2615,6 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 /* 輪到誰的晶片底色是 accent(亮黃),半透明黑疊上去只會變成濁黃、字整個糊掉 ——
    照既有 .mp-chip.turn .seat-badge 的做法用**實心深色**反白。 */
 .mp-chip.turn .m16-cw{background:#1c1008;color:var(--accent)}
-:root[data-theme="ebook"] .mp-chip.turn .m16-cw{background:#fff;color:#000}
 
 /* 玩家晶片上的座位點與台數 */
 .m16-seat{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
@@ -2860,7 +2672,6 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 /* 「🏆 ○○ 以 N 台奪冠」——最後一局才有,而且排在大字下面第一行(v1.75.15)。
    使用者:「本場結束的下一行應該要接誰奪冠」。既然是那一行,就要看起來像那一行。 */
 .m16-champline{display:inline-block;font-weight:800;font-size:1.06em;color:var(--accent)}
-:root[data-theme="ebook"] .m16-champline{color:#000}
 
 /* ---------- 結果卡的排名表(v1.75.14 起是「一張表」) ----------
    使用者:「連線對戰最後的統計頁面,每次在看時候往往都要再想一會」。
@@ -2910,11 +2721,7 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 .m16-rd{flex:none;font:800 12px/1 'Fredoka','Nunito',sans-serif;color:var(--muted)}
 .m16-rd.pos{color:var(--mj-jf)}
 .m16-rd.neg{color:var(--mj-jz)}
-:root[data-theme="ebook"] .m16-tair{background:#fff;border:1px solid #ccc}
-:root[data-theme="ebook"] .m16-tair.me{border:2px solid #000;box-shadow:none}
-:root[data-theme="ebook"] .m16-tair.win .m16-rno{background:#000;color:#fff}
-:root[data-theme="ebook"] .m16-rwin{background:#eee;color:#000;border:1px solid #ccc}
-:root[data-theme="ebook"] .m16-rwin i{color:#000}
+
 /* ★★ 卡片寬度要**寫死**(v1.75.14)。共用的 .win-card 只有 max-width、沒有 width,
    而 .veil 是 grid place-items:center → 卡片是 shrink-to-fit、寬度由內容撐出來。
    排名表拆成兩層之後每一層都變窄,流局那一局又沒有攤牌撐著 → 整張卡會縮成瘦長條
@@ -2941,8 +2748,6 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 .m16-next{margin:10px 0 -4px;text-align:center;
   font:700 12px/1.5 'Nunito',sans-serif;color:var(--muted)}
 .m16-next b{font-weight:800;font-size:1.15em;color:var(--accent)}
-:root[data-theme="ebook"] .m16-next{color:#333}
-:root[data-theme="ebook"] .m16-next b{color:#000}
 
 /* ---------- 台灣 16 張:單機對電腦(v1.60.0) ----------
    ★ 這一段刻意只有一條規則:單機**整組畫面都是重用的** ——
@@ -3186,13 +2991,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
          --sv-tpad:8px; --sv-cgap:2px;
          --sv-cellw:min(var(--sv-cw),
            calc((var(--sv-tw) - var(--sv-tpad) * 2 - var(--sv-cgap) * 12) / 13)); }
-  :root[data-theme="ebook"]{ --sv-face:#ffffff; --sv-line:#000000; --sv-blk:#000000; --sv-red:#000000;
-         --sv-redlit:#000000; --sv-bk:#666666; }
 
   .sv-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
     line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .sv-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+
   .sv-scroll{flex:1 1 auto}
   .sv-hero{text-align:center;margin:14px 0 4px}
   .sv-art{width:96px;height:96px;display:block;margin:0 auto 8px}
@@ -3210,8 +3013,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         這一版把 `.bj-ic-*` 那套原地搬到這裡改名成 `.pk-ic-*`,舊的 `.pk-bd/.pk-k/.pk-r`
         刪掉(同一副牌本來就該長一樣,而兩套並存就是「改一邊忘另一邊」的來源)。
      ⚠ 花色 path 直接抄 js/shared/pk-faces.js 的 PATHS(同一副牌本來就該長一樣)。
-     ⚠ 顏色一律走 --sv-* 變數,**不寫死** → 電子書主題自動黑白(:root[data-theme="ebook"]
-        那條已經把 --sv-face/-line/-blk/-red 全換成黑白),不必再補一組覆寫。
+     ⚠ 顏色一律走 --sv-* 變數,**不寫死** —— 之後要調整任何主題的牌面色只改變數一處。
         --sv-* 與 21 點那組 --bj-* 的值本來就逐字相同,所以這組規則用哪一組都一樣;
         選 --sv-* 只是因為規則住在排七這一段。
      ⚠ 紅色那個 class 叫 `.pk-ic-red`,**不可以**用既有的裸 `.red`
@@ -3245,7 +3047,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .sv-seat{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
   .sv-seat.p0{background:#ff6b8a}.sv-seat.p1{background:#4fc3f7}.sv-seat.p2{background:#ffd54f}
   .sv-seat.p3{background:#81c784}.sv-seat.p4{background:#ba9cff}.sv-seat.p5{background:#ffab6b}
-  :root[data-theme="ebook"] .sv-seat{background:#000}
+
   .sv-chn,.sv-chp{display:inline-flex;align-items:center;gap:1px;
     font:800 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
   .sv-chp{color:var(--sv-redlit)}
@@ -3290,7 +3092,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠⚠ 左右內距**只能是 var(--sv-tpad)** —— 格子寬度是從「容器寬 − 內距 − gap」
        推回來的(見檔頭那三支變數),照抄 21點的 `padding:10px` 會讓格子裡的字算錯。
      ⚠ 綠呢是**寫死的顏色**(不吃主題變數),同另外兩頁:牌桌的綠是撲克牌的辨識背景,
-       跟著主題變會讓象牙白牌面在某些主題下失去對比。電子書主題那條照舊翻成白底黑框。
+       跟著主題變會讓象牙白牌面在某些主題下失去對比。
      ★ 軌道的暗格 / 亮紅字(--sv-redlit)畫在綠呢上仍然分得出來,但這件事**斷言測不到**
        —— 驗收點在 `node tools/gen-sevens-shot.js` 的放大截圖。 */
   .sv-tracks{display:flex;flex-direction:column;gap:3px;flex:0 1 auto;min-height:0;overflow-y:auto;
@@ -3299,7 +3101,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%),
       linear-gradient(180deg,#1d4c3a,#12332a 70%,#0e2822);
     box-shadow:inset 0 0 0 2px rgba(255,255,255,.07), inset 0 10px 26px rgba(0,0,0,.34)}
-  :root[data-theme="ebook"] .sv-tracks{background:#fff;border:1px solid #000;box-shadow:none}
+
   .sv-track{display:flex;align-items:center}
   /* ⚠⚠ `1fr` 的隱含最小值是 `auto`(= min-content),格子有 aspect-ratio 時那個
      min-content 會把 13 欄一起撐開 → **整條軌道橫向溢出,J/Q/K 直接被切掉**。
@@ -3349,13 +3151,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .sv-cell.seven{box-shadow:inset 0 0 0 1px rgba(255,255,255,.20)}
   .sv-cell.seven.on{box-shadow:0 1px 0 rgba(0,0,0,.24)}
   .sv-cell.open{background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 1.6px var(--accent)}
-  :root[data-theme="ebook"] .sv-cell{background:#fff;border:1px solid #bbb;color:#999}
-  :root[data-theme="ebook"] .sv-cell i,
-  :root[data-theme="ebook"] .sv-track.red .sv-cell i{color:#999}
-  :root[data-theme="ebook"] .sv-cell.on{background:#fff;border-color:#000;color:#000}
-  :root[data-theme="ebook"] .sv-cell.on i,
-  :root[data-theme="ebook"] .sv-track.red .sv-cell.on i{color:#000}
-  :root[data-theme="ebook"] .sv-cell.open{border:2px solid #000}
 
   /* ⚠ 盤面**沒有對手列**(v1.75.2 拿掉)。使用者:「在人物的框框裡一定有說了現在的牌狀況,
      但是你在牌池裡下面又再一次的顯示這個資訊」—— 「誰 / 輪到誰 / 剩幾張 / 蓋幾張」
@@ -3372,7 +3167,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .sv-plbl{margin-right:3px}
   .sv-pts{margin-left:5px;font-weight:800;color:var(--sv-redlit)}
   .sv-pts.none{color:var(--accent)}
-  :root[data-theme="ebook"] .sv-mypile{background:#fff;border:1px solid #ccc}
 
   /* ---------- 手牌 ----------
      ★ 不可出的牌壓暗但**仍然可點**(CLAUDE.md 的紅線:不用 disabled 讓牌靜默吃掉
@@ -3415,9 +3209,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     box-shadow:0 4px 8px rgba(0,0,0,.36),0 0 0 3px #e0533f}
   .sv-card.tiny{--svw:21px;cursor:default;box-shadow:0 1px 1px rgba(0,0,0,.22)}
   .sv-empty{font:800 13px/1 'Nunito',sans-serif;color:var(--accent);padding:12px 0}
-  :root[data-theme="ebook"] .sv-card{background:#fff;border-color:#000;box-shadow:none}
-  :root[data-theme="ebook"] .sv-hand .sv-card.no{filter:none;opacity:.42}
-  :root[data-theme="ebook"] .sv-hand .sv-card.can{box-shadow:0 0 0 2px #000}
 
   /* ---------- 蓋牌模式:**整區換皮**,不是只換一行字(v1.75.11) ----------
      使用者:「沒牌可出的時候要蓋牌,但目前這個用文字提醒的設計,突然間很難理解」。
@@ -3453,10 +3244,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .sv-hand.cover .sv-card.sel{transform:none}
   .sv-pickw.sel{transform:translateY(-9px)}
   .sv-pickw.sel .sv-cost{color:#fff;background:#e0533f;border-radius:999px;padding:1.5px 6px}
-  :root[data-theme="ebook"] .sv-hand.cover{background:#fff;border-color:#000}
-  :root[data-theme="ebook"] .sv-cvt b,
-  :root[data-theme="ebook"] .sv-cost{color:#000}
-  :root[data-theme="ebook"] .sv-pickw.sel .sv-cost{background:#000;color:#fff}
 
   /* ---------- 動作列 + 出牌倒數 ----------
      ★ 倒數條**全桌都看得到** —— 「輪到誰、還剩幾秒」是公開資訊(晶片上就有 .turn),
@@ -3547,8 +3334,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.10);
     font:800 10.5px/1.35 'Nunito',sans-serif;color:var(--muted)}
   .sv-rwin i{font-style:normal;font-weight:800;color:var(--accent)}
-  :root[data-theme="ebook"] .sv-rwin{background:#eee;color:#000;border:1px solid #ccc}
-  :root[data-theme="ebook"] .sv-rwin i{color:#000}
+
   /* 第二層:縮排到與名字切齊(19px 的名次圈 + 6px gap),看起來才是「這個人的牌」 */
   .sv-rcards{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding-left:25px}
   .sv-rcn{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
@@ -3556,9 +3342,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* 排名表下面那行小字(單機的「人數 · 難度 · 戰績」)—— 舊版跟「我的罰分」擠在
      大字底下當第二行,那些是**局外的資訊**,降級放到表尾才不搶注意力 */
   .sv-rfoot{margin-top:9px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--muted);text-align:center}
-  :root[data-theme="ebook"] .sv-rrow{background:#fff;border:1px solid #ccc}
-  :root[data-theme="ebook"] .sv-rrow.me{border:2px solid #000;box-shadow:none}
-  :root[data-theme="ebook"] .sv-rrow.win .sv-rno{background:#000;color:#fff}
+
   /* ★★ 連線:共用勝場表 `#winScores` 的**列**收掉(v1.75.9)。
      那些列的內容已經併進上面的排名表(`.sv-rwin`),留著就是同一份資料兩張表 ——
      使用者說的「訊息太雜亂,需要整合」指的正是這個。
@@ -3694,13 +3478,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 房主把倒數設成 0(關掉)時那一圈不出現,那時會多留 32px 空白 ——
        **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次。 */
   body.b2-mp{ --b2-acth:128px; }
-  :root[data-theme="ebook"]{ --b2-face:#ffffff; --b2-line:#000000; --b2-blk:#000000;
-         --b2-red:#000000; --b2-redlit:#000000; --b2-bk:#666666; }
 
   .b2-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
     line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .b2-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+
   .b2-scroll{flex:1 1 auto}
   .b2-hero{text-align:center;margin:14px 0 4px}
   .b2-art{width:96px;height:96px;display:block;margin:0 auto 8px}
@@ -3727,14 +3509,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-seat{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
   .b2-seat.p0{background:#ff6b8a}.b2-seat.p1{background:#4fc3f7}
   .b2-seat.p2{background:#ffd54f}.b2-seat.p3{background:#81c784}
-  :root[data-theme="ebook"] .b2-seat{background:#000}
+
   .b2-chn{display:inline-flex;align-items:center;gap:1px;
     font:800 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
   /* 出完的人:改顯示名次(公開資訊 —— 大家都看到他打完了) */
   .b2-chf{display:inline-flex;align-items:center;padding:1px 5px;border-radius:7px;
     background:rgba(255,255,255,.16);font:800 10px/1.4 'Nunito',sans-serif;color:var(--accent)}
   .mp-chip.out{opacity:.72}
-  :root[data-theme="ebook"] .b2-chf{background:#eee;color:#000;border:1px solid #ccc}
+
   /* ★★ 「拉」= 他剩最後一手了(v1.81.0)。真人規則要求喊出來,所以這是牌情紅線的
      第二個豁免點(第一個是結果卡)—— 但只公開**一個 bit**:牌型 / 牌值一律不准進來。
      ⚠ 一定要 nowrap:4 人局 + 長名字時晶片列本來就很擠,「拉」被折成兩行會把整列撐高。
@@ -3744,7 +3526,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     padding:1px 5px;margin-right:3px;border-radius:7px;
     background:rgba(224,83,63,.26);box-shadow:0 0 0 1px rgba(224,83,63,.55) inset;
     font:900 10px/1.4 'Nunito',sans-serif;color:#ffd7cf;letter-spacing:.5px}
-  :root[data-theme="ebook"] .b2-chla{background:#fff;color:#000;border:2px solid #000;box-shadow:none}
+
   /* ★ 小牌形:代替 U+1F0A0 那一段的撲克牌字元(它們多數字型沒有,會變豆腐方框) */
   .b2-pip{display:inline-block;width:7px;height:10px;border-radius:2px;
     background:var(--b2-face);border:1px solid var(--b2-line);margin-right:2px}
@@ -3858,13 +3640,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        露出一塊灰斑(那條教訓對「格子填滿中央」的版型仍然成立,不要照搬回來)。
      ⚠ 「空的時候桌布不變、只讓 🎴 亮一點」那條規矩留著(見 .b2-tmid 那一段)——
        **不可以**改成「空的時候把框縮小」,那會讓手牌在空的一輪與有牌之間跳一次。 */
-  :root[data-theme="ebook"] .b2-trick{background:#fff;border:1px solid #000;box-shadow:none}
+
   .b2-tlbl{flex:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
     font:700 11.5px/1.3 'Nunito',sans-serif;color:var(--muted)}
   .b2-tttl{padding:1px 9px;border-radius:9px;background:rgba(255,255,255,.13);
     font-weight:800;color:var(--text)}
   .b2-thint b{color:var(--accent)}
-  :root[data-theme="ebook"] .b2-tttl{background:#eee;color:#000;border:1px solid #ccc}
 
   /* ★★★ 座位格 —— v1.99.0 位置回到**繞著桌子坐**。使用者(2026-08-05):
        「底色是 OK,但是**玩家的位置有點糟糕**,我希望看起來會像實在桌子上,
@@ -3953,7 +3734,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     opacity:.16;pointer-events:none;user-select:none}
   /* 這一輪還沒有人出牌 → 桌心亮一點 =「桌面是空的」(桌布本身不變,它是桌子) */
   .b2-trick.empty .b2-tmid{opacity:.26}
-  :root[data-theme="ebook"] .b2-tmid{opacity:.3}
+
   /* ⚠⚠ border 是 2px **透明**的(不是「沒有 border」):亮框(.top)只換顏色,
      所以標不標「目前最大」都不會讓那一格高 4px —— 差了的話整桌的高度就跟著
      「這一輪有沒有人出牌」變,手牌會跳。
@@ -4000,7 +3781,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     font:900 10px/1 'Nunito',sans-serif;color:#241a2e;background:#cfd4e0}
   .b2-sn.p0{background:#ff6b8a}.b2-sn.p1{background:#4fc3f7}
   .b2-sn.p2{background:#ffd54f}.b2-sn.p3{background:#81c784}
-  :root[data-theme="ebook"] .b2-sn{background:#fff;color:#000;border:1px solid #000}
+
   .b2-tnm{flex:1 1 auto;min-width:1.2em;
     font:800 11.5px/1.3 'Nunito',sans-serif;color:var(--text);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -4024,16 +3805,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      所以這裡明寫 flex:0 1 auto + min-width:0 讓它縮得動。
      ⚠ 只給**牌桌上**那一排:手牌一縮就等於格位變了(那是 v1.77.0 的紅線)。 */
   .b2-tcs .b2-card{flex:0 1 auto;min-width:0}
-  /* ⚠ ebook 只換**顏色**,不換尺寸(換了就等於讓亮框改變格子的高,見上) */
-  :root[data-theme="ebook"] .b2-tmv{background:#fff;border-color:#bbb}
-  :root[data-theme="ebook"] .b2-tmv.top{background:#fff;border-color:#000}
-  :root[data-theme="ebook"] .b2-tct{background:#eee;color:#000;border:1px solid #ccc}
-  :root[data-theme="ebook"] .b2-tyou{background:#000;color:#fff}
+
   /* 無敵牌型的記號:鐵支 / 同花順壓得過任何牌型,那件事一定要看得出來。
      ⚠ 在座位版它住在那一列的最右邊,所以字級比舊版小一號(一格只有五張牌的寬度)。 */
   .b2-rbomb{flex:none;padding:1px 5px;border-radius:8px;background:var(--b2-redlit);
     font:800 9.5px/1.5 'Nunito',sans-serif;color:#2a0d0d}
-  :root[data-theme="ebook"] .b2-rbomb{background:#000;color:#fff}
 
   /* ==========================================================================
      大老二 v1.98.0 —— ★★★ 牌桌上三個訊號 = 三條軌
@@ -4065,7 +3841,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        **不要**照21點的結論把它刪掉。
      ========================================================================== */
   :root{ --b2-turn:#6ec8ff; }
-  :root[data-theme="ebook"]{ --b2-turn:#000; }
 
   /* ---------- ①「這是我」:左緣金直條 + 金底 + 金名字(全部靜態)---------- */
   /* ⚠⚠ 金底這一條一定要排在 `.b2-tmv.top` **後面**(同特異度 0,2,0 → 後者贏):
@@ -4077,10 +3852,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      金條的 3px → 它壓在 padding 裡,不會把裡面的內容推走。 */
   .b2-tmv.me::before{content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;
     border-radius:0 4px 4px 0;background:#ffd489;pointer-events:none}
-  :root[data-theme="ebook"] .b2-tmv.me,
-  :root[data-theme="ebook"] .b2-tmv.me.top{background:#fff}
-  :root[data-theme="ebook"] .b2-tmv.me .b2-tnm{color:#000}
-  :root[data-theme="ebook"] .b2-tmv.me::before{background:#000}
 
   /* ---------- ②「現在在等他」:上緣一條會呼吸的青光條(暫時)---------- */
   /* ★ 呼吸刻意做得慢而淺(1.6s · .45→1),逐字沿用21點那顆:同一個訊號在兩個遊戲裡
@@ -4136,9 +3907,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-rules-list li b{color:var(--text)}
   .b2-rules-sum{flex:none;text-align:left;padding-top:8px;
     font:700 12px/1.5 'Nunito',sans-serif;color:var(--accent-2)}
-  :root[data-theme="ebook"] .b2-rules-list li::before{background:#000}
-  :root[data-theme="ebook"] .b2-rules-list li b{color:#000;text-decoration:underline}
-  :root[data-theme="ebook"] .b2-rules-sum{color:#000}
 
   /* ✗ 算牌表(.b2-seen / .b2-sgrid / .b2-spip …)v1.78.0 整段拿掉 ——
      使用者:「出過的牌不要顯示好了,我覺得還是要自己記,比較好玩」。
@@ -4229,7 +3997,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        壓暗的牌被拖著走時照樣是暗的(亮暗講的是「用不用得到」,拖曳不改變那件事)。 */
   .b2-hand .b2-card.b2-drag{transition:none;position:relative;z-index:6;cursor:grabbing;
     box-shadow:0 12px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent)}
-  :root[data-theme="ebook"] .b2-hand .b2-card.b2-drag{box-shadow:0 6px 12px rgba(0,0,0,.35),0 0 0 3px #000}
+
   .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
   /* 桌上那副牌的尺寸(v1.77.0 是「.sm 再小一級」的固定值)。
      ★★★ v1.101.0 起它**跟著螢幕長大** —— 值由 .b2-trick 的 --b2-tcw 給
@@ -4240,11 +4008,8 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-card.mid{--b2w:var(--b2-tcw,calc(var(--b2-cw) * .66));cursor:default}
   .b2-card.tiny{--b2w:21px;cursor:default;box-shadow:0 1px 1px rgba(0,0,0,.22)}
   .b2-empty{font:800 13px/1 'Nunito',sans-serif;color:var(--accent);padding:12px 0}
-  :root[data-theme="ebook"] .b2-card{background:#fff;border-color:#000;box-shadow:none}
-  :root[data-theme="ebook"] .b2-hand .b2-card.sel{background:#fff;box-shadow:0 0 0 3px #000}
+
   /* 黑白模式沒有顏色可用:亮的給一圈灰框、暗的直接淡掉(灰階濾鏡在這裡是白忙) */
-  :root[data-theme="ebook"] .b2-hand .b2-card.hot{box-shadow:0 0 0 2px #666}
-  :root[data-theme="ebook"] .b2-hand .b2-card.cold{filter:none;opacity:.42}
 
   /* ---------- 動作列 ----------
      ★ 只有一份(單機與連線共用)—— 大老二沒有宣告階段,所以它吃的是純資料。 */
@@ -4261,9 +4026,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-selbar.bad{background:rgba(224,83,63,.20);color:var(--text)}
   .b2-selico{flex:none;font-size:14px;line-height:1}
   .b2-seltxt{min-width:0}
-  :root[data-theme="ebook"] .b2-selbar{background:#fff;border:1px solid #ccc;color:#000}
-  :root[data-theme="ebook"] .b2-selbar.ok{border:2px solid #000}
-  :root[data-theme="ebook"] .b2-selbar.bad{border:2px dashed #000}
+
   .b2-btns{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
   .b2-btns .btn{padding:8px 14px;font-size:13.5px}
   /* ★ 「出牌」在選取不合法時只是**變暗**,不是 disabled —— 按下去要說得出原因
@@ -4327,16 +4090,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.14);
     font:700 10.5px/1.6 'Nunito',sans-serif;color:var(--muted)}
   .b2-rwin i{font-style:normal;font-weight:800;color:var(--accent)}
-  :root[data-theme="ebook"] .b2-rwin{background:#eee;color:#000;border:1px solid #ccc}
-  :root[data-theme="ebook"] .b2-rwin i{color:#000}
+
   /* 第二層:他手上還剩什麼(★ 唯一會翻開別人手牌的地方)。縮排對齊名次圈右緣 */
   .b2-rcards{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding-left:25px}
   .b2-rcn{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
   .b2-clean{font-size:11px;font-weight:800;color:var(--accent)}
   .b2-rfoot{margin-top:9px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--muted);text-align:center}
-  :root[data-theme="ebook"] .b2-rrow{background:#fff;border:1px solid #ccc}
-  :root[data-theme="ebook"] .b2-rrow.me{border:2px solid #000;box-shadow:none}
-  :root[data-theme="ebook"] .b2-rrow.win .b2-rno{background:#000;color:#fff}
+
   /* ★★ 共用連線層自己畫的累積分表(#winScores)那些列要收掉(排七 v1.75.9 的教訓):
      它的內容已經併進上面的排名表(.b2-rwin),留著就是同一份資料兩張表 ——
      兩張都「一列一個人、有名次有名字有數字」,疊在一起正是使用者說的那種亂。
@@ -4494,13 +4254,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
          **牌換一次大小**。所以改這三個數字之前一定要先量 actrow 的最大值
          (shot-bj.ps1 會印 actrow=/selbar=/btns=)。 */
   body.bj-mp{ --bj-acth:128px; }
-  :root[data-theme="ebook"]{ --bj-face:#ffffff; --bj-line:#000000; --bj-blk:#000000;
-         --bj-red:#000000; --bj-redlit:#000000; --bj-grn:#000000; --bj-bk:#666666; }
 
   .bj-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
     line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .bj-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+
   .bj-scroll{flex:1 1 auto}
   .bj-hero{text-align:center;margin:14px 0 4px}
   .bj-art{width:96px;height:96px;display:block;margin:0 auto 8px}
@@ -4533,8 +4291,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-rules li::before{content:"";position:absolute;left:2px;top:11px;
     width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:.75}
   .bj-rules li b{color:var(--accent-2)}
-  :root[data-theme="ebook"] .bj-rules li::before{background:#000}
-  :root[data-theme="ebook"] .bj-rules li b{color:#000;text-decoration:underline}
 
   /* ---------- 房規蓋板 ----------
      ★★ 單機與連線**共用這一組 DOM**(見 js/blackjack/main.js 檔頭)。
@@ -4603,7 +4359,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-dot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
   .bj-dot.p0{background:#ff6b8a}.bj-dot.p1{background:#4fc3f7}.bj-dot.p2{background:#ffd54f}
   .bj-dot.p3{background:#81c784}.bj-dot.p4{background:#ba9cff}
-  :root[data-theme="ebook"] .bj-dot{background:#000}
+
   /* 晶片上的「莊」與籌碼 —— ★ 兩樣都是公開資訊
      (誰當莊全場都看得到,籌碼是結算過的歷史)。
      ⚠ 這一頁唯一藏起來的是莊家那張暗牌,而它在盤面上,與晶片無關。 */
@@ -4611,7 +4367,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     padding:1px 5px;margin-right:3px;border-radius:7px;
     background:rgba(255,210,74,.24);box-shadow:0 0 0 1px rgba(255,210,74,.5) inset;
     font:900 10px/1.4 'Nunito',sans-serif;color:#ffe9a8}
-  :root[data-theme="ebook"] .bj-chd{background:#fff;color:#000;border:2px solid #000;box-shadow:none}
+
   /* ★★ 籌碼那一格(v1.85.0 重新配色)——
      使用者:「顯示每個人剩下多少籌碼,這部分的配色需要可以讓籌碼看的明顯一點」。
      原本是 10.5px 的 var(--muted) 純文字,擠在名字後面幾乎看不到,
@@ -4633,8 +4389,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-chc b{font:900 12px/1 'Fredoka','Nunito',sans-serif;color:#fff4d2;letter-spacing:.2px}
   .mp-chip.turn .bj-chc{background:rgba(0,0,0,.26);box-shadow:none;color:#fff1c4}
   .mp-chip.turn .bj-chc b{color:#fff}
-  :root[data-theme="ebook"] .bj-chc{background:#fff;color:#000;border:1px solid #000;box-shadow:none}
-  :root[data-theme="ebook"] .bj-chc b{color:#000}
 
   /* ---------- 牌桌 ----------
      ⚠ .bj-acts 一定要 flex:none —— .bj-play 底下只能有一個可壓縮的兄弟,
@@ -4668,7 +4422,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-table{flex:1 1 auto;min-height:var(--bj-trh);overflow:hidden;
     display:flex;flex-direction:column;justify-content:center;gap:7px;
     background:rgba(0,0,0,.16);border-radius:12px;padding:9px 10px}
-  :root[data-theme="ebook"] .bj-table{background:#fff;border:1px solid #000}
 
   /* ---------- 莊家那一格 ----------
      ⚠⚠ border 是 2px **透明**的(不是「沒有 border」):輪到莊家時只換顏色,
@@ -4732,14 +4485,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     font:800 10px/1.5 'Nunito',sans-serif;color:var(--text)}
   .bj-bet i{font-style:normal;font-weight:700;color:var(--muted);margin-right:1px}
   .bj-bet b{color:var(--accent-2);margin-left:1px}
-  :root[data-theme="ebook"] .bj-bet{background:#eee;color:#000;border:1px solid #ccc}
+
   /* 狀態記號(下注中 / 停 / 爆 / 考慮中)—— ⚠ 一律是**公開資訊**,不准夾帶牌情 */
   .bj-st{flex:none;white-space:nowrap;font:800 10px/1.5 'Nunito',sans-serif;color:var(--muted)}
   .bj-st.ok{color:var(--bj-grn)}
   .bj-st.bad{color:var(--bj-redlit)}
   .bj-st.wait{color:var(--accent-2)}
-  :root[data-theme="ebook"] .bj-st,:root[data-theme="ebook"] .bj-st.ok,
-  :root[data-theme="ebook"] .bj-st.bad,:root[data-theme="ebook"] .bj-st.wait{color:#000}
+
   /* ★ 點數膠囊(雙值「7 / 17」就長在這裡)。⚠ 一律靠右:名字長短不會讓它左右跳 */
   .bj-pt{flex:none;margin-left:auto;white-space:nowrap;
     padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.16);
@@ -4755,9 +4507,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* 「4 + ?」= 這個數字只算了明牌那一張(莊家還沒翻牌)。
      ⚠ 那個 <b>+ ?</b> 要比數字淡:它不是點數的一部分,是「還有一張不知道」 */
   .bj-pt.part b{font-weight:800;font-size:9.5px;opacity:.7;margin-left:1px}
-  :root[data-theme="ebook"] .bj-pt{background:#eee;color:#000;border:1px solid #ccc}
-  :root[data-theme="ebook"] .bj-pt.bust{background:#fff;border:2px dashed #000}
-  :root[data-theme="ebook"] .bj-pt.bj,:root[data-theme="ebook"] .bj-pt.dragon{background:#000;color:#fff}
 
   /* ---------- 我的手牌 ----------
      ★★ 格位是**固定的**(照大老二 v1.77.0):容器寬 = --bj-slots × 一格、靠左填,
@@ -4804,7 +4553,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-card.mid{--bjw:calc(var(--bj-cw) * .72)}
   .bj-card.sm{--bjw:calc(var(--bj-cw) * .52)}
   .bj-card.tiny{--bjw:21px;box-shadow:0 1px 1px rgba(0,0,0,.22)}
-  :root[data-theme="ebook"] .bj-card{background:#fff;border-color:#000;box-shadow:none}
 
   /* ★★★ 牌背 —— **這一頁唯一的牌情紅線**(莊家的第二張牌)。
      ★ 它與前七個遊戲的隱藏性質相反:那些是「防偷看」(顯示端不畫、位置畫張數),
@@ -4818,9 +4566,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       repeating-linear-gradient(45deg,rgba(255,255,255,.20) 0 2px,transparent 2px 6px),
       repeating-linear-gradient(-45deg,rgba(255,255,255,.20) 0 2px,transparent 2px 6px);
     box-shadow:0 0 0 1px rgba(255,255,255,.22) inset}
-  :root[data-theme="ebook"] .bj-card.back{background:#fff;border-color:#000}
-  :root[data-theme="ebook"] .bj-bk{background-image:
-      repeating-linear-gradient(45deg,#000 0 1px,transparent 1px 5px);box-shadow:none}
 
   /* ---------- 動作列 ----------
      ★ 只有一份(單機與連線共用)—— 21 點的動作集很小,兩邊的狀態都表達得成純資料。 */
@@ -4834,8 +4579,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-selbar.ok{background:rgba(129,199,132,.20);color:var(--text)}
   .bj-selico{flex:none;font-size:14px;line-height:1}
   .bj-seltxt{min-width:0}
-  :root[data-theme="ebook"] .bj-selbar{background:#fff;border:1px solid #ccc;color:#000}
-  :root[data-theme="ebook"] .bj-selbar.ok{border:2px solid #000}
+
   .bj-btns{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
   .bj-btns .btn{padding:8px 15px;font-size:13.5px}
 
@@ -4860,8 +4604,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-bamt b{font:900 15px/1 'Fredoka','Nunito',sans-serif;color:#fff4d2}
   .bj-bamt.ok{background:rgba(129,199,132,.24);box-shadow:0 0 0 1px rgba(129,199,132,.5) inset}
   .bj-bamt.ok i,.bj-bamt.ok b{color:#e6ffe7}
-  :root[data-theme="ebook"] .bj-bamt{background:#fff;border:1px solid #000;box-shadow:none}
-  :root[data-theme="ebook"] .bj-bamt i,:root[data-theme="ebook"] .bj-bamt b{color:#000}
+
   /* 「押注 ▸」—— 提示列裡的小鈕(不要用 .bj-btns 那組 8px padding,會把列撐高) */
   .bj-selbar .bj-bok{flex:none;padding:4px 11px;font-size:12.5px;border-radius:9px}
   /* ⚠⚠⚠ 這一條的三個字都是量出來的,不要「順手簡化」:
@@ -4910,8 +4653,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-cd.bj-hot .bj-cdfg{stroke:var(--bj-redlit)}
   .bj-cd.bj-hot .bj-cdn{color:var(--bj-redlit)}
   .bj-cd.bj-hot{animation:m16cdhot .9s ease-in-out infinite}
-  :root[data-theme="ebook"] .bj-cdbg{stroke:rgba(0,0,0,.18)}
-  :root[data-theme="ebook"] .bj-cdfg{stroke:#000}
+
   /* 會動的東西一律尊重系統的「減少動態效果」(同 m16 那條) */
   @media (prefers-reduced-motion:reduce){
     .bj-cd.bj-hot{animation:none}
@@ -4962,19 +4704,17 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 靠右的 auto 邊界只准有**一個** —— 就是這一格的 margin-left:auto,不要再加第二個。 */
   .bj-rchip{flex:none;margin-left:auto;min-width:34px;text-align:right;
     font:900 12.5px/1.5 'Fredoka','Nunito',sans-serif;color:#ffe1a0}
-  :root[data-theme="ebook"] .bj-rchip{color:#000}
+
   .bj-rd{flex:none;min-width:42px;text-align:right;
     font:900 14px/1 'Fredoka','Nunito',sans-serif;color:var(--muted)}
   .bj-rrow.up .bj-rd{color:var(--bj-grn)}
   .bj-rrow.down .bj-rd{color:var(--bj-redlit)}
-  :root[data-theme="ebook"] .bj-rrow.up .bj-rd,:root[data-theme="ebook"] .bj-rrow.down .bj-rd{color:#000}
+
   /* 第二層:他這一局的牌(★ 結算了,莊家的暗牌在這裡一定是翻開的)。縮排對齊名次圈右緣 */
   .bj-rcards{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding-left:25px}
   .bj-rbet{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
   .bj-rfoot{margin-top:9px;font:700 11px/1.5 'Nunito',sans-serif;color:var(--muted);text-align:center}
-  :root[data-theme="ebook"] .bj-rrow{background:#fff;border:1px solid #ccc}
-  :root[data-theme="ebook"] .bj-rrow.me{border:2px solid #000;box-shadow:none}
-  :root[data-theme="ebook"] .bj-rrow.win .bj-rno{background:#000;color:#fff}
+
   /* ★★ 共用連線層自己畫的累積分表(#winScores)那些列要收掉(排七 v1.75.9 的教訓):
      它的內容已經併進上面的排名表,留著就是同一份資料兩張表。
      ⚠ 只留 .ws-goal 的「🎯 搶 N 籌碼」:那句在這一頁沒有別的出口。
@@ -5103,7 +4843,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%),
       linear-gradient(180deg,#1d4c3a,#12332a 70%,#0e2822);
     box-shadow:inset 0 0 0 2px rgba(255,255,255,.07), inset 0 10px 26px rgba(0,0,0,.34)}
-  :root[data-theme="ebook"] .bj-table{background:#fff;border:1px solid #000;box-shadow:none}
 
   /* ---------- 莊家台(要求①的後半:範圍高一點、牌大一階)----------
      ⚠ border 一律 2px **透明**:輪到他時只換顏色,標不標都不會讓整桌高 4px。 */
@@ -5129,7 +4868,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-dhd{flex:none;height:20px}
   .bj-dnm{font:900 15px/1.3 'Nunito',sans-serif;color:#fff;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  :root[data-theme="ebook"] .bj-dnm{color:#000}
+
   /* 牌列:吃掉那一格剩下的高度,不換行(放不下就擠窄,同注區 .bj-bcs 那條) */
   .bj-dcs{flex:1 1 auto;min-height:0;display:flex;flex-wrap:nowrap;gap:3px;
     align-items:center;justify-content:center;overflow:hidden}
@@ -5153,11 +4892,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
   /* ★ 抓人展開時抓得動的那幾格 —— 整格就是那顆鈕在指的東西 */
   .bj-box.target{border-color:#ffc454;box-shadow:0 0 0 3px rgba(255,196,84,.22)}
-  :root[data-theme="ebook"] .bj-box{background:#fff;border-color:#000}
+
   .bj-bhd{display:flex;align-items:center;gap:4px;min-width:0;flex:none}
   .bj-bnm{font:900 11.5px/1 'Nunito',sans-serif;color:#fff;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  :root[data-theme="ebook"] .bj-bnm{color:#000}
+
   /* ★ 要求③:超過放得下的張數就**換行**(不是把牌變小) */
   .bj-bcs{flex:1 1 auto;min-height:0;display:flex;flex-wrap:wrap;gap:3px;
     align-items:center;align-content:center;justify-content:center;overflow:hidden}
@@ -5180,7 +4919,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-bmeta{margin-left:auto;flex:none;display:flex;align-items:center;gap:3px}
   .bj-bmeta .bj-pt{margin-left:0}
   .bj-st.caught{color:#ffc454;font-weight:900}
-  :root[data-theme="ebook"] .bj-st.caught{color:#000}
+
   .bj-box.idle{opacity:.85}
 
   /* ---------- 抓人那一排(動作列切換,★ 不多一列)---------- */
@@ -5278,12 +5017,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* 亮框一律用 border + box-shadow 的**外圈**要小心被裁 —— .bj-boxes 現在是
      overflow:auto,所以這裡的呼吸只動亮度(不動大小 / 不外擴),才不會被裁邊。 */
   @keyframes bjTgt{ 0%,100%{ filter:brightness(1) } 50%{ filter:brightness(1.22) } }
-  :root[data-theme="ebook"] .bj-box.target{animation:none;border-style:dashed}
+
   /* 「這一格抓得動」的記號 —— ⚠ 只准是「抓不抓得動」這件事(公開資訊),
      一個字都不准夾帶牌情(他幾點 / 停了沒 已經各有自己的膠囊在講)。 */
   .bj-gtip{flex:none;padding:0 4px;border-radius:6px;background:#ffc454;
     font:900 9.5px/1.5 'Nunito',sans-serif;color:#2a1c00;white-space:nowrap}
-  :root[data-theme="ebook"] .bj-gtip{background:#000;color:#fff}
 
   /* ---------- 矮視窗:一格的裝潢收一號(v1.87.0)----------
      ★ 為什麼要收:一格的「頭列 + 尾列 + padding」約 57px,而 6 人局有 3 列 + 莊家台
@@ -5324,13 +5062,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     font:900 10px/1 'Nunito',sans-serif;color:#241a2e;background:#cfd4e0}
   .bj-sn.p0{background:#ff6b8a}.bj-sn.p1{background:#4fc3f7}.bj-sn.p2{background:#ffd54f}
   .bj-sn.p3{background:#81c784}.bj-sn.p4{background:#ba9cff}.bj-sn.p5{background:#ffab7a}
-  :root[data-theme="ebook"] .bj-sn{background:#fff;color:#000;border:1px solid #000}
+
   /* 房規面板:「點名誰先當莊」那一排(選項由 main.js 生成 → 這裡只管排版)。
      ⚠ 名字長短不一 → 允許換行(這是設定面板,不是寫死高度的動作列)。 */
   .bj-first-who{flex-wrap:wrap}
   .bj-first-lbl{font:800 10.5px/1.4 'Nunito',sans-serif;color:var(--muted);margin-top:2px}
   .bj-first-note{font:800 10.5px/1.4 'Nunito',sans-serif;color:#ffb4a2;margin-top:4px}
-  :root[data-theme="ebook"] .bj-first-note{color:#000}
 
   /* ==========================================================================
      台式21點 v1.91.0 —— ★★★ 「這是我」與「現在在等誰」用兩種完全不同的語彙
@@ -5367,7 +5104,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        ②在格子裡面 → 捲動容器裁不到 ③兩條可以同時存在(border 只有一條)。
      ========================================================================== */
   :root{ --bj-turn:#6ec8ff; }
-  :root[data-theme="ebook"]{ --bj-turn:#000; }
+
   /* 偽元素的定位基準。⚠ 一格 / 莊家台裡面本來沒有絕對定位的東西,加這條零影響。 */
   .bj-box,.bj-dealer{position:relative}
 
@@ -5381,11 +5118,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        「我在哪」的記號比我當閒家時弱一階(同一件事在兩個位置強度不同 = 玩家會愣一下)。 */
   /* ⚠⚠ 金框那一條寫在**檔尾**(見②的結尾)—— 它必須排在 .act 的 transparent 後面,
      不然「我 + 正在補牌」時框會被關掉。這裡只放不牽涉 border-color 的部分。
-     ⚠ border **寬度**一格都不能動(連電子書主題也不行):BOX_PADX 是「一格塞得下
+     ⚠ border **寬度**一格都不能動:BOX_PADX 是「一格塞得下
        5 張」那條算式的常數,加粗 1px = 我那一格的牌比別人窄 = CARDW 出現兩個值。 */
   .bj-box.me .bj-bnm,.bj-dealer.me .bj-dnm{color:#ffd489}
-  :root[data-theme="ebook"] .bj-box.me .bj-bnm,
-  :root[data-theme="ebook"] .bj-dealer.me .bj-dnm{color:#000}
 
   /* ---------- ②「現在在等他」:上緣一條會呼吸的青光條(暫時)---------- */
   /* ⚠ 這一軌**完全不碰 border** —— border 從此只講身分,所以「我 + 正在補牌」
@@ -5411,8 +5146,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 順序:一定要排在上面兩條 transparent **後面**,否則「我 + 正在補牌」時
        框會被關掉(而那正是舊版 .me / .act 互相蓋來蓋去的老問題)。 */
   .bj-box.me,.bj-box.me.act,.bj-dealer.me,.bj-dealer.me.act{border-color:#ffd489}
-  :root[data-theme="ebook"] .bj-box.me,:root[data-theme="ebook"] .bj-box.me.act,
-  :root[data-theme="ebook"] .bj-dealer.me,:root[data-theme="ebook"] .bj-dealer.me.act{border-color:#000}
 
   /* ---------- ③「這一格抓得動」:改成白框(金色從此只代表「我」)---------- */
   /* ★ 抓人展開的那幾秒,那幾格其實是**按鈕** —— 高對比的白框 + 「🎯 抓」比金色更像
@@ -5421,7 +5154,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        (大老二 v1.77 / v1.78 各錯一次)。呼吸照舊只動亮度。 */
   .bj-box.target{border-color:#ffffff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
   .bj-gtip{background:#ffffff;color:#1d2b1f}
-  :root[data-theme="ebook"] .bj-box.target{border-color:#000}
 
   /* ==========================================================================
      ★★★ 一局結束的過場(v1.92.0)—— #bjHand · BJB.showHand / hideHand
@@ -5445,7 +5177,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     align-items:center;justify-content:center;padding:5px;border-radius:12px;
     background:rgba(8,12,18,.93);backdrop-filter:blur(3px)}
   .bj-hand.show{display:flex}
-  :root[data-theme="ebook"] .bj-hand{background:#fff;backdrop-filter:none}
+
   /* ★★ **只有中間那張表會捲**(逐字照房規面板 v1.87.0 那一組:`.bj-rules-card` +
      `.set-body`)—— 6 人局的結算表 + 六排牌在橫置手機(430px 高)一定超出,
      而第一版是「整張卡自己捲」→ 進度條與「準備下一局…」被推到捲軸下面,
@@ -5457,7 +5189,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     display:flex;flex-direction:column;gap:4px;padding:9px 10px;border-radius:14px;
     background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.035));
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
-  :root[data-theme="ebook"] .bj-hcard{background:#fff;border:2px solid #000;box-shadow:none}
+
   .bj-httl{font:800 11px/1 'Nunito',sans-serif;color:var(--muted);
     letter-spacing:.7px;text-align:center}
   /* 大字 = 我這一把 ±多少。★ clamp 而不是三段 media query:這一格的字級只跟寬度有關,
@@ -5468,10 +5200,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-hbig.down{color:var(--bj-redlit)}
   /* 平手 / 旁觀:數字本身沒有方向 → 不給顏色,而且刻意小一號(它不是重點) */
   .bj-hbig.even,.bj-hbig.none{font-size:clamp(18px,5.5vw,24px)}
-  :root[data-theme="ebook"] .bj-hbig,:root[data-theme="ebook"] .bj-hbig.up,
-  :root[data-theme="ebook"] .bj-hbig.down{color:#000}
+
   .bj-hwhy{font:800 12px/1.35 'Nunito',sans-serif;color:#fff;text-align:center;opacity:.92}
-  :root[data-theme="ebook"] .bj-hwhy{color:#000}
+
   /* ★ 這是卡片裡**唯一**可捲的一塊(見 .bj-hcard 那段的兩條)。
      ⚠ min-height:0 少一個字,flex 子項就不肯縮到內容以下 → 又變成整張卡溢出。 */
   .bj-hlist{flex:1 1 auto;min-height:0;overflow-y:auto;margin-top:1px}
@@ -5485,8 +5216,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     background:var(--accent);transform-origin:left center;
     animation:bjHbar var(--bj-hdur,3s) linear forwards}
   @keyframes bjHbar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
-  :root[data-theme="ebook"] .bj-hbar{background:#eee;border:1px solid #000}
-  :root[data-theme="ebook"] .bj-hbar i{background:#000}
+
   /* ★★★ v1.94.0:腳註與「點掉」那顆鈕同一列(使用者:「我希望有可以快速關掉的操作」)。
      ⚠ 這一列是 flex 而不是「腳註一列 + 鈕一列」:過場的高度是被 `.bj-hlist` 的
        `flex:1` 吃掉剩下的,多一列就等於中間那張表少一列(6 人局最需要那一列)。
@@ -5500,7 +5230,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ★★★ v1.95.0:按過了(連線在等其他人)—— 變暗但**照樣按得動**
      (CLAUDE.md 的紅線:不用 disabled 讓點擊靜默消失;再按會跳「你已經按過了」)。 */
   .bj-hskip.voted{background:rgba(255,255,255,.14);color:#fff;box-shadow:none;opacity:.72}
-  :root[data-theme="ebook"] .bj-hskip.voted{background:#eee;color:#000;border:1px solid #000}
 
   /* ==========================================================================
      UNO(第九個遊戲,v1.106.0)—— 前綴一律 .un-*
@@ -5513,13 +5242,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 四個顏色要能在深色桌面上互相分辨,所以亮度刻意拉高於印刷值;
        綠與藍之間最容易糊掉,取樣過的兩個值差 40 度色相以上。
 
-     ── ★★★ 電子書主題**不可以**把這四支塌成黑 ──────────────────────────────
-       其他八個遊戲的電子書主題一律轉黑白,因為顏色在它們身上只是裝潢。
-       **UNO 不是** —— 「能不能出這張牌」的規則本體就是顏色,四色一起變黑
-       = 這個遊戲在電子書主題下**直接不能玩**(不是變醜,是玩不了)。
-       所以這四支在每個主題下都保持原值,電子書只把「牌面以外」的東西轉黑白。
-       ★ 附帶好處:紅綠色盲的玩家也吃這條 —— 牌面另外會標色名字母(見 .un-cd 那段)。
-     ⚠ 因此圖示的電子書覆寫要寫在**圖示自己那幾條 class 上**,不是改變數。 */
+     ── ★★★ 任何主題都不可以把這四支塌成同一色 ──────────────────────────────
+       其他八個遊戲的顏色只是裝潢,主題想怎麼換都行。
+       **UNO 不是** —— 「能不能出這張牌」的規則本體就是顏色,四色一旦變得分不清
+       = 這個遊戲**直接不能玩**(不是變醜,是玩不了)。
+       所以這四支在每個主題下都保持原值,只有「牌面以外」的裝潢跟著主題走。 */
   :root{ --un-r:#e0322f; --un-y:#f2b01c; --un-g:#2ea94c; --un-b:#2470c4;
          --un-face:#ffffff; --un-line:#f4f1ea; --un-blk:#1d2733; }
 
@@ -5554,7 +5281,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 
      ⚠ 顏色 class(.un-ic-r/y/g/b)**同時給 rect 與 text 用** —— 兩者都是 fill,
        所以一個 class 兩處通吃,不必寫 .un-ic-bd.un-ic-r 那種組合。
-     ⚠ 白橢圓一律 --un-face,**不可以**寫死 #fff(電子書主題要跟著走)。 */
+     ⚠ 白橢圓一律 --un-face,**不可以**寫死 #fff。 */
   .un-ic-bd{stroke:var(--un-line);stroke-width:.9}
   /* ⚠ 橢圓要**撐滿整張牌的對角**(rx 8.4 / ry 13 在 21×30 的牌上約佔八成)——
      第一版取 7.2/11.4,截圖看起來像「牌中間有一小塊白斑」而不是 UNO 的橢圓。
@@ -5571,13 +5298,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-ic-y{fill:var(--un-y)}
   .un-ic-g{fill:var(--un-g)}
   .un-ic-b{fill:var(--un-b)}
-  /* ★ 電子書主題:白牌 + 黑框 + 黑字(同其他八張卡的處理)。
-     ⚠ 走**圖示自己這幾條 class**,不是把 --un-* 塌成黑 —— 見上面那段 ★★★:
-       那四支變數是遊戲規則的一部分,任何主題都不准動它們。
-     ⚠ 這裡要壓過 .un-ic-r/y/g/b 的 fill,所以選擇器要更具體(兩層 class)。 */
-  :root[data-theme="ebook"] .un-ic-bd{fill:#fff;stroke:#000;stroke-width:1.1}
-  :root[data-theme="ebook"] .un-ic-ov{fill:#fff;stroke:#000;stroke-width:.9}
-  :root[data-theme="ebook"] .un-ic-t{fill:#000}
 
   /* 進場插圖(uno.html 頂端那張大圖)。
      ⚠⚠ 首頁那張遊戲卡掛的是 **.un-cart**,**絕對不可以**掛 .un-art ——
@@ -5669,9 +5389,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-c-y .un-lb{color:var(--un-y)}
   .un-c-g .un-lb{color:var(--un-g)}
   .un-c-b .un-lb{color:var(--un-b)}
-  /* ★ 色名字母:只在電子書主題(黑白)才顯示 —— 一般彩色主題下顏色本身就夠分辨,
-     玩家實測反饋不想在牌角看到英文字母,所以彩色主題預設 display:none;
-     電子書主題轉黑白之後顏色判斷通道消失,靠它補回來(見下面 ebook 那段 override)。 */
+  /* ★ 色名字母:給紅綠色盲玩家補的辨色線索,原本只在電子書(黑白)主題顯示 —— 一般彩色
+     主題下顏色本身就夠分辨,玩家實測反饋也不想在牌角看到英文字母,所以預設 display:none。
+     ⚠ 電子書主題已拿掉,現在沒有任何主題會切到 block —— 這顆字母永久隱藏,board.js 那段
+     HTML 仍照樣吐出來(見 js/uno/board.js 檔頭),只是沒有入口再顯示。 */
   .un-cl{position:absolute;right:calc(var(--un-cw) * .08);bottom:calc(var(--un-cw) * .04);
     font:800 calc(var(--un-cw) * .22)/1 'Nunito',sans-serif;color:#fff;opacity:.92;display:none}
   /* Wild:白橢圓裡四色風車 + 中央深色圓寫 W / +4 */
@@ -5731,7 +5452,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ★ 綠底不會吃掉 UNO 的四色:每張牌都有 2px 白邊 + 斜白橢圓(見 .un-card),
        綠牌 #2ea94c 壓在深綠桌布上仍然分得出來 —— 但這件事斷言測不到,
        驗收點是 `node tools/gen-uno-shot.js` 的截圖(它吃 `?theme=`,
-       **bubblegum 與 ebook 一定要各看一次**)。 */
+       **bubblegum 一定要看一次**)。 */
   /* ★ position:relative 是給釘左上角的罰抽膠囊(.un-pen)定位用的。 */
   .un-table{position:relative;flex:0 1 auto;min-height:200px;max-height:340px;
     display:flex;flex-direction:column;align-items:center;
@@ -5741,9 +5462,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,.10), rgba(0,0,0,0) 60%),
       linear-gradient(180deg,#1d4c3a,#12332a 70%,#0e2822);
     box-shadow:inset 0 0 0 2px rgba(255,255,255,.07), inset 0 10px 26px rgba(0,0,0,.34)}
-  /* ⚠ 電子書主題一定要覆寫回白底黑框(同另外三頁),而且要**補 box-shadow:none** ——
-     不補的話白底上壓著一圈暗角。 */
-  :root[data-theme="ebook"] .un-table{background:#fff;border:1px solid #000;box-shadow:none}
+
   /* ⚠⚠ 桌布上的字**不可以吃 --text / --muted** —— 那兩支是跟著主題走的,
      而桌布是寫死的深綠:bubblegum 主題的 --text 是 #6a1f57(深紫)、--muted 是 #a76b96,
      壓在深綠上「現在顏色 黃」那一句幾乎看不見(對比 1.3),而那一句正是 Wild 之後
@@ -5758,8 +5477,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-table .un-swatch{box-shadow:inset 0 0 0 1px rgba(0,0,0,.25),0 0 0 2px rgba(255,255,255,.24)}
   .un-table .un-nowtxt{color:#fff}
   .un-table .un-dir{color:rgba(255,255,255,.78);background:rgba(0,0,0,.26)}
-  :root[data-theme="ebook"] .un-table .un-nowtxt{color:#000}
-  :root[data-theme="ebook"] .un-table .un-dir{color:#555;background:#eee}
+
   /* (v1.108.0 那顆桌子右上角的「牌堆 N」`.un-deck` 在 v1.110.0 拿掉了 ——
       牌堆與「抽一張」合併成手牌右邊的 `.un-drawpad`,同一件事只留一個地方。
       桌上現在只有兩件事:牌河最上面那張 + 現在顏色。) */
@@ -5787,8 +5505,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     font:800 12.5px/1 'Nunito',sans-serif;color:#ffd66b;text-align:center;
     background:rgba(0,0,0,.28);border-radius:999px;padding:4px 11px}
   .un-pen b{font-size:14px;color:#fff}
-  :root[data-theme="ebook"] .un-pen{color:#000;background:#eee}
-  :root[data-theme="ebook"] .un-pen b{color:#000}
 
   /* ---------- 手牌 ----------
      ⚠ 永遠**一列**(nowrap):手牌可能到二十幾張,換行會把桌子擠掉。
@@ -5872,9 +5588,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
           notes/18「桌布上的字不可以吃主題色」那條教訓的鏡像:淺色主題也要驗一次。 */
   .un-drawpad.pen .un-dp-n{color:var(--un-r)}
   .un-drawpad:active{transform:scale(.96)}
-  :root[data-theme="ebook"] .un-drawpad{border-color:#000;color:#000;background:#fff}
-  :root[data-theme="ebook"] .un-drawpad.can{box-shadow:0 0 0 3px #000}
-  :root[data-theme="ebook"] .un-drawpad.pen .un-dp-n{color:#000;text-decoration:underline}
 
   /* ---------- 動作列 ----------
      ★★ 高度是**寫死的**(不是 min-height),而且裡面是固定的兩列:
@@ -5985,27 +5698,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-rcards{display:flex;gap:3px;flex-wrap:wrap}
   .un-rout{font-size:11.5px;font-weight:800;color:var(--accent)}
 
-  /* ---------- 電子書主題 ----------
-     ★★ 四色**不動**(見上面那段 ★★★:顏色是 UNO 的規則本體,轉黑白等於玩不了)。
-     這裡只把「牌面以外」的裝潢轉黑白,並且把牌框加粗讓白底上的牌看得出邊界。 */
-  :root[data-theme="ebook"] .un-card{box-shadow:none;border-color:#000}
-  :root[data-theme="ebook"] .un-card.can{box-shadow:0 0 0 3px #000}
-  :root[data-theme="ebook"] .un-card.no{filter:saturate(.2) brightness(.85)}
-  /* ★★ 色名字母只有這個主題才現身(見上面 .un-cl 那條 ★ 註解)——
-     轉黑白之後顏色判斷通道消失,紅綠色盲的玩家與所有人一樣改靠字母分色。 */
-  :root[data-theme="ebook"] .un-cl{display:block}
-  :root[data-theme="ebook"] .un-table{background:#fff;border:1px solid #000}
-  :root[data-theme="ebook"] .un-dir{background:#eee;color:#000}
-  :root[data-theme="ebook"] .un-cdbg{stroke:rgba(0,0,0,.18)}
-  :root[data-theme="ebook"] .un-cdfg{stroke:#000}
-  :root[data-theme="ebook"] .un-cd.un-hot .un-cdfg{stroke:#000}
-  :root[data-theme="ebook"] .un-cd.un-hot .un-cdn{color:#000}
-  /* ★ UNO 徽章在電子書主題轉黑白 —— 它是**按鈕**不是牌面,不吃「四色一律保留」
-     那條紅線(同首頁圖示的處理:圖示不承載規則)。 */
-  :root[data-theme="ebook"] .un-unobtn{background:#fff;
-    box-shadow:0 0 0 2px #000 inset,0 2px 0 rgba(0,0,0,.5)}
-  :root[data-theme="ebook"] .un-uw{color:#000;text-shadow:none}
-
   /* ==========================================================================
      UNO 的外框(照 .b2-* 那一組做一份對應的)
      ⚠ 這幾條**不可以**直接沿用 .b2-*:那些是大老二那一頁的,改動會波及它。
@@ -6014,7 +5706,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
     line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .un-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+
   .un-scroll{flex:1 1 auto}
   .un-hero{text-align:center;margin:14px 0 4px}
   /* 單機第二層的戰績那一行(照大老二的 .b2-warn) */
@@ -6080,8 +5772,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-rules-list li b{color:var(--text)}
   .un-rules-sum{flex:none;text-align:left;padding-top:8px;
     font:700 12px/1.5 'Nunito',sans-serif;color:var(--accent-2)}
-  :root[data-theme="ebook"] .un-rules-list li::before{background:#000}
-  :root[data-theme="ebook"] .un-rules-list li b{color:#000;text-decoration:underline}
 
   /* ---------- 選色盤那張卡 ---------- */
   .set-card.un-color-card{width:min(88vw,380px);max-width:none;text-align:center}
@@ -6140,10 +5830,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ──────────────────────────────────────────────────────────────────────────
        ★ 前綴一律 .dc-*(CLAUDE.md 紅線 6);這一段只追加,不動上面任何一行。
        ★★ 這一頁的「紅 vs 黑」是**規則本體**(兩方就是靠顏色分的),所以:
-          任何主題都不准把兩方塌成同一種樣子。電子書主題沒有顏色可用 →
-          改用「紅方雙圈、黑方單圈」把辨識點補回來(同 UNO 給色盲補色名字母的做法)。
+          任何主題都不准把兩方塌成同一種樣子。
           ⚠ 另一半的保險是**棋子上的字本來就不一樣**(帥仕相俥傌炮兵 / 將士象車馬包卒),
-            所以就算兩個機制都失效,玩家仍然分得出來 —— 但不要因此拿掉任何一個。
+            所以就算顏色分不清,玩家仍然分得出來 —— 但不要因此就不管顏色。
      ========================================================================== */
   /* 材質色:與數獨的 --sk-* 同一個做法 —— **刻意不吃主題變數**。
      木頭就是木頭,五個主題各換一種顏色只會讓它看起來像塑膠。 */
@@ -6152,11 +5841,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
          --dc-red:#c62828; --dc-blk:#2b2622;
          --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(0,0,0,.14);
          --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6; }
-  :root[data-theme="ebook"]{ --dc-wood:#ffffff; --dc-wood-e:#000000; --dc-wood-in:#ffffff;
-         --dc-back:#ffffff; --dc-back-e:#000000; --dc-back-in:#ffffff;
-         --dc-red:#000000; --dc-blk:#000000;
-         --dc-well:#ffffff; --dc-well-e:#000000; --dc-slot:#f2f2f2;
-         --dc-tgt:#000000; --dc-tgt-eat:#000000; --dc-tgt-far:#000000; }
 
   /* ---------- 首頁 icon / 進場插圖(逐字相同的一份 SVG,只有外層 class 不同) ----------
      ⚠⚠ 首頁那張遊戲卡掛的是 **.dc-cart**,**絕對不可以**掛 .dc-art ——
@@ -6174,9 +5858,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ★ 牌背的三條紋是「這一顆還沒翻」的唯一線索 —— 它與正面那顆的差別要一眼看得出來 */
   .dc-ic-grain{stroke:var(--dc-back-e);stroke-width:1.1;stroke-linecap:round;opacity:.5;fill:none}
   .dc-ic-t{fill:var(--dc-red);font:800 15px/1 'Nunito',sans-serif;text-anchor:middle}
-  /* 電子書主題:白底黑框黑字,紅方那顆靠**雙圈**留住辨識點 */
-  :root[data-theme="ebook"] .dc-ic-ring{stroke:#000;stroke-width:1.6}
-  :root[data-theme="ebook"] .dc-ic-t{fill:#000}
 
   /* ---------- 外框(照 .un-* 那一組做一份對應的)----------
      ⚠ 這幾條**不可以**直接沿用 .un-*:那些是 UNO 那一頁的,改動會波及它。
@@ -6184,7 +5865,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
     line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
-  :root[data-theme="ebook"] .dc-brand{background:none;color:#000;-webkit-text-fill-color:#000}
+
   .dc-scroll{flex:1 1 auto}
   .dc-hero{text-align:center;margin:14px 0 4px}
   .dc-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
@@ -6261,9 +5942,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     line-height:1;font-size:calc(var(--dc-cell,44px) * .46)}
   .dc-red{color:var(--dc-red)}
   .dc-blk{color:var(--dc-blk)}
-  /* ★★ 電子書主題:兩方都變黑字 → 紅方靠**雙圈**留住辨識點(見這一段開頭的 ★★) */
-  :root[data-theme="ebook"] .dc-p{background:#fff;box-shadow:0 0 0 2px #000}
-  :root[data-theme="ebook"] .dc-red .dc-ring{box-shadow:0 0 0 2.5px #fff,0 0 0 4px #000}
 
   /* 牌背:與正面**明顯不同色**,而且沒有字。⚠ 不可以只降飽和度來表示「暗」——
      那會看起來像 disabled(UNO 的暗牌踩過同一件事)。 */
@@ -6272,7 +5950,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     box-shadow:0 0 0 1.5px var(--dc-back-e),0 2px 0 rgba(0,0,0,.3),0 3px 6px rgba(0,0,0,.25)}
   .dc-grain{position:absolute;width:52%;height:34%;border-radius:2px;
     background:repeating-linear-gradient(180deg,currentColor 0 1.5px,transparent 1.5px 5px);opacity:.45}
-  :root[data-theme="ebook"] .dc-back{background:#fff;box-shadow:0 0 0 2px #000}
 
   /* ---------- 可點 / 選中 / 落點 ----------
      ⚠ 不能點的格**不給 disabled**(CLAUDE.md 的紅線)—— 點下去要看得到 toast 說原因。
@@ -6368,8 +6045,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-cd.dc-hot .dc-cdfg{stroke:var(--daub)}
   .dc-cd.dc-hot .dc-cdn{color:var(--daub)}
   .dc-cd.dc-hot{animation:m16cdhot .9s ease-in-out infinite}
-  :root[data-theme="ebook"] .dc-cdbg{stroke:rgba(0,0,0,.18)}
-  :root[data-theme="ebook"] .dc-cdfg{stroke:#000}
+
   /* 會動的東西一律尊重系統的「減少動態效果」(同 m16 那條) */
   @media (prefers-reduced-motion:reduce){
     .dc-cd.dc-hot{animation:none}

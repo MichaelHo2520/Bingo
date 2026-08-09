@@ -1,7 +1,7 @@
 "use strict";
 
   const THEMES=["sunset","midnight","bubblegum","meadow","arcade"];
-  const THEME_NAMES={sunset:"落日",midnight:"午夜霓虹",bubblegum:"泡泡糖",meadow:"草原",arcade:"街機",ebook:"電子書"};
+  const THEME_NAMES={sunset:"落日",midnight:"午夜霓虹",bubblegum:"泡泡糖",meadow:"草原",arcade:"街機"};
   const THEME_COLORS={sunset:["#ff8a3d","#ffd24a"],midnight:["#22e0ff","#ff4bd8"],bubblegum:["#ff4fa3","#9b6bff"],meadow:["#6cc04a","#ffcf47"],arcade:["#ffe600","#ff2d55"]};
   const $=id=>document.getElementById(id);
   const grid=$("grid");
@@ -440,7 +440,6 @@
 
   /* ---------- Confetti ---------- */
   function burst(){
-    if(document.documentElement.getAttribute("data-theme")==="ebook")return;
     const cv=$("confetti"),ctx=cv.getContext("2d");
     cv.width=innerWidth;cv.height=innerHeight;
     const cs=getComputedStyle(document.documentElement);
@@ -485,7 +484,6 @@
       const nameEl=$("mpName");
       localStorage.setItem(STORE_KEY, JSON.stringify({
         theme:lastColorTheme,
-        ebook:document.documentElement.getAttribute("data-theme")==="ebook",
         muted:Sound.isMuted(),
         target:state.target,
         size:SIZE,
@@ -527,7 +525,6 @@
     if(Array.isArray(p.clipOrder)) clipOrder=p.clipOrder;
     if(MP&&MP.usePrefs){ MP.usePrefs(p.scoreMode, p.winGoal); }   // 帶回記住的連線計分偏好(建房預設)
     if(p.bgmOn){ bgmOn=true; }   // 記住「想開」;實際播放等首次使用者互動(繞過自動播放限制)
-    if(p.ebook){ setEbook(true,true); }
     if(typeof p.name==="string" && p.name){ const nameEl=$("mpName"); if(nameEl) nameEl.value=p.name; }
   }
 
@@ -546,24 +543,20 @@
   }
   function setTheme(name){
     if(THEMES.indexOf(name)<0)return;
-    if(document.documentElement.getAttribute("data-theme")==="ebook")return;   // locked in e-book mode
     document.documentElement.setAttribute("data-theme",name);
     lastColorTheme=name;
     savePrefs();
     syncSettingsUI();
   }
   function syncSettingsUI(){
-    const isEbook=document.documentElement.getAttribute("data-theme")==="ebook";
-    const swE=$("swEbook"), swM=$("swMute"), sw=$("swatches");
-    if(swE)swE.setAttribute("aria-checked",isEbook?"true":"false");
+    const swM=$("swMute"), sw=$("swatches");
     if(swM)swM.setAttribute("aria-checked",Sound.isMuted()?"false":"true");   // on = 有聲音
     const sfxEl=$("sfxVol"), sfxRow=$("sfxVolRow");
     if(sfxEl)sfxEl.value=Math.round(sfxVol*100);
     if(sfxRow)sfxRow.classList.toggle("dim",Sound.isMuted());   // 音效關閉時,音量列淡化
     const swV=$("swVibrate"); if(swV)swV.setAttribute("aria-checked",vibrateOn?"true":"false");
     if(sw){
-      sw.classList.toggle("locked",isEbook);
-      const active=isEbook?lastColorTheme:document.documentElement.getAttribute("data-theme");
+      const active=document.documentElement.getAttribute("data-theme");
       [...sw.children].forEach(b=>b.classList.toggle("on",b.dataset.theme===active));
     }
     const swB=$("swBgm"), volEl=$("bgmVol"), volRow=$("bgmVolRow");
@@ -644,19 +637,6 @@
     return false;
   }
 
-  function setEbook(on,silent){
-    const root=document.documentElement;
-    if(on){
-      if(root.getAttribute("data-theme")!=="ebook")lastColorTheme=root.getAttribute("data-theme");
-      root.setAttribute("data-theme","ebook");
-    }else{
-      root.setAttribute("data-theme",lastColorTheme);
-    }
-    if(!silent)showToast(on?"電子書模式":THEME_NAMES[lastColorTheme]);
-    savePrefs();
-    syncSettingsUI();
-  }
-  function toggleEbook(){ setEbook(document.documentElement.getAttribute("data-theme")!=="ebook"); }
   // 背景音樂:開關(開→解鎖音訊並播放;關→停止),音量即時套用;都記憶偏好
   function setBgm(on){ bgmOn=!!on; if(bgmOn){ Sound.wake(); BGM.setOn(true); } else { BGM.setOn(false); } savePrefs(); syncSettingsUI(); }
   function setBgmVol(v){ bgmVol=Math.max(0,Math.min(1,v)); BGM.setVolume(bgmVol); }

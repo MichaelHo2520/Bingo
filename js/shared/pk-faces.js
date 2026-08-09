@@ -101,7 +101,7 @@ const PKFace = (function(){
        「那裡有一張牌,只是還沒翻」,所以必須畫得出來。
 
      ⚠ 圖樣一律交給 CSS(`.<prefix>-bk`)—— 不要在這裡塞 SVG 花紋:
-       牌背要跟著主題換色(ebook 模式是純白 + 黑框),寫在 SVG 裡就換不動了。
+       牌背要跟著主題換色,寫在 SVG 裡就換不動了。
      ⚠ data-c 刻意給 "?" 而不是真正的牌 id:那個屬性會被點擊處理讀去當牌用
        (`+el.dataset.c`),寫真值等於**把暗牌洩漏在 DOM 屬性裡**。 */
   function backHTML(o){

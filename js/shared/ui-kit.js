@@ -49,7 +49,6 @@ function peekBoard(){ $("veil").classList.remove("show"); $("reopenWin").classLi
 
 /* ---------- 彩帶 ---------- */
 function burst(){
-  if(document.documentElement.getAttribute("data-theme")==="ebook")return;
   const cv=$("confetti"), ctx=cv.getContext("2d");
   cv.width=innerWidth; cv.height=innerHeight;
   const cs=getComputedStyle(document.documentElement);
@@ -73,7 +72,7 @@ function burst(){
 
 /* ---------- 主題 / 偏好 ---------- */
 const THEMES=["sunset","midnight","bubblegum","meadow","arcade"];
-const THEME_NAMES={sunset:"落日",midnight:"午夜霓虹",bubblegum:"泡泡糖",meadow:"草原",arcade:"街機",ebook:"電子書"};
+const THEME_NAMES={sunset:"落日",midnight:"午夜霓虹",bubblegum:"泡泡糖",meadow:"草原",arcade:"街機"};
 const THEME_COLORS={sunset:["#ff8a3d","#ffd24a"],midnight:["#22e0ff","#ff4bd8"],bubblegum:["#ff4fa3","#9b6bff"],meadow:["#6cc04a","#ffcf47"],arcade:["#ffe600","#ff2d55"]};
 let lastColorTheme="sunset";
 let bgmOn=false, bgmVol=0.35, voiceVol=1.5, sfxVol=1, vibrateOn=true;
@@ -94,7 +93,6 @@ function savePrefs(){
   const nameEl=$("mpName");
   saveShared({
     theme:lastColorTheme,
-    ebook:document.documentElement.getAttribute("data-theme")==="ebook",
     muted:Sound.isMuted(),
     bgmOn:bgmOn, bgmVol:bgmVol, bgmTrack:bgmTrack,
     voiceVol:voiceVol, sfxVol:sfxVol, vibrate:vibrateOn,
@@ -122,7 +120,6 @@ function loadPrefs(){
   Sound.setVolume(sfxVol);
   if(typeof p.vibrate==="boolean") vibrateOn=p.vibrate;
   if(p.bgmOn) bgmOn=true;             // 記住「想開」;實際播放等首次手勢
-  if(p.ebook) setEbook(true,true);
   if(typeof p.name==="string" && p.name){ const el=$("mpName"); if(el) el.value=p.name; }
   if(typeof MP!=="undefined" && MP.prefsKey && MP.usePrefs) MP.usePrefs(readJSON(MP.prefsKey()));
 }
@@ -140,20 +137,9 @@ function buildSwatches(){
 }
 function setTheme(name){
   if(THEMES.indexOf(name)<0)return;
-  if(document.documentElement.getAttribute("data-theme")==="ebook")return;
   document.documentElement.setAttribute("data-theme",name);
   lastColorTheme=name; savePrefs(); syncSettingsUI();
 }
-function setEbook(on,silent){
-  const root=document.documentElement;
-  if(on){
-    if(root.getAttribute("data-theme")!=="ebook") lastColorTheme=root.getAttribute("data-theme");
-    root.setAttribute("data-theme","ebook");
-  }else root.setAttribute("data-theme",lastColorTheme);
-  if(!silent) showToast(on?"電子書模式":THEME_NAMES[lastColorTheme]);
-  savePrefs(); syncSettingsUI();
-}
-function toggleEbook(){ setEbook(document.documentElement.getAttribute("data-theme")!=="ebook"); }
 function setBgm(on){ bgmOn=!!on; if(bgmOn){ Sound.wake(); BGM.setOn(true); } else BGM.setOn(false); savePrefs(); syncSettingsUI(); }
 function setBgmVol(v){ bgmVol=Math.max(0,Math.min(1,v)); BGM.setVolume(bgmVol); }
 function setBgmTrack(id){ if(!BGM_TRACKS.some(t=>t.id===id))return; bgmTrack=id; BGM.setSrc(bgmSrcOf(id)); savePrefs(); syncSettingsUI(); }
@@ -161,17 +147,14 @@ function setVoiceVol(v){ voiceVol=Math.max(0,Math.min(3,v)); }
 function setSfxVol(v){ sfxVol=Math.max(0,Math.min(1,v)); Sound.setVolume(sfxVol); }
 function setVibrate(on){ vibrateOn=!!on; savePrefs(); syncSettingsUI(); }
 function syncSettingsUI(){
-  const isEbook=document.documentElement.getAttribute("data-theme")==="ebook";
-  const swE=$("swEbook"), swM=$("swMute"), sw=$("swatches");
-  if(swE)swE.setAttribute("aria-checked",isEbook?"true":"false");
+  const swM=$("swMute"), sw=$("swatches");
   if(swM)swM.setAttribute("aria-checked",Sound.isMuted()?"false":"true");
   const sfxEl=$("sfxVol"), sfxRow=$("sfxVolRow");
   if(sfxEl)sfxEl.value=Math.round(sfxVol*100);
   if(sfxRow)sfxRow.classList.toggle("dim",Sound.isMuted());
   const swV=$("swVibrate"); if(swV)swV.setAttribute("aria-checked",vibrateOn?"true":"false");
   if(sw){
-    sw.classList.toggle("locked",isEbook);
-    const active=isEbook?lastColorTheme:document.documentElement.getAttribute("data-theme");
+    const active=document.documentElement.getAttribute("data-theme");
     [...sw.children].forEach(b=>b.classList.toggle("on",b.dataset.theme===active));
   }
   const swB=$("swBgm"), volEl=$("bgmVol"), volRow=$("bgmVolRow");
@@ -1112,7 +1095,6 @@ function bindCommonUI(){
   $("setClose").addEventListener("click",closeSettings);
   $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
   $("fsBtn").addEventListener("click",toggleFull);
-  $("swEbook").addEventListener("click",()=>toggleEbook());
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));
   $("bgmTrackSel").addEventListener("change",e=>setBgmTrack(e.target.value));
