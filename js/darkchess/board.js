@@ -39,6 +39,12 @@ const DCB = (function(){
      的那一格」之前設成 true,pieceHTML() 讀到就消費掉(改回 false),避免吃子欄 /
      結果卡之後再呼叫 pieceHTML() 時被誤套上翻牌動畫。 */
   let pendingFlip = false;
+  /* ★ 每一格「上一次畫面時」是不是已翻開(只存 boolean,不存 p —— 不違反牌情紅線)。
+     ⚠⚠ 用來回答「這一步吃的子,在這一步之前玩家看不看得到」——同一個 kind("jump")
+     炮既可能打明棋也可能(chain 開著時)打暗棋,不能只看 kind 決定要不要播「翻開讓你
+     看清楚」那段動畫,見三之一節的 playMoveFx()。paint() 在畫下一手之前讀舊值決定
+     這一手要不要播翻開動畫,畫完當下這一手才把它更新成新值。 */
+  let prevUp = {};
 
   /* ==========================================================================
      一、音效 —— 全部用合成音,不進 mp3/
@@ -182,6 +188,10 @@ const DCB = (function(){
 
     const fresh = (cur.key !== lastKey);
     const L = st.last;
+    /* ★ 這一手吃 / 翻攻的目標,在這一手**之前**是不是還蓋著 —— 讀的是上一次畫面留下的
+       舊值(這一格迴圈裡才會被覆寫成新值),決定 playMoveFx() 要不要播「翻開讓你看清楚」
+       那段動畫。同一個 kind("jump")炮可能打明棋也可能打暗棋,只看 kind 分不出來。 */
+    const wasHiddenAtTo = !!(fresh && L && typeof L.to === "number" && prevUp[L.to] === false);
     board.style.setProperty("--dc-cols", String(wide ? DC.COLS : DC.ROWS));
     fitBoard();
 
@@ -200,6 +210,7 @@ const DCB = (function(){
                '" style="grid-row:' + g.row + ';grid-column:' + g.col + '">' +
                (c ? (c.up ? pieceHTML(c.p) : backHTML()) : "") +
                "</button>");
+      prevUp[i] = !!(c && c.up);      // ★ 更新成「現在」的翻開狀態,給下一手比較用
     }
     pendingFlip = false;           // ⚠ 迴圈外的 pieceHTML() 呼叫(吃子欄、結果卡)一律不套
     board.innerHTML = out.join("");
@@ -214,7 +225,7 @@ const DCB = (function(){
     fitBoard();
     /* ★ 吃子 / 翻攻的動畫與明確圖示 —— 一定要放在 fitBoard() 之後(算 rect 要用最終尺寸),
        而且只在「這一手真的是新的」時播(fresh),不然每次 setState 都重播一次。 */
-    if(fresh && L) playMoveFx(L);
+    if(fresh && L) playMoveFx(L, wasHiddenAtTo);
   }
 
   /* ==========================================================================
@@ -225,40 +236,38 @@ const DCB = (function(){
          ②「連吃的時候,如果旁邊的還是蓋著,成功的吃掉每次都會不知道到底吃了什麼」
          ③「吃掉加棋子名字這個方法有點糟,效果很差,一點都不像是正式發行的遊戲」
          ④「現在這樣也很糟,看起來太亂了,參考一下網路上比較流行的暗棋遊戲」——
-           查了幾款主流暗棋 App 跟一般棋牌類手遊的共同語彙:**移動一律用滑的**
-           (不瞬移),**吃掉的子送去戰績區**(不是炸開),越正式的棋類 App 動畫越收斂。
+           查了幾款主流暗棋 App 跟一般棋牌類手遊的共同語彙後定案:**移動一律用滑的**。
          ⑤「對於那種還沒有翻開來的,我想要再修改一下…我不希望吃了之後,結果是要去
            下面看才知道吃了什麼…真正下棋時我把自己的棋子放到那一顆還沒翻開的上面,
-           然後會把它拿起來看,如果可以吃就收走」——④的版本(移動→直接飛去吃子欄)
-           對「翻攻吃得動」(`darkEat`)這一種**不夠**:被吃的子在飛之前**從來沒有
-           被清楚翻開讀過**(飛的時候雖然畫的是正確牌面,但那個瞬間玩家的視線還在
-           看攻擊方的子滑過去,根本沒注意到),逼玩家要盯著吃子欄才知道吃了誰。
-       ⑤ 落地成兩條路,依「這顆子在這一步之前玩家看不看得到」分岔:
-         ★ **明棋吃明棋**(`eat`/`jump`/`rush`):被吃的子在這一步之前就是翻開的,
-           玩家早就知道是誰 —— 維持 slidePiece() + flyToTray() 這一套(飛向吃子欄
-           裡它真正的新位置、邊縮邊淡出),不需要再翻一次給他看。
-         ★★ **翻攻吃得動**(`darkEat`,唯一「這一步才知道底下是誰」的情況)——
-           改成三段式,對應使用者說的「放上去 → 拿起來看 → 收走」:
-           ① slidePiece() 攻擊方的子滑過去(放上去);
-           ② revealThenCollect() 在原地把被吃的子**翻開**(拿起來看,重用
-              flipWrapHTML() 那份雙面翻轉,z-index 蓋在攻擊方上面,不是跟攻擊方
-              擠在一起讓人分心)、**停留一下**讓玩家真的看清楚是哪一顆,
-           ③ 停留結束後才飛向吃子欄(收走)。
+           然後會把它拿起來看,如果可以吃就收走」——只對『翻攻吃得動』(`darkEat`)
+           補了「先翻開、停留讓人看清楚」這一段。
+         ⑥「炮也要動啊,如果是沒翻開的都要動」+「我不喜歡吃完跑去下面的動畫,那個
+           取消掉吧」——⑤漏掉一種情境、也多做了一件使用者不想要的事,這一版兩個
+           一起修:
+           - **炮(`jump`)房規「連吃」開著時可以隔子打暗棋**(rules.js 的
+             `paoTargets()`,見規則層第 2 條)—— kind 一樣是 `"jump"`,但目標可能
+             是明棋也可能是暗棋,**光看 kind 分不出來**,⑤那版只認 `kind==="darkEat"`
+             漏了這一種。改成 `wasHiddenAtTo`(見 paint() 裡的 `prevUp` 比對):
+             不管是哪個 kind,只要「這一步的目標在這一步之前還蓋著」就要播翻開動畫,
+             結構上就把炮/車(理論上車不會打到暗子,但邏輯統一)/翻攻三種一次照顧到,
+             不必每加一種新規則就重新想一次判準。
+           - 拿掉整段「翻開之後飛去吃子欄」的收尾:改成翻開、停留讓人看清楚,
+             **就地淡出消失**——不再算吃子欄的座標、不再有東西「跑去下面」。
+       「明棋吃明棋」(被吃的子在這一步之前就已經翻開,玩家早就知道是誰:`eat`、
+       `rush`、以及打到明棋的 `jump`)不套翻開動畫 —— slidePiece() 滑過去、被吃的子
+       瞬間被攻擊方蓋掉就講完了,不需要再翻一次給他看。
        「翻到自己人 / 打不穿」(`darkSelf`/`jumpSelf`/`darkMiss`)這三種都是**沒有
        東西被吃掉、而且那顆子留在原地**——pieceHTML() 的 pendingFlip 翻牌動畫已經是
-       「翻開讓你看清楚,而且它一直留在畫面上」,不必再疊 collect 這一段(沒有東西
-       要收走)。
-       ⚠ knockAway 世代(v1.137.1)拿掉的震波 / 火花 / 色環脈動 / 彈開全部刪乾淨,
-         不留死碼。
-       ⚠ flyToTray()/revealThenCollect() 都會暫時多畫一顆 pieceHTML(got)(被吃的子
-         一定都先翻開過,不違反牌情紅線),播完就移除 —— 不影響
-         tools/gen-dc-solo-e2e.js 對 #dcBoard 的計數斷言(那些斷言都不在「剛吃完子」
-         的那個時間點量)。
+       「翻開讓你看清楚,而且它一直留在畫面上」,不必再疊任何效果。
+       ⚠ revealThenVanish() 會暫時多畫一顆 pieceHTML(got)(被吃的子一定都先翻開過,
+         不違反牌情紅線),播完就移除 —— 不影響 tools/gen-dc-solo-e2e.js 對 #dcBoard
+         的計數斷言(那些斷言都不在「剛吃完子」的那個時間點量)。
      ========================================================================== */
-  // 這一手的 kind → 要不要播位移動畫、有沒有東西被吃掉(見 rules.js 六節的 kind 表)
+  // 這一手的 kind → 要不要播位移動畫(見 rules.js 六節的 kind 表)。
+  // ⚠ 「要不要播翻開讓你看清楚」不是靠這張表 —— 見 paint() 算的 wasHiddenAtTo。
   const REVEAL_KINDS = { flip: 1, darkSelf: 1, darkMiss: 1, jumpSelf: 1 };
   const SLIDE_KINDS  = { move: 1, eat: 1, jump: 1, rush: 1, darkEat: 1 };
-  const EAT_KINDS    = { eat: 1, jump: 1, rush: 1 };          // ⚠ darkEat 不在這裡,見下面 playMoveFx
+  const EAT_KINDS    = { eat: 1, jump: 1, rush: 1, darkEat: 1 };
 
   function sqEl(i){ return board.querySelector('.dc-sq[data-sq="' + i + '"]'); }
 
@@ -283,72 +292,33 @@ const DCB = (function(){
     }, 300);
   }
 
-  /* 這一局「誰吃掉的」該飛去吃子欄的第幾列 —— 對照 trayHTML() 畫出來的順序:
-     第 1 列永遠是「我吃掉」、第 2 列(如果房規 foeCaps 有開才會畫)是對手吃掉的。
-     ⚠ 對手那列房規關著時**沒有目的地**(那一列根本沒畫出來),這時只讓子淡出消失,
-        不要硬飛去一個不存在的地方。 */
-  function trayTargetRect(seat){
-    if(!acts || !cur) return null;
-    const me = (typeof cur.mySeat === "number" && cur.mySeat >= 0) ? cur.mySeat : 0;
-    const nth = (seat === me) ? 1 : 2;
-    const pcs = acts.querySelector(".dc-tray-row:nth-child(" + nth + ") .dc-tray-pcs");
-    if(!pcs) return null;
-    const last = pcs.querySelector(".dc-p:last-child");
-    return (last || pcs).getBoundingClientRect();
-  }
-
-  // 把 el 裡的東西朝吃子欄裡它真正的新位置飛過去、邊縮邊淡出;沒有目的地就原地淡出。
-  function collectToTray(sq, el, seat){
-    const tRect = trayTargetRect(seat);
-    if(tRect){
-      const sRect = sq.getBoundingClientRect();
-      el.style.setProperty("--fx", (tRect.left + tRect.width / 2 - sRect.left - sRect.width / 2).toFixed(1) + "px");
-      el.style.setProperty("--fy", (tRect.top + tRect.height / 2 - sRect.top - sRect.height / 2).toFixed(1) + "px");
-      el.classList.add("dc-fly-go");
-    }else{
-      el.classList.add("dc-fly-fade");            // 沒有目的地(對手那欄沒開)→ 原地淡出就好
-    }
-  }
-
-  // 明棋吃明棋:被吃的子(早就翻開過,玩家已經知道是誰)直接飛向吃子欄。
-  function flyToTray(toIdx, seat, got){
-    const sq = sqEl(toIdx);
-    if(!sq || got == null) return;
-    const el = document.createElement("span");
-    el.className = "dc-fly";
-    el.innerHTML = pieceHTML(got);
-    sq.appendChild(el);
-    collectToTray(sq, el, seat);
-    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 420);
-  }
-
-  /* 翻攻吃得動(darkEat):這一步才第一次知道底下是誰,對應使用者說的
-     「放上去 → 拿起來看 → 收走」—— 先翻開、停留讓人看清楚,再飛去吃子欄。
+  /* 「這一步吃 / 翻攻的目標,之前玩家看不看得到」→ 才需要播:先翻開、停留讓人看清楚、
+     就地淡出消失(不飛去吃子欄 —— 使用者:「我不喜歡吃完跑去下面的動畫」)。
      ⚠ z-index 比攻擊方的子高(見 CSS 的 .dc-reveal),攻擊方雖然已經滑到位,
-       但視覺上被這一層蓋著,直到收走的那一刻才「露出」攻擊方安穩落地的畫面 ——
-       這正是「棋子放上去、掀開看、拿走」的順序,不是兩個東西擠在一起搶注意力。 */
-  const DARK_REVEAL_MS = 420, DARK_HOLD_MS = 420, DARK_FLY_MS = 380;
-  function revealThenCollect(toIdx, seat, got){
+       但視覺上被這一層蓋著,直到淡出消失那一刻才「露出」攻擊方安穩落地的畫面 ——
+       對應「棋子放上去、掀開看、收走」的順序,不是兩個東西擠在一起搶注意力。
+     ⚠⚠ 明棋吃明棋(打之前就翻開過)不叫這一支 —— 玩家早就知道是誰,滑過去就講完了。 */
+  const DARK_REVEAL_MS = 420, DARK_HOLD_MS = 420, DARK_VANISH_MS = 260;
+  function revealThenVanish(toIdx, got){
     const sq = sqEl(toIdx);
     if(!sq || got == null) return;
     const el = document.createElement("span");
     el.className = "dc-reveal";
     el.innerHTML = flipWrapHTML(pieceFaceHTML(got));
     sq.appendChild(el);
-    setTimeout(() => { collectToTray(sq, el, seat); }, DARK_REVEAL_MS + DARK_HOLD_MS);
+    setTimeout(() => { el.classList.add("dc-reveal-gone"); }, DARK_REVEAL_MS + DARK_HOLD_MS);
     setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); },
-               DARK_REVEAL_MS + DARK_HOLD_MS + DARK_FLY_MS);
+               DARK_REVEAL_MS + DARK_HOLD_MS + DARK_VANISH_MS);
   }
 
-  function playMoveFx(L){
+  function playMoveFx(L, wasHiddenAtTo){
     if(SLIDE_KINDS[L.kind]) slidePiece(L.from, L.to);
-    if(L.kind === "darkEat"){
+    if(EAT_KINDS[L.kind] && wasHiddenAtTo){
       // 對齊滑入抵達的時間點:攻擊方的子先滑過去,「放上去」那一刻才翻開被吃的子
-      setTimeout(() => { revealThenCollect(L.to, L.seat, L.got); }, 220);
-    }else if(EAT_KINDS[L.kind]){
-      setTimeout(() => { flyToTray(L.to, L.seat, L.got); }, 190);
+      setTimeout(() => { revealThenVanish(L.to, L.got); }, 220);
     }
-    // darkSelf / jumpSelf / darkMiss:翻牌動畫本身已經講完了,不再疊加任何效果。
+    // 明棋吃明棋(wasHiddenAtTo 是 false):滑過去本身就講完了,不疊加任何效果。
+    // darkSelf / jumpSelf / darkMiss:翻牌動畫本身已經講完了,不疊加任何效果。
   }
 
   /* ==========================================================================
@@ -639,7 +609,7 @@ const DCB = (function(){
   }
 
   function reset(){
-    sel = -1; lastKey = -1; cur = null;
+    sel = -1; lastKey = -1; cur = null; prevUp = {};
     stopCd();
     if(board) board.innerHTML = "";
     if(acts){ acts.innerHTML = ""; acts.classList.add("hidden"); }
