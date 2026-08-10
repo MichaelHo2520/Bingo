@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>象棋暗棋 ｜ 本機對戰 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.144.0 -->
-<meta name="version" content="1.144.0">
+<!-- 象棋暗棋 · v1.145.0 -->
+<meta name="version" content="1.145.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -57,49 +57,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div id="dcPickMode">
       <div class="dc-hero">
         <!-- ★★ 進場插圖:一顆**蓋著的**棋子在後、一顆翻開的紅帥在前。
-             「有一顆是蓋著的」是暗棋與五子棋 / 一般象棋唯一分得出來的辨識點,一定要在;
-             而牌背與正面是同一塊料、只深半階(照棋子本體)—— 分得出來靠**有沒有字**。
-             ★★★ v1.143.0 起整張是**照現在的棋子畫的**:木圓餅 + 靠邊一圈車溝 +
-                圓柱厚度 + 刻進去的字(暗邊左上 / 亮邊右下 / 漆,三個 text 疊出來)。
-             **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
+             「有一顆是蓋著的」是暗棋與五子棋 / 一般象棋唯一分得出來的辨識點,一定要在 ——
+             這張圖靠的是**牌背上的棋盤格線**(而正面是紅圈 + 紅帥)。
+             ★★★ v1.145.0 起是一張**去背的 PNG 貼圖**(dc-icon.png,192×192、13.9KB),
+                從 design-refs/ 那張插畫切出兩顆棋子(旗子 / 旗桿 / 流蘇與深色底都不要)。
+                前一版(v1.144.0)的手繪 SVG 在 46px 的首頁卡上輸給它,經過記在 notes/19 二十節。
+             **與 index.html 首頁那張卡是同一個檔案**,只有外層 class 不一樣
              (這裡是 .dc-art 96px、首頁是 .gc-art.dc-cart 46px)——
-             樣式在 styles.css 的 .dc-ic-* 那幾條;tools/test-pages.js 的 I 節在守這對雙胞胎。 -->
-        <svg class="dc-art" viewBox="0 0 56 56" role="img" aria-label="象棋暗棋">
-          <defs>
-            <!-- 圓柱側壁:上亮下暗(三個色停就是棋子那一疊厚度的頭 / 中 / 尾) -->
-            <linearGradient id="dcIcSide" x1="0" y1="0" x2="0" y2="1">
-              <stop class="dc-ic-e1" offset="0"/><stop class="dc-ic-e2" offset=".42"/><stop class="dc-ic-e3" offset="1"/>
-            </linearGradient>
-            <!-- 左上受光 -->
-            <radialGradient id="dcIcLit" cx=".36" cy=".24" r=".62">
-              <stop class="dc-ic-l1" offset="0"/><stop class="dc-ic-l2" offset="1"/>
-            </radialGradient>
-          </defs>
-          <!-- 蓋著的那一顆(後面、左下):同一塊料、只深半階,而且**沒有字** -->
-          <g transform="translate(17.5 32.4)">
-            <circle class="dc-ic-side" cy="3.2" r="13.9"/>
-            <circle class="dc-ic-bd dc-ic-back" r="13.4"/>
-            <path class="dc-ic-grain" d="M-8.2 -9.6C-6.1 -3.3 -6.4 3.2 -8.6 9.4M-1.2 -12.6C1 -5.6 .6 4.9 -1.6 12.3M6.4 -10.9C8.2 -4.8 7.9 3.3 6 10.2"/>
-            <ellipse class="dc-ic-knot" cx="3.4" cy="-4.7" rx="1.5" ry=".95" transform="rotate(24 3.4 -4.7)"/>
-            <circle class="dc-ic-edge" r="12.3"/>
-            <circle class="dc-ic-lit" r="13.4"/>
-            <circle class="dc-ic-gv" r="12.2"/>
-            <path class="dc-ic-gvl" d="M-11.2 4.8A12.2 12.2 0 0 0 11.2 4.8"/>
-          </g>
-          <!-- 翻開的那一顆(前面、右上):車溝在 0.91r;字是刻進去的 = 暗邊左上 + 亮邊右下 + 漆 -->
-          <g transform="translate(37.4 21.4)">
-            <circle class="dc-ic-side" cy="3.4" r="14.9"/>
-            <circle class="dc-ic-bd dc-ic-face" r="14.4"/>
-            <path class="dc-ic-grain" d="M-8.2 -9.6C-6.1 -3.3 -6.4 3.2 -8.6 9.4M-1.2 -12.6C1 -5.6 .6 4.9 -1.6 12.3M6.4 -10.9C8.2 -4.8 7.9 3.3 6 10.2"/>
-            <circle class="dc-ic-edge" r="13.2"/>
-            <circle class="dc-ic-lit" r="14.4"/>
-            <circle class="dc-ic-gv" r="13.1"/>
-            <path class="dc-ic-gvl" d="M-12.1 5A13.1 13.1 0 0 0 12.1 5"/>
-            <text class="dc-ic-cut" x="-.6" y="4.9">帥</text>
-            <text class="dc-ic-lt" x=".6" y="6.1">帥</text>
-            <text class="dc-ic-t" y="5.5">帥</text>
-          </g>
-        </svg>
+             tools/test-pages.js 的 I 節在守這對雙胞胎。
+             ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE。 -->
+        <img class="dc-art" src="dc-icon.png" alt="象棋暗棋" width="192" height="192">
         <div class="home-tagline">32 顆象棋蓋著擺滿,翻到什麼算什麼</div>
       </div>
       <button class="btn primary block-btn home-btn" id="dcGoOnline">🌐 連線對戰</button>
