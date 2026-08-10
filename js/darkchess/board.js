@@ -336,6 +336,13 @@ const DCB = (function(){
     el.style.top  = (sRect.top  - gRect.top)  + "px";
     el.style.width  = sRect.width  + "px";
     el.style.height = sRect.height + "px";
+    /* ⚠⚠⚠ --dc-cell 一定要自己補一份:它是 fitBoard() 寫在 **`.dc-board`** 身上的,
+       而這顆浮層掛在 **stage**(board 的父層,見上面那段 ⚠⚠⚠)—— 繼承不到。
+       拿不到就會退回 `.dc-ch` / `--dc-th` 宣告裡的後備值 44px,症狀是
+       **飛到中央那顆放大的子,裡面的字明顯小一號、比例整個怪掉**(使用者回報),
+       而且棋子的厚度也會跟著變薄。⚠ 用量到的格寬(= fitBoard 寫的整數 px)最保險,
+       不必再去讀 board 的 computed style。 */
+    el.style.setProperty("--dc-cell", Math.round(sRect.width) + "px");
     el.innerHTML = flipWrapHTML(pieceFaceHTML(got));
     stage.appendChild(el);
     const dx = (bRect.left - sRect.left) + bRect.width  / 2 - sRect.width  / 2;

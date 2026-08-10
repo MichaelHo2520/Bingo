@@ -6039,23 +6039,30 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-backface{color:var(--dc-back-e);
     --dc-side-a:#bd8a52; --dc-side-b:#a4713d; --dc-side-c:#86572c;
     background:
-      radial-gradient(circle at 50% 50%, rgba(255,236,204,0) 0 71%,
-        rgba(255,236,204,.26) 73% 80%, rgba(84,50,18,.16) 82% 92%, rgba(66,38,12,.38) 93% 100%),
-      radial-gradient(circle at 50% 50%,
-        transparent 0 56%, rgba(110,68,32,.4) 56% 59%, transparent 59% 69%,
-        rgba(110,68,32,.32) 69% 72%, transparent 72% 100%),
-      repeating-radial-gradient(circle at 34% 28%,
-        rgba(88,52,18,.16) 0 2%, rgba(88,52,18,0) 2% 8%),
-      radial-gradient(circle at 30% 24%, rgba(255,238,208,.22) 0%, transparent 44%),
-      radial-gradient(circle at 52% 56%, var(--dc-back) 0%, var(--dc-back-in) 58%, #86552a 100%);
-    box-shadow:inset 0 2px 2px rgba(255,255,255,.3),inset 0 -4px 6px rgba(0,0,0,.32),
+      radial-gradient(circle at 50% 50%, rgba(255,236,204,0) 0 69%,
+        rgba(255,244,220,.46) 71% 77%, rgba(78,45,16,.20) 80% 91%, rgba(46,26,7,.50) 92% 100%),
+      radial-gradient(circle at 50% 50%, transparent 0 60%,
+        rgba(62,35,11,.36) 60% 63%, rgba(255,238,208,.24) 63% 66%, transparent 66% 100%),
+      repeating-radial-gradient(ellipse 64% 80% at 27% 19%,
+        rgba(84,48,16,.16) 0 1.6%, rgba(84,48,16,0) 1.6% 7%),
+      radial-gradient(circle at 34% 26%, rgba(255,244,220,.55) 0%, rgba(255,244,220,0) 50%),
+      radial-gradient(circle at 58% 62%, var(--dc-back) 0%, var(--dc-back-in) 48%, #75491f 100%);
+    box-shadow:inset 0 4px 5px rgba(255,240,212,.36),inset 0 -8px 12px rgba(40,21,4,.50),
       0 0 0 1px rgba(122,80,38,.65),var(--dc-lift)}
-  /* 中央紋章:雙圈浮雕(border 一圈 + ::after 實心小圓),比原本的橫紋更像雕出來的圖案。 */
-  .dc-grain{position:absolute;width:30%;height:30%;border-radius:50%;
-    border:1.5px solid currentColor;opacity:.55;
-    box-shadow:0 1px 0 rgba(255,255,255,.35),inset 0 1px 1px rgba(0,0,0,.25)}
-  .dc-grain::after{content:"";position:absolute;inset:32%;border-radius:50%;
-    background:currentColor;opacity:.4}
+  /* ⚠ 牌背**不畫那圈實線**:`.dc-ring` 在正面是棋子上那圈刻痕,照搬到牌背就變成
+     「一個圈圈」—— 使用者原話「暗子畫的一點都沒有立體棋子的感覺,只是兩個圈圈疊在一起」。
+     改成一道**內凹的倒角**(上緣暗、下緣受光),它描述的是形狀不是圖案。 */
+  .dc-backface .dc-ring{border-color:transparent;opacity:1;
+    box-shadow:inset 0 2px 3px rgba(46,25,6,.26),0 1px 0 rgba(255,238,208,.20)}
+  /* 髓心:年輪收斂的那一點(不是「中央紋章」)——所以它**不在正中央**,而是壓在上面那層
+     年輪 repeating-radial-gradient 的圓心(27% / 19%)上,而且是一顆歪斜的小結節。
+     ⚠ 之前是「小圈圈 + 圓點」,那是線稿不是木頭:圓圈在小尺寸下只會讀成幾何圖案,
+        真正撐起立體感的是半球受光 + 車溝 + 這一點年輪的匯聚處。 */
+  .dc-grain{position:absolute;left:27%;top:19%;width:13%;height:9%;border-radius:50%;
+    transform:translate(-50%,-50%) rotate(-16deg);opacity:.8;
+    background:
+      radial-gradient(ellipse at 44% 34%, rgba(255,238,208,.34) 0%, rgba(255,238,208,0) 58%),
+      radial-gradient(ellipse at 52% 58%, rgba(66,37,12,.78) 0%, rgba(66,37,12,0) 80%)}
 
   /* ---------- 可點 / 選中 / 落點 ----------
      ⚠ 不能點的格**不給 disabled**(CLAUDE.md 的紅線)—— 點下去要看得到 toast 說原因。
