@@ -203,6 +203,10 @@ const DCB = (function(){
       if(i === sel) cls.push("dc-sel");
       if(tgtMap[i]) cls.push("dc-tgt", "dc-t-" + tgtMap[i]);
       if(L && fresh && (L.to === i)) cls.push("dc-hit");
+      // ★ 落點的常駐標記(不受 fresh 限制)—— dc-hit 只在剛落地那一瞬間亮一下,
+      //   翻攻吃不動 / 打到自己人這幾種「兩顆都留在原地」的手,亮完就什麼痕跡都沒有,
+      //   使用者反映看不出對手剛剛動了哪顆。語彙同五子棋 .gmk-stone.last / 台灣麻將 .m16-pt.last。
+      if(L && typeof L.to === "number" && L.to === i) cls.push("dc-lastto");
       if(L && L.from === i && !c) cls.push("dc-from");
       // ★ 這一格是不是「這一手剛翻開」——pieceHTML() 讀這個模組變數決定要不要播翻牌動畫
       pendingFlip = !!(c && c.up && fresh && L && REVEAL_KINDS[L.kind] && L.to === i);
@@ -310,23 +314,39 @@ const DCB = (function(){
   const DARK_REVEAL_MS = 380, DARK_HOLD_MS = 420, DARK_VANISH_MS = 280;
   function revealAtCenter(toIdx, got){
     const sq = sqEl(toIdx);
-    if(!sq || got == null || !board) return;
-    const sRect = sq.getBoundingClientRect(), bRect = board.getBoundingClientRect();
+    if(!sq || got == null || !board || !stage) return;
+    /* ⚠⚠⚠ 掛在 **stage** 不是 board:`paint()` 每一手都會 `board.innerHTML = …`
+       整段重建,掛在 board 裡的浮層會被**連根拔掉**。單機對電腦時這是必然發生的 ——
+       玩家吃完暗子後 `aiTurn()` 最快 320ms(AI_MIN_MS)就走一手 → paint() →
+       浮層在只播了一百多毫秒的時候就消失;而連吃(回合留在自己身上、沒有 AI 那一手)
+       剛好躲過,所以症狀是**時有時無**(使用者:「不一定,有時會沒有,但有時候又會有」)。
+       stage 是 paint() 不會動的節點,掛在這裡才活得完整。
+       ⚠ 位移基準跟著換成 stage 的座標系,但「飛到哪裡」仍然是**棋盤的正中央**
+         (bRect 算的還是 board)—— 棋盤在 stage 裡是置中的,兩者中心通常重合,
+         但視窗比例讓棋盤沒有填滿 stage 時就會不一樣,一律以棋盤為準。 */
+    const sRect = sq.getBoundingClientRect();
+    const bRect = board.getBoundingClientRect();
+    const gRect = stage.getBoundingClientRect();
     const el = document.createElement("span");
     el.className = "dc-reveal";
-    el.style.left = (sRect.left - bRect.left) + "px";
-    el.style.top  = (sRect.top  - bRect.top)  + "px";
+    el.style.left = (sRect.left - gRect.left) + "px";
+    el.style.top  = (sRect.top  - gRect.top)  + "px";
     el.style.width  = sRect.width  + "px";
     el.style.height = sRect.height + "px";
     el.innerHTML = flipWrapHTML(pieceFaceHTML(got));
-    board.appendChild(el);
-    const dx = (bRect.width  / 2) - (sRect.left - bRect.left) - sRect.width  / 2;
-    const dy = (bRect.height / 2) - (sRect.top  - bRect.top)  - sRect.height / 2;
+    stage.appendChild(el);
+    const dx = (bRect.left - sRect.left) + bRect.width  / 2 - sRect.width  / 2;
+    const dy = (bRect.top  - sRect.top)  + bRect.height / 2 - sRect.height / 2;
     el.style.setProperty("--fx", dx.toFixed(1) + "px");
     el.style.setProperty("--fy", dy.toFixed(1) + "px");
     setTimeout(() => { el.classList.add("dc-reveal-gone"); }, DARK_REVEAL_MS + DARK_HOLD_MS);
     setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); },
                DARK_REVEAL_MS + DARK_HOLD_MS + DARK_VANISH_MS);
+  }
+  // 離場 / 換局時把還在飛的浮層清掉(它掛在 stage 上,不會被 board.innerHTML 帶走)
+  function clearReveals(){
+    if(!stage) return;
+    stage.querySelectorAll(".dc-reveal").forEach(el => { if(el.parentNode) el.parentNode.removeChild(el); });
   }
 
   function playMoveFx(L, wasHiddenAtTo){
@@ -629,6 +649,7 @@ const DCB = (function(){
   function reset(){
     sel = -1; lastKey = -1; cur = null; prevUp = {};
     stopCd();
+    clearReveals();                 // ⚠ 它掛在 stage 上,不會被下面那行 board.innerHTML 帶走
     if(board) board.innerHTML = "";
     if(acts){ acts.innerHTML = ""; acts.classList.add("hidden"); }
   }

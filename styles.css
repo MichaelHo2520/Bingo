@@ -5923,8 +5923,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ========================================================================== */
   .dc-play{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:0;
     width:min(92vw,720px);margin:0 auto}
+  /* ⚠ position:relative 是給「翻攻吃得動:飛到棋盤正中央」那顆 .dc-reveal 當定位基準——
+     它**掛在 .dc-stage 底下而不是 .dc-board**,因為 paint() 每一手都會整段重建
+     `board.innerHTML`,掛在 board 裡的浮層會被連根拔掉(見 board.js 的 revealAtCenter)。 */
   .dc-stage{flex:1 1 0;min-height:0;display:flex;align-items:center;justify-content:center;
-    overflow:hidden}
+    overflow:hidden;position:relative}
   /* ⚠ position:relative 是給下面「翻攻吃得動:飛到正中央」那顆 .dc-reveal 當定位基準——
      它現在掛在 .dc-board 底下(不是掛在某一格的 .dc-sq 裡),用 left/top 換算成
      board 座標,飛到板子中間才不會被單一格的 stacking context 卡住。 */
@@ -5998,6 +6001,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     0%{box-shadow:0 0 0 3px var(--dc-tgt-eat),0 0 16px 5px var(--dc-tgt-eat)}
     100%{box-shadow:0 0 0 0 transparent}
   }
+  /* ★ 落點的常駐標記:一圈淡框,不寫字、不動畫 —— dc-hit 那道光暈只在落地那一瞬間
+     (0.5s)亮一下,亮完就什麼都不剩,「翻攻吃不動 / 打到自己人」這幾種兩顆都留在
+     原地的手尤其明顯(沒有東西移動,連滑動動畫都沒有)。語彙同五子棋 .gmk-stone.last、
+     台灣麻將 .m16-pt.last(一圈邊框標最後一手,不是文字紀錄)——這裡選常駐不脈動的
+     版本,棋盤本身的動畫已經夠多(翻牌 / 滑動 / 飛到正中央),再疊一個持續脈動只是雜訊。
+     ⚠ 用 ::before 疊一層而不是動 box-shadow —— 才不會跟 .dc-tgt / .dc-sel 既有的
+     box-shadow 蓋掉彼此(同一格可能同時是「上一手落點」又是「這一手能吃的目標」)。 */
+  .dc-sq.dc-lastto::before{content:"";position:absolute;inset:9%;border-radius:8px;
+    border:2px solid var(--accent);opacity:.55;pointer-events:none}
   /* ⚠⚠ v1.137.5:翻牌那一格**不要**再疊這個光暈 —— box-shadow 動畫要逐格重繪,跟
      .dc-flip3d 的 3D 旋轉(transform,靠合成器)同時搶主執行緒,使用者反饋「翻開子
      的時候最後都會好像卡了一下」,這是原因之一(另一半是下面 dcFlipIn 的回彈曲線)。
@@ -6022,6 +6034,17 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
     -webkit-backface-visibility:hidden}
   .dc-face-f{transform:rotateY(180deg)}
+  /* ⚠⚠⚠ 正面那張臉裡包的是 pieceFaceHTML() 產生的 `.dc-p`,而 `.dc-p` 自己是
+     `width:88%;height:88%` —— 巢狀之後就變成「格子的 88% 再乘 88%」= **77%**,
+     比沒翻牌時的同一顆子小一號。而且 `.dc-flip3d` 是 `animation-fill-mode:both`,
+     動畫播完那顆子**就一直維持在小一號的狀態**,直到下一次 paint() 重建 DOM 才
+     恢復 —— 使用者反饋:「翻開來如果是兵的時候,他的動畫又會少一點點,導致他比較小,
+     直接又有移動棋子才會回到真正的大小」,講的就是這個(不限兵,每一顆都會,
+     只是小一號在某些字上比較顯眼)。
+     ⚠ 背面那張臉沒中這個坑,因為它是 `.dc-face` 與 `.dc-p` **掛在同一個元素上**,
+       `.dc-face` 定義在後面 → `width:100%` 贏,剛好就是 flip3d 的滿版。
+       兩張臉大小不一致本身也是 bug(翻到一半會忽然縮一下)。 */
+  .dc-face .dc-p{width:100%;height:100%}
   @keyframes dcFlipIn{ from{transform:rotateY(0)} to{transform:rotateY(180deg)} }
 
   /* ---------- 吃子 / 移動的滑入動畫(board.js 算完 rect 後用 JS 補 transform)----------
