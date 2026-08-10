@@ -6009,8 +6009,15 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        ⚠ 那個 11px 必須與 board.js 的 PAD 一致(改一邊會讓框壓到格子上)。
        ③ 內框的刻線由 ::before 疊(見下)。
      ⚠ --dc-well 留著沒拿掉:它是 v1.137.x 以前的平底色,還有註解在引用。 */
+  /* ⚠⚠ v1.141.1 padding 11 → 16:使用者回報「左右被卡掉了」。
+     算一次就知道為什麼 —— 木框帶(下面那條 inset)**正好蓋滿 padding**,所以
+     「棋子到木框內緣」= 格子裡的留白 = (100-80)/2 × cell ≈ 6px,
+     而「棋子到隔壁棋子」= 6 + gap 4 + 6 = 16px。最外圈只有內部的三分之一 →
+     看起來就是被夾住。padding 加到 16px 之後外圈是 11px,與內圈的一半(8px)同階。
+     ⚠⚠⚠ 這個數字有**三份**,不同步就會壞:board.js 的 PAD、這裡的 padding、
+       下面木框帶那條 `inset 0 0 0 16px`(只改一邊 = 木框壓到最外圈的格子上)。 */
   .dc-board{position:relative;display:grid;grid-template-columns:repeat(var(--dc-cols,8),1fr);
-    grid-auto-rows:1fr;gap:4px;padding:11px;border-radius:17px;
+    grid-auto-rows:1fr;gap:4px;padding:16px;border-radius:17px;
     background:
       repeating-linear-gradient(92deg, rgba(46,24,6,.17) 0 1px, rgba(46,24,6,0) 1px 5px,
         rgba(46,24,6,.10) 5px 6px, rgba(46,24,6,0) 6px 13px),
@@ -6020,7 +6027,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         var(--dc-slab-d) 100%);
     box-shadow:
       inset 0 0 0 1px rgba(255,238,205,.20),
-      inset 0 0 0 11px rgba(48,25,7,.26),
+      inset 0 0 0 16px rgba(48,25,7,.26),
       inset 0 0 26px rgba(38,19,4,.30),
       0 0 0 2px var(--dc-well-e),
       0 12px 26px rgba(0,0,0,.42)}
@@ -6029,7 +6036,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 它畫在 padding 那一圈裡(inset 6px < padding 11px),不會壓到任何一格。
      ⚠ 它一定畫在格子**底下**(::before 是第一個子節點,而 .dc-sq 也是 positioned
         → 同一個 stacking context 裡照 DOM 順序疊),所以不必給 z-index。 */
-  .dc-board::before{content:"";position:absolute;inset:6px;border-radius:12px;pointer-events:none;
+  .dc-board::before{content:"";position:absolute;inset:9px;border-radius:12px;pointer-events:none;
     box-shadow:inset 0 0 0 1px rgba(44,23,6,.62),inset 0 0 0 2px rgba(255,240,210,.14)}
   /* 一格。★ 空格也是一顆 button(要能當落點點下去),只是裡面沒有棋子。
      ★ 格線是「刻進木頭裡」的:一圈暗邊(2px 剛好填滿 4px 的 gap 的一半,兩格各出一半)
@@ -6076,7 +6083,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠⚠ --dc-lift / --dc-side-* 存成變數是有原因的:.dc-sel / dcHitGlow / .dc-backface
        都會整份覆蓋 box-shadow,那幾條全都要把 var(--dc-lift) 接回去,不然「選中的子」
        與「剛落地的子」會在那一瞬間**變扁**(而且只有錄影看得出來)。 */
-  .dc-p{--dc-th:calc(var(--dc-cell,44px) * .155);
+  .dc-p{--dc-th:calc(var(--dc-cell,44px) * .105);
     --dc-lift:
       0 calc(var(--dc-th) * .10) 0 var(--dc-s1),
       0 calc(var(--dc-th) * .22) 0 var(--dc-s2),
@@ -6089,7 +6096,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       0 calc(var(--dc-th) + 4px) calc(var(--dc-th) + 9px) rgba(20,8,0,.52);
     --dc-s1:#f2e8cd; --dc-s2:#e8dbba; --dc-s3:#dccca4; --dc-s4:#cdb98c;
     --dc-s5:#bda775; --dc-s6:#a98f5d; --dc-s7:#93784a; --dc-s8:#7d633a;
-    position:relative;width:83%;height:83%;border-radius:50%;
+    position:relative;width:80%;height:80%;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
     background:
       radial-gradient(circle at 50% 50%, rgba(255,252,243,0) 0 88%,
@@ -6149,14 +6156,17 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠⚠ 陰影是**斜的**不是垂直的,這是很容易做反的地方:光從左上來 →
        凹槽的**左上內壁背對光源**(暗)、**右下內壁朝向光源**(亮)。
        寫成「上暗下亮 + 一層大範圍軟影」的話,讀起來會是**浮起來的字加落影** ——
-       正好相反,而且乍看還蠻立體的,所以特別容易留著不改。 */
+       正好相反,而且乍看還蠻立體的,所以特別容易留著不改。
+     ⚠⚠⚠ v1.141.1:**這兩條一律零模糊**。使用者回報「文字看起來沒有很清晰」——
+       原因是雕刻的兩道邊各帶了一層 blur(1px / 2.5px),字的輪廓被那層暈開,
+       在 63px 的格子上就是「糊」。雕刻的邊緣在實體上是**銳利的**(刀切面),
+       所以位移要留、blur 要歸零。
+     ⚠ 陰影色也從暗紅改成**中性暖褐**:紅字用暗紅還說得過去,黑字配暗紅會發紫。 */
   .dc-ch{position:relative;font-family:'Noto Serif TC','Songti TC','PMingLiU',serif;font-weight:800;
     line-height:1;font-size:calc(var(--dc-cell,44px) * .42);
     text-shadow:
-      -1.2px -1.2px 1px rgba(64,12,12,.60),
-      -2px -2px 2.5px rgba(96,44,20,.22),
-      1px 1px 0 rgba(255,252,238,.42),
-      1.6px 1.6px 1.5px rgba(255,248,226,.22)}
+      -1px -1px 0 rgba(88,56,22,.55),
+      1px 1px 0 rgba(255,252,240,.62)}
   .dc-red{color:var(--dc-ink-r)}
   .dc-blk{color:var(--dc-ink-b)}
 
@@ -6272,9 +6282,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        這樣看起來一點都不順暢」——那個回彈就是「卡一下」的主因,換成不回彈的
        ease-out 曲線,轉到 180deg 就停,不再多轉再修正。 */
   /* ⚠ 這裡的寬高要跟 .dc-p **同一個數字**(v1.138.0 由 88% 一起改成 90%,
-     v1.139.1 再一起收到 83% —— 理由見 .dc-p 那段「棋子 + 厚度不可以超過一格」)。
+     v1.139.1 收到 83%,v1.141.1 再收到 80% —— 理由見 .dc-p 那段
+     「棋子 + 厚度不可以超過一格」與「最外圈那一列不可以貼到木框」)。
      不一樣的話翻牌翻完那顆子會忽然大一號 / 小一號(v1.137.6 修過同源的另一半)。 */
-  .dc-flip3d{position:relative;width:83%;height:83%;transform-style:preserve-3d;
+  .dc-flip3d{position:relative;width:80%;height:80%;transform-style:preserve-3d;
     animation:dcFlipIn .38s cubic-bezier(.22,.61,.36,1) both}
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
     -webkit-backface-visibility:hidden}

@@ -153,9 +153,12 @@ const DCB = (function(){
      ⚠ 這不會與 ResizeObserver 形成迴圈:.dc-stage 是 `flex:1 1 0`,
        尺寸完全由父層分配,子元素多大都回頭撐不到它。 */
   /* ⚠⚠ PAD 與 styles.css 的 `.dc-board{padding}` **必須同一個數字**,而且它同時是
-     那圈「外框帶」的寬度(`inset 0 0 0 11px` 那條 box-shadow)—— 只改一邊的症狀是
-     木框壓到最外圈的格子上,而畫面不會壞、只有截圖看得出來。 */
-  const GAP = 4, PAD = 11, MIN_CELL = 20;
+     那圈「外框帶」的寬度(`inset 0 0 0 16px` 那條 box-shadow)—— 只改一邊的症狀是
+     木框壓到最外圈的格子上,而畫面不會壞、只有截圖看得出來。
+     ★ v1.141.1 由 11 加到 16:木框帶正好蓋滿 padding,所以「最外圈的棋子到木框」
+       就等於格子裡的那點留白(約 6px),而棋子之間有 16px —— 使用者回報
+       「左右被卡掉了」講的就是這個落差。 */
+  const GAP = 4, PAD = 16, MIN_CELL = 20;
   function fitBoard(){
     if(!board || !stage) return;
     const w = stage.clientWidth, h = stage.clientHeight;
