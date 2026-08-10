@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.147.0 -->
-<meta name="version" content="1.147.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.148.0 -->
+<meta name="version" content="1.148.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -188,39 +188,25 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- 第五個遊戲(v1.58.0):真的打麻將,不是消牌。
            ⚠ 房間連結一律 <a href>(首頁跑在 app.html 外殼的 iframe 裡,
               寫成 top.location 會把外殼一起換掉、全螢幕當場沒了)
-           ★★ v1.113.0:改成**滿版深紅放射底 + 一張立體麻將牌,牌面直書「台灣」**
-              (使用者附了一張參考圖:「台灣麻將的 icon,我想改成大概這種樣子」)。
-              舊版是「中 · 發 · 胡 三張小牌立正站好」—— 那個構圖與第四張卡(麻將消消樂,
-              中 · 發 兩張)幾乎一樣,首頁上兩張麻將卡分不出誰是誰;而這一頁的賣點是
-              **台灣規則的十六張**,所以辨識點改成「台灣」兩個字本身。
-           ★ 這是九張卡裡唯一有滿版底色的一張(其餘八張都是透明底 + 物件)——
-              刻意的:它要在兩張麻將卡之間先被認出來。
-           ⚠ 與 mahjong16.html 進場插圖(.m16-art 92px)**逐字相同的一份 SVG**,只有外層
-              class 不一樣;改一邊要改另一邊(tools/test-pages.js 的 G 節在守)
+           ★★★ v1.148.0:圖示改成**一張去背的 PNG 貼圖**(m16-icon.png,192×192、11.5KB)——
+              使用者:「台灣麻將的 Icon 換成這張圖片」,附了一張三顆立體麻將牌的插畫,
+              並指了暗棋 v1.145.0 那次的做法。同一個理由:46px 下手繪 SVG 贏不過畫好的圖 ——
+              新圖的**綠側 + 奶白牌面 + 立體高光**是舊圖(平的白面 + 一片綠色底座)畫不出來的。
+              辨識點沿用「**台灣**兩個字本身」,只是從毛筆字變成插畫上的紅色立體字。
+           ★★ 同時**收掉了滿版深紅放射底**(v1.113.0~v1.147.x 唯一有滿版底色的一張卡)——
+              那個紅底當年是為了「兩張麻將卡分得出來」:舊圖與第四張卡(麻將消消樂:
+              中 · 發 兩張平的白牌)構圖幾乎一樣,不加底色會認錯。新圖不必靠底色了 ——
+              **綠背立體牌 vs 平的白牌**本身就完全不像,首頁十一張卡因此回到清一色透明底。
+              ⚠ 所以「唯一有滿版底色」這條紅線**已經作廢**(暗棋那張卡的註解原本引它當理由)。
+           ⚠ 與 mahjong16.html 的進場插圖是**同一個檔案**(那裡是 .m16-art 92px)——
+              換圖要兩頁一起換(tools/test-pages.js 的 G 節在守這對雙胞胎)
            ⚠⚠ 這裡**不可以**掛 .m16-art —— 那是進場插圖的 92px,它定義在 .gc-art(46px)
-               後面 → 同權重後定義勝 → 這張卡會比另外八張高一截(21點 v1.86.0 踩過的坑) -->
+               後面 → 同權重後定義勝 → 這張卡會比另外十張高一截(21點 v1.86.0 踩過的坑)
+           ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE
+              (離線清單漏掉 → addAll 整批失敗 = 離線完全不能玩) -->
       <a class="game-card as-link" href="mahjong16.html" data-gk="mj16">
         <span class="gc-rank" aria-hidden="true">5</span>
-        <svg class="gc-art m16-cart" viewBox="0 0 56 56" role="img" aria-label="台灣麻將牌">
-          <defs><clipPath id="m16IcClip"><rect x="0" y="0" width="56" height="56" rx="12"/></clipPath></defs>
-          <g clip-path="url(#m16IcClip)">
-            <rect class="m16-ic-bg" x="0" y="0" width="56" height="56"/>
-            <g class="m16-ic-ray">
-              <path d="M28 26 73.1 17 73.1 35Z"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(45 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(90 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(135 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(180 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(225 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(270 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(315 28 26)"/>
-            </g>
-          </g>
-          <rect class="m16-ic-side" x="11" y="5" width="34" height="46" rx="6"/>
-          <rect class="m16-ic-face" x="11" y="5" width="34" height="38" rx="6"/>
-          <text class="m16-ic-w" x="28" y="21.6">台</text>
-          <text class="m16-ic-w" x="28" y="39.2">灣</text>
-        </svg>
+        <img class="gc-art m16-cart" src="m16-icon.png" alt="台灣麻將牌" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">台灣麻將</span>
           <span class="hl-badge hidden" id="hlBadgeMj16"></span>
@@ -408,8 +394,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               換圖要兩頁一起換(tools/test-pages.js 的 I 節在守這對雙胞胎)
            ⚠⚠ 這裡**不可以**掛 .dc-art —— 那是進場插圖的 96px,它定義在 .gc-art(46px)
                後面 → 會把這張卡撐高一截(21點 v1.86.0 踩過的坑)
-           ⚠ 這張卡**刻意沒有滿版底色**:十一張裡只有台灣麻將是滿版的,那是它與麻將消消樂
-              分家的辨識點 —— 所以圖一定要**去背**,不可以連插畫的暗底一起貼上來
+           ⚠ 這張卡**刻意沒有滿版底色** —— 圖一定要**去背**,不可以連插畫的暗底一起貼上來。
+              ★ v1.145.0 當時的理由是「十一張裡只有台灣麻將是滿版的,那是它與麻將消消樂分家的
+                辨識點」;v1.148.0 台灣麻將也換成去背 PNG、紅底一起收掉了 → 現在的理由更單純:
+                **十一張卡清一色透明底**,任何一張加底色都會變成唯一突出的那一張。
            ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE
               (離線清單漏掉 → addAll 整批失敗 = 離線完全不能玩) -->
       <a class="game-card as-link" href="darkchess.html" data-gk="dc">

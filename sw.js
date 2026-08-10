@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.147.0";
+const VERSION = "1.148.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -194,10 +194,12 @@ const CORE = [
   "./mp3/沒禮貌.m4a",
   "./manifest.json",
   "./icon.svg",
-  /* ★ v1.145.0:暗棋的圖示改成一張去背的 PNG 貼圖(index.html 首頁卡 + darkchess.html
-     進場插圖**同一個檔案**)。漏列的症狀是「離線時那張卡是破圖」——
-     而 addAll() 是全有全無,所以檔名打錯的症狀更慘:**離線整個不能玩**。 */
-  "./dc-icon.png"
+  /* ★ v1.145.0 / v1.148.0:暗棋與台灣麻將的圖示都是一張去背的 PNG 貼圖
+     (index.html 首頁卡 + 該遊戲進場插圖**同一個檔案**)。漏列的症狀是
+     「離線時那張卡是破圖」—— 而 addAll() 是全有全無,所以檔名打錯的症狀更慘:
+     **離線整個不能玩**。 */
+  "./dc-icon.png",
+  "./m16-icon.png"
 ];
 /* 筒條萬的牌名語音(v1.72.0,27 個)。★ 用算式接上去而**不是手列 27 行** —— 規律與
    js/mahjong16/sfx.js 的編碼一致(0..8 萬 w / 9..17 條 b / 18..26 筒 d)。

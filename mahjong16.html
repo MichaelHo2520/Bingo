@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.147.0 -->
-<meta name="version" content="1.147.0">
+<!-- 台灣 16 張麻將 · v1.148.0 -->
+<meta name="version" content="1.148.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -56,32 +56,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 第一層:選怎麼玩 -->
     <div id="m16PickMode">
       <div class="mj-hero">
-        <!-- ★★ v1.113.0:改成滿版深紅放射底 + 一張立體麻將牌,牌面直書「台灣」。
-             在此之前這裡與消消樂進場頁共用同一張「中 · 發 兩張牌」的圖 —— 兩頁的插圖
+        <!-- ★★★ v1.148.0 起是一張**去背的 PNG 貼圖**(m16-icon.png,192×192、11.5KB)——
+             使用者附了一張三顆立體麻將牌的插畫,並指了暗棋 v1.145.0 那次的做法。
+             在此之前(v1.113.0~v1.147.x)是手繪 SVG:滿版深紅放射底 + 一張立體麻將牌、
+             牌面用楷體直書「台灣」;那個滿版紅底連同這次一起收掉了(理由記在
+             index.html 那張卡的註解與 notes/13 第十三節)。
+             更早之前這裡與消消樂進場頁共用同一張「中 · 發 兩張牌」的圖 —— 兩頁的插圖
              一模一樣,而它們是兩個完全不同的遊戲。
-             ⚠ 與 index.html 首頁那張遊戲卡(.gc-art.m16-cart 46px)**逐字相同的一份 SVG**,
-                只有外層 class 不一樣(這裡是 .m16-art 92px);改一邊要改另一邊
-                (tools/test-pages.js 的 G 節在守) -->
-        <svg class="m16-art" viewBox="0 0 56 56" role="img" aria-label="台灣麻將牌">
-          <defs><clipPath id="m16IcClip"><rect x="0" y="0" width="56" height="56" rx="12"/></clipPath></defs>
-          <g clip-path="url(#m16IcClip)">
-            <rect class="m16-ic-bg" x="0" y="0" width="56" height="56"/>
-            <g class="m16-ic-ray">
-              <path d="M28 26 73.1 17 73.1 35Z"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(45 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(90 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(135 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(180 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(225 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(270 28 26)"/>
-              <path d="M28 26 73.1 17 73.1 35Z" transform="rotate(315 28 26)"/>
-            </g>
-          </g>
-          <rect class="m16-ic-side" x="11" y="5" width="34" height="46" rx="6"/>
-          <rect class="m16-ic-face" x="11" y="5" width="34" height="38" rx="6"/>
-          <text class="m16-ic-w" x="28" y="21.6">台</text>
-          <text class="m16-ic-w" x="28" y="39.2">灣</text>
-        </svg>
+             ⚠ 與 index.html 首頁那張遊戲卡是**同一個檔案**,只有外層 class 不一樣
+                (這裡是 .m16-art 92px、首頁是 .gc-art.m16-cart 46px);
+                換圖要兩頁一起換(tools/test-pages.js 的 G 節在守)
+             ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE -->
+        <img class="m16-art" src="m16-icon.png" alt="台灣麻將牌" width="192" height="192">
         <div class="home-tagline">真的打麻將:摸打吃碰槓,湊 5 組面子 + 1 對將</div>
       </div>
       <button class="btn primary block-btn home-btn" id="m16GoOnline">🌐 連線對戰</button>

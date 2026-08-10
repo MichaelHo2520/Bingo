@@ -17,10 +17,12 @@ tools/
 #   970_*.png.webp  v1.55.0 的麻將牌面照這張「認識麻將花色」表重畫
 #   數獨icon.png    v1.101.2 首頁數獨木框盤面 + 鉛筆的參考圖
 #   file_0000…8f16.png  v1.145.0 暗棋首頁 icon 的原圖(兩顆棋子就是從它切出來的)
+#   file_0000…54e0.png  v1.148.0 台灣麻將首頁 icon 的原圖(三顆麻將牌,去背後縮成 192px)
 #   back.jpg        早期實驗殘留,沒有任何頁面引用
 # ⚠ 真正在用的圖不在這裡,留在根目錄(黑名單制 → 自動上傳):
 #   icon.svg      PWA 圖示(十一頁 + manifest.json + sw.js 都引用它)
 #   dc-icon.png   暗棋的首頁卡 + 進場插圖(v1.145.0;index.html / darkchess.html / sw.js)
+#   m16-icon.png  台灣麻將的首頁卡 + 進場插圖(v1.148.0;index.html / mahjong16.html / sw.js)
 # ⚠⚠ 頁面**絕對不可以**直接指向 design-refs/ —— 那是「本機好好的、線上永遠破圖」。
 design-refs/
 
