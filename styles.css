@@ -6012,6 +6012,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
          —— 32 顆共用同一份 CSS,不錯開的話整盤是同一張紋路,一眼就露出是印的。
        · 高光也一起放柔(從 .62 的小圓斑改成 .42 的大橢圓):實木是漫反射,
          強高光那一版看起來是塑膠。
+     ⚠⚠⚠ v1.139.1:**棋子的直徑 + 厚度不可以超過一格**,這是一條算式不是感覺 ——
+       `width` 與 `--dc-th` 都是 var(--dc-cell) 的百分比,而厚度是往**下**長的實色陰影,
+       所以佔的垂直空間是 `width + --dc-th`。v1.139.0 把厚度加到 .112 卻沒動 90% 的寬,
+       90 + 11.2 = **101.2% > 一格** → 每一顆的上下緣都貼死在格線上,使用者回報
+       「棋子被邊邊卡掉」。收到 83% 之後是 94.2%,上下各留約 3%。
+       ⚠ 一起改的有三個地方:`.dc-flip3d` 的寬高(不同步 = 翻完忽然大一號)、
+         `.dc-ch` 的字級(它的分母是格子不是棋子 → 棋子縮了字會相對變大)。
      ⚠⚠ --dc-lift / --dc-side-* 存成變數是有原因的:.dc-sel / dcHitGlow / .dc-backface
        都會整份覆蓋 box-shadow,那幾條全都要把 var(--dc-lift) 接回去,不然「選中的子」
        與「剛落地的子」會在那一瞬間**變扁**(而且只有錄影看得出來)。 */
@@ -6023,7 +6030,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       0 calc(var(--dc-th) * .62) 0 var(--dc-side-b),
       0 var(--dc-th) 0 var(--dc-side-c),
       0 calc(var(--dc-th) + 3px) calc(var(--dc-th) + 6px) rgba(26,13,2,.44);
-    position:relative;width:90%;height:90%;border-radius:50%;
+    position:relative;width:83%;height:83%;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
     background:
       radial-gradient(circle at 50% 50%, rgba(255,252,243,0) 0 83%,
@@ -6054,8 +6061,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ⚠ 棋子的字用**襯線體**:象棋子上就是印宋體,用內文的 Nunito 會像貼紙。
      取不到中文襯線體時退回 serif —— 那也還是襯線,不會變成另一種味道。
      ★ text-shadow 是「刻進木頭再上色」的樣子:下緣受光、上緣一道淺淺的凹影。 */
+  /* ⚠ 字級的分母是**格子**不是棋子,所以 .dc-p 的百分比一改,「字 / 棋子」的比例就跟著跑。
+     v1.139.1 棋子 90% → 83% 時字級一起從 .46 收到 .42,把那個比例接回 0.509
+     (notes/19 十四節的 ?mode=reveal 就是在比這個數字)。 */
   .dc-ch{position:relative;font-family:'Noto Serif TC','Songti TC','PMingLiU',serif;font-weight:800;
-    line-height:1;font-size:calc(var(--dc-cell,44px) * .46);
+    line-height:1;font-size:calc(var(--dc-cell,44px) * .42);
     text-shadow:0 1px 0 rgba(255,255,255,.5),0 -1px 1px rgba(88,52,16,.30)}
   .dc-red{color:var(--dc-red)}
   .dc-blk{color:var(--dc-blk)}
@@ -6168,9 +6178,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        (y=1.05)讓 rotateY 轉過 180deg 再彈回來,使用者反饋「最後都會好像卡了一下,
        這樣看起來一點都不順暢」——那個回彈就是「卡一下」的主因,換成不回彈的
        ease-out 曲線,轉到 180deg 就停,不再多轉再修正。 */
-  /* ⚠ 這裡的寬高要跟 .dc-p **同一個數字**(v1.138.0 由 88% 一起改成 90%)——
+  /* ⚠ 這裡的寬高要跟 .dc-p **同一個數字**(v1.138.0 由 88% 一起改成 90%,
+     v1.139.1 再一起收到 83% —— 理由見 .dc-p 那段「棋子 + 厚度不可以超過一格」)。
      不一樣的話翻牌翻完那顆子會忽然大一號 / 小一號(v1.137.6 修過同源的另一半)。 */
-  .dc-flip3d{position:relative;width:90%;height:90%;transform-style:preserve-3d;
+  .dc-flip3d{position:relative;width:83%;height:83%;transform-style:preserve-3d;
     animation:dcFlipIn .38s cubic-bezier(.22,.61,.36,1) both}
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
     -webkit-backface-visibility:hidden}
