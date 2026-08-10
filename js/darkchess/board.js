@@ -396,20 +396,36 @@ const DCB = (function(){
      ⚠ 因此這裡讀的是 st.rules(這一局凍結的那一份),不是任何 localStorage。
 
      吃子欄本身不違反牌情紅線:被吃掉的子一定都現過身(炮打暗子是**先翻開再吃**)。
-     ⚠ 顆數多的時候改成互相疊一點,不然一列排不下 16 顆(class 由這裡掛,尺寸在 CSS)。
-     ⚠⚠ v1.115.0 把子放大到 26px(原 20px)之後,**一段收緊不夠用了**:
-       疊到 16 顆排得下的那個量,9 顆的時候會疊到只看得見最後一顆(截圖看出來的)。
-       所以分兩段 —— 9~12 顆疊一點點、13 顆以上才真的疊很兇(那時本來就快分出勝負了)。
-     ⚠ 兩個門檻與 CSS 的 margin 是**一組算出來的數字**(算式寫在 CSS 那邊),改尺寸要一起改。 */
-  const TRAY_TIGHT = 9, TRAY_TIGHTER = 13;
+
+     ★★★ v1.142.0:同一種子**併成一顆 + 一個小數字**,不再一顆一顆攤開。
+       使用者回報「被吃了什麼的區域看起來不清楚」。攤開的版本在顆數多的時候只有一條路:
+       互相疊(v1.115.0~v1.141.x 的 `.tight` / `.tighter`)—— 而疊掉的正好是**字**
+       (字在正中央、疊掉的是右半邊),前面那幾顆只剩半個字,等於白畫。
+       一方最多只有**七種**子(將士象車馬包卒)→ 併起來永遠 ≤ 7 顆:一列排得下、
+       **一顆都不必疊**,每個字都是完整的。
+       ⚠ 所以那兩段收緊的門檻(TRAY_TIGHT / TRAY_TIGHTER)連同 CSS 的 .tight / .tighter
+         一起拿掉了 —— 留著會讓下次改的人以為還會疊。
+       ⚠ 併的前提是「已經照階級排好」→ 同一種一定相鄰(caps 只裝敵方子,所以同階級
+         就是同一顆),因此只比對前一顆就夠,不必用物件統計再排一次。 */
   const byRank = (a, b) => DC.rankOf(b) - DC.rankOf(a);
+  function groupCaps(caps){
+    const out = [];
+    caps.slice().sort(byRank).forEach(p => {
+      const last = out[out.length - 1];
+      if(last && last.p === p) last.n++;
+      else out.push({ p: p, n: 1 });
+    });
+    return out;
+  }
   function trayRow(label, caps){
-    const n = caps.length;
-    const pcs = caps.slice().sort(byRank).map(pieceHTML).join("");
+    const gs = groupCaps(caps);
+    const pcs = gs.map(g => '<span class="dc-cp">' + pieceHTML(g.p) +
+                            (g.n > 1 ? '<i class="dc-cn">' + g.n + "</i>" : "") +
+                            "</span>").join("");
     return '<div class="dc-tray-row">' +
              '<span class="dc-tray-lbl">' + esc(label) + "</span>" +
-             '<span class="dc-tray-pcs' + (n >= TRAY_TIGHTER ? " tighter" : (n >= TRAY_TIGHT ? " tight" : "")) + '">' +
-             (n ? pcs : '<span class="dc-none">—</span>') + "</span></div>";
+             '<span class="dc-tray-pcs">' +
+             (gs.length ? pcs : '<span class="dc-none">—</span>') + "</span></div>";
   }
   function trayHTML(st){
     const names = cur.names || [];

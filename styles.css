@@ -5859,6 +5859,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
             照片上刻進凹槽的紅是**暗紅**(#8e1f27),而 --dc-red 還要給面板上的
             「你是紅方」用(.dc-red-t),那裡在深色底上,暗紅會直接看不見。 */
          --dc-ink-r:#8e1f27; --dc-ink-b:#241f1c;
+         /* ★ v1.142.0:吃子欄那一排**扁圓餅**的底色 —— 比棋子(--dc-wood)再亮半階。
+            它不是「一塊木頭」而是「一份清單」,亮一點才在半透明的面板底上跳得出來
+            (那一排只有 26px,對比不夠就是使用者回報的「看不清楚」)。 */
+         --dc-cap-face:#f5ebd2;
          --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(52,28,8,.05);
          --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6;
          /* 棋盤那一塊木頭:深一階的胡桃色。★ 棋子是淺楓木,兩者的明度**一定要拉開** ——
@@ -6380,15 +6384,42 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-tray-lbl{flex:none;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-size:11px;font-weight:800;color:var(--muted)}
   .dc-tray-pcs{--dc-cell:28px;flex:1;min-width:0;display:flex;align-items:center;overflow:hidden}
-  .dc-tray-pcs .dc-p{width:26px;height:26px;flex:none;margin-right:2px}
-  /* 顆數多的時候互相疊一點 —— 16 顆排不進一列(class 由 board.js 依顆數掛)。
-     ⚠⚠ **兩段**,不是一段:一段收緊時「16 顆排得下」的那個量,套在 9 顆上會疊到
-        只看得見最後一顆(v1.115.0 放大棋子之後截圖抓到的)。
-     ⚠ 疊多少是算出來的 —— 最窄的手機(390px)這一格約 249px(對手名字佔滿 84px 時):
-        · tight  (9~12 顆):步距 18 → 12 顆 = 11×18 + 26 = 224 ≤ 249 ✔
-        · tighter(13 顆以上):步距 13 → 16 顆 = 15×13 + 26 = 221 ≤ 249 ✔ */
-  .dc-tray-pcs.tight .dc-p{margin-right:-8px}
-  .dc-tray-pcs.tighter .dc-p{margin-right:-13px}
+  /* ---------- 吃子欄的棋子:刻意畫成「扁的」(v1.142.0)----------
+     使用者:「被吃了什麼的區域看起來不清楚,這個部分的棋子可以不需要畫得這麼立體,
+     重點是要能看得清楚」。盤上那一套立體搬到 26px 上是**淨損** ——
+     車溝(.dc-p::after)、厚度(--dc-lift)、刻字的雙向位移(.dc-ch 的 text-shadow)
+     每一層都要吃掉 1~2px,而整顆只有 26px:糊掉的正是唯一的辨識點(那個字)。
+     所以這裡走另一套視覺:**一圈實邊的扁圓餅 + 放大的字**。
+     ⚠ box-shadow 是**整份覆蓋**,所以這裡不必也不可以把 var(--dc-lift) 接回去 ——
+       別處那條 ⚠(選中 / 剛落地不可以變扁)是怕**不小心**弄扁,這裡是**刻意要扁**。
+     ⚠⚠ 兩道刻痕要一起關掉:.dc-p::after(車溝)與 .dc-ring(溝內側那道細線)。
+       只換掉 box-shadow 的話它們還在,26px 上看起來就是「一顆髒的圓餅」。
+     ⚠ 紅 / 黑除了字色再加**一圈同色的邊**:整排都是米白圓餅時,一眼掃過去
+       光靠字色分不出哪幾顆是誰的(紅線:兩方不可以塌成同一種樣子)。 */
+  .dc-tray-pcs .dc-p{width:26px;height:26px;flex:none;
+    background:var(--dc-cap-face);
+    box-shadow:0 0 0 1.5px rgba(36,31,28,.50)}
+  .dc-tray-pcs .dc-p.dc-red{box-shadow:0 0 0 1.5px rgba(142,31,39,.60)}
+  .dc-tray-pcs .dc-p::after{display:none}
+  .dc-tray-pcs .dc-ring{display:none}
+  /* 字級 .60(盤上是 .42)—— 立體省下來的空間全給字;刻字的位移一律拿掉(要銳利)。
+     ⚠ 分母是 .dc-tray-pcs 的 --dc-cell(28px)而不是棋子本身:與盤上同一個算式,
+       所以矮視窗那段只要改 --dc-cell,字與圓餅會一起縮。 */
+  .dc-tray-pcs .dc-ch{font-size:calc(var(--dc-cell,28px) * .60);text-shadow:none}
+  /* 一組「一顆 + 幾顆」(同一種子併成一顆,見 board.js 的 groupCaps())。
+     ⚠ 數字放在**圓的外面**,不壓在角上:壓角必定蓋掉字的右下角,那等於把上面
+       剛省下來的空間又還回去。一方最多七種子 → 最寬的情況
+       7×(26+3) + 6×(1+7) = 251px,390px 手機上這一格量到 298px ✔ 不必疊。
+     ⚠ <i> 預設是斜體,font-style 要寫回 normal。 */
+  .dc-cp{flex:none;display:inline-flex;align-items:center;margin-right:3px}
+  .dc-cn{margin-left:1px;font-size:11px;font-weight:800;font-style:normal;color:var(--text)}
+  /* ⚠ 再窄一階的手機(≤360px)這一格只剩約 228px,而上面那個最寬的情況是 251px ——
+     所以**圓餅縮一階**(--dc-cell 一改,字級跟著縮):7×(22+3) + 6×8 = 223 ✔。
+     ★ 不可以改回「互相疊」:疊掉的就是字,那正是這一版要修的東西。 */
+  @media (max-width:360px){
+    .dc-tray-pcs{--dc-cell:24px}
+    .dc-tray-pcs .dc-p{width:22px;height:22px}
+  }
   /* ⚠ 沒有獨立的包裝 div 了(舊的 .dc-chain-row)—— 文字與按鈕直接是 .dc-actline
      的 flex 子項,跟走棋倒數環同一行並排,間距靠 .dc-actline 的 gap。 */
   .dc-chain-txt{font-size:13px;font-weight:800;color:var(--accent-2)}
@@ -6498,12 +6529,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        ⚠ .dc-actline 的無環版本本來就是 28px(見基準規則),這裡不必再覆寫一次;
          有環版本(.has-cd)由環的 34px 撐住,矮視窗沒有把環縮小,所以也不用覆寫。 */
     .dc-tray-row{min-height:24px}
+    /* ★ 只改這一個數字:圓餅的寬高在下面那條、字級吃 --dc-cell 的 .60(見基準規則)。
+       ⚠ v1.142.0 起沒有 .tight / .tighter 了 —— 同一種子併成一顆之後永遠 ≤ 7 顆,
+         橫置這一列還寬得多(棋桌上限 720px),更不可能排不下。 */
     .dc-tray-pcs{--dc-cell:24px}
     .dc-tray-pcs .dc-p{width:22px;height:22px}
-    /* ★ 橫置時這一列**寬得多**(棋桌上限 720px),16 顆 22px 排一排才 352px ——
-       疊起來只是白白讓人認不出來。所以把收緊量放掉大半(class 還是照掛)。 */
-    .dc-tray-pcs.tight .dc-p{margin-right:2px}
-    .dc-tray-pcs.tighter .dc-p{margin-right:-4px}
   }
 
   /* ==========================================================================
