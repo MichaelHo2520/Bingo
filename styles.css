@@ -5841,12 +5841,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ========================================================================== */
   /* 材質色:與數獨的 --sk-* 同一個做法 —— **刻意不吃主題變數**。
      木頭就是木頭,五個主題各換一種顏色只會讓它看起來像塑膠。 */
-  :root{ --dc-wood:#f0d6a8; --dc-wood-e:#b98a4e; --dc-wood-in:#e3c390;
+  /* ★ v1.140.0:木料從「楓木(偏黃)」換成**白蠟木(偏冷、更淺)** —— 使用者第二張參考照,
+     那顆的頂面接近象牙色,黃度明顯比 v1.139.x 低。明暗差維持約 23(見 .dc-backface)。 */
+  :root{ --dc-wood:#eee1c0; --dc-wood-e:#b98a4e; --dc-wood-in:#e4d3aa;
          /* ★ v1.139.0:牌背從深棕 #c89055 改成**與正面同一塊料、只深半階**的淺橡木 ——
             使用者拿實體木棋子的近照來對照,實體暗棋的背面本來就是原木色(字是刻在正面的)。
             「一眼分得出明暗」改由**有沒有字**扛(那是最強的線索,而且深棕反而與棋盤同階、
             暗子會埋進盤裡)。⚠ 首頁 icon 不跟著改,見下面 --dc-ic-bk。 */
-         --dc-back:#dcbe86; --dc-back-e:#8a5c30; --dc-back-in:#c9a86c;
+         --dc-back:#d4bd8d; --dc-back-e:#8a5c30; --dc-back-in:#c3a978;
          /* ⚠ 首頁 icon / 進場插圖**專用**的牌背色(= 舊的棋子牌背色)。
             icon 只有 46px,辨識點「有一顆是蓋著的」全靠與翻開那顆的**色差**;
             照棋子那樣改淺半階,縮到 46px 就變成「兩顆一樣的圓餅」= 一般象棋的圖。
@@ -6023,7 +6025,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        都會整份覆蓋 box-shadow,那幾條全都要把 var(--dc-lift) 接回去,不然「選中的子」
        與「剛落地的子」會在那一瞬間**變扁**(而且只有錄影看得出來)。 */
   .dc-p{--dc-th:calc(var(--dc-cell,44px) * .112);
-    --dc-side-a:#ddc094; --dc-side-b:#c5a273; --dc-side-c:#a3814f;
+    --dc-side-a:#ddd0a8; --dc-side-b:#c6b78c; --dc-side-c:#a8996d;
     --dc-gx:-34%; --dc-gy:116%;
     --dc-lift:
       0 calc(var(--dc-th) * .30) 0 var(--dc-side-a),
@@ -6034,14 +6036,16 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     display:flex;align-items:center;justify-content:center;
     background:
       radial-gradient(circle at 50% 50%, rgba(255,252,243,0) 0 83%,
-        rgba(255,250,238,.40) 86% 93%, rgba(120,80,36,.14) 95% 98%, rgba(104,68,28,.28) 99% 100%),
+        rgba(255,251,241,.46) 86% 93%, rgba(120,80,36,.13) 95% 98%, rgba(104,68,28,.26) 99% 100%),
+      radial-gradient(circle at 66% 74%, rgba(255,254,249,0) 0 74%,
+        rgba(255,254,249,.42) 86% 95%, rgba(255,254,249,0) 100%),
       repeating-linear-gradient(83deg,
-        rgba(150,104,52,.08) 0 1%, rgba(150,104,52,0) 1% 4%),
+        rgba(150,110,60,.07) 0 1%, rgba(150,110,60,0) 1% 4%),
       repeating-radial-gradient(ellipse 120% 155% at var(--dc-gx) var(--dc-gy),
-        rgba(140,92,38,.19) 0 2.2%, rgba(140,92,38,0) 2.2% 8.5%,
-        rgba(140,92,38,.11) 8.5% 10.4%, rgba(140,92,38,0) 10.4% 19%),
-      radial-gradient(ellipse 82% 72% at 42% 30%, rgba(255,253,246,.42) 0%, rgba(255,253,246,0) 70%),
-      radial-gradient(circle at 50% 44%, var(--dc-wood) 0%, var(--dc-wood-in) 62%, #d7bb8a 100%);
+        rgba(132,96,46,.26) 0 .9%, rgba(132,96,46,0) .9% 9%,
+        rgba(132,96,46,.15) 9% 9.8%, rgba(132,96,46,0) 9.8% 19%),
+      radial-gradient(ellipse 82% 72% at 42% 30%, rgba(255,254,249,.40) 0%, rgba(255,254,249,0) 70%),
+      radial-gradient(circle at 50% 44%, var(--dc-wood) 0%, var(--dc-wood-in) 62%, #d8c69c 100%);
     box-shadow:
       inset 0 1.5px 2px rgba(255,255,255,.50),
       inset 0 -3px 5px rgba(110,72,30,.26),
@@ -6055,8 +6059,31 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-sq:nth-child(4n+2) .dc-p{--dc-gx:128%; --dc-gy:-22%}
   .dc-sq:nth-child(4n+3) .dc-p{--dc-gx:-40%; --dc-gy:-30%}
   .dc-sq:nth-child(4n)   .dc-p{--dc-gx:124%; --dc-gy:118%}
-  /* 內圈:實體棋子上那一圈是**刻進去的**(不是印上去的)—— 一條亮邊在下、一條暗邊在內 */
-  .dc-ring{position:absolute;inset:11%;border-radius:50%;border:1.5px solid currentColor;opacity:.62;
+  /* ---------- 車溝(v1.140.0 新增)----------
+     ★★ 第二張參考照上最搶眼的結構:頂面**靠邊一圈凹槽**,槽外還有一圈窄的凸邊 ——
+     它是車床車出來的痕跡,而且**兩面都有**(所以做在 .dc-p 上,不是只做在正面)。
+     ⚠ 為什麼用 ::after 而不是多疊一層 background:凹槽要有**方向**
+       (上壁背光所以暗、下壁受光所以亮),而 radial-gradient 是等向的 ——
+       同一個半徑上四面八方都一樣,做出來只會是「一個圈圈」。
+       box-shadow 的 inset + Y 位移剛好就是「有方向的凹陷」。
+     ⚠ 四條的分工:①②是**槽裡**的上下壁,③④是**槽外那圈凸邊**的下亮上暗。
+       只留 ①(最容易想到的寫法)看起來會像一條畫上去的細線,不是溝。
+     ⚠ inset 6.5% 要**大於** .dc-p 背景那圈倒角的起點(83%),不然溝會壓在倒角上糊成一團。
+     ⚠ pointer-events:none —— .dc-sq 才是那顆按鈕,這一層不可以吃掉點擊。 */
+  .dc-p::after{content:"";position:absolute;inset:6.5%;border-radius:50%;pointer-events:none;
+    box-shadow:
+      inset 0 2px 3px rgba(112,76,30,.46),
+      inset 0 -1.5px 2px rgba(255,253,244,.55),
+      0 2px 1.5px -1px rgba(255,253,244,.70),
+      0 -1.5px 1.5px -1px rgba(112,76,30,.30)}
+  /* 內圈:實體棋子上那一圈是**刻進去的**(不是印上去的)—— 一條亮邊在下、一條暗邊在內。
+     ★ v1.140.0 起它與上面那道車溝是**兩件事**:車溝是木頭本身的結構(中性、兩面都有),
+     這一圈是**漆在溝內側平面上的紅/黑漆**(只有正面有,吃 currentColor)。
+     實體象棋子就是這個順序:先車溝,再上漆。
+     ⚠ inset 從 11% 收到 15%:兩圈的半徑差**不可以只有幾 px** —— 車溝在 93.5%、
+       漆圈本來在 89%,一格 63px 時兩者只差 1.2px,在畫面上就糊成一條粗線
+       (第一版截圖看得很清楚)。拉到 85% 才讀得出「溝在外、漆圈在內」是兩件事。 */
+  .dc-ring{position:absolute;inset:15%;border-radius:50%;border:1.5px solid currentColor;opacity:.62;
     box-shadow:0 1px 0 rgba(255,255,255,.5),inset 0 1px 1px rgba(0,0,0,.16)}
   /* ⚠ 棋子的字用**襯線體**:象棋子上就是印宋體,用內文的 Nunito 會像貼紙。
      取不到中文襯線體時退回 serif —— 那也還是襯線,不會變成另一種味道。
@@ -6092,26 +6119,30 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        · 紋路用與正面同一組順紋弧線,只把圓心挪到另一側(它是同一塊料的另一面)。
      ⚠ 這裡的淺色**不可以**照抄到首頁 icon(46px 只剩色差可用),見 :root 的 --dc-ic-bk。 */
   .dc-backface{color:var(--dc-back-e);
-    --dc-side-a:#cfb079; --dc-side-b:#b7935d; --dc-side-c:#96733f;
+    --dc-side-a:#c6b48a; --dc-side-b:#ad996c; --dc-side-c:#8c7950;
     --dc-gx:118%; --dc-gy:-26%;
     background:
       radial-gradient(circle at 50% 50%, rgba(255,236,204,0) 0 83%,
-        rgba(255,246,224,.38) 86% 93%, rgba(96,58,20,.15) 95% 98%, rgba(78,46,14,.30) 99% 100%),
+        rgba(255,250,234,.44) 86% 93%, rgba(96,58,20,.14) 95% 98%, rgba(78,46,14,.28) 99% 100%),
+      radial-gradient(circle at 66% 74%, rgba(255,253,244,0) 0 74%,
+        rgba(255,253,244,.40) 86% 95%, rgba(255,253,244,0) 100%),
       repeating-linear-gradient(97deg,
-        rgba(126,84,38,.09) 0 1%, rgba(126,84,38,0) 1% 4%),
+        rgba(126,92,44,.08) 0 1%, rgba(126,92,44,0) 1% 4%),
       repeating-radial-gradient(ellipse 120% 155% at var(--dc-gx) var(--dc-gy),
-        rgba(122,78,30,.20) 0 2.2%, rgba(122,78,30,0) 2.2% 8.5%,
-        rgba(122,78,30,.12) 8.5% 10.4%, rgba(122,78,30,0) 10.4% 19%),
-      radial-gradient(ellipse 82% 72% at 40% 28%, rgba(255,248,228,.40) 0%, rgba(255,248,228,0) 70%),
-      radial-gradient(circle at 52% 46%, var(--dc-back) 0%, var(--dc-back-in) 60%, #c0a06c 100%);
-    box-shadow:inset 0 1.5px 2px rgba(255,252,236,.45),inset 0 -3px 6px rgba(96,58,20,.26),
-      0 0 0 1px rgba(150,104,52,.50),var(--dc-lift)}
+        rgba(118,84,36,.27) 0 .9%, rgba(118,84,36,0) .9% 9%,
+        rgba(118,84,36,.16) 9% 9.8%, rgba(118,84,36,0) 9.8% 19%),
+      radial-gradient(ellipse 82% 72% at 40% 28%, rgba(255,252,240,.38) 0%, rgba(255,252,240,0) 70%),
+      radial-gradient(circle at 52% 46%, var(--dc-back) 0%, var(--dc-back-in) 60%, #b89c6e 100%);
+    box-shadow:inset 0 1.5px 2px rgba(255,253,242,.45),inset 0 -3px 6px rgba(96,58,20,.24),
+      0 0 0 1px rgba(150,110,58,.48),var(--dc-lift)}
   /* ⚠ 牌背**不畫那圈實線**:`.dc-ring` 在正面是棋子上那圈刻痕,照搬到牌背就變成
      「一個圈圈」—— 使用者原話「暗子畫的一點都沒有立體棋子的感覺,只是兩個圈圈疊在一起」。
      ★ v1.139.0 再收一次:連「內凹倒角」都太像圖案了(照片上的背面是全素的),
-     只留最外緣一道極淡的車削痕 —— 位置從 inset 11% 挪到 4%,強度砍到約三分之一。 */
-  .dc-backface .dc-ring{border-color:transparent;opacity:1;inset:4%;
-    box-shadow:inset 0 1px 2px rgba(78,46,14,.10),0 1px 0 rgba(255,246,224,.12)}
+     只留最外緣一道極淡的車削痕 —— 位置從 inset 11% 挪到 4%,強度砍到約三分之一。
+     ★★ v1.140.0 收到底:**整個不畫**。車溝已經由 `.dc-p::after` 接手(它兩面共用),
+     這裡再留一道就是同一個結構畫了兩遍 —— 兩圈同心的細線正是 v1.137.x 被罵
+     「只是兩個圈圈疊在一起」的那個樣子。元素留著只是因為 backHTML() 會吐出它。 */
+  .dc-backface .dc-ring{border-color:transparent;opacity:1;inset:4%;box-shadow:none}
   /* 木結:順紋板材上偶爾有的一顆小節疤(不是「中央紋章」、也不再是年輪的髓心)——
      所以它**不在正中央**,而且刻意做得很淡:認得出是木頭上的瑕疵就夠了,
      一濃就變成「牌背上印了一個東西」。
