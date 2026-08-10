@@ -253,6 +253,11 @@ const MP = MPCore.create((function(){
     /* 認輸刻意不做:暗棋一局本來就有「悶到 40 步比階級總和」當出口,
        而走棋倒數會幫掛機的人走完 —— 再加一顆認輸鈕只是多一個誤按的地方。 */
     hasResign: false,
+    /* ★★ 誰先翻讓玩家選(v1.144.0;核心的第六個能力旗標)——
+       暗棋的先手權很實在(先手第一次翻到什麼顏色就是他的),偷偷 50/50 抽掉太可惜。
+       落地見 js/shared/mp-order.js(蓋板 + 猜拳判定)與 darkchess.html 的 #mpOrderRow;
+       決定出來的順序從 newGame() 的第三個參數進來。 */
+    orderPick: true,
 
     init(c){ ctx = c; },
 
@@ -287,11 +292,15 @@ const MP = MPCore.create((function(){
       deal = ""; moves = []; st = null; curRound = null; lastLen = -1;
       DCB.reset();
     },
-    newGame(ids){
+    newGame(ids, prev, picked){
       /* 座位每局重抽:先手是 0 號座位,而**先手決定自己要什麼顏色**(第一次翻到什麼就是什麼)
-         —— 那是這個遊戲唯一的先手權,不換位置就永遠是同一個人拿。 */
-      const ord = ids.slice();
-      if(Math.random() < 0.5){ const t = ord[0]; ord[0] = ord[1]; ord[1] = t; }
+         —— 那是這個遊戲唯一的先手權,不換位置就永遠是同一個人拿。
+         ★★ v1.144.0:先手改成**玩家選**(房規「誰先翻」:隨機 / 猜拳 / 房主排),
+           核心把決定好的順序從第三個參數送進來 —— 猜拳贏的人就是 picked[0] = 先翻的人。
+           ⚠ 沒帶(舊房間、或核心那邊沒開旗標)一律退回原本的 50/50 重抽,
+             不要讓「先手永遠是同一個人」偷偷回來。 */
+      const ord = (picked && picked.length === ids.length) ? picked.slice() : ids.slice();
+      if(!picked && Math.random() < 0.5){ const t = ord[0]; ord[0] = ord[1]; ord[1] = t; }
       /* ★★★ 房規在**這一刻**凍進 game.rules —— 之後房間欄位怎麼改都不影響這一局。 */
       return { order: ord, deal: DC.newDeal(), moves: [], rules: DC.normRules(rules) };
     },

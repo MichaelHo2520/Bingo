@@ -70,6 +70,21 @@ const MPCore = (function(){
        ⚠ 只放寬 chipTail,chipLead 不用跟著放寬:回大廳 order 會被清空([]),
        chipLead 依賴座位號算不出來就回傳 null,晶片照舊退回準備圓點,不必特別擋。 */
     const CHIP_TAIL_IN_LOBBY = !!A.chipTailInLobby;
+    /* ★★ 出手順序讓玩家選(v1.144.0 為暗棋加,不帶就是舊行為 → 另外九個遊戲
+       一個字都不受影響:ORDER_PICK 為 false 時 startGame() 走的是原本那一行)。
+       三種方式:random(預設,核心自己洗)/ rps(猜拳蓋板)/ host(房主排)。
+       ⚠ 這個旗標加的是**能力**不是遊戲名字(CLAUDE.md 紅線 3);猜拳的畫面與判定
+         在 js/shared/mp-order.js,這裡只管「什麼時候寫什麼進 DB」。
+       ⚠⚠ 決定出來的順序**一律經由 A.newGame(ids, prev, picked) 的第三個參數**交給
+         adapter —— 座位有自己規矩的遊戲(台灣麻將輪莊、21 點換莊)不能被核心蓋掉,
+         所以核心不直接寫 game.order,而是讓 adapter 決定要不要採用。
+         沒有實作第三個參數的 adapter 自動忽略 → 行為與以前逐字相同。
+       ⚠⚠⚠ 猜拳期間 status 是 "rps"/"reveal"、房主排順序時是 "ordering" ——
+         大廳索引因此不是 "lobby",首頁與大廳都會顯示「對戰中」而擋掉加入。
+         那是刻意的:猜到一半有人插進來,那一局的組別要重算。 */
+    const ORDER_PICK = !!A.orderPick;
+    const ORDER_PHASE = { rps:1, reveal:1, ordering:1 };
+    const REVEAL_MS = 2600, TIE_MS = 1500;   // 揭曉停留 / 平手停留(房主端的計時器)
 
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false, roomName="";
     let online=false;
@@ -84,6 +99,11 @@ const MPCore = (function(){
     let graceTimer=null, aloneTimer=null, aloneTick=null;
     let emotesReady=false;
     let playedRound=null;                   // 已經 enterPlaying() 過的那個 roundId(見 CONT_ROUND)
+    /* 出手順序(只有 ORDER_PICK 的遊戲會動到):方式、猜拳中的狀態、揭曉資料,
+       以及房主端的兩顆計時器。orderAnnounced = 這一局公告過順序了沒(order 可能比
+       status 晚到,靠旗標保證只公告一次)。 */
+    let orderMethod="random", rps=null, revealData=null, orderAnnounced=false;
+    let tieTimer=null, revealTimer=null;
 
     /* ---------- 基礎 ---------- */
     function configReady(){ return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("PASTE")<0); }
@@ -240,7 +260,7 @@ const MPCore = (function(){
           host:meId, roomName:roomName,
           scoreMode:scoreMode, winGoal:winGoal, emotes:null, createdAt:Date.now(),
           game:Object.assign({ rev:1 }, lobbyGame(null))
-        }, A.roomFields ? A.roomFields() : {});
+        }, ORDER_PICK ? { orderMethod:orderMethod } : {}, A.roomFields ? A.roomFields() : {});
         return roomRef.update(payload);
       }).then(()=>{
         claimSeat(okSeat=>{
@@ -427,6 +447,8 @@ const MPCore = (function(){
       ready=false; curPhase="lobby"; order=[]; winner=null;
       outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false;
       clearAloneCheck(); closeWin();
+      // 決定順序中被帶回大廳(房主取消 / 對手跑掉):蓋板與計時器一起收
+      clearOrderT(); orderAnnounced=false; { const U=orderUi(); if(U) U.hide(); }
       $("scrollArea").classList.remove("hidden");
       $("primaryBar").classList.remove("hidden");
       $("mpReadyBtn").classList.remove("hidden");
@@ -444,6 +466,10 @@ const MPCore = (function(){
       ready=false;
       outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false;
       closeWin();
+      /* ★ 決定順序的蓋板要在這裡收(開打了就沒有它的事)—— 沒開 ORDER_PICK 的遊戲
+         orderUi() 回 null,這兩行等於不存在。 */
+      clearOrderT(); { const U=orderUi(); if(U) U.hide(); }
+      announceOrder();
       $("scrollArea").classList.add("hidden");
       // 對戰中整條動作列收起來:準備鈕用不到,留著只是白吃一列高度
       $("primaryBar").classList.add("hidden");
@@ -482,6 +508,15 @@ const MPCore = (function(){
       // 房間層級設定(房主可改、全員監聽):欄位由 adapter 宣告,值也由 adapter 保管
       Object.keys(A.roomFields ? A.roomFields() : {}).forEach(k=>{
         roomRef.child(k).on("value",s=>{ A.onRoomField && A.onRoomField(k,s.val()); });
+      });
+      /* 出手順序的決定方式(房主可改、全員監聽)。⚠ 用**白名單**收:舊房間沒有這個
+         欄位、手改 DB 的怪值一律退回 random(不能讓一個亂字串把開局卡住)。
+         ⚠ unreadyOnFieldChange() 要放在**監聽**裡而不是 setter 裡 —— 它只對訪客生效,
+           而事件是每一台都收得到的(同 adapter 的 onRoomField 那一套)。 */
+      if(ORDER_PICK) roomRef.child("orderMethod").on("value",s=>{
+        const v=s.val(), next=(["random","rps","host"].indexOf(v)>=0)?v:"random";
+        if(next===orderMethod)return;
+        orderMethod=next; unreadyOnFieldChange(); syncSetup();
       });
       roomRef.child("scoreMode").on("value",s=>{ scoreMode=(s.val()==="match")?"match":"rank"; syncSetup(); renderPlayers(); });
       roomRef.child("winGoal").on("value",s=>{ const v=s.val(); winGoal=(typeof v==="number"&&v>=2)?Math.min(GOAL_MAX,v):GOAL_DEF; syncSetup(); });
@@ -522,6 +557,7 @@ const MPCore = (function(){
       if(rev<gameRev)return;          // 過期快照
       gameRev=rev;
       order=g.order||[]; roundId=g.roundId||null;
+      rps=g.rps||null; revealData=g.reveal||null;
       const nextWinner=g.winner||null, nextStatus=g.status||"lobby";
       const hadWinner=!!winner;
       winner=nextWinner; status=nextStatus;
@@ -533,6 +569,11 @@ const MPCore = (function(){
       if(status==="playing"){
         if(curPhase!=="playing" || (CONT_ROUND && roundId!==playedRound)){ A.resetRound && A.resetRound(); enterPlaying(); }
       }
+      /* ★ 第三條相位:決定出手順序(猜拳 / 房主排)。只有 ORDER_PICK 的遊戲進得來 ——
+         沒開的遊戲 status 永遠只有 lobby / playing,這一支等於不存在。
+         ⚠ 一定要擋在 backToLobby() 前面:那一行看到「不是 playing」就會把人踢回大廳,
+           猜拳蓋板會在跳出來的同一拍被關掉(而且 DOM 量起來完全正常)。 */
+      else if(ORDER_PICK && ORDER_PHASE[status]){ enterOrder(); }
       else { if(curPhase!=="lobby" && !winner) backToLobby(); }
 
       // 遊戲狀態同步:交給 adapter(五子棋的 moves / 數獨的 fills 與進度)
@@ -556,18 +597,160 @@ const MPCore = (function(){
       if(status!=="lobby" || !allReady){ autoStarting=false; return; }
       if(!autoStarting){ autoStarting=true; startGame(); }   // 全員準備好 → 房主端自動開打
     }
-    function startGame(){
+    /* picked = 已經決定好的出手順序(猜拳揭曉完 / 房主排完 / 核心洗好的隨機順序)。
+       ★ 沒開 ORDER_PICK 的遊戲永遠是 undefined → 下面那段整個跳過,行為與以前逐字相同。 */
+    function startGame(picked){
       if(!isHost)return;
       const ids=Object.keys(players);
       if(ids.length<MIN_PLAYERS || !ids.every(id=>players[id].ready)){ showToast("需要 "+MIN_PLAYERS+" 人並且都準備好"); return; }
+      /* ★★ 順序還沒決定 → 先轉去決定(猜拳 / 房主排),決定完會再回到這裡一次。
+         ⚠ random 也走這裡洗:洗在核心而不是各 adapter,九個遊戲才有同一種「隨機」。 */
+      if(ORDER_PICK && !picked){
+        if(orderMethod==="rps"){ startRps(ids); return; }
+        if(orderMethod==="host"){ startOrdering(); return; }
+        picked=shuffle(ids);
+      }
+      if(picked){
+        picked=picked.filter(id=>players[id]);            // 決定順序的過程中有人跑掉
+        if(picked.length<MIN_PLAYERS){ cancelOrder(); return; }
+      }
       // 上一局的順序(adapter 可據此決定要輪替還是重抽)
       const prev=(order.length===ids.length && order.every(id=>players[id])) ? order.slice() : null;
-      const g=A.newGame(ids, prev);
+      const g=A.newGame(ids, prev, picked||null);
       if(!g) return;                                      // adapter 判定不能開打(例如題目產生失敗)
       const pups={}; ids.forEach(id=>{ pups["players/"+id+"/ready"]=false; });
       roomRef.update(pups);
       setGame(Object.assign({ status:"playing", winner:null, roundId:Date.now() }, g));
     }
+    function shuffle(a){
+      const r=a.slice();
+      for(let i=r.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=r[i]; r[i]=r[j]; r[j]=t; }
+      return r;
+    }
+
+    /* ==========================================================================
+       相位:決定出手順序(只有 ORDER_PICK 的遊戲會走到)
+       ──────────────────────────────────────────────────────────────────────────
+         ★ 分工:這一段管「什麼時候寫什麼進 DB」;畫面與猜拳的分組判定在
+           js/shared/mp-order.js(那支零 firebase,判定是純函式、node 測得到)。
+         ★★ **這個相位不寫 game.order** —— 決定出來的順序只放在 reveal.order(給揭曉
+           那張卡看)並在開打時經 A.newGame 的第三個參數交出去。理由:game.order 在
+           大廳裡裝的是**上一局的順序**(prev,adapter 用來輪莊 / 重抽),中途蓋掉就
+           永遠算不出「上一局是誰先」。
+         ⚠⚠ 出拳、平手重猜這些「同一個相位裡的中途更新」刻意**不遞增 rev**
+           (走 roomRef.child("game/rps").update)—— onGame 的過期判定是 rev < gameRev,
+           所以同 rev 的快照照樣會套用。改成 patchGame 也不會壞,但每出一拳就多一版。
+       ========================================================================== */
+    function orderUi(){ return (ORDER_PICK && typeof MPOrder!=="undefined") ? MPOrder : null; }
+    function clearOrderT(){
+      if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
+      if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
+    }
+    /* 房主:開猜拳(第一輪全部人同一組)/ 開「自己排順序」。
+       ⚠⚠⚠ 一律用 patchGame **只改要改的欄位**,不可以 setGame 整包重寫 ——
+         game.order 這時裝的是**上一局的順序**(startGame 的 prev,輪莊 / 換莊的遊戲
+         靠它算下一局誰先),整包重寫會把它清成 null。
+         症狀:暗棋看不出來(它不用 prev),但台灣麻將 / 21 點接上這個旗標的那天
+         就會變成「每一局都從第一家重新開始」——而畫面完全正常。
+       ⚠ winner 要順手清掉:again() 只把 status 翻回 lobby,舊的 winner 還留在節點裡,
+         不清的話結果卡會疊在猜拳蓋板上面。
+       ⚠ reveal 也要清:上一輪猜拳留下來的手勢會在揭曉那一格閃一下舊資料。 */
+    function startRps(ids){
+      clearOrderT();
+      patchGame({ winner:null, reveal:null, status:"rps",
+                  rps:{ seq:1, groups:MPOrder.dumpGroups([ids.slice()]), throws:null } });
+    }
+    function startOrdering(){
+      clearOrderT();
+      patchGame({ winner:null, rps:null, reveal:null, status:"ordering" });
+    }
+    /* 每一份快照都會進來一次 → 一定要**冪等**。fresh 只在「剛從別的相位進來」時
+       收大廳那幾塊(重複收沒事,但重複 setActionHint 會閃)。 */
+    function enterOrder(){
+      const fresh=!ORDER_PHASE[curPhase];
+      curPhase=status;
+      if(fresh){
+        orderAnnounced=false; ready=false;
+        $("scrollArea").classList.add("hidden");
+        $("primaryBar").classList.add("hidden");
+        $("mpReadyBtn").classList.add("hidden");
+        setActionHint("");
+      }
+      const U=orderUi();
+      if(U) U.show({ phase:status, rps:rps, reveal:revealData, order:order,
+                     players:players, meId:meId, isHost:isHost, dispName:dispName });
+      renderPlayers();
+      if(isHost) hostOrderStep();
+    }
+    // 房主端的推進器:每一份快照都問一次「現在該做什麼」(不靠事件順序)
+    function hostOrderStep(){
+      if(!isHost||!roomRef)return;
+      if(status==="reveal"){
+        if(!revealTimer) revealTimer=setTimeout(()=>{ revealTimer=null; advanceReveal(); }, REVEAL_MS);
+        return;
+      }
+      if(status!=="rps"||!rps||rps.tie)return;             // 平手揭曉中:等計時器帶進下一輪
+      const seq=rps.seq||1, throws=rps.throws||{};
+      const groups=MPOrder.parseGroups(rps.groups, id=>!!players[id]);
+      const pend=MPOrder.pending(groups);
+      if(!pend.length){ finishRps(MPOrder.flat(groups), rps.reveal||{}); return; }   // 有人離開 → 剩下的自動定案
+      if(!pend.every(id=>throws[id]&&throws[id].s===seq))return;                     // 還有人沒出拳
+      const plain={}, acc=Object.assign({}, rps.reveal||{});
+      pend.forEach(id=>{ plain[id]=throws[id].c; acc[id]=throws[id].c; });
+      const next=MPOrder.split(groups, plain);
+      if(MPOrder.settled(next)){ finishRps(MPOrder.flat(next), acc); return; }
+      /* 還有人平手 → 先把分組寫回去並標 tie(讓大家看清楚剛剛平手了),停一下再重猜。
+         ⚠ 少了這一段,平手時畫面只會「忽然又要出一次拳」,沒人知道發生了什麼。 */
+      if(tieTimer)return;
+      /* ⚠⚠⚠ 計時器**一定要先排、才寫 DB**(順序反過來會無限遞迴):寫入會在同一拍
+         觸發自己的 value 事件(Firebase 的本地樂觀套用、mock 更是逐鍵同步),
+         那一拍又進來這一支 —— 這時 tieTimer 還是 null 就再寫一次,一路疊下去。
+         排在前面之後,重入的那一拍會在上面那行 `if(tieTimer)return` 就折返。 */
+      tieTimer=setTimeout(()=>{
+        tieTimer=null;
+        if(!roomRef||status!=="rps")return;
+        roomRef.child("game/rps").update({ seq:seq+1, throws:null, reveal:acc, tie:null });
+      }, TIE_MS);
+      roomRef.child("game/rps").update({ groups:MPOrder.dumpGroups(next), tie:true });
+    }
+    // 猜拳定案 → 進揭曉(帶著大家出的拳與最終順序);開打由 advanceReveal 做
+    function finishRps(finalOrder, acc){
+      clearOrderT();
+      patchGame({ status:"reveal", rps:null, reveal:{ throws:acc||{}, order:finalOrder } });
+    }
+    function advanceReveal(){
+      if(!isHost||status!=="reveal")return;
+      const ord=((revealData&&revealData.order)||[]).filter(id=>players[id]);
+      if(ord.length<MIN_PLAYERS){ cancelOrder(); return; }
+      startGame(ord);
+    }
+    /* 房主:取消整個決定順序的過程,回大廳(房間留著,大家可以重來)。
+       ⚠ 同上,只 patch —— 上一局的順序(prev)不可以被取消動作清掉。 */
+    function cancelOrder(){
+      if(!isHost||!roomRef)return;
+      clearOrderT();
+      patchGame({ status:"lobby", rps:null, reveal:null, winner:null });
+      showToast("已取消,回到大廳");
+    }
+    /* 出拳。⚠ 只有「還在比大小的組」裡的人能出;已經定案的人按了也不寫
+       (不然平手重猜時他的舊拳會被算進去)。 */
+    function throwRps(c){
+      if(!ORDER_PICK||!roomRef||!meId)return;
+      if(status!=="rps"||!rps||rps.tie)return;
+      if(["R","S","P"].indexOf(c)<0)return;
+      const groups=MPOrder.parseGroups(rps.groups, id=>!!players[id]);
+      if(!groups.some(g=>g.length>1&&g.indexOf(meId)>=0))return;
+      roomRef.child("game/rps/throws/"+meId).set({ c:c, s:rps.seq||1 });
+    }
+    function confirmOrder(ids){
+      if(!isHost||status!=="ordering")return;
+      const ord=(ids||[]).filter(id=>players[id]);
+      if(ord.length<MIN_PLAYERS){ showToast("需要 "+MIN_PLAYERS+" 人"); return; }
+      startGame(ord);
+    }
+    function skipReveal(){ if(!isHost||status!=="reveal")return; clearOrderT(); advanceReveal(); }
+    // 蓋板上的逃生出口:房主 = 取消回大廳(不離房);訪客 = 真的離開(先問一次)
+    function bailOrder(){ if(isHost) cancelOrder(); else askLeave(); }
     function toggleReady(){
       if(!roomRef||!meId)return;
       ready=!ready;
@@ -808,6 +991,9 @@ const MPCore = (function(){
       });
       if(aloneTick){ /* 落單倒數中:狀態列交給倒數,不覆蓋 */ }
       else if(curPhase==="playing") onStatusTxt(winner?"這局結束":"對戰中…");
+      // 決定順序中(ORDER_PICK):在等什麼只有狀態列講得出來
+      else if(ORDER_PHASE[curPhase]) onStatusTxt(curPhase==="ordering" ? "房主正在排順序…"
+                                                : (curPhase==="reveal" ? "猜拳結果揭曉…" : "猜拳決定順序…"));
       else onStatusTxt(A.lobbyStatusText ? A.lobbyStatusText(ids)
                        : (ids.length<MIN_PLAYERS?"等待其他人加入…":"等待大家準備…"));
       syncSubrow(); updateGoal();
@@ -824,6 +1010,18 @@ const MPCore = (function(){
     function syncSetup(){
       if(!online)return;
       A.syncSetup && A.syncSetup();
+      /* 出手順序那一列(只有 ORDER_PICK 的遊戲有這組 DOM,在各頁的 HTML 裡)。
+         ★ 標籤的字由**頁面**決定(data-base):暗棋要講「誰先翻」,牌類講「出手順序」——
+           核心只負責在訪客端補上「(房主決定)」與鎖成唯讀。 */
+      if(ORDER_PICK){
+        const oseg=$("mpOrderSeg");
+        if(oseg){
+          oseg.classList.toggle("readonly",!isHost);
+          [...oseg.children].forEach(b=>b.classList.toggle("on",b.dataset.order===orderMethod));
+          const ol=$("mpOrderLabel");
+          if(ol){ const base=ol.dataset.base||"出手順序"; ol.textContent=isHost?base:(base+"(房主決定)"); }
+        }
+      }
       // 計分列(所有遊戲共用同一組 DOM 與鎖定邏輯)
       const seg=$("scoreSeg"); if(!seg)return;
       seg.classList.toggle("readonly",!isHost);
@@ -838,6 +1036,23 @@ const MPCore = (function(){
       const rb=$("resetScoreBtn"); if(rb) rb.style.display=isHost?"":"none";
     }
     function seasonInProgress(){ return scoreMode==="match" && Object.keys(players).some(id=>scoreOf(id)>0); }
+    function setOrderMethod(m){
+      if(!ORDER_PICK)return;
+      if(["random","rps","host"].indexOf(m)<0)return;
+      if(!setRoomField("orderMethod",m,{ lobbyOnly:true, busyMsg:"對戰中不能改出手順序" }))return;
+      orderMethod=m; syncSetup(); savePrefs();
+    }
+    /* 開打之後公告一次這一局的順序。
+       ⚠ 猜拳**不公告** —— 揭曉那張卡已經把誰贏誰輸攤開講完了,再跳一次 toast 是同一句話講兩遍。
+       ⚠ order 與 status 是同一份快照原子到齊的(單一 game 節點),所以在 enterPlaying()
+         裡叫得到值;orderAnnounced 只是保險(續局的遊戲會重進 enterPlaying)。 */
+    function announceOrder(){
+      if(!ORDER_PICK||orderAnnounced||!order.length)return;
+      orderAnnounced=true;
+      if(orderMethod==="rps")return;
+      const txt=order.map(id=>dispName(id)).join(" → ");
+      showToast((orderMethod==="random"?"🎲 隨機順序:":"👑 房主排的順序:")+txt, 3200);
+    }
     function setScoreMode(m){
       if(!isHost||!roomRef)return;
       scoreMode=(m==="match")?"match":"rank"; roomRef.child("scoreMode").set(scoreMode); syncSetup(); savePrefs();
@@ -971,6 +1186,7 @@ const MPCore = (function(){
       try{
         if(roomRef){
           ["host","players","game","scoreMode","winGoal","scores","emotes"]
+            .concat(ORDER_PICK ? ["orderMethod"] : [])
             .concat(Object.keys(A.roomFields ? A.roomFields() : {}))
             .concat(A.extraNodes || [])
             .forEach(k=>roomRef.child(k).off());
@@ -1004,6 +1220,8 @@ const MPCore = (function(){
       gameRev=0; lastIndexSig=null; outcomeShown=false; abandoned=false;
       scoredThisRound=false; myRoundWin=false; autoStarting=false; emotesReady=false;
       playedRound=null;    // 進新房要歸零(同 gameRev):不然新房第一局剛好同號就不會 enterPlaying
+      clearOrderT(); rps=null; revealData=null; orderAnnounced=false;
+      { const U=orderUi(); if(U) U.hide(); }
       closeLeaveAsk(); closeKick(); closeResign(); closeEmote(); closeWin();
       disarmBackGuard();   // 已經不在房裡:守衛連同它墊的那一筆歷史一起收掉(不然返回鍵要多按一次)
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();
@@ -1073,6 +1291,10 @@ const MPCore = (function(){
       ref:(path)=>roomRef?roomRef.child(path):null
     };
     A.init && A.init(ctx);
+    /* 決定順序的蓋板:把「使用者按了什麼」接回這裡(寫 DB 一律在這一支)。
+       ⚠ 只有開了旗標的遊戲才接 —— 另外九頁根本不載入 js/shared/mp-order.js,
+         直接引用 MPOrder 會是 ReferenceError。 */
+    { const U=orderUi(); if(U) U.attach({ onThrow:throwRps, onConfirm:confirmOrder, onSkip:skipReveal, onBail:bailOrder }); }
 
     /* ---------- 對外 API(通用部分 + adapter 自己的) ---------- */
     const api = {
@@ -1081,17 +1303,24 @@ const MPCore = (function(){
       isOnline:()=>online, amHost:()=>isHost, amReady:()=>ready,
       setScoreMode, setWinGoal, resetScores,
       winGoal:()=>winGoal, scoreMode:()=>scoreMode,
+      // 出手順序(只有 ORDER_PICK 的遊戲用得到;沒開的話 setOrderMethod 是空動作)
+      setOrderMethod, orderMethod:()=>orderMethod,
       askResign, confirmResign, cancelResign:closeResign,
       askLeave, confirmLeave, cancelLeave:closeLeaveAsk,
       confirmKick, cancelKick:closeKick,
       roster, sendEmote,
       prefsKey:()=>A.prefsKey,
       emoteAnchor:()=>A.emoteAnchor,
-      ownPrefs:()=>Object.assign({ scoreMode:scoreMode, winGoal:winGoal }, (A.ownPrefs&&A.ownPrefs())||{}),
+      /* ⚠ orderMethod 只在開了旗標時才進偏好:另外九個遊戲的 bingo.prefs.v1 不要多長一個
+         用不到的鍵(五頁共用同一份偏好,見 CLAUDE.md 紅線 12)。 */
+      ownPrefs:()=>Object.assign({ scoreMode:scoreMode, winGoal:winGoal },
+                                 ORDER_PICK?{ orderMethod:orderMethod }:{},
+                                 (A.ownPrefs&&A.ownPrefs())||{}),
       usePrefs(o){
         o=o||{};
         if(o.scoreMode==="match"||o.scoreMode==="rank") scoreMode=o.scoreMode;
         if(typeof o.winGoal==="number"&&o.winGoal>=2) winGoal=Math.min(GOAL_MAX,o.winGoal);
+        if(ORDER_PICK&&["random","rps","host"].indexOf(o.orderMethod)>=0) orderMethod=o.orderMethod;
         A.usePrefs && A.usePrefs(o);
       }
     };
@@ -1108,7 +1337,10 @@ const MPCore = (function(){
      ns:{rooms,index}   Firebase 頂層節點名(各遊戲必須分開)
      prefsKey           遊戲專屬偏好的 localStorage key
      emoteAnchor        表情飛出的錨點元素 id
-     newGame(ids,prev)  房主開局 → 回傳 game 物件(不含 status/winner/roundId,核心會補)
+     newGame(ids,prev,picked)  房主開局 → 回傳 game 物件(不含 status/winner/roundId,核心會補)
+                        picked = 玩家選的出手順序(只有開了 orderPick 才會有;沒開就是 null)。
+                        ⚠ 座位有自己規矩的遊戲(輪莊 / 換莊)可以不理它 —— 核心刻意不直接
+                          寫 game.order,採不採用由 adapter 決定。
      applyGame(g,playing) 收到新 rev 的 game 快照 → 套用到畫面
 
    可選:
@@ -1122,6 +1354,14 @@ const MPCore = (function(){
                         不帶就是舊行為;adapter 自己決定「最後一局不要續」。
      joinMidGame      ★ 允許對局中加入(v1.84.0 為 21 點加)——
                         同樣不帶就是舊行為。⚠ 要一起改 js/home-live.js 的 joinable()
+     orderPick        ★ 出手順序讓玩家選:猜拳 / 隨機 / 房主排(v1.144.0 為暗棋加,
+                        第六個能力旗標)。開了之後:
+                          · 頁面要載入 js/shared/mp-order.js(蓋板 + 猜拳判定)
+                          · 頁面要提供設定列 #mpOrderRow / #mpOrderSeg(三顆 data-order)
+                            與標籤 #mpOrderLabel(data-base 決定它叫「誰先翻」還是「出手順序」)
+                          · main.js 把那一列接到 MP.setOrderMethod(b.dataset.order)
+                          · newGame() 收第三個參數 picked
+                        不帶就是舊行為(status 只會有 lobby / playing)。
      adoptId(old,now)  ★ 同名接續時,把遊戲自己那份「per-pid 的一場進度」從舊 pid 搬到新 pid
                         (v1.97.0;核心只負責 scores 節點,見 adoptScore)。
                         只有 21 點需要(bj.nets);其他七個遊戲對局中不能加入 → 回大廳才進得來,

@@ -203,6 +203,10 @@ $("dcRulesBody").addEventListener("click", e => {
   const s = e.target.closest("#dcSecSeg2 button");
   if(s){ MP.setTurnSec(+s.dataset.sec); syncRules(dcRulesNow(), dcEditable()); }
 });
+/* 誰先翻(v1.144.0):三種決定方式都寫在核心(隨機自己洗、猜拳與房主排走
+   js/shared/mp-order.js 的蓋板)—— 這一頁只負責把點擊送過去。
+   ⚠ 非房主按了會被 setRoomField 擋下並跳 toast(不是靜默吃掉)。 */
+$("mpOrderSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setOrderMethod(b.dataset.order); });
 $("scoreSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setScoreMode(b.dataset.score); });
 $("wgMinus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() - 1));
 $("wgPlus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() + 1));

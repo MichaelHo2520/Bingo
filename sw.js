@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.142.0";
+const VERSION = "1.144.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -17,6 +17,7 @@ const CORE = [
   "./js/main.js",
   // 五子棋 / 數獨共用的連線核心與介面工具箱(Bingo 不載入這兩支)
   "./js/shared/ui-kit.js",
+  "./js/shared/mp-order.js",
   "./js/shared/mp-core.js",
   "./js/shared/mj-faces.js",   // 麻將牌面自繪(消消樂與台灣 16 張共用)
   "./js/shared/pk-faces.js",   // 撲克牌面自繪(排七與大老二共用,v1.76.0 抽出)

@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>大老二 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 大老二 · v1.142.0 -->
-<meta name="version" content="1.142.0">
+<!-- 大老二 · v1.144.0 -->
+<meta name="version" content="1.144.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -58,26 +58,44 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="b2-hero">
         <!-- ⚠ 插圖只用數字與自繪花色,不用撲克牌 Unicode(U+1F0A0 那一段)——
              多數字型沒有,會變豆腐方框(見 notes/13 的禁令)
-             ★★ v1.101.1:兩張交疊斜放的 2 —— ♥︎2 + ♠︎2(2 最大就是這個遊戲的全部;
-                黑桃 2 是這一版最大的一張牌 → 它疊在上面)。
+             ★★★ v1.143.0:**四張 2**(兩欄兩排、每一欄各往外斜 5 度;花色由弱到強
+                方塊 → 梅花 → 紅心 → 黑桃,黑桃 2 是最大的一張 → 疊在最上面)。
+                v1.101.1~v1.142.x 是兩張交疊斜放的 2。
                 **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
-                (這裡是 .b2-art 96px、首頁是 .gc-art.pk-art 58px)——
+                (這裡是 .b2-art 96px、首頁是 .gc-art.pk-art 46px)——
                 同一副牌本來就該長一樣,樣式在 styles.css 的 .pk-ic-* 那幾條
                 (三個撲克牌遊戲共用一組;tools/test-pages.js 的 E 節在守這對雙胞胎) -->
         <svg class="b2-art pk-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 大老二">
-          <!-- 下層:♥︎2(往左斜) -->
-          <g transform="rotate(-16 19 30)">
-            <rect class="pk-ic-bd" x="8.5" y="15" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t pk-ic-red" x="19" y="28">2</text>
-            <g class="pk-ic-s pk-ic-red" transform="translate(15 30.4) scale(.08)">
+          <!-- 上排左:方塊 2 -->
+          <g transform="rotate(-5 17.5 16)">
+            <rect class="pk-ic-bd" x="7" y="1" width="21" height="30" rx="2.7"/>
+            <text class="pk-ic-t pk-ic-red" x="17.5" y="14">2</text>
+            <g class="pk-ic-s pk-ic-red" transform="translate(13.5 16.4) scale(.08)">
+              <path d="M50 6 86 50 50 94 14 50z"/>
+            </g>
+          </g>
+          <!-- 上排右:梅花 2 -->
+          <g transform="rotate(5 38.5 16)">
+            <rect class="pk-ic-bd" x="28" y="1" width="21" height="30" rx="2.7"/>
+            <text class="pk-ic-t" x="38.5" y="14">2</text>
+            <g class="pk-ic-s" transform="translate(34.5 16.4) scale(.08)">
+              <circle cx="50" cy="31" r="20"/><circle cx="34" cy="58" r="20"/><circle cx="66" cy="58" r="20"/>
+              <path d="M50 60c0 14-4 25-11 33h22c-7-8-11-19-11-33z"/>
+            </g>
+          </g>
+          <!-- 下排左:紅心 2 -->
+          <g transform="rotate(-5 17.5 40.1)">
+            <rect class="pk-ic-bd" x="7" y="25.1" width="21" height="30" rx="2.7"/>
+            <text class="pk-ic-t pk-ic-red" x="17.5" y="38.1">2</text>
+            <g class="pk-ic-s pk-ic-red" transform="translate(13.5 40.5) scale(.08)">
               <path d="M50 90S10 62 10 36C10 22 21 12 34 12c8 0 14 5 16 11 2-6 8-11 16-11 13 0 24 10 24 24 0 26-40 54-40 54z"/>
             </g>
           </g>
-          <!-- 上層:♠︎2(往右斜、蓋在前面 —— 這一版最大的一張牌) -->
-          <g transform="rotate(16 37.5 29)">
-            <rect class="pk-ic-bd" x="27" y="14" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t" x="37.5" y="27">2</text>
-            <g class="pk-ic-s" transform="translate(33.5 29.4) scale(.08)">
+          <!-- 下排右:黑桃 2 —— 這一版最大的一張牌,所以疊在最上面 -->
+          <g transform="rotate(5 38.5 40.1)">
+            <rect class="pk-ic-bd" x="28" y="25.1" width="21" height="30" rx="2.7"/>
+            <text class="pk-ic-t" x="38.5" y="38.1">2</text>
+            <g class="pk-ic-s" transform="translate(34.5 40.5) scale(.08)">
               <path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/>
               <path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>
             </g>

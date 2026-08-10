@@ -3007,7 +3007,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ---------- 撲克牌小圖示 .pk-ic-*:三個撲克牌遊戲共用一組(v1.101.1)----------
      ★ 用它的地方有六處(三張首頁遊戲卡 + 三頁進場插圖),每一對逐字相同:
          排七   index.html 的卡 · sevens.html 的 .sv-art      —— ♦6 · ♠7 · ♥8
-         大老二 index.html 的卡 · big2.html 的 .b2-art        —— ♥2 · ♠2
+         大老二 index.html 的卡 · big2.html 的 .b2-art        —— 四張 2(v1.143.0 由兩張改)
          21點   index.html 的卡 · blackjack.html 的 .bj-art   —— ♦10 · ♠A
        viewBox 一律 56×56,牌一律 21×30 rx2.7 → 字級與花色縮放**三個遊戲同一份**,
        不必為某一張卡覆寫(所以牌的尺寸要動就是六處一起動)。
@@ -5847,13 +5847,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
          /* ★ v1.139.0:牌背從深棕 #c89055 改成**與正面同一塊料、只深半階**的淺橡木 ——
             使用者拿實體木棋子的近照來對照,實體暗棋的背面本來就是原木色(字是刻在正面的)。
             「一眼分得出明暗」改由**有沒有字**扛(那是最強的線索,而且深棕反而與棋盤同階、
-            暗子會埋進盤裡)。⚠ 首頁 icon 不跟著改,見下面 --dc-ic-bk。 */
+            暗子會埋進盤裡)。 */
          --dc-back:#d4bd8d; --dc-back-e:#8a5c30; --dc-back-in:#c3a978;
-         /* ⚠ 首頁 icon / 進場插圖**專用**的牌背色(= 舊的棋子牌背色)。
-            icon 只有 46px,辨識點「有一顆是蓋著的」全靠與翻開那顆的**色差**;
-            照棋子那樣改淺半階,縮到 46px 就變成「兩顆一樣的圓餅」= 一般象棋的圖。
-            所以這裡刻意留深棕,不共用 --dc-back。 */
-         --dc-ic-bk:#c89055; --dc-ic-bke:#8a5c30;
+         /* ★★ v1.143.0:icon 專用的深棕牌背(--dc-ic-bk / --dc-ic-bke)**刪掉了** ——
+            那兩個是 v1.139.0 的權宜:當時 icon 還是「平圓 + 一圈線」,兩顆的唯一差別
+            只剩顏色,所以牌背不敢跟著棋子改淺。v1.143.0 起 icon 是**照棋子畫的**
+            (車溝 + 厚度 + 刻進去的字),辨識點與棋子本體同一個 ——「有沒有字」——
+            所以牌背直接吃 --dc-back,不再另留一組。 */
          --dc-red:#c62828; --dc-blk:#2b2622;
          /* ★ v1.141.0:**棋子上那個字**的漆色另開一組,不共用 --dc-red ——
             照片上刻進凹槽的紅是**暗紅**(#8e1f27),而 --dc-red 還要給面板上的
@@ -5920,23 +5920,52 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 </svg>"); }
 
   /* ---------- 首頁 icon / 進場插圖(逐字相同的一份 SVG,只有外層 class 不同) ----------
+     ★★★ v1.143.0:整張**改成照現在的棋子畫**(使用者:「暗棋麻煩改成現在棋子的樣子」)。
+        v1.137~142 把棋子一路做成「白蠟木圓餅 + 靠邊一圈車溝 + 刻進去的字 + 圓柱厚度」,
+        而 icon 還停在最初的「平圓 + 一圈紅線 + 三條橫紋」—— 兩者已經不像同一個遊戲。
+        逐項對照棋子:
+          · **圓柱厚度** = 同一顆圓往下位移 3.2 露出下緣那一彎,側壁吃 #dcIcSide 的上亮下暗
+            (三個色停就是 .dc-p 那一疊 --dc-s1 / s5 / s8)
+          · **車溝在 0.91r** —— 棋子的溝是 .dc-p::after 的 `inset:4.5%`,那是半徑 0.91r。
+            ⚠ 第一版畫在 0.76r,縮圖看起來像**木桶的箍**(不報錯、只有截圖看得出來)
+          · **字是刻進去的**:襯線體 + 暗紅漆(--dc-ink-r),暗邊在左上、亮邊在右下
+            (方向做反 = 浮起來的字加落影,而且乍看還蠻立體的 → 特別容易留著不改)
+        ⚠⚠ 刻痕那兩層**不可以**用 CSS text-shadow —— SVG `<text>` 吃不吃它各家引擎不一致,
+          所以是三個 `<text>` 疊出來的(暗 / 亮 / 漆)。**只有最上面那個掛 `class="dc-ic-t"`**:
+          tools/test-pages.js 的 I 節數的就是那一個(「只有一顆有字」),多掛一個就會紅。
      ⚠⚠ 首頁那張遊戲卡掛的是 **.dc-cart**,**絕對不可以**掛 .dc-art ——
         下面那條 96px 定義在 .gc-art{width:46px} **後面**,同權重後定義勝
-        → 首頁那張卡的圖會變成 96px、整張卡比另外九張高一截(21點 v1.86.0 踩過)。
-     ⚠ 暗棋這張**刻意不做滿版底色** —— 十張卡裡只有台灣麻將是滿版的,那是它與
+        → 首頁那張卡的圖會變成 96px、整張卡比另外十張高一截(21點 v1.86.0 踩過)。
+     ⚠ 暗棋這張**刻意不做滿版底色** —— 十一張卡裡只有台灣麻將是滿版的,那是它與
         麻將消消樂分家的辨識點;多一張滿版就把那個唯一性洗掉了。 */
   .dc-art{width:96px;height:96px;display:block;margin:0 auto}
-  .dc-ic-bd{stroke:var(--dc-wood-e);stroke-width:1.4}
-  .dc-ic-back{fill:var(--dc-ic-bk);stroke:var(--dc-ic-bke)}
+  /* 側壁(圓柱厚度)與左上受光的兩個漸層:色停走 class,顏色才只有 styles.css 一個來源 */
+  .dc-ic-e1{stop-color:#f2e8cd} .dc-ic-e2{stop-color:#bda775} .dc-ic-e3{stop-color:#7d633a}
+  .dc-ic-l1{stop-color:#fffef9;stop-opacity:.55} .dc-ic-l2{stop-color:#fffef9;stop-opacity:0}
+  .dc-ic-side{fill:url(#dcIcSide)}
+  .dc-ic-lit{fill:url(#dcIcLit)}
+  /* ⚠ 頂面的邊框要比棋子本體(0 0 0 1px rgba(150,104,52,.46))**濃一階**:
+     46px 下兩顆圓餅的交界是「淺色壓淺色」,邊框淡掉就黏成一坨。
+     另一半靠側壁比頂面大 0.5(上緣一道受光、下緣一道暗影 = 棋子的落影)。 */
+  .dc-ic-bd{stroke:rgba(140,96,46,.8);stroke-width:.9}
   .dc-ic-face{fill:var(--dc-wood)}
-  .dc-ic-in{fill:none;stroke-width:1.1}
-  .dc-ic-backin{stroke:var(--dc-ic-bke);opacity:.55}
-  .dc-ic-ring{stroke:var(--dc-red)}
-  /* ★ 牌背的三條紋是「這一顆還沒翻」的唯一線索 —— 它與正面那顆的差別要一眼看得出來。
-     ⚠ 這三條與上面兩條吃的是 icon 專用的 --dc-ic-bk*(不是棋子的 --dc-back):
-       v1.139.0 把棋子牌背改淺之後,icon 若跟著改就會失去辨識點(見 :root 那段註解)。 */
-  .dc-ic-grain{stroke:var(--dc-ic-bke);stroke-width:1.1;stroke-linecap:round;opacity:.5;fill:none}
-  .dc-ic-t{fill:var(--dc-red);font:800 15px/1 'Nunito',sans-serif;text-anchor:middle}
+  /* ★ 牌背與正面是**同一塊料、只深半階**(= 棋子本體的 --dc-back);
+     「這一顆還沒翻」靠的是**沒有字**,不是顏色 —— 見 :root 那段 v1.143.0 的註解。 */
+  .dc-ic-back{fill:var(--dc-back);stroke:rgba(150,110,58,.75)}
+  /* 順紋 + 一顆不在正中央的小節疤(照 .dc-p / .dc-grain 那一套,只是縮圖版) */
+  .dc-ic-grain{fill:none;stroke:#9c7442;stroke-width:.8;stroke-linecap:round;opacity:.34}
+  .dc-ic-knot{fill:#8f6730;opacity:.38}
+  /* 頂面邊緣沉一階(棋子那層 radial-gradient 到 100% 的 rgba(126,88,40,.22)) */
+  .dc-ic-edge{fill:none;stroke:rgba(126,88,40,.18);stroke-width:2.4}
+  /* 車溝:整圈暗壁 + **只有下半圈**的受光壁(溝要有方向,不然就只是一個圈圈) */
+  .dc-ic-gv{fill:none;stroke:rgba(108,74,30,.4);stroke-width:1.1}
+  .dc-ic-gvl{fill:none;stroke:rgba(255,253,245,.62);stroke-width:.9}
+  /* 刻進去的字:三層疊出來(暗邊 / 亮邊 / 漆),字級與棋子同一個比例(≈ 直徑的 .51) */
+  .dc-ic-t,.dc-ic-cut,.dc-ic-lt{font:800 15px/1 'Noto Serif TC','Songti TC','PMingLiU',serif;
+    text-anchor:middle}
+  .dc-ic-t{fill:var(--dc-ink-r)}
+  .dc-ic-cut{fill:rgba(88,56,22,.55)}
+  .dc-ic-lt{fill:rgba(255,252,240,.62)}
 
   /* ---------- 外框(照 .un-* 那一組做一份對應的)----------
      ⚠ 這幾條**不可以**直接沿用 .un-*:那些是 UNO 那一頁的,改動會波及它。
