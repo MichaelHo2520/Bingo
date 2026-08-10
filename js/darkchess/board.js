@@ -152,7 +152,10 @@ const DCB = (function(){
      被夾住的那一邊不會把另一邊帶著縮 → 盤面比例會被壓歪(而且只有截圖看得出來)。
      ⚠ 這不會與 ResizeObserver 形成迴圈:.dc-stage 是 `flex:1 1 0`,
        尺寸完全由父層分配,子元素多大都回頭撐不到它。 */
-  const GAP = 4, PAD = 5, MIN_CELL = 20;
+  /* ⚠⚠ PAD 與 styles.css 的 `.dc-board{padding}` **必須同一個數字**,而且它同時是
+     那圈「外框帶」的寬度(`inset 0 0 0 11px` 那條 box-shadow)—— 只改一邊的症狀是
+     木框壓到最外圈的格子上,而畫面不會壞、只有截圖看得出來。 */
+  const GAP = 4, PAD = 11, MIN_CELL = 20;
   function fitBoard(){
     if(!board || !stage) return;
     const w = stage.clientWidth, h = stage.clientHeight;

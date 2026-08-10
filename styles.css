@@ -5844,8 +5844,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   :root{ --dc-wood:#f0d6a8; --dc-wood-e:#b98a4e; --dc-wood-in:#e3c390;
          --dc-back:#c89055; --dc-back-e:#8a5c30; --dc-back-in:#b57f47;
          --dc-red:#c62828; --dc-blk:#2b2622;
-         --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(0,0,0,.14);
-         --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6; }
+         --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(52,28,8,.05);
+         --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6;
+         /* 棋盤那一塊木頭:深一階的胡桃色。★ 棋子是淺楓木,兩者的明度**一定要拉開** ——
+            同一階的話子會埋進盤裡,小格子的手機上尤其看不出哪一格有子。 */
+         --dc-slab:#8a5c30; --dc-slab-d:#6b4420; --dc-slab-l:#a06e3d;
+         /* 刻痕的兩條邊:暗邊在上、受光在下 —— 兩條都要,只有暗邊會看起來像「畫上去的線」 */
+         --dc-cut:rgba(48,25,7,.42); --dc-lit:rgba(255,238,205,.18); }
 
   /* ---------- 首頁 icon / 進場插圖(逐字相同的一份 SVG,只有外層 class 不同) ----------
      ⚠⚠ 首頁那張遊戲卡掛的是 **.dc-cart**,**絕對不可以**掛 .dc-art ——
@@ -5931,26 +5936,92 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   /* ⚠ position:relative 是給下面「翻攻吃得動:飛到正中央」那顆 .dc-reveal 當定位基準——
      它現在掛在 .dc-board 底下(不是掛在某一格的 .dc-sq 裡),用 left/top 換算成
      board 座標,飛到板子中間才不會被單一格的 stacking context 卡住。 */
+  /* ★ v1.138.0:整塊實木的樣子(使用者拿實體木頭棋盤的照片來對照)。三件事湊出來的:
+       ① 木紋橫貫整塊板子 —— 木紋畫在 .dc-board 身上、格子自己是**半透明**的,
+          所以紋路是連續的一整塊,不是 32 塊各自有紋的拼板。
+       ② 外框帶不是另一個元素,是一圈 `inset 0 0 0 11px` 把 padding 那一圈**壓深一階** ——
+          同一塊木頭深一階才像「同一塊料車出來的框」,換成別的顏色會變成貼皮。
+       ⚠ 那個 11px 必須與 board.js 的 PAD 一致(改一邊會讓框壓到格子上)。
+       ③ 內框的刻線由 ::before 疊(見下)。
+     ⚠ --dc-well 留著沒拿掉:它是 v1.137.x 以前的平底色,還有註解在引用。 */
   .dc-board{position:relative;display:grid;grid-template-columns:repeat(var(--dc-cols,8),1fr);
-    grid-auto-rows:1fr;gap:4px;padding:5px;border-radius:14px;
-    background:var(--dc-well);box-shadow:0 0 0 3px var(--dc-well-e),0 8px 22px rgba(0,0,0,.32)}
-  /* 一格。★ 空格也是一顆 button(要能當落點點下去),只是裡面沒有棋子 */
-  .dc-sq{position:relative;appearance:none;-webkit-appearance:none;border:0;padding:0;margin:0;
-    background:var(--dc-slot);border-radius:7px;cursor:pointer;
+    grid-auto-rows:1fr;gap:4px;padding:11px;border-radius:17px;
+    background:
+      repeating-linear-gradient(92deg, rgba(46,24,6,.17) 0 1px, rgba(46,24,6,0) 1px 5px,
+        rgba(46,24,6,.10) 5px 6px, rgba(46,24,6,0) 6px 13px),
+      repeating-linear-gradient(88deg, rgba(255,232,190,.07) 0 1px, rgba(255,232,190,0) 1px 9px),
+      radial-gradient(130% 62% at 20% 10%, var(--dc-slab-l) 0%, rgba(160,110,61,0) 62%),
+      linear-gradient(96deg, var(--dc-slab) 0%, var(--dc-slab-d) 36%, var(--dc-slab) 62%,
+        var(--dc-slab-d) 100%);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,238,205,.20),
+      inset 0 0 0 11px rgba(48,25,7,.26),
+      inset 0 0 26px rgba(38,19,4,.30),
+      0 0 0 2px var(--dc-well-e),
+      0 12px 26px rgba(0,0,0,.42)}
+  /* 內框刻線(一暗一亮兩條)。★ 掛 ::before 而不是 border:.dc-board 的 border 會被
+     grid 的內容盒吃掉一圈 → fitBoard() 算出來的整數 px 會對不上。
+     ⚠ 它畫在 padding 那一圈裡(inset 6px < padding 11px),不會壓到任何一格。
+     ⚠ 它一定畫在格子**底下**(::before 是第一個子節點,而 .dc-sq 也是 positioned
+        → 同一個 stacking context 裡照 DOM 順序疊),所以不必給 z-index。 */
+  .dc-board::before{content:"";position:absolute;inset:6px;border-radius:12px;pointer-events:none;
+    box-shadow:inset 0 0 0 1px rgba(44,23,6,.62),inset 0 0 0 2px rgba(255,240,210,.14)}
+  /* 一格。★ 空格也是一顆 button(要能當落點點下去),只是裡面沒有棋子。
+     ★ 格線是「刻進木頭裡」的:一圈暗邊(2px 剛好填滿 4px 的 gap 的一半,兩格各出一半)
+       + 下緣一條受光。⚠ 存成 --dc-groove 是因為底下的高亮(.dc-tgt / .dc-from)會整份
+       覆蓋 box-shadow —— 那幾條都要把它接回去,不然被標起來的格子會忽然「沒有刻線」。 */
+  /* ⚠ 格子自己**不上底色**(--dc-slot 只剩極淡的一層):上了底色就變成「32 塊圓角磁磚」,
+     而參考的實體棋盤是一整片連續的木面、只有刻線。圓角也跟著收到 4px —— 圓角一大,
+     刻線的十字路口就會被切出四個缺口,線看起來是斷的。 */
+  .dc-sq{--dc-groove:0 0 0 2px var(--dc-cut),0 2px 1px -1px var(--dc-lit);
+    position:relative;appearance:none;-webkit-appearance:none;border:0;padding:0;margin:0;
+    background:var(--dc-slot);border-radius:4px;cursor:pointer;box-shadow:var(--dc-groove);
     display:flex;align-items:center;justify-content:center;perspective:340px;
     -webkit-tap-highlight-color:transparent;touch-action:manipulation}
   .dc-board:not(.dc-mine) .dc-sq{cursor:default}
 
-  /* ---------- 一顆棋子 ---------- */
-  .dc-p{position:relative;width:88%;height:88%;border-radius:50%;
+  /* ---------- 一顆棋子 ----------
+     ★★ v1.138.0:從「一個圓形漸層」改成**車床車出來的木頭圓餅**,三層各管一件事:
+       ① 厚度(--dc-lift):三道**零模糊、只有 Y 位移**的實色陰影疊出圓柱的側面 ——
+          由淺到深模擬「側壁越下面越暗」,最後才是落在盤面上的那一道模糊影子。
+          ⚠ 厚度**跟著格子大小算**(--dc-th),不可以寫死 px:吃子欄那一排是 26px,
+            寫死 4px 的話那幾顆會變成「一疊厚紙板」。
+       ② 倒角:最外圈用一圈亮邊 + 一圈暗邊做出斜切的邊緣(radial 的最後三段)。
+       ③ 年輪:偏心的 repeating-radial-gradient。★ 色停用 **%**(不是 px)——
+          百分比是相對半徑,所以縮到 26px 時紋路自己跟著縮,不會變成一坨密紋。
+     ⚠⚠ --dc-lift / --dc-side-* 存成變數是有原因的:.dc-sel / dcHitGlow / .dc-backface
+       都會整份覆蓋 box-shadow,那幾條全都要把 var(--dc-lift) 接回去,不然「選中的子」
+       與「剛落地的子」會在那一瞬間**變扁**(而且只有錄影看得出來)。 */
+  .dc-p{--dc-th:calc(var(--dc-cell,44px) * .078);
+    --dc-side-a:#e8c896; --dc-side-b:#d2aa76; --dc-side-c:#b28a56;
+    --dc-lift:
+      0 calc(var(--dc-th) * .34) 0 var(--dc-side-a),
+      0 calc(var(--dc-th) * .67) 0 var(--dc-side-b),
+      0 var(--dc-th) 0 var(--dc-side-c),
+      0 calc(var(--dc-th) + 2px) calc(var(--dc-th) + 5px) rgba(26,13,2,.46);
+    position:relative;width:90%;height:90%;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(circle at 34% 28%,#fff8ea 0%,var(--dc-wood) 46%,var(--dc-wood-in) 100%);
-    box-shadow:0 0 0 1.5px var(--dc-wood-e),0 2px 0 rgba(0,0,0,.28),0 3px 6px rgba(0,0,0,.25)}
-  .dc-ring{position:absolute;inset:11%;border-radius:50%;border:1.5px solid currentColor;opacity:.75}
+    background:
+      radial-gradient(circle at 50% 50%, rgba(255,252,243,0) 0 71%,
+        rgba(255,252,243,.55) 73% 80%, rgba(120,80,36,.10) 82% 92%, rgba(104,68,28,.32) 93% 100%),
+      repeating-radial-gradient(circle at 28% 22%,
+        rgba(166,112,54,.17) 0 2%, rgba(166,112,54,0) 2% 8%),
+      radial-gradient(circle at 33% 26%, rgba(255,250,238,.62) 0%, rgba(255,250,238,0) 55%),
+      radial-gradient(circle at 52% 48%, var(--dc-wood) 0%, var(--dc-wood-in) 58%, #d2a970 100%);
+    box-shadow:
+      inset 0 1.5px 2px rgba(255,255,255,.55),
+      inset 0 -2px 4px rgba(110,72,30,.30),
+      0 0 0 1px rgba(150,104,52,.55),
+      var(--dc-lift)}
+  /* 內圈:實體棋子上那一圈是**刻進去的**(不是印上去的)—— 一條亮邊在下、一條暗邊在內 */
+  .dc-ring{position:absolute;inset:11%;border-radius:50%;border:1.5px solid currentColor;opacity:.62;
+    box-shadow:0 1px 0 rgba(255,255,255,.5),inset 0 1px 1px rgba(0,0,0,.16)}
   /* ⚠ 棋子的字用**襯線體**:象棋子上就是印宋體,用內文的 Nunito 會像貼紙。
-     取不到中文襯線體時退回 serif —— 那也還是襯線,不會變成另一種味道。 */
+     取不到中文襯線體時退回 serif —— 那也還是襯線,不會變成另一種味道。
+     ★ text-shadow 是「刻進木頭再上色」的樣子:下緣受光、上緣一道淺淺的凹影。 */
   .dc-ch{position:relative;font-family:'Noto Serif TC','Songti TC','PMingLiU',serif;font-weight:800;
-    line-height:1;font-size:calc(var(--dc-cell,44px) * .46)}
+    line-height:1;font-size:calc(var(--dc-cell,44px) * .46);
+    text-shadow:0 1px 0 rgba(255,255,255,.5),0 -1px 1px rgba(88,52,16,.30)}
   .dc-red{color:var(--dc-red)}
   .dc-blk{color:var(--dc-blk)}
 
@@ -5961,16 +6032,24 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      中央一枚雙圈浮雕紋章(.dc-grain,取代原本的一排橫紋)。
      ⚠ 視覺規則獨立成 .dc-backface(見下),.dc-back 只留語意標記(牌情紅線的計數靠它) ——
      翻牌動畫的「背面那一格」共用同一份視覺,但**不掛 .dc-back**,才不會被
-     tools/gen-dc-solo-e2e.js 的「還蓋著幾顆」計數誤算進去(那顆其實已經翻開了)。 */
+     tools/gen-dc-solo-e2e.js 的「還蓋著幾顆」計數誤算進去(那顆其實已經翻開了)。
+     ★★ v1.138.0:與正面同一套「圓柱厚度 + 倒角 + 年輪」(只換掉三個側壁色 --dc-side-*,
+     厚度那一份 --dc-lift 直接沿用 .dc-p 的宣告 —— 它裡面引用的是 var(--dc-side-*),
+     而 custom property 是在**用到它的元素上**才代換,所以這裡改側壁色就會生效)。 */
   .dc-backface{color:var(--dc-back-e);
+    --dc-side-a:#bd8a52; --dc-side-b:#a4713d; --dc-side-c:#86572c;
     background:
+      radial-gradient(circle at 50% 50%, rgba(255,236,204,0) 0 71%,
+        rgba(255,236,204,.26) 73% 80%, rgba(84,50,18,.16) 82% 92%, rgba(66,38,12,.38) 93% 100%),
       radial-gradient(circle at 50% 50%,
         transparent 0 56%, rgba(110,68,32,.4) 56% 59%, transparent 59% 69%,
         rgba(110,68,32,.32) 69% 72%, transparent 72% 100%),
-      radial-gradient(circle at 30% 24%, rgba(255,255,255,.4) 0%, transparent 42%),
-      radial-gradient(circle at 52% 56%, var(--dc-back) 0%, var(--dc-back-in) 100%);
+      repeating-radial-gradient(circle at 34% 28%,
+        rgba(88,52,18,.16) 0 2%, rgba(88,52,18,0) 2% 8%),
+      radial-gradient(circle at 30% 24%, rgba(255,238,208,.22) 0%, transparent 44%),
+      radial-gradient(circle at 52% 56%, var(--dc-back) 0%, var(--dc-back-in) 58%, #86552a 100%);
     box-shadow:inset 0 2px 2px rgba(255,255,255,.3),inset 0 -4px 6px rgba(0,0,0,.32),
-      0 0 0 1.5px var(--dc-back-e),0 2px 0 rgba(0,0,0,.28),0 3px 6px rgba(0,0,0,.25)}
+      0 0 0 1px rgba(122,80,38,.65),var(--dc-lift)}
   /* 中央紋章:雙圈浮雕(border 一圈 + ::after 實心小圓),比原本的橫紋更像雕出來的圖案。 */
   .dc-grain{position:absolute;width:30%;height:30%;border-radius:50%;
     border:1.5px solid currentColor;opacity:.55;
@@ -5983,12 +6062,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         這裡的高亮只是「幫忙指路」,不是權限。 */
   /* ★ 這裡**刻意沒有**「可以翻」的高亮:暗棋一律都翻得動,標起來就是一次亮十幾顆 ——
      那是雜訊不是資訊(截圖看得很清楚)。「現在能不能動」由動作列那句「輪到你」講。 */
-  .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),0 4px 10px rgba(0,0,0,.35)}
-  .dc-tgt{box-shadow:inset 0 0 0 3px var(--dc-tgt)}
-  .dc-tgt.dc-t-eat,.dc-tgt.dc-t-jump{box-shadow:inset 0 0 0 3px var(--dc-tgt-eat)}
+  /* ⚠ 這四條都會**整份覆蓋** box-shadow —— 一定要把厚度(--dc-lift)/ 刻線(--dc-groove)
+     接回去,不然被選中 / 被標成落點的那一格會忽然變扁、或忽然沒有格線。 */
+  .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift)}
+  .dc-tgt{box-shadow:inset 0 0 0 3px var(--dc-tgt),var(--dc-groove)}
+  .dc-tgt.dc-t-eat,.dc-tgt.dc-t-jump{box-shadow:inset 0 0 0 3px var(--dc-tgt-eat),var(--dc-groove)}
   /* 遠距離的兩種(車直衝 / 連吃翻暗棋)另給一個顏色 —— 它們是房規才有的手,
      與一般吃子分開,玩家才看得出「這一步是因為開了房規才存在的」 */
-  .dc-tgt.dc-t-rush,.dc-tgt.dc-t-dark{box-shadow:inset 0 0 0 3px var(--dc-tgt-far)}
+  .dc-tgt.dc-t-rush,.dc-tgt.dc-t-dark{box-shadow:inset 0 0 0 3px var(--dc-tgt-far),var(--dc-groove)}
   .dc-tgt.dc-empty::after{content:"";position:absolute;width:26%;height:26%;border-radius:50%;
     background:var(--dc-tgt);opacity:.75}
   /* 剛剛動過的兩格:落點亮一下光暈,來源留一個淡框(看得出「他從哪走到哪」)。
@@ -5996,10 +6077,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      board.js 用 JS 滑過來(見下面「吃子 / 移動的滑入動畫」),兩邊都動 transform 的話
      CSS animation 會贏過 JS 的 transition,把滑動效果整個蓋掉。 */
   .dc-hit .dc-p{animation:dcHitGlow .5s ease-out}
-  .dc-from{box-shadow:inset 0 0 0 2px rgba(255,255,255,.34)}
+  .dc-from{box-shadow:inset 0 0 0 2px rgba(255,255,255,.34),var(--dc-groove)}
+  /* ⚠ 兩個關鍵影格的**陰影數量必須一樣**(才補得出中間影格),而且兩邊都要帶 var(--dc-lift)
+     —— 少了它,剛落地那 0.5 秒棋子會扁掉再彈回來。 */
   @keyframes dcHitGlow{
-    0%{box-shadow:0 0 0 3px var(--dc-tgt-eat),0 0 16px 5px var(--dc-tgt-eat)}
-    100%{box-shadow:0 0 0 0 transparent}
+    0%{box-shadow:0 0 0 3px var(--dc-tgt-eat),0 0 16px 5px var(--dc-tgt-eat),var(--dc-lift)}
+    100%{box-shadow:0 0 0 0 transparent,0 0 0 0 transparent,var(--dc-lift)}
   }
   /* ★ 落點的常駐標記:一圈淡框,不寫字、不動畫 —— dc-hit 那道光暈只在落地那一瞬間
      (0.5s)亮一下,亮完就什麼都不剩,「翻攻吃不動 / 打到自己人」這幾種兩顆都留在
@@ -6029,7 +6112,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        (y=1.05)讓 rotateY 轉過 180deg 再彈回來,使用者反饋「最後都會好像卡了一下,
        這樣看起來一點都不順暢」——那個回彈就是「卡一下」的主因,換成不回彈的
        ease-out 曲線,轉到 180deg 就停,不再多轉再修正。 */
-  .dc-flip3d{position:relative;width:88%;height:88%;transform-style:preserve-3d;
+  /* ⚠ 這裡的寬高要跟 .dc-p **同一個數字**(v1.138.0 由 88% 一起改成 90%)——
+     不一樣的話翻牌翻完那顆子會忽然大一號 / 小一號(v1.137.6 修過同源的另一半)。 */
+  .dc-flip3d{position:relative;width:90%;height:90%;transform-style:preserve-3d;
     animation:dcFlipIn .38s cubic-bezier(.22,.61,.36,1) both}
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
     -webkit-backface-visibility:hidden}
