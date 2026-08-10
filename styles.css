@@ -867,7 +867,16 @@
   .svs-row-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .svs-name{font-weight:800}
   .svs-nums{font-size:12px;color:var(--muted);font-weight:700}
-  .svs-stale{margin-top:6px;font-size:12px;color:var(--muted);max-height:88px;overflow-y:auto;line-height:1.6}
+  /* 房間清單。★ v1.147.0 起連**現役**房間也列(原本只有已關閉的那些)→ 行數變多,
+     上限從 88px 放到 190px(約 9~10 行);超過就在這一塊裡自己捲,
+     ⚠ 不可以讓它把整張卡撐長 —— .set-card 本身已經是可捲的蓋板,兩層都能捲會很難操作。 */
+  .svs-stale{margin-top:6px;font-size:12px;color:var(--muted);max-height:190px;overflow-y:auto;line-height:1.7}
+  /* 現役 / 已關閉的狀態點:只是行首的一顆 emoji,寬度固定住讓房名對齊 */
+  .svs-dot{display:inline-block;width:1.35em;opacity:.55}
+  .svs-dot.live{opacity:1}
+  /* 誰開的 —— 比房名淡一階,但比時間亮(它是這一行第二重要的資訊) */
+  .svs-by{color:var(--text);opacity:.72;font-weight:700}
+  .svs-stale i{opacity:.7;font-style:normal}
   .svs-row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .svs-row .btn.ghost{width:auto;margin-top:0;padding:7px 12px;font-size:13px}
 
@@ -5512,9 +5521,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .un-pen b{font-size:14px;color:#fff}
 
   /* ---------- 手牌 ----------
-     ⚠ 永遠**一列**(nowrap):手牌可能到二十幾張,換行會把桌子擠掉。
-       v1.117.0 起放不下就**把牌縮小**(board.js 的 fitHand),不是靠橫向捲動 ——
-       捲軸留著但藏起來,只有撞到 18px 下限的極端局面才真的需要滑。
+     ⚠ 預設**一列**(nowrap):v1.117.0 起放不下就**把牌縮小**(board.js 的 fitHand),
+       不是靠橫向捲動 —— 捲軸留著但藏起來,只有撞到 18px 下限的極端局面才真的需要滑。
+     ★ v1.147.0 起「縮到 28px 以下」會換成**兩列**(`.rows2` + `.un-hrow.wrap`,見下面),
+       而兩列多出來的高度是從手牌上方那塊空白拿的 —— 桌子不必讓、下緣不會動。
      ⚠ padding-top 留著 —— 牌雖然不再上抬(見 .un-card.can),但亮牌的光圈是
         3px 的 box-shadow,貼著捲動容器的上緣一樣會被裁掉
         (那是 notes/13 第三節「捲動容器裡會放大的東西」的同一類問題)。 */
@@ -5543,6 +5553,22 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     padding:8px 2px 4px;touch-action:pan-x;
     scrollbar-width:none;-ms-overflow-style:none}
   .un-hand::-webkit-scrollbar{width:0;height:0;display:none}
+  /* ★★★ 換行(v1.147.0,最多三列)—— 多出來的高度是從**手牌上方那塊本來就沒人用的空白**
+     拿的(`.un-handwrap{margin-top:auto}` 留下的:870×805 量到 197px、390×844 手機量到 249px)
+     → 桌子 / 桌上那張牌 / 動作列 / 手牌下緣**一個像素都不動**,手牌是往上長的。
+     ⚠⚠ 這個高度**照樣吃 `.un-play` 那一層的 --un-cw**(基準寬),不吃內層縮過的值 ——
+       所以它在一整局裡只有**三種**可能值(一 / 二 / 三列),不會跟著張數連續變。
+       `.7` = 每一列的名目牌寬(58 → 40),而**牌到底畫多大是 board.js 量出來的**
+       (fitHand 拿這個框的內高回推,所以三列的名目牌寬與兩列一樣)——
+       這個係數只有一份真相在這裡。
+     ⚠ row-gap 寫死 4px:column-gap 仍然是 `calc(--un-cw * .09)`(跟著牌縮),
+       但列與列之間跟著縮會讓兩列黏在一起 —— 而且 fitHand 是**量** row-gap 的,不必同步改。
+     ⚠ 幾列由 board.js 依「換了牌會不會變大 / 上方空白夠不夠」決定:
+       桌機寬視窗幾乎只會用到兩列,三列是**窄手機 25 張以上**才走到的那一格
+       (390px 手機 30 張:一列 18px 要滑 → 兩列 18px → 三列 28px)。 */
+  .un-hand.rows2{height:calc(var(--un-cw) * .7 * 1.45 * 2 + 4px + 12px)}
+  .un-hand.rows3{height:calc(var(--un-cw) * .7 * 1.45 * 3 + 8px + 12px)}
+  .un-hrow.wrap{flex-wrap:wrap;align-content:center;row-gap:4px}
   /* ★★ 牌真正的容器 —— 「縮多小」設在**這一層**的 --un-cw 上(見上面 ⚠⚠ 與 fitHand)。
      ⚠ width:100% 是量得準的前提:它撐滿 .un-hand 的內容寬,而牌是 flex:none 會溢出它
        → row.clientWidth 就是「可用寬」,不會被牌的總寬帶著跑。

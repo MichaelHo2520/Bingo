@@ -244,7 +244,13 @@
       code=randomCode(); roomRef=db.ref("rooms/"+code);                  // 內部隨機 4 位碼當資料庫鍵值(玩家看不到)
       roomRef.child("host").once("value").then(snap=>{
         if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }   // 撞號就重抽一次
-        return roomRef.update({ host:meId, roomName:roomName, target:state.target, size:SIZE, orderMethod:"random",
+        /* ⚠⚠⚠ 撞到**已關閉**的房間要把殘留欄位清乾淨(v1.147.0)——「撞號重抽」看的是
+           `host` 有沒有值,而關掉的房間 host 正好是空的 → 看起來像沒人用,新房就蓋上去了,
+           而 update() 會**留下舊房的 scores** = 新房一開就有人有分數(名字也對得上,
+           因為 nm 一起留著),畫面上完全看不出哪裡不對。
+           ⚠ 這一段與 js/shared/mp-core.js 的 create() 是雙胞胎(CLAUDE.md 紅線 5)。 */
+        return roomRef.update({ players:null, scores:null, hostName:null, closedAt:null,
+          host:meId, roomName:roomName, target:state.target, size:SIZE, orderMethod:"random",
           scoreMode:scoreMode, winGoal:winGoal,   // 用記住的計分偏好當建房預設
           emotes:null, createdAt:Date.now(),
           // 一局揮發狀態全收在 game(取代舊的散落頂層欄位);rev 由此起算,單調遞增
@@ -277,7 +283,8 @@
     function joinNode(){
       armPresence({ name:meName, lines:0, ready:false });
       // 註:不再於房主斷線時「整房刪除」——短暫切背景改由寬限期+重連歸位處理(見 watchConn/resume);
-      //     房主真的離開時 leave() 會 roomRef.remove() 關房,orphan 房間無玩家也會被大廳清單過濾掉。
+      //     房主真的離開時 leave() 會把 host 清掉關房(v1.147.0 起**房間資料本身留著**,
+      //     給首頁的伺服器狀態面板列「誰開過哪一間」),而沒有 host 的房間大廳清單也不會顯示。
     }
 
     /* ---------- 誤按離開的救援:同名接續(v1.97.0) ----------
@@ -1261,7 +1268,16 @@
             if(meId) roomRef.child("players/"+meId).onDisconnect().cancel();
             roomRef.onDisconnect().cancel();
             if(db&&code){ const ix=db.ref("rooms_index/"+code); ix.onDisconnect().cancel(); ix.remove(); }   // 連同大廳索引一起移除
-            roomRef.remove();                       // 房主離開 → 關閉整個房間
+            /* ★★★ v1.147.0:房主離開**不再刪掉整間房**(舊版是 roomRef.remove())。
+               使用者:「房主正常關掉的話…我希望不要回收,我要留著這樣才有辦法看到你是誰開的房間」。
+               ★★ 「這間房關掉」沒有變(CLAUDE.md 紅線 5)—— 關房的訊號一直是 **host 不見了**:
+                 join() 看 `!r.host` 說「已經關閉」,還在房裡的訪客看 hostGone() 被退出。
+               ⚠ 只留身分與歷史(roomName / createdAt / scores + hostName / closedAt),
+                 live 的三包(host / players / game)照樣清掉;hostName 一定要在這裡補,
+                 因為 host 只有 pid 而 players 馬上要清掉。
+               ⚠ 這一段是**雙胞胎**,js/shared/mp-core.js 的 leave() 有對應的一份(紅線 5)。 */
+            roomRef.update({ host:null, players:null, game:null,
+                             hostName:meName||"", closedAt:Date.now() });
           }else if(meId){
             const pr=roomRef.child("players/"+meId);
             pr.onDisconnect().cancel();

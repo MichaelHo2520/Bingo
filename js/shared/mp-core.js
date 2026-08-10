@@ -256,7 +256,20 @@ const MPCore = (function(){
       code=randomCode(); roomRef=db.ref(ROOMS+"/"+code);
       roomRef.child("host").once("value").then(snap=>{
         if(snap.exists()){ code=randomCode(); roomRef=db.ref(ROOMS+"/"+code); }   // 撞號重抽一次
-        const payload=Object.assign({
+        /* ⚠⚠⚠ 撞到**已關閉**的房間時要把它的殘留欄位清乾淨(v1.147.0 起非做不可)。
+           上面那道「撞號重抽」看的是 `host` 有沒有值,而關掉的房間 host 正好是空的
+           → 它看起來像沒人用,於是新房會直接蓋在舊房上面。用 update() 的話
+           **舊房的 scores 會留下來** = 新房一開就有人有分數(而且對得上名字,
+           因為 nm 也在裡面),而畫面上完全看不出哪裡不對。
+           v1.147.0 之前不會踩到:那時房主離開會整間 remove,而斷線留下的房間
+           `host` 還在 → 一定會被上面那行重抽掉。
+           ★ 用「明確列出要清的欄位」而不是 roomRef.set():set() 在(極小機率的)
+             二次撞號時會把**還在打的那一局**整包擦掉,那個代價比殘留大得多。
+           ⚠ adapter 自己的房內節點(A.extraNodes,例如數獨/消消樂的 progress、
+             台灣麻將的 tai)也要一起清 —— 它們是**上一局**的資料。 */
+        const wipe={ players:null, scores:null, hostName:null, closedAt:null };
+        (A.extraNodes||[]).forEach(k=>{ wipe[k]=null; });
+        const payload=Object.assign(wipe, {
           host:meId, roomName:roomName,
           scoreMode:scoreMode, winGoal:winGoal, emotes:null, createdAt:Date.now(),
           game:Object.assign({ rev:1 }, lobbyGame(null))
@@ -1194,7 +1207,24 @@ const MPCore = (function(){
             if(meId) roomRef.child("players/"+meId).onDisconnect().cancel();
             roomRef.onDisconnect().cancel();
             if(db&&code){ const ix=db.ref(INDEX+"/"+code); ix.onDisconnect().cancel(); ix.remove(); }
-            roomRef.remove();
+            /* ★★★ v1.147.0:房主離開**不再刪掉整間房**(舊版是 roomRef.remove())。
+               使用者:「房主正常關掉的話…我希望不要回收,我要留著這樣才有辦法看到你是誰開的房間」
+               —— 首頁那個隱藏的「伺服器狀態」面板就是靠房間節點列出「誰開過哪一間、什麼時候」,
+               整間刪掉的話那份紀錄跟著消失(而斷線 / 關分頁本來就留著 → 兩種下場不一致)。
+               ★★ 「房間關掉」這件事**沒有變**(CLAUDE.md 紅線 5:房主離開仍然關閉整房):
+                 關房的訊號一直是 **host 這個欄位不見了** —— join() 看 `!r.host` 說「已經關閉」、
+                 還在房裡的訪客看 hostGone()(hostId 變 null)被退出。所以只要把 host 拿掉,
+                 對所有人來說這間房就是關的,不必刪掉整包資料。
+               ⚠ 刻意只留「身分與歷史」,live 的部分照樣清掉:
+                   host    → null(關房訊號,一定要清)
+                   players → null(不然面板會顯示早就離開的人還在裡面)
+                   game    → null(deal + moves 是最大的一包,留著只是佔空間)
+                 留下的是 roomName / createdAt / scores(名字寄生在 scores.nm)+ 這次補的兩筆。
+               ⚠ hostName 要在這裡寫:host 只有 pid,而 players 馬上要清掉 →
+                 不補這一筆,面板就只知道「有人開過房」卻說不出是誰。
+               ⚠ 這一段是**雙胞胎**,js/online.js 的 leave() 有逐字對應的一份(紅線 5)。 */
+            roomRef.update({ host:null, players:null, game:null,
+                             hostName:meName||"", closedAt:Date.now() });
           }else if(meId){
             const pr=roomRef.child("players/"+meId);
             pr.onDisconnect().cancel(); pr.remove();

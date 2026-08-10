@@ -192,10 +192,12 @@ const MP = MPCore.create((function(){
   function whyNot(card){
     if(st.pend > 0){
       if(!st.rules.stack) return "被罰抽 " + st.pend + " 張 —— 只能抽";
-      /* ★ 手上如果還有別的同種牌能疊,強制出牌就輪到那一條 —— 不能靠抽來吃掉罰抽。 */
+      /* ★ 手上如果還有別的加牌能疊,強制出牌就輪到那一條 —— 不能靠抽來吃掉罰抽。
+         ⚠ v1.147.0 起 +2 / +4 互通,所以這句不再指定是哪一種(指定就會騙人:
+           頭上是 +2 而他手上只有 +4 時,那張 +4 現在**疊得上**)。 */
       return UN.canPlay(st.hands[mySeat()], st)
-        ? ("要用 " + (st.pendK === UN.K_W4 ? "+4" : "+2") + " 疊上去")
-        : ("疊不上 —— 只能抽 " + st.pend + " 張");
+        ? "要用 +2 / +4 疊上去"
+        : ("手上沒有加牌 —— 只能抽 " + st.pend + " 張");
     }
     if(st.drew) return "只能出剛抽到的那張";
     return "要出 " + (UN.COL_NAME[st.col] || "") + " 色、同數字,或 Wild";

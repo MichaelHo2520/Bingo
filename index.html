@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.146.0 -->
-<meta name="version" content="1.146.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.147.0 -->
+<meta name="version" content="1.147.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -862,7 +862,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="svs-ping" id="svPing">連線中…</div>
       <div class="svs-actions">
         <button class="btn ghost" id="svRefresh" type="button">🔄 重新整理</button>
-        <button class="btn danger" id="svClearAll" type="button">🗑 清除全部殘留房間</button>
+        <button class="btn danger" id="svClearAll" type="button">🗑 清除全部已關閉的房間</button>
       </div>
       <div class="svs-actions">
         <button class="btn danger" id="svClearStatsAll" type="button">🧹 清除全部統計紀錄</button>

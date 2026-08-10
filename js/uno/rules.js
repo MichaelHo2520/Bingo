@@ -22,8 +22,8 @@
      **只剩一個人手上還有牌**為止(像大老二),名次照出完的先後排。
 
      ★ 五條房規(房主設定,開局那一刻凍結):
-         stack     疊 +2 / +4 —— **同種才疊得上**(+2 疊 +2、+4 疊 +4);
-                   關掉就照官方:被 +2 就抽 2 張並跳過。
+         stack     疊 +2 / +4 —— **任何加牌都疊得上**(+2 疊 +4、+4 疊 +2 都可以,
+                   v1.147.0 由「同種才疊得上」放寬);關掉就照官方:被 +2 就抽 2 張並跳過。
          unoCall   沒喊 UNO 罰抽 2 張 —— 出到剩 1 張要在**同一手**宣告(見第五節);
                    關掉就沒有抓,由畫面自動公告「還剩一張」。
          playDrawn 抽到的那張能出就可以馬上出(**預設關**)。
@@ -73,6 +73,10 @@ const UN = (function(){
   const K_SKIP = 10, K_REV = 11, K_D2 = 12, K_WILD = 13, K_W4 = 14;
   const isWildK = k => k === K_WILD || k === K_W4;
   const isNumK  = k => k >= 0 && k <= 9;
+  /* 「加牌」= +2 與 +4 兩種。★ 它是**疊牌的唯一條件**(見 legalOn 第一道門):
+     v1.147.0 之前是「同種才疊得上」(c.k === st.pendK),玩家實測反饋
+     「疊上去的時候我還有加牌但不能出、還要抽,這不公平」→ 放寬成兩種互通。 */
+  const isDrawK = k => k === K_D2 || k === K_W4;
 
   /* 牌面上印的字。★ 動作牌一律用符號 + 數字,不用中文 —— 牌面只有 20px 寬。 */
   const K_LABEL = { 10: "⊘", 11: "⇄", 12: "+2", 13: "W", 14: "+4" };
@@ -310,7 +314,7 @@ const UN = (function(){
      ★ 規則的心臟:這張現在出不出得了
      ──────────────────────────────────────────────────────────────────────────
        三道門,順序不可以換:
-         ① 有罰抽在頭上 → 只有「疊得上的同種牌」能出(房規關掉就一張都不能出)
+         ① 有罰抽在頭上 → 只有「加牌」能出(+2 / +4 互通;房規關掉就一張都不能出)
          ② 剛抽了一張 → 只有抽到那一張能出(官方:抽到的牌能出就出)
          ③ 一般情形 → Wild 隨時可出 · 同色 · 同數字/同動作
        ⚠ ③ 的「同數字或同動作」寫成一句 `c.k === top.k` 是靠**數字 0..9 與動作
@@ -319,7 +323,10 @@ const UN = (function(){
   function legalOn(st, id){
     if(!st || id < 0 || id >= NCARD) return false;
     const c = CARDS[id];
-    if(st.pend > 0) return st.rules.stack && c.k === st.pendK;   // ★ 同種才疊得上
+    /* ★★ 罰抽在頭上時**任何加牌都疊得上**(v1.147.0,見 isDrawK)——
+       `st.pendK` 從此只是「最後一張砸下來的是哪一種」,純顯示用,不再是閘門。
+       ⚠ 不要「順手」把它改回 `c.k === st.pendK`:那正是玩家抱怨的那件事。 */
+    if(st.pend > 0) return st.rules.stack && isDrawK(c.k);
     if(st.drew) return id === st.drewCard;
     return isWildK(c.k) || c.col === st.col || c.k === CARDS[st.top].k;
   }
@@ -415,9 +422,9 @@ const UN = (function(){
     const seat = st.turn;
     /* ★★★ 手上有合法牌可出時**預設**不准抽 —— 強制出牌,是否放行是房規 freeDraw
        (預設關,照原本的強制出牌)。
-       這裡刻意用 canPlay(),與「疊牌」共用同一個閘門:被罰抽時如果手上有同種牌
-       能疊上去,也一樣不准直接抽來吃掉罰抽(能疊就必須疊)—— freeDraw 開著時這條
-       也一起放行(能疊也可以選擇直接抽掉整份罰抽)。
+       這裡刻意用 canPlay(),與「疊牌」共用同一個閘門:被罰抽時手上如果有加牌
+       (+2 / +4 都算,v1.147.0 起互通),也一樣不准直接抽來吃掉罰抽(能疊就必須疊)
+       —— freeDraw 開著時這條也一起放行(能疊也可以選擇直接抽掉整份罰抽)。
        ⚠ ai.js 不受這條房規影響 —— 它一路都是 pl.length 才回 DRAW(見 notes/18 AI 節:
        屯牌 / 白白放棄能出的牌都是負收益),freeDraw 只多給**人類玩家**一個選項。
        ⚠⚠ 「一個回合只能抽一次」**不必再寫成獨立的一條**(`if(st.drew) return false`)——
@@ -583,7 +590,7 @@ const UN = (function(){
     C_R, C_Y, C_G, C_B, C_WILD, COL_KEY, COL_NAME, COL_LETTER,
     K_SKIP, K_REV, K_D2, K_WILD, K_W4, K_LABEL, K_NAME, DRAW, PASS,
     // 一張牌
-    colOf, kindOf, isWild, isWildK, isNumK, ptsOf, ptsOfK, labelOf, nameOf, letterOf,
+    colOf, kindOf, isWild, isWildK, isNumK, isDrawK, ptsOf, ptsOfK, labelOf, nameOf, letterOf,
     // 編碼
     chr2, unchr2, encodeDeal, decodeDeal, newDeal,
     encPlay, encCatch, isPlay, isDraw, isPass, isCatch, moveCard, moveDeclared,

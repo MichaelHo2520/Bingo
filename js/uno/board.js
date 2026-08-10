@@ -284,18 +284,36 @@ const UNB = (function(){
     watchHand();
   }
 
-  /* ---------- 手牌一多就把牌縮小,而**不捲、不換行**(v1.117.0)----------
-     使用者:「手牌如果太多,會變成要左右滑動,但現在會跑出一條在下方的 bar,這很難看,
-     我希望不要有 bar 條,也不要需要滑動來看手牌,可以考慮換行,或是把中間的牌域給縮小
-     一點點,不過這個還請你要評估看看,我不希望介面變很難看,也不希望固定的區域一直跳來跳去」。
+  /* ---------- 手牌一多就把牌縮小,縮到看不清才換第二列(v1.117.0 → v1.147.0)----------
+     使用者(v1.117.0):「手牌如果太多,會變成要左右滑動,但現在會跑出一條在下方的 bar,
+     這很難看,我希望不要有 bar 條,也不要需要滑動來看手牌,可以考慮換行,或是把中間的牌域給
+     縮小一點點,不過這個還請你要評估看看,我不希望介面變很難看,也不希望固定的區域一直跳來跳去」。
+     使用者(v1.147.0,疊牌放寬成 +2/+4 互通之後):「當初是因為抽太多的時候會讓排太長導致要
+     滑動不好看,我們是不是來想想看有比方法嗎,例如中間區域其實可以不一定要這麼大,當然平常的
+     時候還是大一點,當如果排需要換行的時候,可以適當的縮減中間的大小」。
 
-     ★★★ 三條路裡選了「縮牌」,理由是最後那半句:
+     ★★★ v1.117.0 三條路裡選了「縮牌」,理由是最後那半句:
        · **換行** —— 兩列的高度只能二選一:要嘛預留(直立多浪費 80px、橫置 430px 高的視窗
          直接把手牌擠出畫面下緣,notes/18 版面第 7 條量過),要嘛第 13 張牌出現的那一刻
          整個手牌區長高一倍 → 那正是「固定的區域跳來跳去」最嚴重的一種。
        · **縮中間的牌桌** —— 治不了病:牌桌讓出來的是**高度**,手牌不夠的是**寬度**。
        · **縮牌** —— 只有牌自己變小,`.un-hand` 的高度、標籤、抽牌墊、動作列一格都不動。
          而且**放得下的時候一個像素都不改**(≤ 12 張左右完全是原來的樣子)。
+
+     ★★★ v1.147.0 把「換行」加回來,而**上面那三句話一條都沒有被推翻** ——
+       翻案的是一個**量出來的事實**:直立時手牌上方本來就有一大塊空白
+       (`.un-handwrap{margin-top:auto}` 把手牌壓到動作列上面,桌子卡在 `min-height:200px`)
+       —— 870×805 量到 **197px**。第二列只要 32~38px,**從那塊空白裡拿就夠了**:
+         · 桌子、桌上那張牌、現在顏色 → **一個像素都不動**(所以使用者說的「縮減中間」
+           實際上不必真的縮 —— 那塊空間本來就沒人在用)
+         · 手牌的**下緣**與動作列 → 一個像素都不動(手牌是往**上**長的)
+         · 會動的只有手牌區的上緣與抽牌墊的垂直中心,而它在一整局裡最多**兩種值**
+       而「換行 vs 縮牌」的取捨改成**看牌縮到多小**:縮到 28px 以下(牌高 41px、
+       牌面大字 13px)才換行 —— 那時「換行」是在救可讀性,不是在浪費空間。
+     ★★ 空白夠不夠是**量出來的,不是寫死媒體查詢** —— 橫置矮視窗(`.un-table{flex:none}`、
+       430px 高)自然量到接近 0 → 自動維持一列,不必寫 `@media` 分岔。
+     ⚠ 極端(兩列連 18px 都放不下,約 30+ 張看視窗)**退回一列**,行為與 v1.117.0
+       完全一樣(藏起來的橫向捲動)—— 不要讓它變成「第三列被裁在框外而且看不出來」。
 
      ★ 縮的方式是把 `--un-cw` 設在 `.un-hrow` 上 → 牌寬 / 牌高 / 白橢圓 / 字級 / 圓角
        **整組跟著縮**(它們全都是 `calc(var(--un-cw) × 係數)`,見 notes/18 版面第 1 條)。
@@ -309,22 +327,91 @@ const UNB = (function(){
        那時沒有人記得剛才畫了幾張;傳參數的版本遲早會與畫面不一致。 */
   const GAPR = 0.09;        // 牌與牌的間隙 = 牌寬 × 這個係數(CSS 的 .un-hrow{gap} 同一個式子)
   const MINCW = 18;         // 再小就認不出是什麼牌了(18px 寬 = 26px 高,標籤字 8px)
+  /* ★★★ 換不換第二列的判準刻意**不是一個寫死的門檻**,而是兩句話 ——
+       ① **一列根本放不下**(牌撞到 18px 下限還是溢出)而兩列放得下 → 換,
+          因為那是「不必滑就看得完」的唯一一條路(30 張手機上就是這一格)
+       ② 一列放得下但**兩列能讓牌大兩成以上** → 換,因為換了才划算
+       其餘一律維持一列。
+     ⚠ 這樣寫的三個好處:(a) 沒有「28px 是哪裡來的」這種魔術數字
+       (b) 換行的**理由**與驗收點是同一句話:「換了之後牌有變大嗎 / 還要不要滑?」
+       (c) 它是 (張數, 可用寬, 上方空白) 的**純函式** —— 不必記「現在是幾列」,
+          所以同一手牌永遠排出同一個樣子(要防的抖動由 GAIN 那兩成擔任:
+          臨界張數附近換行只賺一兩個 px 時就不換,不會在一列 / 兩列之間來回跳)。 */
+  const GAIN = 1.2;
+  const MAXR = 3;           // 最多三列(CSS 只有 .rows2 / .rows3 兩個框高)
+  const setCw = (row, cw) => row.style.setProperty("--un-cw", cw + "px");
+  /* 幾列 —— 一列就是「什麼 class 都不掛」(= v1.117.0 的原樣)。 */
+  function setRows(box, row, r){
+    box.classList.remove("rows2", "rows3");
+    if(r > 1){ box.classList.add("rows" + r); row.classList.add("wrap"); }
+    else row.classList.remove("wrap");
+  }
+  /* 手牌上方還有多少空白可以拿(桌子下緣 → 手牌區上緣)。
+     ★ 一律**量**,不從 CSS 常數推 —— 直立 / 橫置 / 五種主題 / 有沒有玩家列都不同。 */
+  function freeAbove(){
+    const stage = $("unStage");
+    const table = stage && stage.querySelector(".un-table");
+    const wrap  = stage && stage.querySelector(".un-handwrap");
+    if(!table || !wrap) return 0;
+    /* ⚠ 扣掉 .un-stage 的 gap:量到的距離含那 10px,全部吃掉手牌就會貼上桌子。 */
+    const gap = parseFloat(getComputedStyle(stage).rowGap) || 0;
+    return wrap.getBoundingClientRect().top - table.getBoundingClientRect().bottom - gap;
+  }
   function fitHand(){
     const box = $("unHand");
     const row = box && box.firstElementChild;
     if(!row) return;
-    row.style.removeProperty("--un-cw");             // ⚠ 先回到基準寬再量
+    /* ⚠ 先整組回到「一列 + 基準寬」再量 —— 量到的才是基準,不然會一路縮下去 */
+    setRows(box, row, 1);
+    row.style.removeProperty("--un-cw");
     const n = row.children.length;
     if(!n) return;
     const avail = row.clientWidth;
     const first = row.firstElementChild;
     if(!avail || !first) return;
-    const base = first.getBoundingClientRect().width;
+    const r0 = first.getBoundingClientRect();
+    const base = r0.width;
     if(!(base > 0)) return;                          // hidden / 還沒版面 → 不要亂設
     const units = n + GAPR * (n - 1);                // 需要幾個「牌寬」(含間隙)
     if(base * units <= avail) return;                // ★ 放得下就一個像素都不動
-    const cw = Math.max(MINCW, Math.floor(avail / units));
-    row.style.setProperty("--un-cw", cw + "px");
+    /* 一列的答案:縮到剛好放得下,但不小於 18px。
+       ⚠ `fits` 一定要用**沒有夾下限**的那個值算 —— 夾完的 cw 看起來永遠「放得下」,
+         而 v1.117.0 的極端情形(30 張以上)正是「夾在 18px 而且還是溢出」。 */
+    const raw1 = Math.floor(avail / units);
+    const h1 = box.getBoundingClientRect().height;
+    const free = freeAbove();                        // 上方的空白(量出來的,見上面)
+    const cs = getComputedStyle(box);
+    const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const ratio = r0.height / base;                  // 牌的長寬比,量出來(不寫死 1.45)
+    let best = { r:1, cw:Math.max(MINCW, raw1), fits:raw1 >= MINCW };
+    /* ★ 往下試每一種列數。cw 隨列數**單調不減**(每列張數變少 → 寬的限制放鬆,
+       而高的限制 byH 因為框高是「列數 × 同一個名目牌寬」而**與列數無關**),
+       所以「挑最少的列數」= 從 2 開始、只有明顯更大才往上換。 */
+    for(let r = 2; r <= MAXR; r++){
+      setRows(box, row, r);
+      const hr = box.getBoundingClientRect().height;
+      if(hr - h1 > free) break;                      // 空間不夠 → 更多列只會更不夠
+      /* 牌能多大由**兩個限制**決定,兩邊都量:
+           寬 —— 每列 ceil(n/r) 張要塞進 avail
+           高 —— r 列 + (r−1) 個列間隙要塞進(變高之後的)框內高
+         ⚠ padding / row-gap / 長寬比一律從**實際元素**量:牌高那個 1.45 寫在 CSS 的
+           .un-card 上,這裡再寫一份就是兩份真相。 */
+      const gapY = parseFloat(getComputedStyle(row).rowGap) || 0;
+      const per = Math.ceil(n / r);
+      const u = per + GAPR * (per - 1);
+      const byH = Math.floor((box.clientHeight - padV - (r - 1) * gapY) / r / ratio);
+      const cw = Math.min(byH, Math.floor(avail / u));
+      const fits = cw >= MINCW;                      // 撞到 18px 下限就算這個列數放不下
+      /* 換的兩個理由(其中一個成立就換):
+           ① 目前這個列數**根本放不下**,而這個列數放得下 → 換了才不必滑
+           ② 都放得下,但牌能大兩成以上 → 換了才划算(不到兩成就別動,省掉沒必要的變形) */
+      if(fits && (!best.fits || cw >= best.cw * GAIN)) best = { r:r, cw:cw, fits:true };
+    }
+    /* ⚠ 沒有任何多列方案可用時**退回一列**,行為與 v1.117.0 完全一樣
+       (18px + 藏起來的橫向捲動)—— 不可以硬塞:框高寫死 + overflow-y:hidden
+       = 多出來的那一列被裁在框外,而且畫面上完全看不出來(CLAUDE.md 紅線 17 那一類)。 */
+    setRows(box, row, best.r);
+    setCw(row, best.cw);
   }
   /* ★★ 兩種情形會讓「量好的那個寬」過期,而它們**都不會觸發 render()**:
        ① 手機轉向 / 改視窗大小 —— 基準寬是 clamp(…,12.5vw,…),vw 一變基準就變
@@ -334,14 +421,27 @@ const UNB = (function(){
        沒補這一手的話那一瞬間會有牌被裁在畫面外而且看不出可以捲。
      ★ 用 ResizeObserver 掛在 .un-hand 上一次解決兩個:它在「0 → 有寬度」與
        「視窗變了」兩種情形都會叫一次。observe() 本身也會立刻叫一次(冪等,無妨)。
-     ⚠ 不會無限迴圈:fitHand 只改內層 .un-hrow 的 --un-cw,而 .un-hand 的寬(flex:1 1 0)
-       與高(吃 .un-play 的 --un-cw)兩軸都不受它影響。
-     ⚠ 每次 render() 都要重新 observe —— #unHand 是 innerHTML 重畫出來的新節點。 */
-  let handRO = null;
+     ⚠⚠⚠ **只有「寬」變了才重算**(v1.147.0 起非做不可):兩列模式是靠 `.rows2` 改
+       `.un-hand` 的**高**做的,而 RO 就掛在 `.un-hand` 上 → 高一變它就再叫一次
+       fitHand,fitHand 又會把高改回去再改過來 = **每一格都在跳的無限迴圈**
+       (瀏覽器會丟 "ResizeObserver loop limit exceeded",而畫面看起來只是在閃)。
+       v1.117.0 那版沒有這個問題(fitHand 只改內層的 --un-cw,兩軸都不影響 .un-hand),
+       所以那時的註解寫「不會無限迴圈」—— **這一版把那個前提改掉了**。
+       ★ 寬是 `flex:1 1 0` 算出來的,與手牌區的高無關 → 拿「寬有沒有變」當閘門是安全的,
+         而轉向 / 顯示出來 / 視窗變大這三種**要**重算的情形寬都一定會變。
+     ⚠ 每次 render() 都要重新 observe,而且要把記著的寬歸零 —— #unHand 是 innerHTML
+       重畫出來的**新節點**(張數也換了,同樣的寬照樣要重算一次)。 */
+  let handRO = null, roW = -1;
   function watchHand(){
     const box = $("unHand");
     if(!box || !window.ResizeObserver) return;
-    if(!handRO) handRO = new ResizeObserver(() => fitHand());
+    roW = -1;
+    if(!handRO) handRO = new ResizeObserver(es => {
+      const w = Math.round((es[0].contentRect || {}).width || 0);
+      if(w === roW) return;
+      roW = w;
+      fitHand();
+    });
     handRO.disconnect();
     handRO.observe(box);
   }

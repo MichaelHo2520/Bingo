@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.146.0 -->
-<meta name="version" content="1.146.0">
+<!-- UNO · v1.147.0 -->
+<meta name="version" content="1.147.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -86,6 +86,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         抽完就換下一家(<b>可在房規改成「抽到的可以馬上出」</b>)。<br>
         動作牌:<b>⊘ 跳過</b>下一家 · <b>⇄ 迴轉</b>換方向(2 人局就是<b>換對手出</b>)·
         <b>+2</b> 讓下一家抽兩張並跳過 · <b>+4</b> 換顏色再讓他抽四張。<br>
+        <!-- ★ 疊牌是房規(預設開),而「+2 與 +4 互通」是玩家最容易誤會的一條 ——
+             不寫的話手上握著 +4 卻被 +2 罰抽的人會以為自己那張是壞的。 -->
+        被加牌時,手上<b>任何 +2 / +4</b> 都可以疊上去往下傳(<b>可在房規關掉</b>);
+        一張都沒有才把整份罰抽吃下來。<br>
         <!-- ★ 這兩句是「為什麼我剩一張要按一顆鈕」的唯一說明。
              不寫的話玩家第一次被抓會以為是 bug(而它是房規,預設開著)。 -->
         出到<b>剩一張</b>時要在出牌的同時按 <b>UNO!</b> ——
@@ -318,7 +322,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="set-group">
           <div class="set-group-title">可以改的五條</div>
           <div class="set-row col">
-            <span class="set-lbl">疊 +2 / +4<span class="set-sub">被 +2 時可以再出 +2 把懲罰往下疊(同種才疊得上);關掉就照官方:抽 2 張並跳過</span></span>
+            <span class="set-lbl">疊 +2 / +4<span class="set-sub">被加牌時可以再出 <b>任何 +2 / +4</b> 把懲罰往下疊(+4 疊 +2、+2 疊 +4 都可以);關掉就照官方:抽 2 張並跳過</span></span>
             <div class="seg" id="unStackSeg" aria-label="疊 +2 / +4">
               <button class="on" data-rk="stack" data-rv="1">✔ 可以疊</button>
               <button data-rk="stack" data-rv="0">✘ 不能疊</button>

@@ -323,23 +323,25 @@ const HomeLive = (function(){
      (仿 Android「連按版本號 7 下」開發者選項的手勢),只給自己排查資料庫用,
      不出現在任何一般玩家會走到的路徑上。
 
-     ★ 內容:十個遊戲各自「大廳現役房數 / 殘留房數 / 累積人氣場次」,
-       外加兩組**各自獨立**的清除——「清除殘留房間」與「清除統計紀錄」,
-       每個遊戲各一顆、外加各一顆全部清除,互不影響:對戰結束、房間變殘留
+     ★ 內容:十一個遊戲各自「大廳現役房數 / 已關閉房數 / 累積人氣場次」+ **每一間房的
+       房名、誰開的、幾個人、什麼時候開的**(v1.147.0 起連現役房間也列),
+       外加兩組**各自獨立**的清除——「清除已關閉的房間」與「清除統計紀錄」,
+       每個遊戲各一顆、外加各一顆全部清除,互不影響:對戰結束、房間關掉
        之後不會自動清掉統計,想留著回顧就留著,要清哪一種自己按。
      ★ 讀取一律走**公開 REST**(fetch databaseURL/*.json),不透過 Firebase SDK:
        這幾個節點的 .read 本來就是 true(見 notes/firebase-rules.json),REST 不必
        等 SDK 下載/初始化,開面板不會被「還沒連線對戰過」卡住。清除也是同一顆
-       REST 的 DELETE method,跟 App 本來刪房間(leave() 裡的 roomRef.remove())
-       走的是同一條規則,不必也不會改資料庫規則。
-     ★ 「殘留房間」= 房間節點裡有、但大廳 index 裡已經沒有的房間代碼 —— 這是設計上的
-       必然結果,不是 game_stats 計數邏輯的 bug:armRoomIndex() 只把
-       onDisconnect().remove() 掛在 INDEX 上(見上面 ★★ 那段),房間本體只有房主
-       明確按「離開房間」(leave() 裡的 roomRef.remove())才會被刪掉;斷線 / 關分頁 /
-       砍視窗只會讓大廳項目消失,房間資料本身留著。game_stats 的人氣計數是完全獨立的
-       另一件事(armPlayCount(),只認「真的開局撐過 30 秒」),兩邊本來就對不上,
-       不必因為對不起來就懷疑計數邏輯壞了。
-     ★ 只刪「殘留」那一批(index 裡已經沒有的 code),絕不會動到還掛在大廳裡的現役房間。
+       REST 的 DELETE method,跟 App 本來刪房間走的是同一條規則,
+       不必也不會改資料庫規則。
+     ★★★ 「已關閉的房間」= 房間節點裡有、但大廳 index 裡已經沒有的房間代碼。
+       **房間資料現在永遠不會自動消失**(v1.147.0):armRoomIndex() 只把
+       onDisconnect().remove() 掛在 INDEX 上(見上面 ★★ 那段),斷線 / 關分頁 / 砍視窗
+       只會讓大廳項目消失;而房主按「離開房間」也**只把 host 清掉關房**,不再刪掉整包
+       (使用者:「我希望不要回收,我要留著這樣才有辦法看到你是誰開的房間」)。
+       → 這一頁就是那份紀錄的唯一入口,而清掉它們的唯一辦法是這裡的按鈕。
+     ★ game_stats 的人氣計數是完全獨立的另一件事(armPlayCount(),只認「真的開局撐過
+       30 秒」),與房間數本來就對不上,不必因為對不起來就懷疑計數邏輯壞了。
+     ★ 清除只動「已關閉」那一批(index 裡已經沒有的 code),絕不會動到還掛在大廳裡的現役房間。
      ========================================================================== */
   const SV_TAP_MS=1500, SV_TAP_GOAL=7;
   let svTapN=0, svTapAt=0, svBusy=false, svRows=[];
@@ -361,6 +363,34 @@ const HomeLive = (function(){
     const h=Math.round(m/60); if(h<48) return h+" 小時前";
     return Math.round(h/24)+" 天前";
   }
+  /* 絕對時間(月/日 時:分)—— 使用者要的是「誰開的房間**跟時間**」,而「3 天前」
+     回答不了「那天晚上那一場是幾點開的」。兩個一起寫,相對時間放括號裡。 */
+  function svWhen(ms){
+    if(!ms) return "";
+    const d=new Date(ms), p=n=>String(n).padStart(2,"0");
+    return p(d.getMonth()+1)+"/"+p(d.getDate())+" "+p(d.getHours())+":"+p(d.getMinutes());
+  }
+  function svTime(ms){ return ms ? (svWhen(ms)+"("+svAgo(ms)+")") : "時間不明"; }
+  /* 誰開的 —— 四個來源依序試(舊房間沒有 hostName 那一筆):
+       ① hostName:v1.147.0 房主離開時補寫的(關房之後 players 會被清掉,只剩這一筆)
+       ② players[host].name:現役房間的即時名字
+       ③ scores[host].nm:名字寄生在得分紀錄上(v1.97.0 的「離席紀錄」)
+       ④ 都沒有 → 空字串,畫面上就不寫房主那一段(不要寫「不明」佔一行) */
+  function svHost(d){
+    if(!d) return "";
+    if(typeof d.hostName==="string" && d.hostName) return d.hostName;
+    const h=d.host;
+    if(h && d.players && d.players[h] && d.players[h].name) return d.players[h].name;
+    if(h && d.scores && d.scores[h] && d.scores[h].nm) return d.scores[h].nm;
+    return "";
+  }
+  // 這間房有幾個人的紀錄(現役看 players,關掉的房間看 scores —— 那是「誰玩過」)
+  function svWho(d){
+    if(!d) return 0;
+    if(d.players) return Object.keys(d.players).length;
+    if(d.scores) return Object.keys(d.scores).length;
+    return 0;
+  }
 
   function tapBrand(){
     const now=Date.now();
@@ -377,37 +407,73 @@ const HomeLive = (function(){
   }
   function closeStatusPanel(){ const v=$("svVeil"); if(v)v.classList.remove("show"); }
 
-  // 單一遊戲的現況:現役房數(index)、殘留房代碼(rooms 有、index 沒有)+ 各自的房名/建立時間、累積人氣
+  /* 單一遊戲的現況:**所有房間**(現役 + 已關閉)各自的房名 / 房主 / 時間 + 累積人氣。
+     ★★ v1.147.0 由「只列殘留」改成「全部都列」。使用者:「之前的版本我可以看得到有誰開過的
+       房間清單跟時間,但現在看不到」—— 舊版只列**殘留**(房間節點有、大廳 index 已經沒有),
+       而房主按「離開房間」時整間房被 remove 掉 → 正常關房的場次一筆都留不下來,
+       清單常常是空的。這一版兩件事一起改:leave() 不再刪房(見 mp-core.js / online.js),
+       這裡則連**現在還在大廳的**房間一起列出來。
+     ★ index 一律**不帶 shallow** —— 它本身就存著 { name, status, count, host(名字) }
+       (見 mp-core 的 updateRoomIndex),現役那幾間不必再逐間去讀房間本體。
+     ⚠ 時間只在房間本體裡(createdAt)→ 現役房間補讀**單一欄位**(小小一筆),
+       不要整包抓:那一包含 deal + moves。
+     ⚠ 上限仍然是各 30 間 —— 而且**要在畫面上講清楚被截掉幾間**
+       (CLAUDE.md 紅線 17:靜靜截斷會讀成「就這些」)。 */
+  const SV_MAX=30;
   async function svLoadGame(g,statsN){
     let idx={},rms={};
-    try{ idx=(await svGet(g.index,"shallow=true"))||{}; }catch(e){}
+    try{ idx=(await svGet(g.index))||{}; }catch(e){}
     try{ rms=(await svGet(g.rooms,"shallow=true"))||{}; }catch(e){}
     const idxKeys=Object.keys(idx), rmKeys=Object.keys(rms);
+    const rooms=[];
+    for(const code of idxKeys.slice(0,SV_MAX)){
+      const r=idx[code]||{};
+      let at=0; try{ at=(await svGet(g.rooms+"/"+code+"/createdAt"))||0; }catch(e){}
+      rooms.push({ code, live:true, name:r.name||("房間 "+code), host:r.host||"",
+                   who:r.count||0, status:r.status||"", at:at });
+    }
     const staleCodes=rmKeys.filter(c=>idxKeys.indexOf(c)<0);
     const staleInfo=[];
-    for(const code of staleCodes.slice(0,30)){
+    for(const code of staleCodes.slice(0,SV_MAX)){
       let d=null; try{ d=await svGet(g.rooms+"/"+code); }catch(e){}
-      staleInfo.push({ code, name:(d&&d.roomName)||("房間 "+code), ago:svAgo(d&&d.createdAt) });
+      const it={ code, live:false, name:(d&&d.roomName)||("房間 "+code), host:svHost(d),
+                 who:svWho(d), at:(d&&d.createdAt)||0, closed:(d&&d.closedAt)||0 };
+      staleInfo.push(it); rooms.push(it);
     }
-    return { g, activeN:idxKeys.length, staleInfo, n:statsN||0 };
+    // 新開的排前面(時間不明的排最後)
+    rooms.sort((a,b)=>(b.at||0)-(a.at||0));
+    const cut=Math.max(0,idxKeys.length-SV_MAX)+Math.max(0,staleCodes.length-SV_MAX);
+    return { g, activeN:idxKeys.length, rooms, staleInfo, cut, n:statsN||0 };
   }
 
+  /* 一間房一行:狀態點 + 房名 + 誰開的 + 幾個人 + 建立時間。
+     ⚠ 清除鈕**只針對已關閉的那些**(row.staleInfo)—— 絕不會動到還掛在大廳裡的現役房間,
+       那條紅線沒有變(見這一節開頭 ★)。 */
+  function svRoomHtml(r){
+    return (r.live ? '<span class="svs-dot live">🟢</span>' : '<span class="svs-dot">💤</span>')+
+      esc(r.name)+
+      (r.host ? ' <span class="svs-by">👑 '+esc(r.host)+'</span>' : "")+
+      (r.who ? ' · '+r.who+' 人' : "")+
+      ' · '+svTime(r.at)+
+      (r.live && r.status==="playing" ? " · 對戰中" : "");
+  }
   function svRowHtml(row){
     const g=row.g;
     const btns=[];
-    if(row.staleInfo.length) btns.push('<button class="btn ghost svs-clear" type="button" data-key="'+g.key+'">清除這 '+row.staleInfo.length+' 間殘留</button>');
+    if(row.staleInfo.length) btns.push('<button class="btn ghost svs-clear" type="button" data-key="'+g.key+'">清除這 '+row.staleInfo.length+' 間已關閉</button>');
     if(row.n) btns.push('<button class="btn ghost svs-clear-stats" type="button" data-key="'+g.key+'">清除統計('+row.n+' 場)</button>');
     const btnRow=btns.length ? '<div class="svs-row-actions">'+btns.join("")+'</div>' : "";
-    const list=row.staleInfo.length
-      ? '<div class="svs-stale">'+row.staleInfo.map(s=>"🏠 "+esc(s.name)+" · "+s.ago).join("<br>")+'</div>'
+    const list=row.rooms.length
+      ? '<div class="svs-stale">'+row.rooms.map(svRoomHtml).join("<br>")+
+        (row.cut ? '<br><i>…還有 '+row.cut+' 間沒列出來(一次最多 '+SV_MAX+' 間)</i>' : "")+'</div>'
       : "";
     return '<div class="svs-row">'+
       '<div class="svs-row-head"><span class="svs-name">'+g.icon+' '+esc(g.name)+'</span>'+
-      '<span class="svs-nums">大廳 '+row.activeN+' 間 · 殘留 '+row.staleInfo.length+' 間 · 累積 '+row.n+' 場</span></div>'+
+      '<span class="svs-nums">大廳 '+row.activeN+' 間 · 已關閉 '+row.staleInfo.length+' 間 · 累積 '+row.n+' 場</span></div>'+
       list+btnRow+'</div>';
   }
 
-  // 排序權重 = 大廳現役 + 殘留房 + 累積場次,三個「有資料」的來源不分輕重全部算進去。
+  // 排序權重 = 大廳現役 + 已關閉的房 + 累積場次,三個「有資料」的來源不分輕重全部算進去。
   // 同分照 GAMES 的原順序(比照 rankRows 的做法,不依賴 sort 的穩定性)。
   function svWeight(r){ return r.activeN+r.staleInfo.length+r.n; }
   // 打開面板時抓一次快照就好(比照 fetchRank 的一次性讀取),不掛常駐監聽 —— 這是給自己排查用,不必即時
@@ -422,14 +488,14 @@ const HomeLive = (function(){
       if(ping)ping.textContent="✅ 連線正常("+(Date.now()-t0)+" ms)";
       const rows=[];
       for(const g of GAMES) rows.push(await svLoadGame(g,stats&&stats[g.key]&&stats[g.key].n));
-      // 有資料(現役房 / 殘留房 / 累積場次)的排前面,方便一眼看出要處理誰
+      // 有資料(現役房 / 已關閉的房 / 累積場次)的排前面,方便一眼看出要處理誰
       rows.sort((a,b)=>svWeight(b)-svWeight(a)||GAMES.indexOf(a.g)-GAMES.indexOf(b.g));
       svRows=rows;
       if(body)body.innerHTML=rows.map(svRowHtml).join("");
       if(clearAll){
         const total=rows.reduce((n,r)=>n+r.staleInfo.length,0);
         clearAll.disabled=!total;
-        clearAll.textContent="🗑 清除全部殘留房間("+total+")";
+        clearAll.textContent="🗑 清除全部已關閉的房間("+total+")";
       }
       if(clearStatsAll){
         const totalN=rows.reduce((n,r)=>n+r.n,0);
@@ -444,21 +510,23 @@ const HomeLive = (function(){
 
   /* ★ 房間與統計紀錄是兩件獨立的事,分開清:房間清掉只是收垃圾,統計紀錄
      (game_stats/{key}/n,首頁熱門度排序的來源)則是使用者想留著回顧的資料 ——
-     所以連線對戰結束、房間變成「殘留」之後不會自動清,也不會跟著房間一起被清掉,
+     所以連線對戰結束、房間關掉之後統計不會自動清,也不會跟著房間一起被清掉,
      全部要靠這裡兩顆各自獨立的按鈕手動按。 */
   async function svClearKey(key){
     const row=svRows.find(r=>r.g.key===key); if(!row||!row.staleInfo.length)return;
-    if(!confirm("確定要清除「"+row.g.name+"」的 "+row.staleInfo.length+" 間殘留房間嗎?此動作無法復原。"))return;
+    /* ⚠ 話要講清楚「清掉的是什麼」:v1.147.0 起這些節點就是「誰開過哪一間、什麼時候」的
+       唯一紀錄(房主離開不再自動刪),按下去等於把那份歷史丟掉。 */
+    if(!confirm("確定要清除「"+row.g.name+"」的 "+row.staleInfo.length+" 間已關閉的房間嗎?那是「誰開過哪一間、什麼時候」的紀錄,清掉就查不到了,而且無法復原。"))return;
     for(const s of row.staleInfo){ try{ await svDelete(row.g.rooms+"/"+s.code); }catch(e){} }
-    showToast("已清除「"+row.g.name+"」的殘留房間 🗑");
+    showToast("已清除「"+row.g.name+"」已關閉的房間 🗑");
     refreshStatusPanel();
   }
   async function svClearAllRooms(){
     const total=svRows.reduce((n,r)=>n+r.staleInfo.length,0);
     if(!total)return;
-    if(!confirm("確定要清除全部遊戲、共 "+total+" 間殘留房間嗎?此動作無法復原。"))return;
+    if(!confirm("確定要清除全部遊戲、共 "+total+" 間已關閉的房間嗎?那是「誰開過哪一間、什麼時候」的紀錄,清掉就查不到了,而且無法復原。"))return;
     for(const row of svRows) for(const s of row.staleInfo){ try{ await svDelete(row.g.rooms+"/"+s.code); }catch(e){} }
-    showToast("已清除全部殘留房間 🗑");
+    showToast("已清除全部已關閉的房間 🗑");
     refreshStatusPanel();
   }
   async function svClearStatsKey(key){
