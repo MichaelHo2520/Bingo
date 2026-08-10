@@ -5855,13 +5855,65 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
             所以這裡刻意留深棕,不共用 --dc-back。 */
          --dc-ic-bk:#c89055; --dc-ic-bke:#8a5c30;
          --dc-red:#c62828; --dc-blk:#2b2622;
+         /* ★ v1.141.0:**棋子上那個字**的漆色另開一組,不共用 --dc-red ——
+            照片上刻進凹槽的紅是**暗紅**(#8e1f27),而 --dc-red 還要給面板上的
+            「你是紅方」用(.dc-red-t),那裡在深色底上,暗紅會直接看不見。 */
+         --dc-ink-r:#8e1f27; --dc-ink-b:#241f1c;
          --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(52,28,8,.05);
          --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6;
          /* 棋盤那一塊木頭:深一階的胡桃色。★ 棋子是淺楓木,兩者的明度**一定要拉開** ——
             同一階的話子會埋進盤裡,小格子的手機上尤其看不出哪一格有子。 */
          --dc-slab:#8a5c30; --dc-slab-d:#6b4420; --dc-slab-l:#a06e3d;
          /* 刻痕的兩條邊:暗邊在上、受光在下 —— 兩條都要,只有暗邊會看起來像「畫上去的線」 */
-         --dc-cut:rgba(48,25,7,.42); --dc-lit:rgba(255,238,205,.18); }
+         --dc-cut:rgba(48,25,7,.42); --dc-lit:rgba(255,238,205,.18);
+         /* ★★★ v1.141.0:木紋改成**一張 SVG 貼圖**(feTurbulence 擾動一組平行條紋)。
+            為什麼非換不可:`repeating-radial-gradient` 畫得出來的永遠是**數學上完美的
+            等距曲線** —— 真的木紋有粗有細、會分岔、間距不規則,那是 gradient 表達不了的
+            (使用者連續三版說「不滿意」,癥結就在這裡,不在顏色)。
+            ⚠ 效能:整張是**一個 data-URI**,32 顆棋子共用同一個 URL → 瀏覽器只解碼一次,
+              feTurbulence 只在那一次跑,執行期沒有 filter 成本。
+            ⚠ 每顆的紋路不同不是換圖,是**取這張圖的不同區域**(--dc-wx / --dc-wy 配
+              background-size 235%)—— 見下面 .dc-sq:nth-child 那三條。
+            ⚠⚠ 這張圖**沒有底色**(只有紋路、其餘透明),顏色一律由它下面那層
+              radial-gradient(--dc-wood / --dc-back)出。第一版在裡面放了一塊
+              `rect fill=#f0e4c6`,結果**明子與暗子被貼圖的底色洗成同一個顏色** ——
+              32 顆看起來全是明棋(而 DOM 完全正常,只有截圖看得出來)。
+            ⚠⚠ 這串裡不可以出現 CSS 註解的結束標記(會把這段註解攔腰切斷,
+              而那種錯誤不報錯、只有截圖看得出來 —— CLAUDE.md 紅線 9)。 */
+         --dc-grainimg:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240'>\
+<defs>\
+<filter id='w' x='-30%25' y='-30%25' width='160%25' height='160%25'>\
+<feTurbulence type='fractalNoise' baseFrequency='0.006 0.05' numOctaves='4' seed='17' result='t'/>\
+<feDisplacementMap in='SourceGraphic' in2='t' scale='34' xChannelSelector='R' yChannelSelector='G'/>\
+</filter>\
+<filter id='f' x='-30%25' y='-30%25' width='160%25' height='160%25'>\
+<feTurbulence type='fractalNoise' baseFrequency='0.02 0.9' numOctaves='3' seed='5' result='t2'/>\
+<feDisplacementMap in='SourceGraphic' in2='t2' scale='7' xChannelSelector='R' yChannelSelector='G'/>\
+</filter>\
+</defs>\
+<g filter='url(%23w)' stroke='%239c7442' fill='none' stroke-linecap='round'>\
+<g opacity='0.34'>\
+<path d='M-40 26 L280 -14' stroke-width='3.2'/>\
+<path d='M-40 62 L280 22' stroke-width='2.1'/>\
+<path d='M-40 96 L280 56' stroke-width='4.0'/>\
+<path d='M-40 138 L280 98' stroke-width='2.6'/>\
+<path d='M-40 172 L280 132' stroke-width='3.4'/>\
+<path d='M-40 208 L280 168' stroke-width='2.2'/>\
+<path d='M-40 244 L280 204' stroke-width='3.0'/>\
+</g>\
+<g opacity='0.16' stroke-width='1.1'>\
+<path d='M-40 44 L280 4'/><path d='M-40 80 L280 40'/><path d='M-40 116 L280 76'/>\
+<path d='M-40 156 L280 116'/><path d='M-40 190 L280 150'/><path d='M-40 226 L280 186'/>\
+</g>\
+</g>\
+<g filter='url(%23f)' stroke='%23a07a44' opacity='0.13' stroke-width='0.8' fill='none'>\
+<path d='M-40 34 L280 -6'/><path d='M-40 54 L280 14'/><path d='M-40 72 L280 32'/>\
+<path d='M-40 90 L280 50'/><path d='M-40 108 L280 68'/><path d='M-40 126 L280 86'/>\
+<path d='M-40 146 L280 106'/><path d='M-40 164 L280 124'/><path d='M-40 182 L280 142'/>\
+<path d='M-40 200 L280 160'/><path d='M-40 218 L280 178'/><path d='M-40 236 L280 196'/>\
+</g>\
+</svg>"); }
 
   /* ---------- 首頁 icon / 進場插圖(逐字相同的一份 SVG,只有外層 class 不同) ----------
      ⚠⚠ 首頁那張遊戲卡掛的是 **.dc-cart**,**絕對不可以**掛 .dc-art ——
@@ -6024,41 +6076,44 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠⚠ --dc-lift / --dc-side-* 存成變數是有原因的:.dc-sel / dcHitGlow / .dc-backface
        都會整份覆蓋 box-shadow,那幾條全都要把 var(--dc-lift) 接回去,不然「選中的子」
        與「剛落地的子」會在那一瞬間**變扁**(而且只有錄影看得出來)。 */
-  .dc-p{--dc-th:calc(var(--dc-cell,44px) * .112);
-    --dc-side-a:#ddd0a8; --dc-side-b:#c6b78c; --dc-side-c:#a8996d;
-    --dc-gx:-34%; --dc-gy:116%;
+  .dc-p{--dc-th:calc(var(--dc-cell,44px) * .155);
     --dc-lift:
-      0 calc(var(--dc-th) * .30) 0 var(--dc-side-a),
-      0 calc(var(--dc-th) * .62) 0 var(--dc-side-b),
-      0 var(--dc-th) 0 var(--dc-side-c),
-      0 calc(var(--dc-th) + 3px) calc(var(--dc-th) + 6px) rgba(26,13,2,.44);
+      0 calc(var(--dc-th) * .10) 0 var(--dc-s1),
+      0 calc(var(--dc-th) * .22) 0 var(--dc-s2),
+      0 calc(var(--dc-th) * .36) 0 var(--dc-s3),
+      0 calc(var(--dc-th) * .52) 0 var(--dc-s4),
+      0 calc(var(--dc-th) * .68) 0 var(--dc-s5),
+      0 calc(var(--dc-th) * .82) 0 var(--dc-s6),
+      0 calc(var(--dc-th) * .92) 0 var(--dc-s7),
+      0 var(--dc-th) 0 var(--dc-s8),
+      0 calc(var(--dc-th) + 4px) calc(var(--dc-th) + 9px) rgba(20,8,0,.52);
+    --dc-s1:#f2e8cd; --dc-s2:#e8dbba; --dc-s3:#dccca4; --dc-s4:#cdb98c;
+    --dc-s5:#bda775; --dc-s6:#a98f5d; --dc-s7:#93784a; --dc-s8:#7d633a;
     position:relative;width:83%;height:83%;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
     background:
-      radial-gradient(circle at 50% 50%, rgba(255,252,243,0) 0 83%,
-        rgba(255,251,241,.46) 86% 93%, rgba(120,80,36,.13) 95% 98%, rgba(104,68,28,.26) 99% 100%),
-      radial-gradient(circle at 66% 74%, rgba(255,254,249,0) 0 74%,
-        rgba(255,254,249,.42) 86% 95%, rgba(255,254,249,0) 100%),
-      repeating-linear-gradient(83deg,
-        rgba(150,110,60,.07) 0 1%, rgba(150,110,60,0) 1% 4%),
-      repeating-radial-gradient(ellipse 120% 155% at var(--dc-gx) var(--dc-gy),
-        rgba(132,96,46,.26) 0 .9%, rgba(132,96,46,0) .9% 9%,
-        rgba(132,96,46,.15) 9% 9.8%, rgba(132,96,46,0) 9.8% 19%),
-      radial-gradient(ellipse 82% 72% at 42% 30%, rgba(255,254,249,.40) 0%, rgba(255,254,249,0) 70%),
-      radial-gradient(circle at 50% 44%, var(--dc-wood) 0%, var(--dc-wood-in) 62%, #d8c69c 100%);
+      radial-gradient(circle at 50% 50%, rgba(255,252,243,0) 0 88%,
+        rgba(255,252,244,.55) 90% 95%, rgba(120,80,36,.16) 97% 100%),
+      radial-gradient(circle at 64% 76%, rgba(255,255,252,0) 0 74%,
+        rgba(255,255,252,.72) 89% 97%, rgba(255,255,252,0) 100%),
+      radial-gradient(circle at 50% 50%, rgba(255,255,250,.30) 0%, rgba(255,255,250,0) 46%,
+        rgba(126,88,40,.10) 78%, rgba(126,88,40,.22) 100%),
+      radial-gradient(ellipse 78% 68% at 38% 26%, rgba(255,254,249,.52) 0%, rgba(255,254,249,0) 68%),
+      var(--dc-grainimg) var(--dc-wx,50%) var(--dc-wy,50%)/235% 235% no-repeat,
+      radial-gradient(circle at 50% 44%, var(--dc-wood) 0%, var(--dc-wood-in) 62%, #d9c79d 100%);
     box-shadow:
       inset 0 1.5px 2px rgba(255,255,255,.50),
-      inset 0 -3px 5px rgba(110,72,30,.26),
-      0 0 0 1px rgba(150,104,52,.50),
+      inset 0 -3px 5px rgba(110,72,30,.24),
+      0 0 0 1px rgba(150,104,52,.46),
       var(--dc-lift)}
-  /* 每顆的紋路方向錯開(四種)。★ 只換那個「丟到元素外面的圓心」——
-     圓心的方位決定弧線往哪邊彎,一格改一個值就等於換一塊料。
+  /* 每顆的木紋不同 —— **不是換圖,是取同一張貼圖的不同區域**
+     (背景鋪成 235%,再用 --dc-wx / --dc-wy 決定取哪一塊)。
      ⚠ nth-child 掛在 **.dc-sq** 上(格子)而不是棋子:棋子每一手都被 innerHTML 重建,
        但格子的序號是固定的 → 同一格的紋路不會每走一步就跳一次。
      ⚠ 吃子欄 / 結果卡那些不在 .dc-sq 裡的棋子吃預設值,那是刻意的(那裡只有一排小圖示)。*/
-  .dc-sq:nth-child(4n+2) .dc-p{--dc-gx:128%; --dc-gy:-22%}
-  .dc-sq:nth-child(4n+3) .dc-p{--dc-gx:-40%; --dc-gy:-30%}
-  .dc-sq:nth-child(4n)   .dc-p{--dc-gx:124%; --dc-gy:118%}
+  .dc-sq:nth-child(4n+2) .dc-p{--dc-wx:8%;  --dc-wy:82%}
+  .dc-sq:nth-child(4n+3) .dc-p{--dc-wx:88%; --dc-wy:14%}
+  .dc-sq:nth-child(4n)   .dc-p{--dc-wx:22%; --dc-wy:30%}
   /* ---------- 車溝(v1.140.0 新增)----------
      ★★ 第二張參考照上最搶眼的結構:頂面**靠邊一圈凹槽**,槽外還有一圈窄的凸邊 ——
      它是車床車出來的痕跡,而且**兩面都有**(所以做在 .dc-p 上,不是只做在正面)。
@@ -6070,32 +6125,40 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        只留 ①(最容易想到的寫法)看起來會像一條畫上去的細線,不是溝。
      ⚠ inset 6.5% 要**大於** .dc-p 背景那圈倒角的起點(83%),不然溝會壓在倒角上糊成一團。
      ⚠ pointer-events:none —— .dc-sq 才是那顆按鈕,這一層不可以吃掉點擊。 */
-  .dc-p::after{content:"";position:absolute;inset:6.5%;border-radius:50%;pointer-events:none;
+  .dc-p::after{content:"";position:absolute;inset:4.5%;border-radius:50%;pointer-events:none;
     box-shadow:
-      inset 0 2px 3px rgba(112,76,30,.46),
-      inset 0 -1.5px 2px rgba(255,253,244,.55),
-      0 2px 1.5px -1px rgba(255,253,244,.70),
-      0 -1.5px 1.5px -1px rgba(112,76,30,.30)}
-  /* 內圈:實體棋子上那一圈是**刻進去的**(不是印上去的)—— 一條亮邊在下、一條暗邊在內。
-     ★ v1.140.0 起它與上面那道車溝是**兩件事**:車溝是木頭本身的結構(中性、兩面都有),
-     這一圈是**漆在溝內側平面上的紅/黑漆**(只有正面有,吃 currentColor)。
-     實體象棋子就是這個順序:先車溝,再上漆。
-     ⚠ inset 從 11% 收到 15%:兩圈的半徑差**不可以只有幾 px** —— 車溝在 93.5%、
-       漆圈本來在 89%,一格 63px 時兩者只差 1.2px,在畫面上就糊成一條粗線
-       (第一版截圖看得很清楚)。拉到 85% 才讀得出「溝在外、漆圈在內」是兩件事。 */
-  .dc-ring{position:absolute;inset:15%;border-radius:50%;border:1.5px solid currentColor;opacity:.62;
-    box-shadow:0 1px 0 rgba(255,255,255,.5),inset 0 1px 1px rgba(0,0,0,.16)}
+      inset 0 2.5px 3px rgba(108,74,30,.42),
+      inset 0 -2px 2px rgba(255,253,245,.62),
+      0 2.5px 2px -1px rgba(255,253,245,.75),
+      0 -2px 2px -1px rgba(108,74,30,.26)}
+  /* ⚠⚠⚠ v1.141.0:這裡**不再是紅/黑圈** —— 使用者第三張參考照(正面的「帥」)上
+     根本沒有那個圈,只有字 + 車溝。前三版一直留著它,是把「棋盤 app 的慣例」
+     當成了實體棋子的樣子。
+     現在它是車溝**內側的第二道細線**(照片上溝的內緣確實還有一條)——
+     中性色、兩面共用,所以 .dc-backface 不必再覆蓋一次(那條規則一起刪了)。
+     ★ 紅 vs 黑的辨識**沒有變弱**:字本身就是紅/黑的(紅線 8 要的是「兩方不可以塌成
+       同一種樣子」,不是「一定要有個圈」)。 */
+  .dc-ring{position:absolute;inset:9.5%;border-radius:50%;border:0;opacity:1;
+    box-shadow:inset 0 1px 1.5px rgba(108,74,30,.24),0 1px 0 rgba(255,252,240,.38)}
   /* ⚠ 棋子的字用**襯線體**:象棋子上就是印宋體,用內文的 Nunito 會像貼紙。
      取不到中文襯線體時退回 serif —— 那也還是襯線,不會變成另一種味道。
-     ★ text-shadow 是「刻進木頭再上色」的樣子:下緣受光、上緣一道淺淺的凹影。 */
-  /* ⚠ 字級的分母是**格子**不是棋子,所以 .dc-p 的百分比一改,「字 / 棋子」的比例就跟著跑。
+     ⚠ 字級的分母是**格子**不是棋子,所以 .dc-p 的百分比一改,「字 / 棋子」的比例就跟著跑。
      v1.139.1 棋子 90% → 83% 時字級一起從 .46 收到 .42,把那個比例接回 0.509
-     (notes/19 十四節的 ?mode=reveal 就是在比這個數字)。 */
+     (notes/19 十四節的 ?mode=reveal 就是在比這個數字)。
+     ★★★ v1.141.0:字改成「**刻進凹槽再上漆**」——
+     ⚠⚠ 陰影是**斜的**不是垂直的,這是很容易做反的地方:光從左上來 →
+       凹槽的**左上內壁背對光源**(暗)、**右下內壁朝向光源**(亮)。
+       寫成「上暗下亮 + 一層大範圍軟影」的話,讀起來會是**浮起來的字加落影** ——
+       正好相反,而且乍看還蠻立體的,所以特別容易留著不改。 */
   .dc-ch{position:relative;font-family:'Noto Serif TC','Songti TC','PMingLiU',serif;font-weight:800;
     line-height:1;font-size:calc(var(--dc-cell,44px) * .42);
-    text-shadow:0 1px 0 rgba(255,255,255,.5),0 -1px 1px rgba(88,52,16,.30)}
-  .dc-red{color:var(--dc-red)}
-  .dc-blk{color:var(--dc-blk)}
+    text-shadow:
+      -1.2px -1.2px 1px rgba(64,12,12,.60),
+      -2px -2px 2.5px rgba(96,44,20,.22),
+      1px 1px 0 rgba(255,252,238,.42),
+      1.6px 1.6px 1.5px rgba(255,248,226,.22)}
+  .dc-red{color:var(--dc-ink-r)}
+  .dc-blk{color:var(--dc-ink-b)}
 
   /* 牌背:與正面**明顯不同色**,而且沒有字。⚠ 不可以只降飽和度來表示「暗」——
      那會看起來像 disabled(UNO 的暗牌踩過同一件事)。
@@ -6119,30 +6182,29 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        · 紋路用與正面同一組順紋弧線,只把圓心挪到另一側(它是同一塊料的另一面)。
      ⚠ 這裡的淺色**不可以**照抄到首頁 icon(46px 只剩色差可用),見 :root 的 --dc-ic-bk。 */
   .dc-backface{color:var(--dc-back-e);
-    --dc-side-a:#c6b48a; --dc-side-b:#ad996c; --dc-side-c:#8c7950;
-    --dc-gx:118%; --dc-gy:-26%;
+    --dc-s1:#e6d8b0; --dc-s2:#dbcb9e; --dc-s3:#cdba87; --dc-s4:#bda672;
+    --dc-s5:#ab925d; --dc-s6:#977d49; --dc-s7:#816739; --dc-s8:#6b532c;
+    --dc-wx:70%; --dc-wy:22%;
     background:
-      radial-gradient(circle at 50% 50%, rgba(255,236,204,0) 0 83%,
-        rgba(255,250,234,.44) 86% 93%, rgba(96,58,20,.14) 95% 98%, rgba(78,46,14,.28) 99% 100%),
-      radial-gradient(circle at 66% 74%, rgba(255,253,244,0) 0 74%,
-        rgba(255,253,244,.40) 86% 95%, rgba(255,253,244,0) 100%),
-      repeating-linear-gradient(97deg,
-        rgba(126,92,44,.08) 0 1%, rgba(126,92,44,0) 1% 4%),
-      repeating-radial-gradient(ellipse 120% 155% at var(--dc-gx) var(--dc-gy),
-        rgba(118,84,36,.27) 0 .9%, rgba(118,84,36,0) .9% 9%,
-        rgba(118,84,36,.16) 9% 9.8%, rgba(118,84,36,0) 9.8% 19%),
-      radial-gradient(ellipse 82% 72% at 40% 28%, rgba(255,252,240,.38) 0%, rgba(255,252,240,0) 70%),
+      radial-gradient(circle at 50% 50%, rgba(255,236,204,0) 0 88%,
+        rgba(255,250,234,.52) 90% 95%, rgba(96,58,20,.17) 97% 100%),
+      radial-gradient(circle at 64% 76%, rgba(255,253,244,0) 0 74%,
+        rgba(255,253,244,.66) 89% 97%, rgba(255,253,244,0) 100%),
+      radial-gradient(circle at 50% 50%, rgba(255,252,240,.26) 0%, rgba(255,252,240,0) 46%,
+        rgba(112,76,32,.11) 78%, rgba(112,76,32,.24) 100%),
+      radial-gradient(ellipse 78% 68% at 38% 26%, rgba(255,252,240,.46) 0%, rgba(255,252,240,0) 68%),
+      var(--dc-grainimg) var(--dc-wx,50%) var(--dc-wy,50%)/235% 235% no-repeat,
       radial-gradient(circle at 52% 46%, var(--dc-back) 0%, var(--dc-back-in) 60%, #b89c6e 100%);
-    box-shadow:inset 0 1.5px 2px rgba(255,253,242,.45),inset 0 -3px 6px rgba(96,58,20,.24),
-      0 0 0 1px rgba(150,110,58,.48),var(--dc-lift)}
+    box-shadow:inset 0 1.5px 2px rgba(255,253,242,.45),inset 0 -3px 6px rgba(96,58,20,.22),
+      0 0 0 1px rgba(150,110,58,.44),var(--dc-lift)}
   /* ⚠ 牌背**不畫那圈實線**:`.dc-ring` 在正面是棋子上那圈刻痕,照搬到牌背就變成
      「一個圈圈」—— 使用者原話「暗子畫的一點都沒有立體棋子的感覺,只是兩個圈圈疊在一起」。
      ★ v1.139.0 再收一次:連「內凹倒角」都太像圖案了(照片上的背面是全素的),
      只留最外緣一道極淡的車削痕 —— 位置從 inset 11% 挪到 4%,強度砍到約三分之一。
-     ★★ v1.140.0 收到底:**整個不畫**。車溝已經由 `.dc-p::after` 接手(它兩面共用),
-     這裡再留一道就是同一個結構畫了兩遍 —— 兩圈同心的細線正是 v1.137.x 被罵
-     「只是兩個圈圈疊在一起」的那個樣子。元素留著只是因為 backHTML() 會吐出它。 */
-  .dc-backface .dc-ring{border-color:transparent;opacity:1;inset:4%;box-shadow:none}
+     ★★ v1.140.0 收到底:整個不畫。
+     ★★★ v1.141.0 **這條覆蓋規則刪掉了** —— `.dc-ring` 本身已經改成
+     「車溝內側的第二道細線」(中性色、不吃 currentColor),牌背要的就是那個樣子,
+     不必也不可以再覆蓋一次(覆蓋回 box-shadow:none 會讓牌背少掉那道線)。 */
   /* 木結:順紋板材上偶爾有的一顆小節疤(不是「中央紋章」、也不再是年輪的髓心)——
      所以它**不在正中央**,而且刻意做得很淡:認得出是木頭上的瑕疵就夠了,
      一濃就變成「牌背上印了一個東西」。
