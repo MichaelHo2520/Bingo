@@ -62,10 +62,8 @@ const MP = MPCore.create((function(){
 
   const seatOf = id => ctx.order().indexOf(id);
   const mySeat = () => seatOf(ctx.me());
-  function nameOfSeat(s){
-    const id = ctx.order()[s];
-    return id ? ctx.dispName(id) : ("玩家" + (s + 1));
-  }
+  /* ⚠ v1.146.0 刪掉了 nameOfSeat():它只給「輪到 ○○○」那一行用,而那一行拿掉了
+     (輪到誰由玩家晶片的 .turn 高亮講)。要顯示對手名字請走 ctx.dispName(id)。 */
   const secOn = () => turnSec > 0;
   const playing = () => ctx.phase() === "playing" && !ctx.winner() && !ctx.abandoned();
 
@@ -95,7 +93,6 @@ const MP = MPCore.create((function(){
       mine: isMyTurn(),
       over: !!ctx.winner() || st.over,
       key: moves.length,
-      turnName: st.over ? "" : nameOfSeat(st.turn),
       // ★ 吃子欄要知道「哪個座位是我」與兩個座位各叫什麼(見 board.js 的 setState)
       mySeat: me,
       names: ctx.order().map(id => ctx.dispName(id)),

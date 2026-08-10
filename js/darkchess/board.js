@@ -226,7 +226,7 @@ const DCB = (function(){
     board.innerHTML = out.join("");
     board.classList.toggle("dc-mine", canAct);
     lastKey = cur.key;
-    renderActs(chainOn, canAct, mySide);
+    renderActs(chainOn, canAct);
     /* ⚠⚠ 一定要**再算一次**:動作列的高度會隨內容變(連吃那一列比平常多一行),
        而它變高就把舞台壓矮 —— 上面那次 fitBoard() 是在 renderActs() **之前**算的,
        用的是舊高度 → 盤面溢出舞台,而 .dc-stage 是 overflow:hidden,
@@ -438,7 +438,9 @@ const DCB = (function(){
            "</div>";
   }
 
-  function renderActs(chainOn, canAct, mySide){
+  /* ⚠ v1.146.0 起**不收 mySide 了**(「你是紅方」那一行拿掉之後它就沒人用)——
+     canAct 仍然要:連吃那一列只在「輪到我而且正在連吃」時才有內容。 */
+  function renderActs(chainOn, canAct){
     if(!acts) return;
     const st = cur.st;
     const bits = [];
@@ -449,12 +451,20 @@ const DCB = (function(){
       return;
     }
     bits.push(trayHTML(st));
-    const who = cur.turnName || "";
-    const meTxt = mySide < 0 ? "未定" : ('<b class="' + (mySide === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' +
-                                         DC.sideName(mySide) + "方</b>");
-    bits.push('<div class="dc-turn">' +
-              (canAct ? '<b class="dc-you">輪到你</b>' : (who ? ("輪到 " + esc(who)) : "…")) +
-              '<span class="dc-side">你是 ' + meTxt + "</span></div>");
+    /* ★★★ v1.146.0:「輪到你 / 你是紅方」那一行**整條拿掉了**。
+       使用者:「最下面那邊的輪到誰,幫我考慮一下是不是可以不要有了,因為上方其實就只是了…
+       我的目的是再空出一行的空間,目標就是為了讓棋盤能再大一點。」
+       兩個資訊上方的玩家晶片本來就都有,而且是同一份真相:
+         · **輪到誰** = 晶片的 `.turn` class(單機在 solo.js 的 chipHTML、
+           連線在 mp-core.js 畫晶片那一段,兩邊都看 st.turn / turn===id)
+         · **我是哪一方** = 晶片尾巴的 `.dc-chip-side`(adapter.js 的 chipTail 畫紅/黑;
+           單機那份在 solo.js,分邊前是「?」)
+       → 這一行只是把同一件事再寫一次,而它吃掉 22px + 5px 的 gap;拿掉 = 棋盤高 27px。
+       ⚠ 拿掉它**不違反**「動作列高度必須固定」那條(見上面的 ⚠⚠⚠):
+         那條要的是「一整局裡不變」,而這一行是**每一種狀態都不畫**,不是忽有忽無。
+       ⚠⚠ 連帶要記住:styles.css 原本寫著「暗棋刻意沒有『可以翻』的高亮,
+         『現在能不能動』由動作列那句『輪到你』講」—— 那句話從這一版起改成**晶片高亮**。
+         所以晶片的 `.turn` 樣式從此是「能不能動」的唯一提示,不可以為了美觀弱化它。 */
 
     /* ★ 第二行:連吃提示 + 走棋倒數環**合併成同一行**(v1.129.x 起)——
        兩個都是「有時候有內容、有時候空」的東西,各佔一份 min-height 太浪費,
@@ -663,7 +673,9 @@ const DCB = (function(){
     }
   }
 
-  /* o = { st, mySide, mine, over, key, turnName, cdMs, cdEnd, mySeat, names }
+  /* o = { st, mySide, mine, over, key, cdMs, cdEnd, mySeat, names }
+     ⚠ v1.146.0 拿掉了 turnName:「輪到誰」那一行沒有了(玩家晶片的 .turn 高亮在講),
+       所以兩個 caller 都不必再算它。
      ★ mySeat / names 只給**吃子欄**用(誰吃掉了什麼);沒帶的話退回「你 / 對手」。
      ★ cdMs / cdEnd 只有連線(adapter.js)會帶 —— 單機沒有走棋倒數,環不會出現。 */
   function setState(o){

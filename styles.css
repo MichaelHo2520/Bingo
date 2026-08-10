@@ -6236,7 +6236,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 不能點的格**不給 disabled**(CLAUDE.md 的紅線)—— 點下去要看得到 toast 說原因。
         這裡的高亮只是「幫忙指路」,不是權限。 */
   /* ★ 這裡**刻意沒有**「可以翻」的高亮:暗棋一律都翻得動,標起來就是一次亮十幾顆 ——
-     那是雜訊不是資訊(截圖看得很清楚)。「現在能不能動」由動作列那句「輪到你」講。 */
+     那是雜訊不是資訊(截圖看得很清楚)。
+     ⚠⚠ v1.146.0 起「現在能不能動」由**玩家晶片的 `.turn` 高亮**講(動作列那句「輪到你」
+       拿掉了,見 .dc-acts 那一段)。所以晶片的 `.turn` 從此是這一頁**唯一**的回合提示 ——
+       不可以為了美觀弱化它,也不要以為「反正動作列還會講一次」。 */
   /* ⚠ 這四條都會**整份覆蓋** box-shadow —— 一定要把厚度(--dc-lift)/ 刻線(--dc-groove)
      接回去,不然被選中 / 被標成落點的那一格會忽然變扁、或忽然沒有格線。 */
   .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift)}
@@ -6357,12 +6360,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-acts{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;
     padding:6px 10px;border-radius:14px;background:var(--panel);
     border:1px solid var(--panel-line);text-align:center}
-  /* ⚠ 行高寫成**固定 px**(不是倍數):子元素字級不一樣(輪到你 16px / 輪到對手 14px),
-     行高用倍數的話兩種狀態差 1px —— 盤面就會每走一手上下挪半格。 */
-  .dc-turn{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
-    font-size:14px;font-weight:800;color:var(--muted);line-height:22px;min-height:22px}
-  .dc-you{color:var(--accent-2);font-size:16px}
-  .dc-side{font-size:12px;font-weight:700;color:var(--muted)}
+  /* ★★★ v1.146.0:「輪到你 / 你是紅方」那一行(.dc-turn / .dc-you / .dc-side)**刪掉了**。
+     使用者:「最下面那邊的輪到誰…因為上方其實就只是了…我的目的是再空出一行的空間,
+     目標就是為了讓棋盤能再大一點。」兩個資訊玩家晶片上本來就都有:
+       · 輪到誰 = 晶片的 `.turn`(單機 solo.js 的 chipHTML / 連線 mp-core.js 那一段)
+       · 我是哪一方 = 晶片尾巴 `.dc-chip-side`(adapter.js 的 chipTail 畫紅/黑)
+     省下 22px + 5px gap = 棋盤高 27px(矮視窗那段是 20 + 3)。
+     ⚠ 拿掉它不違反「動作列高度必須固定」:那條要的是**一整局裡不變**,
+       而這一行是每一種狀態都不畫 —— 忽有忽無才是 v1.113.x 的老毛病。 */
   /* 第二行的容器:連吃提示 + 走棋倒數環**合併成同一行**(v1.129.x 起,原本是分開
      兩行,使用者回報「整合成一行、把空間留給棋盤」)。連吃列 / 其它(空的)/
      只有倒數環三種狀態同一局裡都要同一個高度。
@@ -6524,8 +6529,6 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     .dc-room{padding:6px 10px}
     .dc-room .mp-subrow,.dc-room-foot{margin-top:3px}
     .dc-acts{padding:4px 8px;gap:3px}
-    .dc-turn{font-size:13px;line-height:20px;min-height:20px}
-    .dc-you{font-size:14px}
     .dc-stop{height:26px;padding:0 13px;font-size:13px;min-width:86px}
     /* ⚠ 這一條要跟著改小,但**仍然是固定值** —— 高度可以變小,不可以隨內容變。
        ⚠ .dc-actline 的無環版本本來就是 28px(見基準規則),這裡不必再覆寫一次;

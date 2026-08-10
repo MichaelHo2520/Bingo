@@ -115,7 +115,6 @@ const Solo = (function(){
       mine: friend ? (active && !over && !busy) : (active && !over && !busy && st.turn === mySeat),
       over: over,
       key: moves.length,
-      turnName: friend ? ("P" + (st.turn + 1)) : (st.turn === mySeat ? "你" : "電腦"),
       // ★ 吃子欄要知道「哪個座位是我」與兩個座位各叫什麼(見 board.js 的 setState)
       mySeat: mySeat,
       names: friend ? ["P1", "P2"] : (mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"])
