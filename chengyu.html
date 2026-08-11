@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>成語接龍 ｜ 單機練習與連線對戰</title>
-<!-- 成語接龍 · v1.148.0 -->
-<meta name="version" content="1.148.0">
+<!-- 成語接龍 · v1.149.0 -->
+<meta name="version" content="1.149.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -53,26 +53,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
     <div id="cyPickMode">
       <div class="cy-hero">
-        <!-- ★ 首頁卡(46px)與這裡(92px)逐字相同的一份 SVG,只有外層 class 不同 ——
-             一橫一縱兩個成語交叉(說一不二 × 一心一意,共用「一」字),兩格露出給定字
-             (一 / 心),其餘是待填的空白磚,呼應交叉填字盤的玩法本體。 -->
-        <svg class="cy-art" viewBox="0 0 56 56" role="img" aria-label="成語填字盤">
-          <rect class="cy-ic-plate" x="0.7" y="0.7" width="54.6" height="54.6" rx="7.5"/>
-          <rect class="cy-ic-well" x="3.4" y="3.4" width="49.2" height="49.2" rx="4.5"/>
-          <g class="cy-ic-tiles">
-            <rect class="cy-ic-tile cy-ic-blank" x="6.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-given" x="17.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-blank" x="28.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-blank" x="39.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-blank" x="17.8" y="6.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-given" x="17.8" y="17.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-blank" x="17.8" y="39.8" width="9.5" height="9.5" rx="1.4"/>
-          </g>
-          <g class="cy-ic-text">
-            <text x="22.55" y="36.3">一</text>
-            <text x="22.55" y="25.3">心</text>
-          </g>
-        </svg>
+        <!-- ★ v1.149.0:與首頁卡**指向同一個檔案**(這裡是 .cy-art 92px、
+             首頁是 .gc-art.cy-cart 46px)—— 在此之前兩頁各有一份逐字相同的手繪 SVG
+             (兩個成語交叉、兩格已填)。新圖是四塊「成語接龍」木牌 + 一顆燈泡:
+             它只負責被認出是「成語」那一款,**交叉填字盤**這件事由下面那行說明講。
+             ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十一張的規則寫在 index.html
+                的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這十一對雙胞胎)。 -->
+        <img class="cy-art" src="cy-icon.png" alt="成語填字盤" width="192" height="192">
         <div class="home-tagline">交叉字謎盤,從字卡區選字填空</div>
       </div>
       <button class="btn primary block-btn home-btn" id="cyGoOnline">🌐 連線對戰</button>

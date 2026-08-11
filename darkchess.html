@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>象棋暗棋 ｜ 本機對戰 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.148.0 -->
-<meta name="version" content="1.148.0">
+<!-- 象棋暗棋 · v1.149.0 -->
+<meta name="version" content="1.149.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -56,15 +56,17 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 第一層:選怎麼玩 -->
     <div id="dcPickMode">
       <div class="dc-hero">
-        <!-- ★★ 進場插圖:一顆**蓋著的**棋子在後、一顆翻開的紅帥在前。
-             「有一顆是蓋著的」是暗棋與五子棋 / 一般象棋唯一分得出來的辨識點,一定要在 ——
-             這張圖靠的是**牌背上的棋盤格線**(而正面是紅圈 + 紅帥)。
-             ★★★ v1.145.0 起是一張**去背的 PNG 貼圖**(dc-icon.png,192×192、13.9KB),
-                從 design-refs/ 那張插畫切出兩顆棋子(旗子 / 旗桿 / 流蘇與深色底都不要)。
-                前一版(v1.144.0)的手繪 SVG 在 46px 的首頁卡上輸給它,經過記在 notes/19 二十節。
+        <!-- ★★★ v1.145.0 起是一張**去背的 PNG 貼圖**(dc-icon.png,192×192);
+             v1.149.0 起十一個遊戲全部是同一套插畫裁出來的,這張跟著換掉了。
+             ⚠⚠ v1.149.0 的**已知取捨**:新圖是「將」與「帥」**兩顆都翻開**的木棋子 + 木底座,
+                而 v1.144.0~v1.148.x 那張刻意有**一顆是蓋著的**(牌背上畫棋盤格線)——
+                「有一顆是蓋著的」才是暗棋與一般象棋 / 五子棋唯一分得出來的辨識點。
+                整套換成同一份插畫是使用者指定的,所以先照圖走;代價是這張圖只講得出
+                「象棋」,「暗」靠遊戲名補。★ 要換回去只要重切一張蓋著的棋子覆蓋
+                dc-icon.png —— 接線一個字都不用動(兩頁指同一個檔案)。
              **與 index.html 首頁那張卡是同一個檔案**,只有外層 class 不一樣
              (這裡是 .dc-art 96px、首頁是 .gc-art.dc-cart 46px)——
-             tools/test-pages.js 的 I 節在守這對雙胞胎。
+             tools/test-pages.js 的 E 節在守這十一對雙胞胎。
              ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE。 -->
         <img class="dc-art" src="dc-icon.png" alt="象棋暗棋" width="192" height="192">
         <div class="home-tagline">32 顆象棋蓋著擺滿,翻到什麼算什麼</div>

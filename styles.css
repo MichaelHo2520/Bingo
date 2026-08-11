@@ -798,14 +798,13 @@
   /* 進場插圖區:數值與數獨的 .sdk-hero / .sdk-art 對齊(96×116 的卡片在 96px 寬時高度 ≈ 92px,
      與數獨那張 92px 方形插圖等高),兩個遊戲的「選擇玩法」頁看起來才是同一套介面 */
   .home-hero{margin:14px 0 4px}
-  /* 主選單插圖:內嵌 SVG 賓果卡(取代原本會被誤認成撞球的 🎱);顏色全用主題變數,隨主題自動變色 */
-  .home-art{width:96px;height:auto;margin:0 auto 8px;display:block;
-    filter:drop-shadow(0 6px 16px rgba(0,0,0,.28))}
-  .home-art .bc-card{fill:var(--panel);stroke:var(--panel-line);stroke-width:2}
-  .home-art .bc-hd{fill:var(--accent);font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px}
-  .home-art .bc-cell{fill:rgba(255,255,255,.06);stroke:var(--panel-line);stroke-width:1}
-  .home-art .bc-daub{fill:var(--accent-2)}
-  .home-art .bc-star{fill:var(--accent)}
+  /* 主選單插圖(第二層「選擇玩法」那張):BINGO 的賓果卡。
+     ★★ v1.149.0 起是**去背 PNG 貼圖** bc-icon.png,與首頁那張卡指向同一個檔案
+        (首頁是 .gc-art.bc-cart 46px)—— 在此之前是內嵌 SVG(.home-art + .bc-* 主題配色,
+        整組已刪),那組配色吃主題變數、換主題會跟著變色,PNG 不會(同另外十張的取捨)。
+     ⚠ 十一張進場插圖**一律不加 drop-shadow** —— 圖本身就有立體陰影,再加一層會髒;
+        舊的 .home-art 有一條,是給平面線稿用的。 */
+  .bc-art{width:96px;height:96px;margin:0 auto 8px;display:block}
 
   /* 註:第二層原本還有一個 .home-title 的巨大「BINGO」,已移除 —— 頂列跑馬燈就是 BINGO,
      同一頁不需要第二個;拿掉後版面也與數獨的「選擇玩法」一致(插圖 + 一行說明 + 兩顆鈕) */
@@ -832,7 +831,7 @@
     /* 進場插圖跟著縮(與數獨 .sdk-hero / .sdk-art 的緊湊值相同);.gc-art 在檔尾另有更小的一組,
        靠後定義覆蓋這裡,遊戲卡不受影響 */
     .home-hero{margin:6px 0 2px}
-    .home-art{width:64px}
+    .bc-art{width:64px;height:64px}
     .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
     .quick-voice,.mp-act-btn{width:34px;height:34px;font-size:18px}
     .quick-voice .qv-ico{font-size:18px}
@@ -1138,9 +1137,13 @@
     font-family:'Nunito',sans-serif;transition:transform .15s, border-color .2s}
   .game-card:hover{transform:translateY(-2px);border-color:var(--accent)}
   .game-card:active{transform:scale(.985)}
-  /* 覆寫 .home-art 的大尺寸與置中(BINGO 卡直接重用那張賓果卡 svg 的 .bc-* 配色) */
-  /* ⚠ v1.106.0:58 → 46(三欄)。★ 縮到 46px 之後「認不認得出來」是**斷言測不到**的,
-     只能放大截圖看(notes/13 第七節)—— 尤其數獨那張是 6×6 = 36 個獨立小方塊。 */
+  /* 遊戲卡插圖:十一張一律是 192×192 的去背 PNG(v1.149.0),這一條把它縮成 46px。
+     ⚠⚠ 這一條定義在各遊戲進場插圖的 `*-art`(92/96px)**前面** → 首頁那十一個 <img>
+        一張都不可以掛 `*-art`,否則同權重後定義勝、那張卡會比別張高一截
+        (21 點 v1.86.0 真的踩過)。首頁一律掛 `<前綴>-cart`,那些 class 本身沒有規則,
+        只是「不是 *-art」的標記。
+     ⚠ v1.106.0:58 → 46(三欄)。★ 縮到 46px 之後「認不認得出來」是**斷言測不到**的,
+       只能放大截圖看(notes/13 第七節)。 */
   .gc-art{width:46px;height:46px;flex:none;margin:0;display:block}
   .gc-body{display:flex;flex-direction:column;align-items:center;gap:2px;
     flex:1 1 auto;width:100%;min-width:0}
@@ -1168,11 +1171,9 @@
   .gc-rank[data-top="2"]{background:rgba(203,213,225,.24);color:#cbd5e1}
   .gc-rank[data-top="3"]{background:rgba(251,146,60,.20);color:#fb923c}
 
-  /* 五子棋卡的小棋盤插圖(沿用棋盤那組 --gmk-* 配色,主題會一起變) */
-  .gk-art .gk-bd{fill:var(--gmk-wood);stroke:var(--gmk-frame);stroke-width:2}
-  .gk-art .gk-ln path{stroke:var(--gmk-line);stroke-width:1;fill:none}
-  .gk-art .gk-b{fill:#141414}
-  .gk-art .gk-w{fill:#fff;stroke:rgba(0,0,0,.35);stroke-width:.7}
+  /* 註:五子棋卡的手繪小棋盤 .gk-art .gk-*(木紋 rect + 格線 + 黑白子,吃 --gmk-* 配色)
+     v1.149.0 整組刪掉 —— 那張卡改成去背 PNG(gk-icon.png),首頁掛 .gc-art.gk-cart、
+     gomoku.html 進場掛 .gmk-art,兩處同一個檔案。 */
 
   /* 選遊戲主選單的頂列品牌字(取代 B-I-N-G-O 跑馬燈,見 index.html #brandHome)。
      漸層與 .home-pick-title / .sdk-brand 同一組,字級對齊五子棋 .gmk-brand,三頁頂列高度才一致。 */
@@ -1258,47 +1259,10 @@
   /* ---------- 進場插圖 ---------- */
   .sdk-hero{text-align:center;margin:14px 0 4px}
   .sdk-art{width:92px;height:92px;display:block;margin:0 auto 8px}
-  /* ---------- 數獨插圖 .sk-*:木框 + 一格一格的米黃小方塊 + 鉛筆(v1.101.2)----------
-     使用者附了一張參考圖(木質數獨盤,右下一支鉛筆正在填一格):「數獨的 icon 我不喜歡,
-     參考這個樣式」。舊版是「一張紙 + 兩組線」的平面線稿(`.sk-bd`/`.sk-ln`/`.sk-tn`/`.sk-nm`,
-     已刪),在深色首頁上最沒有質感 —— 而八張卡裡另外三張(麻將 / 撲克 / 五子棋)本來就是
-     **實體材質感**,所以這一版讓數獨也站到同一條線上。
-     ★ 用它的地方有兩處(首頁遊戲卡 58px + `sudoku.html` 進場插圖 92px),**逐字相同的一份
-       SVG** —— 守門是 `tools/test-pages.js` 的 F 節(照撲克牌那三對的作法)。
-     ★★ **格子是 36 個獨立的 rect,縫隙露出的是凹槽色** —— 這就是「一格一格浮起來」的全部,
-        沒有任何陰影 / 濾鏡。⚠ 格縫 0.9 / **宮縫 1.8**(6×6 盤面的宮是 2×2)是一組數字,
-        改一個就要重算 x/y 那六個座標(格寬 = (48 − 2×1.8 − 3×0.9) / 6 = 6.95)。
-     ⚠⚠ 材質色**刻意不吃 `--sdk-*` 主題變數**(那組會讓 midnight 變深藍紙、arcade 變黑紙):
-        它與 `--sv-face`(撲克)/ 麻將牌面同一個路線 —— **實體材質在每個主題下都長一樣**。
-        格縫靠顏色對比撐出來(見下面 `--sk-well`),不是給格子加 stroke(36 個 rect 各描一次邊,
-        線寬在 44px 下會糊成一團)。
-     ⚠ 6×6 盤面**只能用 1~6**:舊插圖寫了 7 與 9(遊戲裡不可能出現),這一版順手改對,
-       而且九個數字擺成同列 / 同行 / 同宮都不重複的合法局面。
-     ⚠⚠ 三個「放大截圖才看得出來」的調整(第一版三樣都不及格,而 DOM 量起來完全正常):
-        ①**格縫靠顏色對比,不是靠寬度** —— 縫佔格寬 13% 已經夠寬,第一版凹槽 `#bd8f56`
-          與格子太接近 → 整塊看起來是「一片米黃 + 隱約的線」;加深到 `#a2743d` 才浮起來
-        ②**數字要照格寬算**(6.95 × .9 ≈ 6.2px):第一版沿用線稿時代的比例算成 5.4,
-          小一號就從「粗黑圓體」變成細細的小字
-        ③**鉛筆是最容易畫壞的東西** —— 第一版寬 5 / 尖 4.7,在 58px 下只剩一個小三角,
-          讀起來像雜點。它要靠**三段明確的對比**(深石墨尖 + 淺木段 + 飽和橘桿)才認得出來,
-          而且桿要夠寬(6.4)。⚠ 筆尖座標與 `rotate` 的角度決定露出多長:角度越接近垂直
-          露出越長(44° 時被右邊界裁在 17 個單位處)—— 這件事**只有看圖**,不要憑算式決定。 */
-  :root{ --sk-frame:#cfa86e; --sk-edge:#a3763f; --sk-well:#a2743d; --sk-cell:#f7e9c9;
-         --sk-num:#3d3833; --sk-hl:#fffdf2; --sk-hlline:#e8a127;
-         --sk-barrel:#d3872a; --sk-shine:#f0b458; --sk-wood:#f6ddb2; --sk-tip:#463d36; }
-
-  .sk-bd{fill:var(--sk-frame);stroke:var(--sk-edge);stroke-width:1.4}
-  .sk-well{fill:var(--sk-well)}
-  .sk-c{fill:var(--sk-cell)}
-  .sk-c.sk-hi{fill:var(--sk-hl);stroke:var(--sk-hlline);stroke-width:1}
-  .sk-nm text{fill:var(--sk-num);font-family:'Fredoka',sans-serif;font-weight:700;
-    font-size:6.2px;text-anchor:middle}
-  /* 鉛筆:整支描一圈凹槽色,才不會與底下的米黃格子融在一起(58px 下最吃這一條) */
-  .sk-pen path,.sk-pen rect{stroke:var(--sk-well);stroke-width:.35}
-  .sk-tip{fill:var(--sk-tip)}
-  .sk-wood{fill:var(--sk-wood)}
-  .sk-barrel{fill:var(--sk-barrel)}
-  .sk-shine{fill:var(--sk-shine);stroke:none}
+  /* 註:手繪數獨插圖那一整組 .sk-*(木框 + 36 個獨立小方塊 + 鉛筆,自帶 --sk-* 材質色)
+     v1.149.0 整組刪掉 —— 這張卡改成去背 PNG(sk-icon.png),首頁掛 .gc-art.sk-cart、
+     這一頁掛 .sdk-art,兩處同一個檔案。手繪那版的設計沿革(格縫 / 宮縫 / 鉛筆三段對比)
+     留在 notes/13 第十節,日後若要再手繪不必重新踩一遍。 */
 
   /* ---------- 房間框(比照五子棋的瘦身版:把高度讓給盤面) ---------- */
   .sdk-room{padding:9px 12px}
@@ -1741,11 +1705,9 @@
   .mj-scroll{flex:1 1 auto}
   .mj-hero{text-align:center;margin:14px 0 4px}
   .mj-art{width:92px;height:92px;display:block;margin:0 auto 8px}
-  /* 牌堆小圖示:index.html 的第四張遊戲卡與本頁進場插圖共用同一組
-     (比照 .sk-* 在首頁卡與數獨進場兩邊共用) */
-  .mk-bd{fill:var(--mj-face);stroke:var(--mj-side);stroke-width:2}
-  .mk-r{fill:var(--mj-jz);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
-  .mk-g{fill:var(--mj-jf);font-size:15px;font-weight:800;text-anchor:middle;font-family:'Nunito',sans-serif}
+  /* 註:手繪的牌堆小圖示 .mk-bd / .mk-r / .mk-g(中 · 發 兩張平的白牌,吃 --mj-* 牌面色)
+     v1.149.0 整組刪掉 —— 這張卡改成去背 PNG(mk-icon.png),首頁掛 .gc-art.mk-cart、
+     這一頁掛 .mj-art,兩處同一個檔案。 */
 
   /* 「調校中」標記(v1.58.1):台灣麻將進場頁在用(首頁那張卡 v1.89.0 精簡掉了)。
      .gc-body 是 flex column,所以接在 .gc-name 後面會自成一行(同 .hl-badge 的作法)。
@@ -2052,11 +2014,11 @@
    使用者:「台灣麻將的 Icon 換成這張圖片」,附了一張三顆立體麻將牌的插畫,
    並指了暗棋 v1.145.0 那次的做法 —— 所以這裡也走同一條路:圖切成 192×192 的去背 PNG
    放根目錄(m16-icon.png),兩頁 <img> 指同一個檔案,樣式只剩尺寸。
+   ★★★ v1.149.0 起十一張卡全部是這個做法(十一合一的插畫總圖裁出來的),
+      所以這張不再特別 —— 共通的規則寫在 .gc-art 那一條旁邊,守門是 test-pages.js 的 E 節。
 
    ★★ v1.112.1~v1.147.x 是一整組手繪 SVG(.m16-ic-bg / -ray / -side / -face / -w:
       滿版深紅放射底 + 綠側白面兩層 + 楷體直書「台灣」),v1.148.0 全部刪掉。
-      刪的理由是 46px 下畫好的圖就是贏 —— 綠側、奶白牌面、立體高光那三樣,
-      「兩個 rect + 兩個 text」畫不出來。
    ★★★ 連同**滿版深紅底一起收掉了**,而那曾經是十一張卡裡唯一的一個 ——
       當年(v1.113.0)加它是為了讓兩張麻將卡分得出來:舊圖與麻將消消樂那張
       (中 · 發 兩張平的白牌)構圖幾乎一樣。新圖不必靠底色了 ——
@@ -2064,11 +2026,6 @@
       而「唯一有滿版底色」這條紅線作廢(它原本是暗棋那張卡「刻意不做底色」的理由)。
    ⚠ 想把紅底加回來的話**不要動 .m16-art**(那條進場頁也吃) ——
      在 .m16-cart 上補 background + border-radius 就好,兩頁才分得開。
-
-   ⚠⚠ 首頁那張遊戲卡掛的是 **.m16-cart**,**絕對不可以**掛 .m16-art ——
-      下面這條 92px 定義在 .gc-art{width:46px} **後面**,同權重後定義勝
-      → 首頁那張卡的圖會變成 92px、整張卡比另外十張高一截(21點 v1.86.0 踩過的坑;
-        .m16-cart 本身不需要任何規則,它只是「不是 .m16-art」的標記,同 .un-cart / .dc-cart)。
 
    進場插圖(mahjong16.html 頂端那張大圖)的尺寸與消消樂 .mj-art 對齊 ——
    兩頁的「選擇玩法」看起來才是同一套介面。 */
@@ -2998,27 +2955,18 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .sv-scroll{flex:1 1 auto}
   .sv-hero{text-align:center;margin:14px 0 4px}
   .sv-art{width:96px;height:96px;display:block;margin:0 auto 8px}
-  /* ---------- 撲克牌小圖示 .pk-ic-*:三個撲克牌遊戲共用一組(v1.101.1)----------
-     ★ 用它的地方有六處(三張首頁遊戲卡 + 三頁進場插圖),每一對逐字相同:
-         排七   index.html 的卡 · sevens.html 的 .sv-art      —— ♦6 · ♠7 · ♥8
-         大老二 index.html 的卡 · big2.html 的 .b2-art        —— 四張 2(v1.144.0 由兩張改)
-         21點   index.html 的卡 · blackjack.html 的 .bj-art   —— ♦10 · ♠A
-       viewBox 一律 56×56,牌一律 21×30 rx2.7 → 字級與花色縮放**三個遊戲同一份**,
-       不必為某一張卡覆寫(所以牌的尺寸要動就是六處一起動)。
-     ★★ v1.101.1 起排七 / 大老二也是「真的牌面」(點數在上 · 花色在下 · 都置中,同 .sv-card
-        / .b2-card / .bj-card 的畫法)—— 使用者:「主頁面紙牌類的都要像二十一點這樣顯示 icon」。
-        在此之前排七與大老二用的是 `.pk-bd/.pk-k/.pk-r`(三張牌、只有一個放大的數字、沒有
-        花色),而 21 點自己一組 `.bj-ic-*`(v1.89.1 加的牌面畫法)= **兩套並存**;
-        這一版把 `.bj-ic-*` 那套原地搬到這裡改名成 `.pk-ic-*`,舊的 `.pk-bd/.pk-k/.pk-r`
-        刪掉(同一副牌本來就該長一樣,而兩套並存就是「改一邊忘另一邊」的來源)。
+  /* ---------- 撲克牌小圖示 .pk-ic-*(v1.101.1)----------
+     ★★ v1.149.0 起用它的只剩**一處**:js/home-live.js 畫「現在有人在玩」看板上那張
+        小卡(viewBox 0 0 24 34,同一份花色 path)。原本的六處(三張首頁遊戲卡 + 三頁
+        進場插圖)全部改成去背 PNG 了 —— 所以**這組規則不可以跟著刪**,
+        刪了看板的小卡會變成沒有邊框、沒有顏色的一團字(那條路徑沒有任何斷言在守)。
+     ⚠ 牌一律 21×30 rx2.7、字級 9.7px(= 牌寬 × .46)、花色 scale(.08):這組數字是
+        當年三個遊戲共用時定下的,改它現在只會影響看板小卡。
      ⚠ 花色 path 直接抄 js/shared/pk-faces.js 的 PATHS(同一副牌本來就該長一樣)。
-     ⚠ 顏色一律走 --sv-* 變數,**不寫死** —— 之後要調整任何主題的牌面色只改變數一處。
-        --sv-* 與 21 點那組 --bj-* 的值本來就逐字相同,所以這組規則用哪一組都一樣;
+     ⚠ 顏色一律走 --sv-* 變數,**不寫死**;--sv-* 與 21 點那組 --bj-* 的值本來就逐字相同,
         選 --sv-* 只是因為規則住在排七這一段。
-     ⚠ 紅色那個 class 叫 `.pk-ic-red`,**不可以**用既有的裸 `.red`
-        (`.sv-card.red` / `.b2-card.red` / `.bj-card.red` 都在用它)。
-     ⚠ 字級 9.7px = 牌寬 21 × .46,與 .bj-cr 同一個比例;六處的 viewBox 都是 56×56,
-        所以各自等比縮放,兩邊都不必再調字級。 */
+     ⚠ 紅色那個 class 叫 .pk-ic-red,**不可以**用既有的裸 .red
+        (.sv-card.red / .b2-card.red / .bj-card.red 都在用它)。 */
   .pk-ic-bd{fill:var(--sv-face);stroke:var(--sv-line);stroke-width:.9}
   .pk-ic-t{fill:var(--sv-blk);font:800 9.7px/1 'Nunito',sans-serif;text-anchor:middle}
   .pk-ic-s{fill:var(--sv-blk)}
@@ -3485,8 +3433,8 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .b2-scroll{flex:1 1 auto}
   .b2-hero{text-align:center;margin:14px 0 4px}
   .b2-art{width:96px;height:96px;display:block;margin:0 auto 8px}
-  /* ⚠ 撲克牌小圖示的 .pk-* 是**排七那一段定義的**(index.html 的遊戲卡也共用同一組)。
-     這一頁只是沿用,刻意不再定義一份 —— 同一副撲克牌本來就該長一樣。 */
+  /* 註:這一頁的進場插圖 v1.149.0 起是去背 PNG(b2-icon.png),與首頁卡同一個檔案 ——
+     手繪那版沿用的 .pk-ic-*(在排七那一段)現在只剩首頁看板的小卡在用。 */
   .b2-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
 
   /* ---------- 房間框 / 單機列(照排七的 .sv-room) ---------- */
@@ -4261,24 +4209,20 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .bj-scroll{flex:1 1 auto}
   .bj-hero{text-align:center;margin:14px 0 4px}
   .bj-art{width:96px;height:96px;display:block;margin:0 auto 8px}
-  /* ---------- 插圖:♠A + ♦10 兩張交疊斜放(v1.89.1)----------
-     使用者附了一張參考圖(兩張斜疊的牌:紅 10 + 黑桃 A)要求「用我們遊戲裡的牌來做」。
-     A + 10 剛好就是 21 點那一手,所以它同時是最貼題的圖示。
-     ★ 首頁那張遊戲卡(.gc-art.bj-cart 58px)與這一頁的進場插圖(.bj-art 96px)
-       **共用逐字相同的一份 SVG 節點**(index.html / blackjack.html 各一份)。
-     ★★ v1.101.1:牌面那幾條樣式**搬到排七那一段改名成 `.pk-ic-*` 了**(排七 / 大老二的
-        圖示同一版換成同一套牌面畫法 → 三個遊戲共用一組,不再是「21 點自己一套」)。
-        這裡不留任何規則,要改牌面請去 `.pk-ic-bd` 那一段(grep pk-ic-bd)。 */
+  /* ---------- 插圖:金色的「21」+ 10 與 A 那一手(v1.149.0 起是去背 PNG)----------
+     ★ 首頁那張遊戲卡(.gc-art.bj-cart 46px)與這一頁的進場插圖(.bj-art 96px)
+       **指向同一個檔案 bj-icon.png**;v1.89.1~v1.148.x 是兩份逐字相同的手繪 SVG
+       (牌面走 .pk-ic-*,那組規則還留著給首頁看板的小卡用)。 */
 
   /* ── ★★ v1.86.0:首頁遊戲卡用的是 .bj-cart,**不可以**掛 .bj-art ────────────
-       上面那條 .bj-art 是**這一頁進場插圖**的 96px,而它定義在
-       .gc-art{width:54px}(第 1152 行)**後面** → 同權重、後定義勝
-       → 首頁那張卡的圖直接變成 96px,整張卡比另外七張高一截(v1.85.0 之前一直是這樣)。
+       上面那條 .bj-art 是**這一頁進場插圖**的 96px,而它定義在 .gc-art(46px)
+       **後面** → 同權重、後定義勝 → 首頁那張卡的圖直接變成 96px,整張卡比別張高一截
+       (v1.85.0 之前一直是這樣)。這就是十一張卡「首頁一律掛 *-cart」那條規則的出處。
        ⚠ 這是 notes/13「CSS 會撞的四類」的第二類(權重 / 順序),而且是**自己撞自己**
          —— 前綴防得了名字撞,防不了這個。加頁面專屬 class 到共用元件上之前,
          一定要先看那個 class 有沒有在別的地方定尺寸。
-       ⚠ v1.101.1 起插圖的牌面走 .pk-ic-*(三個撲克牌遊戲共用,在排七那一段)——
-         但這條坑照舊:`.bj-art` 的 96px 仍然定義在 `.gc-art` 後面。 */
+       ⚠ v1.149.0 圖示改成 PNG 之後這條坑**一個字都沒變**:.bj-art 的 96px 還在
+         .gc-art 後面(換成 <img> 只是把「圖被放大」變成「點陣圖被放大」)。 */
   .bj-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
 
   /* ---------- 規則清單 ----------
@@ -5236,7 +5180,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ========================================================================== */
 
   /* ---------- 四色 ----------
-     ★ 一副實體牌的顏色**不吃主題變數**(同數獨木框那組 --sk-* 與撲克的 --sv-face):
+     ★ 一副實體牌的顏色**不吃主題變數**(同撲克的 --sv-face 與麻將的 --mj-face):
        實體材質在每個主題下都該長一樣。
      ⚠ 四個顏色要能在深色桌面上互相分辨,所以亮度刻意拉高於印刷值;
        綠與藍之間最容易糊掉,取樣過的兩個值差 40 度色相以上。
@@ -5249,54 +5193,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   :root{ --un-r:#e0322f; --un-y:#f2b01c; --un-g:#2ea94c; --un-b:#2470c4;
          --un-face:#ffffff; --un-line:#f4f1ea; --un-blk:#1d2733; }
 
-  /* ---------- 小圖示 .un-ic-*:首頁遊戲卡與進場插圖共用 ----------
-     ★★ 牌的尺寸**沿用三個撲克牌遊戲那一組**(21×30 rx2.7 · viewBox 56×56)——
-        見 notes/13 第九節。九張首頁卡要看起來是同一套,所以不另訂一組牌寬。
-
-     ── ★★ 但構圖**不是**那三個的「兩張交疊」,而是四張扇形 ──────────────────
-       第一版照大老二 / 21點畫成兩張交疊(藍 9 + 紅 +2),使用者看了說
-       「**我希望是能看出是 uno 牌的感覺**」。兩張牌只講得出「兩個顏色的紙牌」,
-       而 UNO 的辨識點其實有兩個,兩個都要在:
-         ① **四個顏色一起出現** —— 那是這副牌的規則本體,也是它的識別色
-         ② **斜白橢圓裡的 UNO 字樣** —— 牌背上那個東西
-       所以定案是「黃 / 綠 / 藍 三張扇在後面 + 最前面一張紅牌,橢圓裡寫 UNO」。
-       ⚠ 最前面那張刻意**用紅牌而不是黑色牌背**:黑牌在深色首頁上幾乎沒有輪廓,
-         而且黑底上的小字比紅底上的難讀(46px 那一格看得最清楚)。
-
-     ── 扇形的幾何 ────────────────────────────────────────────────────────────
-       四張牌的 x/y **完全一樣**(17.5, 11),差別只在繞 **(28, 54)** 轉
-       -25 / -8.5 / 8.5 / 25 度 —— 支點在牌的下方,所以轉出來就是握在手上的扇形。
-       ⚠ 半徑約 28,±25 度 → 左右各外擴約 11.8px,總寬約 45px(viewBox 56 放得下)。
-         **角度再開大就會被裁掉**,而被裁掉的是最外側那張牌的圓角(截圖才看得出來)。
-
-     ── ★★ 為什麼數字畫成「牌色」而不是實體牌的「白字 + 黑描邊」 ──────────────
-       真牌的大數字是**白字帶深色描邊**,壓在彩色牌面與白橢圓**兩種底**上面,
-       描邊就是為了同時壓得住這兩種底。但那個做法在 21×30 的圖示裡會糊成一團
-       (描邊佔的比例太大)。這裡改成「白橢圓 + 橢圓裡填牌色的數字」——
-       對比最大、40px 也讀得出來,而且一眼還是 UNO。
-       ★ 這就是 js/shared/pk-faces.js 那條教訓的同一個推論:
-         **照抄實體物件的規格之前,先問它當初解決的是什麼問題,那個問題還在不在。**
-         真牌要解決的是「白字壓兩種底」,而我們把數字收進橢圓裡 = 那個問題不存在了。
-
-     ⚠ 顏色 class(.un-ic-r/y/g/b)**同時給 rect 與 text 用** —— 兩者都是 fill,
-       所以一個 class 兩處通吃,不必寫 .un-ic-bd.un-ic-r 那種組合。
-     ⚠ 白橢圓一律 --un-face,**不可以**寫死 #fff。 */
-  .un-ic-bd{stroke:var(--un-line);stroke-width:.9}
-  /* ⚠ 橢圓要**撐滿整張牌的對角**(rx 8.4 / ry 13 在 21×30 的牌上約佔八成)——
-     第一版取 7.2/11.4,截圖看起來像「牌中間有一小塊白斑」而不是 UNO 的橢圓。
-     斜 -30 度是實體牌的角度;它與外層 rotate(±16) 疊起來仍然讀得出是斜的。 */
-  .un-ic-ov{fill:var(--un-face)}
-  .un-ic-t{font:800 13px/1 'Nunito',sans-serif;text-anchor:middle}
-  /* ⚠ 兩個字的標籤(+2 / +4)要小一階,不然會頂穿橢圓的兩端 */
-  .un-ic-t.sm{font-size:10.2px}
-  /* ★ 橢圓長軸上的 UNO 字樣(最前面那張牌)。
-     ⚠ 字型用本專案的 Nunito,**刻意不去模仿 Mattel 那個斜體描邊字標**。
-     ⚠ 6.6px 是量出來的上限:再大一階,三個字母就會頂穿 rx=8.4 的橢圓兩端。 */
-  .un-ic-t.wm{font-size:6.6px;letter-spacing:.04em}
-  .un-ic-r{fill:var(--un-r)}
-  .un-ic-y{fill:var(--un-y)}
-  .un-ic-g{fill:var(--un-g)}
-  .un-ic-b{fill:var(--un-b)}
+  /* 註:手繪的 UNO 小圖示那一整組 .un-ic-*(四張扇形的牌 + 斜白橢圓 + UNO 字樣,
+     牌寬沿用撲克那組 21×30)v1.149.0 整組刪掉 —— 這張卡改成去背 PNG(un-icon.png),
+     首頁掛 .gc-art.un-cart、uno.html 進場掛 .un-art,兩處同一個檔案。
+     ⚠ 上面那四支 --un-* 牌面色**不可以**跟著刪:遊戲裡真的那副牌在吃它,
+        而顏色是 UNO 的規則本體(見上一段)。
+     ★ 手繪那版的設計沿革(扇形幾何、為什麼數字畫成牌色而不是白字描邊)留在 notes/18。 */
 
   /* 進場插圖(uno.html 頂端那張大圖)。
      ⚠⚠ 首頁那張遊戲卡掛的是 **.un-cart**,**絕對不可以**掛 .un-art ——
@@ -5382,7 +5284,7 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     text-align:center;font:800 calc(var(--un-cw) * .46)/1 'Nunito',sans-serif;
     letter-spacing:-.02em}
   /* ⚠ 兩個字的標籤(+2 / +4)要小一階 —— 橢圓的可用寬度是 .74w,
-     0.46w 的字級兩個字約 0.5w 寬會頂到白邊(同圖示的 .un-ic-t.sm)。 */
+     0.46w 的字級兩個字約 0.5w 寬會頂到白邊。 */
   .un-lb.two{font-size:calc(var(--un-cw) * .34)}
   .un-c-r .un-lb{color:var(--un-r)}
   .un-c-y .un-lb{color:var(--un-y)}
@@ -5943,13 +5845,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         ★ v1.145.0 當時的理由是「十一張裡只有台灣麻將是滿版的,那是它與麻將消消樂分家的
           辨識點」;v1.148.0 台灣麻將也換成去背 PNG、紅底一起收掉 → 現在的理由更單純:
           **十一張卡清一色透明底**,任何一張加底色都會變成唯一突出的那一張。
-     ⚠⚠ 首頁那張遊戲卡掛的是 **.dc-cart**,**絕對不可以**掛 .dc-art ——
-        下面那條 96px 定義在 .gc-art{width:46px} **後面**,同權重後定義勝
-        → 首頁那張卡的圖會變成 96px、整張卡比另外十張高一截(21點 v1.86.0 踩過)。
-     ⚠ .dc-cart 本身不必寫規則(.gc-art 的 46px 就是它要的);留著這個 class 是為了
-        「首頁那張掛的不是 .dc-art」這件事看得出來,而 test-pages.js 的 I 節在守它。
-     ⚠ 動檔名要三處一起改:index.html 與 darkchess.html 的 img + sw.js 的 CORE
-        (離線清單漏掉 → addAll 整批失敗 = 離線完全不能玩)。 */
+      ⚠⚠ 首頁那張遊戲卡掛的是 **.dc-cart**,**絕對不可以**掛 .dc-art ——
+         下面那條 96px 定義在 .gc-art{width:46px} **後面**,同權重後定義勝
+         → 首頁那張卡的圖會變成 96px、整張卡比另外十張高一截(21點 v1.86.0 踩過)。
+      ⚠ .dc-cart 本身不必寫規則(.gc-art 的 46px 就是它要的);留著這個 class 是為了
+         「首頁那張掛的不是 .dc-art」這件事看得出來,而 test-pages.js 的 E 節在守它
+         (v1.149.0 起十一張卡同一套做法,守門從 I 節併進 E 節)。
+      ⚠ 動檔名要三處一起改:index.html 與 darkchess.html 的 img + sw.js 的 CORE
+         (離線清單漏掉 → addAll 整批失敗 = 離線完全不能玩)。 */
   .dc-art{width:96px;height:96px;display:block;margin:0 auto}
 
   /* ---------- 外框(照 .un-* 那一組做一份對應的)----------
@@ -6588,20 +6491,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
   .cy-scroll{flex:1 1 auto}
 
-  /* ---------- 進場插圖(交叉字磚:一橫一縱兩個成語交叉,兩格露出給定字) ---------- */
+  /* ---------- 進場插圖 ---------- */
   .cy-hero{text-align:center;margin:14px 0 4px}
   .cy-art{width:92px;height:92px;display:block;margin:0 auto 8px}
-  /* .cy-ic-* 是首頁卡(46px)與本頁進場插圖(92px)**逐字相同的一份 SVG**,只有外層
-     class 不同(這裡是 .cy-art、首頁是 .gc-art.cy-cart)。材質色刻意不吃 --cy-* 主題
-     變數(與數獨插圖 .sk-* 同一條路線 —— 實體材質在每個主題下都長一樣)。 */
-  :root{ --cy-ic-plate:#7a4321; --cy-ic-edge:#5c3016; --cy-ic-well:#a8601f;
-         --cy-ic-given:#f4c65a; --cy-ic-blank:#fbe7b0; --cy-ic-blank-e:#d9a94a; --cy-ic-text:#3a2210; }
-  .cy-ic-plate{fill:var(--cy-ic-plate);stroke:var(--cy-ic-edge);stroke-width:1.4}
-  .cy-ic-well{fill:var(--cy-ic-well)}
-  .cy-ic-tile.cy-ic-given{fill:var(--cy-ic-given)}
-  .cy-ic-tile.cy-ic-blank{fill:var(--cy-ic-blank);stroke:var(--cy-ic-blank-e);stroke-width:.6}
-  .cy-ic-text text{fill:var(--cy-ic-text);font-family:'Fredoka',sans-serif;font-weight:700;
-    font-size:7.4px;text-anchor:middle}
+  /* 註:手繪的交叉字磚那一整組 .cy-ic-*(木盤 + 七塊磚 + 兩個給定字,自帶 --cy-ic-* 材質色)
+     v1.149.0 整組刪掉 —— 這張卡改成去背 PNG(cy-icon.png),首頁掛 .gc-art.cy-cart、
+     這一頁掛 .cy-art,兩處同一個檔案。 */
 
   /* ---------- 房間框(比照數獨的瘦身版:把高度讓給盤面) ---------- */
   .cy-room{padding:9px 12px}

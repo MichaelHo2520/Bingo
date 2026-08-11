@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.148.0 -->
-<meta name="version" content="1.148.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.149.0 -->
+<meta name="version" content="1.149.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -84,24 +84,26 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠ HTML 裡寫的 1~10 是**預設排名**(= GAMES 的順序):第一次用、沒有任何統計、
               或 Firebase 讀不到時就停在這個順序,所以它必須與 GAMES 逐一對上。
            ⚠ v1.113.1 起編號一律用**阿拉伯數字**(原本是一~十的國字)。 -->
+      <!-- ★★★ v1.149.0:十一張圖示全部換成**同一套去背 PNG 貼圖**(使用者附了一張十一合一的
+           插畫總圖:「主頁面的 Icon 換成這一個圖片上面的樣式,需要你自己進行裁切」)。
+           在此之前是「九組手繪 SVG + 兩張 PNG」(台灣麻將 v1.148.0 · 暗棋 v1.145.0),
+           這一版把剩下九組也換掉 —— 十一張卡因此第一次真的是**同一套畫風**。
+           接線規則十一張一律相同(照暗棋 / 台灣麻將那兩次的路):
+             · 檔案 `<前綴>-icon.png` 放根目錄(192×192、10~15KB,十一張共約 138KB)
+             · 首頁卡掛 `.gc-art.<前綴>-cart`(46px)、進場插圖掛各頁既有的 `*-art`(92/96px),
+               而**兩處指向同一個檔案**(tools/test-pages.js 的 E 節在守這十一對雙胞胎)
+             ⚠⚠ 首頁這裡**一張都不可以掛 `*-art`** —— 那是進場插圖的 92/96px,
+                 它定義在 .gc-art(46px)**後面** → 同權重後定義勝 → 那張卡會比別張高一截
+                 (21 點 v1.86.0 踩過的坑)
+             ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE
+                (離線清單漏掉 → addAll 整批失敗 = 離線完全不能玩)
+             ⚠ 圖一律**去背**,十一張清一色透明底 —— 任何一張加底色都會變成唯一突出的那一張
+             ★ 原圖與裁切腳本在 design-refs/十一遊戲icon總圖-插畫.png 與 tools/cut-icons.py;
+               ⚠ 頁面**不可以**直接指向 design-refs/(那個目錄不上傳,線上永遠破圖) -->
       <div class="gc-grid">
       <button class="game-card" id="pickBingo" type="button" data-gk="bingo">
         <span class="gc-rank" aria-hidden="true">1</span>
-        <svg class="home-art gc-art" viewBox="0 0 120 116" role="img" aria-label="賓果卡">
-          <rect class="bc-card" x="3" y="3" width="114" height="110" rx="14"/>
-          <g class="bc-hd" text-anchor="middle">
-            <text x="14.4" y="25">B</text><text x="37.2" y="25">I</text><text x="60" y="25">N</text><text x="82.8" y="25">G</text><text x="105.6" y="25">O</text>
-          </g>
-          <line x1="10" y1="32" x2="110" y2="32" stroke="var(--panel-line)" stroke-width="1.5"/>
-          <g>
-            <rect class="bc-cell" x="5.4" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="39" width="18" height="18" rx="4"/>
-            <rect class="bc-cell" x="5.4" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="63" width="18" height="18" rx="4"/>
-            <rect class="bc-cell" x="5.4" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="87" width="18" height="18" rx="4"/>
-          </g>
-          <circle class="bc-daub" cx="37.2" cy="48" r="8.4"/><circle class="bc-daub" cx="82.8" cy="48" r="8.4"/>
-          <circle class="bc-daub" cx="14.4" cy="72" r="8.4"/><circle class="bc-daub" cx="105.6" cy="72" r="8.4"/>
-          <polygon class="bc-star" points="60,63 62.23,68.93 68.56,69.22 63.61,73.17 65.29,79.28 60,75.8 54.71,79.28 56.39,73.17 51.44,69.22 57.77,68.93"/>
-        </svg>
+        <img class="gc-art bc-cart" src="bc-icon.png" alt="賓果卡" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">BINGO</span>
           <span class="hl-badge hidden" id="hlBadgeBingo"></span>
@@ -110,17 +112,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       <a class="game-card as-link" href="gomoku.html" data-gk="gomoku">
         <span class="gc-rank" aria-hidden="true">2</span>
-        <svg class="gc-art gk-art" viewBox="0 0 56 56" role="img" aria-label="五子棋盤">
-          <rect class="gk-bd" x="2" y="2" width="52" height="52" rx="6"/>
-          <g class="gk-ln">
-            <path d="M9 9H47M9 18.5H47M9 28H47M9 37.5H47M9 47H47"/>
-            <path d="M9 9V47M18.5 9V47M28 9V47M37.5 9V47M47 9V47"/>
-          </g>
-          <circle class="gk-b" cx="28" cy="28" r="4.4"/>
-          <circle class="gk-w" cx="18.5" cy="18.5" r="4.4"/>
-          <circle class="gk-b" cx="37.5" cy="18.5" r="4.4"/>
-          <circle class="gk-w" cx="18.5" cy="37.5" r="4.4"/>
-        </svg>
+        <img class="gc-art gk-cart" src="gk-icon.png" alt="五子棋盤" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">五子棋</span>
           <span class="hl-badge hidden" id="hlBadgeGomoku"></span>
@@ -129,42 +121,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       <a class="game-card as-link" href="sudoku.html" data-gk="sudoku">
         <span class="gc-rank" aria-hidden="true">3</span>
-        <!-- ★★ v1.101.2:木框 + 一格一格的米黃小方塊 + 右下一支鉛筆正在填(使用者附了一張
-             參考圖:「數獨的 icon 我不喜歡,參考這個樣式」)。舊版是「一張紙 + 兩組線」的
-             平面線稿,在深色首頁上最沒有質感;另外三張紙牌 / 麻將 / 棋盤卡本來就是實體材質感。
-             ⚠ 格子是 36 個獨立 rect、縫隙露出凹槽色 = 立體感的全部(沒有陰影 / 濾鏡);
-                格縫 0.9 / 宮縫 1.8 / 格寬 6.95 是**一組**數字,改一個要重算六個座標。
-             ⚠ 6×6 盤面只能用 1~6(舊圖寫了 7 與 9),而這九個數字同列 / 同行 / 同宮都不重複。
-             ⚠ 與 sudoku.html 進場插圖(.sdk-art 92px)**逐字相同的一份 SVG**,只有外層 class
-                不一樣;改一邊要改另一邊(tools/test-pages.js 的 F 節在守) -->
-        <svg class="gc-art sk-art" viewBox="0 0 56 56" role="img" aria-label="數獨盤">
-          <rect class="sk-bd" x="0.7" y="0.7" width="54.6" height="54.6" rx="7.5"/>
-          <rect class="sk-well" x="3.4" y="3.4" width="49.2" height="49.2" rx="4.5"/>
-          <g class="sk-c">
-            <rect x="4" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="4" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="4" width="6.95" height="6.95" rx="1.1"/>
-            <rect x="4" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="11.85" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="11.85" width="6.95" height="6.95" rx="1.1"/>
-            <rect x="4" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="20.6" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="20.6" width="6.95" height="6.95" rx="1.1"/>
-            <rect x="4" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="28.45" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="28.45" width="6.95" height="6.95" rx="1.1"/>
-            <rect x="4" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect class="sk-hi" x="37.2" y="37.2" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="37.2" width="6.95" height="6.95" rx="1.1"/>
-            <rect x="4" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="11.85" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="20.6" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="28.45" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="37.2" y="45.05" width="6.95" height="6.95" rx="1.1"/><rect x="45.05" y="45.05" width="6.95" height="6.95" rx="1.1"/>
-          </g>
-          <g class="sk-nm">
-            <text x="7.5" y="9.5">5</text><text x="24.1" y="9.5">3</text><text x="48.5" y="9.5">2</text>
-            <text x="15.3" y="17.4">1</text>
-            <text x="31.9" y="26.1">6</text><text x="40.7" y="26.1">4</text>
-            <text x="7.5" y="34">6</text>
-            <text x="24.1" y="42.7">1</text><text x="40.7" y="42.7">5</text>
-            <text x="31.9" y="50.6">4</text>
-          </g>
-          <!-- 鉛筆:筆尖落在那格高亮的右上角,筆桿往右下伸出畫面(SVG 自己裁掉)。
-               ⚠ 三段的對比(深石墨尖 / 淺木段 / 飽和橘桿)是「小尺寸下認得出是鉛筆」的全部 -->
-          <g class="sk-pen" transform="translate(43.8 38.6) rotate(44)">
-            <path class="sk-tip" d="M0 0 5.6-3.2 5.6 3.2Z"/>
-            <path class="sk-wood" d="M5.6-3.2H9.6V3.2H5.6Z"/>
-            <rect class="sk-barrel" x="9.6" y="-3.2" width="18" height="6.4" rx="1.2"/>
-            <rect class="sk-shine" x="10.2" y="-2.6" width="16.8" height="2" rx="1"/>
-          </g>
-        </svg>
+        <img class="gc-art sk-cart" src="sk-icon.png" alt="數獨盤" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">數獨</span>
           <span class="hl-badge hidden" id="hlBadgeSudoku"></span>
@@ -173,12 +130,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       <a class="game-card as-link" href="mahjong.html" data-gk="mahjong">
         <span class="gc-rank" aria-hidden="true">4</span>
-        <svg class="gc-art mk-art" viewBox="0 0 56 56" role="img" aria-label="麻將牌">
-          <rect class="mk-bd" x="3.5" y="9" width="23" height="31" rx="4.5"/>
-          <rect class="mk-bd" x="29.5" y="16" width="23" height="31" rx="4.5"/>
-          <text class="mk-r" x="15" y="31">中</text>
-          <text class="mk-g" x="41" y="38">發</text>
-        </svg>
+        <img class="gc-art mk-cart" src="mk-icon.png" alt="麻將牌" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">麻將消消樂</span>
           <span class="hl-badge hidden" id="hlBadgeMahjong"></span>
@@ -188,22 +140,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- 第五個遊戲(v1.58.0):真的打麻將,不是消牌。
            ⚠ 房間連結一律 <a href>(首頁跑在 app.html 外殼的 iframe 裡,
               寫成 top.location 會把外殼一起換掉、全螢幕當場沒了)
-           ★★★ v1.148.0:圖示改成**一張去背的 PNG 貼圖**(m16-icon.png,192×192、11.5KB)——
-              使用者:「台灣麻將的 Icon 換成這張圖片」,附了一張三顆立體麻將牌的插畫,
-              並指了暗棋 v1.145.0 那次的做法。同一個理由:46px 下手繪 SVG 贏不過畫好的圖 ——
-              新圖的**綠側 + 奶白牌面 + 立體高光**是舊圖(平的白面 + 一片綠色底座)畫不出來的。
-              辨識點沿用「**台灣**兩個字本身」,只是從毛筆字變成插畫上的紅色立體字。
-           ★★ 同時**收掉了滿版深紅放射底**(v1.113.0~v1.147.x 唯一有滿版底色的一張卡)——
-              那個紅底當年是為了「兩張麻將卡分得出來」:舊圖與第四張卡(麻將消消樂:
-              中 · 發 兩張平的白牌)構圖幾乎一樣,不加底色會認錯。新圖不必靠底色了 ——
-              **綠背立體牌 vs 平的白牌**本身就完全不像,首頁十一張卡因此回到清一色透明底。
-              ⚠ 所以「唯一有滿版底色」這條紅線**已經作廢**(暗棋那張卡的註解原本引它當理由)。
-           ⚠ 與 mahjong16.html 的進場插圖是**同一個檔案**(那裡是 .m16-art 92px)——
-              換圖要兩頁一起換(tools/test-pages.js 的 G 節在守這對雙胞胎)
-           ⚠⚠ 這裡**不可以**掛 .m16-art —— 那是進場插圖的 92px,它定義在 .gc-art(46px)
-               後面 → 同權重後定義勝 → 這張卡會比另外十張高一截(21點 v1.86.0 踩過的坑)
-           ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE
-              (離線清單漏掉 → addAll 整批失敗 = 離線完全不能玩) -->
+           ★★ 辨識點是牌面上那兩個字「**台灣**」—— 首頁上兩張麻將卡(這張與第四張消消樂)
+              就靠它分家:綠背立體的「台灣」牌 vs 平放的「中 · 發」兩張。
+              ⚠ v1.113.0~v1.147.x 是靠**滿版深紅底**分的(當年唯一有底色的一張卡);
+                 v1.148.0 起十一張一律透明底 → 分家只剩構圖,而構圖**斷言測不到**,
+                 換圖只能看 46px 的截圖確認兩張麻將卡還認得出誰是誰。 -->
       <a class="game-card as-link" href="mahjong16.html" data-gk="mj16">
         <span class="gc-rank" aria-hidden="true">5</span>
         <img class="gc-art m16-cart" src="m16-icon.png" alt="台灣麻將牌" width="192" height="192">
@@ -214,39 +155,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </a>
 
       <!-- 第六個遊戲(v1.75.0):撲克牌接龍。
-           ⚠ 插圖只用數字與自繪花色,不用撲克牌 Unicode(U+1F0A0 那一段)—— 多數字型沒有,
-              會變豆腐方框(同麻將牌那條禁令,見 notes/13)
-           ★★ v1.101.1:改成**三張真的牌面 ♦︎6 · ♠︎7 · ♥︎8**(使用者:「主頁面紙牌類的都要像
-              二十一點這樣來顯示 icon…排七也需要把牌變成數字加上花色的樣子」)——
-              點數在上、花色在下、都置中(同 .sv-card / .bj-card),樣式是三個撲克牌遊戲
-              共用的 .pk-ic-*(在 styles.css 排七那一段),花色 path 抄 js/shared/pk-faces.js。
-              在此之前是三張「只有一個放大數字、沒有花色」的牌(.pk-bd/.pk-k/.pk-r,已刪)。
-           ★ 中間那張是 ♠︎7 —— 這一局就是從它開始接的,所以它疊在最上面而且比兩側高一點。
-           ⚠ 與 sevens.html 進場插圖(.sv-art 96px)**逐字相同的一份 SVG**,只有外層 class
-              不一樣;改一邊要改另一邊(tools/test-pages.js 的 E 節在守) -->
+           ★ 辨識點是**三張連號的牌**(6 · 7 · 8,中間那張是起始牌 7)—— 三張紙牌卡
+             (這張 / 大老二 / 21點)在 46px 下就靠「連號 vs 四張 2 vs 金色 21」分家。 -->
       <a class="game-card as-link" href="sevens.html" data-gk="sevens">
         <span class="gc-rank" aria-hidden="true">6</span>
-        <svg class="gc-art pk-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 排七">
-          <!-- 左:♦︎6 -->
-          <rect class="pk-ic-bd" x="1" y="15" width="21" height="30" rx="2.7"/>
-          <text class="pk-ic-t pk-ic-red" x="11.5" y="28">6</text>
-          <g class="pk-ic-s pk-ic-red" transform="translate(7.5 30.4) scale(.08)">
-            <path d="M50 6 86 50 50 94 14 50z"/>
-          </g>
-          <!-- 右:♥︎8 -->
-          <rect class="pk-ic-bd" x="34" y="15" width="21" height="30" rx="2.7"/>
-          <text class="pk-ic-t pk-ic-red" x="44.5" y="28">8</text>
-          <g class="pk-ic-s pk-ic-red" transform="translate(40.5 30.4) scale(.08)">
-            <path d="M50 90S10 62 10 36C10 22 21 12 34 12c8 0 14 5 16 11 2-6 8-11 16-11 13 0 24 10 24 24 0 26-40 54-40 54z"/>
-          </g>
-          <!-- 中:♠︎7(起始牌,疊在最上面) -->
-          <rect class="pk-ic-bd" x="17.5" y="11" width="21" height="30" rx="2.7"/>
-          <text class="pk-ic-t" x="28" y="24">7</text>
-          <g class="pk-ic-s" transform="translate(24 26.4) scale(.08)">
-            <path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/>
-            <path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>
-          </g>
-        </svg>
+        <img class="gc-art sv-cart" src="sv-icon.png" alt="撲克牌 排七" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">排七</span>
           <span class="hl-badge hidden" id="hlBadgeSevens"></span>
@@ -254,57 +167,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </a>
 
       <!-- 第七個遊戲(v1.76.0):大老二。
-           ⚠ 插圖同樣只用數字與自繪花色,不用撲克牌 Unicode(U+1F0A0 那一段)——
-              多數字型沒有,會變豆腐方框(同麻將牌那條禁令,見 notes/13)
-           ★★★ v1.144.0:改成**四張 2**(使用者:「大老二請幫我改成 4 張 2 的樣子」)。
-              2 最大就是這個遊戲的全部,四張 2 就是「這副牌的最上層」——
-              兩張只講得出「2 很大」,四張才講得出「大老二」。
-              構圖是兩欄兩排、每一欄各往外斜 5 度:上面兩張的間隙因此**張開**
-              (置中的點數不會被隔壁蓋掉)、下面兩張交叉(看起來是一疊牌而不是一個方陣)。
-              花色由弱到強照大老二的順序(方塊 → 梅花 → 紅心 → 黑桃),黑桃 2 疊在最上面。
-              ⚠ **刻意不做扇形**:UNO 那張卡就是四張扇形,同一排並列會分不出誰是誰;
-                而扇形要讓四個置中的點數都露出來得把整組縮到 .79,46px 下那個「2」太小了。
-           ★ v1.101.1~v1.143.x 是兩張交疊斜放的 2(紅心 + 黑桃)。
-           ⚠ 與 big2.html 進場插圖(.b2-art 96px)**逐字相同的一份 SVG**,只有外層 class
-              不一樣;改一邊要改另一邊(tools/test-pages.js 的 E 節在守) -->
+           ★★ 辨識點是**四張 2 + 皇冠**:2 最大就是這個遊戲的全部,兩張只講得出「2 很大」、
+              四張才講得出「大老二」(v1.144.0 手繪那版就是為此由兩張改四張,新圖沿用同一構圖)。 -->
       <a class="game-card as-link" href="big2.html" data-gk="big2">
         <span class="gc-rank" aria-hidden="true">7</span>
-        <svg class="gc-art pk-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 大老二">
-          <!-- 上排左:方塊 2 -->
-          <g transform="rotate(-5 17.5 16)">
-            <rect class="pk-ic-bd" x="7" y="1" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t pk-ic-red" x="17.5" y="14">2</text>
-            <g class="pk-ic-s pk-ic-red" transform="translate(13.5 16.4) scale(.08)">
-              <path d="M50 6 86 50 50 94 14 50z"/>
-            </g>
-          </g>
-          <!-- 上排右:梅花 2 -->
-          <g transform="rotate(5 38.5 16)">
-            <rect class="pk-ic-bd" x="28" y="1" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t" x="38.5" y="14">2</text>
-            <g class="pk-ic-s" transform="translate(34.5 16.4) scale(.08)">
-              <circle cx="50" cy="31" r="20"/><circle cx="34" cy="58" r="20"/><circle cx="66" cy="58" r="20"/>
-              <path d="M50 60c0 14-4 25-11 33h22c-7-8-11-19-11-33z"/>
-            </g>
-          </g>
-          <!-- 下排左:紅心 2 -->
-          <g transform="rotate(-5 17.5 40.1)">
-            <rect class="pk-ic-bd" x="7" y="25.1" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t pk-ic-red" x="17.5" y="38.1">2</text>
-            <g class="pk-ic-s pk-ic-red" transform="translate(13.5 40.5) scale(.08)">
-              <path d="M50 90S10 62 10 36C10 22 21 12 34 12c8 0 14 5 16 11 2-6 8-11 16-11 13 0 24 10 24 24 0 26-40 54-40 54z"/>
-            </g>
-          </g>
-          <!-- 下排右:黑桃 2 —— 這一版最大的一張牌,所以疊在最上面 -->
-          <g transform="rotate(5 38.5 40.1)">
-            <rect class="pk-ic-bd" x="28" y="25.1" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t" x="38.5" y="38.1">2</text>
-            <g class="pk-ic-s" transform="translate(34.5 40.5) scale(.08)">
-              <path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/>
-              <path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>
-            </g>
-          </g>
-        </svg>
+        <img class="gc-art b2-cart" src="b2-icon.png" alt="撲克牌 大老二" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">大老二</span>
           <span class="hl-badge hidden" id="hlBadgeBig2"></span>
@@ -312,39 +179,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </a>
 
       <!-- 第八個遊戲(v1.84.0):台式21點。
-           ⚠ 插圖同樣只用數字與字母,不用撲克牌 Unicode(U+1F0A0 那一段)——
-              多數字型沒有,會變豆腐方框(同麻將牌那條禁令,見 notes/13)
-           ★★ v1.89.1:改成**兩張交疊斜放的牌 ♠︎A + ♦︎10**(使用者附了一張參考圖)——
-              A + 10 剛好就是 21 點那一手,比原本「A / 21 / K 三張立正站好」講得清楚。
-              牌面照的是**遊戲裡真的那副牌**:點數在上、花色在下、都置中(同 .bj-card),
-              花色 path 直接抄 js/shared/pk-faces.js 的 PATHS(同一副牌本來就該長一樣),
-              配色走 --sv-face / --sv-line / --sv-blk / --sv-red(所以電子書主題自動黑白)。
-           ★★ v1.101.1:牌面那組 class 從 `.bj-ic-*` 改名成 **`.pk-ic-*`** —— 同一版排七與
-              大老二的圖示也換成這套畫法,三個撲克牌遊戲共用一組(不再是「21 點自己一套」)。
-           ⚠⚠ 這裡**不可以**掛 .bj-art —— 那是 blackjack.html 進場插圖的 96px,
-               它定義在 .gc-art(54px)後面 → 會把這張卡撐得比另外七張高一截
-               (v1.86.0 修掉的;理由記在 styles.css .bj-cart 那條旁邊) -->
+           ★ 辨識點是**金色的「21」**,配 10 + A 那一手牌(= 剛好 21 點)。
+             ⚠ 這張卡是「不可以掛 *-art」那條的出處(v1.86.0 真的踩過:掛了 .bj-art
+                就比另外幾張高一截)—— 十一張的規則寫在 .gc-grid 上面那段。 -->
       <a class="game-card as-link" href="blackjack.html" data-gk="bj">
         <span class="gc-rank" aria-hidden="true">8</span>
-        <svg class="gc-art bj-cart" viewBox="0 0 56 56" role="img" aria-label="撲克牌 台式21點">
-          <!-- 下層:♦︎10(往左斜) -->
-          <g transform="rotate(-16 19 30)">
-            <rect class="pk-ic-bd" x="8.5" y="15" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t pk-ic-red" x="19" y="28">10</text>
-            <g class="pk-ic-s pk-ic-red" transform="translate(15 30.4) scale(.08)">
-              <path d="M50 6 86 50 50 94 14 50z"/>
-            </g>
-          </g>
-          <!-- 上層:♠︎A(往右斜、蓋在前面) -->
-          <g transform="rotate(16 37.5 29)">
-            <rect class="pk-ic-bd" x="27" y="14" width="21" height="30" rx="2.7"/>
-            <text class="pk-ic-t" x="37.5" y="27">A</text>
-            <g class="pk-ic-s" transform="translate(33.5 29.4) scale(.08)">
-              <path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/>
-              <path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>
-            </g>
-          </g>
-        </svg>
+        <img class="gc-art bj-cart" src="bj-icon.png" alt="撲克牌 台式21點" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">台式21點</span>
           <span class="hl-badge hidden" id="hlBadgeBj"></span>
@@ -352,28 +192,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </a>
 
       <!-- 第九個遊戲(v1.106.0):UNO。
-           ★★ 構圖與另外八張卡**不同一套**:黃 / 綠 / 藍 三張扇在後面 + 最前面一張紅牌,
-              斜白橢圓裡寫 UNO。使用者:「我希望是能看出是 uno 牌的感覺」——
-              兩張交疊(撲克牌那三張卡的作法)只講得出「兩個顏色的紙牌」,
-              而 UNO 的辨識點有兩個、兩個都要在:**四個顏色** + **橢圓裡的 UNO 字樣**。
-           ★ 牌的尺寸(21×30 rx2.7 · viewBox 56)仍然沿用 .un-ic-* / .pk-ic-* 同一組,
-              九張首頁卡才會看起來是同一套。
-           ⚠ 與 uno.html 進場插圖(.un-art 96px)**逐字相同的一份 SVG**,只有外層 class
-              不一樣;改一邊要改另一邊(tools/test-pages.js 的 E 節在守)
-           ⚠⚠ 這裡**不可以**掛 .un-art —— 那是進場插圖的 96px,它定義在 .gc-art(46px)
-               後面 → 會把這張卡撐得比另外八張高一截(21點 v1.86.0 踩過的坑) -->
+           ★★ 辨識點有兩個、而且兩個都要在:**四個顏色** + **橢圓裡的 UNO 字樣**
+              (只有兩色的紙牌講不出是 UNO)。
+              ⚠ 顏色是 UNO 的規則本體 —— 任何主題、任何換圖都不准把四色轉黑白。 -->
       <a class="game-card as-link" href="uno.html" data-gk="uno">
         <span class="gc-rank" aria-hidden="true">9</span>
-        <svg class="gc-art un-cart" viewBox="0 0 56 56" role="img" aria-label="UNO 牌">
-          <g transform="rotate(-25 28 54)"><rect class="un-ic-bd un-ic-y" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
-          <g transform="rotate(-8.5 28 54)"><rect class="un-ic-bd un-ic-g" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
-          <g transform="rotate(8.5 28 54)"><rect class="un-ic-bd un-ic-b" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
-          <g transform="rotate(25 28 54)">
-            <rect class="un-ic-bd un-ic-r" x="17.5" y="11" width="21" height="30" rx="2.7"/>
-            <ellipse class="un-ic-ov" cx="28" cy="26" rx="8.4" ry="13" transform="rotate(-30 28 26)"/>
-            <text class="un-ic-t un-ic-r wm" x="28" y="28.1" transform="rotate(-30 28 26)">UNO</text>
-          </g>
-        </svg>
+        <img class="gc-art un-cart" src="un-icon.png" alt="UNO 牌" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">UNO</span>
           <span class="hl-badge hidden" id="hlBadgeUno"></span>
@@ -381,25 +205,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </a>
 
       <!-- 第十個遊戲(v1.113.0):象棋暗棋。
-           ★★★ v1.145.0:圖示改成**一張去背的 PNG 貼圖**(dc-icon.png,192×192、13.9KB)——
-              使用者:「暗棋那個 icon 有點難看…有辦法直接貼上這一張圖片嗎」,附了一張插畫。
-              前一版(v1.144.0)才剛把手繪 SVG 改成「照現在的棋子畫」,但 46px 下它明顯輸給
-              一張畫好的圖 —— 兩個辨識點在那張圖上都更跳:**正面是紅圈 + 紅帥**、
-              **牌背上是棋盤的格線**(比素面木頭更講得出「還沒翻」)。
-              圖是從 design-refs/ 那張插畫**切出兩顆棋子**來的:旗子 / 旗桿 / 流蘇與深色底
-              全部去掉(膠囊遮罩 × 最大通道亮度斜坡),所以背景是透明的。
-           ★★ 辨識點只有一個,而且非它不可:**有一顆是蓋著的**。
-              只畫兩顆翻開的棋子的話,那是一般象棋(或五子棋)的圖,看不出是暗棋。
-           ⚠ 與 darkchess.html 的進場插圖是**同一個檔案**(那裡是 .dc-art 96px)——
-              換圖要兩頁一起換(tools/test-pages.js 的 I 節在守這對雙胞胎)
-           ⚠⚠ 這裡**不可以**掛 .dc-art —— 那是進場插圖的 96px,它定義在 .gc-art(46px)
-               後面 → 會把這張卡撐高一截(21點 v1.86.0 踩過的坑)
-           ⚠ 這張卡**刻意沒有滿版底色** —— 圖一定要**去背**,不可以連插畫的暗底一起貼上來。
-              ★ v1.145.0 當時的理由是「十一張裡只有台灣麻將是滿版的,那是它與麻將消消樂分家的
-                辨識點」;v1.148.0 台灣麻將也換成去背 PNG、紅底一起收掉了 → 現在的理由更單純:
-                **十一張卡清一色透明底**,任何一張加底色都會變成唯一突出的那一張。
-           ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE
-              (離線清單漏掉 → addAll 整批失敗 = 離線完全不能玩) -->
+           ⚠⚠ v1.149.0 的**已知取捨**:這張圖是「將」與「帥」**兩顆都翻開**的木棋子 + 木底座,
+              而 v1.144.0~v1.148.x 那張(以及手繪那幾版)刻意有**一顆是蓋著的** ——
+              那才是「暗」棋唯一的辨識點,只畫翻開的棋子講出來的是一般象棋。
+              這一版整套換成同一份插畫總圖(使用者指定),所以先照圖走;
+              代價是暗棋這張卡現在只講得出「象棋」,靠遊戲名補足「暗」。
+              ★ 要換回「有一顆蓋著」的話:重切一張蓋著的棋子貼上去就好 ——
+                接線一個字都不用動(首頁與進場頁指同一個 dc-icon.png)。
+           ⚠ 這件事**斷言測不到**(E 節只驗得到「兩頁同一個檔案」),只能看 46px 的截圖。 -->
       <a class="game-card as-link" href="darkchess.html" data-gk="dc">
         <span class="gc-rank" aria-hidden="true">10</span>
         <img class="gc-art dc-cart" src="dc-icon.png" alt="象棋暗棋" width="192" height="192">
@@ -410,31 +223,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </a>
 
       <!-- 第十一個遊戲(v1.135.0):成語接龍(交叉填字盤)。
-           ★ 一橫一縱兩個成語交叉(說一不二 × 一心一意,共用「一」字),兩格露出給定字
-             (一 / 心),呼應「部分黑字、部分待填」的填字盤玩法本體。
-           ⚠ 與 chengyu.html 進場插圖(.cy-art 92px)**逐字相同的一份 SVG**,
-              只有外層 class 不一樣;改一邊要改另一邊。
-           ⚠⚠ 這裡**不可以**掛 .cy-art —— 那是進場插圖的 92px,它定義在 .gc-art(46px)
-               後面 → 會把這張卡撐得比其他張高一截(21點 v1.86.0 踩過的坑) -->
+           ★ 圖上是四塊刻著「成語接龍」的木牌 + 一顆燈泡。⚠ 這個遊戲是**交叉填字盤**,
+             不是傳統接龍 —— 圖示講不出這件事(手繪那版曾經用「兩個成語交叉、兩格已填」
+             去講),所以它只負責被認出是「成語」那一款,玩法本體由進場頁的說明講。 -->
       <a class="game-card as-link" href="chengyu.html" data-gk="chengyu">
         <span class="gc-rank" aria-hidden="true">11</span>
-        <svg class="gc-art cy-cart" viewBox="0 0 56 56" role="img" aria-label="成語填字盤">
-          <rect class="cy-ic-plate" x="0.7" y="0.7" width="54.6" height="54.6" rx="7.5"/>
-          <rect class="cy-ic-well" x="3.4" y="3.4" width="49.2" height="49.2" rx="4.5"/>
-          <g class="cy-ic-tiles">
-            <rect class="cy-ic-tile cy-ic-blank" x="6.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-given" x="17.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-blank" x="28.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-blank" x="39.8" y="28.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-blank" x="17.8" y="6.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-given" x="17.8" y="17.8" width="9.5" height="9.5" rx="1.4"/>
-            <rect class="cy-ic-tile cy-ic-blank" x="17.8" y="39.8" width="9.5" height="9.5" rx="1.4"/>
-          </g>
-          <g class="cy-ic-text">
-            <text x="22.55" y="36.3">一</text>
-            <text x="22.55" y="25.3">心</text>
-          </g>
-        </svg>
+        <img class="gc-art cy-cart" src="cy-icon.png" alt="成語填字盤" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">成語接龍</span>
           <span class="hl-badge hidden" id="hlBadgeChengyu"></span>
@@ -452,22 +246,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="subtitle">選擇玩法</span>
     </div>
     <div class="home-hero">
-      <svg class="home-art" viewBox="0 0 120 116" role="img" aria-label="賓果卡">
-        <rect class="bc-card" x="3" y="3" width="114" height="110" rx="14"/>
-        <g class="bc-hd" text-anchor="middle">
-          <text x="14.4" y="25">B</text><text x="37.2" y="25">I</text><text x="60" y="25">N</text><text x="82.8" y="25">G</text><text x="105.6" y="25">O</text>
-        </g>
-        <line x1="10" y1="32" x2="110" y2="32" stroke="var(--panel-line)" stroke-width="1.5"/>
-        <g>
-          <rect class="bc-cell" x="5.4" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="39" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="39" width="18" height="18" rx="4"/>
-          <rect class="bc-cell" x="5.4" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="63" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="63" width="18" height="18" rx="4"/>
-          <rect class="bc-cell" x="5.4" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="28.2" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="51" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="73.8" y="87" width="18" height="18" rx="4"/><rect class="bc-cell" x="96.6" y="87" width="18" height="18" rx="4"/>
-        </g>
-        <circle class="bc-daub" cx="37.2" cy="48" r="8.4"/><circle class="bc-daub" cx="82.8" cy="48" r="8.4"/>
-        <circle class="bc-daub" cx="14.4" cy="72" r="8.4"/><circle class="bc-daub" cx="105.6" cy="72" r="8.4"/>
-        <circle class="bc-daub" cx="37.2" cy="96" r="8.4"/><circle class="bc-daub" cx="82.8" cy="96" r="8.4"/>
-        <polygon class="bc-star" points="60,63 62.23,68.93 68.56,69.22 63.61,73.17 65.29,79.28 60,75.8 54.71,79.28 56.39,73.17 51.44,69.22 57.77,68.93"/>
-      </svg>
+      <img class="bc-art" src="bc-icon.png" alt="賓果卡" width="192" height="192">
       <div class="home-tagline">和朋友連線比賽,或自己單機練習</div>
     </div>
     <button class="btn primary block-btn home-btn" id="homeOnline">🌐 連線對戰</button>

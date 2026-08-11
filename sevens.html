@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>排七（接龍） ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- 排七(接龍) · v1.148.0 -->
-<meta name="version" content="1.148.0">
+<!-- 排七(接龍) · v1.149.0 -->
+<meta name="version" content="1.149.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -56,40 +56,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 第一層:選怎麼玩 -->
     <div id="svPickMode">
       <div class="sv-hero">
-        <!-- ⚠ 插圖只用數字與自繪花色,不用撲克牌 Unicode(U+1F0A0 那一段)——
-             多數字型沒有,會變豆腐方框(見 notes/13 的禁令)
-             ⚠⚠ **連註解裡的花色符號都要帶 U+FE0E** —— t-sevens-solo-e2e 那條
+        <!-- ★ v1.149.0:與首頁卡**指向同一個檔案**(這裡是 .sv-art 96px、
+             首頁是 .gc-art.sv-cart 46px)—— 在此之前兩頁各有一份逐字相同的手繪 SVG。
+             ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十一張的規則寫在 index.html
+                的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這十一對雙胞胎)。
+             ⚠⚠ 這一頁**連註解裡的花色符號都要帶 U+FE0E** —— t-sevens-solo-e2e 那條
                 「每個花色符號都帶 U+FE0E」掃的是 body.innerHTML(只排除 #__log 與
-                <script>),所以**註解也算進去**;v1.101.1 踩了兩次:先是註解裡
-                寫了 7 個沒帶 U+FE0E 的花色,補好之後又在這段警告裡拿「沒帶的樣子」
-                當反例 → 又紅一次。要舉反例請寫碼點(U+2660)不要真的打那個字。
-             ★★ v1.101.1:三張真的牌面 ♦︎6 · ♠︎7 · ♥︎8(點數在上、花色在下、都置中,同 .sv-card),
-                中間那張 ♠︎7 是起始牌,所以疊在最上面而且比兩側高一點。
-                **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
-                (這裡是 .sv-art 96px、首頁是 .gc-art.pk-art 58px)——
-                同一副牌本來就該長一樣,樣式在 styles.css 的 .pk-ic-* 那幾條
-                (三個撲克牌遊戲共用一組;tools/test-pages.js 的 E 節在守這對雙胞胎) -->
-        <svg class="sv-art pk-art" viewBox="0 0 56 56" role="img" aria-label="撲克牌 排七">
-          <!-- 左:♦︎6 -->
-          <rect class="pk-ic-bd" x="1" y="15" width="21" height="30" rx="2.7"/>
-          <text class="pk-ic-t pk-ic-red" x="11.5" y="28">6</text>
-          <g class="pk-ic-s pk-ic-red" transform="translate(7.5 30.4) scale(.08)">
-            <path d="M50 6 86 50 50 94 14 50z"/>
-          </g>
-          <!-- 右:♥︎8 -->
-          <rect class="pk-ic-bd" x="34" y="15" width="21" height="30" rx="2.7"/>
-          <text class="pk-ic-t pk-ic-red" x="44.5" y="28">8</text>
-          <g class="pk-ic-s pk-ic-red" transform="translate(40.5 30.4) scale(.08)">
-            <path d="M50 90S10 62 10 36C10 22 21 12 34 12c8 0 14 5 16 11 2-6 8-11 16-11 13 0 24 10 24 24 0 26-40 54-40 54z"/>
-          </g>
-          <!-- 中:♠︎7(起始牌,疊在最上面) -->
-          <rect class="pk-ic-bd" x="17.5" y="11" width="21" height="30" rx="2.7"/>
-          <text class="pk-ic-t" x="28" y="24">7</text>
-          <g class="pk-ic-s" transform="translate(24 26.4) scale(.08)">
-            <path d="M50 9C50 9 88 40 88 61c0 12-9 20-20 20-7 0-13-4-18-10-5 6-11 10-18 10-11 0-20-8-20-20C12 40 50 9 50 9z"/>
-            <path d="M50 66c0 12-4 21-11 27h22c-7-6-11-15-11-27z"/>
-          </g>
-        </svg>
+                <script>),所以註解也算進去。要舉反例請寫碼點(U+2660)不要真的打那個字。 -->
+        <img class="sv-art" src="sv-icon.png" alt="撲克牌 排七" width="192" height="192">
         <div class="home-tagline">從 7 往兩邊接龍,蓋掉的牌算你的罰分</div>
       </div>
       <button class="btn primary block-btn home-btn" id="svGoOnline">🌐 連線對戰</button>

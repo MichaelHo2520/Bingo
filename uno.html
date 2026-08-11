@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.148.0 -->
-<meta name="version" content="1.148.0">
+<!-- UNO · v1.149.0 -->
+<meta name="version" content="1.149.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -56,23 +56,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 第一層:選怎麼玩 -->
     <div id="unPickMode">
       <div class="un-hero">
-        <!-- ★★ 進場插圖:黃 / 綠 / 藍 三張扇在後面 + 最前面一張紅牌,斜白橢圓裡寫 UNO。
-             使用者:「我希望是能看出是 uno 牌的感覺」→ 兩張交疊只講得出「兩個顏色的紙牌」,
-             UNO 的辨識點是**四個顏色**與**橢圓裡的 UNO 字樣**,兩個都要在。
-             **與 index.html 首頁那張卡逐字相同的一份 SVG**,只有外層 class 不一樣
-             (這裡是 .un-art 96px、首頁是 .gc-art.un-cart 46px)——
-             樣式在 styles.css 的 .un-ic-* 那幾條;tools/test-pages.js 的 E 節在守這對雙胞胎。
-             ⚠ 扇形的支點是 (28,54),四張牌的 x/y 完全一樣,差別只在轉幾度 -->
-        <svg class="un-art" viewBox="0 0 56 56" role="img" aria-label="UNO 牌">
-          <g transform="rotate(-25 28 54)"><rect class="un-ic-bd un-ic-y" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
-          <g transform="rotate(-8.5 28 54)"><rect class="un-ic-bd un-ic-g" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
-          <g transform="rotate(8.5 28 54)"><rect class="un-ic-bd un-ic-b" x="17.5" y="11" width="21" height="30" rx="2.7"/></g>
-          <g transform="rotate(25 28 54)">
-            <rect class="un-ic-bd un-ic-r" x="17.5" y="11" width="21" height="30" rx="2.7"/>
-            <ellipse class="un-ic-ov" cx="28" cy="26" rx="8.4" ry="13" transform="rotate(-30 28 26)"/>
-            <text class="un-ic-t un-ic-r wm" x="28" y="28.1" transform="rotate(-30 28 26)">UNO</text>
-          </g>
-        </svg>
+        <!-- ★ v1.149.0:與首頁卡**指向同一個檔案**(這裡是 .un-art 96px、
+             首頁是 .gc-art.un-cart 46px)—— 在此之前兩頁各有一份逐字相同的手繪 SVG。
+             ★★ 辨識點是**四個顏色** + **橢圓裡的 UNO 字樣**,兩個都要在
+                (兩色的紙牌講不出是 UNO)。⚠ 顏色是 UNO 的規則本體,不准轉黑白。
+             ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十一張的規則寫在 index.html
+                的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這十一對雙胞胎)。 -->
+        <img class="un-art" src="un-icon.png" alt="UNO 牌" width="192" height="192">
         <div class="home-tagline">搶著把手上的牌出完,剩一張要喊 UNO</div>
       </div>
       <button class="btn primary block-btn home-btn" id="unGoOnline">🌐 連線對戰</button>

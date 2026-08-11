@@ -16,8 +16,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>五子棋 ｜ 連線對戰 · 本機對戰</title>
-<!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v1.148.0 -->
-<meta name="version" content="1.148.0">
+<!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v1.149.0 -->
+<meta name="version" content="1.149.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -58,17 +58,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 第一層:選怎麼玩(連線在上,與數獨同順序) -->
     <div id="gmkPickMode">
       <div class="gmk-hero">
-        <svg class="gmk-art gk-art" viewBox="0 0 56 56" role="img" aria-label="五子棋盤">
-          <rect class="gk-bd" x="2" y="2" width="52" height="52" rx="6"/>
-          <g class="gk-ln">
-            <path d="M9 9H47M9 18.5H47M9 28H47M9 37.5H47M9 47H47"/>
-            <path d="M9 9V47M18.5 9V47M28 9V47M37.5 9V47M47 9V47"/>
-          </g>
-          <circle class="gk-b" cx="28" cy="28" r="4.4"/>
-          <circle class="gk-w" cx="18.5" cy="18.5" r="4.4"/>
-          <circle class="gk-b" cx="37.5" cy="18.5" r="4.4"/>
-          <circle class="gk-w" cx="18.5" cy="37.5" r="4.4"/>
-        </svg>
+        <img class="gmk-art" src="gk-icon.png" alt="五子棋盤" width="192" height="192">
         <div class="home-tagline">橫、豎、斜任一方向連成 5 顆就贏</div>
       </div>
       <button class="btn primary block-btn home-btn" id="gmkGoOnline">🌐 連線對戰</button>

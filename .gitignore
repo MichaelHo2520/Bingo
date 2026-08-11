@@ -14,15 +14,18 @@ tools/
 
 # 設計參考圖與舊資產(第三方素材,只用來對照配色與排法,絕不上傳也不打包進 App)
 # 一律收在 design-refs/,根目錄不再散放圖片;裡面目前有:
-#   970_*.png.webp  v1.55.0 的麻將牌面照這張「認識麻將花色」表重畫
-#   數獨icon.png    v1.101.2 首頁數獨木框盤面 + 鉛筆的參考圖
-#   file_0000…8f16.png  v1.145.0 暗棋首頁 icon 的原圖(兩顆棋子就是從它切出來的)
-#   file_0000…54e0.png  v1.148.0 台灣麻將首頁 icon 的原圖(三顆麻將牌,去背後縮成 192px)
-#   back.jpg        早期實驗殘留,沒有任何頁面引用
+#   麻將花色對照表-雀神.webp   v1.55.0 的麻將牌面照這張「認識麻將花色」表重畫
+#   數獨icon.png              v1.101.2 首頁數獨木框盤面 + 鉛筆的參考圖
+#   暗棋icon-帥與蓋牌-插畫.png  v1.145.0 暗棋首頁 icon 的原圖(兩顆棋子從它切出來)
+#   台灣麻將icon-台灣牌-插畫.png v1.148.0 台灣麻將首頁 icon 的原圖
+#   十一遊戲icon總圖-插畫.png   ★ v1.149.0 十一個遊戲的圖示全部從這一張切出來
+#                             (tools/cut-icons.py 演算法裁切,可重跑)
+#   back.jpg                  早期實驗殘留,沒有任何頁面引用
+# ⚠ v1.149.0 把這裡的檔名全部改成看得懂的中文(原本是 file_00000000xxxx.png 那種亂碼)。
 # ⚠ 真正在用的圖不在這裡,留在根目錄(黑名單制 → 自動上傳):
 #   icon.svg      PWA 圖示(十一頁 + manifest.json + sw.js 都引用它)
-#   dc-icon.png   暗棋的首頁卡 + 進場插圖(v1.145.0;index.html / darkchess.html / sw.js)
-#   m16-icon.png  台灣麻將的首頁卡 + 進場插圖(v1.148.0;index.html / mahjong16.html / sw.js)
+#   <前綴>-icon.png  ★ 十一個遊戲的圖示(v1.149.0;bc gk sk mk m16 sv b2 bj un dc cy)——
+#                 每一張都是「index.html 首頁卡 + 該遊戲進場插圖」同一個檔案,而且列進 sw.js 的 CORE
 # ⚠⚠ 頁面**絕對不可以**直接指向 design-refs/ —— 那是「本機好好的、線上永遠破圖」。
 design-refs/
 
