@@ -1334,11 +1334,15 @@
     background:transparent;
     font-family:'Fredoka',sans-serif;font-weight:600;
     display:grid;place-items:center;
-    box-shadow:inset -1px -1px 0 0 var(--sdk-line);
+    box-shadow:inset -1px 0 0 0 var(--sdk-line),inset 0 -1px 0 0 var(--sdk-line);
     transition:background .12s}
-  .sdk-cell.rb{box-shadow:inset -3px -1px 0 0 var(--sdk-thick)}
-  .sdk-cell.bb{box-shadow:inset -1px -3px 0 0 var(--sdk-thick)}
-  .sdk-cell.rb.bb{box-shadow:inset -3px -3px 0 0 var(--sdk-thick)}
+  /* ⚠ 右緣與下緣一定要拆成**兩道** box-shadow:一道只能有一個顏色,
+     寫成 inset -3px -1px … thick 的話「3px 的右緣」與「1px 的下緣」會被迫同色 ——
+     於是第 3、6 行每一格的下緣、第 3、6 列每一格的右緣都被畫成宮線的深色,
+     在盤面上長出一格長的深色線頭,看起來像多了幾條沒有邏輯的區塊界線(v1.151.2) */
+  .sdk-cell.rb{box-shadow:inset -3px 0 0 0 var(--sdk-thick),inset 0 -1px 0 0 var(--sdk-line)}
+  .sdk-cell.bb{box-shadow:inset 0 -3px 0 0 var(--sdk-thick),inset -1px 0 0 0 var(--sdk-line)}
+  .sdk-cell.rb.bb{box-shadow:inset -3px 0 0 0 var(--sdk-thick),inset 0 -3px 0 0 var(--sdk-thick)}
   .sdk-v{font-size:clamp(15px,4.6vw,26px);line-height:1;color:var(--sdk-given)}
   @supports (font-size:1cqmin){ .sdk-v{font-size:calc(62cqmin / var(--sn,9))} }
   /* 三層高亮:同列同行同宮 → 同數字 → 選中格。少一層在 9×9 手機上就很難掃描 */
