@@ -232,6 +232,32 @@ function dismissTopLayer(){
   }
   return false;
 }
+/* ---------- 回主選單不疊歷史(v1.153.0) ----------
+   要解決的事:首頁 → 遊戲 → 回主選單 → 再進下一個遊戲,每來回一趟就在歷史裡多疊兩筆,於是
+   **在首頁按返回不是離開,而是倒帶回上一個玩過的遊戲**(使用者:「在主頁面按返回應該直接退出」)。
+   PWA(standalone)的規則是「歷史到底時,系統返回鍵才會關掉 app」→ 修法就是不讓歷史長大:
+     · 從首頁點進來的(首頁在點卡片時寫下 NAV_HOME_KEY)→ 回主選單走 history.back(),把來的那一筆退掉
+     · 深層連結直接開這一頁(app.html#gomoku、書籤)→ 沒有那一筆可退 → location.replace(),原地換掉
+   兩條路走完歷史都只剩「首頁」一筆,所以在首頁再按一次返回就是退出。
+   ⚠ 守衛武裝著(= 在房裡)一律不接手:那時 back 只會吃掉守衛墊的那一筆,人還留在這一頁。
+     實務上這顆鍵只在進場選單第一層顯示,連線中看不到它 —— 這行是保險。
+   ★ 首頁那一半在 js/main.js(Bingo 不載入本檔),兩邊共用同一個 key —— 改一邊記得改另一邊。 */
+const NAV_HOME_KEY="bingo.navhome";
+function bindHomeLinks(){
+  document.querySelectorAll('a[href="index.html"]').forEach(a=>{
+    a.addEventListener("click",e=>{
+      // 中鍵 / Ctrl+點(開新分頁)一律照 <a href> 原本的行為走
+      if(e.defaultPrevented||e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+      if(bgArmed)return;
+      e.preventDefault();
+      let fromHome=false;
+      try{ fromHome=sessionStorage.getItem(NAV_HOME_KEY)==="1"; }catch(_){}
+      // ⚠ 記號會跟著「開新分頁」被複製過去(sessionStorage 是複製一份給新分頁的),
+      //   而新分頁根本沒有上一筆可退 → 一併看 history.length,否則那顆鍵會變成按了沒反應
+      if(fromHome && history.length>1) history.back(); else location.replace("index.html");
+    });
+  });
+}
 /* ---------- 全螢幕(v1.50.0:外殼架構) ----------
    Fullscreen API 綁在 document 上,**換頁瀏覽器一定收掉全螢幕**,而重進全螢幕一定要使用者手勢
    (實測:換頁後立刻 requestFullscreen 會 REJECT "Permissions check failed",連「使用者是點連結
@@ -1091,6 +1117,7 @@ function paintVersion(){
 }
 // 設定蓋板 / 表情面板 / 音訊解鎖 / SW 註冊:兩個遊戲一字不差的那些綁定
 function bindCommonUI(){
+  bindHomeLinks();   // 頂列 / 進場選單的「回主選單」:不再往歷史裡多疊一筆(見 bindHomeLinks)
   $("settingsBtn").addEventListener("click",openSettings);
   $("setClose").addEventListener("click",closeSettings);
   $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });

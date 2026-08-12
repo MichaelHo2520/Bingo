@@ -76,6 +76,21 @@
     if(card && card.scrollHeight>card.clientHeight) return;   // 卡片內容超出畫面時,才讓卡片自己捲
     e.preventDefault();
   },{passive:false});
+  /* 首頁 → 別頁遊戲(v1.153.0):記下「這一趟是從首頁點進去的」,那一頁的「回主選單」才知道
+     可以 history.back() 退回來 —— 而不是再往歷史裡疊一筆首頁,害得在首頁按返回是倒帶回
+     上一個玩過的遊戲、而不是退出 app。理由與另一半在 js/shared/ui-kit.js 的 bindHomeLinks()。
+     十張卡與「現在有人在玩」看板的每一列都是 <a href="xxx.html">(看板那些是 home-live.js
+     動態產生的)→ 一律委派在 document 上,不逐一綁。
+     ⚠ 進首頁先清掉:被 location.replace() 換進來的首頁,上一筆歷史並不是首頁。 */
+  const NAV_HOME_KEY="bingo.navhome";
+  try{ sessionStorage.removeItem(NAV_HOME_KEY); }catch(_){}
+  document.addEventListener("click",e=>{
+    const a=e.target.closest?e.target.closest("a[href]"):null;
+    if(!a)return;
+    const href=a.getAttribute("href")||"";
+    if(!/^[\w-]+\.html([?#]|$)/.test(href) || /^index\.html/.test(href))return;   // 只認同目錄的別頁遊戲
+    try{ sessionStorage.setItem(NAV_HOME_KEY,"1"); }catch(_){}
+  });
   // 主選單第一層:選遊戲(五子棋是 <a href="gomoku.html">,不需綁定)
   $("pickBingo").addEventListener("click",()=>showHomeLayer("bingo"));
   $("homeBack").addEventListener("click",()=>showHomeLayer("pick"));

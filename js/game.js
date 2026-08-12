@@ -288,6 +288,25 @@
     if(pick) pick.classList.toggle("hidden", which!=="pick");
     if(sub)  sub.classList.toggle("hidden", which!=="bingo");
     setTopBrand(which==="pick" ? "party" : "bingo");
+    // 返回鍵(v1.153.0):第一層就是「主頁面」→ 撤掉守衛,再按一下返回就退出 app;
+    // 離開第一層一律武裝守衛,按返回是往回退一層而不是關掉 app(見 homeBackKey)
+    if(which==="pick") disarmBackGuard(); else armBackGuard(homeBackKey);
+  }
+  /* 返回鍵(Bingo 專用,v1.153.0):第一層以外的每一層都往回退一層,而不是離開這一頁。
+     為什麼要有它:首頁就是 Bingo 這一頁,而歷史在首頁已經到底(見 ui-kit.js 的 bindHomeLinks)——
+     沒有守衛的話,在第二層 / 單機局中按返回會直接把 app 關掉。
+     ⚠ 連線中的返回鍵是 online.js 的 onBackKey(進房時把 bgAct 覆蓋掉),不會走到這裡;
+       離房 disarm 後畫面也已經回到第一層。 */
+  function homeBackKey(){
+    if(dismissTopLayer())return;                                                  // 有浮層先關浮層
+    const conn=$("mpConnect");
+    if(conn && !conn.classList.contains("hidden")){                               // 連線大廳 → 回主選單
+      if(typeof MP!=="undefined" && MP.closeConnect) MP.closeConnect(); else enterHome();
+      return;
+    }
+    if(state.mode==="play"){ toSetup(); return; }                                 // 單機對局中 → 回單機設定
+    if(state.mode==="setup"){ enterHome(); return; }                              // 單機設定 → 主選單第一層
+    showHomeLayer("pick");                                                        // 第二層(選 BINGO 玩法)→ 第一層
   }
   // 頂列品牌字:"party"=選遊戲主選單顯示「派對遊戲」;"bingo"=其餘畫面顯示 B-I-N-G-O 跑馬燈。
   // 只有這裡切換就夠 —— 離開第一層的唯一出口是 showHomeLayer("bingo")(另兩張卡是連到別頁的 <a>),
