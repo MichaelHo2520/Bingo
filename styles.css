@@ -6057,6 +6057,19 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     --dc-s5:#bda775; --dc-s6:#a98f5d; --dc-s7:#93784a; --dc-s8:#7d633a;
     position:relative;width:80%;height:80%;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
+    /* ★★★ v1.150.1:把厚度**讓出來**,否則整顆看起來偏下(使用者:「棋子上下沒有置中」)。
+       ⚠ 這不是 flex 沒置中 —— 量過:圓餅本身上下留白**完全相等**。問題在於
+         `align-items:center` 只認 border-box,而厚度(--dc-lift)是一疊**往下長的
+         box-shadow**、根本不佔版面 → 置中的是「圓餅」,但眼睛看到的是「圓餅 + 側壁」,
+         那個整體就偏下了**半個厚度**(上緣多一條空白、下緣的側壁貼死格線)。
+       ⚠ 用 margin-bottom 而不是 transform / padding:
+         · padding 加在格子(.dc-sq)上 → .dc-p 的 `height:80%` 是相對 content box,
+           棋子會**跟著縮小**;
+         · transform 會與落地 / 翻牌那幾支動畫的 transform 打架。
+         margin 只改外框、不動百分比基準,而且 flex 置中本來就把 margin 算進去。
+       ⚠⚠ 要一起讓的是 `.dc-flip3d`(翻牌時它才是那個 flex item),
+         要一起**歸零**的是兩張臉(absolute 滿版)與吃子欄(刻意扁的、根本沒有厚度)。 */
+    margin-bottom:var(--dc-th);
     background:
       radial-gradient(circle at 50% 50%, rgba(255,252,243,0) 0 88%,
         rgba(255,252,244,.55) 90% 95%, rgba(120,80,36,.16) 97% 100%),
@@ -6271,10 +6284,20 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      v1.139.1 收到 83%,v1.141.1 再收到 80% —— 理由見 .dc-p 那段
      「棋子 + 厚度不可以超過一格」與「最外圈那一列不可以貼到木框」)。
      不一樣的話翻牌翻完那顆子會忽然大一號 / 小一號(v1.137.6 修過同源的另一半)。 */
+  /* ⚠⚠ 翻牌時**它**才是格子裡那個 flex item,所以「讓出厚度」這件事要跟 .dc-p 做同一份
+     (不同步的症狀:翻完那一格的子會**往下跳半個厚度**才落定,而且只有錄影看得出來)。
+     ⚠ --dc-th 在這裡**重複宣告一次**是必要的:它原本宣告在 .dc-p 身上,而 .dc-p 在翻牌時
+       是這一層的**子孫**、拿不到反向繼承。⚠⚠ 兩處的算式必須一模一樣 ——
+       這條與底下那條「寬高要與 .dc-p 同一個數字」是同一種雙胞胎。 */
   .dc-flip3d{position:relative;width:80%;height:80%;transform-style:preserve-3d;
+    --dc-th:calc(var(--dc-cell,44px) * .105);margin-bottom:var(--dc-th);
     animation:dcFlipIn .38s cubic-bezier(.22,.61,.36,1) both}
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
     -webkit-backface-visibility:hidden}
+  /* ⚠ 兩張臉是 absolute + inset:0 的滿版,厚度已經由外層 .dc-flip3d 讓過了 ——
+     再讓一次會把兩張臉往上推、與外殼錯開(背面那張的 .dc-face 與 .dc-p 是**同一個元素**,
+     所以要 `.dc-face.dc-p` 這種寫法才蓋得到)。 */
+  .dc-face .dc-p,.dc-face.dc-p{margin-bottom:0}
   .dc-face-f{transform:rotateY(180deg)}
   /* ⚠⚠⚠ 正面那張臉裡包的是 pieceFaceHTML() 產生的 `.dc-p`,而 `.dc-p` 自己是
      `width:88%;height:88%` —— 巢狀之後就變成「格子的 88% 再乘 88%」= **77%**,
@@ -6382,7 +6405,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        光靠字色分不出哪幾顆是誰的(紅線:兩方不可以塌成同一種樣子)。 */
   .dc-tray-pcs .dc-p{width:26px;height:26px;flex:none;
     background:var(--dc-cap-face);
-    box-shadow:0 0 0 1.5px rgba(36,31,28,.50)}
+    box-shadow:0 0 0 1.5px rgba(36,31,28,.50);
+    /* ⚠ 「讓出厚度」那條(v1.150.1)在這裡要**歸零**:這一排是刻意扁的,box-shadow 被整份
+       覆蓋掉、根本沒有厚度可以讓 —— 留著只會讓整排圓餅無故上移一截、與標籤對不齊。 */
+    margin-bottom:0}
   .dc-tray-pcs .dc-p.dc-red{box-shadow:0 0 0 1.5px rgba(142,31,39,.60)}
   .dc-tray-pcs .dc-p::after{display:none}
   .dc-tray-pcs .dc-ring{display:none}
