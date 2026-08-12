@@ -36,6 +36,17 @@ const MP = MPCore.create((function(){
   let turnSec = 40;                     // ★ 比 UNO 長 —— 暗棋一手要看整個盤面
   let ctx = null;
 
+  /* ★★ 棋子樣式(v1.151.0)——「設定規則」面板裡的一組,但它**不是房規**:
+       純視覺、不影響任何判定,也沒有情報落差 → **各人自己的本機偏好**,
+       連線時雙方可以不一樣(這一點與「對手吃子」那條房規正好相反,那條是公平性問題)。
+     ⚠ 這份陣列是**白名單**,usePrefs 一律拿它擋:localStorage 裡的舊值 / 手改的值
+       如果放行,body 上就會掛一個沒有規則的 class,棋子退回 fallback ——
+       症狀是「選了烏木卻還是原木」,而且不報錯。
+     ⚠⚠ 值要與三件事一字不差:styles.css 的 .dcs-* 三條、darkchess.html 的 data-skin、
+       以及 main.js 的 applySkin()。四處是同一組字串。 */
+  const SKINS = ["plain", "carved", "ebony"];
+  let skin = "carved";                  // 預設 = v1.150 那版(使用者現在看到的樣子)
+
   /* ★★★ 房規 —— **兩份**,而它們刻意不一樣:
        rules   房間欄位 `dcRules`(房主現在設定的那一份 → **下一局**才生效)
        gRules  這一局**開局那一刻凍結**的那一份(`game.rules`,真相層要用的就是它)
@@ -437,17 +448,26 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { turnSec: turnSec, dcRules: DC.normRules(rules) }; },
+    ownPrefs(){ return { turnSec: turnSec, dcRules: DC.normRules(rules), skin: skin }; },
     usePrefs(o){
       if(typeof o.turnSec === "number" && (o.turnSec === 0 || (o.turnSec >= 10 && o.turnSec <= 180))) turnSec = o.turnSec;
       /* ★ 我上次當房主設的房規 → 下次建房自動帶回來(同 turnSec)。
          ⚠ 一律 normRules:那份 JSON 住在 localStorage,版本一換就可能有認不出的值。 */
       if(o.dcRules) rules = DC.normRules(o.dcRules);
+      /* ★ 棋子樣式:**純本機偏好**,不進房規也不進房間欄位(連線時雙方可以不一樣)。
+         ⚠ 一律用白名單擋:那份 JSON 住在 localStorage,舊版 / 手改都可能塞進認不出的值,
+           而認不出的值會變成「body 上掛了一個沒有規則的 class」= 棋子回到 fallback,
+           看起來像「選了烏木卻還是原木」。 */
+      if(SKINS.indexOf(o.skin) >= 0) skin = o.skin;
     },
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
       act, isMyTurn, resign,
+      /* 棋子樣式:只存值,套進 DOM 由 main.js 做(adapter 不碰版面) */
+      skins: () => SKINS.slice(),
+      skin: () => skin,
+      setSkin(v){ if(SKINS.indexOf(v) >= 0) skin = v; return skin; },
       // 投降鈕該不該出現 / 按得按不動(單機那份的條件在 main.js)
       canResign: () => !!(st && !st.over && playing() && mySeat() >= 0),
       /* ---------- 房規:面板是單機連線共用的,分流點在 main.js ----------

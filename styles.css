@@ -5869,7 +5869,115 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 </svg>");
          --dc-innerimg:url("data:image/svg+xml;utf8,\
 <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23fff'\
- stroke-width='1.5'><circle cx='50' cy='50' r='35.4'/></svg>"); }
+ stroke-width='1.5'><circle cx='50' cy='50' r='35.4'/></svg>");
+         /* ★ 「原木」那一套的細線 —— 半徑 40.5 是照 v1.141~v1.150 的 `.dc-ring{inset:9.5%}`
+            換算的(inset 9.5% → 半徑 .405),換成 mask 之後兩面共用同一張。 */
+         --dc-thinimg:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23fff'\
+ stroke-width='1.4'><circle cx='50' cy='50' r='40.5'/></svg>"); }
+
+  /* ==========================================================================
+     棋子樣式:三選一(v1.151.0)
+     ──────────────────────────────────────────────────────────────────────────
+     ★ 使用者:「我要設定規則裡面,增加一個選項可以選棋子,選項要有三種,原本的那一個,
+       還有現在的這一個,再加上一個深色系的」+「在選擇棋子那邊需要有圖案可以看」。
+       · plain  原木 = v1.149.0 那版(字直接刻在木頭上、沒有圈,牌背素面 + 一顆小節疤)
+       · carved 雕花 = v1.150.0 那版(漆圈 + 雲頭紋,牌背一圈回紋)
+       · ebony  烏木 = 深色木 + **象牙色字面** + 雕花那一套刻紋
+
+     ⚠⚠⚠ 三套一律用 **custom property** 表達,**不可以**改用 class 選擇器分流
+       (`.dcs-plain .dc-p{...}` / `.dcs-carved .dc-p{...}`)—— 房規面板上那三張預覽卡
+       要**同時**顯示三種樣式,而它們與盤面同在一個 body 底下:
+       兩條 class 規則的特異性**相同**,誰贏由 **CSS 檔案裡的先後順序**決定,
+       CSS **沒有「就近的祖先贏」這回事** → 三張卡會全部長成同一個樣子(而且是「最後
+       寫的那一套」,看起來像「預覽壞了」而不是「選擇器寫錯了」)。
+       custom property 是**繼承**的,最近的祖先值贏 → 預覽卡蓋得過 body。這是唯一解。
+     ⚠ 因此底下 .dc-p / .dc-ring / .dc-grain 的骨架**只准吃變數**,不准寫死任何一套的值;
+       每個 var() 都帶 fallback = 原木那一套,所以就算 body 上一個 class 都沒有也不會破。
+     ⚠ ebony 的深木**不可以只做一半**:深木上紅字幾乎看不見 → 它一定要配**象牙色字面**
+       (那正好是參考照上深木那顆的樣子)。只換木色不加字面 = 紅方變成一團暗紅。
+     ⚠ ebony 的棋身要比棋盤(--dc-slab #8a5c30)**深很多**,否則子會埋進盤裡
+       —— 這條與 v1.139.0 牌背改色是同一個教訓,只是方向相反。
+     ========================================================================== */
+  /* ---------- 原木(v1.149.0 那版)---------- */
+  .dcs-plain{
+    --dcs-ring:var(--dc-thinimg);  --dcs-bring:var(--dc-thinimg);
+    --dcs-ring-c:rgba(108,74,30,.34); --dcs-ring-lit:rgba(255,252,240,.50);
+    --dcs-bring-c:rgba(108,74,30,.30); --dcs-bring-lit:rgba(255,252,240,.44);
+    --dcs-key-d:none;
+    /* 小節疤:順紋板材上偶爾有的一顆瑕疵 —— 不在正中央、而且刻意很淡 */
+    --dcs-knot-x:63%; --dcs-knot-y:32%; --dcs-knot-w:11%; --dcs-knot-h:7%;
+    --dcs-knot-t:translate(-50%,-50%) rotate(24deg); --dcs-knot-o:.42;
+    --dcs-knot-bg:
+      radial-gradient(ellipse at 44% 30%, rgba(255,244,220,.30) 0%, rgba(255,244,220,0) 58%),
+      radial-gradient(ellipse at 52% 58%, rgba(96,58,20,.70) 0%, rgba(96,58,20,0) 80%)}
+  /* ---------- 雕花(v1.150.0 那版)---------- */
+  .dcs-carved{
+    --dcs-ring:var(--dc-ringimg);  --dcs-bring:var(--dc-innerimg);
+    --dcs-ring-c:currentColor; --dcs-ring-lit:rgba(255,252,238,.62);
+    --dcs-bring-c:rgba(96,58,20,.42); --dcs-bring-lit:rgba(255,250,232,.42);
+    --dcs-key-d:block; --dcs-key-c:rgba(96,58,20,.60); --dcs-key-lit:rgba(255,250,232,.50);
+    /* ⚠⚠⚠ 關掉小節疤只能靠 --dcs-knot-bg:none,**不可以**用 --dcs-knot-o:0 ——
+       opacity 作用在**整個元素**、連同偽元素,而回紋正是畫在偽元素上:
+       設 0 會把回紋一起關掉(第一版就是這樣,整圈回紋靜靜消失,而 display 與 mask
+       量起來都完全正常)。這個節點一人分飾兩角,兩角共用的屬性一律不准拿來當開關。 */
+    --dcs-knot-bg:none}
+  /* ---------- 烏木(深色系)----------
+     ⚠ 側壁那八階(--dcs-s* / --dcs-bs*)一定要跟著換:它們是**寫死的淺木色**,
+       不換的話深色棋身底下會長出一圈亮橘色的側壁(而且只有截圖看得出來)。 */
+  .dcs-ebony{
+    --dcs-ring:var(--dc-ringimg);  --dcs-bring:var(--dc-innerimg);
+    --dcs-ring-c:currentColor; --dcs-ring-lit:rgba(255,238,214,.30);
+    /* ⚠ 刻紋在深木上要**比淺木更強**才看得見:第一版照抄淺木那組的 alpha,
+       結果暗子整顆是一塊純深色圓餅、回紋完全讀不出來(只有截圖看得出來)。 */
+    --dcs-bring-c:rgba(12,6,3,.60); --dcs-bring-lit:rgba(206,168,134,.46);
+    --dcs-key-d:block; --dcs-key-c:rgba(8,4,1,.70); --dcs-key-lit:rgba(214,176,140,.56);
+    --dcs-knot-bg:none;   /* ⚠ 同雕花那條:不可以改用 --dcs-knot-o:0 關它 */
+    /* 棋身:紫檀。★ 象牙字面那一層畫在 --dcs-pbg 的**最上面一層之下**(高光之下、木紋之上) */
+    --dcs-s1:#6b4c3c; --dcs-s2:#5e4234; --dcs-s3:#52382c; --dcs-s4:#452f25;
+    --dcs-s5:#39261e; --dcs-s6:#2e1e18; --dcs-s7:#241712; --dcs-s8:#1a100c;
+    --dcs-bs1:#5f4234; --dcs-bs2:#53392d; --dcs-bs3:#472f26; --dcs-bs4:#3b271f;
+    --dcs-bs5:#301f19; --dcs-bs6:#261813; --dcs-bs7:#1d120e; --dcs-bs8:#140b08;
+    --dcs-pbg:
+      radial-gradient(circle at 50% 50%, rgba(255,232,204,0) 0 88%,
+        rgba(255,236,208,.26) 90% 95%, rgba(10,5,2,.34) 97% 100%),
+      radial-gradient(circle at 64% 76%, rgba(255,240,216,0) 0 74%,
+        rgba(255,240,216,.30) 89% 97%, rgba(255,240,216,0) 100%),
+      radial-gradient(ellipse 78% 68% at 38% 26%, rgba(255,238,212,.16) 0%, rgba(255,238,212,0) 68%),
+      /* ⚠⚠ 象牙字面的半徑是**夾出來的**,不是隨手挑的:
+         漆圈在 .415(--dc-ringimg 的 r=41.5)、車溝在 .455(.dc-p::after 的 inset 4.5%)——
+         字面一定要落在**兩者之間**,否則漆圈會畫到字面外的深木上,紅方那幾顆等於沒有圈。
+         ⚠⚠⚠ 一定要用 `ellipse 44% 44%` 而**不是** `circle ... 44%`:
+           circle 的色停百分比是相對**farthest-corner**(正方形 = 0.707×邊長),
+           寫 44% 實際只有 .311 —— 比漆圈還小,而症狀正好就是上面那一句。
+           ellipse 的兩個百分比才是直接對 width / height。 */
+      radial-gradient(ellipse 44% 44% at 50% 50%, #f2e6c6 0 99%, rgba(0,0,0,0) 100%),
+      var(--dc-grainimg) var(--dc-wx,50%) var(--dc-wy,50%)/235% 235% no-repeat,
+      radial-gradient(circle at 50% 44%, #59392c 0%, #472c22 62%, #35201a 100%);
+    --dcs-pbox:
+      inset 0 1.5px 2px rgba(255,232,204,.20),
+      inset 0 -3px 5px rgba(8,4,1,.40),
+      0 0 0 1px rgba(30,17,10,.62);
+    --dcs-bbg:
+      radial-gradient(circle at 50% 50%, rgba(255,232,204,0) 0 88%,
+        rgba(255,236,208,.22) 90% 95%, rgba(10,5,2,.36) 97% 100%),
+      radial-gradient(circle at 64% 76%, rgba(255,240,216,0) 0 74%,
+        rgba(255,240,216,.26) 89% 97%, rgba(255,240,216,0) 100%),
+      radial-gradient(ellipse 78% 68% at 38% 26%, rgba(255,238,212,.14) 0%, rgba(255,238,212,0) 68%),
+      var(--dc-grainimg) var(--dc-wx,50%) var(--dc-wy,50%)/235% 235% no-repeat,
+      radial-gradient(circle at 52% 46%, #4d3126 0%, #3e2720 60%, #2c1a15 100%);
+    --dcs-bbox:
+      inset 0 1.5px 2px rgba(255,232,204,.16),
+      inset 0 -3px 6px rgba(8,4,1,.38),
+      0 0 0 1px rgba(30,17,10,.60);
+    /* 車溝在深木上要翻過來:亮邊拉強、暗邊收弱,否則整條溝糊在暗色裡看不見 */
+    --dcs-cut:
+      inset 0 2.5px 3px rgba(8,4,1,.50),
+      inset 0 -2px 2px rgba(226,190,150,.30),
+      0 2.5px 2px -1px rgba(226,190,150,.34),
+      0 -2px 2px -1px rgba(8,4,1,.34);
+    /* 字刻在**象牙字面**上,所以雕刻的兩道邊回到淺色那一組(不是深木那一組) */
+    --dcs-ink-r:#9e1f28; --dcs-ink-b:#221d1a}
 
   /* ---------- 首頁 icon / 進場插圖:**同一個檔案 dc-icon.png** ----------
      ★★★ v1.145.0:圖示改成一張**去背的 PNG 貼圖**(dc-icon.png,192×192、13.9KB)。
@@ -6053,8 +6161,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       0 calc(var(--dc-th) * .92) 0 var(--dc-s7),
       0 var(--dc-th) 0 var(--dc-s8),
       0 calc(var(--dc-th) + 4px) calc(var(--dc-th) + 9px) rgba(20,8,0,.52);
-    --dc-s1:#f2e8cd; --dc-s2:#e8dbba; --dc-s3:#dccca4; --dc-s4:#cdb98c;
-    --dc-s5:#bda775; --dc-s6:#a98f5d; --dc-s7:#93784a; --dc-s8:#7d633a;
+    /* ⚠ 側壁八階一律走 var(--dcs-s*, 淺木原值):skin 換不換得掉全靠這一層,
+       而 fallback 就是「原木 / 雕花」共用的那組淺木(見上面的棋子樣式區塊)。 */
+    --dc-s1:var(--dcs-s1,#f2e8cd); --dc-s2:var(--dcs-s2,#e8dbba);
+    --dc-s3:var(--dcs-s3,#dccca4); --dc-s4:var(--dcs-s4,#cdb98c);
+    --dc-s5:var(--dcs-s5,#bda775); --dc-s6:var(--dcs-s6,#a98f5d);
+    --dc-s7:var(--dcs-s7,#93784a); --dc-s8:var(--dcs-s8,#7d633a);
     position:relative;width:80%;height:80%;border-radius:50%;
     display:flex;align-items:center;justify-content:center;
     /* ★★★ v1.150.1:把厚度**讓出來**,否則整顆看起來偏下(使用者:「棋子上下沒有置中」)。
@@ -6070,7 +6182,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
        ⚠⚠ 要一起讓的是 `.dc-flip3d`(翻牌時它才是那個 flex item),
          要一起**歸零**的是兩張臉(absolute 滿版)與吃子欄(刻意扁的、根本沒有厚度)。 */
     margin-bottom:var(--dc-th);
-    background:
+    /* ⚠ 整份 background / 前三道 box-shadow 都可以被 skin 換掉(--dcs-pbg / --dcs-pbox)——
+       烏木那套不是「把淺木調暗」而是**另一組堆疊**(高光要收、還多一層象牙字面),
+       逐層改 alpha 是改不出來的。fallback 就是原木 / 雕花共用的淺木那份。 */
+    background:var(--dcs-pbg,
       radial-gradient(circle at 50% 50%, rgba(255,252,243,0) 0 88%,
         rgba(255,252,244,.55) 90% 95%, rgba(120,80,36,.16) 97% 100%),
       radial-gradient(circle at 64% 76%, rgba(255,255,252,0) 0 74%,
@@ -6079,11 +6194,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         rgba(126,88,40,.10) 78%, rgba(126,88,40,.22) 100%),
       radial-gradient(ellipse 78% 68% at 38% 26%, rgba(255,254,249,.52) 0%, rgba(255,254,249,0) 68%),
       var(--dc-grainimg) var(--dc-wx,50%) var(--dc-wy,50%)/235% 235% no-repeat,
-      radial-gradient(circle at 50% 44%, var(--dc-wood) 0%, var(--dc-wood-in) 62%, #d9c79d 100%);
+      radial-gradient(circle at 50% 44%, var(--dc-wood) 0%, var(--dc-wood-in) 62%, #d9c79d 100%));
     box-shadow:
-      inset 0 1.5px 2px rgba(255,255,255,.50),
-      inset 0 -3px 5px rgba(110,72,30,.24),
-      0 0 0 1px rgba(150,104,52,.46),
+      var(--dcs-pbox,
+        inset 0 1.5px 2px rgba(255,255,255,.50),
+        inset 0 -3px 5px rgba(110,72,30,.24),
+        0 0 0 1px rgba(150,104,52,.46)),
       var(--dc-lift)}
   /* 每顆的木紋不同 —— **不是換圖,是取同一張貼圖的不同區域**
      (背景鋪成 235%,再用 --dc-wx / --dc-wy 決定取哪一塊)。
@@ -6105,11 +6221,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ inset 6.5% 要**大於** .dc-p 背景那圈倒角的起點(83%),不然溝會壓在倒角上糊成一團。
      ⚠ pointer-events:none —— .dc-sq 才是那顆按鈕,這一層不可以吃掉點擊。 */
   .dc-p::after{content:"";position:absolute;inset:4.5%;border-radius:50%;pointer-events:none;
-    box-shadow:
+    box-shadow:var(--dcs-cut,
       inset 0 2.5px 3px rgba(108,74,30,.42),
       inset 0 -2px 2px rgba(255,253,245,.62),
       0 2.5px 2px -1px rgba(255,253,245,.75),
-      0 -2px 2px -1px rgba(108,74,30,.26)}
+      0 -2px 2px -1px rgba(108,74,30,.26))}
   /* ---------- 正面:漆圈 + 雲頭(v1.150.0)----------
      ★★★ 使用者換了參考照(design-refs 那張四顆的近照),圈**又回來了** ——
      所以這裡**推翻 v1.141.0 的結論**,而那條結論的原話是「參考照上根本沒有那個圈」。
@@ -6128,10 +6244,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-ring{position:absolute;inset:0;border-radius:50%;border:0;opacity:1;pointer-events:none}
   .dc-ring::before,.dc-ring::after{content:"";position:absolute;inset:0;border-radius:50%;
     pointer-events:none;
-    -webkit-mask:var(--dc-ringimg) center/100% 100% no-repeat;
-    mask:var(--dc-ringimg) center/100% 100% no-repeat}
-  .dc-ring::before{background:rgba(255,252,238,.62);transform:translate(.9px,.9px)}
-  .dc-ring::after{background:currentColor}
+    -webkit-mask:var(--dcs-ring,var(--dc-thinimg)) center/100% 100% no-repeat;
+    mask:var(--dcs-ring,var(--dc-thinimg)) center/100% 100% no-repeat}
+  .dc-ring::before{background:var(--dcs-ring-lit,rgba(255,252,240,.50));
+    transform:translate(.9px,.9px)}
+  .dc-ring::after{background:var(--dcs-ring-c,rgba(108,74,30,.34))}
   /* ⚠ 棋子的字用**襯線體**:象棋子上就是印宋體,用內文的 Nunito 會像貼紙。
      取不到中文襯線體時退回 serif —— 那也還是襯線,不會變成另一種味道。
      ⚠ 字級的分母是**格子**不是棋子,所以 .dc-p 的百分比一改,「字 / 棋子」的比例就跟著跑。
@@ -6152,8 +6269,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
     text-shadow:
       -1px -1px 0 rgba(88,56,22,.55),
       1px 1px 0 rgba(255,252,240,.62)}
-  .dc-red{color:var(--dc-ink-r)}
-  .dc-blk{color:var(--dc-ink-b)}
+  /* ⚠ 漆圈吃的是 currentColor,所以這兩條同時決定「字的顏色」與「圈的顏色」——
+     烏木那套把它們換掉(--dcs-ink-*),因為字改寫在象牙字面上、不再是寫在木頭上。 */
+  .dc-red{color:var(--dcs-ink-r,var(--dc-ink-r))}
+  .dc-blk{color:var(--dcs-ink-b,var(--dc-ink-b))}
 
   /* 牌背:與正面**明顯不同色**,而且沒有字。⚠ 不可以只降飽和度來表示「暗」——
      那會看起來像 disabled(UNO 的暗牌踩過同一件事)。
@@ -6178,10 +6297,12 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ★ v1.145.0 起「首頁 icon 要不要跟著改」這個問題消失了 —— 它變成一張 PNG 貼圖
      (dc-icon.png),不吃這裡任何一個變數。這一段從此只管盤面上真的那些棋子。 */
   .dc-backface{color:var(--dc-back-e);
-    --dc-s1:#e6d8b0; --dc-s2:#dbcb9e; --dc-s3:#cdba87; --dc-s4:#bda672;
-    --dc-s5:#ab925d; --dc-s6:#977d49; --dc-s7:#816739; --dc-s8:#6b532c;
+    --dc-s1:var(--dcs-bs1,#e6d8b0); --dc-s2:var(--dcs-bs2,#dbcb9e);
+    --dc-s3:var(--dcs-bs3,#cdba87); --dc-s4:var(--dcs-bs4,#bda672);
+    --dc-s5:var(--dcs-bs5,#ab925d); --dc-s6:var(--dcs-bs6,#977d49);
+    --dc-s7:var(--dcs-bs7,#816739); --dc-s8:var(--dcs-bs8,#6b532c);
     --dc-wx:70%; --dc-wy:22%;
-    background:
+    background:var(--dcs-bbg,
       radial-gradient(circle at 50% 50%, rgba(255,236,204,0) 0 88%,
         rgba(255,250,234,.52) 90% 95%, rgba(96,58,20,.17) 97% 100%),
       radial-gradient(circle at 64% 76%, rgba(255,253,244,0) 0 74%,
@@ -6190,9 +6311,13 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         rgba(112,76,32,.11) 78%, rgba(112,76,32,.24) 100%),
       radial-gradient(ellipse 78% 68% at 38% 26%, rgba(255,252,240,.46) 0%, rgba(255,252,240,0) 68%),
       var(--dc-grainimg) var(--dc-wx,50%) var(--dc-wy,50%)/235% 235% no-repeat,
-      radial-gradient(circle at 52% 46%, var(--dc-back) 0%, var(--dc-back-in) 60%, #b89c6e 100%);
-    box-shadow:inset 0 1.5px 2px rgba(255,253,242,.45),inset 0 -3px 6px rgba(96,58,20,.22),
-      0 0 0 1px rgba(150,110,58,.44),var(--dc-lift)}
+      radial-gradient(circle at 52% 46%, var(--dc-back) 0%, var(--dc-back-in) 60%, #b89c6e 100%));
+    box-shadow:
+      var(--dcs-bbox,
+        inset 0 1.5px 2px rgba(255,253,242,.45),
+        inset 0 -3px 6px rgba(96,58,20,.22),
+        0 0 0 1px rgba(150,110,58,.44)),
+      var(--dc-lift)}
   /* ---------- 牌背:回紋(雷紋)雕刻帶 + 內圈細線(v1.150.0)----------
      ★★★ 這一段**推翻 v1.139 ~ v1.141 那三版一路收到底的結論**(當時的結論是
      「牌背上任何幾何圖案都會讓它讀成『牌』而不是一塊車出來的木頭」,所以收成全素面)。
@@ -6207,20 +6332,51 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 這裡的明暗方向與正面**相反**:正面是「漆色蓋在受光邊上」,牌背是純雕刻,
        所以暗壁先畫(::before)、受光壁後畫並往右下錯開(::after)。 */
   .dc-backface .dc-ring::before,.dc-backface .dc-ring::after{
-    -webkit-mask-image:var(--dc-innerimg);mask-image:var(--dc-innerimg)}
-  .dc-backface .dc-ring::before{background:rgba(255,250,232,.42);transform:translate(.8px,.8px)}
-  .dc-backface .dc-ring::after{background:rgba(96,58,20,.42);transform:none}
+    -webkit-mask-image:var(--dcs-bring,var(--dc-thinimg));
+    mask-image:var(--dcs-bring,var(--dc-thinimg))}
+  .dc-backface .dc-ring::before{background:var(--dcs-bring-lit,rgba(255,252,240,.44));
+    transform:translate(.8px,.8px)}
+  .dc-backface .dc-ring::after{background:var(--dcs-bring-c,rgba(108,74,30,.30));transform:none}
   /* ⚠ .dc-grain 從「一顆小節疤」改成**整圈回紋**:位置/尺寸整份重寫成 inset:0。
      ⚠⚠ 這裡**不可以**再補一組 left:auto / top:auto 「把舊值清乾淨」——
        整條規則是重寫的,舊宣告本來就不存在;而 auto 寫在 inset 後面會把 inset 的
        top/left 打回 auto → 元素縮成 0×0,回紋整圈靜靜不見(第一版就是這樣,
        computed 的 mask-image 量起來完全正常,只有截圖看得出來)。 */
-  .dc-grain{position:absolute;inset:0;border-radius:50%;pointer-events:none;background:none}
+  /* ⚠⚠ 這個節點**一人分飾兩角**:雕花 / 烏木是「整圈回紋」(偽元素),原木是「一顆小節疤」
+     (本體的背景)。兩者的定位差很多,所以位置 / 尺寸 / 旋轉 / 透明度全部走變數 ——
+     預設值(fallback)是**回紋**那一組滿版,原木那套再用 --dcs-knot-* 縮回去。
+     ⚠ 一律用 left/top/width/height,**不可以混用 inset** —— v1.150.0 就是在這裡
+       用了 `inset:0` 又補 `left:auto`,把元素打成 0×0(回紋整圈靜靜不見)。 */
+  .dc-grain{position:absolute;border-radius:50%;pointer-events:none;
+    left:var(--dcs-knot-x,0); top:var(--dcs-knot-y,0);
+    width:var(--dcs-knot-w,100%); height:var(--dcs-knot-h,100%);
+    transform:var(--dcs-knot-t,none); opacity:var(--dcs-knot-o,1);
+    background:var(--dcs-knot-bg,none)}
   .dc-grain::before,.dc-grain::after{content:"";position:absolute;inset:0;pointer-events:none;
+    display:var(--dcs-key-d,none);
     -webkit-mask:var(--dc-keyimg) center/100% 100% no-repeat;
     mask:var(--dc-keyimg) center/100% 100% no-repeat}
-  .dc-grain::before{background:rgba(96,58,20,.60)}
-  .dc-grain::after{background:rgba(255,250,232,.50);transform:translate(.8px,.8px)}
+  .dc-grain::before{background:var(--dcs-key-c,rgba(96,58,20,.60))}
+  .dc-grain::after{background:var(--dcs-key-lit,rgba(255,250,232,.50));
+    transform:translate(.8px,.8px)}
+
+  /* ---------- 房規面板裡的「棋子樣式」三張預覽卡(v1.151.0)----------
+     ⚠ 預覽用的是**真的棋子 DOM**,所以這裡只負責「給它一個格子大小」——
+       尺寸一律走 --dc-cell(棋子的厚度與字級都是它的百分比),不可以直接寫死 .dc-p 的 px:
+       寫死的話厚度與字會各自跑掉(縮圖上一眼就看得出來是「壓扁的棋子」)。
+     ⚠ 卡片自己帶 .dcs-*,所以三張卡各顯示一套 —— 靠的是 custom property 就近繼承。 */
+  .dc-skin-pick{display:flex;gap:8px}
+  .dc-skin{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:5px;
+    padding:8px 4px 6px;border-radius:12px;cursor:pointer;
+    border:2px solid transparent;background:rgba(255,255,255,.05);
+    -webkit-tap-highlight-color:transparent}
+  .dc-skin:hover{background:rgba(255,255,255,.09)}
+  /* ⚠ 選中一律**同時**給邊框與底色:只給邊框的話,深色主題下那圈幾乎看不見 */
+  .dc-skin.on{border-color:var(--daub);background:rgba(255,255,255,.12)}
+  .dc-skin-pv{--dc-cell:44px;display:flex;align-items:flex-start;justify-content:center;gap:3px}
+  .dc-skin-pv .dc-p{width:38px;height:38px;flex:none}
+  .dc-skin-nm{font-size:12px;font-weight:800;color:var(--text)}
+  .dc-skin-hint{margin-top:6px;font-size:11px;color:var(--muted);text-align:center}
 
   /* ---------- 可點 / 選中 / 落點 ----------
      ⚠ 不能點的格**不給 disabled**(CLAUDE.md 的紅線)—— 點下去要看得到 toast 說原因。

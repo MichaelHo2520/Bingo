@@ -111,10 +111,36 @@ function syncRules(rules, editable){
       }
     }
   }
+  /* ★★ 棋子樣式那一組**不吃 editable** —— 它是各人的本機偏好,訪客也改得動自己的。
+     ⚠ 所以它刻意不帶 data-rp(上面那個迴圈只掃 .seg[data-rp] 加 readonly)。 */
+  syncSkinUI();
+
   const who = $("dcRulesWho");
   if(who) who.textContent = editable ? "房規在下一局開始時套用" : "房規由房主設定";
   const sum = $("dcRulesSum");
   if(sum) sum.textContent = DC.rulesText(r);
+}
+/* ---------- 棋子樣式(v1.151.0)----------
+   ★ 它在房規面板裡,但**不是房規**:純視覺、不影響任何判定、也沒有情報落差 →
+     各人自己的本機偏好,連線時雙方可以不一樣(白名單與存值在 adapter.js)。
+   ⚠⚠ 套用的方式是**在 <body> 上換一個 .dcs-* class**,而三套樣式本身是用
+     custom property 表達的(styles.css)—— 那不是「順手」的寫法而是唯一解:
+     面板上三張預覽卡要與盤面**同時**顯示三種樣式,class 選擇器做不到(特異性相同 →
+     由 CSS 順序決定,沒有就近原則),只有繼承的 custom property 才會「最近的祖先贏」。
+   ⚠ 一次只能掛一個:先把三個都移掉再加,不可以只 add(留著舊的 → 兩套規則打架,
+     贏的是 CSS 裡寫在後面那一套,看起來像「選了沒反應」)。 */
+function applySkin(){
+  const cur = MP.skin();
+  MP.skins().forEach(s => document.body.classList.toggle("dcs-" + s, s === cur));
+}
+// 三張卡的選中狀態(⚠ aria-pressed 要跟著換:它們是 button 不是 radio)
+function syncSkinUI(){
+  const cur = MP.skin();
+  document.querySelectorAll("#dcSkinPick .dc-skin").forEach(b => {
+    const on = b.dataset.skin === cur;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+  });
 }
 /* 現在該對誰設定 —— 單機改 Solo 的、連線改房間的(★ 唯一的分流點就這三支) */
 function dcEditable(){ return !MP.isOnline() || MP.amHost(); }
@@ -201,7 +227,13 @@ $("dcRulesBody").addEventListener("click", e => {
   if(b){ dcSetRule(b.closest(".seg").dataset.rp, +b.dataset.rv); return; }
   // 走棋倒數那一組走既有的房間欄位(不是房規物件)——⚠ 兩處入口寫同一支 MP.setTurnSec
   const s = e.target.closest("#dcSecSeg2 button");
-  if(s){ MP.setTurnSec(+s.dataset.sec); syncRules(dcRulesNow(), dcEditable()); }
+  if(s){ MP.setTurnSec(+s.dataset.sec); syncRules(dcRulesNow(), dcEditable()); return; }
+  /* 棋子樣式:既不進房規也不進房間欄位,只換 body 的 class + 存本機偏好。
+     ⚠ savePrefs() 一定要叫:不叫的話這一次看得到效果,但重開頁就變回上一次的選擇
+       (而且「重開才發現沒存到」是最難聯想到的一種)。
+     ⚠ 不必重畫盤面 —— 樣式全是 CSS,換 class 當下所有棋子(含已經畫好的)一起變。 */
+  const k = e.target.closest("#dcSkinPick .dc-skin");
+  if(k){ MP.setSkin(k.dataset.skin); applySkin(); syncSkinUI(); savePrefs(); }
 });
 /* 誰先翻(v1.144.0):三種決定方式都寫在核心(隨機自己洗、猜拳與房主排走
    js/shared/mp-order.js 的蓋板)—— 這一頁只負責把點擊送過去。
@@ -290,6 +322,7 @@ initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過�
 /* ---------- 啟動 ---------- */
 buildSwatches();
 loadPrefs();       // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 暗棋的連線偏好
+applySkin();       // ⚠ 一定要在 loadPrefs() **之後**:那一支才會把上次選的樣式讀回來
 Solo.loadOwn();    // 電腦對決的難度 / 先手 / 房規 / 戰績(獨立 key,不與連線那組互相覆蓋)
 syncSettingsUI();
 DCB.init();        // 盤面 DOM + 點擊委派(舞台此時是 hidden,ResizeObserver 會在顯示後算方向)
