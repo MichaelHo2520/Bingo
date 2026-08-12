@@ -2055,6 +2055,16 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
        被 overflow:hidden 削到的是看得見的一角(桌面沒事是因為它的內容置中,削到空白)
      ②窄螢幕照舊 = 只有寬螢幕會變,手機上一個 px 都沒動。 */
 body.m16-mp .mj-room{width:min(92vw,960px)}
+/* ★★ 頂列(品牌字 + ⛶ / ⚙️ 那一行)也要**跟著同一個數字**放寬 —— 這是 v1.68.1
+   只修了一半的地方:.topbar 固定吃 min(92vw,520px),桌機上房間框已經 960 了,
+   那兩顆鈕卻停在框內 220px 的地方(使用者:「全螢幕跟設定那一行跟房間框沒有搭配起來」)。
+   ⚠ 六頁都有這一條(排七 / 大老二 / 21點 / UNO / 暗棋 / 這裡),數字一律**抄同一頁的
+     房間框那條**,不是抄別頁 —— 每一頁的上限是它自己的桌面寬算出來的。
+   ⚠ 對齊的是房間框的**外緣**(頂列沒有 padding、房間框有 12px):
+     520 那些頁本來就是外緣對外緣,放寬之後照舊。
+   ⚠ 這一頁在橫置矮螢幕會把頂列整條收掉(見下面 body.m16-mp .topbar{display:none}),
+     那時這條自然不作用 —— 兩條不衝突,display 贏。 */
+body.m16-mp .topbar{width:min(92vw,960px)}
 
 /* ---------- 對局中整桌不可選字(v1.105.0) ----------
    桌機用滑鼠按住左鍵拖曳(打牌 / 想把牌河往上滑)時,拖過的牌名、台數、玩家暱稱會被
@@ -2720,6 +2730,7 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
      單機沒有房間框,混用只會讓兩件事日後互相絆倒。 */
 body.m16-solo .mj-play{width:min(98vw,960px)}
 body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(v1.68.1) */
+body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(v1.152.1;理由寫在那裡) */
 
 /* ---------- 設定面板:「報牌名」那一列的三段(v1.72.0) ----------
    這一列比其它設定列擠 —— 標籤 + 三顆中文按鈕(關掉 / 只有字牌 / 全部牌)。窄機排不下就讓它
@@ -3317,6 +3328,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ 房間框用 92vw 不是 98vw:它有底色與圓角,98vw 超出 body 的 padding 會被
        overflow:hidden 削掉看得見的一角(台灣麻將 v1.68.1 踩過)。 */
   body.sv-mp .sv-room,body.sv-solo .sv-room{width:min(92vw,700px)}
+  /* ★ 頂列(品牌字 + ⛶ / ⚙️)跟著同一個數字 —— 不放寬的話桌機上那兩顆鈕停在房間框裡面
+     90px 的地方。理由與六頁共通的注意事項寫在 body.m16-mp .topbar 那條。
+     ⚠ 這一頁在橫置矮螢幕會把頂列收掉(見下面那段媒體查詢),那時這條自然不作用。 */
+  body.sv-mp .topbar,body.sv-solo .topbar{width:min(92vw,700px)}
 
   /* 矮視窗(橫置手機 / 小筆電)整體縮一級。
      ⚠⚠ 牌寬只准動 --sv-cw,**不要**在這裡改 .sv-card 的 --svw ——
@@ -4066,6 +4081,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 
   /* ---------- 對局中把牌桌放寬(大廳與選單維持 .panel 原本的 520)---------- */
   body.b2-mp .b2-room,body.b2-solo .b2-room{width:min(92vw,700px)}
+  /* ★ 頂列(品牌字 + ⛶ / ⚙️)跟著同一個數字 —— 理由與六頁共通的注意事項寫在
+     body.m16-mp .topbar 那條。⚠ 橫置矮螢幕會把頂列整條收掉,那時這條不作用。 */
+  body.b2-mp .topbar,body.b2-solo .topbar{width:min(92vw,700px)}
 
   /* ---------- 矮視窗:每一塊都收一號 ----------
      ⚠⚠ 牌寬只准動 --b2-cw,**不要**在這裡改 .b2-card 的 --b2w ——
@@ -4679,6 +4697,9 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 
   /* ---------- 對局中把牌桌放寬(大廳與選單維持 .panel 原本的 520)---------- */
   body.bj-mp .bj-room,body.bj-solo .bj-room{width:min(92vw,700px)}
+  /* ★ 頂列(品牌字 + ⛶ / ⚙️)跟著同一個數字 —— 理由與六頁共通的注意事項寫在
+     body.m16-mp .topbar 那條。⚠ 橫置矮螢幕會把頂列整條收掉,那時這條不作用。 */
+  body.bj-mp .topbar,body.bj-solo .topbar{width:min(92vw,700px)}
 
   /* ---------- 矮視窗:每一塊都收一號 ----------
      ⚠⚠ 牌寬只准動 --bj-cw,**不要**在這裡改 .bj-card 的 --bjw ——
@@ -5711,6 +5732,10 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
         不要為了「跟另外三頁一樣」改成 700 —— 要改就兩條一起改。 */
   .un-play{width:min(92vw,720px);margin:0 auto}
   body.un-mp .un-room,body.un-solo .un-room{width:min(92vw,720px)}
+  /* ★★ 頂列(品牌字 + ⛶ / ⚙️)也吃同一個 720 —— UNO 與暗棋**從來不收頂列**
+     (styles.css 裡沒有這兩頁的 `.topbar{display:none}`),所以這條在任何尺寸都看得到,
+     不像另外四頁只有桌機會露餡。理由與共通注意事項寫在 body.m16-mp .topbar 那條。 */
+  body.un-mp .topbar,body.un-solo .topbar{width:min(92vw,720px)}
 
   /* ---------- 橫置矮視窗 ----------
      ⚠ e2e 的 headless 視窗永遠是矮的(750×485)→ **直立版沒有 e2e 守門**,
@@ -6719,6 +6744,11 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ★★ 房間框一定要**跟著同一個數字放寬**(同 UNO / 排七 / 大老二那三條):
         兩塊不同寬看起來就不像同一張桌子。 */
   body.dc-on .dc-room{width:min(92vw,720px)}
+  /* ★★ 頂列(品牌字 + ⛶ / ⚙️)也吃同一個 720。這一頁**從來不收頂列**,所以手機直向
+     也看得到落差(回報就是從這一頁來的);而 .dc-board 的實際寬由 fitBoard() 算,
+     常常比 720 窄 —— 對齊的基準是**房間框**,不是棋盤。
+     理由與共通注意事項寫在 body.m16-mp .topbar 那條。 */
+  body.dc-on .topbar{width:min(92vw,720px)}
 
   /* ---------- 橫置矮視窗 ----------
      ⚠ e2e 的 headless 視窗永遠是矮的(750×485)→ **直立版沒有 e2e 守門**,
