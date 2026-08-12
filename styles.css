@@ -5899,6 +5899,35 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
      ⚠ ebony 的棋身要比棋盤(--dc-slab #8a5c30)**深很多**,否則子會埋進盤裡
        —— 這條與 v1.139.0 牌背改色是同一個教訓,只是方向相反。
      ========================================================================== */
+  /* ---------- ⚠⚠⚠ 先把整組歸零(v1.151.1)----------
+     **每一套 skin 都必須是「完整集合」** —— custom property 會**繼承**,
+     一個變數只要那一套沒寫,它就會**從 body 上那一套繼承下來**。
+     症狀(使用者原話「選了其它棋子時,那個頁面上的圖你連結錯了」):
+     在面板上選了烏木 → body 掛 .dcs-ebony → 另外兩張預覽卡因為沒有定義
+     --dcs-pbg / --dcs-s* / --dcs-bbg,整個木色被 body 拉成深木,
+     **三張卡看起來都變成烏木**。反過來選原木時,雕花與烏木那兩張的回紋會消失
+     (--dcs-knot-* 被繼承 → .dc-grain 被縮成 11%×7%)。
+     ⚠ 「繼承」正是上面那條「為什麼只能用 custom property」所依賴的性質 ——
+       同一個性質,少寫一個變數就從優點變成 bug。
+     ★ 所以這裡先把**全部 38 個**設成 initial(= guaranteed-invalid → 骨架吃 fallback,
+       而 fallback 就是原木那一套),三套底下只寫**自己與原木的差異**。
+     ⚠⚠ 以後**新增任何 --dcs-* 變數,一定要同時加進這一段**,否則它會變成
+       「只有某兩套之間切換才會露出來」的髒繼承 —— 這種 bug 不報錯,而且要
+       「先選 A 再看 B 的預覽」才重現得出來。 */
+  .dcs-plain,.dcs-carved,.dcs-ebony{
+    --dcs-ring:initial; --dcs-bring:initial;
+    --dcs-ring-c:initial; --dcs-ring-lit:initial;
+    --dcs-bring-c:initial; --dcs-bring-lit:initial;
+    --dcs-key-d:initial; --dcs-key-c:initial; --dcs-key-lit:initial;
+    --dcs-knot-x:initial; --dcs-knot-y:initial; --dcs-knot-w:initial; --dcs-knot-h:initial;
+    --dcs-knot-t:initial; --dcs-knot-o:initial; --dcs-knot-bg:initial;
+    --dcs-s1:initial; --dcs-s2:initial; --dcs-s3:initial; --dcs-s4:initial;
+    --dcs-s5:initial; --dcs-s6:initial; --dcs-s7:initial; --dcs-s8:initial;
+    --dcs-bs1:initial; --dcs-bs2:initial; --dcs-bs3:initial; --dcs-bs4:initial;
+    --dcs-bs5:initial; --dcs-bs6:initial; --dcs-bs7:initial; --dcs-bs8:initial;
+    --dcs-pbg:initial; --dcs-pbox:initial; --dcs-bbg:initial; --dcs-bbox:initial;
+    --dcs-cut:initial; --dcs-ink-r:initial; --dcs-ink-b:initial}
+
   /* ---------- 原木(v1.149.0 那版)---------- */
   .dcs-plain{
     --dcs-ring:var(--dc-thinimg);  --dcs-bring:var(--dc-thinimg);
