@@ -5831,7 +5831,45 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
 <path d='M-40 146 L280 106'/><path d='M-40 164 L280 124'/><path d='M-40 182 L280 142'/>\
 <path d='M-40 200 L280 160'/><path d='M-40 218 L280 178'/><path d='M-40 236 L280 196'/>\
 </g>\
-</svg>"); }
+</svg>");
+         /* ★★★ v1.150.0:雕刻的**線稿**兩張 —— 正面的漆圈 + 牌背的回紋帶。
+            兩張都只當 **mask** 用(白線 = 留下、其餘透明),顏色一律由底下那層的
+            background 出 → 同一張圖服務紅/黑兩方(正面那圈吃 currentColor)。
+            ⚠ 為什麼不用 border / box-shadow 畫:
+              · 圈上要有 12 點與 6 點的**雲頭紋** —— border 畫不出局部的紋樣;
+              · 回紋是**重複的直角勾**,radial/conic-gradient 只做得出等向的環。
+            ⚠ 效能與 --dc-grainimg 同一個道理:整張是一個 data-URI、32 顆共用同一個 URL,
+              瀏覽器只解碼一次。回紋那張用 use 引用同一個 path 轉 20 次,所以字串很短。
+            ⚠ 幾何是**照參考照量出來的**,不是隨手抓的(design-refs 那張近照):
+              漆圈半徑 = 棋子的 .83、線寬 = 直徑的 2.6%;雲頭寬 .24 直徑、高 .062;
+              回紋帶落在半徑 .74 ~ .89 之間、20 個單元。改數字前先回去看那張圖。
+            ⚠⚠ 這兩串裡都不可以出現 CSS 註解的結束標記(會把這段註解攔腰切斷,
+              而那種錯誤不報錯、只有截圖看得出來 —— CLAUDE.md 紅線 9)。 */
+         --dc-ringimg:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23fff'\
+ stroke-width='2.6'>\
+<circle cx='50' cy='50' r='41.5'/>\
+<path d='M38 10.9V15.2H45.4V12.2M62 10.9V15.2H54.6V12.2M50 9.2V15.4'/>\
+<path d='M38 89.1V84.8H45.4V87.8M62 89.1V84.8H54.6V87.8M50 90.8V84.6'/>\
+</svg>");
+         --dc-keyimg:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'>\
+<defs><path id='k' d='M85.4 26H114.6M111 26V11H89.6V20.5H104' fill='none' stroke='%23fff'\
+ stroke-width='2.8'/></defs>\
+<use href='%23k'/><use href='%23k' transform='rotate(18 100 100)'/>\
+<use href='%23k' transform='rotate(36 100 100)'/><use href='%23k' transform='rotate(54 100 100)'/>\
+<use href='%23k' transform='rotate(72 100 100)'/><use href='%23k' transform='rotate(90 100 100)'/>\
+<use href='%23k' transform='rotate(108 100 100)'/><use href='%23k' transform='rotate(126 100 100)'/>\
+<use href='%23k' transform='rotate(144 100 100)'/><use href='%23k' transform='rotate(162 100 100)'/>\
+<use href='%23k' transform='rotate(180 100 100)'/><use href='%23k' transform='rotate(198 100 100)'/>\
+<use href='%23k' transform='rotate(216 100 100)'/><use href='%23k' transform='rotate(234 100 100)'/>\
+<use href='%23k' transform='rotate(252 100 100)'/><use href='%23k' transform='rotate(270 100 100)'/>\
+<use href='%23k' transform='rotate(288 100 100)'/><use href='%23k' transform='rotate(306 100 100)'/>\
+<use href='%23k' transform='rotate(324 100 100)'/><use href='%23k' transform='rotate(342 100 100)'/>\
+</svg>");
+         --dc-innerimg:url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23fff'\
+ stroke-width='1.5'><circle cx='50' cy='50' r='35.4'/></svg>"); }
 
   /* ---------- 首頁 icon / 進場插圖:**同一個檔案 dc-icon.png** ----------
      ★★★ v1.145.0:圖示改成一張**去背的 PNG 貼圖**(dc-icon.png,192×192、13.9KB)。
@@ -6059,15 +6097,28 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       inset 0 -2px 2px rgba(255,253,245,.62),
       0 2.5px 2px -1px rgba(255,253,245,.75),
       0 -2px 2px -1px rgba(108,74,30,.26)}
-  /* ⚠⚠⚠ v1.141.0:這裡**不再是紅/黑圈** —— 使用者第三張參考照(正面的「帥」)上
-     根本沒有那個圈,只有字 + 車溝。前三版一直留著它,是把「棋盤 app 的慣例」
-     當成了實體棋子的樣子。
-     現在它是車溝**內側的第二道細線**(照片上溝的內緣確實還有一條)——
-     中性色、兩面共用,所以 .dc-backface 不必再覆蓋一次(那條規則一起刪了)。
-     ★ 紅 vs 黑的辨識**沒有變弱**:字本身就是紅/黑的(紅線 8 要的是「兩方不可以塌成
-       同一種樣子」,不是「一定要有個圈」)。 */
-  .dc-ring{position:absolute;inset:9.5%;border-radius:50%;border:0;opacity:1;
-    box-shadow:inset 0 1px 1.5px rgba(108,74,30,.24),0 1px 0 rgba(255,252,240,.38)}
+  /* ---------- 正面:漆圈 + 雲頭(v1.150.0)----------
+     ★★★ 使用者換了參考照(design-refs 那張四顆的近照),圈**又回來了** ——
+     所以這裡**推翻 v1.141.0 的結論**,而那條結論的原話是「參考照上根本沒有那個圈」。
+     兩張照片拍的是兩種棋子,不是誰記錯:v1.141 那張的字直接刻在木面上,新這張是
+     「一圈漆圈 + 12 點與 6 點各一個雲頭紋」。⚠ 以後看到 v1.141 那段話**不要照著把圈拿掉**,
+       先問使用者手上是哪一張圖。
+     ★ 圈是**吃 currentColor** 的(.dc-red / .dc-blk 給色)→ 紅黑兩方的辨識比 v1.141 更強,
+       但紅線 8 要的那道保險(字本身就不一樣)照樣還在,不是靠這圈撐著。
+     ⚠⚠ mask 掛在**兩個偽元素**上,不可以掛在 .dc-ring 本體:
+       mask 會連同子節點/偽元素一起裁掉 → 掛本體的話「錯開半格出受光邊」這招整個失效
+       (第一版就是這樣,受光那層被裁得跟漆色完全重疊,看起來就是一條平的線)。
+     ⚠ 錯開的方向要與雕刻字(.dc-ch)同向:**左上暗、右下受光**。
+       這裡是漆色蓋在上面、受光邊從右下露出來 → ::before(亮)先畫、::after(漆)後畫。
+     ⚠ inset:0 是刻意的 —— 幾何全部寫在 SVG 裡(圈半徑 41.5/50),改大小只動那一張圖,
+       不必兩邊對算式。 */
+  .dc-ring{position:absolute;inset:0;border-radius:50%;border:0;opacity:1;pointer-events:none}
+  .dc-ring::before,.dc-ring::after{content:"";position:absolute;inset:0;border-radius:50%;
+    pointer-events:none;
+    -webkit-mask:var(--dc-ringimg) center/100% 100% no-repeat;
+    mask:var(--dc-ringimg) center/100% 100% no-repeat}
+  .dc-ring::before{background:rgba(255,252,238,.62);transform:translate(.9px,.9px)}
+  .dc-ring::after{background:currentColor}
   /* ⚠ 棋子的字用**襯線體**:象棋子上就是印宋體,用內文的 Nunito 會像貼紙。
      取不到中文襯線體時退回 serif —— 那也還是襯線,不會變成另一種味道。
      ⚠ 字級的分母是**格子**不是棋子,所以 .dc-p 的百分比一改,「字 / 棋子」的比例就跟著跑。
@@ -6129,24 +6180,34 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
       radial-gradient(circle at 52% 46%, var(--dc-back) 0%, var(--dc-back-in) 60%, #b89c6e 100%);
     box-shadow:inset 0 1.5px 2px rgba(255,253,242,.45),inset 0 -3px 6px rgba(96,58,20,.22),
       0 0 0 1px rgba(150,110,58,.44),var(--dc-lift)}
-  /* ⚠ 牌背**不畫那圈實線**:`.dc-ring` 在正面是棋子上那圈刻痕,照搬到牌背就變成
-     「一個圈圈」—— 使用者原話「暗子畫的一點都沒有立體棋子的感覺,只是兩個圈圈疊在一起」。
-     ★ v1.139.0 再收一次:連「內凹倒角」都太像圖案了(照片上的背面是全素的),
-     只留最外緣一道極淡的車削痕 —— 位置從 inset 11% 挪到 4%,強度砍到約三分之一。
-     ★★ v1.140.0 收到底:整個不畫。
-     ★★★ v1.141.0 **這條覆蓋規則刪掉了** —— `.dc-ring` 本身已經改成
-     「車溝內側的第二道細線」(中性色、不吃 currentColor),牌背要的就是那個樣子,
-     不必也不可以再覆蓋一次(覆蓋回 box-shadow:none 會讓牌背少掉那道線)。 */
-  /* 木結:順紋板材上偶爾有的一顆小節疤(不是「中央紋章」、也不再是年輪的髓心)——
-     所以它**不在正中央**,而且刻意做得很淡:認得出是木頭上的瑕疵就夠了,
-     一濃就變成「牌背上印了一個東西」。
-     ⚠ 之前是「小圈圈 + 圓點」,那是線稿不是木頭:圓圈在小尺寸下只會讀成幾何圖案,
-        真正撐起立體感的是漫射受光 + 倒角 + 紋路本身。 */
-  .dc-grain{position:absolute;left:63%;top:32%;width:11%;height:7%;border-radius:50%;
-    transform:translate(-50%,-50%) rotate(24deg);opacity:.42;
-    background:
-      radial-gradient(ellipse at 44% 30%, rgba(255,244,220,.30) 0%, rgba(255,244,220,0) 58%),
-      radial-gradient(ellipse at 52% 58%, rgba(96,58,20,.70) 0%, rgba(96,58,20,0) 80%)}
+  /* ---------- 牌背:回紋(雷紋)雕刻帶 + 內圈細線(v1.150.0)----------
+     ★★★ 這一段**推翻 v1.139 ~ v1.141 那三版一路收到底的結論**(當時的結論是
+     「牌背上任何幾何圖案都會讓它讀成『牌』而不是一塊車出來的木頭」,所以收成全素面)。
+     推翻的理由不是那句話錯,是**參考物換了**:新的參考照上,牌背靠邊就是一圈
+     車出來的回紋帶。⚠ 以後看到那三段「收到底」的話**不要照著把回紋拿掉**,
+       先問使用者手上是哪一張圖。
+     ★ 兩件事仍然照舊,不可以順手改掉:
+       ① 牌背與正面**同一塊木料、只深半階**(--dc-back);深棕那版會與棋盤同階、暗子埋進盤裡。
+       ② 「一眼分得出明子暗子」扛在**有沒有字**上,不是扛在顏色或紋樣上。
+     ⚠ 回紋帶落在半徑 .74 ~ .89,而車溝(.dc-p::after)在 .955 —— 兩者不重疊是算過的,
+       壓在一起會糊成一團。
+     ⚠ 這裡的明暗方向與正面**相反**:正面是「漆色蓋在受光邊上」,牌背是純雕刻,
+       所以暗壁先畫(::before)、受光壁後畫並往右下錯開(::after)。 */
+  .dc-backface .dc-ring::before,.dc-backface .dc-ring::after{
+    -webkit-mask-image:var(--dc-innerimg);mask-image:var(--dc-innerimg)}
+  .dc-backface .dc-ring::before{background:rgba(255,250,232,.42);transform:translate(.8px,.8px)}
+  .dc-backface .dc-ring::after{background:rgba(96,58,20,.42);transform:none}
+  /* ⚠ .dc-grain 從「一顆小節疤」改成**整圈回紋**:位置/尺寸整份重寫成 inset:0。
+     ⚠⚠ 這裡**不可以**再補一組 left:auto / top:auto 「把舊值清乾淨」——
+       整條規則是重寫的,舊宣告本來就不存在;而 auto 寫在 inset 後面會把 inset 的
+       top/left 打回 auto → 元素縮成 0×0,回紋整圈靜靜不見(第一版就是這樣,
+       computed 的 mask-image 量起來完全正常,只有截圖看得出來)。 */
+  .dc-grain{position:absolute;inset:0;border-radius:50%;pointer-events:none;background:none}
+  .dc-grain::before,.dc-grain::after{content:"";position:absolute;inset:0;pointer-events:none;
+    -webkit-mask:var(--dc-keyimg) center/100% 100% no-repeat;
+    mask:var(--dc-keyimg) center/100% 100% no-repeat}
+  .dc-grain::before{background:rgba(96,58,20,.60)}
+  .dc-grain::after{background:rgba(255,250,232,.50);transform:translate(.8px,.8px)}
 
   /* ---------- 可點 / 選中 / 落點 ----------
      ⚠ 不能點的格**不給 disabled**(CLAUDE.md 的紅線)—— 點下去要看得到 toast 說原因。
