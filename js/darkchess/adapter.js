@@ -36,16 +36,27 @@ const MP = MPCore.create((function(){
   let turnSec = 40;                     // ★ 比 UNO 長 —— 暗棋一手要看整個盤面
   let ctx = null;
 
-  /* ★★ 棋子樣式(v1.151.0)——「設定規則」面板裡的一組,但它**不是房規**:
-       純視覺、不影響任何判定,也沒有情報落差 → **各人自己的本機偏好**,
-       連線時雙方可以不一樣(這一點與「對手吃子」那條房規正好相反,那條是公平性問題)。
-     ⚠ 這份陣列是**白名單**,usePrefs 一律拿它擋:localStorage 裡的舊值 / 手改的值
-       如果放行,body 上就會掛一個沒有規則的 class,棋子退回 fallback ——
+  /* ★★ 棋子樣式(v1.151.0 加,v1.152.0 改成**房主決定全房**)——
+       使用者:「目前設計的是只有自己能看到選擇的樣子,我想要的是房主來設計選擇大家看到的樣子」。
+     ⚠⚠⚠ 它走的是**房間欄位** `dcSkin`(與 `turnSec` 同構),**不是房規物件** `dcRules`:
+       房規會在開局那一刻凍結進 `game.rules`(因為它影響判定),棋子樣式凍結了反而變成
+       「對局中改了不生效」。所以它跟 turnSec 一樣是獨立欄位、不凍結。
+     ⚠⚠ 兩件事刻意與 turnSec **不一樣**:
+       ① **不帶 `lobbyOnly`** → 對局中也改得動(純視覺,而且現場最想換的時機正是玩到一半);
+       ② **不叫 `unreadyOnFieldChange()`** → 不把大家的「準備好了」退回去
+          (那是給「會改變開打條件」的設定用的,拿來管配色只會很煩)。
+     ★ 兩份值,不是一份:
+       skin      = **我自己的偏好** —— 單機用它、建房時把它帶進房間、離開房間回到它
+       roomSkin  = **這間房現在的值** —— 連線時看的是這一份(房主寫、所有人讀)
+       ⚠ 併成一份會有這個症狀:離開房間之後,我的偏好被房主設的那一套蓋掉了。
+     ⚠ 這份陣列是**白名單**,usePrefs / readRoom / onRoomField 三處一律拿它擋:
+       放行認不出的值,body 上就會掛一個沒有規則的 class → 棋子退回 fallback,
        症狀是「選了烏木卻還是原木」,而且不報錯。
      ⚠⚠ 值要與三件事一字不差:styles.css 的 .dcs-* 三條、darkchess.html 的 data-skin、
        以及 main.js 的 applySkin()。四處是同一組字串。 */
   const SKINS = ["plain", "carved", "ebony"];
   let skin = "carved";                  // 預設 = v1.150 那版(使用者現在看到的樣子)
+  let roomSkin = "carved";              // 這間房現在的值(連線時才看它)
 
   /* ★★★ 房規 —— **兩份**,而它們刻意不一樣:
        rules   房間欄位 `dcRules`(房主現在設定的那一份 → **下一局**才生效)
@@ -270,8 +281,20 @@ const MP = MPCore.create((function(){
     init(c){ ctx = c; },
 
     /* ---------- 房間層級設定 ---------- */
-    roomFields(){ return { turnSec: turnSec, dcRules: DC.normRules(rules) }; },
+    /* ⚠ 建房時把**我自己的偏好**帶進房間(同 turnSec 的做法)—— 房主上次選什麼,
+       開新房就是那一套,不必每開一間都重選。 */
+    roomFields(){ return { turnSec: turnSec, dcRules: DC.normRules(rules), dcSkin: skin }; },
     onRoomField(k, v){
+      /* 棋子樣式:純視覺 → **不**叫 unreadyOnFieldChange()、也**不**碰 phase。
+         ⚠ 要叫 applySkin()(main.js)把 body 的 class 換掉 —— 只改變數的話,
+           房主改了以後訪客這邊「面板選中的那張卡跳了、但棋子沒變」。
+         ⚠ 不必重畫盤面:樣式全在 CSS,換 class 當下所有棋子(含已經畫好的)一起變。 */
+      if(k === "dcSkin"){
+        if(SKINS.indexOf(v) < 0 || v === roomSkin) return;
+        roomSkin = v;
+        applySkin(); syncSkinUI();
+        return;
+      }
       if(k === "dcRules"){
         const next = DC.normRules(v);
         if(sameRules(next, rules)) return;
@@ -291,6 +314,15 @@ const MP = MPCore.create((function(){
     readRoom(r){
       if(typeof r.turnSec === "number") turnSec = r.turnSec;
       if(r && r.dcRules) rules = DC.normRules(r.dcRules);   // ⚠ 舊房間沒有 → 維持預設
+      /* ★ 加入房間時就看房主那一套。⚠ 舊房間沒有 dcSkin → 退回**我自己的偏好**
+         (不是硬寫 "carved":那會讓「進了一間舊房」看起來像「我的選擇被吃掉了」)。
+         ⚠⚠⚠ 這裡**只存值,不可以順手叫 applySkin()** —— 第一版叫了,而它**完全無效**:
+           readRoom 跑的時候 `MP.isOnline()` 還是 false,`dcSkinNow()` 於是回**本機偏好**,
+           等於用我自己的那一套蓋一次。真正把房主那一套套上去的是隨後的
+           `showScreen("lobby")`(main.js 那一行 applySkin)。
+           ⚠ 那一版「看起來對」而且測試全綠 —— 因為 showScreen 把它救回來了;
+             是突變測試(把 showScreen 那行拿掉)才照出這一支是空的。 */
+      roomSkin = (r && SKINS.indexOf(r.dcSkin) >= 0) ? r.dcSkin : skin;
     },
 
     /* ---------- 一局的生命週期 ---------- */
@@ -464,10 +496,26 @@ const MP = MPCore.create((function(){
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
       act, isMyTurn, resign,
-      /* 棋子樣式:只存值,套進 DOM 由 main.js 做(adapter 不碰版面) */
+      /* ---------- 棋子樣式(v1.152.0:房主決定全房)----------
+         ⚠⚠ 這裡**只給兩份原始值與兩支寫入**,「現在該用哪一份」的判斷**不在這裡** ——
+           `ctx` 沒有 `isOnline`(只有 `isHost`),而這一頁的規矩是
+           **分流點只准在 main.js**(見 main.js 的 dcEditable / dcRulesNow / dcSetRule
+           那一段註解)。為了讓 adapter 自己判斷而去 mp-core 的 ctx 加一個 isOnline,
+           會為了一顆按鈕動到十個遊戲共用的核心(CLAUDE.md 紅線 3)—— 不值得。 */
       skins: () => SKINS.slice(),
-      skin: () => skin,
-      setSkin(v){ if(SKINS.indexOf(v) >= 0) skin = v; return skin; },
+      skinPref: () => skin,          // 我自己的偏好(單機用 · 建房時帶進房間)
+      skinRoom: () => roomSkin,      // 這間房現在的值(連線時用)
+      setSkinPref(v){ if(SKINS.indexOf(v) >= 0){ skin = v; roomSkin = v; } return skin; },
+      /* 連線那一路:寫房間欄位。回傳「有沒有真的改成」——
+         訪客會被 setRoomField 擋下並**跳 toast**(⚠ CLAUDE.md 紅線:不可以用 disabled
+         讓點擊靜默消失,按下去要看得到原因),然後回 false。
+         ⚠ 刻意不帶 lobbyOnly:純視覺,對局中也改得動。 */
+      setSkinRoom(v){
+        if(SKINS.indexOf(v) < 0) return false;
+        if(!ctx.setRoomField("dcSkin", v, { denyMsg: "只有房主能改棋子樣式" })) return false;
+        roomSkin = v;
+        return true;
+      },
       // 投降鈕該不該出現 / 按得按不動(單機那份的條件在 main.js)
       canResign: () => !!(st && !st.over && playing() && mySeat() >= 0),
       /* ---------- 房規:面板是單機連線共用的,分流點在 main.js ----------

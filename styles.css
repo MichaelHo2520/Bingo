@@ -6410,6 +6410,14 @@ body.m16-solo .mj-room{width:min(92vw,960px)}   /* 同上面 body.m16-mp 那條(
   .dc-skin-pv .dc-p{width:38px;height:38px;flex:none}
   .dc-skin-nm{font-size:12px;font-weight:800;color:var(--text)}
   .dc-skin-hint{margin-top:6px;font-size:11px;color:var(--muted);text-align:center}
+  /* 訪客不可改(v1.152.0):只把**沒選中**的那兩張壓暗,選中那張維持原樣 ——
+     它要繼續講「現在全房是這一套」。
+     ⚠⚠ 這裡**刻意沒有** pointer-events:none(`.seg.readonly` 有,這裡不能照抄):
+       訪客按下去要走到 setRoomField 才看得到「只有房主能改棋子樣式」,
+       擋在 CSS 上就變成點擊靜默消失 —— 那正是 CLAUDE.md 紅線禁的那件事。
+     ⚠ 也不要下 cursor:not-allowed:按下去**會**有反應(一句 toast),不是不能按。 */
+  .dc-skin-pick.readonly .dc-skin:not(.on){opacity:.42}
+  .dc-skin-pick.readonly .dc-skin:not(.on):hover{background:rgba(255,255,255,.05)}
 
   /* ---------- 可點 / 選中 / 落點 ----------
      ⚠ 不能點的格**不給 disabled**(CLAUDE.md 的紅線)—— 點下去要看得到 toast 說原因。

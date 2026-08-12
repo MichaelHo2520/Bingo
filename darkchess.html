@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>象棋暗棋 ｜ 本機對戰 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.151.2 -->
-<meta name="version" content="1.151.2">
+<!-- 象棋暗棋 · v1.152.0 -->
+<meta name="version" content="1.152.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -368,11 +368,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           </div>
         </div>
 
-        <!-- ★★ 棋子樣式(v1.151.0)——「設定規則」裡面,但它**既不是房規、也不是房間欄位**。
-             ⚠⚠ 它是**各人自己的本機偏好**,連線時雙方可以不一樣:
-               純視覺、不影響任何判定,也沒有情報落差(不像「對手吃子」那條是公平性問題)。
-               所以這一組**刻意不帶 data-rp** —— syncRules() 的 readonly 只掃
-               `.seg[data-rp]`,不帶就等於「訪客也改得動自己的棋子」,那正是要的。
+        <!-- ★★ 棋子樣式(v1.151.0 加,v1.152.0 改成**房主決定全房**)。
+             使用者:「我想要的是房主來設計選擇大家看到的樣子」。
+             ⚠⚠ 連線時它是**房間欄位 `dcSkin`**(房主寫、所有人讀),與 turnSec 同構 ——
+               **不是**房規物件 dcRules:房規會在開局那一刻凍結進 game.rules(因為它影響判定),
+               棋子樣式凍結了反而變成「對局中改了不生效」。單機沒有房間 → 走本機偏好。
+             ⚠ 這一組**刻意不帶 data-rp**:它不進房規物件,所以 syncRules() 那個
+               `.seg[data-rp]` 迴圈掃不到它;訪客的唯讀由 syncSkinUI() 自己上
+               `.readonly`(而且**不擋 pointer-events** —— 按下去要看得到
+               「只有房主能改棋子樣式」,擋在 CSS 就變成點擊靜默消失)。
              ⚠ 預覽卡自己掛 .dcs-*:靠 custom property 就近繼承,三張卡才能與盤面
                同時顯示三種不同樣式(見 styles.css 那一段的 ⚠⚠⚠)。
              ⚠ 預覽用的是**真的棋子 DOM**(.dc-p / .dc-ring / .dc-ch),不是另外畫的示意圖 ——
@@ -402,7 +406,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               <span class="dc-skin-nm">烏木</span>
             </button>
           </div>
-          <div class="dc-skin-hint">只改你自己看到的樣子,不影響對手</div>
+          <!-- ⚠ 文案由 syncSkinUI() 填:單機 / 房主 / 訪客三種說法不一樣。
+               這裡留一句單機版當**沒有 JS 時的保底**(也是最常見的那一種)。 -->
+          <div class="dc-skin-hint" id="dcSkinHint">只改這一台看到的樣子</div>
         </div>
 
         <!-- ★ 走棋倒數:**連線專屬**(單機沒有倒數 —— 想多久是自己的節奏)。

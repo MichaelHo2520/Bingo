@@ -38,6 +38,12 @@ function showScreen(which){
   else if(which === "solo") dockTools("dcSoloBar");
   else undockTools();
   if(which === "home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始
+  /* ★ 棋子樣式跟著相位重套一次(v1.152.0)—— 連線時看房間那一份、單機/選單看自己的偏好。
+     ⚠ 掛在這裡是因為**離開房間有好幾條路**(自己離開 / 被踢 / 房主關房 / 直接回選單),
+       每一條都要「從房主那一套回到我自己的那一套」。掛在 showScreen 上一次涵蓋全部,
+       不必去每條離開路徑各補一次(那種漏一條的 bug 只有兩台實測才看得出來)。
+     ⚠ 很輕(三個 classList.toggle),放在相位切換裡不必擔心成本。 */
+  applySkin();
 }
 
 /* ---------- 進場選單的兩層 ---------- */
@@ -111,8 +117,11 @@ function syncRules(rules, editable){
       }
     }
   }
-  /* ★★ 棋子樣式那一組**不吃 editable** —— 它是各人的本機偏好,訪客也改得動自己的。
-     ⚠ 所以它刻意不帶 data-rp(上面那個迴圈只掃 .seg[data-rp] 加 readonly)。 */
+  /* ★★ 棋子樣式那一組**不吃這裡的 editable 參數,而是自己算一次**(見 syncSkinUI):
+     判準雖然與房規相同(單機或房主才能改),但它不進房規物件 → 上面那個
+     `.seg[data-rp]` 迴圈掃不到它,唯讀樣式得由 syncSkinUI() 自己上。
+     ⚠ v1.152.0 前這裡寫的是「它是各人的本機偏好、訪客也改得動」——**那句話已經作廢**
+       (現在連線時是房主決定全房)。 */
   syncSkinUI();
 
   const who = $("dcRulesWho");
@@ -120,27 +129,52 @@ function syncRules(rules, editable){
   const sum = $("dcRulesSum");
   if(sum) sum.textContent = DC.rulesText(r);
 }
-/* ---------- 棋子樣式(v1.151.0)----------
-   ★ 它在房規面板裡,但**不是房規**:純視覺、不影響任何判定、也沒有情報落差 →
-     各人自己的本機偏好,連線時雙方可以不一樣(白名單與存值在 adapter.js)。
+/* ---------- 棋子樣式(v1.151.0 加,v1.152.0 改成房主決定全房)----------
+   ★★ 使用者:「我想要的是房主來設計選擇大家看到的樣子」——
+     所以連線時它是**房間欄位 `dcSkin`**(房主寫、所有人讀),不再是各人偏好。
+     單機沒有房間,仍然是自己的本機偏好。
+   ⚠ 分流一律走底下這三支(dcSkinNow / dcSkinEditable / dcSetSkin)——
+     與房規那三支(dcRulesNow / dcEditable / dcSetRule)同一個模式、同一個理由:
+     「現在該對誰設定」只准有一個地方知道。
    ⚠⚠ 套用的方式是**在 <body> 上換一個 .dcs-* class**,而三套樣式本身是用
      custom property 表達的(styles.css)—— 那不是「順手」的寫法而是唯一解:
      面板上三張預覽卡要與盤面**同時**顯示三種樣式,class 選擇器做不到(特異性相同 →
      由 CSS 順序決定,沒有就近原則),只有繼承的 custom property 才會「最近的祖先贏」。
    ⚠ 一次只能掛一個:先把三個都移掉再加,不可以只 add(留著舊的 → 兩套規則打架,
      贏的是 CSS 裡寫在後面那一套,看起來像「選了沒反應」)。 */
+function dcSkinNow(){ return MP.isOnline() ? MP.skinRoom() : MP.skinPref(); }
+function dcSkinEditable(){ return !MP.isOnline() || MP.amHost(); }
+function dcSetSkin(v){
+  if(MP.isOnline()){
+    if(!MP.setSkinRoom(v)) return;        // 訪客:setRoomField 已經跳過 toast 了
+  }else{
+    MP.setSkinPref(v);
+    savePrefs();                          // ⚠ 單機這一路才要存偏好(連線那份住在房間裡)
+  }
+  applySkin(); syncSkinUI();
+}
 function applySkin(){
-  const cur = MP.skin();
+  const cur = dcSkinNow();
   MP.skins().forEach(s => document.body.classList.toggle("dcs-" + s, s === cur));
 }
-// 三張卡的選中狀態(⚠ aria-pressed 要跟著換:它們是 button 不是 radio)
+/* 三張卡的選中狀態 + 訪客不可改。
+   ⚠ aria-pressed 要跟著換(它們是 button 不是 radio)。
+   ⚠⚠ `.readonly` 這裡**刻意不做 pointer-events:none**(與 `.seg.readonly` 不同):
+     訪客按下去要走到 setRoomField 才看得到「只有房主能改棋子樣式」——
+     擋在 CSS 上就變成點擊靜默消失,那正是 CLAUDE.md 紅線禁的。 */
 function syncSkinUI(){
-  const cur = MP.skin();
+  const cur = dcSkinNow(), ed = dcSkinEditable();
+  const box = $("dcSkinPick");
+  if(box) box.classList.toggle("readonly", !ed);
   document.querySelectorAll("#dcSkinPick .dc-skin").forEach(b => {
     const on = b.dataset.skin === cur;
     b.classList.toggle("on", on);
     b.setAttribute("aria-pressed", on ? "true" : "false");
   });
+  const hint = $("dcSkinHint");
+  if(hint) hint.textContent = MP.isOnline()
+    ? (ed ? "房主選的樣式,房裡所有人一起換" : "棋子樣式由房主決定")
+    : "只改這一台看到的樣子";
 }
 /* 現在該對誰設定 —— 單機改 Solo 的、連線改房間的(★ 唯一的分流點就這三支) */
 function dcEditable(){ return !MP.isOnline() || MP.amHost(); }
@@ -228,12 +262,11 @@ $("dcRulesBody").addEventListener("click", e => {
   // 走棋倒數那一組走既有的房間欄位(不是房規物件)——⚠ 兩處入口寫同一支 MP.setTurnSec
   const s = e.target.closest("#dcSecSeg2 button");
   if(s){ MP.setTurnSec(+s.dataset.sec); syncRules(dcRulesNow(), dcEditable()); return; }
-  /* 棋子樣式:既不進房規也不進房間欄位,只換 body 的 class + 存本機偏好。
-     ⚠ savePrefs() 一定要叫:不叫的話這一次看得到效果,但重開頁就變回上一次的選擇
-       (而且「重開才發現沒存到」是最難聯想到的一種)。
+  /* 棋子樣式:連線 → 寫房間欄位 dcSkin(訪客會被擋下並跳 toast);單機 → 自己的偏好。
+     ⚠ 分流與存檔都在 dcSetSkin 裡,這裡只負責把「按了哪一張卡」送過去。
      ⚠ 不必重畫盤面 —— 樣式全是 CSS,換 class 當下所有棋子(含已經畫好的)一起變。 */
   const k = e.target.closest("#dcSkinPick .dc-skin");
-  if(k){ MP.setSkin(k.dataset.skin); applySkin(); syncSkinUI(); savePrefs(); }
+  if(k){ dcSetSkin(k.dataset.skin); }
 });
 /* 誰先翻(v1.144.0):三種決定方式都寫在核心(隨機自己洗、猜拳與房主排走
    js/shared/mp-order.js 的蓋板)—— 這一頁只負責把點擊送過去。
