@@ -46,6 +46,15 @@ const DWB = (function () {
   const COLORS = ["#20242c", "#e0413a", "#2f7de0", "#2fa14a", "#e8992b", "#8c4bd8"];
   const WIDTHS = [4, 8, 16];             // 邏輯單位(1000 寬的座標系裡)
   const DEF_C = 0, DEF_W = 1;
+  /* ★★★ 擦布(v1.157.0)。**它是一筆「記錄」,不是像素操作** ——
+     這一頁的真相是 replay(照順序重放整包 ink),重連的人是靠重放把圖畫回來的。
+     直接對 canvas 做像素刪除的話,擦掉的地方在別人那台、以及自己重連之後**會整片跑回來**。
+     ★ 實作是 `globalCompositeOperation = "destination-out"`:
+       畫布只有 clearRect(從不填色)、紙是 CSS 的 `.dw-ink{background:var(--dw-paper)}`
+       → 擦成透明剛好露出紙,是真正的擦布,而且**主題換色也不會出錯**
+       (用「白色筆」的話 midnight 主題的紙不是白的就會留下一道白痕)。
+     ⚠ 擦布比筆粗才好用(筆最粗 16),而 w 欄位照樣寫進記錄 —— 保留給日後的「擦布大小」。 */
+  const ER_W = 30;
 
   /* ---------- 節流參數(見檔頭 ③) ---------- */
   const FLUSH_MS = 70;                   // 最多這麼久就送一批
@@ -59,12 +68,16 @@ const DWB = (function () {
   let enabled = false;                   // 我現在能不能畫
   let drawing = null;                    // 正在畫的那一筆 { sid, c, w, p:[] }
   let pend = [], pendSid = -1, flushT = null;
+  /* ⚠ pendEr 記的是**這一批屬於哪一種筆**,不可以在 flush 時才讀 curEr:
+     使用者可能在 70ms 的批次還沒送出去之前就按了擦布 / 換色,那樣這一批會被貼上錯的種類。 */
+  let pendEr = false;
   let nextSid = 1;
   /* ★★ 我自己送出去的 sid(v1.156.0)。存在的唯一理由是**把自己的回音擋掉**:
      畫家送出的每一批都會從 child_added 原封不動回到 applyRec,而那時本地早就畫過了。
      完整說明在 applyRec 裡那道 return 的註解。⚠ 每一回合要跟著 resetInk() 清掉。 */
   let mySids = new Set();
   let curC = DEF_C, curW = DEF_W;
+  let curEr = false;                      // 現在拿的是擦布嗎(只影響自己這一端要送 s 還是 e)
   /* 畫布四周留這麼多(v1.155.2):`.dw-stage` 是 overflow:hidden,而紙有一圈 3px 的外框
      (`.dw-ink` 的第一段 box-shadow)—— 貼死就會被削掉,看起來像沒有邊。 */
   const INK_PAD = 4;
@@ -76,6 +89,7 @@ const DWB = (function () {
     if (!cv) return;
     ctx = cv.getContext("2d");
     bindDraw();
+    bindTools();
     bindGuess();
     bindPick();
     addEventListener("resize", fit);
@@ -138,33 +152,51 @@ const DWB = (function () {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, cv.width, cv.height);
   }
+  /* 一筆的畫筆設定 —— **筆與擦布唯一的差別就在這一支**(見上面 ER_W 那段)。
+     ⚠⚠ `destination-out` 一定要在畫完之後**還原成 `source-over`**:
+       它是 canvas 的全域狀態,漏還原的話下一筆真的墨水也會變成擦除
+       (症狀是「擦一次之後就再也畫不出東西」,而且畫面上完全看不出原因)。
+       所以四個畫的地方(strokePath / drawTail / applyRec 的續段 / repaint)一律走 penStyle + penEnd。 */
+  function penStyle(s) {
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    if (s.er) {
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.strokeStyle = "rgba(0,0,0,1)";                  // 擦除只看 alpha,顏色無關
+      ctx.lineWidth = Math.max(1, ER_W * boxW / LW * dpr);
+    } else {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.strokeStyle = COLORS[s.c] || COLORS[0];
+      ctx.lineWidth = Math.max(1, (WIDTHS[s.w] || WIDTHS[DEF_W]) * boxW / LW * dpr);
+    }
+  }
+  function penEnd() { ctx.globalCompositeOperation = "source-over"; }
   function strokePath(s) {
     if (!ctx || s.p.length < 2) return;
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.strokeStyle = COLORS[s.c] || COLORS[0];
-    ctx.lineWidth = Math.max(1, (WIDTHS[s.w] || WIDTHS[DEF_W]) * boxW / LW * dpr);
+    penStyle(s);
     ctx.beginPath();
     ctx.moveTo(sx(s.p[0]), sy(s.p[1]));
     for (let i = 2; i < s.p.length; i += 2) ctx.lineTo(sx(s.p[i]), sy(s.p[i + 1]));
     // 只有一個點的筆劃(點一下)畫成一個圓點,否則什麼都看不到
     if (s.p.length === 2) ctx.lineTo(sx(s.p[0]) + 0.01, sy(s.p[1]));
     ctx.stroke();
+    penEnd();
   }
   function repaint() {
     clearCanvas();
+    /* ⚠ 重畫一定要**照原本的順序**一筆一筆畫(含擦布那幾筆)——
+       擦布是靠疊在墨水上面才有效果,順序換掉就會擦錯東西。 */
     for (let i = 0; i < strokes.length; i++) strokePath(strokes[i]);
   }
   /* 增量畫「這一筆最後兩個點之間那一段」—— 整張重畫在筆劃多的時候會掉幀 */
   function drawTail(s) {
     if (!ctx || s.p.length < 4) { strokePath(s); return; }
     const n = s.p.length;
-    ctx.lineCap = "round"; ctx.lineJoin = "round";
-    ctx.strokeStyle = COLORS[s.c] || COLORS[0];
-    ctx.lineWidth = Math.max(1, (WIDTHS[s.w] || WIDTHS[DEF_W]) * boxW / LW * dpr);
+    penStyle(s);
     ctx.beginPath();
     ctx.moveTo(sx(s.p[n - 4]), sy(s.p[n - 3]));
     ctx.lineTo(sx(s.p[n - 2]), sy(s.p[n - 1]));
     ctx.stroke();
+    penEnd();
   }
 
   /* ==========================================================================
@@ -172,18 +204,28 @@ const DWB = (function () {
      ──────────────────────────────────────────────────────────────────────────
        一筆推送就是一個字串:
          "s<sid>,<c>,<w>,<x>,<y>,<x>,<y>,…"   一段筆劃(可以是同一 sid 的續段)
+         "e<sid>,<c>,<w>,<x>,<y>,…"           一段**擦除**(v1.157.0;格式與 s 完全同形,c 不用)
          "x"                                   清空
        ★ 每一批都**自帶 c / w** → 每一筆推送是自足的,不依賴前面收到過什麼;
          重連只要照順序重放整包就一定畫得出一樣的圖。
        ★ 座標是 0~999 / 0~749 的整數 → 一個點約 7~8 個位元組。
        ⚠ 解析一律防呆:長度不對 / 不是數字的一律整筆丟掉(手改 DB、舊版本的殘留),
          **絕不可以讓一筆壞資料把整張圖弄掉**。
+       ★★ 擦除**刻意用新的開頭字母 `e`,而不是新增一個顏色索引**:
+         v1.156.x 以前的舊版 `applyRec` 第一件事就是 `if (charAt(0) !== "s") return` ——
+         也就是舊版會**整筆忽略**擦除,最壞的下場是「他那台看到被擦掉的東西還在」。
+         若改用顏色索引(例如 c=9),舊版會走 `COLORS[9] || COLORS[0]` →
+         **在他那台畫出一道黑色塗鴉**,那比「沒擦到」難看也難解釋得多。
+         這是與 v1.155.2「新舊版同房只是看到的形狀不一樣」同一種取捨。
      ========================================================================== */
-  function encode(sid, c, w, pts) { return "s" + sid + "," + c + "," + w + "," + pts.join(","); }
+  function encode(sid, c, w, pts, er) {
+    return (er ? "e" : "s") + sid + "," + c + "," + w + "," + pts.join(",");
+  }
   function applyRec(rec) {
     if (typeof rec !== "string" || !rec) return;
     if (rec.charAt(0) === "x") { strokes = []; byId = {}; mySids.clear(); clearCanvas(); return; }
-    if (rec.charAt(0) !== "s") return;
+    const kind = rec.charAt(0);
+    if (kind !== "s" && kind !== "e") return;
     const a = rec.slice(1).split(",");
     if (a.length < 5) return;                                   // sid,c,w + 至少一個點
     const sid = +a[0], c = +a[1], w = +a[2];
@@ -212,25 +254,29 @@ const DWB = (function () {
     if (!pts.length) return;
     if (sid >= nextSid) nextSid = sid + 1;                      // 別人的 sid 也要讓過(重連當畫家時不撞號)
     let s = byId[sid];
-    if (!s) { s = { sid: sid, c: c, w: w, p: [] }; byId[sid] = s; strokes.push(s); }
+    /* ⚠ er 記在**這一筆**上(不是全域狀態):同一 sid 的續段一定是同一種筆,
+       而不同 sid 之間筆與擦布會交錯 —— repaint() 靠這個旗標才畫得回原樣。 */
+    if (!s) { s = { sid: sid, c: c, w: w, p: [], er: kind === "e" }; byId[sid] = s; strokes.push(s); }
     const fresh = !s.p.length;
     s.p = s.p.concat(pts);
     if (fresh) strokePath(s);
     else {
       // 續段:從接點開始逐段補畫(不必整張重畫)
       const start = s.p.length - pts.length;
-      ctx.lineCap = "round"; ctx.lineJoin = "round";
-      ctx.strokeStyle = COLORS[s.c] || COLORS[0];
-      ctx.lineWidth = Math.max(1, (WIDTHS[s.w] || WIDTHS[DEF_W]) * boxW / LW * dpr);
+      penStyle(s);                       // ⚠ 一定要走它:擦布的續段也要 destination-out
       ctx.beginPath();
       ctx.moveTo(sx(s.p[start - 2]), sy(s.p[start - 1]));
       for (let i = start; i < s.p.length; i += 2) ctx.lineTo(sx(s.p[i]), sy(s.p[i + 1]));
       ctx.stroke();
+      penEnd();
     }
   }
   function resetInk() {
     strokes = []; byId = {}; drawing = null;
-    pend = []; pendSid = -1; nextSid = 1;
+    pend = []; pendSid = -1; pendEr = false; nextSid = 1;
+    /* ★ 每一回合把筆歸零:換人畫的時候不該繼承上一位畫家挑的顏色 / 還拿著擦布。 */
+    curC = DEF_C; curW = DEF_W; curEr = false;
+    syncTool();
     mySids.clear();                       // ⚠ 一定要跟著清:重連重放整包時它必須是空的
     if (flushT) { clearTimeout(flushT); flushT = null; }
     clearCanvas();
@@ -248,7 +294,7 @@ const DWB = (function () {
   function flush() {
     if (flushT) { clearTimeout(flushT); flushT = null; }
     if (!pend.length || pendSid < 0) { pend = []; return; }
-    const rec = encode(pendSid, curC, curW, pend);
+    const rec = encode(pendSid, curC, curW, pend, pendEr);
     pend = [];
     cb.onStroke && cb.onStroke(rec);
   }
@@ -262,12 +308,12 @@ const DWB = (function () {
     try { cv.setPointerCapture(e.pointerId); } catch (_) {}
     const p = pos(e);
     const sid = nextSid++;
-    drawing = { sid: sid, c: curC, w: curW, p: [p[0], p[1]] };
+    drawing = { sid: sid, c: curC, w: curW, p: [p[0], p[1]], er: curEr };
     byId[sid] = drawing; strokes.push(drawing);
     mySids.add(sid);                      // 這一筆的回音要擋掉(見 applyRec)
     strokePath(drawing);
     // 換一筆就把上一筆還沒送的先送掉(不然兩筆的點會混進同一個 sid)
-    if (pendSid !== sid) { flush(); pendSid = sid; }
+    if (pendSid !== sid) { flush(); pendSid = sid; pendEr = curEr; }
     pend.push(p[0], p[1]);
     armFlush();
   }
@@ -289,6 +335,24 @@ const DWB = (function () {
     drawing = null;
     flush();                                                    // 放手一定要立刻送(不然最後一段會慢 70ms)
   }
+  /* 工具列:四顆色塊 + 擦布。⚠ 用事件委派掛在 #dwTools 上 —— 那一列會被 hidden/顯示,
+     但元素不會重建,所以掛一次就夠(不必每回合重綁)。 */
+  function bindTools() {
+    const box = $("dwTools"); if (!box) return;
+    /* ★★ 色塊的顏色**在這裡設**,CSS 裡刻意沒有色碼 —— COLORS 是唯一真相。
+       兩邊各寫一份的症狀是「色塊看起來是藍的、畫出來是綠的」,而且沒有任何斷言會紅。 */
+    for (let i = 0; i < SWATCHES; i++) {
+      const b = $("dwSw" + i);
+      if (b) b.style.background = COLORS[i];
+    }
+    box.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.id === "dwErase") { toggleEraser(); return; }
+      const m = /^dwSw(\d)$/.exec(b.id || "");
+      if (m) pickColor(+m[1]);
+    });
+    syncTool();
+  }
   function bindDraw() {
     /* ⚠ 一律用 Pointer Events + touch-action:none(CSS 那邊):
        用 touch 事件的話手指一動就會捲整頁,而畫布常常是滿版的 → 根本畫不出東西。 */
@@ -309,11 +373,38 @@ const DWB = (function () {
     drawing = null; pend = []; pendSid = -1;
     if (flushT) { clearTimeout(flushT); flushT = null; }
     strokes = []; byId = {}; mySids.clear(); clearCanvas();
+    curEr = false;                    // 清空之後回到筆(擦空白的紙沒有意義)
+    syncTool();
     cb.onClear && cb.onClear();
   }
   function setBrush(c, w) {
     if (COLORS[c]) curC = c;
     if (WIDTHS[w]) curW = w;
+  }
+  /* ---------- 工具列的狀態(v1.157.0:四色 + 擦布) ----------
+     ★ 只有這一支會碰畫面上的 on 狀態 —— 選色 / 選擦布 / 清空 / 換回合都走它,
+       所以「畫面上亮的那一顆」與 curC / curEr 不可能不一致。
+     ⚠ 色塊只放前四色(墨黑 / 紅 / 藍 / 綠)—— COLORS 有六個,橘與紫沒有 UI。
+       那不是漏做:`#dwTools` 那一列在 360px 的手機上要同時放題目 + 色塊 + 擦布 + 清空,
+       六顆會把題目擠到只剩省略號,而題目是畫家唯一要讀的字。
+       線上格式照樣吃 0~5,所以日後要放開只要加兩顆色塊,協議一個字都不必改。 */
+  const SWATCHES = 4;
+  function syncTool() {
+    for (let i = 0; i < SWATCHES; i++) {
+      const b = $("dwSw" + i);
+      if (b) b.classList.toggle("on", !curEr && curC === i);
+    }
+    const er = $("dwErase");
+    if (er) { er.classList.toggle("on", curEr); er.setAttribute("aria-pressed", curEr ? "true" : "false"); }
+    if (cv) cv.classList.toggle("erasing", curEr);   // 只改鼠標樣式,不影響任何幾何
+  }
+  function pickColor(i) {
+    if (!COLORS[i]) return;
+    curC = i; curEr = false; syncTool();
+  }
+  function toggleEraser(on) {
+    curEr = (on === undefined) ? !curEr : !!on;
+    syncTool();
   }
 
   /* ==========================================================================
@@ -532,11 +623,15 @@ const DWB = (function () {
 
   return {
     init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush,
+    pickColor, toggleEraser, syncTool,
     setCd, stopCd, setRoundInfo, setZoom,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
     LW, LH, COLORS, WIDTHS,
     // 診斷 / 測試用:目前畫了幾筆、共幾個點、畫布現在多大
-    stats: () => ({ n: strokes.length, pts: strokes.reduce((a, s) => a + s.p.length / 2, 0), w: boxW, h: boxH })
+    stats: () => ({ n: strokes.length, pts: strokes.reduce((a, s) => a + s.p.length / 2, 0),
+                    er: strokes.filter(s => s.er).length,     // 幾筆是擦除(v1.157.0)
+                    c: curC, tool: curEr ? "er" : "pen",      // 現在拿的是什麼
+                    w: boxW, h: boxH })
   };
 })();

@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.156.0 -->
-<meta name="version" content="1.156.0">
+<!-- 你畫我猜 · v1.157.0 -->
+<meta name="version" content="1.157.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -208,10 +208,25 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="dw-over hidden" id="dwOver"></div>
       </div>
     </div>
+    <!-- ★★ 畫家的工具列(v1.157.0 加了四色 + 擦布)。
+         ⚠ 色塊的**顏色由 JS 設**(js/draw/board.js 的 bindTools 讀 COLORS[i] 寫 style.background)——
+           刻意不在 CSS 裡再寫一份色碼:那會變成兩個真相,漂移的症狀是
+           「色塊看起來是藍的、畫出來是綠的」,而且沒有任何斷言會紅。
+         ⚠ 只放前四色(COLORS 有六個)—— 這一列在 360px 手機上還要放題目 + 擦布 + 清空,
+           六顆會把題目擠成省略號,而題目是畫家唯一要讀的字。線上格式照樣吃 0~5。
+         ⚠ 這一列是 `flex:none`(高度固定)—— 多出來的垂直空間永遠是畫布的(見 notes/21),
+           所以**不可以**讓它換行:窄畫面靠隱藏「你要畫的是」與「清空」兩個字省位置。 -->
     <div class="dw-tools hidden" id="dwTools">
       <span class="dw-word-lbl">你要畫的是</span>
       <span class="dw-word display" id="dwWord"></span>
-      <button class="dw-tool" id="dwClear" type="button">🗑 清空</button>
+      <span class="dw-pens" role="group" aria-label="筆色">
+        <button class="dw-sw on" id="dwSw0" type="button" aria-label="墨黑筆"></button>
+        <button class="dw-sw" id="dwSw1" type="button" aria-label="紅筆"></button>
+        <button class="dw-sw" id="dwSw2" type="button" aria-label="藍筆"></button>
+        <button class="dw-sw" id="dwSw3" type="button" aria-label="綠筆"></button>
+      </span>
+      <button class="dw-tool dw-er" id="dwErase" type="button" aria-pressed="false" aria-label="擦布" title="擦布(擦掉一部分)">🧽</button>
+      <button class="dw-tool" id="dwClear" type="button" title="整張清空">🗑<span class="dw-clr-t"> 清空</span></button>
     </div>
     <div class="dw-say" id="dwSay" aria-live="polite"></div>
     <div class="dw-input hidden" id="dwInputRow">

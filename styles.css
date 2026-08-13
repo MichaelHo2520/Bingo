@@ -7223,6 +7223,20 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
     font-weight:800;font-size:13px;cursor:pointer;transition:.15s}
   .dw-tool:hover{background:rgba(255,255,255,.16)}
   .dw-tool:active{transform:scale(.94)}
+  /* ---------- 四色 + 擦布(v1.157.0)----------
+     ⚠ 色塊的 background **不在這裡寫** —— 由 js/draw/board.js 讀 COLORS[i] 設 inline style
+       (單一真相,見 draw.html 那段註解)。這裡只管形狀與「哪一顆亮著」。
+     ⚠ 尺寸 20px:這一列是 flex:none、絕對不可以換行(換行就吃掉畫布的高度),
+       而 20px 是「手指按得到」與「360px 手機放得下四顆 + 擦布 + 清空」的交會點。 */
+  .dw-pens{flex:none;display:flex;align-items:center;gap:5px}
+  .dw-sw{width:20px;height:20px;padding:0;border-radius:50%;flex:none;cursor:pointer;
+    border:2px solid rgba(255,255,255,.5);box-shadow:0 1px 3px rgba(0,0,0,.35);
+    transition:transform .12s,border-color .12s}
+  .dw-sw:active{transform:scale(.88)}
+  .dw-sw.on{border-color:var(--accent);transform:scale(1.18)}
+  /* 擦布按下去要看得出來「現在拿的是擦布」—— 不然使用者會以為筆壞了(畫不出東西) */
+  .dw-tool.on{border-color:var(--accent);background:rgba(255,255,255,.22)}
+  .dw-ink.erasing{cursor:cell}
 
   /* ---------- 猜題訊息列 ----------
      ⚠ 高度固定成三行左右並自己捲:讓它跟著內容長高的話,每有人猜一次
@@ -7281,6 +7295,16 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
 
   /* 賽後表情列(沿用五子棋的 .gmk-react 外觀,只換容器 class) */
   .dw-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+
+  /* ---------- 窄**寬度**:工具列一定要留在一行(v1.157.0)----------
+     加了四顆色塊 + 擦布之後,360px 手機上「你要畫的是」+ 題目 + 四色 + 🧽 + 🗑 清空
+     會把題目擠成省略號 —— 而題目是畫家唯一要讀的字。
+     所以窄畫面把兩個**純裝飾的字**藏掉(標籤與「清空」二字),圖示與功能全部留著。
+     ⚠ 不可以改成讓 .dw-tools 換行:它是 flex:none,換行就是從畫布身上拿走高度。 */
+  @media (max-width:430px){
+    .dw-word-lbl{display:none}
+    .dw-clr-t{display:none}
+  }
 
   /* ---------- 窄畫面 ---------- */
   @media (max-height:700px){
