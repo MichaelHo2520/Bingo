@@ -243,18 +243,24 @@ function dismissTopLayer(){
    ⚠ 在房裡(`body.mp-on`)一律不碰:那一段的守衛歸 mp-core 管(誤按返回要跳離開確認卡,
      而且 bgAct 只有一個 —— 搶著設會把離開確認換成「退一層」,等於一按就斷線)。
    ⚠ 單機對局中預設走 `Solo.quit()`(= 各頁單機返回鈕的行為);台灣麻將要先跳確認卡,
-     所以它傳自己的 soloBack。 */
-let pbSub="", pbSoloBack=null;
+     所以它傳自己的 soloBack。
+   ★★ `noHome:true`(v1.155.3):**這一頁沒有進場選單,連線畫面就是第一層**。
+     只有你畫我猜是這樣(它沒有單機 → 進場選單只有一顆「連線對戰」,那一層純粹是多一下)。
+     不設這個旗標的話 pageLayer() 會回 "connect" → 守衛武裝著 → 按返回跑去
+     showScreen("home"),而那一頁根本沒有 home 那一層 → **卡在原地按不出去**。 */
+let pbSub="", pbSoloBack=null, pbNoHome=false;
 function bindPageBack(cfg){
   pbSub=(cfg&&cfg.sub)||"";
   pbSoloBack=(cfg&&cfg.soloBack)||null;
+  pbNoHome=!!(cfg&&cfg.noHome);
   syncPageBack();
 }
 function pageLayer(){
   if(document.body.classList.contains("mp-on")) return "room";        // 房裡:守衛歸 mp-core
   if(document.body.classList.contains("solo-on")) return "solo";      // 單機對局中
   const conn=$("mpConnect");
-  if(conn && !conn.classList.contains("hidden")) return "connect";    // 連線大廳(還沒進房)
+  // noHome 的頁面:連線畫面**就是**第一層 → 回 "top",守衛撤掉,返回鍵直接回首頁
+  if(conn && !conn.classList.contains("hidden")) return pbNoHome ? "top" : "connect";
   const sub=pbSub?$(pbSub):null;
   if(sub && !sub.classList.contains("hidden")) return "sub";          // 進場選單第二層
   return "top";                                                       // 進場選單第一層

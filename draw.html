@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.155.2 -->
-<meta name="version" content="1.155.2">
+<!-- 你畫我猜 · v1.155.3 -->
+<meta name="version" content="1.155.3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -42,14 +42,24 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 進場選單 ======
+  <!-- ====== 連線畫面 = 這一頁的**第一層**(暱稱 / 建房 / 大廳清單)======
        ★★ 這一頁**只有連線對戰,沒有單機** —— 十二個遊戲裡唯一的一個。
-          你畫我猜需要一個會畫圖的人與會看圖的人,兩邊都沒有 AI 做得到,
-          所以這一層不像另外十頁那樣有「單機 / 連線」兩顆,只有一顆。
-          ⚠ 連帶:這一頁沒有 js/draw/solo.js,離線也不能玩(PWA 只剩看得到這一層)。 -->
-  <section class="panel" id="dwHome">
-    <div class="mp-head" id="dwHomeHead">
-      <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
+          你畫我猜需要一個會畫圖的人與會看圖的人,兩邊都沒有 AI 做得到。
+       ★★★ v1.155.3 起**沒有獨立的進場選單**(原本的 #dwHome 整段刪掉):
+          那一層只有一顆「🌐 連線對戰」,按下去必定走同一條路 = 純粹多一下。
+          使用者:「你猜我畫沒有單機版本,所以是不是主選單選了,就不用在多一層去選連線」。
+          進場插圖與玩法提示搬進這一層(插圖是 test-pages.js E 節在守的雙胞胎,不可以刪)。
+       ⚠ 連帶三件:
+          ① 返回鍵那顆改成 <a href="index.html">(回主選單,交給 ui-kit 的 bindHomeLinks
+            接管,不疊歷史);原本它是「回選擇玩法」的 <button>。
+          ② main.js 要 bindPageBack({noHome:true}),否則 pageLayer() 判成 "connect"
+            → 守衛武裝著 → 按返回跑去 showScreen("home"),而那一層已經不存在。
+          ③ 開頁就會載入 Firebase SDK(openConnect 會 ensureFirebase)——
+            在此之前是「按了那顆鈕才載」。這一頁只有連線,早一步載沒有損失。
+       ⚠ 這一頁離線玩不了(沒有 solo.js);離線開起來會停在這一層的「載入失敗」。 -->
+  <section class="panel" id="mpConnect">
+    <div class="mp-head">
+      <a class="icon-btn as-link" id="mpConnBack" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
       <div class="subtitle">你畫我猜</div>
@@ -63,18 +73,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <img class="dw-art" src="dw-icon.png" alt="畫筆與畫板" width="192" height="192">
       <div class="home-tagline">一人畫、其他人打字搶答</div>
     </div>
-    <button class="btn primary block-btn home-btn" id="dwGoOnline">🌐 連線對戰</button>
-    <div class="home-hint">2~6 人:輪流當畫家,每人畫 <b>2</b> 次。越早猜中分數越高,畫家依「有幾個人猜懂」拿分。</div>
-  </section>
+    <div class="home-hint dw-intro">2~6 人:輪流當畫家,每人畫 <b>2</b> 次。越早猜中分數越高,畫家依「有幾個人猜懂」拿分。</div>
 
-  <!-- ====== 連線畫面(暱稱 / 建房 / 大廳清單)====== -->
-  <section class="panel hidden" id="mpConnect">
-    <div class="mp-head">
-      <button class="icon-btn" id="mpConnBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <div class="subtitle">連線對戰</div>
-    </div>
     <div class="field">
       <span class="field-label">你的暱稱(必填)</span>
       <input id="mpName" class="mp-input" maxlength="8" placeholder="輸入你的名字">

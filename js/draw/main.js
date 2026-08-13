@@ -3,26 +3,24 @@
 /* ============================================================================
    你畫我猜 — 畫面切換、事件綁定與啟動(必須最後載入)
 
-   ★ 這一頁**只有連線**(見 draw.html 進場選單那段註解),所以:
+   ★ 這一頁**只有連線**(見 draw.html 那段註解),所以:
      · 沒有 body.solo-on 這一條路,showScreen() 少一個 "solo"
-     · bindPageBack() 不必給 sub(進場選單只有一層)
+     · ★★★ v1.155.3 起連**進場選單那一層都沒有** —— 連線畫面就是第一層
+       (原本 #dwHome 只有一顆「🌐 連線對戰」,按下去必定走同一條路)。
+       所以 showScreen() 少一個 "home",而 bindPageBack() 要給 `noHome:true`。
      · initUpdateCheck() 的「安全」只問「在不在房裡」
    ========================================================================== */
 
 /* ---------- 畫面切換 ----------
    mpConnect / mpBar / scrollArea / primaryBar 由 mp-core 控制,這裡只管自己的區塊。 */
-const DW_SCREENS = ["dwHome", "dwPlay", "dwSetup"];
+const DW_SCREENS = ["dwPlay", "dwSetup"];
 function showScreen(which) {
   const on = {
-    home:    ["dwHome"],
-    connect: [],                       // 連線畫面本體由 mp-core 顯示
+    connect: [],                       // 連線畫面本體由 mp-core 顯示(它就是第一層)
     lobby:   ["dwSetup"],
     play:    ["dwPlay"]
   }[which] || [];
   DW_SCREENS.forEach(id => { const el = $(id); if (el) el.classList.toggle("hidden", on.indexOf(id) < 0); });
-  if (which === "home") {
-    ["mpConnect", "mpBar", "primaryBar", "scrollArea"].forEach(id => { const el = $(id); if (el) el.classList.add("hidden"); });
-  }
   /* ⚠⚠ 這一頁**刻意不 dockTools()**(v1.155.2)—— 另外五頁在收掉頂列時會把 `⛶`/`⚙️`
      搬進房間框,這一頁不要:房間框那一列已經有返回鍵 + 房名 + 規則 + 🎤 + 😀,
      再塞兩顆進去會直接壓在 😀 上面(共用的 .tools-docked 是 absolute 貼右緣,
@@ -43,9 +41,6 @@ DWB.init({
   onGuess(text) { MP.guess(text); },
   onPick(k) { MP.pick(k); }
 });
-
-/* ---------- 進場選單 ---------- */
-$("dwGoOnline").addEventListener("click", () => MP.openConnect());
 
 /* ---------- 對局:畫家工具列 ---------- */
 $("dwClear").addEventListener("click", () => DWB.clearInk());
@@ -77,7 +72,9 @@ $("mpName").addEventListener("input", () => $("mpName").classList.remove("needs-
 $("mpRoomName").addEventListener("keydown", e => { if (e.key === "Enter") MP.create($("mpName").value, $("mpRoomName").value); });
 $("mpReadyBtn").addEventListener("click", () => MP.toggleReady());
 $("mpLeaveBtn").addEventListener("click", () => MP.askLeave());
-$("mpConnBack").addEventListener("click", () => showScreen("home"));
+/* ⚠ #mpConnBack v1.155.3 起是 <a href="index.html">(回主選單)—— 這一頁沒有進場選單
+   那一層,連線畫面就是第一層。點擊交給 ui-kit 的 bindHomeLinks() 接管(不疊歷史),
+   這裡**刻意不綁 click**:綁了就會蓋掉那條「回主選單不疊歷史」的路。 */
 $("leaveConfirm").addEventListener("click", () => MP.confirmLeave());
 $("leaveCancel").addEventListener("click", () => MP.cancelLeave());
 $("leaveVeil").addEventListener("click", e => { if (e.target === $("leaveVeil")) MP.cancelLeave(); });
@@ -107,7 +104,9 @@ $("dwReactRow").addEventListener("click", e => {
 
 /* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */
 bindCommonUI();
-bindPageBack({});     // 進場選單只有一層 → 不必給 sub
+/* ★ noHome:連線畫面就是第一層(這一頁沒有進場選單)。少了它,pageLayer() 會判成
+   "connect" → 守衛武裝著 → 按返回跑去 showScreen("home"),而那一層已經不存在。 */
+bindPageBack({ noHome: true });
 bindAudioLifecycle();
 registerSW();
 paintVersion();
@@ -119,7 +118,7 @@ initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過�
 buildSwatches();
 loadPrefs();          // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 你畫我猜的連線偏好
 syncSettingsUI();
-showScreen("home");
+MP.openConnect();     // ★ 開頁直接進連線畫面(這一頁沒有進場選單那一層)
 autoJoinFromQuery(MP);   // 從主選單的「現在有人在玩」點過來(?join=1234)→ 直接進那間房
 // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
 setTimeout(maybeShowInstallTip, 1500);

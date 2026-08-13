@@ -7045,6 +7045,9 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
      ⚠ .dw-cart 本身不必寫規則(.gc-art 的 46px 就是它要的);留著這個 class 是為了
        與另外十一張一致,而且 tools/test-pages.js 的 E 節逐字比對它。 */
   .dw-hero{text-align:center;margin:14px 0 4px}
+  /* 玩法提示與底下的「你的暱稱」之間多留一口氣(v1.155.3 把進場選單併進連線畫面之後,
+     這兩塊變成上下相鄰;`.home-hint` 原本只有 margin-top,貼太近像同一組)。 */
+  .dw-intro{margin-bottom:6px}
   .dw-art{width:92px;height:92px;display:block;margin:0 auto 8px}
 
   /* ---------- 房間框(比照成語接龍的瘦身版:把高度讓給畫板) ---------- */
