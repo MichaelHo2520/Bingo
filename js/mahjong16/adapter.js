@@ -742,7 +742,7 @@ const MP = MPCore.create((function(){
          不然房主會以為「怎麼沒有回到準備畫面」。只打 1 局就不提(它沒有中間局)。
          ⚠ v1.122.0 拿掉了「N 秒後自動」:續局不再倒數,要等全部人都按過(見下面那一整段)。 */
       (handsGoal !== 1
-        ? "<br>中間每一局結束<b>不回大廳</b>:結果卡看完按一下「✓ 我看完了」,"+
+        ? "<br>中間每一局結束<b>不回大廳</b>:結果卡看完按一下「繼續」,"+
           "等大家都按了就接著打下一局。"
         : "");
   }
@@ -794,11 +794,11 @@ const MP = MPCore.create((function(){
     const wait = waitCount();
     el.classList.remove("hidden");
     el.innerHTML = mine
-      ? (wait > 0 ? "✓ 已看完 —— 還在等 <b>"+wait+"</b> 人…" : "✓ 大家都看完了,馬上開下一局…")
-      : "按「✓ 我看完了」,大家都按了就接著打下一局";
+      ? (wait > 0 ? "✓ 已按繼續 —— 還在等 <b>"+wait+"</b> 人…" : "✓ 大家都按了,馬上開下一局…")
+      : "按「繼續」,大家都按了就接著打下一局";
     const b = $("mpAgain");
     if(b){
-      b.textContent = mine ? "✓ 已看完" : "✓ 我看完了";
+      b.textContent = mine ? "✓ 已按繼續" : "繼續 ▸";
       b.classList.toggle("ghost", mine);
       b.classList.toggle("primary", !mine);
       b.disabled = mine;
@@ -1216,7 +1216,7 @@ const MP = MPCore.create((function(){
         if(!ctx.setRoomField("baseTai", v, { lobbyOnly:true, denyMsg:"只有房主能改底台", busyMsg:"對戰中不能改底台" })) return;
         baseTai = v; ctx.syncSetup(); savePrefs();
       },
-      /* 結果卡那顆鈕:續局中是「我看完了」(回 true),最後一局才是原本的「下一局」。
+      /* 結果卡那顆鈕:續局中是「繼續」(回 true),最後一局才是原本的「下一局」。
          ⚠ 判斷放在這裡而不是 main.js —— 「這一局是不是最後一局」只有 adapter 知道。 */
       seeDone,
       taiOf, handsDone, goal:()=>handsGoal, sec:()=>claimSec, base:()=>baseTai,

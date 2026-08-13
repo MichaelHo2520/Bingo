@@ -7,34 +7,33 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="數獨">
-<meta name="theme-color" content="#2a1136">
+<meta name="apple-mobile-web-app-title" content="你畫我猜">
+<meta name="theme-color" content="#3d2410">
 <!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
-<!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.154.0 -->
+<title>你畫我猜 ｜ 連線對戰</title>
+<!-- 你畫我猜 · v1.154.0 -->
 <meta name="version" content="1.154.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
-  location.replace("app.html#sudoku");
+  location.replace("app.html#draw");
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- 共用 Bingo 的 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
-     id 與 class,樣式 100% 重用;盤面與數字鍵盤是檔尾追加的 .sdk-* 段落 -->
+     id 與 class,樣式 100% 重用;畫板與猜題列是檔尾追加的 .dw-* 段落 -->
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <div class="topbar">
     <div class="brand">
-      <div class="sdk-brand display">數獨</div>
+      <div class="dw-brand display">你畫我猜</div>
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
@@ -43,52 +42,29 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 進場選單(兩層):先選玩法(連線在上),點單機練習才挑難度 ====== -->
-  <section class="panel" id="sdkHome">
-    <!-- 回 index.html 的返回列。只在第一層顯示 —— 第二層有自己的返回(回第一層),
-         兩個返回鈕同時出現會分不清誰是誰 -->
-    <div class="mp-head" id="sdkHomeHead">
+  <!-- ====== 進場選單 ======
+       ★★ 這一頁**只有連線對戰,沒有單機** —— 十二個遊戲裡唯一的一個。
+          你畫我猜需要一個會畫圖的人與會看圖的人,兩邊都沒有 AI 做得到,
+          所以這一層不像另外十頁那樣有「單機 / 連線」兩顆,只有一顆。
+          ⚠ 連帶:這一頁沒有 js/draw/solo.js,離線也不能玩(PWA 只剩看得到這一層)。 -->
+  <section class="panel" id="dwHome">
+    <div class="mp-head" id="dwHomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
-      <div class="subtitle">選擇玩法</div>
+      <div class="subtitle">你畫我猜</div>
     </div>
 
-    <!-- 第一層:先選怎麼玩(連線在上)。刻意與 index.html 的 #homeBingo 同一套結構與 class,
-         三個遊戲進門的操作一致 —— 原本把難度膠囊擺在最前面,等於逼人先回答一個還沒決定的問題 -->
-    <div id="sdkPickMode">
-      <div class="sdk-hero">
-        <!-- ★ v1.149.0:與首頁卡**指向同一個檔案**(這裡是 .sdk-art 92px、
-             首頁是 .gc-art.sk-cart 46px)—— 在此之前兩頁各有一份逐字相同的手繪 SVG。
-             ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十一張的規則寫在 index.html
-                的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這十一對雙胞胎)。 -->
-        <img class="sdk-art" src="sk-icon.png" alt="數獨盤" width="192" height="192">
-        <div class="home-tagline">填滿 1~9,每列每行每宮不重複</div>
-      </div>
-      <button class="btn primary block-btn home-btn" id="sdkGoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="sdkPickSolo">🎯 單機練習</button>
-      <div class="home-hint">連線 2~6 人:<b>搶格</b>(同一張盤面搶著填)或<b>競速</b>(各解各的比快);單機自己練一題</div>
+    <div class="dw-hero">
+      <!-- ★ v1.149.0 起的規則:與首頁卡**指向同一個檔案**(這裡是 .dw-art 92px、
+           首頁是 .gc-art.dw-cart 46px)。
+           ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十二張的規則寫在 index.html
+              的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這些雙胞胎)。 -->
+      <img class="dw-art" src="dw-icon.png" alt="畫筆與畫板" width="192" height="192">
+      <div class="home-tagline">一人畫、其他人打字搶答</div>
     </div>
-
-    <!-- 第二層:單機要先挑難度 -->
-    <div id="sdkPickLevel" class="hidden">
-      <div class="home-sub-head">
-        <button class="icon-btn" id="sdkLevelBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <span class="subtitle">單機練習 · 選難度</span>
-      </div>
-      <div class="field">
-        <span class="field-label">難度</span>
-        <div class="seg" id="sdkHomeDiffSeg" aria-label="單機難度">
-          <button data-diff="m6">迷你 6×6</button>
-          <button class="on" data-diff="e9">標準 9×9</button>
-          <button data-diff="h9">困難 9×9</button>
-        </div>
-      </div>
-      <button class="btn primary block-btn home-btn" id="sdkStartSolo">開始練習 ▸</button>
-      <div class="home-hint" id="sdkLevelHint"></div>
-    </div>
+    <button class="btn primary block-btn home-btn" id="dwGoOnline">🌐 連線對戰</button>
+    <div class="home-hint">2~6 人:輪流當畫家,每人畫 <b>2</b> 次。越早猜中分數越高,畫家依「有幾個人猜懂」拿分。</div>
   </section>
 
   <!-- ====== 連線畫面(暱稱 / 建房 / 大廳清單)====== -->
@@ -121,15 +97,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="hint" id="mpConnMsg"></div>
   </section>
 
-  <!-- ====== 房間橫幅(沿用 Bingo 的 #mpBar;.sdk-room 再把它壓矮)====== -->
-  <div class="panel sdk-room hidden" id="mpBar">
-    <div class="row sdk-room-top">
+  <!-- ====== 房間橫幅(沿用 Bingo 的 #mpBar;.dw-room 再把它壓矮)====== -->
+  <div class="panel dw-room hidden" id="mpBar">
+    <div class="row dw-room-top">
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <!-- v1.105.0:拿掉「房間」字首(房名預設就是「XXX的房間」,前面再加一次是重複) -->
-      <span class="label sdk-room-title"><b id="mpRoomTitle" class="display">–</b></span>
-      <span class="mp-goal" id="mpBarGoal" aria-label="玩法與難度"></span>
+      <span class="label dw-room-title"><b id="mpRoomTitle" class="display">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="這一場的規則"></span>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
@@ -137,43 +112,43 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
       </div>
     </div>
-    <!-- 狀態列:大廳說明在等什麼;對戰中收起來(比分 HUD 已經在盤面上方),落單倒數才臨時放出來 -->
     <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
     </div>
-    <div class="sdk-room-foot">
+    <div class="dw-room-foot">
       <div id="mpPlayers" class="mp-players"></div>
     </div>
   </div>
 
   <!-- ====== 連線大廳設定(房主可改,訪客唯讀)====== -->
-  <div class="scroll-area sdk-scroll hidden" id="scrollArea">
-    <section class="panel hidden" id="sdkSetup">
+  <div class="scroll-area dw-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="dwSetup">
       <div class="subtitle">對戰設定</div>
 
       <div class="field">
-        <span class="field-label" id="sdkModeLabel">玩法</span>
-        <div class="seg" id="sdkModeSeg" aria-label="玩法">
-          <button class="on" data-mode="grab">⚡ 搶格</button>
-          <button data-mode="race">⏱ 競速</button>
+        <span class="field-label" id="dwRoundLabel">每人當幾次畫家</span>
+        <div class="seg" id="dwRoundSeg" aria-label="每人當幾次畫家">
+          <button data-v="1">1 次</button>
+          <button class="on" data-v="2">2 次</button>
+          <button data-v="3">3 次</button>
         </div>
       </div>
 
       <div class="field">
-        <span class="field-label" id="sdkDiffLabel">難度</span>
-        <div class="seg" id="sdkDiffSeg" aria-label="難度">
-          <button data-diff="m6">迷你 6×6</button>
-          <button class="on" data-diff="e9">標準 9×9</button>
-          <button data-diff="h9">困難 9×9</button>
+        <span class="field-label" id="dwSecLabel">作畫秒數</span>
+        <div class="seg" id="dwSecSeg" aria-label="一回合幾秒">
+          <button data-v="45">45 秒</button>
+          <button class="on" data-v="60">60 秒</button>
+          <button data-v="90">90 秒</button>
         </div>
       </div>
 
-      <!-- 候選提示:只能全房一致(搶格比手速,單方面省掉掃描時間就是直接贏) -->
       <div class="field">
-        <span class="field-label" id="sdkAssistLabel">候選提示</span>
-        <div class="seg" id="sdkAssistSeg" aria-label="候選提示">
-          <button class="on" data-assist="0">關</button>
-          <button data-assist="1">🔍 開(填錯 −1)</button>
+        <span class="field-label" id="dwDiffLabel">題目難度</span>
+        <div class="seg" id="dwDiffSeg" aria-label="題目難度">
+          <button data-v="easy">簡單</button>
+          <button class="on" data-v="std">標準</button>
+          <button data-v="hard">困難</button>
         </div>
       </div>
 
@@ -187,51 +162,53 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="wg-group hidden" id="wgGroup">
             <span class="wg-lbl">先到</span>
             <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
-              <span class="target-val display" id="winGoalVal">3</span>
-              <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+              <button class="mini" id="wgMinus" aria-label="減少目標分數">−</button>
+              <span class="target-val display" id="winGoalVal">1500</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標分數">＋</button>
             </div>
-            <span class="wg-lbl">勝奪冠</span>
+            <span class="wg-lbl">分奪冠</span>
           </div>
           <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
           <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
         </div>
       </div>
 
-      <div class="hint" id="sdkRuleHint"></div>
+      <div class="hint" id="dwRuleHint"></div>
     </section>
   </div>
 
-  <!-- ====== 單機 HUD(時間 / 錯誤 / 提示 / 筆記)====== -->
-  <div class="panel sdk-solobar hidden" id="sdkSoloBar">
-    <div class="row sdk-room-top">
-      <button class="icon-btn" id="sdkSoloBack" type="button" title="回選單" aria-label="回選單">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <span class="sdk-lvtag" id="sdkLevelTag">9×9 · 標準</span>
-      <span class="sdk-timer display" id="sdkTime">00:00</span>
-      <span class="sdk-miss" id="sdkMiss">✗ 0</span>
-      <button class="sdk-mini" id="sdkPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
+  <!-- ====== 對局畫面 ======
+       由上而下:比分 HUD → 回合資訊列(含倒數環)→ 畫板 → 畫家工具列 → 猜題訊息 → 輸入列。
+       ⚠ #dwOver(選題目 / 公布答案)住在 .dw-stage 裡面,不是 .veil 那種強制回應層 →
+         **不必列進 ui-kit.js 的 BACK_LAYERS**(那個陣列是雙胞胎,能不動就不動)。 -->
+  <div class="dw-play hidden" id="dwPlay">
+    <div class="dw-hud hidden" id="dwHud"></div>
+    <div class="dw-bar" id="dwBar">
+      <span class="dw-round" id="dwRound"></span>
+      <span class="dw-role hidden" id="dwRole"></span>
+      <span class="dw-cd hidden" id="dwCd" aria-label="剩餘秒數"></span>
     </div>
-    <div class="sdk-solotools">
-      <button class="sdk-tool" id="sdkHintBtn" type="button">💡 提示 3</button>
-      <button class="sdk-tool" id="sdkNoteBtn" type="button" title="筆記模式:先把可能的數字記在格子裡">✎ 筆記</button>
-    </div>
-  </div>
-
-  <!-- ====== 盤面 + 數字鍵盤(單機與連線共用)====== -->
-  <div class="sdk-play hidden" id="sdkPlay">
-    <!-- 即時比分:連線才顯示(搶格看分數、競速看進度條) -->
-    <div class="sdk-hud hidden" id="sdkHud"></div>
-    <!-- boardbox 吃掉剩餘高度,盤面再用 height:min(100%,92vw,460px) + aspect-ratio 自己夾成正方形
-         → 不必像 Bingo 那樣用 JS 實測高度寫進 --boardpx(數獨沒有那麼多變動的固定列) -->
-    <div class="sdk-boardbox">
-      <div class="sdk-stage" id="sdkStage">
-        <div class="sdk-board" id="sdkBoard"></div>
-        <div class="sdk-freeze hidden" id="sdkFreeze">🥶 3</div>
+    <div class="dw-stage" id="dwStage">
+      <!-- ⚠⚠ 蓋板一定要包在 .dw-wrap 裡面、而**不是**直接掛在 .dw-stage 上:
+           .dw-stage 吃的是「剩下的高度」,它幾乎總是比 4:3 的畫布高一截 ——
+           蓋板 inset:0 掛在 stage 上的話,那半透明的黑會連畫布**上下的空白**一起蓋掉,
+           畫面上看起來是「一塊深色大板子中間有一塊灰色」(截圖才看得出來,DOM 完全正常)。
+           .dw-wrap 的寬高由 js/draw/board.js 的 fit() 設成與畫布逐像素相同。 -->
+      <div class="dw-wrap" id="dwWrap">
+        <canvas class="dw-ink" id="dwInk"></canvas>
+        <div class="dw-over hidden" id="dwOver"></div>
       </div>
     </div>
-    <div class="sdk-pad" id="sdkPad"></div>
+    <div class="dw-tools hidden" id="dwTools">
+      <span class="dw-word-lbl">你要畫的是</span>
+      <span class="dw-word display" id="dwWord"></span>
+      <button class="dw-tool" id="dwClear" type="button">🗑 清空</button>
+    </div>
+    <div class="dw-say" id="dwSay" aria-live="polite"></div>
+    <div class="dw-input hidden" id="dwInputRow">
+      <input id="dwGuess" class="dw-guess" type="text" maxlength="16" placeholder="打出你猜的答案" autocomplete="off" enterkeyhint="send">
+      <button class="btn primary dw-send" id="dwSend" type="button">猜</button>
+    </div>
   </div>
 
   <!-- ====== 主要動作列(連線大廳的「準備好了」)====== -->
@@ -242,16 +219,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
-  <!-- ====== 結果卡(單機與連線共用;按鈕組靠 body.solo-on 切換)====== -->
+  <!-- ====== 結果卡 ====== -->
   <div class="veil" id="veil">
-    <div class="win-card sdk-win" id="sdkWinCard">
+    <div class="win-card dw-win" id="dwWinCard">
       <div class="word display" id="winWord">完成!</div>
-      <div class="sdk-winner" id="sdkWinner"></div>
       <p id="winMsg"></p>
-      <div class="sdk-stats hidden" id="sdkStats"></div>
+      <div class="dw-stats hidden" id="dwStats"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
-      <div class="sdk-react-row" id="sdkReactRow">
+      <div class="dw-react-row" id="dwReactRow">
         <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
         <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
         <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
@@ -260,26 +236,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </div>
       <div class="actions" id="mpWinBtns">
         <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
-        <button class="btn primary" id="mpAgain">繼續 ▸</button>
+        <button class="btn primary" id="mpAgain">再玩一場 ▸</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
-      <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="soloAgain">再來一局 ▸</button>
-        <button class="btn ghost" id="soloHome">回選單</button>
-      </div>
-      <button class="peek-link" id="winPeek">先看看盤面 👀</button>
+      <button class="peek-link" id="winPeek">先看看畫板 👀</button>
     </div>
   </div>
   <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
-
-  <!-- 單機暫停 -->
-  <div class="veil" id="sdkPauseVeil">
-    <div class="win-card confirm-card">
-      <div class="confirm-ico">⏸</div>
-      <div class="confirm-title">暫停中</div>
-      <p>點畫面任一處繼續</p>
-    </div>
-  </div>
 
   <!-- ====== 設定(沿用 Bingo 的設定蓋板;偏好與 Bingo 共用,寫入採 merge)====== -->
   <div class="veil" id="setVeil">
@@ -341,7 +304,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       </div>
       <button class="btn primary" id="setClose">完成</button>
-      <div class="set-foot">數獨 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+      <div class="set-foot">你畫我猜 · <span id="setVer"></span> · 開發者 Michael Ho</div>
     </div>
   </div>
 
@@ -356,7 +319,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="emote-phrases" id="emotePhrases"></div>
       <div class="emote-sub">🔊 語音短訊</div>
       <div class="emote-phrases" id="emoteClips"></div>
-      <!-- 自訂語音:沒錄過就整區隱藏(buildMyClips 控制),面板不會多一塊空的 -->
       <div class="emote-sub hidden" id="myClipsSub">⭐ 我的語音</div>
       <div class="emote-phrases hidden" id="emoteMyClips"></div>
       <div class="emote-input">
@@ -367,9 +329,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
   <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
 
-  <!-- 自訂語音的編輯浮層(由設定卡的「我的語音 → 編輯」開啟)
-       自己錄 3 秒短語音存在本機 localStorage(bingo.myclips.v1,三個遊戲共用同一批),
-       連線時在互動面板當按鈕送出;走既有的 kind="voice" 管道 = 把音訊本身傳過去,對方不需要有任何檔案。 -->
   <div class="veil" id="myVoiceVeil">
     <div class="set-card mvc-card">
       <button class="card-x" id="mvClose" type="button" aria-label="關閉">✕</button>
@@ -419,9 +378,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
 <script>
 /* ============================================================
-   連線對戰設定 — 與 index.html(Bingo)、gomoku.html 使用同一個 Firebase 專案,
-   但數獨的資料放在獨立的頂層節點 sudoku_rooms / sudoku_index。
-   ⚠ 需在 Firebase 規則開放 sudoku_rooms 與 sudoku_index 的讀寫。
+   連線對戰設定 — 與 index.html(Bingo)等頁共用同一個 Firebase 專案,
+   但你畫我猜的資料放在獨立的頂層節點 dw_rooms / dw_index。
+   ⚠ 需在 Firebase 規則開放 dw_rooms 與 dw_index 的讀寫。
+   ⚠ 這一頁比別頁多兩個房內子節點(dw_rooms/{code}/ink 與 /say)——
+      它們在 $code 底下,吃的是同一條 .write 規則,**不必額外開規則**。
    ============================================================ */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBVBN3hRMSFq7KwWmyf3IR01Y82XmfhLQ0",
@@ -434,15 +395,16 @@ const FIREBASE_CONFIG = {
 };
 </script>
 
-<!-- 載入順序固定:ui-kit(定義 $ 與介面工具)→ mp-core(連線核心)→ gen(出題)→ board(盤面)
-     → solo(單機)→ adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
+<!-- 載入順序固定:ui-kit(定義 $ 與介面工具)→ mp-core(連線核心)→ rules(純函式規則)
+     → gen(題庫與出題)→ board(畫板與對局畫面)→ adapter(連線,在這裡 const MP = MPCore.create(...))
+     → main(綁定,必須最後)。★ 這一頁**沒有 solo.js 也沒有 ai.js**(見進場選單那段註解)。 -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <script src="js/shared/mp-core.js"></script>
-<script src="js/sudoku/gen.js"></script>
-<script src="js/sudoku/board.js"></script>
-<script src="js/sudoku/solo.js"></script>
-<script src="js/sudoku/adapter.js"></script>
-<script src="js/sudoku/main.js"></script>
+<script src="js/draw/rules.js"></script>
+<script src="js/draw/gen.js"></script>
+<script src="js/draw/board.js"></script>
+<script src="js/draw/adapter.js"></script>
+<script src="js/draw/main.js"></script>
 </body>
 </html>

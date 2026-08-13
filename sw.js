@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.153.1";
+const VERSION = "1.154.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -115,6 +115,17 @@ const CORE = [
   "./js/chengyu/solo.js",
   "./js/chengyu/adapter.js",
   "./js/chengyu/main.js",
+  /* 你畫我猜(第十二個遊戲,v1.154.0;獨立頁面)。
+     ★★ 十二個裡**唯一沒有 solo.js 也沒有 ai.js** 的一頁 —— 沒有 AI 畫家、也沒有 AI 猜圖者,
+       所以它只有連線。⚠ 連帶:**這一頁離線是玩不了的**(快取只讓進場頁畫得出來),
+       那與另外十一頁不同,不是漏列檔案。
+     ★ 這一頁不新增任何 mp3:動作聲全是 Sound.tone() 的合成音(同暗棋 / 成語接龍)。 */
+  "./draw.html",
+  "./js/draw/rules.js",
+  "./js/draw/gen.js",
+  "./js/draw/board.js",
+  "./js/draw/adapter.js",
+  "./js/draw/main.js",
   "./mp3/bgm.mp3",
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",
@@ -209,7 +220,8 @@ const CORE = [
   "./bj-icon.png",     // 台式 21 點
   "./un-icon.png",     // UNO
   "./dc-icon.png",     // 象棋暗棋
-  "./cy-icon.png"      // 成語接龍
+  "./cy-icon.png",     // 成語接龍
+  "./dw-icon.png"      // 你畫我猜(★ 目前是 tools/gen-dw-icon.py 產的佔位圖,不是那套手繪插畫)
 ];
 /* 筒條萬的牌名語音(v1.72.0,27 個)。★ 用算式接上去而**不是手列 27 行** —— 規律與
    js/mahjong16/sfx.js 的編碼一致(0..8 萬 w / 9..17 條 b / 18..26 筒 d)。

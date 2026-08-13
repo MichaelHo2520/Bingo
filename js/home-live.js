@@ -96,7 +96,18 @@ const HomeLive = (function(){
        ⚠ icon 用 🧩(U+1F9E9 拼圖片)—— 呼應「交叉填字」,且與另外十個都不撞
          (🎲⚫🔢🀄🀄🎴🎴🌈🔴)。不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
        ⚠ 成語接龍 **不帶 joinMid** —— 一場一局,對戰中不給加入(比照 UNO / 暗棋)。 */
-    { key:"chengyu", index:"chengyu_index", rooms:"chengyu_rooms", name:"成語接龍", icon:"🧩", badge:"hlBadgeChengyu", max:6, href:"chengyu.html" }
+    { key:"chengyu", index:"chengyu_index", rooms:"chengyu_rooms", name:"成語接龍", icon:"🧩", badge:"hlBadgeChengyu", max:6, href:"chengyu.html" },
+    /* ★ 第十二個遊戲(v1.154.0):你畫我猜。
+       max 必須與 js/draw/adapter.js 的 maxPlayers 一致(**6**)。
+       ⚠⚠ key / index / rooms / 圖檔 / CSS 前綴**一律用同一個縮寫 dw** ——
+         key 必須等於 index 去掉 "_index"(dw_index → dw),不一致的話 game_stats 永遠對不上,
+         那個遊戲的熱門度永遠是 0 而**沒有任何測試會紅**(暗棋 v1.118.1 踩過)。
+         index.html 那張卡的 data-gk 也是 "dw"(applyRank 是靠它找卡片的)。
+       ⚠ icon 用 🎨(U+1F3A8 調色盤)—— 與另外十一個都不撞(🎲⚫🔢🀄🀄🎴🎴🌈🔴🧩),
+         也不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
+       ⚠ **不帶 joinMid** —— 一場就是一場(每人要當滿 N 次畫家),中途進來的人湊不齊次數;
+         這一條要與 adapter 沒有開 joinMidGame 保持一致。 */
+    { key:"dw", index:"dw_index", rooms:"dw_rooms", name:"你畫我猜", icon:"🎨", badge:"hlBadgeDraw", max:6, href:"draw.html" }
   ];
 
   /* ==========================================================================

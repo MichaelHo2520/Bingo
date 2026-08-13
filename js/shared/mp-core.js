@@ -770,18 +770,29 @@ const MPCore = (function(){
       roomRef.child("players/"+meId).update({ ready:ready, name:meName });
       updateReadyBtn();
     }
-    /* 局間續局的「我看完了」(只有 A.contRound 的遊戲用得到,見檔頭 CONT_ROUND)。
+    /* 局間續局的「繼續」(只有 A.contRound 的遊戲用得到,見檔頭 CONT_ROUND)。
        與 toggleReady 的差別有三:單向(只會變成準備好,不會取消)、**不必回大廳**、
        而且**順手把 status 翻回 lobby** —— 房主端的 updateStartBtn 有 status!=="lobby"
        這道門,不翻的話大家都準備好了也開不了下一局。
        ★ 回傳「有沒有真的送出去」給 adapter 用(按過第二次要保持原樣、不要重畫成剛按下)。
        ⚠ status 那一筆走一般交易(會本地樂觀套用)—— 它不碰 game.winner,
-         不在踩坑 #8 的射程內;而且第一個按的人先翻好,後面的人交易看到就中止。 */
+         不在踩坑 #8 的射程內;而且第一個按的人先翻好,後面的人交易看到就中止。
+       ⚠⚠⚠ **兩個判斷值都要在寫 players 之前抓下來**(v1.153.2 修的 bug):
+         下面那一筆 players 寫入會**在同一個呼叫堆疊裡**打到自己的 players 監聽 →
+         updateStartBtn() → 我如果是湊齊那一票的人,**下一局就在那一行裡被開走了**
+         (status 變回 playing、roundId 換新)。回到這裡再讀當下的 status,就會拿
+         「剛開的那一局」去跑交易 → 把它的 status 翻回 lobby,而新局的 winner 是空的
+         → onGame 的 `!winner` 那條當場成立 → **全房一起 backToLobby()**。
+         使用者回報的原句:「大家都按了繼續,但不知道為什麼跳回了房間」。
+       ⚠ roundId 那道門同時擋掉網路版的同一件事:交易被伺服器判定過期而重跑時,
+         手上的快照可能已經是下一局了(那時本地 status 也已經翻過)。
+       ★ 守門:tools/gen-mj16-e2e.js 的 Y 段(房主當最後一個按的人)。 */
     function readyUp(){
       if(!CONT_ROUND || !roomRef || !meId || ready) return false;
+      const rid=roundId, wasPlaying=(status!=="lobby");
       ready=true;
       roomRef.child("players/"+meId).update({ ready:true, name:meName });
-      if(status!=="lobby") txGame(g=>{ if(g.status==="lobby")return false; g.status="lobby"; });
+      if(wasPlaying) txGame(g=>{ if(g.status==="lobby" || g.roundId!==rid)return false; g.status="lobby"; });
       updateReadyBtn();
       return true;
     }
@@ -901,7 +912,7 @@ const MPCore = (function(){
       }
       renderScoreboard();
       /* ★★ 正在偷看牌桌時**不要把結果卡叫回來**(v1.108.0)。
-         showOutcome() 會被 players / scores 的任何變動叫起來(別人按「我看完了」、
+         showOutcome() 會被 players / scores 的任何變動叫起來(別人按「繼續」、
          有人改名、分數同步…),而它以前一律 showResult() —— 使用者按了「看牌」正在
          研究牌桌,畫面卻**自己跳回結算畫面**:「我按返回去看牌,然後突然跳回來結算畫面」。
          ⚠ 卡片的內容(大字 / 訊息 / 台數表)上面幾行照樣更新了,所以按「🏆 看結果」
@@ -914,7 +925,7 @@ const MPCore = (function(){
       /* 本局結束就把自己設為未準備(下一局要各自重新按準備)。
          ⚠⚠ 只在**這一局第一次**顯示結果時做。showOutcome() 會被反覆呼叫 ——
            players / scores 任何一個節點一動,只要還在結果相位就再跑一次 ——
-           而續局的「我看完了」(readyUp)正是在這張卡上按的:不擋的話我按下去寫進去的
+           而續局的「繼續」(readyUp)正是在這張卡上按的:不擋的話我按下去寫進去的
            ready:true 會被自己**同一個 tick**抹回 false(症狀:按了完全沒反應,
            而 status 已經翻成 lobby,像是只有一半生效)。
          ★ 對七個舊遊戲逐字等價:那時 ready 只可能是 false(準備鈕在對戰中是收起來的),

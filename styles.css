@@ -7009,3 +7009,235 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   @media (max-height:780px) and (pointer:coarse){
     body:has(#cyPlay:not(.hidden)) .topbar{display:none}
   }
+
+  /* ==========================================================================
+     你畫我猜(draw.html 專用) — 第十二個遊戲
+     ★ 同一條鐵則:只「追加」,選擇器一律 .dw-*(掃過 styles.css,.dw- 零命中)。
+       進場選單刻意沿用既有的 .panel / .field / .seg / .home-btn / .home-hint /
+       .home-tagline;玩家六色沿用數獨已經定義在 :root 的 --sp0~--sp5。
+
+     ★★★ 這一段唯一一條「不知道就會做錯」的事:
+       **畫紙永遠是淺色的,不吃主題變數。**
+       墨水是深色的;紙如果跟著 midnight / arcade 變深,深墨水就整個看不見了 ——
+       而那是「切到某一個主題才壞」的坑,平常五個主題只看一個根本測不到。
+       畫板就是一張白紙,五個主題都一樣(邊框與陰影才吃主題)。
+       ⚠ 同理 --dw-ink 也是固定值,不可以改成 var(--text)(深色主題的 --text 是淺的)。
+
+     ★ 版面:.dw-play 是欄式,由上而下
+         比分 HUD → 回合列(含倒數環)→ 畫板 → 畫家工具列 → 猜題訊息 → 輸入列
+       只有 .dw-stage 會伸縮(flex:1 1 0),其餘全部 flex:none —— 這樣鍵盤彈出來時
+       被壓縮的是畫板,而不是「輸入框被擠到畫面外」。
+     ⚠ 房間框沒有放寬(維持 .panel 的 min(92vw,520px))→ 頂列不必跟著改
+       (CLAUDE.md 紅線 7 講的是「放寬了才要一起放寬」)。
+     ========================================================================== */
+
+  :root{ --dw-paper:#fffdf7; --dw-ink:#20242c; --dw-edge:rgba(74,43,31,.55); }
+
+  .dw-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
+    line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .dw-scroll{flex:1 1 auto}
+
+  /* ---------- 進場插圖 ----------
+     ⚠ .dw-art 是**這一頁**的 92px;首頁那張是 .gc-art.dw-cart(46px)。
+       這條定義在 .gc-art{width:46px} 後面 → 同權重後定義勝 →
+       首頁卡**絕對不可以**掛 .dw-art,不然那張卡會比別張高一截(21 點 v1.86.0 踩過)。
+     ⚠ .dw-cart 本身不必寫規則(.gc-art 的 46px 就是它要的);留著這個 class 是為了
+       與另外十一張一致,而且 tools/test-pages.js 的 E 節逐字比對它。 */
+  .dw-hero{text-align:center;margin:14px 0 4px}
+  .dw-art{width:92px;height:92px;display:block;margin:0 auto 8px}
+
+  /* ---------- 房間框(比照成語接龍的瘦身版:把高度讓給畫板) ---------- */
+  .dw-room{padding:9px 12px}
+  .dw-room .row{margin-top:0}
+  .dw-room-top{flex-wrap:nowrap;gap:8px}
+  .dw-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
+  .dw-room-title b{font-size:15px;color:var(--text)}
+  .dw-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .dw-room .quick-voice,.dw-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .dw-room .quick-voice .qv-ico{font-size:18px}
+  .dw-room .mp-subrow{margin-top:5px}
+  .dw-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .dw-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+  .dw-room-foot .mp-players.oneline .mp-chip{flex:0 0 auto;min-width:0;padding:4px 9px;gap:5px}
+  /* 對戰中收起名單列:比分 HUD 講的是同一件事、還更清楚,這 30px 讓給畫板 */
+  .dw-room.playing .dw-room-foot{display:none}
+
+  /* 玩家色點(晶片 / HUD / 猜題列共用),沿用數獨已定義的 --sp0~--sp5 */
+  .dw-seat{width:11px;height:11px;border-radius:50%;flex:none;display:inline-block}
+  .dw-seat.p0{background:var(--sp0)} .dw-seat.p1{background:var(--sp1)}
+  .dw-seat.p2{background:var(--sp2)} .dw-seat.p3{background:var(--sp3)}
+  .dw-seat.p4{background:var(--sp4)} .dw-seat.p5{background:var(--sp5)}
+  .dw-pts{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--accent);flex:none}
+
+  /* ---------- 對局整體版面 ---------- */
+  .dw-play{flex:1 1 auto;min-height:0;width:min(92vw,520px);
+    display:flex;flex-direction:column;align-items:stretch;gap:8px}
+
+  /* ---------- 即時比分 HUD ---------- */
+  .dw-hud{flex:none;width:100%;display:grid;gap:6px;
+    grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+  .dw-hud.dw-hud-two{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .dw-hud.dw-hud-two .dw-hcard{padding:4px 7px 5px}
+  .dw-hud.dw-hud-two .dw-hn{font-size:11px}
+  .dw-hud.dw-hud-two .dw-hv{font-size:16px}
+  .dw-hcard{position:relative;overflow:hidden;cursor:pointer;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;
+    padding:5px 8px 6px;display:flex;flex-direction:column;gap:2px;min-width:0}
+  .dw-hcard:active{transform:scale(.97)}
+  .dw-hcard.me{border-color:var(--accent)}
+  /* 這一回合的畫家:整張卡標起來(晶片列在對戰中是收起來的,只剩這裡看得到誰在畫) */
+  .dw-hcard.drawer{border-color:var(--accent-2);box-shadow:0 0 0 1px var(--accent-2)}
+  /* 已經猜中的人:淡淡的綠底(不用打勾符號,那一格太窄) */
+  .dw-hcard.hit{background:linear-gradient(180deg,rgba(95,224,138,.20),var(--panel))}
+  .dw-hn{display:flex;align-items:center;gap:5px;font-weight:800;font-size:11.5px;
+    color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dw-hn b{color:var(--accent);font-size:10px}
+  .dw-hv{font-family:'Fredoka',sans-serif;font-weight:700;font-size:19px;line-height:1;color:var(--text)}
+  .dw-hv em{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
+  .dw-pop{position:absolute;right:7px;top:6px;pointer-events:none;color:#5fe08a;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;line-height:1;
+    animation:dwPop 1s ease-out forwards}
+  @keyframes dwPop{
+    0%{opacity:0;transform:translateY(6px)}
+    20%{opacity:1;transform:translateY(0)}
+    100%{opacity:0;transform:translateY(-12px)}
+  }
+
+  /* ---------- 回合資訊列 + 倒數環 ---------- */
+  .dw-bar{flex:none;display:flex;align-items:center;gap:8px;min-height:28px}
+  .dw-round{font-weight:800;font-size:12.5px;color:var(--muted);flex:none}
+  .dw-role{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-weight:800;font-size:12.5px;color:var(--text)}
+  .dw-role.mine{color:var(--accent-2)}
+  /* 倒數環:conic-gradient 掃一圈(--dw-p 由 js/draw/board.js 每 200ms 設一次)。
+     ⚠ 刻意不用 CSS 動畫 —— 錨點是「相位開始時間 + 這一段多長」,
+       手機切 App 回來時動畫會走鐘,用時間差重算才不會。 */
+  .dw-cd{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;color:var(--text);
+    background:conic-gradient(var(--accent) var(--dw-p,100%),rgba(0,0,0,.22) 0);
+    box-shadow:inset 0 0 0 4px var(--panel)}
+  .dw-cd.hot{color:#fff;background:conic-gradient(var(--daub) var(--dw-p,100%),rgba(0,0,0,.22) 0)}
+
+  /* ---------- 畫板 ----------
+     .dw-stage 吃掉剩餘高度,畫布本身的寬高由 js/draw/board.js 的 fit() 算成整數 px
+     (固定 4:3,見那支的檔頭 ①)。 */
+  .dw-stage{flex:1 1 0;min-height:120px;width:100%;position:relative;
+    display:flex;align-items:center;justify-content:center;overflow:hidden}
+  /* ⚠⚠ touch-action:none 是**非做不可**的:沒有它,手指一動就變成捲整頁,
+     根本畫不出東西(而滑鼠測起來完全正常 → 只有真的用手機才會發現)。 */
+  /* ★ 畫布與蓋板的共同外框:寬高由 js/draw/board.js 的 fit() 設成與畫布逐像素相同。
+     ⚠ 蓋板一定要掛在它上面,不可以掛在 .dw-stage 上(見 draw.html 那段註解)。 */
+  .dw-wrap{position:relative;flex:none;line-height:0}
+  .dw-ink{display:block;border-radius:14px;background:var(--dw-paper);
+    box-shadow:0 0 0 3px var(--dw-edge),0 10px 30px rgba(0,0,0,.22);
+    touch-action:none;-webkit-user-select:none;user-select:none}
+  .dw-ink.live{cursor:crosshair}
+
+  /* ---------- 蓋板:選題目 / 公布答案 ---------- */
+  /* 遮罩與卡片一律照既有的 .veil + .win-card 配方(那一組五個主題都驗過)——
+     不要自己另外調一組半透明值:bubblegum 的 --text 是**深色**的,自創的配方
+     很容易變成「只有那一個主題讀不到字」,而那正好是平常不會去看的那一個。 */
+  .dw-over{position:absolute;inset:0;display:grid;place-items:center;padding:10px;
+    background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:14px}
+  .dw-ov-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;
+    padding:14px 16px;text-align:center;max-width:100%;backdrop-filter:blur(14px);
+    box-shadow:0 10px 30px rgba(0,0,0,.35)}
+  .dw-ov-t{font-weight:800;font-size:15px;color:var(--text);margin-bottom:10px}
+  .dw-ov-s{font-size:12px;color:var(--muted);margin-top:8px}
+  .dw-ov-w{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(26px,8vw,38px);
+    line-height:1.1;color:var(--accent-2);margin:2px 0 8px}
+  /* 三選一 */
+  .dw-picks{display:flex;flex-direction:column;gap:8px}
+  .dw-pickbtn{display:flex;align-items:center;gap:10px;min-width:190px;
+    border:1px solid var(--panel-line);border-radius:13px;padding:9px 14px;
+    background:rgba(255,255,255,.10);color:var(--text);cursor:pointer;transition:.15s}
+  .dw-pickbtn:hover{background:rgba(255,255,255,.18)}
+  .dw-pickbtn:active{transform:scale(.97)}
+  .dw-pickbtn.on{border-color:var(--accent);background:rgba(255,255,255,.20)}
+  .dw-pk-ic{font-size:22px;line-height:1;flex:none}
+  .dw-pk-w{font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px}
+  /* 公布答案的分數表 */
+  .dw-sh-list{display:flex;flex-direction:column;gap:4px;margin-top:4px;text-align:left}
+  .dw-sh-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
+  .dw-sh-row.me{color:var(--text)}
+  .dw-sh-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
+  .dw-sh-p{font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;color:var(--accent);flex:none}
+
+  /* ---------- 畫家工具列 ---------- */
+  .dw-tools{flex:none;display:flex;align-items:center;gap:8px}
+  .dw-word-lbl{font-size:11.5px;color:var(--muted);font-weight:800;flex:none}
+  .dw-word{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:20px;color:var(--accent-2)}
+  .dw-tool{flex:none;border:1px solid var(--panel-line);border-radius:11px;padding:6px 12px;
+    background:rgba(255,255,255,.08);color:var(--text);font-family:'Nunito',sans-serif;
+    font-weight:800;font-size:13px;cursor:pointer;transition:.15s}
+  .dw-tool:hover{background:rgba(255,255,255,.16)}
+  .dw-tool:active{transform:scale(.94)}
+
+  /* ---------- 猜題訊息列 ----------
+     ⚠ 高度固定成三行左右並自己捲:讓它跟著內容長高的話,每有人猜一次
+       畫板就被往上推一次(而畫布一改尺寸就要整張重畫 → 整個畫面在抖)。 */
+  /* ★ 高度會長:畫布是**固定 4:3**,直向手機上它是被寬度夾住的 → 上下一定會空一塊,
+     那塊空白給猜題列比留白有用(看得到更多亂猜的笑點)。
+     ⚠ 但**一定要有 max-height** —— 沒有上限的話,在寬視窗上它會把畫布壓小,
+       而畫布是這個遊戲的主角(實測 560px 寬時畫布從 430 掉到 324)。
+     ⚠ 也一定要有 min-height:內容少的時候不可以縮成一條線(它同時是「這裡會有訊息」的暗示)。 */
+  .dw-say{flex:1 1 74px;min-height:74px;max-height:140px;overflow-y:auto;overscroll-behavior:contain;
+    display:flex;flex-direction:column;gap:3px;padding:6px 9px;
+    background:var(--panel);border:1px solid var(--panel-line);border-radius:12px}
+  .dw-say-row{display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.35}
+  .dw-say-n{font-weight:800;color:var(--muted);flex:none;max-width:6.5em;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dw-say-n.me{color:var(--accent)}
+  .dw-say-t{color:var(--text);min-width:0;word-break:break-all}
+  .dw-say-hit{font-weight:800;color:#5fe08a}
+  .dw-say-sys{color:var(--muted);font-style:italic}
+
+  /* ---------- 猜題輸入列 ---------- */
+  .dw-input{flex:none;display:flex;gap:8px}
+  .dw-guess{flex:1;min-width:0;border-radius:12px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.10);color:var(--text);
+    font-family:'Nunito',sans-serif;font-weight:700;font-size:16px;padding:10px 13px}
+  .dw-guess::placeholder{color:var(--muted);font-weight:600}
+  .dw-guess:focus{outline:none;border-color:var(--accent)}
+  .dw-guess:disabled{opacity:.55}
+  .dw-send{flex:none;padding:10px 18px}
+  .dw-send:disabled{opacity:.45}
+  .dw-input.cool .dw-guess{border-color:var(--daub)}
+
+  /* ---------- 結果卡 ---------- */
+  .dw-win{padding:30px 22px}
+  .dw-win p{margin:8px 0 14px}
+  .dw-win.lose .word{background:none;color:#ff8f8f;-webkit-text-fill-color:#ff8f8f}
+  .dw-win.draw .word{background:none;color:var(--muted);-webkit-text-fill-color:var(--muted)}
+  .dw-win.win{border-color:var(--accent);box-shadow:0 0 26px rgba(0,0,0,.25),0 0 0 1px var(--accent)}
+  .dw-stats{display:flex;flex-direction:column;gap:4px;margin:6px 0 14px;text-align:left}
+  .dw-st-h{font-size:11.5px;font-weight:800;color:var(--muted);text-align:center;margin-bottom:2px}
+  .dw-st-row{display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:10px;
+    background:rgba(255,255,255,.06)}
+  .dw-st-row.me{background:rgba(255,255,255,.14)}
+  .dw-st-k{width:22px;text-align:center;font-weight:800;font-size:13px;color:var(--muted);flex:none}
+  .dw-st-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-weight:800;font-size:14px;color:var(--text)}
+  .dw-st-p{font-family:'Fredoka',sans-serif;font-weight:700;font-size:17px;color:var(--accent);flex:none}
+  .dw-st-p em{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
+
+  /* 賽後表情列(沿用五子棋的 .gmk-react 外觀,只換容器 class) */
+  .dw-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+
+  /* ---------- 窄畫面 ---------- */
+  @media (max-height:700px){
+    .dw-play{gap:6px}
+    .dw-say{flex:1 1 58px;min-height:58px;padding:5px 8px}
+    .dw-hcard{padding:4px 7px 5px}
+    .dw-hv{font-size:16px}
+    .dw-guess{font-size:15px;padding:8px 11px}
+    .dw-send{padding:8px 15px}
+    .dw-word{font-size:17px}
+    .dw-cd{width:30px;height:30px;font-size:13px}
+  }
+  /* ---------- 手機沒進全螢幕時,玩的時候收掉頂列(比照數獨 / 五子棋 / 成語接龍) ---------- */
+  @media (max-height:780px) and (pointer:coarse){
+    body:has(#dwPlay:not(.hidden)) .topbar{display:none}
+  }

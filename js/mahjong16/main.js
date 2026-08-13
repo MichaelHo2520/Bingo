@@ -227,7 +227,7 @@ $("kickCancel").addEventListener("click",()=>MP.cancelKick());
 $("kickVeil").addEventListener("click",e=>{ if(e.target===$("kickVeil"))MP.cancelKick(); });
 
 /* ---------- 結果卡 ---------- */
-/* 續局中(打一圈 / 一將的中間局)這顆是「我看完了」:不回大廳、直接標成準備好,
+/* 續局中(打一圈 / 一將的中間局)這顆是「繼續」:不回大廳、直接標成準備好,
    全部人看完房主就開下一局 —— MP.seeDone() 回 true 就代表它接手了。
    最後一局 / 只打一局才是原本的「下一局」= 各自回大廳重新準備。 */
 $("mpAgain").addEventListener("click",()=>{ if(!MP.seeDone()) MP.again(); });

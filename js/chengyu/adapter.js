@@ -13,7 +13,7 @@
 
    ⚠ 只用了一個能力旗標:一場一局、搶字模式、不扣分、對局中不可加入,
      跟數獨一樣不碰 js/shared/mp-core.js 一行 —— 唯一例外是 contRound(v1.136.0,
-     局間續局,比照台灣麻將):結果卡按「我看完了」不回大廳,湊齊直接接下一盤。
+     局間續局,比照台灣麻將):結果卡按「繼續」不回大廳,湊齊直接接下一盤。
    ========================================================================== */
 
 const MP = MPCore.create((function () {
@@ -126,7 +126,7 @@ const MP = MPCore.create((function () {
     });
   }
 
-  /* ---------- 局間續局:結果卡按「我看完了」直接接下一盤,不回大廳(比照台灣麻將)。
+  /* ---------- 局間續局:結果卡按「繼續」直接接下一盤,不回大廳(比照台灣麻將)。
      使用者:「按繼續是直接接下一句,而不是調回選單然後還要再按一次準備好了」——
      成語接龍沒有台灣麻將「打幾局」那種季末結算,所以永遠續局,不必像那邊分兩種文案。 */
   function seenBy(id) { return !!(ctx.players()[id] || {}).ready; }
@@ -145,11 +145,11 @@ const MP = MPCore.create((function () {
     const wait = waitCount();
     el.classList.remove("hidden");
     el.innerHTML = mine
-      ? (wait > 0 ? "✓ 已看完 —— 還在等 <b>" + wait + "</b> 人…" : "✓ 大家都看完了,馬上換下一盤…")
-      : "按「✓ 我看完了」,大家都按了就接著玩下一盤";
+      ? (wait > 0 ? "✓ 已按繼續 —— 還在等 <b>" + wait + "</b> 人…" : "✓ 大家都按了,馬上換下一盤…")
+      : "按「繼續」,大家都按了就接著玩下一盤";
     const b = $("mpAgain");
     if (b) {
-      b.textContent = mine ? "✓ 已看完" : "✓ 我看完了";
+      b.textContent = mine ? "✓ 已按繼續" : "繼續 ▸";
       b.classList.toggle("ghost", mine);
       b.classList.toggle("primary", !mine);
       b.disabled = mine;
@@ -180,7 +180,7 @@ const MP = MPCore.create((function () {
     winCardId: "cyWinCard",
     hasResign: false,               // 限時解謎,中途認輸沒有意義
     extraNodes: [],
-    /* ★ 局間續局(v1.136.0)—— 一盤結束不回大廳,結果卡按「我看完了」就 MP.readyUp(),
+    /* ★ 局間續局(v1.136.0)—— 一盤結束不回大廳,結果卡按「繼續」就 MP.readyUp(),
        湊齊由房主開下一盤。沒有台灣麻將的「打幾局」季末結算,永遠續局。 */
     contRound: true,
 

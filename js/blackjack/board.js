@@ -57,7 +57,7 @@ const BJB = (function(){
      與 betPend / grabOpen 同一類:**純畫面狀態**,不進 DB、不進 st、不影響任何判定。
      ⚠ handKey 是**去重**用的:過場開著的時候每一次 paint 都會叫 showHand 一次
        (連線一個快照一次),沒有它結算聲會一直重播。
-     ⚠ hSkip 是呼叫端給的「按下去要做什麼」(單機 = 立刻換局 / 連線 = 送一筆「我看完了」);
+     ⚠ hSkip 是呼叫端給的「按下去要做什麼」(單機 = 立刻換局 / 連線 = 送一筆「繼續」);
        hVoted 是「我按過了沒」—— 只給「再按一次要說得出原因」用,**真相在呼叫端**
        (連線是 DB 的 `bj.nx`,而 showHand 每次都會把它餵進來)。
      ⚠ v1.94.0 的 handDone 旗標**拿掉了**:它當初擋的是「本地先收掉、advance 還在飛」
@@ -1231,7 +1231,7 @@ const BJB = (function(){
          時間到(SETTLE_MS)照舊自動推進 —— 那是**後備**,擋掉「有人放著不管全桌乾等」。
        ★★ 「按了會發生什麼事」由**呼叫端**給(`v.onSkip`)—— 面板只有這一份:
             單機 → 立刻跑 `nextRound()`(只有我一個人,不必等)
-            連線 → 送一筆「我看完了」(`sendNext`);湊齊了才由 `maybeNext` 叫 `advance`
+            連線 → 送一筆「繼續」(`sendNext`);湊齊了才由 `maybeNext` 叫 `advance`
        ⚠⚠ 因此 `skipHand()` **不可以自己把過場收掉** —— 連線按完還要**留在畫面上**
          看「還在等幾人」。收不收由呼叫端的流程決定(單機是 `startRound` 收、
          連線是下一個快照相位變了就收)。v1.94.0 那個 `handDone` 旗標因此**拿掉了**:
@@ -1310,7 +1310,7 @@ const BJB = (function(){
              '<div class="bj-hbar" style="--bj-hdur:' +
                (Math.max(400, v.ms || 3000) / 1000) + 's"><i></i></div>' +
              /* ★★★ v1.94.0:看完可以按(使用者:「我希望有可以快速關掉的操作」)。
-                ★★★ v1.95.0:連線改成**投票** —— 按過了就換成「✓ 已看完 · 還在等 N 人」
+                ★★★ v1.95.0:連線改成**投票** —— 按過了就換成「✓ 已按繼續 · 還在等 N 人」
                 (使用者:「不希望是誰按就全桌一起跳,變成全部都按完了才一起跳」)。
                 ⚠ 鈕上的字由**呼叫端**給:最後一局要寫「看結果」而不是「下一局」,
                   而「這是不是最後一局 / 還在等幾人」只有呼叫端算得出來。
@@ -1322,14 +1322,14 @@ const BJB = (function(){
                '<span class="bj-hfoot">' + esc(footTxt(v)) + '</span>' +
                '<button class="btn primary bj-hskip' + (v.skipDone ? " voted" : "") +
                  '" type="button">' +
-                 esc(v.skipDone ? "✓ 已看完" : (v.skipTxt || "下一局 ▸")) + '</button>' +
+                 esc(v.skipDone ? "✓ 已按繼續" : (v.skipTxt || "下一局 ▸")) + '</button>' +
              '</div>' +
            '</div>';
   }
   /* 腳註那一句。★ 按過了就換成「還在等誰」—— 那是投票制唯一需要多講的事,
      而「還在等幾人」只有呼叫端算得出來(它才知道誰還在房裡)。 */
   function footTxt(v){
-    if(v.skipDone && v.skipWait > 0) return "還在等 " + v.skipWait + " 人按「看完了」…";
+    if(v.skipDone && v.skipWait > 0) return "還在等 " + v.skipWait + " 人按「繼續」…";
     if(v.skipDone) return "大家都看完了 —— 馬上開下一局";
     return v.foot || "準備下一局…";
   }
