@@ -1274,6 +1274,21 @@ function bindAudioLifecycle(){
   addEventListener("pagehide",()=>{ markAudioStale(); BGM.setHidden(true); });
   addEventListener("pageshow",e=>{ if(!e.persisted)return; BGM.setHidden(false); armAudioUnlock(); });
 }
+/* ---------- 載入空窗的收尾(v1.160.0) ----------
+   各頁 main.js 的**最後一行**呼叫它,把 <html class="boot-wait"> 拿掉 → 按鈕才真的能按。
+   要解決的事:各頁的 <script> 全在 </body> 前,CSS 在 <head> —— 慢網下畫面會**比程式早到**,
+   那段期間按鈕的 addEventListener 一行都還沒跑,使用者按了完全沒反應、也沒有任何提示
+   (使用者回報「暗棋按了沒反應,等久一點又會可以」就是這個)。
+   ⚠ 漏呼叫的下場是「那一頁的按鈕永遠灰著」—— 比原本的問題更糟,所以有測試守著
+     (tools/test-boot.js:十二頁都要有 class、十二支 main.js 都要呼叫)。
+   ⚠ 一定要放在**同步啟動流程跑完之後**;setTimeout 裡的收尾(例如 maybeShowInstallTip)
+     不算,那些晚一點跑不影響「按鈕能不能按」。
+   ★ 提示條與灰化都是純 CSS(計時器是 animation 的 delay)—— 這一刻壞掉的東西正是 JS,
+     用 setTimeout 做的計時器在這裡跟按鈕一樣不會跑。細節在 styles.css 檔尾那一節。
+   ⚠ 這一支是**雙胞胎**,js/main.js 有對應的一份給 Bingo(紅線 4)。 */
+function bootReady(){
+  try{ document.documentElement.classList.remove("boot-wait"); }catch(_){}
+}
 function registerSW(){
   if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost" || location.hostname==="127.0.0.1")){
     addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); });

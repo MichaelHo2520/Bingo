@@ -7351,3 +7351,57 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .hu-ver{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;
     padding:3px 5px;margin:0 -3px;-webkit-tap-highlight-color:transparent}
   .hu-ver:active{opacity:.5}
+
+  /* ---------- 載入空窗:JS 還沒就緒時,畫面不可以騙人(v1.160.0,十二頁共用) ----------
+     要解決的事(使用者回報「暗棋按了沒反應,等久一點又會可以」):
+       各頁的 <script> 全在 </body> 前,而 <link rel=stylesheet> 在 <head> —— 所以慢網下的
+       順序是「CSS 載完 → 整個進場畫面完整畫出來 → 那 10 支 / 約 400 KB 的 JS 還在載」。
+       那段期間按鈕的 addEventListener 一行都還沒跑,**按了完全沒反應、也沒有任何提示**。
+       等 JS 載完就自己好了 —— 所以它看起來像「間歇性的 bug」,其實是畫面比程式早到。
+     ★ `boot-wait` 寫死在十二頁的 <html> 上,由各頁 main.js 最後一行的 bootReady() 移除。
+       ⚠ 那一行漏掉的下場是「那一頁的按鈕永遠灰著」→ 守門 tools/test-boot.js。
+     ★★ 只灰 <button>,**不碰 <a href>** —— 返回鍵與首頁的十二張遊戲卡都是連結,
+       JS 沒就緒時瀏覽器的原生導覽照樣可用,灰掉它們才是真的把能用的東西弄壞。
+     ⚠ 前綴用 `boot-` 而不是 `bt-`:`.btn` 已經存在,只差一個字元的兩個 class 遲早看錯。 */
+  :root.boot-wait button{opacity:.45;pointer-events:none}
+
+  /* 提示條。★★★ 計時器是 **CSS animation 的 delay**,不是 setTimeout ——
+     這一刻壞掉的東西正是 JS,拿 JS 做的計時器在這裡沒有意義(它跟按鈕一樣不會跑)。
+     ⚠ 兩段的理由:1.5 秒之前什麼都不顯示 —— 快網下 JS 幾十毫秒就好,馬上跳「載入中」
+       只會變成每次進頁面都閃一下。10 秒還沒好就換成有指示的那一句。
+     ⚠ 刻意**不做成可點的「重試」鈕**:偽元素接不了事件,而綁事件要 JS。
+       在這個情境下唯一誠實的做法是告訴使用者手動重新整理。
+
+     ⚠⚠⚠ **第二段掛在 `:root::after`,絕對不可以改用 `body::before`**(v1.160.0 踩過)——
+       `body::before` 是**整個 app 的固定背景漸層層**(見本檔第 110 行,十二頁共用)。
+       第一版把第二段寫在那裡,等於在載入期間把背景層換成一個黑色膠囊:
+       ★ 症狀是「載入超過 10 秒 → 整頁背景消失」,而**斷言完全測不到**(規則存在、
+         computed style 也讀得到 animation-delay,全綠),只有截圖看得出來。
+       ★ 這是 notes/13「CSS 會撞的四類」的**第二類**:前綴只防得了第一類,而
+         `body::before` 這種**既有元素的偽元素**照樣撞得到 —— 新增規則前一定要 grep 一次。
+       → 守門:tools/test-boot.js 有一條反向斷言(boot 的規則不准碰 body::before)。
+
+     ⚠⚠ **`animation-duration` 不可以寫 0s**(同一版踩的第二個坑):`0s` 配 `forwards` 在
+       Edge 上**整段不套用**,提示條永遠是 opacity:0 —— 而 `getComputedStyle` 讀
+       `animation-delay` 照樣回報 1.5s / 10s,所以量數字的診斷會**全綠**。
+       給一個非零的 .25s,順便變成柔和的淡入。 */
+  :root.boot-wait body::after,
+  :root.boot-wait::after{
+    position:fixed;left:50%;transform:translateX(-50%);
+    max-width:82vw;padding:9px 16px;border-radius:999px;
+    background:rgba(0,0,0,.72);color:#fff;font-size:13px;font-weight:700;
+    letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    z-index:9999;pointer-events:none;opacity:0
+  }
+  /* 第一段:1.5 秒後淡入,10 秒時交棒給第二段 */
+  :root.boot-wait body::after{
+    content:"⏳ 載入中…";bottom:20px;
+    animation:bootShow .25s 1.5s forwards,bootHide .25s 10s forwards
+  }
+  /* 第二段:10 秒還沒就緒 —— 這時候要給的是「怎麼辦」,不是再說一次「載入中」 */
+  :root.boot-wait::after{
+    content:"載入很慢…請確認網路,或重新整理這一頁";bottom:20px;
+    animation:bootShow .25s 10s forwards
+  }
+  @keyframes bootShow{from{opacity:0}to{opacity:1}}
+  @keyframes bootHide{from{opacity:1}to{opacity:0}}
