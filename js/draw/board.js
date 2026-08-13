@@ -446,6 +446,22 @@ const DWB = (function () {
       o.classList.toggle("hidden", !roleTxt);
     }
   }
+  /* ★★ 猜題者的字數提示(v1.161.0)。n = 正解有幾個字;**0 = 整格收起來**。
+     使用者:「我覺得要猜的人應該要知道有幾個字,這樣才不會太廣泛」——
+     沒有這一格的話「畫了一隻四隻腳的動物」可以是貓 / 狗 / 牛 / 長頸鹿,範圍大到猜不動。
+     ⚠⚠ 這一格**只准放數字**,絕對不可以放題目本身(連「遮起來的字」也不行)——
+       偷看 DOM 比偷看 DB 容易太多,那正是 paintPick 對非畫家連文字都不產生的同一條理由。
+     ⚠ 誰看得到、什麼時候顯示一律由 adapter 的 paintBar 決定(這一支只管畫),
+       而**畫家不需要**:他看的是工具列那一格題目本身。
+     ⚠ 這一格住在 .dw-bar(既有的一列)裡,不是新開一列 —— 這一頁多出來的垂直空間
+       永遠是畫布的(見 notes/21 紅線 17)。 */
+  function setLen(n) {
+    const el = $("dwLen"); if (!el) return;
+    const k = Math.max(0, n | 0);
+    el.classList.toggle("hidden", !k);
+    el.innerHTML = k ? '<span class="dw-len-l">答案</span><b>' + k + '</b> 字' : "";
+    el.setAttribute("aria-label", k ? ("答案有 " + k + " 個字") : "");
+  }
 
   /* ==========================================================================
      五、蓋板:選題目 / 公布答案
@@ -527,7 +543,9 @@ const DWB = (function () {
             '<span class="dw-say-t">' + esc(text) + '</span>');
   }
   /* 猜中的:★★ **只講「誰猜中了」,不播內容**(檔頭 ④)。
-     ⚠ 連「幾個字」都不要透露 —— 字數本身就是很強的提示。 */
+     ⚠ v1.161.0 起「正解幾個字」是**公開的提示**(見 setLen),但這裡照樣一個字都不播:
+       猜中的人打的可能是**同義詞**(貓咪 / 小貓),長度與正解不一樣 → 播了等於多送一條
+       正解之外的線索;而內容本身更是直接把答案報給全房。「字數公開」不等於「這一則可以播」。 */
   function addHit(name, seat, rank) {
     pushSay('<span class="dw-seat p' + ((seat | 0) % 6) + '"></span>' +
             '<span class="dw-say-hit">✅ ' + esc(name) + ' 猜中了' +
@@ -560,12 +578,14 @@ const DWB = (function () {
     inp.value = "";
     cb.onGuess && cb.onGuess(t);
   }
-  /* 輸入列的狀態。st = { show, can, why, coolEnd }
+  /* 輸入列的狀態。st = { show, can, why, coolEnd, len }
        show   要不要顯示這一列(畫家 / 沒開打時整列收起來)
        can    現在能不能送
        why    不能送的原因(直接寫在 placeholder 上 —— 不用 disabled 靜默吃掉點擊,
               但欄位本身要鎖住,不然打了半天按下去沒反應更糟)
-       coolEnd 冷卻到什麼時候(有值就自己倒數,到期自動解鎖) */
+       coolEnd 冷卻到什麼時候(有值就自己倒數,到期自動解鎖)
+       len    正解幾個字(v1.161.0;0 / 沒給就不提)—— ★ 手指在打字時眼睛就在這一格,
+              頂列那一顆晶片容易被忽略,所以字數**兩個地方都講一次**。 */
   let coolT = null;
   function setGuess(st) {
     const row = $("dwInputRow"), inp = $("dwGuess"), btn = $("dwSend");
@@ -578,7 +598,8 @@ const DWB = (function () {
       inp.disabled = !can; btn.disabled = !can;
       row.classList.toggle("cool", left > 0);
       inp.placeholder = left > 0 ? ("冷卻中… " + Math.ceil(left / 1000) + " 秒")
-                                 : (can ? "打出你猜的答案" : (st.why || "現在不能猜"));
+                                 : (can ? ("打出你猜的答案" + (st.len > 0 ? " · " + st.len + " 個字" : ""))
+                                        : (st.why || "現在不能猜"));
       if (left <= 0 && coolT) { clearInterval(coolT); coolT = null; }
     };
     apply();
@@ -600,7 +621,20 @@ const DWB = (function () {
          放大模式刻意**不動它**:那是使用者要求「放進房間框」的東西。
      ========================================================================== */
   function setZoom(on) {
-    document.body.classList.toggle("dw-big", !!on);
+    /* ★★★ 放大**只在對局畫面生效**(v1.161.0 修的 bug)。
+       `body.dw-big` 會把整條頂列收掉(styles.css),而頂列裡是**遊戲名稱 + ⛶ + ⚙️** ——
+       在對局中那是要的(使用者自己按的放大),但在**連線畫面與大廳**就是災難:
+       放大鈕住在 `#dwPlay` 裡面,那兩層它是 hidden → **沒有任何東西可以把它關回來**。
+       ⚠⚠ 而且一定會發生:放大狀態記在偏好裡(`dwZoom`),`loadPrefs()` 在開頁那一刻就
+         會套用 → 只要上一場結束時忘了縮小,**之後每次開這一頁都少了名稱與那兩顆鈕**,
+         而且看起來就像「這一頁跟別的遊戲長得不一樣」(使用者回報的正是這句)。
+       ⚠ 守衛擋在這裡而不是各個呼叫端:`body.dw-big` 只有這一行在掛,擋在源頭就不必
+         要求每一個呼叫端記得判斷(偏好、放大鈕、截圖頁三條路都會經過)。
+       ⚠ 連帶一條:**離開對局的那一刻要再呼叫一次** —— class 是掛在 body 上的,
+         沒人來脫它就會留著。那一半在 js/draw/main.js 的 showScreen()(每次換畫面都叫)。 */
+    const play = $("dwPlay");
+    const live = !!play && !play.classList.contains("hidden");
+    document.body.classList.toggle("dw-big", !!on && live);
     const b = $("dwZoom");
     if (b) {
       b.classList.toggle("on", !!on);
@@ -624,7 +658,7 @@ const DWB = (function () {
   return {
     init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush,
     pickColor, toggleEraser, syncTool,
-    setCd, stopCd, setRoundInfo, setZoom,
+    setCd, stopCd, setRoundInfo, setLen, setZoom,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
     LW, LH, COLORS, WIDTHS,

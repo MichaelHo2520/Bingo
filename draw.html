@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.160.0 -->
-<meta name="version" content="1.160.0">
+<!-- 你畫我猜 · v1.161.0 -->
+<meta name="version" content="1.161.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -190,6 +190,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="dw-bar" id="dwBar">
       <span class="dw-round" id="dwRound"></span>
       <span class="dw-role hidden" id="dwRole"></span>
+      <!-- ★★ 猜題者的字數提示(v1.161.0)。使用者:「我覺得要猜的人應該要知道有幾個字,
+           這樣才不會太廣泛」。
+           ⚠⚠ 這一格**只准放數字** —— 題目文字一個字都不可以進來(連遮起來的都不行):
+              偷看 DOM 比偷看 DB 容易太多(同 #dwOver 對非畫家連文字都不產生的那條)。
+           ⚠ 畫家看不到它(他看的是工具列那一格題目);顯示條件在 js/draw/adapter.js 的 paintBar。
+           ⚠ 刻意塞在**既有的這一列**裡,不另開一列:這一頁多出來的垂直空間永遠是畫布的。 -->
+      <span class="dw-len hidden" id="dwLen" aria-live="polite"></span>
       <!-- 放大:吃掉猜題列與頂列,把空間全部讓給畫布(見 styles.css 的 body.dw-big)。
            ⚠ v1.155.1 曾經「限於寬時把它藏起來」;v1.155.2 畫布改成吃滿舞台之後
              它在任何視窗上都有用了 → **一律顯示**,不要再加回那個條件。 -->

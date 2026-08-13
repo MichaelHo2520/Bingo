@@ -246,6 +246,15 @@ const DWGen = (function () {
   function wordAt(i) { return WORDS[i] || null; }
   function textAt(i) { const w = WORDS[i]; return w ? w.w : ""; }
   function iconAt(i) { const w = WORDS[i]; return w ? (w.i || "🎨") : ""; }
+  /* ★★ 這一題有**幾個字**(v1.161.0)—— 猜題者唯一拿得到的提示。
+     使用者:「我覺得要猜的人應該要知道有幾個字,這樣才不會太廣泛」。
+     ⚠ 一律用 Array.from 數**字元**,不可以用 .length:題庫目前全是漢字(每個字剛好
+       一個 UTF-16 單元,兩者相等),但只要哪天加進一個 U+10000 以上的字,`.length`
+       就會**多算一倍** —— 畫面上顯示「4 個字」而題目其實只有兩個字,而且沒有任何
+       既有斷言會紅(守門在 tools/test-draw-rules.js 的 J4 節)。
+     ⚠ 數的是**正解 w**,不是同義詞:同義詞的長度常常不一樣(貓 / 貓咪、大象 / 象),
+       提示講的一律是正解那一個(打同義詞照樣算猜中,那是多賺的,不是提示錯了)。 */
+  function lenAt(i) { const w = WORDS[i]; return w ? Array.from(w.w).length : 0; }
   /* ⚠ 這一支**刻意不提供 hitAt(i, guess)** —— 那需要引用 DWR,而這一頁的各檔共用同一個
      全域詞法作用域(無 IIFE 外層,見 notes/02):在 node 裡為了測試補一行 `var DWR = require(...)`
      會在瀏覽器變成「用 var 重新宣告 rules.js 的 const DWR」→ **整頁 SyntaxError**。
@@ -274,7 +283,7 @@ const DWGen = (function () {
     return out;
   }
 
-  return { WORDS, LEVELS, levelOf, wordAt, textAt, iconAt, pick3, poolOf: k => BY_LEVEL[levelOf(k).key] };
+  return { WORDS, LEVELS, levelOf, wordAt, textAt, iconAt, lenAt, pick3, poolOf: k => BY_LEVEL[levelOf(k).key] };
 })();
 
 /* node 測試用(瀏覽器沒有 module,這一行完全無副作用) */

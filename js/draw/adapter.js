@@ -297,6 +297,13 @@ const MP = MPCore.create((function () {
       iAmDrawer() ? "🎨 你是畫家" : ("🎨 " + dname),
       iAmDrawer() ? "mine" : ""
     );
+    /* ★★ 猜題者的字數提示(v1.161.0)。使用者:「我覺得要猜的人應該要知道有幾個字,
+       這樣才不會太廣泛」—— 沒有它的話「四隻腳的動物」可以是貓 / 狗 / 牛 / 長頸鹿。
+       ⚠ 三個條件都要:**在畫的相位**(pick 還沒選、show 已經公布)、**我不是畫家**
+         (畫家看的是工具列那一格題目)、**題目真的選好了**(dw.w >= 0)。
+       ⚠ 傳出去的只有**數字**,題目文字一個字都不進 DOM(見 DWB.setLen 那段)。 */
+    const lenOn = dw.ph === "draw" && !iAmDrawer() && dw.w >= 0;
+    DWB.setLen(lenOn ? DWGen.lenAt(dw.w) : 0);
     const ms = phaseMs(dw);
     if (ms && dw.ph !== "over") DWB.setCd((dw.at || 0) + ms, ms, dw.ph + "#" + dw.seq);
     else DWB.setCd(0, 0);
@@ -308,7 +315,8 @@ const MP = MPCore.create((function () {
     if (dw.ph !== "draw") { DWB.setGuess({ show: true, can: false, why: dw.ph === "pick" ? "畫家正在選題目…" : "這一回合結束了" }); return; }
     if (dw.hits && dw.hits[me]) { DWB.setGuess({ show: true, can: false, why: "✅ 你已經猜中了" }); return; }
     if (DWR.out(dw.miss && dw.miss[me])) { DWB.setGuess({ show: true, can: false, why: "😅 這一題你沒有機會了" }); return; }
-    DWB.setGuess({ show: true, can: true, coolEnd: coolEnd });
+    // ★ len:正解幾個字(v1.161.0)—— placeholder 上也講一次,打字時眼睛就在這一格
+    DWB.setGuess({ show: true, can: true, coolEnd: coolEnd, len: DWGen.lenAt(dw.w) });
   }
   // 畫家的工具列(題目 + 清空);猜題者一律整列收起來
   function paintTools() {
@@ -440,7 +448,13 @@ const MP = MPCore.create((function () {
       // 換相位 → 蓋板、畫布鎖、音效
       if (dw.ph !== curPh) {
         curPh = dw.ph;
-        if (dw.ph === "draw") { try { Sound.start(); } catch (e) {} }
+        if (dw.ph === "draw") {
+          try { Sound.start(); } catch (e) {}
+          /* ★ 字數在猜題列也報一次(v1.161.0)——「幾個字」是猜題者唯一的提示,而眼睛
+             在畫布與猜題列上,頂列那顆晶片很容易被忽略。⚠ 畫家不必收(他看得到題目);
+             ⚠ 一定要排在上面那段 attachRound() 後面 —— 它會 clearSay(),順序反了這一行會被清掉。 */
+          if (!iAmDrawer()) DWB.sysSay("題目是 " + DWGen.lenAt(dw.w) + " 個字 ✏️");
+        }
       }
       DWB.setEnabled(dw.ph === "draw" && iAmDrawer());
 
@@ -567,7 +581,13 @@ const MP = MPCore.create((function () {
     usePrefs(o) {
       if (!o) return;
       if (o.dwRules) rules = DWR.normRules(o.dwRules);
-      if (typeof o.dwZoom === "boolean") { zoom = o.dwZoom; DWB.setZoom(zoom); }
+      /* ★★★ 放大只**記下來**,畫面由 showScreen() 去套(v1.161.0 修的 bug)。
+         這一刻是開頁那一瞬間,畫面還在連線層 —— 在這裡 setZoom(true) 會把頂列
+         (遊戲名稱 + ⛶ + ⚙️)收掉,而放大鈕住在 #dwPlay 裡是 hidden 的 → **關不回來**。
+         症狀正是使用者回報的「這一頁比別的遊戲少了最上面那一列」,而且只發生在
+         「上一場忘了縮小」的人身上(偏好記著)→ 自己測很容易永遠遇不到。
+         ⚠ board.js 的 setZoom() 裡另外有一道守衛,兩邊一起看(這一行只是不做無用功)。 */
+      if (typeof o.dwZoom === "boolean") zoom = o.dwZoom;
     },
 
     /* ---------- 額外暴露給 main.js ---------- */

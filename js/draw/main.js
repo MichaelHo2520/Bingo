@@ -28,6 +28,12 @@ function showScreen(which) {
      → 於是頂列被收掉時那兩顆鈕就跟著不見,而那正是要的:收頂列只發生在**放大模式**,
        放大就是「只想看畫布」;要按設定就再按一次縮小。 */
   undockTools();
+  /* ★★★ 放大狀態**每次換畫面都要重套一次**(v1.161.0)。這一行同時做兩件事:
+       ① 進對局時把偏好記住的放大套回來(loadPrefs 那一刻套不得,見 adapter 的 usePrefs)
+       ② 離開對局時把 `body.dw-big` 脫掉 —— 那個 class 會收掉頂列(遊戲名稱 + ⛶ + ⚙️),
+          而放大鈕只住在對局畫面裡,留著就再也關不回來(完整說明在 js/draw/board.js 的 setZoom)。
+     ⚠ 真正的守衛在 setZoom() 裡(它自己會看對局畫面在不在),所以這裡無條件傳現在的偏好值就對。 */
+  DWB.setZoom(MP.zoom());
   if (which === "play") DWB.fit();
   syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
 }

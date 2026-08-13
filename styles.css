@@ -7132,6 +7132,15 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-role{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-weight:800;font-size:12.5px;color:var(--text)}
   .dw-role.mine{color:var(--accent-2)}
+  /* 猜題者的字數提示晶片(v1.161.0)。
+     ⚠ flex:none + nowrap:這一列絕對不可以換行(換行就是從畫布身上拿走高度)。
+     ⚠ 窄畫面把「答案」兩個字藏掉、數字留著(同 .dw-word-lbl 的作法,見檔尾那段 media)。
+     ⚠ 顏色沿用 --accent-2(與畫家那一格題目 .dw-word 同色)—— 兩邊講的是同一件事。 */
+  .dw-len{flex:none;display:flex;align-items:center;gap:4px;white-space:nowrap;
+    padding:3px 8px;border-radius:999px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.08);color:var(--muted);
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:11.5px;line-height:1}
+  .dw-len b{font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;color:var(--accent-2)}
   /* 放大鈕:與倒數環同高的小圓鈕,擺在環左邊。
      ⚠⚠ class 叫 .dw-zoom**btn**,而放大狀態掛在 body 上的是 .dw-big —— 兩個名字**一定要不一樣**。
        第一版兩邊都叫 dw-zoom,於是 `body.dw-zoom` 直接吃到這條規則的
@@ -7304,6 +7313,9 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   @media (max-width:430px){
     .dw-word-lbl{display:none}
     .dw-clr-t{display:none}
+    /* 字數晶片在窄畫面只留數字(「答案 3 字」→「3 字」)——
+       同一列上還有回合數 + 畫家名字 + 放大鈕 + 倒數環,而那顆環是 34px 不可壓。 */
+    .dw-len-l{display:none}
   }
 
   /* ---------- 窄畫面 ---------- */
