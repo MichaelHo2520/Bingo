@@ -474,14 +474,15 @@ const EMOTES=["👍","👎","❤️","😂","🎉","🔥","👏","😮","😢","
 const PHRASES=["睡著了嗎 😴","阿嬤都比你快","笑死 🤣","菜就多練 💪","我讓你的啦~","運氣好而已","手在抖喔 🤏","不然你先投降?"];
 // 語音短訊:只傳代號,對方播本地預錄 m4a(與 Bingo 共用同一批檔案;不含 bingo 專屬的「聽牌」)
 const CLIPS=[
-  { id:"howlong", label:"是要多久",     src:"mp3/是要多久.m4a" },
-  { id:"ready",   label:"啊西好了沒",   src:"mp3/啊西好了沒.m4a" },
-  { id:"hurry",   label:"快點來不及啦", src:"mp3/快點，來不急啦.m4a" },
-  { id:"gofast",  label:"你就趕快啦",   src:"mp3/你就趕快啦.m4a" },
-  { id:"crying",  label:"你是在哭喔",   src:"mp3/你是在哭喔.m4a" },
-  { id:"verify",  label:"我要驗牌",     src:"mp3/我要驗牌.m4a" },
-  { id:"fine",    label:"牌沒問題",     src:"mp3/牌沒問題.m4a" },
-  { id:"rude",    label:"沒禮貌",       src:"mp3/沒禮貌.m4a" },
+  { id:"howlong", label:"是要多久", src:"mp3/是要多久.m4a" },
+  { id:"ready",   label:"好了沒",   src:"mp3/啊西好了沒.m4a" },
+  { id:"hurry",   label:"來不及啦", src:"mp3/快點，來不急啦.m4a" },
+  { id:"gofast",  label:"趕快啦",   src:"mp3/你就趕快啦.m4a" },
+  { id:"crying",  label:"在哭喔",   src:"mp3/你是在哭喔.m4a" },
+  { id:"verify",  label:"我要驗牌", src:"mp3/我要驗牌.m4a" },
+  { id:"fine",    label:"牌沒問題", src:"mp3/牌沒問題.m4a" },
+  { id:"rude",    label:"沒禮貌",   src:"mp3/沒禮貌.m4a" },
+  { id:"polite",  label:"你禮貌嗎", src:"mp3/你禮貌嗎.m4a" },
 ];
 /* ---------- 罐頭面板拖曳排序(v1.128.0,觸發方式 v1.128.x 改成按住不放) ----------
    使用者:「語音罐頭 / emoji 想要自己拖曳排序」。四個罐頭區塊(表情 / 一句話 / 內建語音 / 我的語音)
