@@ -52,6 +52,11 @@ const DWB = (function () {
   let pend = [], pendSid = -1, flushT = null;
   let nextSid = 1;
   let curC = DEF_C, curW = DEF_W;
+  let zoomable = false;                  // 現在這個視窗「放大鈕按下去畫布真的會變大」嗎(見 fit())
+
+  /* ---------- 舞台的高度重分配(v1.155.1,見 fit() ①) ---------- */
+  const STAGE_PAD = 16;                  // 舞台比畫布高出來這麼多:紙的外框 + 陰影(.dw-stage 是 overflow:hidden,不留就被削掉)
+  const SLACK_MIN = 40;                  // 空白少於這麼多就不重分配(為了 10px 讓整個版面跳一下不划算)
 
   /* ---------- 初始化 ---------- */
   function init(o) {
@@ -73,15 +78,41 @@ const DWB = (function () {
          CSS 的 aspect-ratio 同時吃 max-width / max-height 時,被夾住的那一邊
          不會把另一邊帶著縮,畫面比例會被壓歪(成語接龍 v1.135.0 踩過)。
        ⚠ dpr 夾在 2:手機常見 3,那是 2.25 倍的像素量,而畫的是純線條,看不出差別。
+
+       ★★ ①「被寬度夾住時,舞台上下那塊空白全部讓給猜題列」(v1.155.1)
+          畫布鎖 4:3,而手機是直的:360×803 實測畫布 331×248、舞台 429 ——
+          **中間白白空掉 181px**(使用者:「上下的畫面能夠加到滿一點嗎?」)。
+          那塊空白**沒有任何辦法變成更大的畫布**(寬度已經吃滿 92vw),所以讓給猜題列。
+       ⚠ 一定要「先還原上一次的分配再量」:不還原就是量到自己上次縮好的高度,
+         每量一次再縮一點 → 單向卡死,而且視窗變大時永遠回不來。
+         下一行的 getBoundingClientRect() 會強制回流,所以量到的一定是還原後的值。
+
+       ★★ ②「放大鈕只在它真的能放大的時候出現」(v1.155.1)
+          判準就是這裡的 availW*3/4 > availH(俗稱「限於高」)—— 只有這時候
+          收掉頂列 / 壓扁猜題列省下來的垂直像素才會變成更大的畫布。
+          直向手機一律是「限於寬」,那時候那顆鈕**按了什麼都不會發生**,
+          留著只是佔位置(使用者:「你倒數旁邊的縮放,好難看啊」)。
+       ⚠ 已經在放大模式時**一定要繼續顯示**,否則使用者縮不回去(availH 那時已含
+         省下來的空間,判準會翻面 → 不特判就會自己把自己藏掉)。
      ========================================================================== */
   function fit() {
     const stage = $("dwStage");
     if (!cv || !stage) return;
+    const say = $("dwSay");
+    stage.style.flex = ""; stage.style.height = "";     // ← 先還原(見上面 ①)
+    if (say) say.style.flex = "";
     const r = stage.getBoundingClientRect();
     const availW = Math.max(80, Math.floor(r.width));
     const availH = Math.max(60, Math.floor(r.height));
     let w = availW, h = Math.round(w * LH / LW);
     if (h > availH) { h = availH; w = Math.round(h * LW / LH); }
+    const slack = availH - h;
+    if (say && slack >= SLACK_MIN) {
+      stage.style.flex = "0 0 auto";
+      stage.style.height = (h + STAGE_PAD) + "px";
+      say.style.flex = "1 0 auto";                     // ⚠ 不可縮(1 1 auto 會在鍵盤彈出時被壓破)
+    }
+    syncZoomBtn(availW * LH / LW - availH);
     if (w === boxW && h === boxH && cv.width) return;   // 沒變就別重畫(重畫會閃)
     boxW = w; boxH = h;
     dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -95,6 +126,16 @@ const DWB = (function () {
     if (wrap) { wrap.style.width = w + "px"; wrap.style.height = h + "px"; }
     repaint();
   }
+  /* 見 fit() ②。gap = 「純照寬度算出來的高度」減「實際能用的高度」,>0 就是限於高。
+     ⚠ 用 .hidden 藏(它是 display:none!important)—— 直接寫 style.display 會被
+       .dw-zoombtn 的 display:grid 蓋回去,而那正是看得到卻不知道為什麼的那種錯。 */
+  function syncZoomBtn(gap) {
+    const b = $("dwZoom");
+    zoomable = gap >= 12;
+    if (!b) return;
+    b.classList.toggle("hidden", !(zoomable || document.body.classList.contains("dw-big")));
+  }
+
   function sx(x) { return x * boxW / LW * dpr; }
   function sy(y) { return y * boxH / LH * dpr; }
 
@@ -447,10 +488,11 @@ const DWB = (function () {
      ──────────────────────────────────────────────────────────────────────────
        使用者:「目前的畫板太小了…可以有一個放大的按鈕,按下去可以吃掉下面回答的
        一些空間。」→ 一顆 class 開關,收掉猜題列的大部分與頂列,全部讓給畫布。
-       ★★ 為什麼這樣有效:這一頁的畫布**永遠是被高度夾住的**,不是寬度
-         (`tools/gen-draw-shot.js` 的診斷會回報「限於高 / 限於寬」,實測四種視窗
-          全部是「限於高」)—— 所以省下來的每一個垂直像素都直接變成更大的畫布,
-          而且因為是 4:3,高度多 100px 等於寬度多 133px。
+       ★★ 它**只在「限於高」的視窗上有用**(桌機、平板、橫置):省下來的每一個垂直
+         像素都會變成更大的畫布,而且因為是 4:3,高度多 100px 等於寬度多 133px。
+       ⚠⚠ v1.155.0 的檔頭寫「畫布**永遠**是被高度夾住的」——**那是錯的**,
+         它是拿四個矮胖視窗量出來的。直向手機(360×803)實測是**限於寬**,
+         那時這顆鈕按下去畫布一個 px 都不會變 → 所以 fit() 會把它整顆藏起來(見 fit() ②)。
        ⚠ 真正的樣式在 styles.css 的 `body.dw-big` 那一段;這裡只負責
          **切 class 之後把畫布重新量一次**(`fit()` 讀的是即時的 getBoundingClientRect)。
        ⚠ 比分不在這裡收 —— 它現在住在房間框的玩家晶片列(見 draw.html 那段註解),
@@ -461,7 +503,9 @@ const DWB = (function () {
     const b = $("dwZoom");
     if (b) {
       b.classList.toggle("on", !!on);
-      b.textContent = on ? "⤡" : "⤢";
+      /* ⚠ 字面刻意用「大 / 小」而不是 ⤢ / ⤡:那兩個箭頭在手機上細得像雜訊
+         (使用者:「好難看啊」),而中文字在哪一套字型都長一樣、也不必猜意思。 */
+      b.textContent = on ? "小" : "大";
       b.title = on ? "縮小畫板" : "放大畫板";
       b.setAttribute("aria-label", b.title);
     }
@@ -480,7 +524,7 @@ const DWB = (function () {
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
     LW, LH, COLORS, WIDTHS,
-    // 診斷 / 測試用:目前畫了幾筆、共幾個點
-    stats: () => ({ n: strokes.length, pts: strokes.reduce((a, s) => a + s.p.length / 2, 0) })
+    // 診斷 / 測試用:目前畫了幾筆、共幾個點、這個視窗按放大鈕有沒有用(見 fit() ②)
+    stats: () => ({ n: strokes.length, pts: strokes.reduce((a, s) => a + s.p.length / 2, 0), zoomable })
   };
 })();

@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.155.0 -->
-<meta name="version" content="1.155.0">
+<!-- 你畫我猜 · v1.155.1 -->
+<meta name="version" content="1.155.1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -182,16 +182,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
        ⚠ #dwOver(選題目 / 公布答案)住在 .dw-stage 裡面,不是 .veil 那種強制回應層 →
          **不必列進 ui-kit.js 的 BACK_LAYERS**(那個陣列是雙胞胎,能不動就不動)。 -->
   <div class="dw-play hidden" id="dwPlay">
-    <!-- ★★ v1.155.0 起**沒有獨立的比分列** —— 誰幾分、輪到誰畫一律畫在
+    <!-- ★★ v1.155.1 起**沒有獨立的比分列** —— 誰幾分、輪到誰畫一律畫在
          房間框的玩家晶片列(`#mpPlayers`,核心的 renderPlayers 畫的那一排),
          與另外十一個遊戲同一個概念。理由有兩個:①原本那一列 45~50px 是純浪費
-         ②畫布**永遠是被高度夾住的**(不是寬度)→ 省下來的每一個垂直像素
-         都直接變成更大的畫布。 -->
+         ②在**限於高**的視窗上,省下來的每一個垂直像素都直接變成更大的畫布
+         (⚠ v1.155.1 這裡寫「畫布永遠被高度夾住」是錯的,直向手機是限於寬)。 -->
     <div class="dw-bar" id="dwBar">
       <span class="dw-round" id="dwRound"></span>
       <span class="dw-role hidden" id="dwRole"></span>
-      <!-- 放大:吃掉猜題列與頂列,把空間全部讓給畫布(見 styles.css 的 body.dw-big) -->
-      <button class="dw-zoombtn" id="dwZoom" type="button" title="放大畫板" aria-label="放大畫板">⤢</button>
+      <!-- 放大:吃掉猜題列與頂列,把空間全部讓給畫布(見 styles.css 的 body.dw-big)。
+           ⚠ 它只在「限於高」的視窗上出現 —— 直向手機按了畫布一個 px 都不會變,
+             那時 js/draw/board.js 的 fit() 會把它整顆藏起來(見那支的 fit() ②)。 -->
+      <button class="dw-zoombtn hidden" id="dwZoom" type="button" title="放大畫板" aria-label="放大畫板">大</button>
       <span class="dw-cd hidden" id="dwCd" aria-label="剩餘秒數"></span>
     </div>
     <div class="dw-stage" id="dwStage">
