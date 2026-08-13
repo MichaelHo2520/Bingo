@@ -630,10 +630,21 @@
     bgArmed=false; bgEat=true;
     try{ history.back(); }catch(e){ bgEat=false; }
   }
+  /* 三頁單機暫停蓋板共用的回呼(見下面 BACK_LAYERS 那三筆)。
+     ⚠ typeof 防身:Bingo 這一份沒有 Solo(它的單機是 game.js 自己那套)——
+       這三個 id 在 index.html 不存在,回呼永遠不會被叫到,列著只為兩份逐字相同。 */
+  function soloPause(){ if(typeof Solo!=="undefined"&&Solo.togglePause)Solo.togglePause(); }
   /* 返回鍵先關掉最上層的浮層(手機上的直覺),沒有浮層開著才回傳 false 交給呼叫端處理。
      ⚠ 結果卡(#veil)刻意不列 —— 它是強制回應視窗,要離開只能按卡片上的按鈕(見各頁 main.js)。
-       順序 = 疊在上面的先關;這一頁沒有的 id(投降只有五子棋、猜拳只有 Bingo)自動跳過。 */
+       順序 = 疊在上面的先關;這一頁沒有的 id(投降只有五子棋、猜拳只有 Bingo)自動跳過。
+     ⚠⚠ 這個陣列是**十二頁所有蓋板的登記表**,而且是雙胞胎(兩份都要列全部 id,
+       不存在的自動跳過)。漏登記一張蓋板的下場不是「按返回沒反應」,而是按返回**穿過去**
+       做了更下面那一層的事。v1.156.0 一次補了漏掉的四張(見下面)。 */
   const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettings()],
+                   /* ★ 三頁單機的暫停蓋板(v1.156.0 補)。只有 sudoku / mahjong / chengyu
+                      有這三個 id,Bingo 與其他八頁自動跳過。⚠ 回呼不可以只移掉 .show,
+                      那會讓 paused 旗標與畫面脫節 —— 一定要走 togglePause。 */
+                   ["sdkPauseVeil",soloPause],["mjPauseVeil",soloPause],["cyPauseVeil",soloPause],
                    ["emoteVeil",()=>closeEmote()],["kickVeil",()=>MP.cancelKick()],
                    // ★ 伺服器狀態隱藏面板(js/home-live.js 檔尾,點 7 下首頁「派對遊戲」開)
                    ["svVeil",()=>HomeLive.closeStatusPanel()],
@@ -647,6 +658,9 @@
                    ["unColorVeil",()=>UNB.closeColor()],["unRulesVeil",()=>closeRules()],
                    // ★ 暗棋的房規蓋板(v1.113.0)。只有 darkchess.html 有這個 id,其他九頁自動跳過。
                    ["dcRulesVeil",()=>closeRules()],
+                   // ★ 大老二的房規蓋板(v1.156.0 補;v1.100.0 就存在,漏登記了 55 個中碼)。
+                   //   只有 big2.html 有這個 id —— 漏掉的話按返回會跳成「離開房間?」
+                   ["b2RulesVeil",()=>closeRules()],
                    ["resignVeil",()=>MP.cancelResign()],["leaveVeil",()=>MP.cancelLeave()]];
   function dismissTopLayer(){
     for(let i=0;i<BACK_LAYERS.length;i++){
@@ -969,36 +983,19 @@
     const b=$("voiceBtn"); if(voiceTick){ clearInterval(voiceTick); voiceTick=null; }
     if(!b)return; b.classList.remove("rec"); b.disabled=false; b.textContent="🎤 錄音留言";
   }
-  function toggleVoice(){
-    const b=$("voiceBtn"), hint=$("voiceHint"); if(!b)return;
-    if(hint)hint.textContent="";
-    if(!Voice.supported()){ if(hint)hint.textContent="此裝置/瀏覽器不支援錄音"; return; }
-    if(Voice.recording()){ b.disabled=true; b.textContent="處理中…"; Voice.stop(); return; }   // 停止 → 交給 onBlob 收尾
-    markAudioArmed(); Sound.wake(); kickVoiceQueue();   // 按麥克風=手勢,順手解鎖播放音訊並補播等待中的語音
-    const to=emoteTarget;
-    b.disabled=true; b.textContent="準備中…";
-    voiceRecording=true; refreshBgmDuck();   // 先停背景音樂,再開麥克風(避免 Android 通話路徑把音樂弄難聽)
-    Voice.start((wav)=>{
-      voiceRecording=false; refreshBgmDuck();  // 錄音結束:恢復背景音樂(若還有收到的語音在播,duck 會維持到播完)
-      resetVoiceBtn();
-      if(!wav || wav.byteLength<=44){ if(hint)hint.textContent="沒有錄到聲音"; return; }
-      try{
-        const url=Voice.toDataURL(wav);
-        if(url.length>200000){ if(hint)hint.textContent="語音太長,請再短一點"; return; }   // RTDB 友善上限(WAV 較大)
-        MP.sendEmote(to,"🎤","voice",url);
-        closeEmote();
-      }catch(e){ if(hint)hint.textContent="語音處理失敗"; }
-    }).then(()=>{
-      b.disabled=false; b.classList.add("rec");
-      let left=Math.ceil(Voice.MAX_MS/1000);
-      b.textContent="⏹ 停止 · "+left+"s";
-      voiceTick=setInterval(()=>{ left--; if(left<=0){ if(voiceTick){clearInterval(voiceTick);voiceTick=null;} return; } b.textContent="⏹ 停止 · "+left+"s"; },1000);
-    }).catch(err=>{
-      voiceRecording=false; refreshBgmDuck();   // 開麥失敗:恢復背景音樂
-      resetVoiceBtn();
-      if(hint)hint.textContent=(err&&err.name==="NotAllowedError")?"麥克風權限被拒絕":"無法啟動錄音";
-    });
-  }
+  /* ★★ v1.156.0 刪掉 toggleVoice()(29 行)—— 全專案唯一一支真死碼。
+     它是「表情面板裡的錄音鈕」那一版的狀態機,而 v1.27.0 把錄音改成浮動的快速語音鈕之後
+     `#voiceBtn` / `#voiceHint` / `.emote-voice` 三個東西就都刪掉了(index.html 與 styles.css
+     現在一個字都找不到)—— 也就是說它從那時起就永遠停在第一行的 `if(!b)return`。
+     ⚠ 當年 notes/02 記的是「暫留,等它復活」,但那個前提已經不成立:元素都沒了,
+       復活不可能只是把函式接回去。距今 128 個中碼版本。
+     ⚠ 真正在用的是下面的 toggleQuickVoice() —— 兩支幾乎一模一樣(同一套 Voice.start +
+       refreshBgmDuck + 倒數),留著死的那一份最大的風險是**改語音行為時改錯那一支**。
+     ⚠ 刻意**不動** voiceRecording / refreshBgmDuck() / closeEmote() 裡的 Voice.cancel():
+       那些是快速語音鈕在用的,也是 v1.15.1「Android 錄音時 BGM 變難聽」的修正本體。
+     ⚠ resetVoiceBtn() 也刻意留著(它現在是 no-op,但 openEmote/closeEmote 各叫一次,
+       而 closeEmote 是雙胞胎的 DIFFER 例外之一 —— 拔掉它會讓兩份變成一樣,
+       連帶要改 tools/test-twins.js 的例外表,換不到任何東西)。 */
   /* ---- 快速語音留言:浮動鈕直接錄音、送給全部人(沿用面板同一套 Voice) ---- */
   // 快速語音鈕可能同時存在兩顆(房間框固定那顆 + 猜拳蓋板那顆),用 class 一起掃描,
   // 讓「準備中/錄音倒數/⏹」等狀態兩邊同步顯示,不會因為只更新其中一顆而顯示不一致。

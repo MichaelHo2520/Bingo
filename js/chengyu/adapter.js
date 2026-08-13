@@ -108,8 +108,13 @@ const MP = MPCore.create((function () {
   }
   function erase() { showToast("搶到的格子不能清掉"); }
 
-  // 盤面填滿就結算。誰看到誰寫,交易保證只有第一個成功(不指定「填最後一格的人」,
-  // 免得那個人剛好斷線就沒人寫、整局卡住)——比照數獨的 settleGrab
+  /* 盤面填滿就結算。誰看到誰寫,交易保證只有第一個成功(不指定「填最後一格的人」,
+     免得那個人剛好斷線就沒人寫、整局卡住)——比照數獨的 settleGrab。
+     ★★ { local:false }(v1.156.0 補):決定勝負的寫入不做本地樂觀套用,否則搶輸的那一台
+       會先閃一次「你贏了!」+ 彩帶 + 勝利音效(分數收得回來,那三件事收不回來)。
+       ⚠ 這個缺陷當年是**連著程式一起**從數獨複製過來的 —— 上面那句「比照數獨的 settleGrab」
+         就是它的來源,完整理由寫在 js/sudoku/adapter.js 的結算段。
+       ⚠ 上面搶格那支 txGame 刻意不帶 —— 它不決定勝負,樂觀套用才有即時手感。 */
   function settleGrab() {
     ctx.txGame(g => {
       if (g.winner) return false;
@@ -123,7 +128,7 @@ const MP = MPCore.create((function () {
       g.winner = ids.length === 1
         ? { id: ids[0], name: ctx.dispName(ids[0]), by: "score", pts: best }
         : { ids: ids, by: "draw", pts: best };
-    });
+    }, { local: false });
   }
 
   /* ---------- 局間續局:結果卡按「繼續」直接接下一盤,不回大廳(比照台灣麻將)。

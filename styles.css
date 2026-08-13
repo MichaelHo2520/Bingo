@@ -88,7 +88,15 @@
   /* ⚠ #bjHome 是 v1.85.0 補的:21 點的進場選單有 11 條規則清單,900×430 實測
      整份比可視高度還長 → 底下三四條**看不到而且捲不到**(使用者:「我沒有辦法滑到下面來看」)。
      症狀與 v1.54.0 首頁那次逐字相同,而修法就是把它列進這一行(id 只存在那一頁,零外溢)。 */
-  #home,#gmkHome,#sdkHome,#mjHome,#m16Home,#bjHome,#mpConnect{flex:0 1 auto;min-height:0;
+  /* ⚠⚠ 這一行是**十二頁的登記表**,不是「有需要才加」的清單:漏掉哪一頁,那一頁的進場說明
+     就是「看不完也滑不動」,而且完全靜默 —— DOM 齊全、斷言全綠,只有真機橫置看得出來。
+     v1.156.0 一次補了漏掉的五頁(#svHome #b2Home #unHome #dcHome #cyHome):
+     #unHome 386 字、#dcHome 321 字、#b2Home 302 字與當年出事的 #bjHome(396 字)同一個等級,
+     而被裁掉的正好是各頁「不講就會被當成 bug」那一條(UNO 剩一張要按 UNO!、暗棋炮的三條、
+     大老二同牌型才能互壓)—— 那三處的 HTML 註解都自稱自己是那條規則唯一的說明。
+     ★ 守門在 tools/test-pages.js:掃每頁 class="panel" 的 *Home id,一律要出現在這一行。 */
+  #home,#gmkHome,#sdkHome,#mjHome,#m16Home,#svHome,#b2Home,#bjHome,#unHome,#dcHome,#cyHome,
+  #mpConnect{flex:0 1 auto;min-height:0;
     overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   /* 填號分頁:改回 flex:1 撐滿(內容本來就有整片號碼格,不會空太多),讓準備列固定在最底,右下浮動鈕才有穩定的落點、不會壓到準備鈕 */
   body.room-tab-fill .scroll-area{flex:1 1 0}
@@ -557,22 +565,16 @@
     background:transparent;border:1px solid var(--panel-line);color:var(--muted)}
   .score-extra .score-reset:hover{border-color:var(--accent);color:var(--text)}
 
-  /* 叫號框(連線遊戲 HUD):整體再調小一點,替號碼格多擠出縱向空間,避免盤面被擠到要上下捲 */
-  .mp-play{
-    width:min(92vw,520px);display:flex;align-items:center;gap:12px;flex-wrap:wrap;
-    background:var(--panel);border:1px solid var(--panel-line);border-radius:14px;padding:6px 13px;
-  }
-  .mp-hud-item{display:flex;flex-direction:column;gap:2px;align-items:flex-start}
-  .mp-hud-item + .mp-hud-item{padding-left:12px;border-left:1px solid var(--panel-line)}
-  .mp-play .lbl{color:var(--muted);font-size:10.5px;font-weight:800;letter-spacing:.2px}
-  .mp-ball{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
-    background:var(--daub);color:var(--daub-ink);font-family:'Fredoka';font-size:17px;font-weight:700;line-height:1;
-    box-shadow:0 2px 8px rgba(0,0,0,.25)}
-  .mp-goal-num{font-family:'Fredoka';font-weight:700;font-size:18px;line-height:1;color:var(--text)}
-  .mp-turn{margin-left:auto;text-align:center;font-weight:800;font-size:13px;color:var(--accent);
-    background:rgba(0,0,0,.16);padding:6px 12px;border-radius:999px}
-  .mp-turn.wait{color:var(--muted)}
-
+  /* ★ v1.156.0 刪掉整組舊的「叫號框 HUD」:.mp-play / .mp-play .lbl / .mp-hud-item /
+     .mp-ball / .mp-goal-num / .mp-turn(共 6 個名字、9 條規則)。
+     十二頁的 HTML 與 js 底下全部原始碼**一個都找不到**(v1.26.0 移除常駐最新號碼、
+     後來房間框改版之後就沒人用了)。
+     ⚠ 為什麼優先刪這一組而不是其他二十幾個死選擇器:它們占的是 `mp-` ——
+       **十一個遊戲共用的命名空間**,撞到就是十一頁一起中(notes/13 第一節 1b 剛記過
+       v1.155.0 `.dw-zoom` 自己撞自己那次)。其餘死規則都是遊戲專屬前綴、沒有這個風險,
+       刪它們要付十二頁截圖回歸的代價,收益卻只有幾十行 → 留著。
+     ⚠ 偵測死選擇器時**不可以用 indexOf 找**:`mp-play` 是 `mp-players` 的子字串,
+       那樣會把它判成活的(這一輪就先誤判過一次)。要用 word boundary。 */
   .cell.callable{box-shadow:0 0 0 3px var(--accent) inset;cursor:pointer}
   .mp-panel{
     width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
@@ -1479,7 +1481,17 @@
   /* 賽後表情列(沿用五子棋的 .gmk-react 外觀,只換容器 class) */
   .sdk-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
   /* 單機 / 連線的結果卡內容切換:單機沒有排行榜與表情,連線沒有單機統計。
-     這裡的 #id 只存在於 sudoku.html,不會影響 Bingo 與五子棋。 */
+     ⚠⚠ v1.156.0 更正註解:這裡原本寫「這些 #id 只存在於 sudoku.html」—— **那是錯的**。
+       `#winScores` / `#winChamp` / `#mpWinBtns` / `#soloWinBtns` 是**十二頁共用**的結果卡零件
+       (grep 一下:winScores 十二頁全有、soloWinBtns 十頁),所以這兩行裡不帶遊戲前綴的
+       那幾個選擇器是**全域**規則,住在數獨那一段只是歷史因素。
+       ⚠ 同樣的兩行在成語接龍那一段(檔案下方)**又有一份**,兩份都在生效。
+         想調「單機結果卡要不要顯示排行榜」的人若只改成語接龍那一份,
+         `#winScores` 仍然被這一行藏著 → **改了完全沒反應**,然後開始懷疑 JS。
+       ⚠ 只帶前綴的 `.sdk-react-row` / `.sdk-stats` 才真的只影響數獨。
+       ★ 刻意**只改註解不搬規則**:把它們合併搬到 .win-card 共用段會改變同權重的層疊順序,
+         而 notes/13 記的四類 CSS 撞法裡有三類「不報錯、DOM 量起來正常、只有截圖看得出來」。
+         真要搬,十二頁的結果卡(單機 + 連線兩相位)都得回歸過。 */
   body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .sdk-react-row,body.solo-on #mpWinBtns{display:none}
   body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .sdk-stats{display:none}
 
@@ -3005,10 +3017,21 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .sv-room .mp-subrow{margin-top:5px}
   .sv-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .sv-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
-  /* 晶片上的「剩幾張 / 蓋幾張」 */
+  /* 晶片上的「剩幾張 / 蓋幾張」。
+     ★★ v1.156.0:顏色改吃 --sp0~--sp5(定義在 :root,見 styles.css 上方數獨那一段)。
+       在此之前排七 / 大老二 / 21 點是**另外一套寫死的粉彩**,與 --sp* 一個都不重疊 ——
+       症狀是「同一個人在數獨是橘色、換去排七變粉紅」,而十二個遊戲共用同一批親友、
+       色點又是「哪一格是我」的唯一線索。維護面更糟:要調這組色的人會去改 :root 那一行,
+       而那三頁**靜靜地不會跟著變**,沒有任何斷言會紅。
+     ⚠⚠ **一次要改五組,少一組就是同畫面對不上**(v1.156.0 差點只改兩組):
+       `.sv-seat`(這裡)· `.b2-seat` + `.b2-sn`(大老二晶片列與牌桌徽章同時在畫面上)
+       · `.bj-dot` + `.bj-sn`(21 點同型)。搜 `var(--sp` 應該五組都在。
+     ⚠ 尺寸 9px 刻意保持不動(別頁是 11/12px)—— 那是這兩頁的版面決定,不是走鐘。
+     ⚠ 這件事**沒有任何斷言在量**(色值測不到)→ 改完要開 tools 底下的截圖頁看
+       大老二單機那一畫面(晶片列的色點與牌桌徽章要同色)。 */
   .sv-seat{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
-  .sv-seat.p0{background:#ff6b8a}.sv-seat.p1{background:#4fc3f7}.sv-seat.p2{background:#ffd54f}
-  .sv-seat.p3{background:#81c784}.sv-seat.p4{background:#ba9cff}.sv-seat.p5{background:#ffab6b}
+  .sv-seat.p0{background:var(--sp0)}.sv-seat.p1{background:var(--sp1)}.sv-seat.p2{background:var(--sp2)}
+  .sv-seat.p3{background:var(--sp3)}.sv-seat.p4{background:var(--sp4)}.sv-seat.p5{background:var(--sp5)}
 
   .sv-chn,.sv-chp{display:inline-flex;align-items:center;gap:1px;
     font:800 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
@@ -3472,9 +3495,10 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .b2-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .b2-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
   /* 晶片上的「剩幾張 / 第幾名」。★★ 牌情紅線:對手**只給張數**,牌值要等結算 */
+  /* ★★ v1.156.0:顏色改吃 --sp0~--sp5(理由與排七那一份逐字相同,見 .sv-seat)。 */
   .b2-seat{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
-  .b2-seat.p0{background:#ff6b8a}.b2-seat.p1{background:#4fc3f7}
-  .b2-seat.p2{background:#ffd54f}.b2-seat.p3{background:#81c784}
+  .b2-seat.p0{background:var(--sp0)}.b2-seat.p1{background:var(--sp1)}
+  .b2-seat.p2{background:var(--sp2)}.b2-seat.p3{background:var(--sp3)}
 
   .b2-chn{display:inline-flex;align-items:center;gap:1px;
     font:800 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
@@ -3739,14 +3763,18 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .b2-thd{display:flex;align-items:center;gap:4px;min-width:0;height:18px;overflow:hidden}
   /* ★★ 座位號碼徽章(v1.98.0 取代原本純裝飾的 7px 色點,照21點的 .bj-sn)——
      格子是照座位號碼排的,「這是第幾家」一定要看得出來,否則排列順序沒有意義。
-     ⚠ 顏色沿用晶片列那一套 p0..p3(大老二最多 4 人,沒有 p4/p5)→ 兩個地方對得上。
+     ⚠⚠ 顏色沿用晶片列那一套 p0..p3(大老二最多 4 人,沒有 p4/p5)→ 兩個地方對得上。
+        **這是一條同畫面的不變式**:單機時 #b2SoloPlayers 的色點與牌桌每一格的座位徽章
+        同時在畫面上,想靠顏色找「第三家坐哪一格」就得靠它。
+        v1.156.0 差點只改一半 —— .b2-seat 換成了 var(--sp*) 而這裡忘了跟,
+        結果是晶片列第三個人是綠的、牌桌上綠色那格印著「4」。**兩處要一起改。**
      ⚠ 高度 15px 要壓在 .b2-thd 的 18px 裡:那一列一長高,「空格與出五張牌一樣高」
        就得重算 --b2-tph(牌不會變小,但整桌會跳一次)。 */
   .b2-sn{flex:none;min-width:15px;height:15px;padding:0 3px;border-radius:8px;
     display:inline-flex;align-items:center;justify-content:center;
     font:900 10px/1 'Nunito',sans-serif;color:#241a2e;background:#cfd4e0}
-  .b2-sn.p0{background:#ff6b8a}.b2-sn.p1{background:#4fc3f7}
-  .b2-sn.p2{background:#ffd54f}.b2-sn.p3{background:#81c784}
+  .b2-sn.p0{background:var(--sp0)}.b2-sn.p1{background:var(--sp1)}
+  .b2-sn.p2{background:var(--sp2)}.b2-sn.p3{background:var(--sp3)}
 
   .b2-tnm{flex:1 1 auto;min-width:1.2em;
     font:800 11.5px/1.3 'Nunito',sans-serif;color:var(--text);
@@ -4322,8 +4350,8 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .bj-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
   /* 座位色點(五個人 → 五個顏色) */
   .bj-dot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
-  .bj-dot.p0{background:#ff6b8a}.bj-dot.p1{background:#4fc3f7}.bj-dot.p2{background:#ffd54f}
-  .bj-dot.p3{background:#81c784}.bj-dot.p4{background:#ba9cff}
+  .bj-dot.p0{background:var(--sp0)}.bj-dot.p1{background:var(--sp1)}.bj-dot.p2{background:var(--sp2)}
+  .bj-dot.p3{background:var(--sp3)}.bj-dot.p4{background:var(--sp4)}
 
   /* 晶片上的「莊」與籌碼 —— ★ 兩樣都是公開資訊
      (誰當莊全場都看得到,籌碼是結算過的歷史)。
@@ -5028,8 +5056,8 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .bj-sn{flex:none;min-width:15px;height:15px;padding:0 3px;border-radius:8px;
     display:inline-flex;align-items:center;justify-content:center;
     font:900 10px/1 'Nunito',sans-serif;color:#241a2e;background:#cfd4e0}
-  .bj-sn.p0{background:#ff6b8a}.bj-sn.p1{background:#4fc3f7}.bj-sn.p2{background:#ffd54f}
-  .bj-sn.p3{background:#81c784}.bj-sn.p4{background:#ba9cff}.bj-sn.p5{background:#ffab7a}
+  .bj-sn.p0{background:var(--sp0)}.bj-sn.p1{background:var(--sp1)}.bj-sn.p2{background:var(--sp2)}
+  .bj-sn.p3{background:var(--sp3)}.bj-sn.p4{background:var(--sp4)}.bj-sn.p5{background:var(--sp5)}
 
   /* 房規面板:「點名誰先當莊」那一排(選項由 main.js 生成 → 這裡只管排版)。
      ⚠ 名字長短不一 → 允許換行(這是設定面板,不是寫死高度的動作列)。 */
@@ -5231,7 +5259,10 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
         → 首頁那張卡的圖會變成 96px、整張卡比另外八張高一截。
         這是 21 點 v1.86.0 踩過的坑(notes/13 第九節第 4 條),原封不動照抄它的解法:
         首頁與進場各用一個 class,共用的只有裡面那份逐字相同的 SVG。 */
-  .un-art{width:96px;height:96px;display:block;margin:0 auto}
+  /* ★ v1.156.0 補回下邊距 8px:另外十頁的 *-art 一律是 `margin:0 auto 8px`,
+     只有 UNO 與暗棋這兩份是 `margin:0 auto` —— 插圖與底下第一行字之間少了那 8px,
+     兩頁的進場面板比別頁擠一點點。純粹是複製時漏掉,沒有任何一份文檔說要不一樣。 */
+  .un-art{width:96px;height:96px;display:block;margin:0 auto 8px}
 
   /* ==========================================================================
      UNO 的版面
@@ -6057,7 +6088,8 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
          (v1.149.0 起十一張卡同一套做法,守門從 I 節併進 E 節)。
       ⚠ 動檔名要三處一起改:index.html 與 darkchess.html 的 img + sw.js 的 CORE
          (離線清單漏掉 → addAll 整批失敗 = 離線完全不能玩)。 */
-  .dc-art{width:96px;height:96px;display:block;margin:0 auto}
+  /* ★ v1.156.0 補回下邊距 8px(理由同 .un-art:另外十頁都是 `margin:0 auto 8px`)。 */
+  .dc-art{width:96px;height:96px;display:block;margin:0 auto 8px}
 
   /* ---------- 外框(照 .un-* 那一組做一份對應的)----------
      ⚠ 這幾條**不可以**直接沿用 .un-*:那些是 UNO 那一頁的,改動會波及它。
@@ -6981,7 +7013,12 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .cy-next{margin:10px 0 -4px;text-align:center;font:700 12px/1.5 'Nunito',sans-serif;color:var(--muted)}
   .cy-next b{font-weight:800;font-size:1.15em;color:var(--accent)}
   /* 單機 / 連線的結果卡內容切換:單機沒有排行榜與表情,連線沒有單機統計。
-     這裡的 #id 只存在於 chengyu.html,不會影響其他頁。 */
+     ⚠⚠ v1.156.0 更正註解:原本寫「這些 #id 只存在於 chengyu.html」—— **那是錯的**。
+       `#winScores` / `#winChamp` / `#mpWinBtns` / `#soloWinBtns` 十二頁共用,
+       而**同樣的兩行在數獨那一段已經有一份**(搜 `body.solo-on #winScores`),兩份都在生效。
+       改這一份不會讓那幾個共用 id 的行為變化(它們早就被上面那一份藏著)——
+       這一份真正獨有的只有帶前綴的 `.cy-react-row` / `.cy-stats` 與 `#cyNext`。
+       完整說明寫在數獨那一份的註解裡。 */
   body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .cy-react-row,body.solo-on #mpWinBtns,body.solo-on #cyNext{display:none}
   body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .cy-stats{display:none}
 

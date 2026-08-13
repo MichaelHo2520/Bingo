@@ -60,6 +60,10 @@ const DWB = (function () {
   let drawing = null;                    // 正在畫的那一筆 { sid, c, w, p:[] }
   let pend = [], pendSid = -1, flushT = null;
   let nextSid = 1;
+  /* ★★ 我自己送出去的 sid(v1.156.0)。存在的唯一理由是**把自己的回音擋掉**:
+     畫家送出的每一批都會從 child_added 原封不動回到 applyRec,而那時本地早就畫過了。
+     完整說明在 applyRec 裡那道 return 的註解。⚠ 每一回合要跟著 resetInk() 清掉。 */
+  let mySids = new Set();
   let curC = DEF_C, curW = DEF_W;
   /* 畫布四周留這麼多(v1.155.2):`.dw-stage` 是 overflow:hidden,而紙有一圈 3px 的外框
      (`.dw-ink` 的第一段 box-shadow)—— 貼死就會被削掉,看起來像沒有邊。 */
@@ -75,6 +79,20 @@ const DWB = (function () {
     bindGuess();
     bindPick();
     addEventListener("resize", fit);
+    /* ★★ 舞台自己變高變矮時也要重量(v1.156.0)。這一頁原本只掛 resize,而
+       **切 body 的 class 不會發 resize** —— 於是「先看看畫板 👀」(共用的 peekBoard()
+       只做 body.peeking,而 styles.css 給它 padding-bottom:66px)把舞台壓矮 66px 之後,
+       畫布還維持舊高、`.dw-stage` 是 overflow:hidden、內容又置中 → 圖的上下**各被削掉 33px**
+       (直向手機畫布 477 高 ⇒ 少掉 14%,而畫圖的人常把重點畫在中下方)。
+       完全靜默:DOM 與 canvas 尺寸都合法,只有把它截下來才看得出來。
+       ★ 十二頁裡只有這一頁沒掛 RO(另外八頁的 board 都有),補上之後連放大鈕、
+         回結果卡、手機鍵盤與網址列收合全部一起涵蓋。
+       ⚠ 不會形成迴圈:`.dw-stage` 是 `flex:1 1 0`,尺寸由父層分配、子元素撐不回去;
+         而 fit() 第一行就有「尺寸沒變就直接 return」的守衛。
+       ⚠ 仍然**不能只靠它**:RO 要等下一個 frame,中間會閃一下 —— 所以按下 👀 的那條路
+         另外在 js/draw/main.js 同步再叫一次 fit()(比照 js/darkchess/board.js 那條註解)。 */
+    const stage = $("dwStage");
+    if (typeof ResizeObserver !== "undefined" && stage) new ResizeObserver(() => fit()).observe(stage);
     fit();
   }
 
@@ -164,12 +182,27 @@ const DWB = (function () {
   function encode(sid, c, w, pts) { return "s" + sid + "," + c + "," + w + "," + pts.join(","); }
   function applyRec(rec) {
     if (typeof rec !== "string" || !rec) return;
-    if (rec.charAt(0) === "x") { strokes = []; byId = {}; clearCanvas(); return; }
+    if (rec.charAt(0) === "x") { strokes = []; byId = {}; mySids.clear(); clearCanvas(); return; }
     if (rec.charAt(0) !== "s") return;
     const a = rec.slice(1).split(",");
     if (a.length < 5) return;                                   // sid,c,w + 至少一個點
     const sid = +a[0], c = +a[1], w = +a[2];
     if (!isFinite(sid) || !isFinite(c) || !isFinite(w)) return;
+    /* ★★★ 自己送出的那一批一定要在這裡擋掉(v1.156.0 修)。
+       adapter 的 child_added 是**掛給所有人的**(含畫家),而畫家在 onDown/onMove 就已經
+       畫進 strokes/byId 了 —— 回音進來時 byId[sid] 存在 → fresh=false → 走下面那條
+       「續段」分支,結果是:
+         ① s.p 被 concat 第二次 → 本地點數是實際的兩倍(repaint / fit 的成本與記憶體跟著加倍)
+         ② 續段分支從 s.p[start-2](= 這一批的最後一點)畫到這一批的第一點 =
+            **多畫一條弦**。慢慢畫時只跨 3~4 個取樣點藏在筆畫底下,但畫快時 pend 會先撞到
+            MAX_PTS 才送 → 那條弦橫跨 24 個取樣點,是看得見的切角。
+         ③ 壞資料進了 strokes,之後任何一次重畫都會重現。
+       ⚠ 只有畫家自己那台會中(別人的畫布一直是對的)→ 回報會是「我這邊畫的圖怪怪的」。
+       ⚠⚠ **不可以改成「送出端不畫本地」**:flush 是 70ms / 24 點才送一批,不畫本地的話
+         連按下去那一點都要等一趟批次 → 畫起來是一段一段跳的。即時回饋一定要留在本地。
+       ⚠ mySids 只在 resetInk()(每一回合)與 "x" 時清 —— 重連重放時它是空的,
+         整包記錄照樣會被畫出來(attachRound 是先 detach 再 resetInk,順序剛好對)。 */
+    if (mySids.has(sid)) return;
     const pts = [];
     for (let i = 3; i + 1 < a.length; i += 2) {
       const x = +a[i], y = +a[i + 1];
@@ -198,6 +231,7 @@ const DWB = (function () {
   function resetInk() {
     strokes = []; byId = {}; drawing = null;
     pend = []; pendSid = -1; nextSid = 1;
+    mySids.clear();                       // ⚠ 一定要跟著清:重連重放整包時它必須是空的
     if (flushT) { clearTimeout(flushT); flushT = null; }
     clearCanvas();
   }
@@ -230,6 +264,7 @@ const DWB = (function () {
     const sid = nextSid++;
     drawing = { sid: sid, c: curC, w: curW, p: [p[0], p[1]] };
     byId[sid] = drawing; strokes.push(drawing);
+    mySids.add(sid);                      // 這一筆的回音要擋掉(見 applyRec)
     strokePath(drawing);
     // 換一筆就把上一筆還沒送的先送掉(不然兩筆的點會混進同一個 sid)
     if (pendSid !== sid) { flush(); pendSid = sid; }
@@ -273,7 +308,7 @@ const DWB = (function () {
     if (!enabled) return;
     drawing = null; pend = []; pendSid = -1;
     if (flushT) { clearTimeout(flushT); flushT = null; }
-    strokes = []; byId = {}; clearCanvas();
+    strokes = []; byId = {}; mySids.clear(); clearCanvas();
     cb.onClear && cb.onClear();
   }
   function setBrush(c, w) {

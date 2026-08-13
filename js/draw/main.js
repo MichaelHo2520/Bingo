@@ -86,7 +86,12 @@ $("kickVeil").addEventListener("click", e => { if (e.target === $("kickVeil")) M
 $("mpAgain").addEventListener("click", () => MP.again());
 $("mpLeaveWin").addEventListener("click", () => MP.askLeave());
 $("mpNewSeason").addEventListener("click", () => { MP.resetScores(); MP.again(); });
-$("winPeek").addEventListener("click", peekBoard);
+/* ★ 「先看看畫板 👀」要在同一個 tick 內把畫布重量一次(v1.156.0)——
+   共用的 peekBoard() 只切 body.peeking,而那個 class 給 body 加了 66px 的 padding-bottom
+   → 舞台矮 66px、畫布沒跟著縮 → 圖上下各被削掉 33px(這一頁那顆鈕唯一的用途就是
+   「打完回頭看最後那張圖」,削掉的正是重點)。切 class 之後讀 rect 會強制同步 layout,
+   量到的就是新值,順序對就夠、不必等 rAF。⚠ 兜底那一半(RO)在 js/draw/board.js 的 init()。 */
+$("winPeek").addEventListener("click", () => { peekBoard(); DWB.fit(); });
 $("reopenWin").addEventListener("click", showResult);
 // 賽後表情列:四顆一鍵送給全部人(結果卡不關),😀 開完整面板。節流 600ms 防連點狂送。
 let reactAt = 0;

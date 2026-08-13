@@ -224,7 +224,12 @@
     if(document.hidden || navigator.onLine===false)return;
     if(Date.now()-updLastAt < UPD_CHECK_MS)return;
     updLastAt=Date.now();
-    fetch(location.pathname,{cache:"no-store"})            // 只抓自己這頁;no-store 繞過 HTTP 快取
+    /* ★★ 只抓前 4 KB(v1.156.0)。要的只有 <meta name="version"> 那一個標籤,而它在十二頁
+       全部落在前 2,160 B 之內;抓整份是 21~40 KB(index.html 是最大的那一頁)。
+       ⚠ 伺服器不支援 Range 就回 200 全檔 → 下面的 .match() 自動退回舊行為。
+       ⚠⚠ 必須與 sw.js 的 cache.put 一起改(206 的 res.ok 是 true,而 Cache.put 對 206 會 reject)。
+       ⚠ 這一段是**雙胞胎**,js/shared/ui-kit.js 有對應的一份(紅線 4)。 */
+    fetch(location.pathname,{cache:"no-store",headers:{Range:"bytes=0-4095"}})   // 只抓自己這頁的開頭
       .then(r=>r.ok?r.text():"")
       .then(html=>{
         const mm=html.match(/<meta\s+name="version"\s+content="([^"]+)"/i), v=mm?mm[1]:"";

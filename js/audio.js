@@ -22,9 +22,28 @@
       setAudioSession("playback");
     }
     function ac(){
-      if(!ctx){const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return null; ctx=new AC(); setPlaybackSession(); preload();}
+      if(!ctx){const AC=window.AudioContext||window.webkitAudioContext; if(!AC)return null; ctx=new AC(); setPlaybackSession(); armPreload();}
       if(ctx.state==="suspended")ctx.resume();
       return ctx;
+    }
+    /* ★★ 勝敗音檔的預載排到「瀏覽器閒下來」才做(v1.156.0)。
+       在此之前是在 ac() 裡**同步**呼叫 preload(),而 ac() 的入口是 tone() ——
+       也就是**使用者按下的第一顆鈕**:那一瞬間去抓 win.wav + lose.wav 合計 1,434,910 B
+       (兩個都是未壓縮 PCM,4.1s / 44.1kHz / 立體聲 / 16-bit),跟 Firebase 建連線
+       搶同一條上行。典型場景是六支手機同時連一個熱點、同時第一次開頁,
+       症狀是「剛進遊戲那幾秒特別頓」而不是「下載很久」→ 很難認出是音檔造成的。
+       ★ 只要排開就夠,不必動音檔:勝敗音最早也要一局打完才用到(幾十秒),
+         而 Sound.win()/lose() 本來就有「還沒載好就先走合成音」的後備(synthWin/synthLose),
+         真的提早需要也不會沒聲音。
+       ⚠ **不要**改成「要用的時候才載」—— 那會讓第一次贏的那一下延遲一兩秒才出聲。
+       ⚠ 這一項只解掉「搶上行」那一半。真正把那 1.37 MB 變小要重編碼成 mp3
+         (SFX 改成候選陣列 + sw.js 的 CORE 同一版進 repo),**還沒做** ——
+         見 notes/plan/eval-20260813-整體優化盤點.md 的 P1-7。 */
+    let preArmed=false;
+    function armPreload(){
+      if(preArmed)return; preArmed=true;
+      if(typeof requestIdleCallback==="function") requestIdleCallback(()=>preload(),{timeout:4000});
+      else setTimeout(()=>preload(),2500);
     }
     // Silent Buffer Kick:在使用者手勢當下播一段 0.01s 無聲 buffer,強制解鎖 AudioContext(舊 iOS resume() 不夠力時的便宜保險)
     function silentKick(c){ try{ const b=c.createBuffer(1,1,22050); const s=c.createBufferSource(); s.buffer=b; s.connect(c.destination); s.start(0); }catch(e){} }

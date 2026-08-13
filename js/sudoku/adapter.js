@@ -170,11 +170,20 @@ const MP = MPCore.create((function(){
     fills.forEach(c=>{ const f=decFill(c); if(f.seat!==s)return; if(f.ok)ok++; else no++; });
     return no ? "<br>你 "+ok+" 對 · "+no+" 錯 → "+(tally[s]||0)+" 分" : "";
   }
+  /* ---------- 結算 ----------
+     ★★ 兩支都用 { local:false }(v1.156.0 補;紅線 15 舉的例子就是這裡)——
+       決定勝負的寫入**不做本地樂觀套用**。樂觀套用會讓「搶最後一格 / 幾乎同時解完」的
+       那一台先看到一個之後被伺服器推翻的贏家,而看到贏家就會放彩帶、播勝利音效、
+       往 scores/{me} 寫分,那三件事都不會隨交易回退(核心的反向修正只收回分數,
+       畫面上閃過的「你贏了!」與音效已經發生)。代價是自己那一手要等一趟往返
+       (~100~300ms)才看到結果卡,那是另外八個遊戲已接受的取捨。
+       ⚠ 同一個缺陷連著程式一起被複製到 js/chengyu/adapter.js 的 settleGrab(同版一起修)。
+       ⚠ 上面填格的那支 txGame **刻意**不帶 —— 它不決定勝負,樂觀套用才有即時手感。 */
   function settleRace(){
     ctx.txGame(g=>{
       if(g.winner)return false;
       g.winner={ id:ctx.me(), name:ctx.name(), by:"time", ms:Date.now()-startedAt };
-    });
+    },{ local:false });
   }
   // 搶格:盤面填滿就結算。誰看到誰寫,交易保證只有第一個成功(不指定「填最後一格的人」,
   // 免得那個人剛好斷線就沒人寫、整局卡住)
@@ -192,7 +201,7 @@ const MP = MPCore.create((function(){
       g.winner = ids.length===1
         ? { id:ids[0], name:ctx.dispName(ids[0]), by:"score", pts:best }
         : { ids:ids, by:"draw", pts:best };
-    });
+    },{ local:false });
   }
 
   /* ---------- 大廳設定 ---------- */

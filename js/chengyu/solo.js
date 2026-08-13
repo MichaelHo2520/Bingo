@@ -64,6 +64,12 @@ const Solo = (function () {
   }
   function quit() {
     running = false; stopTick(); CYB.setEnabled(false);
+    /* ★ v1.156.0:暫停中離開要收掉蓋板與 ⏸/▶ 的字 —— 否則留下一張點了完全沒反應的
+       全螢幕黑幕。⚠ 目前是**防禦性的、走不到**(蓋板會攔住返回鈕、finish 有 paused 守衛),
+       真正生效的是 ui-kit.js 的 BACK_LAYERS —— 完整說明在 js/sudoku/solo.js 的 quit()。 */
+    paused = false;
+    const pv = $("cyPauseVeil"); if (pv) pv.classList.remove("show");
+    const pb = $("cyPauseBtn"); if (pb) pb.textContent = "⏸";
     closeWin();
     showScreen("home");
   }

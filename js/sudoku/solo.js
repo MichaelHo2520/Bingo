@@ -67,6 +67,24 @@ const Solo = (function(){
   }
   function quit(){
     running=false; stopTick(); SB.setEnabled(false);
+    /* ★ v1.156.0:暫停中離開要順手收掉那張蓋板與 ⏸/▶ 的字。
+       漏掉的下場不是「多一張蓋板」而是「選單看得到按不到」—— .veil.show 是
+       position:fixed inset:0 z-index:50 的全螢幕層,而它綁的 togglePause 第一行就是
+       if(!running)return,此時 running 已經 false → 點它完全沒反應。
+       ⚠⚠ **老實記一筆:這三行目前是防禦性的、走不到。** 原本以為它涵蓋
+         「單機返回鈕」與「結果卡」兩條路,實際查過都不成立:
+           · 返回鈕 #sdkSoloBack 住在 .panel(沒有 z-index)→ 被那張 .veil 整片蓋住,
+             而蓋板的 click 監聽是**無條件**的(main.js 那一行沒有 e.target 判斷)
+             → 暫停中不管點到哪都是「解除暫停」,quit() 根本叫不到。
+           · 結果卡要先 finish(),而 finish 的每一個入口第一行都有 paused 守衛。
+         真正在生效的是 ui-kit.js 的 BACK_LAYERS(返回鍵先解除暫停),那一半有守門
+         (tools/test-pages.js J 節)。
+       ★ 這三行留著的理由:日後給單機加「倒數到 0 自動結算」之類的路徑,它就會真的用到,
+         而那時漏掉的症狀是靜默的。零成本的兜底,不必拿掉。
+       同一件事在 js/mahjong/solo.js 與 js/chengyu/solo.js 各有一份。 */
+    paused=false;
+    const pv=$("sdkPauseVeil"); if(pv) pv.classList.remove("show");
+    const pb=$("sdkPauseBtn"); if(pb) pb.textContent="⏸";
     closeWin();
     showScreen("home");
   }

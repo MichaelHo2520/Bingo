@@ -235,19 +235,34 @@
       if(el){ el.classList.remove("needs-name"); void el.offsetWidth; el.classList.add("needs-name"); try{ el.focus(); }catch(e){} el.scrollIntoView&&el.scrollIntoView({block:"center"}); }
       showToast("請先輸入你的暱稱 🙂", 2200);
     }
+    /* 抽一個沒人在用的房號,最多試 tries 次。★★ v1.156.0:在此之前是「撞到重抽**一次**,
+       之後不再檢查直接寫」= 二次撞號會把還在打的那一局整包蓋掉。機率極低但單向上升
+       (孤兒房沒有自動清理,被佔用的四位碼只會愈來愈多)。
+       ⚠ 與 js/shared/mp-core.js 的 pickFreeCode() 是雙胞胎(紅線 5)。 */
+    function pickFreeCode(tries){
+      code=randomCode(); roomRef=db.ref("rooms/"+code);   // 內部隨機 4 位碼當資料庫鍵值(玩家看不到)
+      return roomRef.child("host").once("value").then(snap=>{
+        if(!snap.exists()) return true;                   // 沒人用 / 已關閉 → 可以用
+        if(tries<=1) return false;
+        return pickFreeCode(tries-1);
+      });
+    }
     function create(name,wantName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
       const nm=(name||"").trim();
       if(!nm){ flagNameNeeded(); return; }   // 必填暱稱
       meName=nm.slice(0,8); meId=pid(); isHost=true;
       roomName=(wantName||"").trim().slice(0,12) || (meName+"的房間");   // 房名可留空,預設用暱稱
-      code=randomCode(); roomRef=db.ref("rooms/"+code);                  // 內部隨機 4 位碼當資料庫鍵值(玩家看不到)
-      roomRef.child("host").once("value").then(snap=>{
-        if(snap.exists()){ code=randomCode(); roomRef=db.ref("rooms/"+code); }   // 撞號就重抽一次
-        /* ⚠⚠⚠ 撞到**已關閉**的房間要把殘留欄位清乾淨(v1.147.0)——「撞號重抽」看的是
+      const QUIET={ __quiet:true };          // 抽不到房號:已經給過訊息,不要再蓋一次
+      pickFreeCode(5).then(free=>{
+        if(!free){ setMsg("房號一直撞到別人開的房,請再按一次。"); return Promise.reject(QUIET); }
+        /* ⚠⚠⚠ 撞到**已關閉**的房間要把殘留欄位清乾淨(v1.147.0)—— pickFreeCode 看的是
            `host` 有沒有值,而關掉的房間 host 正好是空的 → 看起來像沒人用,新房就蓋上去了,
            而 update() 會**留下舊房的 scores** = 新房一開就有人有分數(名字也對得上,
            因為 nm 一起留著),畫面上完全看不出哪裡不對。
+           ★ 用「明確列出要清的欄位」而不是 set():留住 roomName / createdAt / scores 這幾筆歷史。
+             ⚠ v1.156.0 更正:共用層那一份原本寫的理由是「set() 在二次撞號時會擦掉還在打的
+               那一局」,而這一包 payload 本身就會 —— 真正擋住二次撞號的是 pickFreeCode 的迴圈。
            ⚠ 這一段與 js/shared/mp-core.js 的 create() 是雙胞胎(CLAUDE.md 紅線 5)。 */
         return roomRef.update({ players:null, scores:null, hostName:null, closedAt:null,
           host:meId, roomName:roomName, target:state.target, size:SIZE, orderMethod:"random",
@@ -255,7 +270,8 @@
           emotes:null, createdAt:Date.now(),
           // 一局揮發狀態全收在 game(取代舊的散落頂層欄位);rev 由此起算,單調遞增
           game:{ rev:1, status:"lobby", order:null, turnIndex:0, calledList:[], winner:null, rps:null, reveal:null, roundId:null } });
-      }).then(()=>{ joinNode(); enterLobby(); armRoomIndex(); }).catch(e=>setMsg("建立房間失敗:"+((e&&e.message)||e)));
+      }).then(()=>{ joinNode(); enterLobby(); armRoomIndex(); })
+        .catch(e=>{ if(e===QUIET)return; setMsg("建立房間失敗:"+((e&&e.message)||e)); });
     }
     function join(inCode,name,inName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
@@ -1275,7 +1291,11 @@
                ⚠ 只留身分與歷史(roomName / createdAt / scores + hostName / closedAt),
                  live 的三包(host / players / game)照樣清掉;hostName 一定要在這裡補,
                  因為 host 只有 pid 而 players 馬上要清掉。
-               ⚠ 這一段是**雙胞胎**,js/shared/mp-core.js 的 leave() 有對應的一份(紅線 5)。 */
+               ⚠ 這一段是**雙胞胎**,js/shared/mp-core.js 的 leave() 有對應的一份(紅線 5)。
+               ⚠⚠ v1.156.0 起共用層那一份多一圈 `A.extraNodes` 的清理(數獨/消消樂的 progress、
+                 台灣麻將的 tai、你畫我猜的 ink/say)—— Bingo **沒有** extraNodes 這個概念
+                 (它的房內節點就是上面那幾個固定欄位),所以這一份刻意不加。
+                 這是那一對雙胞胎目前唯一該有的差異,不是漏改。 */
             roomRef.update({ host:null, players:null, game:null,
                              hostName:meName||"", closedAt:Date.now() });
           }else if(meId){

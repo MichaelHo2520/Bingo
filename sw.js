@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.155.3";
+const VERSION = "1.156.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -254,7 +254,24 @@ self.addEventListener("fetch", e => {
   // network-first:先網路(順手更新快取),失敗才回退快取;導覽請求離線時退回外殼 app.html
   e.respondWith(
     fetch(req).then(res => {
-      if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+      /* ⚠⚠ 條件是 status === 200,**不可以寫 res.ok**(v1.156.0 修)。
+         `Response.ok` 涵蓋 200~299,所以 **206(Partial Content)的 ok 是 true** ——
+         而規格對 `Cache.put` 明訂 206 要以 TypeError reject。
+         這個專案到處都會發 Range 請求:HTMLMediaElement 一律送 Range,而
+         js/audio.js 的 BGM(new Audio(src))、win/lose 的 HTMLAudio 後備、playClipEl
+         (js/mahjong16/sfx.js 對全部 mj16 語音明確開了 {el:true})都走它。
+         ★ 後果不影響播放(return res 在 put 之外),症狀是安靜的兩件事:
+           ① SW console 被 unhandled rejection 塞滿 → 真正的快取錯誤(發版時 CORE 列錯檔名)
+              會被埋掉,而那是「離線整個不能玩」的唯一線索
+           ② 這些媒體回應永遠進不了 runtime cache —— 也就是說「network-first 會順手把
+              播過的檔收進來」這個假設**對所有走 HTMLAudio 的音檔都不成立**,
+              而下面第 138 行那條「使用者自己放的 mp3 刻意不列進 CORE」正是靠這個假設。
+         ⚠ 就算條件收成 200,`.catch()` 還是要留:同一段的兄弟 c.addAll(CORE).catch(()=>{})
+           一直都有,這裡少了純粹是漏的(配額滿、私密瀏覽都會 reject)。 */
+      if (res && res.status === 200) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+      }
       return res;
     }).catch(() => caches.match(req).then(hit => hit || (req.mode === "navigate" ? caches.match("./app.html") : Response.error())))
   );

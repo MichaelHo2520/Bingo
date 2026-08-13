@@ -71,7 +71,12 @@ const HomeLive = (function(){
     /* ⚠ name 是**顯示名**(v1.86.0 從「21點」改成「台式21點」)——
        index / key / href 這三個是**資料與路徑**,一個字都不准跟著改。 */
     // icon 是迷你 ♦︎A —— 21 點裡最關鍵的一張牌
-    { key:"bj",      index:"bj_index",      rooms:"bj_rooms",      name:"台式21點", icon:miniCard("A","diamond",true), badge:"hlBadgeBj",   max:5, href:"blackjack.html", joinMid:true },
+    /* ⚠⚠ v1.156.0 修:這一列的 max 從 v1.86.0 起就漏跟 adapter(停在 5,而 adapter 是 6)。
+       症狀是首頁把 5 人的 21 點房間當成滿房**整列藏起來**,第六個人在首頁看到的結論是「滿了」,
+       而 blackjack.html 的大廳與核心 MAX_PLAYERS 一直是對的 → 兩個入口互相矛盾。
+       21 點又是十二個裡唯一開 joinMidGame 的一個,壞掉的正是它最主要的使用情境。
+       ★ 守門在 tools/test-twins.js 第四節:GAMES 每一列的 max / joinMid 對 adapter 逐一比。 */
+    { key:"bj",      index:"bj_index",      rooms:"bj_rooms",      name:"台式21點", icon:miniCard("A","diamond",true), badge:"hlBadgeBj",   max:6, href:"blackjack.html", joinMid:true },
     /* ★ 第九個遊戲(v1.106.0)。max 必須與 js/uno/adapter.js 的 maxPlayers 一致(**6**)。
        ⚠ icon 用 🌈(U+1F308)—— UNO 的識別就是四個顏色,而且它與另外八個都不撞。
          **不可以用 🃏**(U+1F0CF):它落在 U+1F0A0–U+1F0FF 那段撲克牌字元裡,

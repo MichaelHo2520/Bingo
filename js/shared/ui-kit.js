@@ -206,10 +206,27 @@ function disarmBackGuard(){
   bgArmed=false; bgEat=true;
   try{ history.back(); }catch(e){ bgEat=false; }
 }
+/* 三頁單機暫停蓋板共用的回呼(見下面 BACK_LAYERS 那三筆)。
+   ⚠ typeof 防身:Bingo 那一份雙胞胎沒有 Solo(它的單機是 game.js 自己那套)。 */
+function soloPause(){ if(typeof Solo!=="undefined"&&Solo.togglePause)Solo.togglePause(); }
 /* 返回鍵先關掉最上層的浮層(手機上的直覺),沒有浮層開著才回傳 false 交給呼叫端處理。
    ⚠ 結果卡(#veil)刻意不列 —— 它是強制回應視窗,要離開只能按卡片上的按鈕(見各頁 main.js)。
-     順序 = 疊在上面的先關;這一頁沒有的 id(投降只有五子棋、猜拳只有 Bingo)自動跳過。 */
+     順序 = 疊在上面的先關;這一頁沒有的 id(投降只有五子棋、猜拳只有 Bingo)自動跳過。
+   ⚠⚠ 這個陣列是**十二頁所有蓋板的登記表**,而且是雙胞胎(兩份都要列全部 id,
+     不存在的自動跳過)。漏登記一張蓋板的下場不是「按返回沒反應」,而是按返回**穿過去**
+     做了更下面那一層的事 —— 在房裡是跳「離開房間?」(誤按 = 房主關房、全房重開),
+     在單機是把這一局丟掉還留一張蓋板。v1.156.0 一次補了漏掉的四張(見下面)。 */
 const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettings()],
+                   /* ★ 三頁單機的暫停蓋板(v1.156.0 補;v1.63.0 就存在,漏登記了九十幾個中碼)。
+                      只有 sudoku / mahjong / chengyu 有這三個 id,其他九頁自動跳過。
+                      ⚠ 回呼**不可以只移掉 .show** —— 那會讓 paused 旗標與畫面脫節
+                        (計時停著、盤面 disabled,人以為解除了卻按不動),一定要走 togglePause。
+                      ⚠ 漏登記的舊症狀:pageBackKey() 沒攔到就走 solo 那一支 Solo.quit(),
+                        而 quit() 當時不收這張蓋板 → 這一局沒了,畫面留一張寫著
+                        「點畫面任一處繼續」而點了完全沒反應的全螢幕黑幕(它綁的 togglePause
+                        第一行就是 if(!running)return,而 running 已經 false)。
+                        根因那一半修在三支 solo.js 的 quit(),這裡是手勢那一半。 */
+                   ["sdkPauseVeil",soloPause],["mjPauseVeil",soloPause],["cyPauseVeil",soloPause],
                    ["emoteVeil",()=>closeEmote()],["kickVeil",()=>MP.cancelKick()],
                    // ★ 伺服器狀態隱藏面板(js/home-live.js 檔尾,點 7 下首頁「派對遊戲」開)。
                    //   只有 index.html 有這個 id(home-live.js 只有 Bingo 載入),其他九頁自動跳過。
@@ -224,6 +241,11 @@ const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettin
                    ["unColorVeil",()=>UNB.closeColor()],["unRulesVeil",()=>closeRules()],
                    // ★ 暗棋的房規蓋板(v1.113.0)。只有 darkchess.html 有這個 id,其他九頁自動跳過。
                    ["dcRulesVeil",()=>closeRules()],
+                   /* ★ 大老二的房規蓋板(v1.156.0 補;v1.100.0 就存在,漏登記了 55 個中碼)。
+                      只有 big2.html 有這個 id,其他十一頁自動跳過。症狀與上面 bjRulesVeil
+                      那條註解逐字相同 —— 房主開局前看一眼房規、按返回想關掉,跳出來的是
+                      「離開房間?」;而同型的 21 點 / UNO / 暗棋三頁一直都是對的。 */
+                   ["b2RulesVeil",()=>closeRules()],
                    ["resignVeil",()=>MP.cancelResign()],["leaveVeil",()=>MP.cancelLeave()]];
 function dismissTopLayer(){
   for(let i=0;i<BACK_LAYERS.length;i++){
@@ -1305,7 +1327,16 @@ function updTick(){
   if(document.hidden || navigator.onLine===false)return;
   if(Date.now()-updLastAt < UPD_CHECK_MS)return;
   updLastAt=Date.now();
-  fetch(location.pathname,{cache:"no-store"})            // 只抓自己這頁;no-store 繞過 HTTP 快取
+  /* ★★ 只抓前 4 KB(v1.156.0)。要的只有 <meta name="version"> 那一個標籤,而它在十二頁
+     **全部落在前 2,160 B 之內**(最遠的是 index.html 的 2160);抓整份是 21~40 KB。
+     單頁三小時 ≈ 36 次 × 30 KB ≈ 1.1 MB,六支手機同場 ≈ 7 MB,而 no-store 明確繞過 HTTP 快取。
+     更糟的是 updTick 只擋 hidden / onLine / 間隔三道閘,**不擋「正在對局」** ——
+     每五分鐘一筆 30 KB 跟 Firebase 的即時同步搶同一條上行,觀感是「每隔一陣子卡一下」。
+     ⚠ 伺服器不支援 Range 就回 200 全檔 → 下面的 .match() 一個字都不必改,自動退回舊行為。
+     ⚠⚠ 這一項**必須與 sw.js 的 cache.put 一起改**:Range 生效 = 206,而 sw.js 原本用
+       `res.ok` 當條件(206 的 ok 是 true)→ Cache.put 對 206 一定 reject。
+     ⚠ 版號的單一來源就是那個 meta —— 不要為了省這幾 KB 另外開一支 version.json(見上面)。 */
+  fetch(location.pathname,{cache:"no-store",headers:{Range:"bytes=0-4095"}})   // 只抓自己這頁的開頭
     .then(r=>r.ok?r.text():"")
     .then(html=>{
       const mm=html.match(/<meta\s+name="version"\s+content="([^"]+)"/i), v=mm?mm[1]:"";

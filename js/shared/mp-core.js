@@ -247,26 +247,45 @@ const MPCore = (function(){
         (A.lobbyGame && A.lobbyGame()) || {}
       );
     }
+    /* 抽一個沒人在用的房號,最多試 tries 次;抽到就把 code / roomRef 設好並回 true。
+       ★★ 為什麼要迴圈(v1.156.0):在此之前是「撞到就重抽**一次**,之後不再檢查直接寫」——
+         也就是二次撞號時會把**還在打的那一局**整包蓋掉(人、分數、盤面全沒,host 還被換人)。
+         機率極低但是**單向上升的**:孤兒房沒有自動清理,被佔用的四位碼只會愈來愈多。
+       ★ 判準是 host 在不在:關掉的房 host 正好是空的 → 那種房**本來就要**被撿來重用
+         (下面的 wipe 負責把殘留清乾淨),所以這裡不算撞號。 */
+    function pickFreeCode(tries){
+      code=randomCode(); roomRef=db.ref(ROOMS+"/"+code);
+      return roomRef.child("host").once("value").then(snap=>{
+        if(!snap.exists()) return true;                 // 沒人用 / 已關閉 → 可以用
+        if(tries<=1) return false;
+        return pickFreeCode(tries-1);
+      });
+    }
     function create(name,wantName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
       const nm=(name||"").trim();
       if(!nm){ flagNameNeeded(); return; }
       meName=nm.slice(0,8); meId=pid(); isHost=true;
       roomName=(wantName||"").trim().slice(0,12) || (meName+"的房間");
-      code=randomCode(); roomRef=db.ref(ROOMS+"/"+code);
-      roomRef.child("host").once("value").then(snap=>{
-        if(snap.exists()){ code=randomCode(); roomRef=db.ref(ROOMS+"/"+code); }   // 撞號重抽一次
+      const QUIET={ __quiet:true };                     // 抽不到房號:已經給過訊息,不要再蓋一次
+      pickFreeCode(5).then(free=>{
+        if(!free){ setMsg("房號一直撞到別人開的房,請再按一次。"); return Promise.reject(QUIET); }
         /* ⚠⚠⚠ 撞到**已關閉**的房間時要把它的殘留欄位清乾淨(v1.147.0 起非做不可)。
-           上面那道「撞號重抽」看的是 `host` 有沒有值,而關掉的房間 host 正好是空的
+           pickFreeCode 看的是 `host` 有沒有值,而關掉的房間 host 正好是空的
            → 它看起來像沒人用,於是新房會直接蓋在舊房上面。用 update() 的話
            **舊房的 scores 會留下來** = 新房一開就有人有分數(而且對得上名字,
            因為 nm 也在裡面),而畫面上完全看不出哪裡不對。
            v1.147.0 之前不會踩到:那時房主離開會整間 remove,而斷線留下的房間
-           `host` 還在 → 一定會被上面那行重抽掉。
-           ★ 用「明確列出要清的欄位」而不是 roomRef.set():set() 在(極小機率的)
-             二次撞號時會把**還在打的那一局**整包擦掉,那個代價比殘留大得多。
+           `host` 還在 → 一定會被重抽掉。
+           ★ 用「明確列出要清的欄位」而不是 roomRef.set():留住 roomName / createdAt / scores
+             這幾筆歷史(首頁那個隱藏的伺服器狀態面板要靠它們列出「誰開過哪一間」)。
+             ⚠ v1.156.0 更正:這裡原本寫的理由是「set() 在二次撞號時會把還在打的那一局
+               整包擦掉」—— 那個理由**已經不成立**了。這一包 payload 本身就含
+               players:null / scores:null / extraNodes:null / game:{rev:1} / host:meId,
+               二次撞號時用 update() 一樣把那一局整包擦掉。真正擋住二次撞號的是
+               pickFreeCode 的迴圈(最多試五次、全撞就放棄並告訴使用者),不是 update()。
            ⚠ adapter 自己的房內節點(A.extraNodes,例如數獨/消消樂的 progress、
-             台灣麻將的 tai)也要一起清 —— 它們是**上一局**的資料。 */
+             台灣麻將的 tai、你畫我猜的 ink/say)也要一起清 —— 它們是**上一局**的資料。 */
         const wipe={ players:null, scores:null, hostName:null, closedAt:null };
         (A.extraNodes||[]).forEach(k=>{ wipe[k]=null; });
         const payload=Object.assign(wipe, {
@@ -280,7 +299,7 @@ const MPCore = (function(){
           if(!okSeat){ setMsg("建立房間失敗,請再試一次。"); return; }
           enterLobby(); armRoomIndex();
         });
-      }).catch(e=>setMsg("建立房間失敗:"+((e&&e.message)||e)));
+      }).catch(e=>{ if(e===QUIET)return; setMsg("建立房間失敗:"+((e&&e.message)||e)); });
     }
     function join(inCode,name,inName){
       if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
@@ -1230,12 +1249,26 @@ const MPCore = (function(){
                    host    → null(關房訊號,一定要清)
                    players → null(不然面板會顯示早就離開的人還在裡面)
                    game    → null(deal + moves 是最大的一包,留著只是佔空間)
+                   A.extraNodes → null(v1.156.0 補,見下面)
                  留下的是 roomName / createdAt / scores(名字寄生在 scores.nm)+ 這次補的兩筆。
                ⚠ hostName 要在這裡寫:host 只有 pid,而 players 馬上要清掉 →
                  不補這一筆,面板就只知道「有人開過房」卻說不出是誰。
-               ⚠ 這一段是**雙胞胎**,js/online.js 的 leave() 有逐字對應的一份(紅線 5)。 */
-            roomRef.update({ host:null, players:null, game:null,
-                             hostName:meName||"", closedAt:Date.now() });
+               ⚠⚠ **A.extraNodes 也要清**(v1.156.0 修):create() 的 wipe 早就清了它
+                 (見上面 :270),leave() 這一份卻漏了 —— 而上面那句「game 是最大的一包」
+                 在你畫我猜身上剛好是錯的:最大的一包是 ink(筆劃),而它正好是 extraNode。
+                 漏掉的下場是**每一間「打完就散」的房永久留著最後一回合的全部筆劃**
+                 (FLUSH_MS=70、一個 60 秒回合估 ≈ 400 筆 × ~100 B ≈ 40 KB/間):
+                 draw 的 sweep() 只刪上一回合,整包 remove 只發生在**下一場** newGame(),
+                 所以最後那一回合沒有任何人會刪。
+                 受影響的還有 sudoku / mahjong 的 progress、mahjong16 的 tai。
+                 ⚠ 連帶:js/home-live.js 的伺服器狀態面板對已關閉的房間是**整包**讀
+                   (svGet(rooms/code)),面板每開一次最多下載 30 間 × 40 KB。
+               ⚠ 這一段是**雙胞胎**,js/online.js 的 leave() 有對應的一份(紅線 5)——
+                 但 Bingo 沒有 extraNodes,所以那一份**刻意**不加這一圈(見它那條註解)。 */
+            const ups={ host:null, players:null, game:null,
+                        hostName:meName||"", closedAt:Date.now() };
+            (A.extraNodes||[]).forEach(k=>{ ups[k]=null; });
+            roomRef.update(ups);
           }else if(meId){
             const pr=roomRef.child("players/"+meId);
             pr.onDisconnect().cancel(); pr.remove();
@@ -1319,14 +1352,24 @@ const MPCore = (function(){
       if(typeof kickVoiceQueue==="function") kickVoiceQueue();
     });
 
-    /* ---------- 交給 adapter 的執行環境 ---------- */
+    /* ---------- 交給 adapter 的執行環境 ----------
+       ★★★ v1.156.0 撤掉五個成員:status / setGame / patchGame / updateReadyBtn / onStatusTxt。
+         十一支 adapter 對它們**零呼叫**(函式本體留著,核心內部照樣用)。
+         其中兩個不只是沒人用,而是**會繞過 rev 交易紀律的後門**:
+           · setGame(g)   —— 非交易寫入,rev 取自本地快照 gameRev+1
+           · patchGame(p)  —— 同上,而且連 local 選項都沒有
+         兩台同時用它們寫 game 會算出**同一個 rev**,onGame 的 `rev<gameRev` 就會靜靜丟掉
+         其中一張快照 —— 那正是踩坑 #1/#3 要消滅的病灶;用 patchGame 寫 winner 更是連
+         紅線 15 的補救管道(local:false)都沒有。
+         而它們過去就列在 notes/07 那張 ctx 表裡、**與 txGame 並排**,從表上看不出哪個不該用。
+       ★ 結論:adapter 要寫 game 節點,**只有 txGame 這一條路**。 */
     const ctx = {
       me:()=>meId, name:()=>meName, players:()=>players, order:()=>order,
-      isHost:()=>isHost, phase:()=>curPhase, status:()=>status,
+      isHost:()=>isHost, phase:()=>curPhase,
       winner:()=>winner, roundId:()=>roundId, abandoned:()=>abandoned,
       dispName, youTag, scoreOf,
-      setGame, patchGame, txGame, setRoomField, unreadyOnFieldChange, readyUp,
-      renderPlayers, syncSetup, updateReadyBtn, updateGoal, onStatusTxt,
+      txGame, setRoomField, unreadyOnFieldChange, readyUp,
+      renderPlayers, syncSetup, updateGoal,
       maxPlayers:MAX_PLAYERS, minPlayers:MIN_PLAYERS,
       // adapter 自己要讀寫的房內節點(見 A.listen / A.extraNodes);沒進房時回 null
       ref:(path)=>roomRef?roomRef.child(path):null
