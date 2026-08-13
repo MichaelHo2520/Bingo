@@ -1197,10 +1197,12 @@ addEventListener("resize", syncTools);
 function paintVersion(){
   const m=document.querySelector('meta[name="version"]'), v=m?m.content:"";
   const tv=$("topVer"); if(tv)tv.textContent=v?("v"+v):"";
-  const sv=$("setVer"); if(sv)sv.textContent=v?("v"+v):"";
+  // 設定頁那顆同時是「強制更新」的按鈕(見 armHardRefresh);頂列那顆刻意不綁
+  const sv=$("setVer"); if(sv){ sv.textContent=v?("v"+v):""; armHardRefresh(sv); }
 }
 // 設定蓋板 / 表情面板 / 音訊解鎖 / SW 註冊:兩個遊戲一字不差的那些綁定
 function bindCommonUI(){
+  hardRefreshLanded();   // ⚠ 必須在 autoJoinFromQuery() 之前:那支會 replaceState 掉整個 search
   bindHomeLinks();   // 頂列 / 進場選單的「回主選單」:不再往歷史裡多疊一筆(見 bindHomeLinks)
   $("settingsBtn").addEventListener("click",openSettings);
   $("setClose").addEventListener("click",closeSettings);
@@ -1298,35 +1300,51 @@ function autoJoinFromQuery(MP){
    絕不把人踢出局。safeFn 由各遊戲的 main.js 提供(什麼叫「安全」只有遊戲自己知道)。
    ★ Bingo(index.html)不載入本檔,同一套邏輯在 js/main.js 另有一份 —— 改一邊記得改另一邊。 */
 const UPD_CHECK_MS=5*60*1000;     // 兩次連線檢查的最小間隔
+const UPD_STUCK_MS=30*60*1000;    // 上一輪重載後版號沒變 → 退化成這個慢速間隔(見 initUpdateCheck)
+const UPD_STUCK_MAX=3;            // 連續三輪都沒換到版才真的放棄
 const UPD_TICK_MS=4000;           // 心跳:也負責「pending 等到安全就套用」,所以要比檢查間隔密
 const UPD_FROM_KEY="bingo.updfrom";
+const UPD_TRY_KEY="bingo.updtry";
 let updCur="", updSafe=null, updPending="", updLastAt=0, updGoing=false;
+let updGap=UPD_CHECK_MS, updStuck=false;
 function initUpdateCheck(safeFn){
   const m=document.querySelector('meta[name="version"]');
   updCur=m?m.content:"";
   if(!updCur || location.protocol==="file:")return;   // 沒版號、或本機用 file:// 開(fetch 一定失敗)就不啟用
   updSafe=safeFn||(()=>true);
-  // 上一輪是為了更新而重載的話,回報結果。版號沒變 = 這次更新沒生效(CDN 還沒同步之類),
-  // 本次瀏覽就整個停掉檢查 —— 否則每 5 分鐘重載一次會變成無限重載。
+  /* 上一輪是為了更新而重載的話,回報結果。版號沒變 = 這次更新沒生效 —— 成因通常是
+     GitHub Pages 的 CDN 還沒同步,或 HTML 吃到瀏覽器自己的 HTTP 快取(max-age=600)。
+     ⚠⚠ v1.159.0 之前這裡是「本次瀏覽**整個停掉**檢查」。防無限重載的用意是對的,但下手太重:
+       手機分頁 / PWA 常一整天不關,而 CDN 通常一兩分鐘就好了 → 症狀是**推了新版,那一台
+       就一整天卡在舊版,而且怎麼等都不會好**(使用者回報的「一直卡著沒更新」,成因之一)。
+     改成:退化成 30 分鐘一次的慢速重試,連續三輪都沒換到版才真的放棄 ——
+       最壞情況是 3 次重載分散在 1.5 小時裡,那已經不是「無限重載」了。
+     ⚠ 計數存 sessionStorage:關掉分頁重開就歸零,而那時本來就該重新積極檢查。 */
   let stuck=false;
   try{
     const from=sessionStorage.getItem(UPD_FROM_KEY);
     if(from){
       sessionStorage.removeItem(UPD_FROM_KEY);
-      if(from!==updCur) setTimeout(()=>showToast("已更新到 v"+updCur+" 🎉",2200),1200);
+      if(from!==updCur){ sessionStorage.removeItem(UPD_TRY_KEY); setTimeout(()=>showToast("已更新到 v"+updCur+" 🎉",2200),1200); }
       else stuck=true;
     }
   }catch(_){}
-  if(stuck)return;
+  if(stuck){
+    let n=0;
+    try{ n=(parseInt(sessionStorage.getItem(UPD_TRY_KEY),10)||0)+1; sessionStorage.setItem(UPD_TRY_KEY,String(n)); }catch(_){ n=UPD_STUCK_MAX; }
+    if(n>=UPD_STUCK_MAX)return;                      // 連三輪沒換到版:這次瀏覽真的放棄(設定頁的版號還可以手動強制更新)
+    updStuck=true; updGap=UPD_STUCK_MS;
+  }
   updLastAt=Date.now();                              // 這頁剛載入本身就是最新的,第一次檢查等一個週期後
-  addEventListener("online",()=>{ updLastAt=0; });   // 離線時開的是快取版,一連上網就馬上查
+  // 離線時開的是快取版,一連上網就馬上查。⚠ 慢速重試中不吃這條:那時「馬上查」很可能又是白跑一趟重載
+  addEventListener("online",()=>{ if(!updStuck) updLastAt=0; });
   setInterval(updTick,UPD_TICK_MS);
 }
 function updTick(){
   if(updGoing)return;
   if(updPending){ if(updSafe()) updApply(); return; }   // 有新版在等 → 只等「安全」這件事
   if(document.hidden || navigator.onLine===false)return;
-  if(Date.now()-updLastAt < UPD_CHECK_MS)return;
+  if(Date.now()-updLastAt < updGap)return;              // updGap:正常 5 分鐘,慢速重試中 30 分鐘
   updLastAt=Date.now();
   /* ★★ 只抓前 4 KB(v1.156.0)。要的只有 <meta name="version"> 那一個標籤,而它在十二頁
      **全部落在前 2,160 B 之內**(最遠的是 index.html 的 2160);抓整份是 21~40 KB。
@@ -1365,4 +1383,117 @@ function updApply(){
       navigator.serviceWorker.getRegistration().then(r=>r?r.update():null).then(go).catch(go);
     }else go();
   },1100);
+}
+
+/* ---------- 強制更新:設定頁的版號可以按(v1.159.0) ----------
+   上面那套自動檢查治的是「沒有人會主動重載」,但它治不了另外三種「卡在舊版」——
+   這一節是給那三種的救援手段(使用者從設定頁的 v1.x.y 按下去):
+     ① **Cache Storage 殘留**:sw.js 是 network-first,只在 fetch 成功時才更新快取 ——
+        離線過一次、或請求被中斷過,那一份舊回應就會一直墊在下面。
+     ② **瀏覽器自己的 HTTP disk cache**:GitHub Pages 給 HTML / CSS / JS 的是 max-age=600,
+        而 `caches.delete()` **碰不到它**(那是兩個不同的快取層,清了 Cache Storage 也沒用)。
+        這一層在 JS 裡唯一的手段是 `fetch(url,{cache:"reload"})` —— 它繞過快取去問伺服器,
+        並用新回應**覆寫掉**那一格,等價於對那個 URL 按 Ctrl+Shift+R。`location.reload(true)` 早已失效。
+     ③ **PWA 的外殼 app.html 自己不吃更新檢查**(那是它刻意保持極簡的代價,見 app.html 開頭那段)——
+        頂層 document 一輩子是安裝當天那一份。症狀很具體:v1.154.0 之前安裝的人,外殼的
+        PAGES 表裡沒有 draw → 點「你畫我猜」會被丟回 Bingo,而且**怎麼等都不會好**。
+   ★★ 一行設定都不碰,而且是**結構上碰不到**:要清的東西全在 Cache Storage / SW registration /
+      HTTP cache 這三層,而設定值全在 localStorage —— 這一整節裡沒有出現過 localStorage。
+      維護時請保持這件事:bingo.prefs.v1(主題 / 音量 / 暱稱)、bingo.pid、
+      bingo.myclips.v1(自訂語音)、十一支 *.solo.v1 存檔,一個都不准掉。
+      (動到的兩個 sessionStorage key 都是**衍生狀態**:bingo.updfrom / bingo.updtry。)
+   ⚠ 這一整節是**雙胞胎**,js/main.js 有對應的一份給 Bingo(紅線 4)—— 改一邊記得改另一邊。 */
+const HARD_FROM_KEY="bingo.hardfrom";
+const HARD_WARM_MS=4000;          // 重抓資源的總時限:網路很差的手機不可以卡在「正在清除快取」不動
+let hardGoing=false;
+
+/* 這一頁實際載入了哪些同源資源 —— 從 DOM 撈,十二頁自動正確,不必維護第二份清單
+   (sw.js 的 CORE 那種手列清單是漏檔的主要來源)。
+   ⚠ 外部資源(Firebase SDK / Google Fonts)刻意不碰:sw.js 的 fetch 也不攔它們。
+   ⚠ sw.js 自己也列進來 —— 規範其實已經讓 SW 主腳本的更新請求繞過 HTTP 快取,
+     多抓這一次純粹是保險(成本是一個請求),不要因為「理論上不必」就拿掉。 */
+function hardUrls(){
+  const list=[location.pathname,"sw.js"];
+  const add=(el,attr)=>{ const u=el.getAttribute(attr); if(u && !/^(https?:)?\/\//i.test(u) && !/^data:/i.test(u)) list.push(u); };
+  document.querySelectorAll("script[src]").forEach(el=>add(el,"src"));
+  document.querySelectorAll('link[rel="stylesheet"][href]').forEach(el=>add(el,"href"));
+  return list;
+}
+async function hardRewarm(){
+  const jobs=hardUrls().map(u=>fetch(u,{cache:"reload"}).catch(()=>{}));
+  /* 總時限。逾時就直接往下走 —— 沒抓完的部分重載後照樣走 network-first 再抓一次,
+     這一步只是「先把 HTTP 快取那一格換掉」的最佳化,不是正確性的前提。 */
+  await Promise.race([Promise.all(jobs), new Promise(r=>setTimeout(r,HARD_WARM_MS))]);
+}
+async function hardRefresh(){
+  if(hardGoing)return;
+  /* ⚠ 對局中誤按絕不可以把人踢出局 —— 設定頁在對局中也開得起來(頂列那顆 ⚙️)。
+     沿用自動更新那套 updSafe():什麼叫「安全」只有各遊戲自己知道。
+     ⚠ ui-kit 那一份的 updSafe 是**變數**(initUpdateCheck(safeFn) 才賦值)→ 可能還是 null;
+       js/main.js 那一份是函式宣告、永遠存在。寫成 `updSafe && …` 兩邊都對,而雙胞胎要求逐字相同。 */
+  if(updSafe && !updSafe()){ showToast("對局中不能強制更新,這局結束後再試",2600); return; }
+  // file:// 直接開的時候沒有 SW、也沒有 Cache Storage / HTTP 快取可清 —— 誠實說,不要假裝做了事
+  if(location.protocol==="file:"){ showToast("本機直接開檔時沒有快取可清",2600); return; }
+  hardGoing=true;
+  showToast("正在清除快取…",2400);
+  const m=document.querySelector('meta[name="version"]');
+  try{ sessionStorage.setItem(HARD_FROM_KEY,m?m.content:""); }catch(_){}
+  // ① Cache Storage 全清。⚠ 不只 bingo-* :快取名萬一換過就再也清不掉,而這裡本來就該清光
+  try{ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k).catch(()=>{}))); }catch(_){}
+  // ② 註銷全部 SW。iOS PWA 的更新遲滯只有這一招治得了;重載後 registerSW() 會重新註冊回來
+  try{
+    if(navigator.serviceWorker && navigator.serviceWorker.getRegistrations){
+      const rs=await navigator.serviceWorker.getRegistrations();
+      await Promise.all(rs.map(r=>r.unregister().catch(()=>{})));
+    }
+  }catch(_){}
+  await hardRewarm();                                 // ③ 繞過並覆寫 HTTP disk cache(見本節開頭 ②)
+  // ④ 清掉自動檢查的「上一輪沒換到版」狀態:不然重載後可能立刻被判定該放棄
+  try{ sessionStorage.removeItem(UPD_FROM_KEY); sessionStorage.removeItem(UPD_TRY_KEY); }catch(_){}
+  hardReload();
+}
+/* 重載。兩件事:
+   · 帶 ?fresh=<時間戳> —— 第 ③ 步已經覆寫過 HTTP 快取那一格了,這個是第二層保險
+     (伺服器忽略 no-store、中間有代理);落地後由 hardRefreshLanded() 抹掉。
+   · 在外殼的 iframe 裡要**請外殼重載它自己**:只 reload iframe 的話舊外殼會原封不動留著(本節 ③)。
+     ⚠ 舊版外殼不認得 act:"hardreload"(v1.159.0 才加的)→ 訊息會掉在地上,
+       所以那個 setTimeout 一定要留,不然舊 PWA 上按了會**完全沒反應**。 */
+function hardReload(){
+  const fresh=location.pathname+"?fresh="+Date.now()+location.hash;
+  if(parent!==window){
+    try{ parent.postMessage({t:"bingo.fs",act:"hardreload"},"*"); }catch(_){}
+    setTimeout(()=>location.replace(fresh),1200);
+    return;
+  }
+  location.replace(fresh);
+}
+/* 重載後的回饋。★ 一定要有 —— 按完「清除快取」最需要知道的就是「到底有沒有換到版」,
+   而沒換到版通常不是這顆按鈕壞了,是伺服器上真的還沒有新版(剛推完要等 CDN)。
+   ⚠ 只移除 fresh 這一個參數,**不可以把整份 search 清掉** —— ?join=1234 還要留給後面的
+     autoJoinFromQuery()(那是「從首頁看板點進某間房」的入口)。
+   ⚠ 因此這支必須在 autoJoinFromQuery() **之前**跑:那支會 replaceState 掉整個 search。
+     目前掛在 bindCommonUI() 開頭,而各頁 main.js 的順序是 bindCommonUI → … → autoJoinFromQuery。 */
+function hardRefreshLanded(){
+  const s=location.search;
+  if(!/[?&]fresh=/.test(s))return;
+  const kept=s.replace(/^\?/,"").split("&").filter(p=>p && !/^fresh=/.test(p)).join("&");
+  try{ history.replaceState(null,"",location.pathname+(kept?"?"+kept:"")+location.hash); }catch(_){}
+  let from="";
+  try{ from=sessionStorage.getItem(HARD_FROM_KEY)||""; sessionStorage.removeItem(HARD_FROM_KEY); }catch(_){}
+  const m=document.querySelector('meta[name="version"]'), v=m?m.content:"";
+  setTimeout(()=>{
+    if(from && v && from!==v) showToast("已更新到 v"+v+" 🎉",2600);
+    else showToast("快取已清除(伺服器上還是 v"+v+")",3000);
+  },1000);
+}
+/* 讓設定頁的版號可以按。★ 刻意**不動十二個 HTML** —— `.set-foot` 那一行的
+   <span id="setVer"> 十二頁一字不差,在這裡加 class 就十二頁一起有了。
+   ⚠ 頂列的 #topVer 刻意**不綁**:那顆在對局中一直看得到,誤按的代價太大
+     (雖然 hardRefresh() 有 updSafe 擋著,但少一個誤觸點就是少一個)。 */
+function armHardRefresh(el){
+  if(!el || el.dataset.hu==="1")return;
+  el.dataset.hu="1";
+  el.classList.add("hu-ver");
+  el.title="清除快取並強制更新(不會清掉設定、暱稱與自訂語音)";
+  el.addEventListener("click",hardRefresh);
 }

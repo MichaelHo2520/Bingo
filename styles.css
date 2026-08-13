@@ -7340,3 +7340,14 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
        · 自動收頂列是「進對局就收」→ 那就整場都按不到 ⚙️
      所以改成:收頂列**只發生在放大模式**(body.dw-big,使用者自己按的),
      要按設定就再按一次縮小。⚠ 想省那 42px 的話請走放大鈕,不要把這條加回來。 */
+
+  /* ---------- 設定頁的版號 = 「清除快取並強制更新」(v1.159.0,十二頁共用) ----------
+     綁定在 JS 裡(js/shared/ui-kit.js 的 armHardRefresh + js/main.js 那一份),
+     十二個 HTML 一行都沒動 —— `.set-foot` 那行的 <span id="setVer"> 十二頁一字不差。
+     ⚠ 刻意只給虛線底線這一點提示:`.set-foot` 整行是 12px、opacity .7 的說明文字,
+       做成看得出是按鈕的樣子會把那一行變成版面重心,而這顆一年按不到一次。
+     ⚠ padding / 負 margin 是為了把 12px 文字的觸控區撐大,inline 元素的上下 padding
+       不會影響那一行的行高,所以不會把 `.set-foot` 推開。 */
+  .hu-ver{cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;
+    padding:3px 5px;margin:0 -3px;-webkit-tap-highlight-color:transparent}
+  .hu-ver:active{opacity:.5}

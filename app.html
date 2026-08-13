@@ -20,8 +20,8 @@
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v1.158.0 -->
-<meta name="version" content="1.158.0">
+<!-- 外殼(shell)· v1.159.0 -->
+<meta name="version" content="1.159.0">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
@@ -58,10 +58,17 @@
     var k = (location.hash || "").replace(/^#/, "");
     return PAGES[k] ? k : "bingo";
   }
+  /* 內層按過設定頁的「強制更新」→ 這一頁被重載,網址上帶著 ?fresh=<時間戳>(v1.159.0)。
+     ① 先從自己的網址抹掉:PWA 的 start_url 是這一頁,留著會讓「加到主畫面」記到帶參數的網址。
+     ② 但要**轉交給 iframe** —— 那個參數是內層在認的(它落地後會抹掉,並回報「已更新到 vX」),
+        不轉交的話使用者按完會完全沒有回饋,不知道到底成功了沒。
+     ⚠ 只在第一次設 src 時轉交;下面 hashchange 那條(換遊戲)不必帶。 */
+  var fresh = (/[?&]fresh=(\d+)/.exec(location.search) || [])[1] || "";
+  if(fresh){ try{ history.replaceState(null, "", location.pathname + location.hash); }catch(_){} }
   // 深層連結:app.html#gomoku 直接開五子棋。iOS「加到主畫面」記的是當下網址(含 hash),
   // 所以三個遊戲照樣可以各自加一個直接開該遊戲的圖示。
   var cur = PAGES[keyOfHash()];   // iframe 目前是哪一頁;以內層 hello 回報的為準
-  stage.src = cur;
+  stage.src = cur + (fresh ? "?fresh=" + fresh : "");
   /* 只改 hash 是「同文件導覽」,瀏覽器不會重載這一頁 → 要自己聽(例如點了 app.html#sudoku 的書籤,
      而分頁已經開在 #bingo)。
      ⚠ 兩個坑:
@@ -143,6 +150,17 @@
     if(d.act === "gesture"){
       // 這一頁被 F5 重載過(全螢幕掉了但意願還記著)→ 借內層這一下手勢接回來
       if(want() && !fsEl() && fsSupported()) request();
+      return;
+    }
+    if(d.act === "hardreload"){
+      /* 內層按了設定頁的「強制更新」(v1.159.0)。這一頁自己**不吃**更新檢查(見開頭那段),
+         所以只重載 iframe 的話,舊外殼會原封不動留著 —— 那正是「PWA 裝很久的人點新遊戲
+         會被丟回 Bingo」的成因(PAGES 是安裝當天那一份)。
+         ⚠ 內層已經清完 Cache Storage、註銷了 SW、也用 cache:"reload" 重抓過資源,
+           這裡只負責換掉頂層 document;帶 ?fresh= 是為了繞掉 HTML 的 HTTP 快取。
+         ⚠ 重載後上面會依 hash 重設 stage.src → iframe 跟著換新的,內層不必自己再 reload
+           (它那邊那個 1.2 秒的 setTimeout 是給**不認得這個 act 的舊外殼**墊底用的)。 */
+      location.replace(location.pathname + "?fresh=" + Date.now() + location.hash);
       return;
     }
   });
