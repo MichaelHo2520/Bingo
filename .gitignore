@@ -29,6 +29,12 @@ tools/
 # ⚠⚠ 頁面**絕對不可以**直接指向 design-refs/ —— 那是「本機好好的、線上永遠破圖」。
 design-refs/
 
+# 本機專用倉庫的 git 目錄(v1.159.0)。管的是「不上 GitHub 但值得版控」的東西:
+#   CLAUDE.md + tools/ 的原始碼(在此之前那兩者完全沒有版控 —— 上面 *.md 與 tools/ 把它們濾掉了)
+# 它的 work-tree 也是專案根,與這個公開 repo 重疊,靠各自的 index 分開;**永遠沒有 remote**。
+# 用法見 CLAUDE.md 檔尾與 tools/lg.ps1。
+.git-local/
+
 # 系統/編輯器雜項
 .DS_Store
 Thumbs.db
