@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.154.0 -->
-<meta name="version" content="1.154.0">
+<!-- 台灣 16 張麻將 · v1.154.1 -->
+<meta name="version" content="1.154.1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -320,12 +320,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </div>
       <div class="actions" id="mpWinBtns">
         <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
-        <button class="btn primary" id="mpAgain">下一局 ▸</button>
+        <button class="btn primary" id="mpAgain">下一局</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
       <!-- 局間續局的腳註(v1.103.0,v1.122.0 拿掉自動倒數):還在等幾個人。
            連線、打超過 1 局、而且不是最後一局才會出現(字全部由 adapter 的 paintNext 填)。
-           ★ #mpAgain 上面的字也是那支換的:續局中是「繼續」,最後一局才是「下一局 ▸」。
+           ★ #mpAgain 上面的字也是那支換的:續局中是「繼續」,最後一局才是「下一局」。
            ⚠ 不再自動繼續——沒人按就一直等,見 adapter.js「局間續局」那一段的檔頭。 -->
       <div class="m16-next hidden" id="m16Next" aria-live="polite"></div>
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;

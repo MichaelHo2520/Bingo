@@ -1310,7 +1310,7 @@ const BJB = (function(){
              '<div class="bj-hbar" style="--bj-hdur:' +
                (Math.max(400, v.ms || 3000) / 1000) + 's"><i></i></div>' +
              /* ★★★ v1.94.0:看完可以按(使用者:「我希望有可以快速關掉的操作」)。
-                ★★★ v1.95.0:連線改成**投票** —— 按過了就換成「✓ 已按繼續 · 還在等 N 人」
+                ★★★ v1.95.0:連線改成**投票** —— 按過了就換成「等待中 · 還在等 N 人」
                 (使用者:「不希望是誰按就全桌一起跳,變成全部都按完了才一起跳」)。
                 ⚠ 鈕上的字由**呼叫端**給:最後一局要寫「看結果」而不是「下一局」,
                   而「這是不是最後一局 / 還在等幾人」只有呼叫端算得出來。
@@ -1322,7 +1322,7 @@ const BJB = (function(){
                '<span class="bj-hfoot">' + esc(footTxt(v)) + '</span>' +
                '<button class="btn primary bj-hskip' + (v.skipDone ? " voted" : "") +
                  '" type="button">' +
-                 esc(v.skipDone ? "✓ 已按繼續" : (v.skipTxt || "下一局 ▸")) + '</button>' +
+                 esc(v.skipDone ? "等待中" : (v.skipTxt || "下一局")) + '</button>' +
              '</div>' +
            '</div>';
   }

@@ -217,7 +217,7 @@ const MP = MPCore.create((function(){
                  : "大家按完就開下一局(時間到也會自動開)",
       /* ★ 連線一律寫「繼續」而不是「下一局」:按下去**不會**馬上換局
          (要等大家),鈕上的字一定要與實際發生的事一致。單機那邊才是「下一局 ▸」。 */
-      skipTxt: "繼續 ▸",
+      skipTxt: "繼續",
       skipDone: nextDone(ctx.me()),
       skipWait: nextWait().length,
       onSkip: function(){ if(playing()) sendNext(seq); },

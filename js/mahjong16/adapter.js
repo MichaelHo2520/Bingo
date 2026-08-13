@@ -794,11 +794,11 @@ const MP = MPCore.create((function(){
     const wait = waitCount();
     el.classList.remove("hidden");
     el.innerHTML = mine
-      ? (wait > 0 ? "✓ 已按繼續 —— 還在等 <b>"+wait+"</b> 人…" : "✓ 大家都按了,馬上開下一局…")
+      ? (wait > 0 ? "還在等 <b>"+wait+"</b> 人…" : "大家都按了,馬上開下一局…")
       : "按「繼續」,大家都按了就接著打下一局";
     const b = $("mpAgain");
     if(b){
-      b.textContent = mine ? "✓ 已按繼續" : "繼續 ▸";
+      b.textContent = mine ? "等待中" : "繼續";
       b.classList.toggle("ghost", mine);
       b.classList.toggle("primary", !mine);
       b.disabled = mine;
@@ -1128,7 +1128,7 @@ const MP = MPCore.create((function(){
         // 最後一局(或只打一局):回到原本的「下一局 = 回大廳重新準備」
         clearNext();
         const b = $("mpAgain");
-        if(b){ b.textContent = "下一局 ▸"; b.disabled = false;
+        if(b){ b.textContent = "下一局"; b.disabled = false;
                b.classList.add("primary"); b.classList.remove("ghost"); }
       }
 

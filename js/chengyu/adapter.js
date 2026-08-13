@@ -145,11 +145,11 @@ const MP = MPCore.create((function () {
     const wait = waitCount();
     el.classList.remove("hidden");
     el.innerHTML = mine
-      ? (wait > 0 ? "✓ 已按繼續 —— 還在等 <b>" + wait + "</b> 人…" : "✓ 大家都按了,馬上換下一盤…")
+      ? (wait > 0 ? "還在等 <b>" + wait + "</b> 人…" : "大家都按了,馬上換下一盤…")
       : "按「繼續」,大家都按了就接著玩下一盤";
     const b = $("mpAgain");
     if (b) {
-      b.textContent = mine ? "✓ 已按繼續" : "繼續 ▸";
+      b.textContent = mine ? "等待中" : "繼續";
       b.classList.toggle("ghost", mine);
       b.classList.toggle("primary", !mine);
       b.disabled = mine;
