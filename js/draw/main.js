@@ -44,13 +44,10 @@ $("dwGoOnline").addEventListener("click", () => MP.openConnect());
 /* ---------- 對局:畫家工具列 ---------- */
 $("dwClear").addEventListener("click", () => DWB.clearInk());
 
-/* 比分 HUD:點某個人的卡片 = 傳表情給他(對戰中名單列收起來了,這裡接手那個入口) */
-$("dwHud").addEventListener("click", e => {
-  const c = e.target.closest(".dw-hcard"); if (!c) return;
-  const id = c.dataset.id; if (!id) return;
-  const me = (MP.roster().find(p => p.me) || {}).id;
-  openEmote(id === me ? "all" : id);      // 點自己的卡片 = 送給全部人(同玩家晶片的行為)
-});
+/* 放大畫板:吃掉猜題列與頂列(見 styles.css 的 body.dw-big)。
+   ⚠ 沒有獨立的比分列要接 —— v1.155.0 起比分就畫在房間框的玩家晶片列上,
+     而那一排的「點一下傳表情」是核心的 renderPlayers 自己綁的(與另外十一頁同一套)。 */
+$("dwZoom").addEventListener("click", () => MP.toggleZoom());
 
 /* ---------- 連線大廳設定(房主可改) ----------
    ⚠ 三段設定都走同一支 MP.setRule(key, val) —— 它自己會擋「只有房主 / 只有大廳」

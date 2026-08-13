@@ -443,37 +443,42 @@ const DWB = (function () {
   }
 
   /* ==========================================================================
-     七、比分 HUD(盤面上方那一列;比照成語接龍的 cy-hud)
+     七、放大模式(v1.155.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「目前的畫板太小了…可以有一個放大的按鈕,按下去可以吃掉下面回答的
+       一些空間。」→ 一顆 class 開關,收掉猜題列的大部分與頂列,全部讓給畫布。
+       ★★ 為什麼這樣有效:這一頁的畫布**永遠是被高度夾住的**,不是寬度
+         (`tools/gen-draw-shot.js` 的診斷會回報「限於高 / 限於寬」,實測四種視窗
+          全部是「限於高」)—— 所以省下來的每一個垂直像素都直接變成更大的畫布,
+          而且因為是 4:3,高度多 100px 等於寬度多 133px。
+       ⚠ 真正的樣式在 styles.css 的 `body.dw-big` 那一段;這裡只負責
+         **切 class 之後把畫布重新量一次**(`fit()` 讀的是即時的 getBoundingClientRect)。
+       ⚠ 比分不在這裡收 —— 它現在住在房間框的玩家晶片列(見 draw.html 那段註解),
+         放大模式刻意**不動它**:那是使用者要求「放進房間框」的東西。
      ========================================================================== */
-  function setHud(rows) {
-    const box = $("dwHud"); if (!box) return;
-    if (!rows || !rows.length) { box.classList.add("hidden"); box.innerHTML = ""; return; }
-    box.classList.remove("hidden");
-    box.classList.toggle("dw-hud-two", rows.length > 4);
-    box.innerHTML = rows.map(r =>
-      '<div class="dw-hcard p' + (r.seat % 6) + (r.me ? " me" : "") + (r.drawer ? " drawer" : "") +
-        (r.hit ? " hit" : "") + '" data-id="' + r.id + '" title="點一下傳送互動表情">' +
-        '<span class="dw-hn"><span class="dw-seat p' + (r.seat % 6) + '"></span>' +
-          (r.drawer ? "🎨 " : "") + esc(r.name) + (r.me ? ' <b>你</b>' : '') + '</span>' +
-        '<span class="dw-hv">' + (r.pts | 0) + '<em>分</em></span>' +
-      '</div>').join("");
-  }
-  function popScore(seat, delta) {
-    const box = $("dwHud"); if (!box) return;
-    const card = box.children[seat]; if (!card) return;
-    const el = document.createElement("span");
-    el.className = "dw-pop up";
-    el.textContent = (delta > 0 ? "+" : "") + delta;
-    card.appendChild(el);
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1000);
+  function setZoom(on) {
+    document.body.classList.toggle("dw-big", !!on);
+    const b = $("dwZoom");
+    if (b) {
+      b.classList.toggle("on", !!on);
+      b.textContent = on ? "⤡" : "⤢";
+      b.title = on ? "縮小畫板" : "放大畫板";
+      b.setAttribute("aria-label", b.title);
+    }
+    /* ⚠⚠ 一定要重新同步 `⛶`/`⚙️` 的停靠。ui-kit 的 syncTools() 判的是「頂列現在是不是
+       display:none」,而放大模式正是把頂列收掉的那個人 —— 不叫這一支的話:
+         · 開放大 → 頂列不見了,而那兩顆鈕還留在頂列裡面 → **整組消失,按不到設定**
+         · 關放大 → 那兩顆鈕留在房間框裡 → 房間框比原本高一截 → 畫布縮不回原本大小
+       ⚠ 它只在對局中有事做(toolsPanelId 是 showScreen("play") 設的);其餘相位是空動作。 */
+    if (typeof syncTools === "function") syncTools();
+    fit();
   }
 
   return {
     init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush,
-    setCd, stopCd, setRoundInfo,
+    setCd, stopCd, setRoundInfo, setZoom,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
-    setHud, popScore,
     LW, LH, COLORS, WIDTHS,
     // 診斷 / 測試用:目前畫了幾筆、共幾個點
     stats: () => ({ n: strokes.length, pts: strokes.reduce((a, s) => a + s.p.length / 2, 0) })

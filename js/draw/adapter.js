@@ -41,7 +41,9 @@ const MP = MPCore.create((function () {
   let phaseT = null;
   let seenHits = {};                    // 這一回合已經播報過的猜中者(避免重複跳訊息)
   let coolEnd = 0;                      // 我的冷卻到什麼時候(本地)
-  let lastPts = {};                     // 上一次畫 HUD 時的分數(算 +N 飄字用)
+  /* ★ 放大模式(v1.155.0):吃掉猜題列與頂列,全部讓給畫布。存在偏好裡(ownPrefs),
+     下次進來記得住 —— 一場要開關好幾次的東西,每次都要重按太煩。 */
+  let zoom = false;
 
   /* ---------- 小工具 ---------- */
   function seatOf(id) { return gOrder.indexOf(id); }
@@ -281,22 +283,10 @@ const MP = MPCore.create((function () {
   /* ==========================================================================
      四、畫面
      ========================================================================== */
-  function paintHud() {
-    if (ctx.phase() !== "playing" || !dw) { DWB.setHud(null); return; }
-    const me = ctx.me(), d = drawerId();
-    const rows = aliveOrder().map(id => ({
-      id: id, seat: Math.max(0, seatOf(id)), name: ctx.dispName(id),
-      pts: ptsOf(id), me: id === me, drawer: id === d,
-      hit: !!(dw.hits && dw.hits[id])
-    }));
-    DWB.setHud(rows);
-    // +N 飄字:只在分數真的變了的時候(公布答案那一刻)
-    rows.forEach((r, i) => {
-      const before = lastPts[r.id];
-      if (before !== undefined && r.pts > before) DWB.popScore(i, r.pts - before);
-      lastPts[r.id] = r.pts;
-    });
-  }
+  /* 比分畫在**房間框的玩家晶片列**(核心的 renderPlayers)—— v1.155.0 起沒有獨立的比分列。
+     那一排本來就會畫「誰輪到了(turnId → .turn)」「誰幾分(chipTail)」「點一下送表情」,
+     與另外十一個遊戲同一個概念,而且省下 45~50px 直接變成更大的畫布(見 draw.html 那段註解)。 */
+  function paintHud() { ctx.renderPlayers(); }
   function paintBar() {
     if (!dw) { DWB.setRoundInfo("", ""); DWB.setCd(0, 0); return; }
     const R = DWR.normRules(dw.rules);
@@ -404,7 +394,7 @@ const MP = MPCore.create((function () {
     lobbyGame() { return { dw: null }; },
     resetRound() {
       detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0; lastPts = {};
+      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd(); DWB.setEnabled(false);
     },
     /* 開一場。★ 座位表:有上一場就整個輪一位(讓不同的人先當畫家),否則洗牌。
@@ -436,13 +426,13 @@ const MP = MPCore.create((function () {
     applyGame(g, playing) {
       gOrder = (g && g.order) || [];
       dw = (g && g.dw) || null;
-      if (!playing || !dw) { DWB.setEnabled(false); DWB.setHud(null); DWB.setGuess({ show: false }); return; }
+      if (!playing || !dw) { DWB.setEnabled(false); DWB.setGuess({ show: false }); return; }
 
       // 換回合 → 重掛筆劃 / 猜題監聽,並請房主把上一回合的資料收掉
       if (dw.n !== curN) {
         const old = curN;
         curN = dw.n; curPh = "";
-        coolEnd = 0; lastPts = {};
+        coolEnd = 0;
         attachRound(dw);
         sweep(dw.mid, old);
         try { Sound.turn(); } catch (e) {}
@@ -476,9 +466,9 @@ const MP = MPCore.create((function () {
       showScreen("lobby");
       $("mpBar").classList.remove("playing");
       clearPhaseT(); detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0; lastPts = {};
+      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
-      DWB.setEnabled(false); DWB.setHud(null); DWB.setGuess({ show: false });
+      DWB.setEnabled(false); DWB.setGuess({ show: false });
       ruleHint();
     },
     enterPlaying() {
@@ -489,9 +479,9 @@ const MP = MPCore.create((function () {
     },
     onLeave() {
       clearPhaseT(); detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0; lastPts = {};
+      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
-      DWB.setEnabled(false); DWB.setHud(null); DWB.setGuess({ show: false });
+      DWB.setEnabled(false); DWB.setGuess({ show: false });
     },
 
     /* ---------- 大廳設定列 / 房間框徽章 ---------- */
@@ -525,9 +515,15 @@ const MP = MPCore.create((function () {
       if (s < 0) return null;
       return '<span class="dw-seat p' + (s % 6) + '"></span>';
     },
+    /* 晶片尾巴:這一場的得分 + 「這一題猜中了」的勾。
+       ⚠ 勾**只在 draw 相位畫**:公布答案之後全場都知道誰猜中了,那時再掛一排勾
+         只是雜訊;而且下一回合開始時 hits 會被清掉,留著會閃一下舊資料。
+       ⚠ 畫家那一格不畫勾(他不能猜)—— 輪到誰畫由核心的 .turn 高亮講(見 turnId)。 */
     chipTail(id) {
       if (!dw) return "";
-      return '<span class="dw-pts">' + ptsOf(id) + '</span>';
+      const hit = dw.ph === "draw" && dw.hits && dw.hits[id] && id !== drawerId();
+      return (hit ? '<span class="dw-hit" title="已經猜中">✅</span>' : '') +
+             '<span class="dw-pts">' + ptsOf(id) + '</span>';
     },
     lobbyStatusText(ids) {
       return ids.length < ctx.minPlayers
@@ -567,12 +563,18 @@ const MP = MPCore.create((function () {
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs() { return { dwRules: DWR.normRules(rules) }; },
-    usePrefs(o) { if (o && o.dwRules) rules = DWR.normRules(o.dwRules); },
+    ownPrefs() { return { dwRules: DWR.normRules(rules), dwZoom: zoom }; },
+    usePrefs(o) {
+      if (!o) return;
+      if (o.dwRules) rules = DWR.normRules(o.dwRules);
+      if (typeof o.dwZoom === "boolean") { zoom = o.dwZoom; DWB.setZoom(zoom); }
+    },
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
       pick, ink, inkClear, guess,
+      zoom: () => zoom,
+      toggleZoom() { zoom = !zoom; DWB.setZoom(zoom); savePrefs(); },
       rules: () => DWR.normRules(rules),
       setRule(key, val) {
         const next = DWR.normRules(Object.assign({}, rules, { [key]: val }));

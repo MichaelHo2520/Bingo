@@ -7060,8 +7060,11 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .dw-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
   .dw-room-foot .mp-players.oneline .mp-chip{flex:0 0 auto;min-width:0;padding:4px 9px;gap:5px}
-  /* 對戰中收起名單列:比分 HUD 講的是同一件事、還更清楚,這 30px 讓給畫板 */
-  .dw-room.playing .dw-room-foot{display:none}
+  /* ★★ v1.155.0:對戰中**照樣顯示**玩家晶片列 —— 比分、輪到誰畫、點一下傳表情
+     全部就畫在那一排(與另外十一個遊戲同一個概念)。在此之前這裡是 display:none,
+     另外拉一條 .dw-hud 比分列放在畫布上面 —— 那一列 45~50px 純浪費,而且
+     「人員沒放進房間框」與其他遊戲不一致。整條 .dw-hud/.dw-hcard 已經刪掉。 */
+  .dw-hit{font-size:11px;flex:none;line-height:1}
 
   /* 玩家色點(晶片 / HUD / 猜題列共用),沿用數獨已定義的 --sp0~--sp5 */
   .dw-seat{width:11px;height:11px;border-radius:50%;flex:none;display:inline-block}
@@ -7074,42 +7077,24 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-play{flex:1 1 auto;min-height:0;width:min(92vw,520px);
     display:flex;flex-direction:column;align-items:stretch;gap:8px}
 
-  /* ---------- 即時比分 HUD ---------- */
-  .dw-hud{flex:none;width:100%;display:grid;gap:6px;
-    grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
-  .dw-hud.dw-hud-two{grid-template-columns:repeat(3,minmax(0,1fr))}
-  .dw-hud.dw-hud-two .dw-hcard{padding:4px 7px 5px}
-  .dw-hud.dw-hud-two .dw-hn{font-size:11px}
-  .dw-hud.dw-hud-two .dw-hv{font-size:16px}
-  .dw-hcard{position:relative;overflow:hidden;cursor:pointer;
-    background:var(--panel);border:1px solid var(--panel-line);border-radius:12px;
-    padding:5px 8px 6px;display:flex;flex-direction:column;gap:2px;min-width:0}
-  .dw-hcard:active{transform:scale(.97)}
-  .dw-hcard.me{border-color:var(--accent)}
-  /* 這一回合的畫家:整張卡標起來(晶片列在對戰中是收起來的,只剩這裡看得到誰在畫) */
-  .dw-hcard.drawer{border-color:var(--accent-2);box-shadow:0 0 0 1px var(--accent-2)}
-  /* 已經猜中的人:淡淡的綠底(不用打勾符號,那一格太窄) */
-  .dw-hcard.hit{background:linear-gradient(180deg,rgba(95,224,138,.20),var(--panel))}
-  .dw-hn{display:flex;align-items:center;gap:5px;font-weight:800;font-size:11.5px;
-    color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .dw-hn b{color:var(--accent);font-size:10px}
-  .dw-hv{font-family:'Fredoka',sans-serif;font-weight:700;font-size:19px;line-height:1;color:var(--text)}
-  .dw-hv em{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
-  .dw-pop{position:absolute;right:7px;top:6px;pointer-events:none;color:#5fe08a;
-    font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;line-height:1;
-    animation:dwPop 1s ease-out forwards}
-  @keyframes dwPop{
-    0%{opacity:0;transform:translateY(6px)}
-    20%{opacity:1;transform:translateY(0)}
-    100%{opacity:0;transform:translateY(-12px)}
-  }
-
   /* ---------- 回合資訊列 + 倒數環 ---------- */
   .dw-bar{flex:none;display:flex;align-items:center;gap:8px;min-height:28px}
   .dw-round{font-weight:800;font-size:12.5px;color:var(--muted);flex:none}
   .dw-role{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-weight:800;font-size:12.5px;color:var(--text)}
   .dw-role.mine{color:var(--accent-2)}
+  /* 放大鈕:與倒數環同高的小圓鈕,擺在環左邊。
+     ⚠⚠ class 叫 .dw-zoom**btn**,而放大狀態掛在 body 上的是 .dw-big —— 兩個名字**一定要不一樣**。
+       第一版兩邊都叫 dw-zoom,於是 `body.dw-zoom` 直接吃到這條規則的
+       `display:grid;width:30px;height:30px` → **整個 body 變成 30px 高的格線容器**,
+       畫布縮成最小值、下面空一大片。那正是 CLAUDE.md 紅線 6 的第一類撞名,
+       而且是最難想到的一種:**自己撞自己**(前綴一樣、掃描也掃得到,只是沒想到要掃)。 */
+  .dw-zoombtn{flex:none;width:30px;height:30px;border-radius:10px;display:grid;place-items:center;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    font-size:15px;line-height:1;cursor:pointer;transition:.15s}
+  .dw-zoombtn:hover{background:rgba(255,255,255,.16)}
+  .dw-zoombtn:active{transform:scale(.9)}
+  .dw-zoombtn.on{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
   /* 倒數環:conic-gradient 掃一圈(--dw-p 由 js/draw/board.js 每 200ms 設一次)。
      ⚠ 刻意不用 CSS 動畫 —— 錨點是「相位開始時間 + 這一段多長」,
        手機切 App 回來時動畫會走鐘,用時間差重算才不會。 */
@@ -7178,12 +7163,13 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   /* ---------- 猜題訊息列 ----------
      ⚠ 高度固定成三行左右並自己捲:讓它跟著內容長高的話,每有人猜一次
        畫板就被往上推一次(而畫布一改尺寸就要整張重畫 → 整個畫面在抖)。 */
-  /* ★ 高度會長:畫布是**固定 4:3**,直向手機上它是被寬度夾住的 → 上下一定會空一塊,
-     那塊空白給猜題列比留白有用(看得到更多亂猜的笑點)。
-     ⚠ 但**一定要有 max-height** —— 沒有上限的話,在寬視窗上它會把畫布壓小,
-       而畫布是這個遊戲的主角(實測 560px 寬時畫布從 430 掉到 324)。
-     ⚠ 也一定要有 min-height:內容少的時候不可以縮成一條線(它同時是「這裡會有訊息」的暗示)。 */
-  .dw-say{flex:1 1 74px;min-height:74px;max-height:140px;overflow-y:auto;overscroll-behavior:contain;
+  /* ★★ v1.155.0 改回**固定高度**(在此之前是 flex:1 1 74px + max-height:140px)。
+     當初讓它長大的理由是「畫布在直向手機上是被寬度夾住的,上下反正會空一塊」——
+     **那個前提是錯的**:tools/gen-draw-shot.js 的診斷實測四種視窗全部回報「限於高」,
+     也就是說猜題列每長高 1px,畫布就少 1px 高、少 1.33px 寬。
+     實測它會一路長到 140px 上限 → 畫布白白少了 66px 高。
+     ⚠ 要改回可伸縮之前,先跑一次那支診斷確認「限於寬」才成立。 */
+  .dw-say{flex:none;height:74px;overflow-y:auto;overscroll-behavior:contain;
     display:flex;flex-direction:column;gap:3px;padding:6px 9px;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:12px}
   .dw-say-row{display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.35}
@@ -7229,14 +7215,29 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   /* ---------- 窄畫面 ---------- */
   @media (max-height:700px){
     .dw-play{gap:6px}
-    .dw-say{flex:1 1 58px;min-height:58px;padding:5px 8px}
-    .dw-hcard{padding:4px 7px 5px}
-    .dw-hv{font-size:16px}
+    .dw-say{height:58px;padding:5px 8px}
     .dw-guess{font-size:15px;padding:8px 11px}
     .dw-send{padding:8px 15px}
     .dw-word{font-size:17px}
     .dw-cd{width:30px;height:30px;font-size:13px}
   }
+  /* ==========================================================================
+     放大模式(body.dw-big,v1.155.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「目前的畫板太小了…可以有一個放大的按鈕,按下去可以吃掉下面回答的
+       一些空間。」→ 收掉頂列 + 把猜題列壓成一行,其餘不動。
+     ★★ 為什麼只吃這兩塊就有感:這一頁的畫布**永遠是被高度夾住的**,不是寬度
+       (tools/gen-draw-shot.js 的診斷會回報「限於高 / 限於寬」,四種視窗實測全部
+        是「限於高」)—— 省下來的每一個垂直像素都直接變成更大的畫布,而且因為
+        是 4:3,高度多 100px 等於寬度多 133px。
+     ⚠ **刻意不收玩家晶片列** —— 那正是使用者要求「放進房間框」的東西,
+       放大模式把它收掉等於一手給一手拿走。
+     ⚠ 猜題列壓成一行而不是整個藏掉:看得到最新一則(誰猜錯了什麼)是這個遊戲的
+       笑點來源,全部收掉會讓放大模式變成「看不到別人在幹嘛」。 */
+  body.dw-big .topbar{display:none}
+  body.dw-big .dw-say{height:30px;padding:4px 9px}
+  body.dw-big .dw-play{gap:6px}
+
   /* ---------- 手機沒進全螢幕時,玩的時候收掉頂列(比照數獨 / 五子棋 / 成語接龍) ---------- */
   @media (max-height:780px) and (pointer:coarse){
     body:has(#dwPlay:not(.hidden)) .topbar{display:none}
