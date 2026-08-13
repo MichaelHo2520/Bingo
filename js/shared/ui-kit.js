@@ -232,6 +232,61 @@ function dismissTopLayer(){
   }
   return false;
 }
+/* ---------- 遊戲頁的返回鍵:一次退一層(v1.153.1) ----------
+   使用者:「我只是要在主頁面才這樣(按返回就退出),如果在遊戲裡面,返回應該還是往上一層跳。」
+   十頁的畫面層級長得一樣,由外而內:
+     進場選單第一層 →(第二層設定 / 單機對局 / 連線大廳)→ 房裡
+   返回鍵一律退一層,**退到第一層才把守衛撤掉** —— 那時再按返回才是回首頁(見 bindHomeLinks),
+   首頁再按一次才退出 app。三段接線各頁一行:
+     · `bindPageBack({sub:"<進場選單第二層的 id>"[, soloBack:fn]})` 在 main.js 尾端呼叫一次
+     · 自己的 showScreen() 與 showHomeLayer() 尾端各補一行 syncPageBack()
+   ⚠ 在房裡(`body.mp-on`)一律不碰:那一段的守衛歸 mp-core 管(誤按返回要跳離開確認卡,
+     而且 bgAct 只有一個 —— 搶著設會把離開確認換成「退一層」,等於一按就斷線)。
+   ⚠ 單機對局中預設走 `Solo.quit()`(= 各頁單機返回鈕的行為);台灣麻將要先跳確認卡,
+     所以它傳自己的 soloBack。 */
+let pbSub="", pbSoloBack=null;
+function bindPageBack(cfg){
+  pbSub=(cfg&&cfg.sub)||"";
+  pbSoloBack=(cfg&&cfg.soloBack)||null;
+  syncPageBack();
+}
+function pageLayer(){
+  if(document.body.classList.contains("mp-on")) return "room";        // 房裡:守衛歸 mp-core
+  if(document.body.classList.contains("solo-on")) return "solo";      // 單機對局中
+  const conn=$("mpConnect");
+  if(conn && !conn.classList.contains("hidden")) return "connect";    // 連線大廳(還沒進房)
+  const sub=pbSub?$(pbSub):null;
+  if(sub && !sub.classList.contains("hidden")) return "sub";          // 進場選單第二層
+  return "top";                                                       // 進場選單第一層
+}
+function pageBackKey(){
+  if(dismissTopLayer())return;                                        // 有浮層一律先關浮層
+  const at=pageLayer();
+  if(at==="solo"){
+    if(pbSoloBack) pbSoloBack();
+    else if(typeof Solo!=="undefined" && Solo.quit) Solo.quit();
+    return;
+  }
+  if(at==="connect"){ showScreen("home"); return; }
+  if(at==="sub"){ showHomeLayer("pick"); return; }
+  syncPageBack();   // 已經在第一層(守衛照理早就撤了)—— 保險起見重算一次
+}
+/* ⚠⚠ 一定要**整批結算**(排到下一拍),不可以每次呼叫就當場算。
+   退出單機那條路是兩步的:`Solo.quit()` 先 `showScreen("home")`(→ 第一層)再
+   `showHomeLayer("solo")`(退回第二層讓人換設定)。當場算的話會在中間那個瞬間看到「第一層」→
+   `disarmBackGuard()`,而它會 `history.back()`;那一發 back 是非同步的,等它生效時
+   後半步的 `armBackGuard()` 已經又 pushState 一筆 —— **back 退掉的是剛墊的新那筆**,
+   守衛的舊那筆留了下來:症狀是「從單機退回第二層之後,再按返回直接跳掉整頁」。 */
+let pbTimer=0;
+function syncPageBack(){
+  if(pbTimer)return;
+  pbTimer=setTimeout(()=>{ pbTimer=0; applyPageBack(); },0);
+}
+function applyPageBack(){
+  const at=pageLayer();
+  if(at==="room")return;                       // 房裡不碰(mp-core 的守衛正武裝著)
+  if(at==="top") disarmBackGuard(); else armBackGuard(pageBackKey);
+}
 /* ---------- 回主選單不疊歷史(v1.153.0) ----------
    要解決的事:首頁 → 遊戲 → 回主選單 → 再進下一個遊戲,每來回一趟就在歷史裡多疊兩筆,於是
    **在首頁按返回不是離開,而是倒帶回上一個玩過的遊戲**(使用者:「在主頁面按返回應該直接退出」)。

@@ -38,6 +38,7 @@ function showScreen(which){
   else if(which === "solo") dockTools("dcSoloBar");
   else undockTools();
   if(which === "home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始
+  syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
   /* ★ 棋子樣式跟著相位重套一次(v1.152.0)—— 連線時看房間那一份、單機/選單看自己的偏好。
      ⚠ 掛在這裡是因為**離開房間有好幾條路**(自己離開 / 被踢 / 房主關房 / 直接回選單),
        每一條都要「從房主那一套回到我自己的那一套」。掛在 showScreen 上一次涵蓋全部,
@@ -52,6 +53,7 @@ function showHomeLayer(which){
   if(pick) pick.classList.toggle("hidden", which !== "pick");
   if(solo) solo.classList.toggle("hidden", which !== "solo");
   if(head) head.classList.toggle("hidden", which !== "pick");
+  syncPageBack();   // 同上:第二層按返回要退回第一層,不是離開這一頁
 }
 /* 第二層的說明:難度文案直接讀 Solo 的難度表,不另外硬編一份。
    ★ 文案規格與進場說明一致:標籤在前、一行一件事,不寫成對話。
@@ -345,6 +347,7 @@ $("resignVeil").addEventListener("click", e => { if(e.target === $("resignVeil")
 
 /* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */
 bindCommonUI();
+bindPageBack({sub:"dcPickSolo"});
 bindAudioLifecycle();
 registerSW();
 paintVersion();

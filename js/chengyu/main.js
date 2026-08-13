@@ -26,6 +26,7 @@ function showScreen(which) {
   else if (which === "solo") dockTools("cySoloBar");
   else undockTools();
   if (which === "home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始
+  syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
 }
 
 /* ---------- 進場選單的兩層 ---------- */
@@ -34,6 +35,7 @@ function showHomeLayer(which) {
   if (pick) pick.classList.toggle("hidden", which !== "pick");
   if (lvl)  lvl.classList.toggle("hidden", which !== "level");
   if (head) head.classList.toggle("hidden", which !== "pick");
+  syncPageBack();   // 同上:第二層按返回要退回第一層,不是離開這一頁
 }
 // 第二層的難度說明:直接讀 CYGen 的難度表,不另外硬編一份文案
 function paintLevelHint() {
@@ -125,6 +127,7 @@ $("cyReactRow").addEventListener("click", e => {
 
 /* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */
 bindCommonUI();
+bindPageBack({sub:"cyPickLevel"});
 bindAudioLifecycle();
 registerSW();
 paintVersion();

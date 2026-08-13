@@ -38,6 +38,7 @@ function showScreen(which){
   else if(which==="solo") dockTools("m16SoloBar");
   else undockTools();
   if(which==="home") showHomeLayer("pick");    // 回主選單一律從「選玩法」開始
+  syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
 }
 
 /* ---------- 進場選單的兩層 ----------
@@ -47,6 +48,7 @@ function showHomeLayer(which){
   if(pick) pick.classList.toggle("hidden", which!=="pick");
   if(solo) solo.classList.toggle("hidden", which!=="solo");
   if(head) head.classList.toggle("hidden", which!=="pick");
+  syncPageBack();   // 同上:第二層按返回要退回第一層,不是離開這一頁
 }
 /* 第二層的說明:難度文案直接讀 MJ16AI 的難度表,不另外硬編一份 */
 function paintSoloHint(){
@@ -248,6 +250,7 @@ $("m16ReactRow").addEventListener("click",e=>{
 
 /* ---------- 共用綁定 ---------- */
 bindCommonUI();
+bindPageBack({sub:"m16PickSolo", soloBack:()=>askSoloQuit()});  // 單機對局中先跳確認卡(這一頁的返回鈕就是這個行為)
 bindAudioLifecycle();
 registerSW();
 paintVersion();

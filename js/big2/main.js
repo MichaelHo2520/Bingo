@@ -39,6 +39,7 @@ function showScreen(which){
   else if(which==="solo") dockTools("b2SoloBar");
   else undockTools();
   if(which==="home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始
+  syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
 }
 
 /* ---------- 進場選單的兩層 ----------
@@ -49,6 +50,7 @@ function showHomeLayer(which){
   if(pick) pick.classList.toggle("hidden", which!=="pick");
   if(solo) solo.classList.toggle("hidden", which!=="solo");
   if(head) head.classList.toggle("hidden", which!=="pick");
+  syncPageBack();   // 同上:第二層按返回要退回第一層,不是離開這一頁
 }
 /* 第二層的說明:難度文案直接讀 B2AI 的難度表,不另外硬編一份 */
 function paintSoloHint(){
@@ -245,6 +247,7 @@ $("b2ReactRow").addEventListener("click",e=>{
 
 /* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */
 bindCommonUI();
+bindPageBack({sub:"b2PickSolo"});
 bindAudioLifecycle();
 registerSW();
 paintVersion();
