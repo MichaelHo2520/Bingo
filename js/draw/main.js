@@ -23,7 +23,13 @@ function showScreen(which) {
   if (which === "home") {
     ["mpConnect", "mpBar", "primaryBar", "scrollArea"].forEach(id => { const el = $(id); if (el) el.classList.add("hidden"); });
   }
-  if (which === "play") dockTools("mpBar"); else undockTools();
+  /* ⚠⚠ 這一頁**刻意不 dockTools()**(v1.155.2)—— 另外五頁在收掉頂列時會把 `⛶`/`⚙️`
+     搬進房間框,這一頁不要:房間框那一列已經有返回鍵 + 房名 + 規則 + 🎤 + 😀,
+     再塞兩顆進去會直接壓在 😀 上面(共用的 .tools-docked 是 absolute 貼右緣,
+     壓過去也不會把別人擠開)。使用者:「我不要把他們放進房間框,這樣 emoji 會很難按」。
+     → 於是頂列被收掉時那兩顆鈕就跟著不見,而那正是要的:收頂列只發生在**放大模式**,
+       放大就是「只想看畫布」;要按設定就再按一次縮小。 */
+  undockTools();
   if (which === "play") DWB.fit();
   syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
 }

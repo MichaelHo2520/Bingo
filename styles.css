@@ -7074,9 +7074,8 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-pts{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--accent);flex:none}
 
   /* ---------- 對局整體版面 ----------
-     ★★ 上限從 .panel 的 520 放寬到 760(v1.155.1)。畫布鎖 4:3 → 寬度上限 520
-       等於**高度上限 390**,於是任何比 520 寬的視窗都被這條夾住(診斷回報「限於寬」),
-       放大鈕再怎麼收垂直空間都長不大。手機上 92vw 先觸頂 → **一個 px 都沒動**。
+     ★★ 上限從 .panel 的 520 放寬到 760(v1.155.1)—— 桌機上那 240px 直接是畫布。
+       手機上 92vw 先觸頂,所以這一條**對手機一個 px 都沒動**。
      ⚠ 三塊要用**同一個數字**(紅線 7:同一條邊界上有三塊)——
        房間框、這一欄、頂列。守門是 tools\run-e2e.ps1 t-topbar-fit。
      ⚠⚠ 只在**對局中**放寬(照台灣麻將 body.m16-mp 那條的作法):進場頁與**大廳**
@@ -7122,15 +7121,23 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-cd.hot{color:#fff;background:conic-gradient(var(--daub) var(--dw-p,100%),rgba(0,0,0,.22) 0)}
 
   /* ---------- 畫板 ----------
-     .dw-stage 吃掉剩餘高度,畫布本身的寬高由 js/draw/board.js 的 fit() 算成整數 px
-     (固定 4:3,見那支的檔頭 ①)。 */
+     .dw-stage 吃掉剩餘高度,畫布本身的寬高由 js/draw/board.js 的 fit() 算成整數 px。
+     ★★ v1.155.2 起畫布**把舞台吃滿、不鎖長寬比**(只留 INK_PAD 4px 讓那圈 3px 外框
+       不被 overflow:hidden 削掉)—— 所以這裡**不可以**加 aspect-ratio 之類的東西,
+       兩邊各算各的會打架。為什麼拿掉鎖:見 js/draw/board.js 的檔頭 ①。 */
   .dw-stage{flex:1 1 0;min-height:120px;width:100%;position:relative;
     display:flex;align-items:center;justify-content:center;overflow:hidden}
   /* ⚠⚠ touch-action:none 是**非做不可**的:沒有它,手指一動就變成捲整頁,
      根本畫不出東西(而滑鼠測起來完全正常 → 只有真的用手機才會發現)。 */
   /* ★ 畫布與蓋板的共同外框:寬高由 js/draw/board.js 的 fit() 設成與畫布逐像素相同。
-     ⚠ 蓋板一定要掛在它上面,不可以掛在 .dw-stage 上(見 draw.html 那段註解)。 */
-  .dw-wrap{position:relative;flex:none;line-height:0}
+     ⚠ 蓋板一定要掛在它上面,不可以掛在 .dw-stage 上(見 draw.html 那段註解)。
+     ⚠⚠⚠ **不可以在這裡寫 line-height:0**(v1.155.2 拿掉的)——
+       蓋板 `.dw-over` 是它的孩子,line-height 會被繼承下去 → 蓋板裡的兩行字
+       (「阿華 正在選題目」+「選好就開始畫…」)行高變成 0,**整個疊在一起**。
+       使用者:「這裡也請你修一下,字都疊在一起了」。
+       ⚠ 那條原本是為了消掉 inline 元素底下的基線空隙,但 `.dw-ink` 本來就是
+         `display:block` → 那個空隙根本不存在,這條從頭到尾都是多餘的。 */
+  .dw-wrap{position:relative;flex:none}
   .dw-ink{display:block;border-radius:14px;background:var(--dw-paper);
     box-shadow:0 0 0 3px var(--dw-edge),0 10px 30px rgba(0,0,0,.22);
     touch-action:none;-webkit-user-select:none;user-select:none}
@@ -7180,14 +7187,14 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   /* ---------- 猜題訊息列 ----------
      ⚠ 高度固定成三行左右並自己捲:讓它跟著內容長高的話,每有人猜一次
        畫板就被往上推一次(而畫布一改尺寸就要整張重畫 → 整個畫面在抖)。 */
-  /* ★★★ 高度由 js/draw/board.js 的 fit() 逐次決定,這裡只是「限於高」時的底線值。
-     這一格前後翻過三次,三次都是同一個誤會:**先假設畫布被哪一邊夾住**。
-       v1.154.0 flex:1 1 74px + max-height:140px —— 假設限於寬(錯,矮胖視窗是限於高)
-       v1.155.0 flex:none;height:74px          —— 假設限於高(錯,直向手機是限於寬)
-       v1.155.1 兩種都會遇到 → **不要假設,量了再決定**:
-                fit() 算完畫布之後如果舞台還有空(= 限於寬),才把那塊空白
-                用 inline 的 flex:1 0 auto 讓給這一列;限於高時它一個 px 都不會長。
-     ⚠ 所以改這裡的 height 只會改到「限於高」那一半;另一半在 fit() 裡。 */
+  /* ★★★ 固定高度,**不可以讓它伸縮**(v1.155.2 定案)。這一格前後翻過四次:
+       v1.154.0 flex:1 1 74px + max-height:140px  → 它一路長到上限,把畫布壓小 66px
+       v1.155.0 flex:none;height:74px             → 回固定
+       v1.155.1 限於寬時把舞台的空白讓給它(長到 239)→ **使用者當場打槍**:
+                「最下面的顯示猜題答案那個板面很大,麻煩你處理一下」
+       v1.155.2 畫布改成吃滿舞台(不鎖 4:3)→ 舞台根本不會剩空白,這一列就回到固定 74。
+     ★ 一句話結論:**這一頁多出來的空間永遠是畫布的**,不是猜題列的。
+       猜題列自己會捲(74px 約三行,最新一則貼在底部),要看更多是捲,不是長高。 */
   .dw-say{flex:none;height:74px;overflow-y:auto;overscroll-behavior:contain;
     display:flex;flex-direction:column;gap:3px;padding:6px 9px;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:12px}
@@ -7250,11 +7257,10 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
      ──────────────────────────────────────────────────────────────────────────
        使用者:「目前的畫板太小了…可以有一個放大的按鈕,按下去可以吃掉下面回答的
        一些空間。」→ 收掉頂列 + 把猜題列壓成一行,其餘不動。
-     ★★ 為什麼吃這兩塊有感:**限於高**的視窗上(桌機 / 平板 / 橫置),省下來的每一個
-       垂直像素都直接變成更大的畫布,而且因為是 4:3,高度多 100px 等於寬度多 133px。
-     ⚠⚠ v1.155.0 這裡寫「畫布**永遠**被高度夾住」——**那是錯的**,是拿四個矮胖視窗
-       量出來的。直向手機(360×803)實測限於寬,那時這一整段按下去畫布一個 px 都不動
-       → 所以 fit() 會把放大鈕整顆藏起來,使用者根本按不到這個模式(見 board.js fit() ②)。
+     ★★ v1.155.2 起畫布吃滿舞台、不鎖長寬比 → 省下來的每一個垂直像素都直接變成
+       更高的畫布,**在任何視窗上都有用**,所以那顆鈕一律顯示。
+     ⚠⚠ v1.155.1 曾經「限於寬時把放大鈕整顆藏起來」(那時 4:3 的鎖讓它在直向手機上
+       按了不會有事)—— 鎖拿掉之後那個前提就不成立了,**不要再加回來**。
      ⚠ **刻意不收玩家晶片列** —— 那正是使用者要求「放進房間框」的東西,
        放大模式把它收掉等於一手給一手拿走。
      ⚠ 猜題列壓成一行而不是整個藏掉:看得到最新一則(誰猜錯了什麼)是這個遊戲的
@@ -7263,7 +7269,10 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   body.dw-big .dw-say{height:30px;padding:4px 9px}
   body.dw-big .dw-play{gap:6px}
 
-  /* ---------- 手機沒進全螢幕時,玩的時候收掉頂列(比照數獨 / 五子棋 / 成語接龍) ---------- */
-  @media (max-height:780px) and (pointer:coarse){
-    body:has(#dwPlay:not(.hidden)) .topbar{display:none}
-  }
+  /* ---------- ⚠⚠ 這一頁**不做**「手機對局中自動收頂列」 ----------
+     另外五頁有一條 `(max-height:780px) and (pointer:coarse)` 的自動收頂列,這一頁
+     v1.155.2 整條拿掉,理由是它與「不停靠」湊在一起會變成**設定鈕永遠按不到**:
+       · 這一頁刻意不 dockTools()(見 js/draw/main.js 的 showScreen)→ 頂列收掉 = 那兩顆鈕消失
+       · 自動收頂列是「進對局就收」→ 那就整場都按不到 ⚙️
+     所以改成:收頂列**只發生在放大模式**(body.dw-big,使用者自己按的),
+     要按設定就再按一次縮小。⚠ 想省那 42px 的話請走放大鈕,不要把這條加回來。 */

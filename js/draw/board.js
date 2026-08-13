@@ -6,10 +6,19 @@
 
    ★★★ 四件「不知道就會做錯」的事(完整版在 notes/21 的〇節):
 
-   ① **邏輯座標是固定的 1000×750,不是各自的畫布大小。**
-      每台裝置的畫布尺寸都不一樣,如果照自己的畫布正規化,同一張圖在別人螢幕上
-      會被拉扁或壓長(而且**畫的人自己永遠看不出來**)。固定長寬比 → 大家看到同一張畫。
-      畫布本體也一律照 4:3 夾住,寧可上下留白也不要變形。
+   ① **座標一律正規化成 0~999 / 0~749 送出,畫布本身則是「有多少吃多少」(v1.155.2)。**
+      也就是說:**每個人看到的畫按各自的畫布比例拉伸**,不是同一個形狀。
+      ⚠⚠ 這是 v1.155.2 **刻意反轉**的決定,不是漏做 —— v1.154.0~v1.155.1 是把畫布
+        鎖成 4:3(寧可留白也不變形),而使用者實測後說:
+        「畫板一定要大一點,別人那邊的顯示可以依狀況進行大小的比例來縮放。」
+        直向手機上那個鎖的代價是**畫布只有可用高度的 58%**(331×248,而舞台有 429)。
+      ★ 取捨講白:直向手機之間長寬比很接近(0.7~0.8),差異看不太出來;
+        真正會歪的是「手機畫的圖在桌機橫向視窗上看」。受眾是親友聚會、全部是手機
+        → 換到大一倍的畫布划算得多。
+      ★ 線上格式**一個字都不必改**:送出端本來就是拿自己的 rect 正規化
+        (`(e.clientX-r.left)/r.width*LW`),接收端本來就是 `x*boxW/LW` ——
+        拿掉 4:3 之後這兩行的語意自然從「固定邏輯空間」變成「各自比例縮放」。
+        新舊版本同房也不會壞(只是看到的形狀不一樣)。
 
    ② **紙一律是淺色的,不吃主題變數。**
       墨水是深色的;紙如果跟著 midnight / arcade 變深,深墨水就整個看不見了 ——
@@ -52,11 +61,9 @@ const DWB = (function () {
   let pend = [], pendSid = -1, flushT = null;
   let nextSid = 1;
   let curC = DEF_C, curW = DEF_W;
-  let zoomable = false;                  // 現在這個視窗「放大鈕按下去畫布真的會變大」嗎(見 fit())
-
-  /* ---------- 舞台的高度重分配(v1.155.1,見 fit() ①) ---------- */
-  const STAGE_PAD = 16;                  // 舞台比畫布高出來這麼多:紙的外框 + 陰影(.dw-stage 是 overflow:hidden,不留就被削掉)
-  const SLACK_MIN = 40;                  // 空白少於這麼多就不重分配(為了 10px 讓整個版面跳一下不划算)
+  /* 畫布四周留這麼多(v1.155.2):`.dw-stage` 是 overflow:hidden,而紙有一圈 3px 的外框
+     (`.dw-ink` 的第一段 box-shadow)—— 貼死就會被削掉,看起來像沒有邊。 */
+  const INK_PAD = 4;
 
   /* ---------- 初始化 ---------- */
   function init(o) {
@@ -79,40 +86,18 @@ const DWB = (function () {
          不會把另一邊帶著縮,畫面比例會被壓歪(成語接龍 v1.135.0 踩過)。
        ⚠ dpr 夾在 2:手機常見 3,那是 2.25 倍的像素量,而畫的是純線條,看不出差別。
 
-       ★★ ①「被寬度夾住時,舞台上下那塊空白全部讓給猜題列」(v1.155.1)
-          畫布鎖 4:3,而手機是直的:360×803 實測畫布 331×248、舞台 429 ——
-          **中間白白空掉 181px**(使用者:「上下的畫面能夠加到滿一點嗎?」)。
-          那塊空白**沒有任何辦法變成更大的畫布**(寬度已經吃滿 92vw),所以讓給猜題列。
-       ⚠ 一定要「先還原上一次的分配再量」:不還原就是量到自己上次縮好的高度,
-         每量一次再縮一點 → 單向卡死,而且視窗變大時永遠回不來。
-         下一行的 getBoundingClientRect() 會強制回流,所以量到的一定是還原後的值。
-
-       ★★ ②「放大鈕只在它真的能放大的時候出現」(v1.155.1)
-          判準就是這裡的 availW*3/4 > availH(俗稱「限於高」)—— 只有這時候
-          收掉頂列 / 壓扁猜題列省下來的垂直像素才會變成更大的畫布。
-          直向手機一律是「限於寬」,那時候那顆鈕**按了什麼都不會發生**,
-          留著只是佔位置(使用者:「你倒數旁邊的縮放,好難看啊」)。
-       ⚠ 已經在放大模式時**一定要繼續顯示**,否則使用者縮不回去(availH 那時已含
-         省下來的空間,判準會翻面 → 不特判就會自己把自己藏掉)。
+       ★★★ **畫布把舞台吃滿,不鎖長寬比**(v1.155.2,見檔頭 ①)。
+          在此之前是鎖 4:3,代價在直向手機上很嚇人:實測舞台 429 高,而畫布只有 248 ——
+          **58%**,剩下的 181px 是純空白(v1.155.1 那一版把它讓給猜題列,於是變成
+          「畫板一樣小、下面多一塊很大的猜題板」,使用者兩件都不滿意)。
+       ⚠ 只留 INK_PAD 的邊,其餘全吃 —— 這裡**不可以**再出現任何長寬比運算。
      ========================================================================== */
   function fit() {
     const stage = $("dwStage");
     if (!cv || !stage) return;
-    const say = $("dwSay");
-    stage.style.flex = ""; stage.style.height = "";     // ← 先還原(見上面 ①)
-    if (say) say.style.flex = "";
     const r = stage.getBoundingClientRect();
-    const availW = Math.max(80, Math.floor(r.width));
-    const availH = Math.max(60, Math.floor(r.height));
-    let w = availW, h = Math.round(w * LH / LW);
-    if (h > availH) { h = availH; w = Math.round(h * LW / LH); }
-    const slack = availH - h;
-    if (say && slack >= SLACK_MIN) {
-      stage.style.flex = "0 0 auto";
-      stage.style.height = (h + STAGE_PAD) + "px";
-      say.style.flex = "1 0 auto";                     // ⚠ 不可縮(1 1 auto 會在鍵盤彈出時被壓破)
-    }
-    syncZoomBtn(availW * LH / LW - availH);
+    const w = Math.max(80, Math.floor(r.width)  - INK_PAD * 2);
+    const h = Math.max(60, Math.floor(r.height) - INK_PAD * 2);
     if (w === boxW && h === boxH && cv.width) return;   // 沒變就別重畫(重畫會閃)
     boxW = w; boxH = h;
     dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -121,19 +106,10 @@ const DWB = (function () {
     cv.width = Math.round(w * dpr);
     cv.height = Math.round(h * dpr);
     /* ★ 外框跟著同尺寸 —— 蓋板(選題 / 公布答案)是 inset:0 掛在它上面的。
-       少了這兩行,蓋板會跟著 .dw-stage 的高度把畫布上下的空白一起蓋黑(見 draw.html 那段註解)。 */
+       少了這兩行,蓋板會跟著 .dw-stage 的尺寸把畫布外面那一圈也蓋黑(見 draw.html 那段註解)。 */
     const wrap = $("dwWrap");
     if (wrap) { wrap.style.width = w + "px"; wrap.style.height = h + "px"; }
     repaint();
-  }
-  /* 見 fit() ②。gap = 「純照寬度算出來的高度」減「實際能用的高度」,>0 就是限於高。
-     ⚠ 用 .hidden 藏(它是 display:none!important)—— 直接寫 style.display 會被
-       .dw-zoombtn 的 display:grid 蓋回去,而那正是看得到卻不知道為什麼的那種錯。 */
-  function syncZoomBtn(gap) {
-    const b = $("dwZoom");
-    zoomable = gap >= 12;
-    if (!b) return;
-    b.classList.toggle("hidden", !(zoomable || document.body.classList.contains("dw-big")));
   }
 
   function sx(x) { return x * boxW / LW * dpr; }
@@ -488,11 +464,10 @@ const DWB = (function () {
      ──────────────────────────────────────────────────────────────────────────
        使用者:「目前的畫板太小了…可以有一個放大的按鈕,按下去可以吃掉下面回答的
        一些空間。」→ 一顆 class 開關,收掉猜題列的大部分與頂列,全部讓給畫布。
-       ★★ 它**只在「限於高」的視窗上有用**(桌機、平板、橫置):省下來的每一個垂直
-         像素都會變成更大的畫布,而且因為是 4:3,高度多 100px 等於寬度多 133px。
-       ⚠⚠ v1.155.0 的檔頭寫「畫布**永遠**是被高度夾住的」——**那是錯的**,
-         它是拿四個矮胖視窗量出來的。直向手機(360×803)實測是**限於寬**,
-         那時這顆鈕按下去畫布一個 px 都不會變 → 所以 fit() 會把它整顆藏起來(見 fit() ②)。
+       ★★ v1.155.2 起畫布**不鎖長寬比、把舞台吃滿**(見檔頭 ①)→ 省下來的每一個
+         垂直像素都直接變成更高的畫布,**在任何視窗上都有用**,所以這顆鈕一律顯示。
+       ⚠⚠ v1.155.1 曾經「限於寬時把它整顆藏起來」(那時 4:3 的鎖讓它在直向手機上
+         按了不會有事)—— 鎖拿掉之後那個條件就不成立了,**不要再加回來**。
        ⚠ 真正的樣式在 styles.css 的 `body.dw-big` 那一段;這裡只負責
          **切 class 之後把畫布重新量一次**(`fit()` 讀的是即時的 getBoundingClientRect)。
        ⚠ 比分不在這裡收 —— 它現在住在房間框的玩家晶片列(見 draw.html 那段註解),
@@ -509,11 +484,13 @@ const DWB = (function () {
       b.title = on ? "縮小畫板" : "放大畫板";
       b.setAttribute("aria-label", b.title);
     }
-    /* ⚠⚠ 一定要重新同步 `⛶`/`⚙️` 的停靠。ui-kit 的 syncTools() 判的是「頂列現在是不是
-       display:none」,而放大模式正是把頂列收掉的那個人 —— 不叫這一支的話:
-         · 開放大 → 頂列不見了,而那兩顆鈕還留在頂列裡面 → **整組消失,按不到設定**
-         · 關放大 → 那兩顆鈕留在房間框裡 → 房間框比原本高一截 → 畫布縮不回原本大小
-       ⚠ 它只在對局中有事做(toolsPanelId 是 showScreen("play") 設的);其餘相位是空動作。 */
+    /* ⚠⚠ v1.155.2 起這一頁**刻意讓 `⛶`/`⚙️` 跟著頂列一起消失** ——
+       showScreen("play") 呼叫的是 undockTools(),不是 dockTools("mpBar")。
+       使用者:「如果放大畫板後,可以把全螢幕跟設定的按鈕給先隱藏,我不要把他們放進
+       房間框,這樣 emoji 會很難按」(房間框那一列塞不下第五、六顆鈕,共用的
+       .tools-docked 是 absolute 貼右緣 → 會直接壓在 😀 上面)。
+       ⚠ 這一行留著是為了「縮小回來時把它們放回頂列」的那一半(toolsPanelId 是 null,
+         syncTools() 會確保它們待在 toolsHome);拿掉不會壞,但留著語意完整。 */
     if (typeof syncTools === "function") syncTools();
     fit();
   }
@@ -524,7 +501,7 @@ const DWB = (function () {
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
     LW, LH, COLORS, WIDTHS,
-    // 診斷 / 測試用:目前畫了幾筆、共幾個點、這個視窗按放大鈕有沒有用(見 fit() ②)
-    stats: () => ({ n: strokes.length, pts: strokes.reduce((a, s) => a + s.p.length / 2, 0), zoomable })
+    // 診斷 / 測試用:目前畫了幾筆、共幾個點、畫布現在多大
+    stats: () => ({ n: strokes.length, pts: strokes.reduce((a, s) => a + s.p.length / 2, 0), w: boxW, h: boxH })
   };
 })();
