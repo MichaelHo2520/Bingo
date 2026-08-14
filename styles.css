@@ -7118,6 +7118,14 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-seat.p2{background:var(--sp2)} .dw-seat.p3{background:var(--sp3)}
   .dw-seat.p4{background:var(--sp4)} .dw-seat.p5{background:var(--sp5)}
   .dw-pts{font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;color:var(--accent);flex:none}
+  /* ⚠⚠ 輪到誰畫的那一格,底色就是 accent —— 分數也是 accent = 字與底同色,整個數字消失。
+     這一頁的 .turn 正好是**畫家**那一格,也就是最該看清楚的那一格。照既有做法
+     (.mp-chip.turn .seat-badge / .m16-pts / .bj-chc)反白成實心深色,不要用半透明黑
+     疊 —— 疊出來是濁色、字一樣糊。
+     色點同理:sp0 對派對主題的 accent、sp4 對粉、sp2 對綠都近到看不出邊界,
+     所以在 .turn 那一格補一圈深色描邊(只有那一格會有,其他格外觀一個 px 都沒動)。 */
+  .mp-chip.turn .dw-pts{color:#1c1008}
+  .mp-chip.turn .dw-seat{box-shadow:0 0 0 1.5px #1c1008}
 
   /* ---------- 對局整體版面 ----------
      ★★ 上限從 .panel 的 520 放寬到 760(v1.155.1)—— 桌機上那 240px 直接是畫布。
