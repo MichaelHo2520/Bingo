@@ -7155,6 +7155,16 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
     background:rgba(255,255,255,.08);color:var(--muted);
     font-family:'Nunito',sans-serif;font-weight:800;font-size:11.5px;line-height:1}
   .dw-len b{font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;color:var(--accent-2)}
+  /* ---------- 畫家的「畫完了」(v1.168.0)----------
+     住在 .dw-bar 裡,與猜題者的字數格 .dw-len 互斥(一個人只會是畫家或猜題者之一)。
+     ⚠ 亮起來一定要**整顆填色**(同 v1.165.0 那三顆模式鈕的結論):只換邊框在這個尺寸
+       根本看不出來,而「我到底宣告了沒」是它唯一要傳達的事。 */
+  .dw-fin{flex:none;display:inline-flex;align-items:center;gap:2px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.08);color:var(--text);font-weight:800;font-size:12px;
+    border-radius:11px;padding:5px 9px;cursor:pointer;white-space:nowrap;
+    -webkit-tap-highlight-color:transparent}
+  .dw-fin.on{background:var(--accent-2);border-color:var(--accent-2);color:#1c1008}
+  .dw-fin:active{transform:scale(.94)}
   /* 放大鈕:與倒數環同高的小圓鈕,擺在環左邊。
      ⚠⚠ class 叫 .dw-zoom**btn**,而放大狀態掛在 body 上的是 .dw-big —— 兩個名字**一定要不一樣**。
        第一版兩邊都叫 dw-zoom,於是 `body.dw-zoom` 直接吃到這條規則的
@@ -7340,6 +7350,18 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-send{flex:none;padding:10px 18px}
   .dw-send:disabled{opacity:.45}
   .dw-input.cool .dw-guess{border-color:var(--daub)}
+  /* ---------- 放棄這一題(v1.168.0)----------
+     ⚠⚠ **寬度固定**(min-width):它的字會在「🏳️」與「確定?」之間換,而這一列上就是
+       輸入框 + 猜 + 這一顆 —— 寬度會變的話按下去整列跳一下,而那正好發生在
+       「要不要再按一次」的那一刻(手指已經在移動了)。
+     ⚠ 武裝中用 --daub(警告色)+ 整顆填色:兩段式的第二段一定要一眼看得出來,
+       不然使用者會以為第一次按沒反應而狂按(那就變成一按就放棄)。 */
+  .dw-gv{flex:none;min-width:56px;display:inline-flex;align-items:center;justify-content:center;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    font-weight:800;font-size:13px;border-radius:12px;padding:10px 8px;cursor:pointer;
+    white-space:nowrap;-webkit-tap-highlight-color:transparent}
+  .dw-gv.armed{background:var(--daub);border-color:var(--daub);color:#fff}
+  .dw-gv:active{transform:scale(.94)}
 
   /* ---------- 結果卡 ---------- */
   .dw-win{padding:30px 22px}
@@ -7400,6 +7422,10 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
     /* 字數晶片在窄畫面只留數字(「答案 3 字」→「3 字」)——
        同一列上還有回合數 + 畫家名字 + 放大鈕 + 倒數環,而那顆環是 34px 不可壓。 */
     .dw-len-l{display:none}
+    /* 「✅ 畫完了」在窄畫面只留圖示(v1.168.0):同一列上有回合數 + 你是畫家 + 放大鈕 +
+       倒數環,而 .dw-role 是 flex:1 會先被壓成省略號 ——「🎨 你是畫...」比少三個字更糟。
+       ⚠ 圖示留著就好:那一顆亮不亮才是它要講的事(而 title / aria-pressed 都還在)。 */
+    .dw-fin-t{display:none}
   }
 
   /* ---------- 窄畫面 ---------- */
@@ -7421,13 +7447,31 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
        更高的畫布,**在任何視窗上都有用**,所以那顆鈕一律顯示。
      ⚠⚠ v1.155.1 曾經「限於寬時把放大鈕整顆藏起來」(那時 4:3 的鎖讓它在直向手機上
        按了不會有事)—— 鎖拿掉之後那個前提就不成立了,**不要再加回來**。
-     ⚠ **刻意不收玩家晶片列** —— 那正是使用者要求「放進房間框」的東西,
-       放大模式把它收掉等於一手給一手拿走。
      ⚠ 猜題列壓成一行而不是整個藏掉:看得到最新一則(誰猜錯了什麼)是這個遊戲的
-       笑點來源,全部收掉會讓放大模式變成「看不到別人在幹嘛」。 */
+       笑點來源,全部收掉會讓放大模式變成「看不到別人在幹嘛」。
+
+     ★★★ v1.168.0:**房間框也收掉,只留 🎤 與 😀** —— 使用者:「大畫版的畫面可以再大
+       一點,我打算可以把房間框也一起空間給畫板用,可是要把麥克風跟 emoji 留下來」。
+     ⚠⚠ 這一條**刻意反轉** v1.155.0~v1.167.0 寫在這裡的「刻意不收玩家晶片列」
+       (理由曾是「那正是使用者要求放進房間框的東西,收掉等於一手給一手拿走」)——
+       現在是同一個使用者拿「比分」換「更大的畫布」,而放大模式本來就是「只想看畫布」。
+       ⚠ 所以放大時看不到分數是**刻意的**,不是 bug;要看分數就再按一次縮小。
+     ⚠⚠ 做法是**只留 .mp-actions 那兩顆鈕**,不是把 #mpBar 整塊 display:none ——
+       那兩顆鈕是 mp-core 的 DOM、住在 #mpBar 裡面,藏掉整塊就等於放大模式不能傳表情 / 語音。
+       ⚠ 也**不可以**改成把它們搬進別的容器(共用的 .tools-docked 是 absolute 貼右緣,
+         這一頁踩過:搬過去直接壓在 😀 上面)—— 見紅線 16。
+     ⚠ 兩顆鈕靠右:那一列剩下的東西全部藏起來之後 .dw-room-top 只剩它們,
+       用 justify-content:flex-end 維持與縮小狀態相同的位置(手的肌肉記憶)。 */
   body.dw-big .topbar{display:none}
   body.dw-big .dw-say{height:30px;padding:4px 9px}
   body.dw-big .dw-play{gap:6px}
+  body.dw-big .dw-room{padding:5px 10px}
+  body.dw-big .dw-room .mp-leave-btn,
+  body.dw-big .dw-room-title,
+  body.dw-big .dw-room .mp-goal,
+  body.dw-big .dw-room .mp-subrow,
+  body.dw-big .dw-room-foot{display:none}
+  body.dw-big .dw-room-top{justify-content:flex-end}
 
   /* ---------- ⚠⚠ 這一頁**不做**「手機對局中自動收頂列」 ----------
      另外五頁有一條 `(max-height:780px) and (pointer:coarse)` 的自動收頂列,這一頁

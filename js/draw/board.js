@@ -105,6 +105,8 @@ const DWB = (function () {
     bindDraw();
     bindTools();
     bindGuess();
+    bindGiveUp();   // 放棄這一題(v1.168.0;兩段式在 bindGiveUp 裡)
+    bindFin();      // 畫家的「畫完了」(v1.168.0)
     bindPick();
     addEventListener("resize", fit);
     /* ★★ 舞台自己變高變矮時也要重量(v1.156.0)。這一頁原本只掛 resize,而
@@ -628,6 +630,28 @@ const DWB = (function () {
     el.setAttribute("aria-label", k ? ("答案有 " + k + " 個字") : "");
   }
 
+  /* ---------- 畫家的「畫完了」(v1.168.0)----------
+     使用者:「顯示說我已經畫完了,但是畫完後還是可以再補充,只是可以提醒其他要猜的人說,
+     我沒有打算繼續畫了你們可以猜了」。
+     ⚠⚠ 這一顆**不鎖畫布、不結束相位** —— 宣告完照樣可以繼續畫(那是使用者明講的)。
+       所以它是 toggle 而不是「送出一次就定案」:按錯了再按一次收回來,零代價。
+     ⚠ show / on 由 adapter 的 paintBar 決定(這一支只管畫),而 on 的真相在 `game.dw.fin`
+       —— **不可以**用本地旗標記它:那樣別人那台看不到,而它存在的唯一目的就是給別人看。 */
+  function setFinBtn(show, on) {
+    const b = $("dwFin"); if (!b) return;
+    b.classList.toggle("hidden", !show);
+    b.classList.toggle("on", !!on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    const t = $("dwFinT");
+    if (t) t.textContent = on ? " 已畫完" : " 畫完了";
+    b.title = on ? "再按一次:我還要再畫" : "告訴大家「我沒打算繼續畫了,可以猜了」(還是可以再補畫)";
+    b.setAttribute("aria-label", on ? "已宣告畫完,再按一次收回" : "宣告我畫完了");
+  }
+  function bindFin() {
+    const b = $("dwFin"); if (!b) return;
+    b.addEventListener("click", () => cb.onFin && cb.onFin(!b.classList.contains("on")));
+  }
+
   /* ==========================================================================
      五、蓋板:選題目 / 公布答案
      ──────────────────────────────────────────────────────────────────────────
@@ -774,11 +798,50 @@ const DWB = (function () {
        coolEnd 冷卻到什麼時候(有值就自己倒數,到期自動解鎖)
        len    正解幾個字(v1.161.0;0 / 沒給就不提)—— ★ 手指在打字時眼睛就在這一格,
               頂列那一顆晶片容易被忽略,所以字數**兩個地方都講一次**。 */
+  /* ---------- 放棄這一題:兩段式(v1.168.0)----------
+     使用者:「如果真的猜不到,我想多一個放棄的功能,才不用一直硬要等時間到」。
+     ⚠⚠ 放棄**不能反悔**(`DWR.roundDone` 看的就是它),所以誤觸一定要擋 ——
+       但**不可以**為它開一層 veil / 確認卡:那要列進 ui-kit 的 BACK_LAYERS,而那個陣列
+       是雙胞胎(CLAUDE.md 紅線 7)。→ 用「第一次按只是武裝 3 秒」的兩段式,零新蓋板。
+     ⚠ 武裝中鈕要**整顆變警告色 + 換字**:第一次按沒有任何反應的話使用者會狂按,
+       那就等於一按就放棄(而那是這一顆最不能出的錯)。
+     ⚠ 武裝到期一定要自己解除 —— 停在武裝狀態的話,下一次隨手一按就送出去了。 */
+  const GV_ARM_MS = 3000;
+  let gvArmT = null;
+  function gvArmed() { const b = $("dwGiveUp"); return !!b && b.classList.contains("armed"); }
+  function gvDisarm() {
+    if (gvArmT) { clearTimeout(gvArmT); gvArmT = null; }
+    const b = $("dwGiveUp"), t = $("dwGvT");
+    if (b) b.classList.remove("armed");
+    if (t) t.textContent = "🏳️";
+    if (b) b.title = "猜不出來,放棄這一題(按兩次)";
+  }
+  function bindGiveUp() {
+    const b = $("dwGiveUp"); if (!b) return;
+    b.addEventListener("click", () => {
+      if (gvArmed()) { gvDisarm(); cb.onGiveUp && cb.onGiveUp(); return; }
+      const t = $("dwGvT");
+      b.classList.add("armed");
+      if (t) t.textContent = "確定?";
+      b.title = "再按一次就放棄這一題(不能反悔)";
+      try { showToast("再按一次就放棄這一題(不能反悔)🏳️", 2600); } catch (e) {}
+      if (gvArmT) clearTimeout(gvArmT);
+      gvArmT = setTimeout(gvDisarm, GV_ARM_MS);
+    });
+  }
+
   let coolT = null;
   function setGuess(st) {
     const row = $("dwInputRow"), inp = $("dwGuess"), btn = $("dwSend");
     if (!row || !inp || !btn) return;
     row.classList.toggle("hidden", !st.show);
+    /* ★ 放棄鈕的顯示條件**就是 `can`**(= adapter 說「這一題你還能猜」):
+       已經猜中 / 已經放棄 / 不是 draw 相位一律跟著收起來,不必再傳一個欄位。
+       ⚠ 凍結中照樣顯示且**按得到**(冷卻只鎖輸入,放棄與它無關)——
+         所以這一行刻意在 apply() 外面,不看倒數。 */
+    const gb = $("dwGiveUp");
+    if (gb) gb.classList.toggle("hidden", !(st.show && st.can));
+    if (!(st.show && st.can)) gvDisarm();
     if (coolT) { clearInterval(coolT); coolT = null; }
     const apply = () => {
       const left = st.coolEnd ? Math.max(0, st.coolEnd - Date.now()) : 0;
@@ -989,6 +1052,7 @@ const DWB = (function () {
     pickColor, toggleEraser, toggleLine, undo, syncTool,
     setShotInfo, shareShot, shotLines, shotDataUrl,
     setCd, stopCd, setRoundInfo, setLen, setZoom,
+    setFinBtn, gvArmed, gvDisarm,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
     LW, LH, COLORS, WIDTHS,

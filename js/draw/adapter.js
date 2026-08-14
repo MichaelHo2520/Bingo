@@ -40,6 +40,8 @@ const MP = MPCore.create((function () {
   let inkRef = null, sayRef = null, inkRound = -1;
   let phaseT = null;
   let seenHits = {};                    // 這一回合已經播報過的猜中者(避免重複跳訊息)
+  let seenGv = {};                      // 這一回合已經播報過的放棄者(v1.168.0,同上)
+  let seenFin = false;                  // 這一回合「畫家說畫完了」播報過沒有(v1.168.0)
   let coolEnd = 0;                      // 我的冷卻到什麼時候(本地)
   /* ★ 放大模式(v1.155.0):吃掉猜題列與頂列,全部讓給畫布。存在偏好裡(ownPrefs),
      下次進來記得住 —— 一場要開關好幾次的東西,每次都要重按太煩。 */
@@ -151,6 +153,7 @@ const MP = MPCore.create((function () {
       d.n = nx; d.ph = "pick"; d.at = Date.now(); d.seq = seq + 1;
       d.cand = DWGen.pick3(R.diff, d.used || []);
       d.w = -1; d.hits = null; d.miss = null; d.last = null;
+      d.gv = null; d.fin = null;                        // 放棄名單 / 「畫完了」都是**這一回合**的(v1.168.0)
       // 這一回合有幾個人可以猜(見 toShow 的說明)
       const nextDrawer = DWR.drawerAt(order, nx);
       d.gs = order.filter(id => alive[id] && id !== nextDrawer).length;
@@ -205,6 +208,7 @@ const MP = MPCore.create((function () {
     const me = ctx.me();
     if (iAmDrawer()) { showToast("你是畫家,不能猜 🎨"); return; }
     if (dw.hits && dw.hits[me]) { showToast("你已經猜中了,看別人猜吧 👀"); return; }
+    if (dw.gv && dw.gv[me]) { showToast("這一題你放棄了 🏳️"); return; }   // v1.168.0
     if (coolEnd > Date.now()) { showToast("冷卻中,先看看畫面 🥶", 1200); return; }
 
     const w = wordOf();
@@ -245,6 +249,56 @@ const MP = MPCore.create((function () {
     paintGuessRow();
   }
 
+  /* ★★ 放棄這一題(v1.168.0)。使用者:「如果真的猜不到,我想多一個放棄的功能,
+     才不用一直硬要等時間到」。
+     ★ 效果只有一個:寫進 `d.gv` → `DWR.roundDone` 把我算成「定案」,
+       等最後一個人也定案(猜中 or 放棄)那一回合立刻公布答案。
+     ⚠⚠ **一按定案、沒有反悔** —— 反悔會讓「大家都定案了」在兩個狀態之間跳,
+       而那個判定每一台都在跑(誰先搶到交易誰結算)。誤觸由畫面那一層的兩段式擋
+       (board.js 的 bindGiveUp),這裡收到的一律當真。
+     ⚠ **不寫進 say 節點**:放棄不是「猜了什麼」,而且 say 會進分享圖的字幕。
+       播報走 `d.gv` + `seenGv`(比照 announceHits)—— 重連的人自己也算得出來。
+     ⚠ 分數就是 0(沒進 hits 就沒有那一份),而畫家分的分母是 `d.gs`(回合開始時的
+       猜題者數)→ 有人放棄 = 少一個人猜懂 = 畫家分自己就低了,不必另外扣。 */
+  function giveUp() {
+    if (!dw || dw.ph !== "draw") return;
+    const me = ctx.me();
+    if (iAmDrawer()) { showToast("你是畫家,不能放棄 🎨"); return; }
+    if (dw.hits && dw.hits[me]) { showToast("你已經猜中了 🎉"); return; }
+    if (dw.gv && dw.gv[me]) return;
+    const seq = dw.seq;
+    ctx.txGame(g => {
+      const d = g.dw;
+      if (!d || d.ph !== "draw" || d.seq !== seq) return false;
+      const gv = Object.assign({}, d.gv || {});
+      if (gv[me]) return false;                         // 別人的快照比我早到,已經記過了
+      gv[me] = 1;
+      d.gv = gv;
+    });
+    showToast("這一題你放棄了 🏳️", 1600);
+    paintGuessRow();
+  }
+
+  /* ★★ 畫家宣告「我畫完了」(v1.168.0)。使用者:「顯示說我已經畫完了,但是畫完後還是
+     可以再補充,只是可以提醒其他要猜的人說,我沒有打算繼續畫了你們可以猜了」。
+     ⚠⚠ 它**純粹是提示**:不結束相位、不鎖畫布、不進 `roundDone` ——
+       拿它當「作畫結束」的訊號就直接違背「畫完後還是可以再補充」那句話。
+     ⚠ 所以它是 toggle(再按一次收回),而且**繼續畫也不會自動取消** ——
+       「我沒打算繼續畫了」補幾筆不推翻那句話,自動取消只會讓那顆鈕看起來壞掉。
+     ⚠ 真相一定要在 DB(`d.fin`)而不是本地旗標:它存在的唯一目的就是給別人看。 */
+  function setFin(on) {
+    if (!dw || dw.ph !== "draw" || !iAmDrawer()) return;
+    const want = on ? 1 : null;
+    const seq = dw.seq;
+    ctx.txGame(g => {
+      const d = g.dw;
+      if (!d || d.ph !== "draw" || d.seq !== seq) return false;
+      if ((d.fin ? 1 : null) === want) return false;
+      d.fin = want;
+    });
+    showToast(on ? "已經告訴大家你畫完了 ✅(還是可以再補畫)" : "收回了,大家知道你還要畫 ✏️", 1800);
+  }
+
   /* ==========================================================================
      三、獨立節點的監聽(筆劃 / 猜題訊息)
      ──────────────────────────────────────────────────────────────────────────
@@ -258,7 +312,7 @@ const MP = MPCore.create((function () {
     if (inkRound === key) return;
     detachRound();
     DWB.resetInk(); DWB.clearSay();
-    seenHits = {};
+    seenHits = {}; seenGv = {}; seenFin = false;
     inkRound = key;
     inkRef = ctx.ref(inkPath(d));
     if (inkRef) inkRef.on("child_added", s => DWB.applyRec(s.val()));
@@ -295,11 +349,17 @@ const MP = MPCore.create((function () {
     const R = DWR.normRules(dw.rules);
     const total = DWR.totalOf(gOrder, R.rounds);
     const dname = ctx.dispName(drawerId() || "");
+    /* ★ 猜題者看得到「畫家說畫完了」(v1.168.0):畫家名字後面掛一段後綴。
+       ⚠ 只在 draw 相位講 —— pick 還沒開始畫、show 已經公布,那時候講沒有意義。
+       ⚠ 畫家自己看的是那顆鈕(它會亮起來),不必在這裡重複一次。 */
+    const finTail = (dw.ph === "draw" && dw.fin && !iAmDrawer()) ? " · 畫完了" : "";
     DWB.setRoundInfo(
       "第 " + (dw.n + 1) + " / " + total + " 回合",
-      iAmDrawer() ? "🎨 你是畫家" : ("🎨 " + dname),
+      iAmDrawer() ? "🎨 你是畫家" : ("🎨 " + dname + finTail),
       iAmDrawer() ? "mine" : ""
     );
+    // 「✅ 畫完了」只有畫家、而且只在 draw 相位看得到(見 draw.html 那段註解)
+    DWB.setFinBtn(dw.ph === "draw" && iAmDrawer(), !!dw.fin);
     /* ★★ 猜題者的字數提示(v1.161.0)。使用者:「我覺得要猜的人應該要知道有幾個字,
        這樣才不會太廣泛」—— 沒有它的話「四隻腳的動物」可以是貓 / 狗 / 牛 / 長頸鹿。
        ⚠ 三個條件都要:**在畫的相位**(pick 還沒選、show 已經公布)、**我不是畫家**
@@ -317,6 +377,8 @@ const MP = MPCore.create((function () {
     if (iAmDrawer()) { DWB.setGuess({ show: false }); return; }
     if (dw.ph !== "draw") { DWB.setGuess({ show: true, can: false, why: dw.ph === "pick" ? "畫家正在選題目…" : "這一回合結束了" }); return; }
     if (dw.hits && dw.hits[me]) { DWB.setGuess({ show: true, can: false, why: "✅ 你已經猜中了" }); return; }
+    // 放棄了(v1.168.0):輸入列留著、但鎖住並說清楚原因(不能反悔,見 giveUp)
+    if (dw.gv && dw.gv[me]) { DWB.setGuess({ show: true, can: false, why: "🏳️ 你放棄了這一題" }); return; }
     // ★ len:正解幾個字(v1.161.0)—— placeholder 上也講一次,打字時眼睛就在這一格
     DWB.setGuess({ show: true, can: true, coolEnd: coolEnd, len: DWGen.lenAt(dw.w) });
   }
@@ -363,6 +425,26 @@ const MP = MPCore.create((function () {
       if (id !== ctx.me()) { try { Sound.place(); } catch (e) {} }
     });
   }
+  /* 新放棄的人 → 播報一次(v1.168.0)。★ 這一則是**資訊**不只是笑點:
+     沒有它的話畫面上完全看不出「還在等誰」,而放棄本來就是為了不要乾等。
+     ⚠ 不出聲:一回合可能好幾個人放棄,每個都叫一聲會很吵(猜中才值得出聲)。 */
+  function announceGv() {
+    if (!dw || !dw.gv) return;
+    Object.keys(dw.gv).forEach(id => {
+      if (seenGv[id]) return;
+      seenGv[id] = 1;
+      DWB.sysSay("🏳️ " + (id === ctx.me() ? "你" : ctx.dispName(id)) + "放棄了這一題");
+    });
+  }
+  /* 畫家說「畫完了」→ 猜題列跳一則 + 輕輕出個聲(v1.168.0)。
+     ⚠ 只播一次(`seenFin`)—— 畫家可以收回再宣告,而每次都跳一則會變成刷版。
+     ⚠ 畫家自己不必收:他按的那一下已經有 toast 了。 */
+  function announceFin() {
+    if (!dw || dw.ph !== "draw" || !dw.fin || seenFin || iAmDrawer()) return;
+    seenFin = true;
+    DWB.sysSay("✅ " + ctx.dispName(drawerId() || "") + "說畫完了,可以猜了!");
+    try { Sound.place(); } catch (e) {}
+  }
 
   /* ---------- 大廳的規則說明 ---------- */
   function ruleHint() {
@@ -373,6 +455,7 @@ const MP = MPCore.create((function () {
        (舊規則反過來,畫爛才划算,而那是玩家自己會算出來的)。 */
     el.innerHTML = "一人畫、其他人打字搶答。<b>越早猜中分數越高</b>(200 / 150 / 100 / 50)," +
       "而<b>畫家跟著大家的分數抽成</b> —— 讓越多人猜懂,自己拿越多;猜錯只凍結 <b>3 秒</b>,冷完繼續猜。" +
+      "<br>真的猜不出來可以按 <b>🏳️ 放棄</b>(大家都猜中或放棄就直接公布);畫家畫夠了可以按 <b>✅ 畫完了</b>提醒大家。" +
       "<br>每人當 <b>" + rules.rounds + "</b> 次畫家 · 一回合 <b>" + rules.sec + "</b> 秒 · 題目「" +
       L.label + "」(" + L.desc + ")";
   }
@@ -413,7 +496,7 @@ const MP = MPCore.create((function () {
     lobbyGame() { return { dw: null }; },
     resetRound() {
       detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0;
+      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd(); DWB.setEnabled(false);
     },
     /* 開一場。★ 座位表:有上一場就整個輪一位(讓不同的人先當畫家),否則洗牌。
@@ -434,7 +517,7 @@ const MP = MPCore.create((function () {
           mid: Date.now(),              // 這一場的識別碼(筆劃節點的路徑要用,見 inkPath)
           seq: 1, n: 0, ph: "pick", at: Date.now(),
           cand: DWGen.pick3(R.diff, []), w: -1, used: [],
-          hits: null, miss: null, last: null, pts: null,
+          hits: null, miss: null, gv: null, fin: null, last: null, pts: null,
           st: null,                     // 娛樂統計(整場累積,見 toShow)
           gs: ord.length - 1,           // 第一回合有幾個人可以猜
           rules: R
@@ -470,13 +553,14 @@ const MP = MPCore.create((function () {
       }
       DWB.setEnabled(dw.ph === "draw" && iAmDrawer());
 
-      announceHits();
+      announceHits(); announceGv(); announceFin();
       paintHud(); paintBar(); paintTools(); paintGuessRow(); paintOver();
       DWB.fit();
 
-      /* 所有猜題者都猜中了 → 不必等到 60 秒(規則書第 13 節)。
+      /* 每個猜題者都定案了 → 不必等到 60 秒(規則書第 13 節)。
+         ★ v1.168.0 起「定案」= 猜中**或自己按了放棄**(見 DWR.roundDone)。
          ⚠ 每一台都會看到同一份快照,所以每一台都會叫這一支 —— 交易的 seq 守衛保證只有第一個算數。 */
-      if (dw.ph === "draw" && DWR.roundDone(guesserIds(), dw.hits)) toShow(dw.seq);
+      if (dw.ph === "draw" && DWR.roundDone(guesserIds(), dw.hits, dw.gv)) toShow(dw.seq);
       armPhaseT();
     },
 
@@ -492,7 +576,7 @@ const MP = MPCore.create((function () {
       showScreen("lobby");
       $("mpBar").classList.remove("playing");
       clearPhaseT(); detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0;
+      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
       DWB.setEnabled(false); DWB.setGuess({ show: false });
       ruleHint();
@@ -505,7 +589,7 @@ const MP = MPCore.create((function () {
     },
     onLeave() {
       clearPhaseT(); detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; coolEnd = 0;
+      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
       DWB.setEnabled(false); DWB.setGuess({ show: false });
     },
@@ -624,7 +708,7 @@ const MP = MPCore.create((function () {
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
-      pick, ink, inkClear, guess,
+      pick, ink, inkClear, guess, giveUp, setFin,
       zoom: () => zoom,
       toggleZoom() { zoom = !zoom; DWB.setZoom(zoom); savePrefs(); },
       rules: () => DWR.normRules(rules),
@@ -640,7 +724,8 @@ const MP = MPCore.create((function () {
         rules = next; ctx.syncSetup(); ctx.updateGoal(); ruleHint(); savePrefs();
       },
       // 診斷 / e2e 用:目前這一場的狀態(不對外顯示)
-      state: () => (dw ? { n: dw.n, ph: dw.ph, seq: dw.seq, w: dw.w, hits: dw.hits, miss: dw.miss, pts: dw.pts, st: dw.st } : null)
+      state: () => (dw ? { n: dw.n, ph: dw.ph, seq: dw.seq, w: dw.w, hits: dw.hits, miss: dw.miss,
+                           gv: dw.gv, fin: dw.fin, pts: dw.pts, st: dw.st } : null)
     }
   };
 })());

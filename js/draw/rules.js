@@ -218,16 +218,21 @@ const DWR = (function () {
   }
 
   /* ---------- 這一回合結束了沒 ----------
-     ★ 兩個條件任一成立:時間到(由 adapter 的計時器管)、或**所有猜題者都猜中了**
+     ★ 兩個條件任一成立:時間到(由 adapter 的計時器管)、或**每個猜題者都定案了**
        (規則書第 13 節)—— 這一支只回答後者。
-     ⚠⚠ v1.167.0 起**猜錯不會失格** → 這一支**不看 miss**(連參數都不收):沒猜中的人
-       永遠算「還在猜」,所以沒人猜出來的那一題就是乾等到時間到 —— 那正是新規則要的
-       (猜錯凍 3 秒、冷完繼續猜,不會有人被踢出這一題)。
-       ⚠ 舊版有第三個參數 miss,用來把「三次猜錯的人」當成不必等 —— 別再加回來。
+     ★★ 「定案」有兩種(v1.168.0):**猜中了** 或 **自己按了放棄**。
+       使用者:「如果真的猜不到,我想多一個放棄的功能,才不用一直硬要等時間到」。
+     ⚠⚠ 第三個參數是 `gv`(放棄名單),**不是 v1.167.0 拿掉的那個 `miss`** ——
+       兩者長得很像但語意相反:`miss` 是「系統數你錯幾次就把你踢出這一題」(已廢),
+       `gv` 是「**當事人自己按的**」。所以猜錯幾次都還在等他,他不想猜了才算定案。
+       → 別把 miss 判定「順手」加回來(紅線 27),也別把 gv 當成 miss 的復活。
      ⚠ 一個猜題者都沒有(人都跑光了)回 true:那一回合已經沒有意義,直接收掉。 */
-  function roundDone(guesserIds, hits) {
-    hits = hits || {};
-    for (let i = 0; i < guesserIds.length; i++) if (!hits[guesserIds[i]]) return false;
+  function roundDone(guesserIds, hits, gv) {
+    hits = hits || {}; gv = gv || {};
+    for (let i = 0; i < guesserIds.length; i++) {
+      const id = guesserIds[i];
+      if (!hits[id] && !gv[id]) return false;
+    }
     return true;
   }
 

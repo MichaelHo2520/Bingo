@@ -45,7 +45,12 @@ DWB.init({
   onStroke(rec) { MP.ink(rec); },
   onClear() { MP.inkClear(); },
   onGuess(text) { MP.guess(text); },
-  onPick(k) { MP.pick(k); }
+  onPick(k) { MP.pick(k); },
+  /* ★ v1.168.0 的兩顆。⚠ 這裡收到的一律當真:
+       · onGiveUp —— 誤觸的防線是**兩段式**,而它整段留在 board.js(第一次按只是武裝)
+       · onFin —— 純提示,adapter 只寫 game.dw.fin,不碰相位也不鎖畫布 */
+  onGiveUp() { MP.giveUp(); },
+  onFin(on) { MP.setFin(on); }
 });
 
 /* ---------- 對局:畫家工具列 ---------- */

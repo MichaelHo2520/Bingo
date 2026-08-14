@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.167.0 -->
-<meta name="version" content="1.167.0">
+<!-- 你畫我猜 · v1.168.0 -->
+<meta name="version" content="1.168.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -200,6 +200,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠ 畫家看不到它(他看的是工具列那一格題目);顯示條件在 js/draw/adapter.js 的 paintBar。
            ⚠ 刻意塞在**既有的這一列**裡,不另開一列:這一頁多出來的垂直空間永遠是畫布的。 -->
       <span class="dw-len hidden" id="dwLen" aria-live="polite"></span>
+      <!-- ★★ 畫家的「畫完了」(v1.168.0)。使用者:「畫家是不是可以考慮多一個功能,顯示說
+           我已經畫完了,但是畫完後還是可以再補充,只是可以提醒其他要猜的人說,
+           我沒有打算繼續畫了你們可以猜了」。
+           ⚠⚠ 它**純粹是提示**:不結束相位、不鎖畫布、不影響「這一回合結束了沒」——
+              拿它當「作畫結束」的訊號就直接違背「畫完後還是可以再補充」那句話。
+           ⚠ 刻意放在**這一列**而不是工具列:#dwTools 在 360px 上已經是
+              「題目 + 四色 + 四顆鈕」剛好塞滿(見 styles.css 那條媒體查詢),再加一顆就爆;
+              而這一格與猜題者的字數提示 #dwLen **互斥**(畫家沒有字數格),位置剛好空著。
+           ⚠ 猜題者看到的是另外兩處:回合列的畫家名字後面加「· 畫完了」+ 猜題列跳一則。 -->
+      <button class="dw-fin hidden" id="dwFin" type="button" aria-pressed="false">✅<span class="dw-fin-t" id="dwFinT"> 畫完了</span></button>
       <!-- 放大:吃掉猜題列與頂列,把空間全部讓給畫布(見 styles.css 的 body.dw-big)。
            ⚠ v1.155.1 曾經「限於寬時把它藏起來」;v1.155.2 畫布改成吃滿舞台之後
              它在任何視窗上都有用了 → **一律顯示**,不要再加回那個條件。 -->
@@ -257,6 +267,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="dw-input hidden" id="dwInputRow">
       <input id="dwGuess" class="dw-guess" type="text" maxlength="16" placeholder="打出你猜的答案" autocomplete="off" enterkeyhint="send">
       <button class="btn primary dw-send" id="dwSend" type="button">猜</button>
+      <!-- ★★ 放棄這一題(v1.168.0)。使用者:「如果真的猜不到,我想多一個放棄的功能,
+           才不用一直硬要等時間到」—— 每個猜題者都定案(猜中 or 放棄)就立刻公布答案。
+           ⚠⚠ 一按定案、**不能反悔**(DWR.roundDone 看的就是它,反悔會讓「都定案了」
+              在兩個狀態之間跳)→ 誤觸靠**兩段式**擋:第一次按只是武裝 3 秒(鈕變成「確定?」),
+              3 秒內再按一次才真的送出。⚠ 不要換成原生 confirm(),也不要為它開一層 veil
+              (那要進 BACK_LAYERS,而那個陣列是雙胞胎)。
+           ⚠ 凍結中也按得到 —— 放棄與冷卻是兩件事。 -->
+      <button class="dw-gv" id="dwGiveUp" type="button" title="猜不出來,放棄這一題(按兩次)">
+        <span id="dwGvT">🏳️</span>
+      </button>
     </div>
   </div>
 
