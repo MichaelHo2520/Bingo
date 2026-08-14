@@ -72,6 +72,7 @@ $("dwDiffSeg").addEventListener("click", e => { const b = e.target.closest("butt
 /* ★ 共同作畫(v1.170.0)。⚠ 值一定要轉成數字:白名單是 [0,1],字串 "1" 會被 normRules
    換成預設值,而 setRule 看到「換掉了」就整個不動 → 症狀是「按了那顆鈕完全沒反應」。 */
 $("dwCoSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) MP.setRule("co", +b.dataset.v); });
+$("dwCuSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) MP.setRule("cu", +b.dataset.v); });
 $("scoreSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) MP.setScoreMode(b.dataset.score); });
 /* ⚠ 這一頁的目標分數一次跳 **250**,不是 1 —— 一場的總得分是幾百分起跳
    (規則書那張 850 / 720 的表),±1 的話要按幾百下。核心的 clampGoal 對任何步進都成立。 */

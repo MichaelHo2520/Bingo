@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.171.0 -->
-<meta name="version" content="1.171.0">
+<!-- 你畫我猜 · v1.171.1 -->
+<meta name="version" content="1.171.1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -179,6 +179,20 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="seg" id="dwCoSeg" aria-label="猜中的人可不可以幫忙畫">
           <button class="on" data-v="0">🎨 只有畫家</button>
           <button data-v="1">🖌 猜中的人可以幫畫</button>
+        </div>
+      </div>
+
+      <!-- ★★ 自訂題目(v1.171.1)。使用者:「能不能自訂題目,要有房主選擇決定」。
+           開著的話畫家的選題卡上會多一列輸入框,可以自己打一個題目(最多 4 個字)。
+           ⚠ 預設**開**(與共同作畫刻意相反):它不改變玩法,只是題目多一個來源;
+              預設關的話等於每一場都要先來翻設定才用得到。舊房間也會退回開。
+           ⚠ 關掉時那一格在畫家的 DOM 上**根本不產生**,不是藏起來 ——
+              唯一的真相在 js/draw/rules.js 的 mayOwnWord()。 -->
+      <div class="field">
+        <span class="field-label" id="dwCuLabel">自訂題目</span>
+        <div class="seg" id="dwCuSeg" aria-label="畫家可不可以自己出題">
+          <button data-v="0">🎲 只能三選一</button>
+          <button class="on" data-v="1">✏️ 可以自己出題</button>
         </div>
       </div>
 

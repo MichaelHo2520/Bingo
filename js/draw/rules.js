@@ -23,9 +23,11 @@ const DWR = (function () {
 
   /* ---------- 相位時長(毫秒)----------
      ★ 只有 draw 吃房規(45 / 60 / 90 秒);pick 與 show 是固定值。
-     ⚠ pick 給 15 秒是刻意的:三選一不必想太久,而畫家發呆時全房都在等他。
-       到期由 adapter 幫他選第一個(見 adapter 的 forcePick)。 */
-  const PICK_MS = 15000;
+     ⚠ pick 從 v1.171.1 起是 **20 秒**(原本 15 秒)。使用者:「選題秒數改為 20 秒」——
+       15 秒是「三選一不必想太久」那一版的數字,而 v1.171.0 之後那一頁多了
+       「自己出題」那一格:要想一個題目 + 用注音打完 4 個字,15 秒是真的會被逼到超時。
+     ⚠ 畫家發呆時全房都在等他,所以這個數字不該再往上加;到期由 adapter 幫他選第一個。 */
+  const PICK_MS = 20000;
   const SHOW_MS = 5000;
   const SECS = [45, 60, 90];          // 作畫秒數的選項;預設值也寫在 draw.html 的 .on
   const ROUNDS = [1, 2, 3];           // 每人當幾次畫家
@@ -33,7 +35,16 @@ const DWR = (function () {
   /* ★★ 共同作畫(v1.170.0):0 = 關(經典玩法)、1 = 開。
      ⚠ 預設**關** —— 舊房間沒有這個欄位、而經典玩法才是這個遊戲的基準線。 */
   const COS = [0, 1];
-  const DEF_SEC = 60, DEF_ROUNDS = 2, DEF_DIFF = "std", DEF_CO = 0;
+  /* ★★ 自訂題目(v1.171.1):0 = 只能三選一、1 = 畫家可以自己出題(最多 4 個字)。
+     使用者:「能不能自訂題目,要有房主選擇決定」。
+     ⚠ 預設**開**,與共同作畫(co)刻意相反,理由是兩者改變的東西不同:
+       · co 開了會變成「好幾個人同時畫」—— 那是另一種玩法,所以基準線是關。
+       · cu 開了還是「一個畫家、一個題目」,規則一條都沒變,只是題目多一個來源;
+         而它正是使用者上一版指名要的功能 —— 預設關的話等於每一場都要先去翻設定才用得到。
+     ⚠ 因此**舊房間(沒有這一欄)會退回「開」** —— 這是刻意的,不是漏寫。
+       想關掉的房主按一下就好,而那顆鈕就在大廳。 */
+  const CUS = [0, 1];
+  const DEF_SEC = 60, DEF_ROUNDS = 2, DEF_DIFF = "std", DEF_CO = 0, DEF_CU = 1;
 
   /* ---------- 房規:白名單正規化 ----------
      ⚠ 一律走這一支(不要在別處各自 if):舊房間沒有這個欄位、手改 DB 的怪值
@@ -47,13 +58,20 @@ const DWR = (function () {
       sec: SECS.indexOf(r.sec) >= 0 ? r.sec : DEF_SEC,
       rounds: ROUNDS.indexOf(r.rounds) >= 0 ? r.rounds : DEF_ROUNDS,
       diff: DIFFS.indexOf(r.diff) >= 0 ? r.diff : DEF_DIFF,
-      co: COS.indexOf(r.co) >= 0 ? r.co : DEF_CO
+      co: COS.indexOf(r.co) >= 0 ? r.co : DEF_CO,
+      cu: CUS.indexOf(r.cu) >= 0 ? r.cu : DEF_CU
     };
   }
   function sameRules(a, b) {
     a = normRules(a); b = normRules(b);
-    return a.sec === b.sec && a.rounds === b.rounds && a.diff === b.diff && a.co === b.co;
+    return a.sec === b.sec && a.rounds === b.rounds && a.diff === b.diff
+        && a.co === b.co && a.cu === b.cu;
   }
+  /* ★ 畫家可不可以自己出題(v1.171.1)—— **唯一的真相**:
+     蓋板上那一格畫不畫得出來、以及送出時擋不擋,兩邊都問這一支
+     (比照 mayInk;分兩處各寫一次 if 就是兩個真相,遲早會不一致)。
+     ⚠ 吃的是**開局凍結的那一份**(dw.rules),不是大廳當下的 rules。 */
+  function mayOwnWord(rules) { return normRules(rules).cu === 1; }
 
   /* ---------- ★★★ 誰的筆畫得進去(v1.170.0 共同作畫)----------
      使用者:「假如還有人沒猜出來,其他人可以幫忙畫,但幫忙畫的人要是一定猜成功了」。
@@ -375,8 +393,9 @@ const DWR = (function () {
   }
 
   return {
-    PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, COS, DEF_SEC, DEF_ROUNDS, DEF_DIFF, DEF_CO,
-    normRules, sameRules, mayInk, norm, hit, cleanCustom, CUSTOM_MAX, COOL_MS, coolMs,
+    PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, COS, CUS,
+    DEF_SEC, DEF_ROUNDS, DEF_DIFF, DEF_CO, DEF_CU,
+    normRules, sameRules, mayInk, mayOwnWord, norm, hit, cleanCustom, CUSTOM_MAX, COOL_MS, coolMs,
     drawerAt, totalOf, plan, nextLive,
     guessPts, drawerPts, settle, roundDone,
     blankSt, tally, awards,

@@ -132,6 +132,10 @@ const MP = MPCore.create((function () {
     ctx.txGame(g => {
       const d = g.dw;
       if (!d || d.ph !== "pick" || d.seq !== seq) return false;
+      /* ⚠ 房規的第二道門(第一道在 pickOwn、第三道是蓋板上根本不畫那一格)——
+         比照 ink() 的慣例:畫面擋一次、寫入端再擋一次。
+         ⚠ 吃的是**這一場凍結的** d.rules,不是大廳當下的 rules。 */
+      if (!DWR.mayOwnWord(d.rules)) return false;
       d.cw = cw; d.w = -1;
       d.ph = "draw"; d.at = Date.now(); d.seq = seq + 1;
     });
@@ -236,6 +240,8 @@ const MP = MPCore.create((function () {
   function pickOwn(text) {
     if (!dw || dw.ph !== "pick") return;
     if (!iAmDrawer()) { showToast("這一回合不是你畫 🙂"); return; }
+    // 房規關掉時連提示都要說得出原因(蓋板上本來就不會畫那一格,這裡是第二道)
+    if (!DWR.mayOwnWord(dw.rules)) { showToast("這一場房主關掉了自訂題目 ✏️", 1800); return; }
     const cw = DWR.cleanCustom(text);
     if (!cw) { showToast("題目要是 1~" + DWR.CUSTOM_MAX + " 個中文 / 英數字 ✏️", 1800); return; }
     toDrawOwn(cw, dw.seq);
@@ -498,7 +504,8 @@ const MP = MPCore.create((function () {
   function paintOver() {
     if (!dw) { DWB.hideOver(); return; }
     if (dw.ph === "pick") {
-      DWB.paintPick(dw.cand || [], iAmDrawer(), ctx.dispName(drawerId() || ""));
+      // 第四個參數 = 房規允不允許自己出題(v1.171.1);關掉時那一格**根本不產生**
+      DWB.paintPick(dw.cand || [], iAmDrawer(), ctx.dispName(drawerId() || ""), DWR.mayOwnWord(dw.rules));
       return;
     }
     if (dw.ph === "show") {
@@ -564,6 +571,9 @@ const MP = MPCore.create((function () {
       /* ★ 共同作畫要講清楚兩件事:誰能幫(已經猜中的人)、以及**幫畫不會加分**
          —— 不講的話會有人以為幫畫有分,而它純粹是「不用乾等」的玩法(見 notes/21 紅線 30)。 */
       (rules.co ? "<br>🖌 <b>共同作畫</b>:已經猜中的人可以一起畫,幫還沒猜到的人一把(幫畫不加分,清空只有畫家能按)。" : "") +
+      /* ★ 自訂題目(v1.171.1)。⚠ **關掉時才講**:它預設開著,而預設值不必在規則說明裡
+         佔一行(那一段每多一句就少一點被讀完的機會);關掉是房主特地按的,那才要講。 */
+      (rules.cu ? "" : "<br>✏️ 這一場<b>不能自己出題</b>,畫家只能從三個候選裡挑。") +
       "<br>每人當 <b>" + rules.rounds + "</b> 次畫家 · 一回合 <b>" + rules.sec + "</b> 秒 · 題目「" +
       L.label + "」(" + L.desc + ")";
   }
@@ -719,7 +729,8 @@ const MP = MPCore.create((function () {
     /* ---------- 大廳設定列 / 房間框徽章 ---------- */
     syncSetup() {
       const isHost = ctx.isHost();
-      [["dwSecSeg", "sec"], ["dwRoundSeg", "rounds"], ["dwDiffSeg", "diff"], ["dwCoSeg", "co"]].forEach(([id, key]) => {
+      [["dwSecSeg", "sec"], ["dwRoundSeg", "rounds"], ["dwDiffSeg", "diff"],
+       ["dwCoSeg", "co"], ["dwCuSeg", "cu"]].forEach(([id, key]) => {
         const seg = $(id); if (!seg) return;
         seg.classList.toggle("readonly", !isHost);
         [...seg.children].forEach(b => {
@@ -728,7 +739,8 @@ const MP = MPCore.create((function () {
         });
       });
       [["dwSecLabel", "作畫秒數"], ["dwRoundLabel", "每人當幾次畫家"],
-       ["dwDiffLabel", "題目難度"], ["dwCoLabel", "共同作畫"]].forEach(([id, base]) => {
+       ["dwDiffLabel", "題目難度"], ["dwCoLabel", "共同作畫"],
+       ["dwCuLabel", "自訂題目"]].forEach(([id, base]) => {
         const el = $(id); if (el) el.textContent = isHost ? base : (base + "(房主決定)");
       });
       ruleHint();

@@ -743,9 +743,10 @@ const DWB = (function () {
        而畫面上沒有任何線索,他只會覺得這一頁壞掉了。
        key 包含 mine / 候選 / 畫家名字 = 這張卡會長得不一樣的全部理由;一樣就整段不動。
      ⚠ 相位換掉時 showOver / hideOver 會把 key 清空 —— 所以下一回合一定重畫得出來。 */
-  function paintPick(cands, mine, drawerName) {
+  function paintPick(cands, mine, drawerName, allowOwn) {
     const box = $("dwOver");
-    const key = (mine ? "m|" : "o|") + (cands || []).join(",") + "|" + (drawerName || "");
+    const key = (mine ? "m|" : "o|") + (cands || []).join(",") + "|" + (drawerName || "")
+              + "|" + (allowOwn ? 1 : 0);
     if (box && !box.classList.contains("hidden") && box.dataset.pk === key) return;
     if (!mine) {
       showOver('<div class="dw-ov-card"><div class="dw-ov-t">' + esc(drawerName || "畫家") + ' 正在選題目…</div>' +
@@ -758,9 +759,11 @@ const DWB = (function () {
         '<span class="dw-pk-ic">' + DWGen.iconAt(idx) + '</span>' +
         '<span class="dw-pk-w">' + esc(DWGen.textAt(idx)) + '</span>' +
       '</button>').join("");
-    /* ✏️ 自己出題。⚠ maxlength 只是第一道:貼上、注音選字、手改 DOM 都繞得過,
-       真正的上限在 DWR.cleanCustom(送出端與每一台的讀取端各洗一次)。 */
-    const own = '<div class="dw-own">' +
+    /* ✏️ 自己出題。⚠ 房規關掉時**整格不產生**(不是用 CSS 藏起來)——
+         藏起來的話 DOM 上還是有一個送得出去的輸入框,而擋它的只剩 adapter 那兩道。
+       ⚠ maxlength 只是第一道:貼上、注音選字、手改 DOM 都繞得過,
+         真正的上限在 DWR.cleanCustom(送出端與每一台的讀取端各洗一次)。 */
+    const own = !allowOwn ? "" : '<div class="dw-own">' +
       '<input id="dwOwnI" class="dw-own-i" type="text" maxlength="' + DWR.CUSTOM_MAX + '" ' +
         'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
         'placeholder="自己出題(最多 ' + DWR.CUSTOM_MAX + ' 個字)" aria-label="自己出題">' +
