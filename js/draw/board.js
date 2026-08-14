@@ -648,6 +648,9 @@ const DWB = (function () {
   function bindPick() {
     const box = $("dwOver"); if (!box) return;
     box.addEventListener("click", e => {
+      /* 分享鈕與題目鈕共用這一個委派(蓋板每換一次相位就整段重畫,綁在 paintShow 裡
+         會每重畫一次多疊一個監聽 → 按一下送出好幾次)。 */
+      if (e.target.closest(".dw-shbtn")) { shareShot(); return; }
       const b = e.target.closest(".dw-pickbtn"); if (!b) return;
       const k = +b.dataset.k;
       if (!isFinite(k)) return;
@@ -664,7 +667,16 @@ const DWB = (function () {
         '<span class="dw-sh-n">' + esc(r.name) + (r.drawer ? ' <b>🎨</b>' : '') + '</span>' +
         '<span class="dw-sh-p">' + (r.pts > 0 ? "+" + r.pts : "—") + '</span>' +
       '</div>').join("");
-    showOver('<div class="dw-ov-card"><div class="dw-ov-s">答案是</div>' +
+    /* ★★ 分享鈕放在**這張蓋板上**(v1.164.0)—— 那是最自然的時刻:答案剛揭曉、圖還在、
+       大家在笑。而且**零版面成本**:工具列與回合列都已經滿了,往那兩列塞就是從畫布身上
+       拿高度(見紅線 17)。⚠ 作畫中刻意沒有這顆鈕:那時題目還沒公布,分享出去的圖
+       連「答案幾個字」都寫不了,就只是一張沒有故事的塗鴉。
+       ⚠⚠ 它是**卡片的兄弟、貼在蓋板右上角**,不是卡片裡的一列 —— 第一版放進卡片裡,
+         矮視窗(舞台 213px)上把卡片撐高 39px 直接被 .dw-stage 裁掉;
+         改成卡片自己捲之後又變成「要捲一下才找得到」,而這張卡只活 5 秒。
+         貼在角落就與卡片多高完全無關,永遠在同一個位置。 */
+    showOver('<button class="dw-shbtn" type="button" title="分享這張畫" aria-label="分享這張畫">📤</button>' +
+             '<div class="dw-ov-card"><div class="dw-ov-s">答案是</div>' +
              '<div class="dw-ov-w display">' + esc(word || "?") + '</div>' +
              '<div class="dw-sh-list">' + list + '</div></div>', "show");
   }
@@ -673,6 +685,11 @@ const DWB = (function () {
      六、猜題列(見檔頭 ④:只收猜錯的)
      ========================================================================== */
   const SAY_MAX = 40;
+  /* ★★ 這一回合的猜測紀錄(v1.164.0,分享圖要用)。畫面上那幾列是 innerHTML,
+     要重新解析回來太脆弱 —— 這裡另外留一份結構化的。
+     ⚠⚠ **sayLog 只收猜錯的**(addSay 本來就只收猜錯的,見檔頭 ④),
+       而 hitLog **一個字的內容都不存** —— 猜中的人打的就是正解,存了等於把答案留在手上。 */
+  let sayLog = [], hitLog = [];
   function sayBox() { return $("dwSay"); }
   function pushSay(html) {
     const box = sayBox(); if (!box) return;
@@ -685,6 +702,7 @@ const DWB = (function () {
   }
   // 猜錯的:名字 + 內容(這是笑點來源,所以內容照實播)
   function addSay(name, text, seat, mine) {
+    sayLog.push({ n: String(name || ""), t: String(text || "") });   // 分享圖要用(只有猜錯的)
     pushSay('<span class="dw-seat p' + ((seat | 0) % 6) + '"></span>' +
             '<span class="dw-say-n' + (mine ? " me" : "") + '">' + esc(name) + '</span>' +
             '<span class="dw-say-t">' + esc(text) + '</span>');
@@ -693,13 +711,18 @@ const DWB = (function () {
      ⚠ v1.161.0 起「正解幾個字」是**公開的提示**(見 setLen),但這裡照樣一個字都不播:
        猜中的人打的可能是**同義詞**(貓咪 / 小貓),長度與正解不一樣 → 播了等於多送一條
        正解之外的線索;而內容本身更是直接把答案報給全房。「字數公開」不等於「這一則可以播」。 */
-  function addHit(name, seat, rank) {
+  function addHit(name, seat, rank, secs) {
+    /* ⚠ secs 只是給分享圖用的(v1.164.0)——**內容一個字都不進來**,同上面那條。 */
+    hitLog.push({ n: String(name || ""), s: +secs > 0 ? +secs : 0 });
     pushSay('<span class="dw-seat p' + ((seat | 0) % 6) + '"></span>' +
             '<span class="dw-say-hit">✅ ' + esc(name) + ' 猜中了' +
             (rank >= 0 ? '(第 ' + (rank + 1) + ' 個)' : '') + '</span>');
   }
   function sysSay(txt) { pushSay('<span class="dw-say-sys">' + esc(txt) + '</span>'); }
-  function clearSay() { const box = sayBox(); if (box) box.innerHTML = ""; }
+  function clearSay() {
+    const box = sayBox(); if (box) box.innerHTML = "";
+    sayLog = []; hitLog = [];      // ⚠ 兩份一起清:換回合時分享圖不可以帶著上一題的猜測
+  }
 
   /* ---------- 猜題輸入 ----------
      ⚠⚠ 中文輸入法(IME)選字時按 Enter 是「確定選字」,不是「送出」——
@@ -802,9 +825,151 @@ const DWB = (function () {
     fit();
   }
 
+  /* ==========================================================================
+     八、分享這張畫(v1.164.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「可以考慮做一個功能,把目前的畫面分享到 line 之類的」
+       以及:「我覺得題目不要分享出來,其他的內容就可以,包含了誰猜了什麼」
+
+       ★★★ **分享圖刻意不寫題目** —— 這讓它從「存檔」變成**給 LINE 群組玩的謎題**:
+         收到的人看畫 + 看大家猜了什麼,自己猜。
+       ⚠⚠ 所以「誰猜了什麼」**只能放猜錯的那幾則**:猜中的人打的就是正解(或同義詞),
+         印上去等於把答案印上去,與「題目不要分享」直接矛盾。
+         猜中的一律只寫「✅ 某某猜中了(3.2 秒)」——同檔頭 ④ 的理由,延伸到分享圖。
+       ★ 但**「答案幾個字」要寫**:那本來就是遊戲裡公開給猜題者的提示,而且沒有它
+         收到圖的人範圍太大、根本猜不動 —— 有它才成立為一道謎題。
+
+       ★★ 匯出一律用**邏輯座標系 1000×750**(不是現在畫布的尺寸)——
+         每一台裝置分享出來的圖才會一模一樣、也不會因為誰的手機小就糊掉。
+
+       ⚠⚠⚠ **不可以「先填紙色再把筆劃畫上去」** —— 擦布是 `destination-out`,
+         紙色已經在下面的話,擦布會**把紙也一起擦掉**,分享出去是一個透明的洞
+         (在 LINE 深色模式下就是一塊黑斑)。一定要兩層:
+           ① 透明的畫布上畫墨水 + 擦布(與線上那張畫的機制完全相同)
+           ② 另一張填好紙色的畫布,再把 ① 貼上去
+         這正是線上那張畫的做法(canvas 透明、紙是 CSS 背景),只是要自己補上紙。
+     ========================================================================== */
+  const SHOT_SAYS = 3;                 // 字幕最多放幾則猜錯的(取最早的幾則,每台裝置一致)
+  const SHOT_PAD = 34, SHOT_LINE = 46;
+  let shotInfo = {};                   // { drawer, len } —— 由 adapter 在公布答案時給
+
+  function setShotInfo(o) { shotInfo = o || {}; }
+
+  /* 紙的顏色**只有一份真相**(styles.css 的 --dw-paper)—— 這裡讀 computed 值,
+     刻意不在 JS 裡再寫一份色碼(同色塊讀 COLORS[i] 那條的理由)。 */
+  function paperColor() {
+    const el = $("dwInk");
+    const c = el ? getComputedStyle(el).backgroundColor : "";
+    return (c && c !== "rgba(0, 0, 0, 0)" && c !== "transparent") ? c : "#fffdf7";
+  }
+  /* 把 strokes 依邏輯座標畫進任意一個 context(給匯出用;畫面上那張走 repaint)。
+     ⚠ 撤銷掉的跳過、順序不可以動 —— 與 repaint() 同一套規矩。 */
+  function paintTo(g, W, H) {
+    const kx = W / LW, ky = H / LH;
+    g.lineCap = "round"; g.lineJoin = "round";
+    for (let i = 0; i < strokes.length; i++) {
+      const s = strokes[i];
+      if (s.un || s.p.length < 2) continue;
+      if (s.er) {
+        g.globalCompositeOperation = "destination-out";
+        g.strokeStyle = "rgba(0,0,0,1)";
+        g.lineWidth = Math.max(1, ER_W * kx);
+      } else {
+        g.globalCompositeOperation = "source-over";
+        g.strokeStyle = COLORS[s.c] || COLORS[0];
+        g.lineWidth = Math.max(1, (WIDTHS[s.w] || WIDTHS[DEF_W]) * kx);
+      }
+      g.beginPath();
+      g.moveTo(s.p[0] * kx, s.p[1] * ky);
+      for (let j = 2; j < s.p.length; j += 2) g.lineTo(s.p[j] * kx, s.p[j + 1] * ky);
+      if (s.p.length === 2) g.lineTo(s.p[0] * kx + 0.01, s.p[1] * ky);
+      g.stroke();
+    }
+    g.globalCompositeOperation = "source-over";     // ⚠ 一定要還原(同 penEnd)
+  }
+  /* 字幕。★ 回傳的每一則都已經是最終文字 —— 這一支是「分享圖上會出現什麼」的唯一真相,
+     要驗「題目沒有洩漏出去」只要驗它就夠了。 */
+  function shotLines() {
+    const out = [];
+    const who = shotInfo.drawer ? (shotInfo.drawer + " 畫的") : "";
+    const len = shotInfo.len > 0 ? ("答案 " + shotInfo.len + " 個字") : "";
+    out.push({ t: (who && len) ? (who + " · " + len) : (who || len || "你畫我猜"), head: true });
+    // ⚠⚠ 只有猜錯的(見上面那段)
+    sayLog.slice(0, SHOT_SAYS).forEach(r => out.push({ t: r.n + " 猜:" + r.t }));
+    if (hitLog.length) {
+      const h = hitLog[0];
+      out.push({ t: "✅ " + h.n + " 猜中了" + (h.s > 0 ? "(" + h.s.toFixed(1) + " 秒)" : ""), ok: true });
+    } else {
+      out.push({ t: "😅 這一題沒有人猜中", ok: true });
+    }
+    return out;
+  }
+  /* 合成整張圖 → dataURL。★★ 全程**同步**:iOS 要求 navigator.share() 在使用者手勢裡呼叫,
+     中間 await 一下(例如用非同步的 toBlob)手勢授權就過期了,分享會靜靜失敗。 */
+  function shotDataUrl() {
+    const lines = shotLines();
+    const capH = SHOT_PAD * 2 + lines.length * SHOT_LINE;
+    // ① 透明層:墨水與擦布(見上面 ⚠⚠⚠)
+    const ink = document.createElement("canvas");
+    ink.width = LW; ink.height = LH;
+    paintTo(ink.getContext("2d"), LW, LH);
+    // ② 紙 + 貼上 ① + 字幕
+    const out = document.createElement("canvas");
+    out.width = LW; out.height = LH + capH;
+    const g = out.getContext("2d");
+    g.fillStyle = paperColor();
+    g.fillRect(0, 0, out.width, out.height);
+    g.drawImage(ink, 0, 0);
+    g.strokeStyle = "rgba(0,0,0,.12)"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(SHOT_PAD, LH); g.lineTo(LW - SHOT_PAD, LH); g.stroke();
+    let y = LH + SHOT_PAD + 30;
+    lines.forEach(l => {
+      g.fillStyle = l.head ? "#20242c" : (l.ok ? "#2f7de0" : "rgba(32,36,44,.72)");
+      g.font = (l.head ? "800 34px " : "700 30px ") + "'Nunito','Noto Sans TC',sans-serif";
+      g.fillText(l.t, SHOT_PAD, y);
+      y += SHOT_LINE;
+    });
+    g.fillStyle = "rgba(32,36,44,.34)";
+    g.font = "700 24px 'Nunito','Noto Sans TC',sans-serif";
+    const mark = "你畫我猜 🎨";
+    g.fillText(mark, LW - SHOT_PAD - g.measureText(mark).width, LH + capH - SHOT_PAD + 6);
+    return out.toDataURL("image/png");
+  }
+  // dataURL → File(同步;見 shotDataUrl 上面那段為什麼不可以用 toBlob)
+  function dataUrlToFile(url, name) {
+    try {
+      const bin = atob(url.slice(url.indexOf(",") + 1));
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return new File([arr], name, { type: "image/png" });
+    } catch (e) { return null; }
+  }
+  /* 按下分享。回傳 "share" / "download" / "empty"(給 e2e 判斷走了哪一條)。
+     ⚠⚠ 這一頁跑在 app.html 的滿版 iframe 裡,而 Web Share 受權限政策管 ——
+       **`app.html` 的 iframe 一定要有 `allow="web-share"`**,否則 share() 直接
+       NotAllowedError。那是「直接開 draw.html 測都正常、包進外殼就永遠失敗」的坑。
+     ⚠ 桌機大多沒有「分享檔案」→ 退成下載 PNG(不要什麼都不做)。 */
+  const SHOT_TXT = "猜猜這是什麼?🎨";
+  function shareShot() {
+    if (!strokes.some(s => !s.un)) { try { showToast("這一張還沒有畫東西 🙂"); } catch (e) {} return "empty"; }
+    const url = shotDataUrl();
+    const file = dataUrlToFile(url, "draw.png");
+    const nv = navigator;
+    if (file && nv.share && (!nv.canShare || nv.canShare({ files: [file] }))) {
+      /* ⚠ 不 await:使用者按取消會 reject,那不是錯誤,吞掉就好。 */
+      try { nv.share({ files: [file], text: SHOT_TXT }).catch(() => {}); return "share"; } catch (e) {}
+    }
+    const a = document.createElement("a");
+    a.href = url; a.download = "你畫我猜.png";
+    document.body.appendChild(a); a.click(); a.remove();
+    try { showToast("已存成圖片 📥"); } catch (e) {}
+    return "download";
+  }
+
   return {
     init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush,
     pickColor, toggleEraser, toggleLine, undo, syncTool,
+    setShotInfo, shareShot, shotLines, shotDataUrl,
     setCd, stopCd, setRoundInfo, setLen, setZoom,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,

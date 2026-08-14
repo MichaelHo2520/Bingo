@@ -344,6 +344,11 @@ const MP = MPCore.create((function () {
         pts: last[id] || 0, me: id === me, drawer: id === d
       }));
       const w = wordOf();
+      /* ★★ 分享圖要用的兩件事(v1.164.0):誰畫的 + 答案幾個字。
+         ⚠⚠ **題目文字刻意不傳** —— 使用者:「我覺得題目不要分享出來」,
+           那讓分享圖變成一道給 LINE 群組玩的謎題(完整說明在 board.js 第八節)。
+         ⚠ 字數走 DWGen.lenAt(正解),與頂列那顆晶片同一個真相。 */
+      DWB.setShotInfo({ drawer: ctx.dispName(d || ""), len: dw.w >= 0 ? DWGen.lenAt(dw.w) : 0 });
       DWB.paintShow(w ? w.w : "?", rows);
       return;
     }
@@ -356,7 +361,8 @@ const MP = MPCore.create((function () {
       if (seenHits[id]) return;
       seenHits[id] = 1;
       const h = dw.hits[id] || {};
-      DWB.addHit(ctx.dispName(id), Math.max(0, seatOf(id)), h.o);
+      // ⚠ 第四個參數是**秒數**,只給分享圖用(內容一個字都不傳,見 board.js 的 addHit)
+      DWB.addHit(ctx.dispName(id), Math.max(0, seatOf(id)), h.o, Math.max(0, h.t | 0) / 1000);
       if (id !== ctx.me()) { try { Sound.place(); } catch (e) {} }
     });
   }

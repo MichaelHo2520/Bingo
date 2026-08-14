@@ -98,6 +98,10 @@ $("mpNewSeason").addEventListener("click", () => { MP.resetScores(); MP.again();
    「打完回頭看最後那張圖」,削掉的正是重點)。切 class 之後讀 rect 會強制同步 layout,
    量到的就是新值,順序對就夠、不必等 rAF。⚠ 兜底那一半(RO)在 js/draw/board.js 的 init()。 */
 $("winPeek").addEventListener("click", () => { peekBoard(); DWB.fit(); });
+/* ★★ 分享最後那一張(v1.164.0)。⚠ 一定要**直接**在 click 裡走完到 navigator.share():
+   iOS 要求它在使用者手勢裡呼叫,中間 await 一下手勢授權就過期、分享會靜靜失敗
+   —— 所以 DWB.shareShot() 整條路徑都是同步的(見 js/draw/board.js 第八節)。 */
+$("winShare").addEventListener("click", () => DWB.shareShot());
 $("reopenWin").addEventListener("click", showResult);
 // 賽後表情列:四顆一鍵送給全部人(結果卡不關),😀 開完整面板。節流 600ms 防連點狂送。
 let reactAt = 0;

@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.163.0 -->
-<meta name="version" content="1.163.0">
+<!-- 你畫我猜 · v1.164.0 -->
+<meta name="version" content="1.164.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -287,7 +287,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn primary" id="mpAgain">再玩一場</button>
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
+      <!-- ★ 分享最後那一張(v1.164.0)。刻意跟「先看看畫板 👀」擺在一起 ——
+           那兩件事是同一個動作的兩半:看一下、然後把它傳出去。
+           ⚠ 分享圖上**沒有題目**(使用者:「我覺得題目不要分享出來」),
+             那讓它變成一道給 LINE 群組玩的謎題(完整說明在 js/draw/board.js 第八節)。 -->
       <button class="peek-link" id="winPeek">先看看畫板 👀</button>
+      <button class="peek-link" id="winShare">分享這張畫 📤</button>
     </div>
   </div>
   <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>

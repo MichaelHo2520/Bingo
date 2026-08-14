@@ -20,8 +20,8 @@
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v1.163.0 -->
-<meta name="version" content="1.163.0">
+<!-- 外殼(shell)· v1.164.0 -->
+<meta name="version" content="1.164.0">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
@@ -45,7 +45,10 @@
 </style>
 </head>
 <body>
-<iframe id="stage" title="遊戲" allow="fullscreen; microphone; autoplay"></iframe>
+<!-- ⚠⚠ `web-share` 非加不可(v1.164.0):你畫我猜的「分享這張畫」走 navigator.share(),
+     而 Web Share **受權限政策管** —— 內層是 iframe,沒有這一項就直接 NotAllowedError。
+     那是「直接開 draw.html 測都正常、包進這個外殼就永遠失敗」的坑,而且只有真機按下去才會發現。 -->
+<iframe id="stage" title="遊戲" allow="fullscreen; microphone; autoplay; web-share"></iframe>
 <noscript><div class="noscript">這個遊戲需要 JavaScript。<a href="index.html">直接進入首頁</a></div></noscript>
 <script>
 (function(){

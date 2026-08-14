@@ -7198,6 +7198,16 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
      很容易變成「只有那一個主題讀不到字」,而那正好是平常不會去看的那一個。 */
   .dw-over{position:absolute;inset:0;display:grid;place-items:center;padding:10px;
     background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:14px}
+  /* ⚠⚠⚠ **這張卡不可以加 `max-height:100%` + `overflow-y:auto`**(v1.164.0 試過,會壞)。
+     動機是對的:矮視窗上這張卡本來就會超出蓋板一點(實測舞台 213px 時溢出 14px),
+     而 `.dw-stage` 是 overflow:hidden → 超出去的部分**會被靜靜裁掉**。
+     但那個修法有一個**看不出因果的副作用**:卡片變成捲動容器之後,
+     `.dw-stage` 的尺寸解析跟著變,`fit()` 會在舞台還沒有高度時就跑,
+     然後**卡在 80×60 的下限回不來** —— 症狀是「放大鈕按了畫布不會變大」、
+     「畫布只剩一小塊」,而且與這張卡完全無關,任何人都不會往這裡找。
+     ★ e2e 的 O / P / M2 三節會一起紅(二分驗過:只拿掉這三個屬性就全綠)。
+     → 所以分享鈕改成**貼在蓋板角落**(見 .dw-shbtn),卡片一個字都不必動。
+     ⚠ 那 14px 的既有溢出留著不修 —— 它從 v1.155.x 就在,而且只影響矮視窗。 */
   .dw-ov-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;
     padding:14px 16px;text-align:center;max-width:100%;backdrop-filter:blur(14px);
     box-shadow:0 10px 30px rgba(0,0,0,.35)}
@@ -7221,6 +7231,18 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-sh-row.me{color:var(--text)}
   .dw-sh-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:800}
   .dw-sh-p{font-family:'Fredoka',sans-serif;font-weight:700;font-size:15px;color:var(--accent);flex:none}
+  /* 分享這張(v1.164.0)。⚠⚠ **貼在蓋板右上角,不是卡片裡的一列** ——
+     放進卡片裡的話,矮視窗上會把卡片撐出蓋板而被 .dw-stage 裁掉(見上面 .dw-ov-card 那段);
+     改成卡片自己捲又變成「要捲一下才找得到」,而這張卡只活 5 秒。貼角落就與卡片多高無關。
+     ⚠ 44px 是觸控目標的下限,不要再縮。
+     ⚠ class 刻意叫 .dw-shbtn 而不是 .dw-sh-btn:同一段裡已經有一整組 .dw-sh-*(公布答案
+       的分數表),多一個同族名字之後很容易改到彼此(CLAUDE.md 紅線 6 的第一類撞名)。 */
+  .dw-shbtn{position:absolute;top:8px;right:8px;z-index:2;width:44px;height:44px;
+    display:grid;place-items:center;border-radius:50%;cursor:pointer;font-size:19px;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.16);color:var(--text);
+    transition:.15s}
+  .dw-shbtn:hover{background:rgba(255,255,255,.26)}
+  .dw-shbtn:active{transform:scale(.92)}
 
   /* ---------- 畫家工具列 ---------- */
   .dw-tools{flex:none;display:flex;align-items:center;gap:8px}
