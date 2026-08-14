@@ -343,7 +343,32 @@ const MP = MPCore.create((function () {
   /* 比分畫在**房間框的玩家晶片列**(核心的 renderPlayers)—— v1.155.0 起沒有獨立的比分列。
      那一排本來就會畫「誰輪到了(turnId → .turn)」「誰幾分(chipTail)」「點一下送表情」,
      與另外十一個遊戲同一個概念,而且省下 45~50px 直接變成更大的畫布(見 draw.html 那段註解)。 */
-  function paintHud() { ctx.renderPlayers(); }
+  function paintHud() { ctx.renderPlayers(); paintMini(); }
+
+  /* ★★ 放大模式那一列的迷你比分條(v1.169.0)。使用者:「最上層現在只剩下兩個小圖案,
+     這樣是不是有點浪費,想點東西放上去吧,但要注意到絕對不能影響到麥克風跟 emoji」。
+     ★ 放的就是**放大模式收掉的那件事** —— 比分(v1.168.0 起晶片列在放大時收著),
+       順手把「誰是畫家 / 誰猜中 / 誰放棄」標上去:那是有了放棄之後最想知道的事
+       (還在等誰),而畫面上原本完全看不出來。
+     ⚠ **依分數排序**(`DWR.standings`)不是照座位:人多時右邊會被 CSS 裁掉,
+       排序保證被裁掉的是分數最低的那幾個,而「誰領先」永遠看得到。
+     ⚠ 只算**還在房裡的人**(同 winner.pts 的慣例)。
+     ⚠ 「會不會擠掉那兩顆鈕」是 CSS 的責任(見 styles.css 的 .dw-mini)——
+       這裡一律畫滿,不做「塞不下就少畫」的判斷(那會變成第二個真相)。 */
+  function paintMini() {
+    if (!dw || ctx.phase() !== "playing") { DWB.setMini([]); return; }
+    const me = ctx.me(), dId = drawerId(), alive = aliveMap();
+    const live = gOrder.filter(id => alive[id]);
+    DWB.setMini(DWR.standings(live, dw.pts || {}).map(r => ({
+      name: ctx.dispName(r.id),
+      pts: r.pts,
+      /* ⚠ 順序有意義:畫家先判(他不會有 hits / gv),再猜中、再放棄 */
+      mark: r.id === dId ? "🎨"
+          : (dw.hits && dw.hits[r.id]) ? "✅"
+          : (dw.gv && dw.gv[r.id]) ? "🏳️" : "",
+      me: r.id === me
+    })));
+  }
   function paintBar() {
     if (!dw) { DWB.setRoundInfo("", ""); DWB.setCd(0, 0); return; }
     const R = DWR.normRules(dw.rules);
@@ -529,7 +554,7 @@ const MP = MPCore.create((function () {
     applyGame(g, playing) {
       gOrder = (g && g.order) || [];
       dw = (g && g.dw) || null;
-      if (!playing || !dw) { DWB.setEnabled(false); DWB.setGuess({ show: false }); return; }
+      if (!playing || !dw) { DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]); return; }
 
       // 換回合 → 重掛筆劃 / 猜題監聽,並請房主把上一回合的資料收掉
       if (dw.n !== curN) {
@@ -578,7 +603,7 @@ const MP = MPCore.create((function () {
       clearPhaseT(); detachRound();
       dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
-      DWB.setEnabled(false); DWB.setGuess({ show: false });
+      DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]);
       ruleHint();
     },
     enterPlaying() {
@@ -591,7 +616,7 @@ const MP = MPCore.create((function () {
       clearPhaseT(); detachRound();
       dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
-      DWB.setEnabled(false); DWB.setGuess({ show: false });
+      DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]);
     },
 
     /* ---------- 大廳設定列 / 房間框徽章 ---------- */

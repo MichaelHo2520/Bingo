@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.168.0 -->
-<meta name="version" content="1.168.0">
+<!-- 你畫我猜 · v1.169.0 -->
+<meta name="version" content="1.169.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -108,6 +108,19 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </button>
       <span class="label dw-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="這一場的規則"></span>
+      <!-- ★★ 放大模式的迷你比分條(v1.169.0)。使用者:「最上層現在只剩下兩個小圖案,
+           這樣是不是有點浪費,想點東西放上去吧,但要注意到絕對不能影響到麥克風跟 emoji」。
+           ★ 放的就是**放大模式收掉的那件事** —— 比分(v1.168.0 起晶片列在放大時是收著的),
+             順手把「誰是畫家 / 誰猜中了 / 誰放棄了」也標上去(那是 v1.168.0 之後最想知道的事)。
+           ⚠⚠ **絕對不能影響 🎤 / 😀**:靠的是 CSS 的寬度規則 ——
+              這一格 `flex:1 1 0` + `min-width:0` + `overflow:hidden`,
+              而 .mp-actions 那兩顆是 `flex:none` → **永遠是這一條先被壓縮**,
+              名字再長、人再多都推不動那兩顆。⚠ 改這一段的 CSS 一定要重跑 e2e 的 O3 節
+              (它會塞六個超長名字,再用 elementFromPoint 確認那兩顆還按得到)。
+           ⚠ 平常(沒放大)整條是 display:none —— 那時房間框的晶片列本來就在,
+             同一件事講兩次正是使用者說過的「資訊相當得亂」。
+           ⚠ 不可以給任何一格 accent 底色(紅線 26:字色與底色會解析成同一個變數 → 看不見)。 -->
+      <span class="dw-mini" id="dwMini" aria-hidden="true"></span>
       <div class="mp-actions">
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>

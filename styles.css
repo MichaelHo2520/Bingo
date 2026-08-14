@@ -7472,6 +7472,29 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   body.dw-big .dw-room .mp-subrow,
   body.dw-big .dw-room-foot{display:none}
   body.dw-big .dw-room-top{justify-content:flex-end}
+  /* ---------- 放大模式的迷你比分條(v1.169.0)----------
+     使用者:「最上層現在只剩下兩個小圖案,這樣是不是有點浪費,想點東西放上去吧,
+     但要注意到絕對不能影響到麥克風跟 emoji」。
+     ★ 放的是**放大模式自己收掉的那件事**:比分 + 誰是畫家 / 誰猜中 / 誰放棄。
+     ⚠⚠⚠ 「絕對不能影響 🎤 / 😀」是這一段唯一的紅線,而保證它的是這三個宣告:
+       `flex:1 1 0`(可以無限收縮)+ `min-width:0`(不受內容最小寬撐開)+ `overflow:hidden`。
+       .mp-actions 裡那兩顆是 `flex:none` → **永遠是這一條先被壓縮**。
+       ⚠ 少了 `min-width:0` 就會破功:flex 項目的預設 min-width 是 auto,
+         內容(六個名字)會把它撐開,而被推出去的就是那兩顆鈕。
+     ⚠ 右緣用 mask 淡出:人多時最後幾格會被裁掉,而**依分數排序**(見 adapter 的 paintMini)
+       保證被裁掉的是分數最低的那幾個 —— 切一半的字用漸層收掉比硬切好看。
+     ⚠ 不可以給任何一格 accent 底(紅線 26 那族:字色與底色同一個變數 → 整格看不見)。
+     ⚠ 高度要壓在 34px 的鈕以下,否則這一列會變高 —— 那就把放大省下來的畫布又吃回去了。 */
+  .dw-mini{display:none}
+  body.dw-big .dw-mini{display:flex;align-items:center;gap:5px;flex:1 1 0;min-width:0;
+    overflow:hidden;white-space:nowrap;
+    -webkit-mask-image:linear-gradient(to right,#000 88%,transparent);
+    mask-image:linear-gradient(to right,#000 88%,transparent)}
+  .dw-mi{flex:none;display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:9px;
+    background:rgba(255,255,255,.07);font-size:11px;font-weight:800;color:var(--muted);line-height:1.5}
+  .dw-mi.me{background:rgba(255,255,255,.16);color:var(--text)}
+  .dw-mi-n{max-width:52px;overflow:hidden;text-overflow:ellipsis}
+  .dw-mi b{font-family:'Fredoka',sans-serif;font-size:12px;font-weight:700;color:var(--accent-2)}
 
   /* ---------- ⚠⚠ 這一頁**不做**「手機對局中自動收頂列」 ----------
      另外五頁有一條 `(max-height:780px) and (pointer:coarse)` 的自動收頂列,這一頁

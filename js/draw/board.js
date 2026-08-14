@@ -652,6 +652,25 @@ const DWB = (function () {
     b.addEventListener("click", () => cb.onFin && cb.onFin(!b.classList.contains("on")));
   }
 
+  /* ---------- 放大模式的迷你比分條(v1.169.0)----------
+     rows = [{ name, pts, mark, me }],**已經排好序**(adapter 的 paintMini 依分數排)。
+     使用者:「最上層現在只剩下兩個小圖案,這樣是不是有點浪費,想點東西放上去吧,
+     但要注意到絕對不能影響到麥克風跟 emoji」。
+     ⚠⚠ 「不影響那兩顆」是 CSS 的事(`flex:1 1 0` + `min-width:0` + `overflow:hidden`,
+       見 styles.css 那一段)—— 這一支**不可以**改成「算得出塞不下就少畫幾格」:
+       那會變成兩個真相,而且視窗一轉向就錯。畫滿、讓 CSS 去裁。
+     ⚠ 平常整條被 CSS 收起來(只有 body.dw-big 顯示),所以這裡**無條件畫**就對了 ——
+       不要在這裡問「現在放大了嗎」,那又是第二個真相。 */
+  function setMini(rows) {
+    const el = $("dwMini"); if (!el) return;
+    const list = rows || [];
+    el.innerHTML = list.map(r =>
+      '<span class="dw-mi' + (r.me ? " me" : "") + '">' +
+      (r.mark ? '<span class="dw-mi-k">' + esc(r.mark) + '</span>' : "") +
+      '<span class="dw-mi-n">' + esc(r.name || "") + '</span><b>' + (r.pts | 0) + '</b></span>'
+    ).join("");
+  }
+
   /* ==========================================================================
      五、蓋板:選題目 / 公布答案
      ──────────────────────────────────────────────────────────────────────────
@@ -1052,7 +1071,7 @@ const DWB = (function () {
     pickColor, toggleEraser, toggleLine, undo, syncTool,
     setShotInfo, shareShot, shotLines, shotDataUrl,
     setCd, stopCd, setRoundInfo, setLen, setZoom,
-    setFinBtn, gvArmed, gvDisarm,
+    setFinBtn, gvArmed, gvDisarm, setMini,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
     LW, LH, COLORS, WIDTHS,
