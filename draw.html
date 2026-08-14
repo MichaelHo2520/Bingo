@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.169.0 -->
-<meta name="version" content="1.169.0">
+<!-- 你畫我猜 · v1.170.0 -->
+<meta name="version" content="1.170.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -168,6 +168,20 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
 
+      <!-- ★★ 共同作畫(v1.170.0)。使用者:「我希望在房主可以設定要不要共同作畫,
+           如果有開啟這個功能的話,假如還有人沒猜出來,其他人可以幫忙畫,
+           但幫忙畫的人要是一定猜成功了」。
+           ⚠ 資格只認「**已經猜中**」—— 放棄的人與猜錯很多次的人都不行(他們不知道答案)。
+              唯一的真相在 js/draw/rules.js 的 mayInk()。
+           ⚠ 預設**關**:經典玩法才是基準線,而舊房間沒有這個欄位(normRules 會退回預設)。 -->
+      <div class="field">
+        <span class="field-label" id="dwCoLabel">共同作畫</span>
+        <div class="seg" id="dwCoSeg" aria-label="猜中的人可不可以幫忙畫">
+          <button class="on" data-v="0">🎨 只有畫家</button>
+          <button data-v="1">🖌 猜中的人可以幫畫</button>
+        </div>
+      </div>
+
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">
@@ -250,13 +264,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
          ⚠ 這一列是 `flex:none`(高度固定)—— 多出來的垂直空間永遠是畫布的(見 notes/21),
            所以**不可以**讓它換行:窄畫面靠隱藏「你要畫的是」與「清空」兩個字省位置。 -->
     <div class="dw-tools hidden" id="dwTools">
-      <span class="dw-word-lbl">你要畫的是</span>
+      <!-- ★ 這一格的字會換(v1.170.0):畫家看到「你要畫的是」、幫忙畫的人看到「🖌 幫忙畫」
+           —— 兩種角色共用同一列工具,而幫畫的人**看不到題目那一格**(見 adapter 的 paintTools)。 -->
+      <span class="dw-word-lbl" id="dwWordLbl">你要畫的是</span>
       <span class="dw-word display" id="dwWord"></span>
+      <!-- ⚠ 色塊的索引 = COLORS 的索引(board.js 的 pickColor 直接吃 id 尾巴那個數字)——
+           所以黃色是 dwSw4,而 COLORS[4] 就是黃(原本那一格的橘挪到 6,理由見 board.js)。 -->
       <span class="dw-pens" role="group" aria-label="筆色">
         <button class="dw-sw on" id="dwSw0" type="button" aria-label="墨黑筆"></button>
         <button class="dw-sw" id="dwSw1" type="button" aria-label="紅筆"></button>
         <button class="dw-sw" id="dwSw2" type="button" aria-label="藍筆"></button>
         <button class="dw-sw" id="dwSw3" type="button" aria-label="綠筆"></button>
+        <button class="dw-sw" id="dwSw4" type="button" aria-label="黃筆"></button>
       </span>
       <!-- ★★★ 這一列有**兩種**鈕,而 v1.165.0 之前它們長得一模一樣 —— 使用者:
            「擦布跟直線工具不要同時用,現在工具有點不容易了解在幹嘛」。

@@ -30,7 +30,10 @@ const DWR = (function () {
   const SECS = [45, 60, 90];          // 作畫秒數的選項;預設值也寫在 draw.html 的 .on
   const ROUNDS = [1, 2, 3];           // 每人當幾次畫家
   const DIFFS = ["easy", "std", "hard"];
-  const DEF_SEC = 60, DEF_ROUNDS = 2, DEF_DIFF = "std";
+  /* ★★ 共同作畫(v1.170.0):0 = 關(經典玩法)、1 = 開。
+     ⚠ 預設**關** —— 舊房間沒有這個欄位、而經典玩法才是這個遊戲的基準線。 */
+  const COS = [0, 1];
+  const DEF_SEC = 60, DEF_ROUNDS = 2, DEF_DIFF = "std", DEF_CO = 0;
 
   /* ---------- 房規:白名單正規化 ----------
      ⚠ 一律走這一支(不要在別處各自 if):舊房間沒有這個欄位、手改 DB 的怪值
@@ -43,12 +46,30 @@ const DWR = (function () {
     return {
       sec: SECS.indexOf(r.sec) >= 0 ? r.sec : DEF_SEC,
       rounds: ROUNDS.indexOf(r.rounds) >= 0 ? r.rounds : DEF_ROUNDS,
-      diff: DIFFS.indexOf(r.diff) >= 0 ? r.diff : DEF_DIFF
+      diff: DIFFS.indexOf(r.diff) >= 0 ? r.diff : DEF_DIFF,
+      co: COS.indexOf(r.co) >= 0 ? r.co : DEF_CO
     };
   }
   function sameRules(a, b) {
     a = normRules(a); b = normRules(b);
-    return a.sec === b.sec && a.rounds === b.rounds && a.diff === b.diff;
+    return a.sec === b.sec && a.rounds === b.rounds && a.diff === b.diff && a.co === b.co;
+  }
+
+  /* ---------- ★★★ 誰的筆畫得進去(v1.170.0 共同作畫)----------
+     使用者:「假如還有人沒猜出來,其他人可以幫忙畫,但幫忙畫的人要是一定猜成功了」。
+     ★ 這一支是**唯一的真相**:adapter 的 ink() 與畫布的鎖(setEnabled)都問它,
+       所以「畫得進去」與「畫布是活的」不可能不一致。
+     ⚠⚠ 幫畫的資格只認 **d.hits[id]**(已經猜中),絕不可以放寬到:
+       · `gv`(放棄的人)—— 他不知道答案,讓他畫等於讓他亂畫
+       · `miss`(猜錯很多次的人)—— 同上,而且 miss 從 v1.167.0 起不影響任何判定(紅線 27)
+     ⚠ 「還有人沒猜出來」不必另外判:每個猜題者都定案時 roundDone 會把相位推去 show,
+       而這一支的第一行就要求 `ph === "draw"` —— 兩條判定不要各寫一份(那就是第二個真相)。
+     ⚠ 房規吃的是**開局凍結的那一份**(d.rules / dw.rules),不是大廳當下的 rules。 */
+  function mayInk(rules, d, id, drawerId) {
+    if (!d || !id || d.ph !== "draw") return false;
+    if (id === drawerId) return true;                  // 這一回合的畫家
+    if (!normRules(rules).co) return false;            // 沒開共同作畫 → 只有畫家畫得到
+    return !!(d.hits && d.hits[id]);                   // ★ 只有已經猜中的人才能幫忙畫
   }
 
   /* ---------- 答案比對 ----------
@@ -321,8 +342,8 @@ const DWR = (function () {
   }
 
   return {
-    PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, DEF_SEC, DEF_ROUNDS, DEF_DIFF,
-    normRules, sameRules, norm, hit, COOL_MS, coolMs,
+    PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, COS, DEF_SEC, DEF_ROUNDS, DEF_DIFF, DEF_CO,
+    normRules, sameRules, mayInk, norm, hit, COOL_MS, coolMs,
     drawerAt, totalOf, plan, nextLive,
     guessPts, drawerPts, settle, roundDone,
     blankSt, tally, awards,

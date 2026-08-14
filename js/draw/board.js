@@ -51,8 +51,19 @@ const DWB = (function () {
 
   /* ---------- 筆刷 ----------
      ★ v1 只用得到 c=0 / w=1(固定筆色、固定粗細)——但**編碼一開始就帶著這兩個欄位**,
-       之後要加顏色 / 粗細只要放開 UI,線上格式一個字都不必改(舊版與新版也還能同房)。 */
-  const COLORS = ["#20242c", "#e0413a", "#2f7de0", "#2fa14a", "#e8992b", "#8c4bd8"];
+       之後要加顏色 / 粗細只要放開 UI,線上格式一個字都不必改(舊版與新版也還能同房)。
+     ★★ 黃色(v1.170.0)。使用者:「畫筆的顏色再幫我加上黃色」。
+     ⚠⚠ **它刻意放在 index 4**(原本那一格是「橘」,橘往後挪到 6)——
+       這是唯一不會在新舊版同房時出錯的位置,而理由是「**index 4 從來沒有任何 client
+       送得出來**」:UI 只放前四顆(見 SWATCHES),而 setBrush() 除了 board 自己沒有人叫,
+       所以 DB 裡不存在 c=4 的舊資料。
+       · 放在 index 4 → 舊版收到 c=4 會畫成**橘**(相近色,看得出是同一張圖)
+       · 若改成 append 到 index 6 → 舊版走 `COLORS[6] || COLORS[0]` → **畫成墨黑**(整條線變色)
+       兩害相權取相近色。⚠ 而 0~3 那四格**絕對不可以動**(那是紅線 12 那一族的
+       「靠索引同步」約定:動了就是「他畫紅色、我看到綠色」,而且只發生在版本不同的兩台之間)。
+     ⚠ 黃色在淺色紙上本來就比較淡(紙是 #fffdf7)—— 所以取的是**金黃**而不是純黃,
+       純黃(#ffe000 那一類)在紙上幾乎看不見。 */
+  const COLORS = ["#20242c", "#e0413a", "#2f7de0", "#2fa14a", "#e9b400", "#8c4bd8", "#e8992b"];
   const WIDTHS = [4, 8, 16];             // 邏輯單位(1000 寬的座標系裡)
   const DEF_C = 0, DEF_W = 1;
   /* ★★★ 擦布(v1.157.0)。**它是一筆「記錄」,不是像素操作** ——
@@ -81,6 +92,24 @@ const DWB = (function () {
      使用者可能在 70ms 的批次還沒送出去之前就按了擦布 / 換色,那樣這一批會被貼上錯的種類。 */
   let pendEr = false;
   let nextSid = 1;
+  /* ★★★ sid 的**座位命名空間**(v1.170.0,共同作畫的地基)。
+     ──────────────────────────────────────────────────────────────────────────
+     在此之前每一台都從 1 開始編號,而那沒問題是因為「同一時間只有畫家在畫」。
+     開了共同作畫之後兩個人會**同時**下筆,兩台都會鑄出 sid=5,於是:
+       ① 我收到他的 "s5,…" 時 `mySids.has(5)` 成立 → **整筆被當成自己的回音丟掉**
+          (我這台永遠看不到他畫的那條線)
+       ② 第三個人先收到誰的就先建 byId[5],另一個人的那一批走「續段」分支被
+          **接到同一條折線後面** → 畫面上多一條橫跨畫布的弦(症狀與紅線 3-A 一模一樣)
+     → 做法:sid = 座位 × SID_SPAN + 本地流水號。六個座位各佔一段,永遠不會撞。
+     ⚠ 線上格式**一個字都沒改**(sid 本來就是任意整數)—— 舊版收到照樣畫得出來。
+     ⚠⚠ 連帶兩處**一定要跟著改**,漏一處就是靜靜地壞:
+       ① applyRec 那句「別人的 sid 也要讓過」只能對**自己這一段**生效
+          (照舊全域讓過的話,收到座位 5 的 sid 會把我的流水號推到他的段裡去)
+       ② undo() 只能退**自己**的筆(見 lastLive)—— 不然一按就把畫家的線退掉了 */
+  const SID_SPAN = 100000;               // 一回合幾百筆就很多了,10 萬綽綽有餘
+  let sidBase = 0;
+  function setSeat(n) { sidBase = Math.max(0, n | 0) * SID_SPAN; }
+  function isMySid(sid) { return sid >= sidBase && sid < sidBase + SID_SPAN; }
   /* ★★ 我自己送出去的 sid(v1.156.0)。存在的唯一理由是**把自己的回音擋掉**:
      畫家送出的每一批都會從 child_added 原封不動回到 applyRec,而那時本地早就畫過了。
      完整說明在 applyRec 裡那道 return 的註解。⚠ 每一回合要跟著 resetInk() 清掉。 */
@@ -295,7 +324,11 @@ const DWB = (function () {
       pts.push(x, y);
     }
     if (!pts.length) return;
-    if (sid >= nextSid) nextSid = sid + 1;                      // 別人的 sid 也要讓過(重連當畫家時不撞號)
+    /* 重連時要接著自己上次的號碼編下去(不然重放完一畫就撞到自己的舊 sid)。
+       ⚠⚠ 只讓過**自己那一段**(v1.170.0):共同作畫時別人的 sid 在別的段裡,
+         照舊寫成 `if (sid >= nextSid)` 的話,收到座位 5 的 500123 會把我的流水號
+         推成 500124 → **我接著鑄出來的筆就跑進他的命名空間**,撞號又回來了。 */
+    if (isMySid(sid) && sid - sidBase >= nextSid) nextSid = sid - sidBase + 1;
     let s = byId[sid];
     /* ⚠ er 記在**這一筆**上(不是全域狀態):同一 sid 的續段一定是同一種筆,
        而不同 sid 之間筆與擦布會交錯 —— repaint() 靠這個旗標才畫得回原樣。 */
@@ -373,7 +406,7 @@ const DWB = (function () {
     lineFrom = null; lineTo = null;
     if (!a) return;
     flush();
-    const sid = nextSid++;
+    const sid = sidBase + nextSid++;       // ★ 帶座位命名空間(見 SID_SPAN 那段)
     const s = { sid: sid, c: curC, w: curW, p: [a[0], a[1], b[0], b[1]], er: curEr };
     byId[sid] = s; strokes.push(s);
     mySids.add(sid);                      // 這一筆的回音要擋掉(見 applyRec)
@@ -388,7 +421,7 @@ const DWB = (function () {
     const p = pos(e);
     // ★ 直線:按下去只記起點,放開才成筆(中間都是預覽)
     if (curLine) { lineFrom = p; lineTo = p; return; }
-    const sid = nextSid++;
+    const sid = sidBase + nextSid++;       // ★ 帶座位命名空間(見 SID_SPAN 那段)
     drawing = { sid: sid, c: curC, w: curW, p: [p[0], p[1]], er: curEr };
     byId[sid] = drawing; strokes.push(drawing);
     mySids.add(sid);                      // 這一筆的回音要擋掉(見 applyRec)
@@ -497,8 +530,15 @@ const DWB = (function () {
        **那一筆在他那台會復活一半**,而自己這台看起來完全正常。
      ⚠ 沒有 redo(刻意):一顆鈕解決 95% 的情況,兩顆鈕在 360px 的工具列上放不下,
        而且「復原完又想還原」在 60 秒的回合裡幾乎不會發生。 */
+  /* ⚠⚠ **只找自己畫的那一筆**(v1.170.0)—— 開了共同作畫之後 strokes 裡混著別人的線,
+     照舊拿「最後一筆」的話,幫畫的人一按復原就把**畫家剛畫好的那條線**退掉了
+     (而畫家那台完全正常,他只會看到自己的線莫名消失)。⚠ 同時它也是復原鈕
+     disabled 的來源(syncTool)→ 沒東西可退時鈕會自己灰掉,不必另外判。 */
   function lastLive() {
-    for (let i = strokes.length - 1; i >= 0; i--) if (!strokes[i].un) return strokes[i];
+    for (let i = strokes.length - 1; i >= 0; i--) {
+      const s = strokes[i];
+      if (!s.un && isMySid(s.sid)) return s;
+    }
     return null;
   }
   function undo() {
@@ -516,14 +556,18 @@ const DWB = (function () {
     if (COLORS[c]) curC = c;
     if (WIDTHS[w]) curW = w;
   }
-  /* ---------- 工具列的狀態(v1.157.0:四色 + 擦布) ----------
+  /* ---------- 工具列的狀態(v1.157.0:四色 + 擦布;v1.170.0 加黃 = 五色) ----------
      ★ 只有這一支會碰畫面上的 on 狀態 —— 選色 / 選擦布 / 清空 / 換回合都走它,
        所以「畫面上亮的那一顆」與 curC / curEr 不可能不一致。
-     ⚠ 色塊只放前四色(墨黑 / 紅 / 藍 / 綠)—— COLORS 有六個,橘與紫沒有 UI。
-       那不是漏做:`#dwTools` 那一列在 360px 的手機上要同時放題目 + 色塊 + 擦布 + 清空,
-       六顆會把題目擠到只剩省略號,而題目是畫家唯一要讀的字。
-       線上格式照樣吃 0~5,所以日後要放開只要加兩顆色塊,協議一個字都不必改。 */
-  const SWATCHES = 4;
+     ⚠ 色塊放**前五色**(墨黑 / 紅 / 藍 / 綠 / 黃)—— COLORS 有七個,紫與橘沒有 UI。
+       那不是漏做:`#dwTools` 那一列在 360px 的手機上要同時放題目 + 色塊 + 四顆工具鈕,
+       再多兩顆會把題目擠到只剩省略號,而題目是畫家唯一要讀的字。
+     ⚠⚠ 加第五顆的時候色塊在窄畫面跟著縮成 18px、gap 收到 3px(styles.css 那條 media)——
+       改這個數字之後**一定要用裝置模擬量一次** `#dwTools` 的 scrollWidth − clientWidth
+       (必須是 0),Edge 的視窗寬度壓不到 360px(見 notes/21 第五節)。
+     ⚠ 這個數字同時是「UI 有幾顆」與「掃哪幾個 COLORS 索引」——
+       所以黃色只能放在 index 4(見 COLORS 那段),不能 append 到尾巴。 */
+  const SWATCHES = 5;
   function syncTool() {
     for (let i = 0; i < SWATCHES; i++) {
       const b = $("dwSw" + i);
@@ -1067,7 +1111,7 @@ const DWB = (function () {
   }
 
   return {
-    init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush,
+    init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush, setSeat,
     pickColor, toggleEraser, toggleLine, undo, syncTool,
     setShotInfo, shareShot, shotLines, shotDataUrl,
     setCd, stopCd, setRoundInfo, setLen, setZoom,
@@ -1084,7 +1128,10 @@ const DWB = (function () {
                er: live.filter(s => s.er).length,        // 幾筆是擦除(v1.157.0)
                un: strokes.length - live.length,         // 幾筆被撤銷了(v1.163.0)
                c: curC, tool: curEr ? "er" : (curLine ? "line" : "pen"),
-               line: curLine, w: boxW, h: boxH };
+               line: curLine, w: boxW, h: boxH,
+               /* v1.170.0:共同作畫的守門要量得到「我的筆有沒有帶座位命名空間」
+                  與「復原鈕會不會去動別人的筆」。 */
+               base: sidBase, mine: strokes.filter(s => !s.un && isMySid(s.sid)).length };
     }
   };
 })();

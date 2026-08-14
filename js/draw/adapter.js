@@ -42,6 +42,9 @@ const MP = MPCore.create((function () {
   let seenHits = {};                    // 這一回合已經播報過的猜中者(避免重複跳訊息)
   let seenGv = {};                      // 這一回合已經播報過的放棄者(v1.168.0,同上)
   let seenFin = false;                  // 這一回合「畫家說畫完了」播報過沒有(v1.168.0)
+  /* ⚠ 這一個是**整場**一次,不是每一回合(v1.170.0)—— 所以它不在 attachRound 裡清,
+     只在開新的一場 / 回大廳 / 離開時清。共同作畫是房規,每回合都播就是刷版。 */
+  let saidCo = false;
   let coolEnd = 0;                      // 我的冷卻到什麼時候(本地)
   /* ★ 放大模式(v1.155.0):吃掉猜題列與頂列,全部讓給畫布。存在偏好裡(ownPrefs),
      下次進來記得住 —— 一場要開關好幾次的東西,每次都要重按太煩。 */
@@ -192,15 +195,26 @@ const MP = MPCore.create((function () {
     toDraw(k | 0, dw.seq);
   }
 
-  /* 畫家送出一段筆劃 / 清空。
-     ⚠ 一律先擋在本地:不是畫家、不在 draw 相位就什麼都不寫
-       —— 畫布本身也會被 setEnabled(false) 鎖住,這裡是第二道。 */
+  /* 送出一段筆劃 / 清空。
+     ⚠ 一律先擋在本地:畫不進去的人就什麼都不寫
+       —— 畫布本身也會被 setEnabled(false) 鎖住,這裡是第二道。
+     ★★ v1.170.0 起「誰畫得進去」不只有畫家(共同作畫),而判定**只有一份**:
+       DWR.mayInk(開局凍結的房規, 這一場, 我, 這一回合的畫家)。 */
+  function iCanInk() { return !!dw && DWR.mayInk(dw.rules, dw, ctx.me(), drawerId()); }
+  function iAssist() { return iCanInk() && !iAmDrawer(); }
   function ink(rec) {
-    if (!dw || dw.ph !== "draw" || !iAmDrawer()) return;
+    if (!iCanInk()) return;
     const ref = ctx.ref(inkPath(dw));
     if (ref) ref.push().set(rec);
   }
-  function inkClear() { ink("x"); }
+  /* ⚠⚠ 清空**只有畫家**(v1.170.0):它是不可復原的、而且一次帶走整張圖 ——
+     幫畫的人誤按一下就把畫家六十秒的東西清光了。幫畫的人要修自己畫壞的地方
+     有復原(只退自己的筆)與擦布。⚠ 畫面上那顆鈕對幫畫的人是 hidden(paintTools),
+     這裡是第二道門(比照 ink 的慣例:畫面擋一次、寫入端再擋一次)。 */
+  function inkClear() {
+    if (!iAmDrawer()) return;
+    ink("x");
+  }
 
   /* ★★★ 猜一次。這一支是這個遊戲最容易做錯的地方(見檔頭 ②)。 */
   function guess(text) {
@@ -401,19 +415,37 @@ const MP = MPCore.create((function () {
     const me = ctx.me();
     if (iAmDrawer()) { DWB.setGuess({ show: false }); return; }
     if (dw.ph !== "draw") { DWB.setGuess({ show: true, can: false, why: dw.ph === "pick" ? "畫家正在選題目…" : "這一回合結束了" }); return; }
-    if (dw.hits && dw.hits[me]) { DWB.setGuess({ show: true, can: false, why: "✅ 你已經猜中了" }); return; }
+    /* ★ 猜中了。開了共同作畫的話這一行就是**唯一告訴他「可以幫畫」的地方** ——
+       工具列會自己冒出來,但沒有一句話的話沒人知道那是給他的(見 iAssist)。 */
+    if (dw.hits && dw.hits[me]) {
+      DWB.setGuess({ show: true, can: false, why: iAssist() ? "✅ 猜中了 —— 可以幫忙畫 🖌" : "✅ 你已經猜中了" });
+      return;
+    }
     // 放棄了(v1.168.0):輸入列留著、但鎖住並說清楚原因(不能反悔,見 giveUp)
     if (dw.gv && dw.gv[me]) { DWB.setGuess({ show: true, can: false, why: "🏳️ 你放棄了這一題" }); return; }
     // ★ len:正解幾個字(v1.161.0)—— placeholder 上也講一次,打字時眼睛就在這一格
     DWB.setGuess({ show: true, can: true, coolEnd: coolEnd, len: DWGen.lenAt(dw.w) });
   }
-  // 畫家的工具列(題目 + 清空);猜題者一律整列收起來
+  /* 工具列。★★ v1.170.0 起有**兩種角色**共用這一列:
+       · 畫家 —— 題目 + 五色 + 直線 / 擦布 / 復原 / 清空(全套)
+       · 幫忙畫的人(共同作畫,已經猜中)—— 五色 + 直線 / 擦布 / 復原,**沒有題目、沒有清空**
+     ⚠⚠ **題目那一格對幫畫的人也一個字都不產生**(紅線 6)。他確實已經知道答案了
+       (他就是猜中的人),但「非畫家的 DOM 裡沒有題目」是這一頁擋洩漏的結構性保證 ——
+       為了一個他已經知道的字去鬆開它,換來的是以後每次都要重新論證一次。
+     ⚠ 幫畫的人少了兩格 → 這一列反而比畫家寬鬆,窄畫面的塞爆風險只在畫家那一邊。 */
   function paintTools() {
-    const row = $("dwTools"), wEl = $("dwWord");
+    const row = $("dwTools"), wEl = $("dwWord"), lbl = $("dwWordLbl"), clr = $("dwClear");
     if (!row) return;
-    const on = !!dw && dw.ph === "draw" && iAmDrawer();
-    row.classList.toggle("hidden", !on);
-    if (on && wEl) { const w = wordOf(); wEl.textContent = w ? w.w : ""; }
+    const drawer = !!dw && dw.ph === "draw" && iAmDrawer();
+    const assist = iAssist();                     // ⚠ 相位的判定在 mayInk 裡面,這裡不要再寫一次
+    row.classList.toggle("hidden", !(drawer || assist));
+    if (lbl) { lbl.textContent = drawer ? "你要畫的是" : "🖌 幫忙畫"; lbl.classList.toggle("hidden", !(drawer || assist)); }
+    if (wEl) {
+      wEl.classList.toggle("hidden", !drawer);
+      const w = drawer ? wordOf() : null;
+      wEl.textContent = w ? w.w : "";              // ⚠ 不是畫家就一律清空(不是只藏起來)
+    }
+    if (clr) clr.classList.toggle("hidden", !drawer);
   }
   function paintOver() {
     if (!dw) { DWB.hideOver(); return; }
@@ -481,6 +513,9 @@ const MP = MPCore.create((function () {
     el.innerHTML = "一人畫、其他人打字搶答。<b>越早猜中分數越高</b>(200 / 150 / 100 / 50)," +
       "而<b>畫家跟著大家的分數抽成</b> —— 讓越多人猜懂,自己拿越多;猜錯只凍結 <b>3 秒</b>,冷完繼續猜。" +
       "<br>真的猜不出來可以按 <b>🏳️ 放棄</b>(大家都猜中或放棄就直接公布);畫家畫夠了可以按 <b>✅ 畫完了</b>提醒大家。" +
+      /* ★ 共同作畫要講清楚兩件事:誰能幫(已經猜中的人)、以及**幫畫不會加分**
+         —— 不講的話會有人以為幫畫有分,而它純粹是「不用乾等」的玩法(見 notes/21 紅線 30)。 */
+      (rules.co ? "<br>🖌 <b>共同作畫</b>:已經猜中的人可以一起畫,幫還沒猜到的人一把(幫畫不加分,清空只有畫家能按)。" : "") +
       "<br>每人當 <b>" + rules.rounds + "</b> 次畫家 · 一回合 <b>" + rules.sec + "</b> 秒 · 題目「" +
       L.label + "」(" + L.desc + ")";
   }
@@ -521,7 +556,7 @@ const MP = MPCore.create((function () {
     lobbyGame() { return { dw: null }; },
     resetRound() {
       detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; coolEnd = 0;
+      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; saidCo = false; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd(); DWB.setEnabled(false);
     },
     /* 開一場。★ 座位表:有上一場就整個輪一位(讓不同的人先當畫家),否則洗牌。
@@ -554,6 +589,11 @@ const MP = MPCore.create((function () {
     applyGame(g, playing) {
       gOrder = (g && g.order) || [];
       dw = (g && g.dw) || null;
+      /* ★★★ 把座位告訴畫布(v1.170.0)—— 它用座位給自己的 sid 開一段命名空間,
+         共同作畫時兩個人同時下筆才不會撞號(完整說明在 board.js 的 SID_SPAN)。
+         ⚠ 一定要在這裡設:座位表是 g.order,只有這一支拿得到,而且它在**畫布可能被
+           解鎖之前**就要設好(setEnabled 就在下面幾行)。座位表沒變時重設是無害的。 */
+      DWB.setSeat(mySeat());
       if (!playing || !dw) { DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]); return; }
 
       // 換回合 → 重掛筆劃 / 猜題監聽,並請房主把上一回合的資料收掉
@@ -574,9 +614,18 @@ const MP = MPCore.create((function () {
              在畫布與猜題列上,頂列那顆晶片很容易被忽略。⚠ 畫家不必收(他看得到題目);
              ⚠ 一定要排在上面那段 attachRound() 後面 —— 它會 clearSay(),順序反了這一行會被清掉。 */
           if (!iAmDrawer()) DWB.sysSay("題目是 " + DWGen.lenAt(dw.w) + " 個字 ✏️");
+          /* ★★ 共同作畫開著就講一次(v1.170.0)。⚠ **整場只講一次**(saidCo):
+             這是房規、不是每一回合的新消息,每回合都跳一則就是刷版。
+             ⚠ 刻意不寫進 .dw-bar 那一列 —— 那一列在 360px 上已經是回合數 + 角色 +
+               字數格 / 畫完了 + 倒數環 + 放大鈕,再加字就把它撐爆(而它是 flex:none,
+               撐爆就是從畫布身上拿高度)。 */
+          if (!saidCo && DWR.normRules(dw.rules).co) {
+            saidCo = true;
+            DWB.sysSay("🖌 共同作畫:猜中的人可以幫忙畫(清空還是只有畫家能按)");
+          }
         }
       }
-      DWB.setEnabled(dw.ph === "draw" && iAmDrawer());
+      DWB.setEnabled(iCanInk());
 
       announceHits(); announceGv(); announceFin();
       paintHud(); paintBar(); paintTools(); paintGuessRow(); paintOver();
@@ -601,7 +650,7 @@ const MP = MPCore.create((function () {
       showScreen("lobby");
       $("mpBar").classList.remove("playing");
       clearPhaseT(); detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; coolEnd = 0;
+      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; saidCo = false; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
       DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]);
       ruleHint();
@@ -614,7 +663,7 @@ const MP = MPCore.create((function () {
     },
     onLeave() {
       clearPhaseT(); detachRound();
-      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; coolEnd = 0;
+      dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; saidCo = false; coolEnd = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
       DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]);
     },
@@ -622,7 +671,7 @@ const MP = MPCore.create((function () {
     /* ---------- 大廳設定列 / 房間框徽章 ---------- */
     syncSetup() {
       const isHost = ctx.isHost();
-      [["dwSecSeg", "sec"], ["dwRoundSeg", "rounds"], ["dwDiffSeg", "diff"]].forEach(([id, key]) => {
+      [["dwSecSeg", "sec"], ["dwRoundSeg", "rounds"], ["dwDiffSeg", "diff"], ["dwCoSeg", "co"]].forEach(([id, key]) => {
         const seg = $(id); if (!seg) return;
         seg.classList.toggle("readonly", !isHost);
         [...seg.children].forEach(b => {
@@ -630,7 +679,8 @@ const MP = MPCore.create((function () {
           b.classList.toggle("on", v === rules[key]);
         });
       });
-      [["dwSecLabel", "作畫秒數"], ["dwRoundLabel", "每人當幾次畫家"], ["dwDiffLabel", "題目難度"]].forEach(([id, base]) => {
+      [["dwSecLabel", "作畫秒數"], ["dwRoundLabel", "每人當幾次畫家"],
+       ["dwDiffLabel", "題目難度"], ["dwCoLabel", "共同作畫"]].forEach(([id, base]) => {
         const el = $(id); if (el) el.textContent = isHost ? base : (base + "(房主決定)");
       });
       ruleHint();
