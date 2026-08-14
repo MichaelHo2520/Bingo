@@ -113,6 +113,11 @@ const MP = MPCore.create((function () {
       Object.keys(add).forEach(id => { pts[id] = (pts[id] || 0) + add[id]; });
       d.pts = pts;
       d.last = add;                       // 這一回合各加了幾分(公布答案那張卡要用)
+      /* ★★ 娛樂統計(v1.163.0)。**這裡是唯一的累加點** —— 下一回合開始時
+         d.hits / d.miss 會被清成 null(見 toNext),整場打完之後那些數字早就不在了。
+         ⚠ DWR.tally 一律回新物件,所以交易被重跑(別人的寫入先到)也不會重複加:
+           每次重跑讀到的都是 DB 上還沒動過的 d.st。 */
+      d.st = DWR.tally(d.st, drawer, d.hits, d.miss, add);
       d.ph = "show"; d.at = Date.now(); d.seq = seq + 1;
     });
   }
@@ -360,8 +365,11 @@ const MP = MPCore.create((function () {
   function ruleHint() {
     const el = $("dwRuleHint"); if (!el) return;
     const L = DWGen.levelOf(rules.diff);
+    /* ★ v1.163.0 起畫家分是「跟著大家的分數抽成」(見 DWR.drawerPts)——
+       這一句要講清楚,因為它直接影響畫家的策略:**畫得越好、自己拿越多**
+       (舊規則反過來,畫爛才划算,而那是玩家自己會算出來的)。 */
     el.innerHTML = "一人畫、其他人打字搶答。<b>越早猜中分數越高</b>(200 / 150 / 100 / 50)," +
-      "畫家依<b>有幾個人猜懂</b>拿分;猜錯會冷卻,三次就換你看戲。" +
+      "而<b>畫家跟著大家的分數抽成</b> —— 讓越多人猜懂,自己拿越多;猜錯會冷卻,三次就換你看戲。" +
       "<br>每人當 <b>" + rules.rounds + "</b> 次畫家 · 一回合 <b>" + rules.sec + "</b> 秒 · 題目「" +
       L.label + "」(" + L.desc + ")";
   }
@@ -424,6 +432,7 @@ const MP = MPCore.create((function () {
           seq: 1, n: 0, ph: "pick", at: Date.now(),
           cand: DWGen.pick3(R.diff, []), w: -1, used: [],
           hits: null, miss: null, last: null, pts: null,
+          st: null,                     // 娛樂統計(整場累積,見 toShow)
           gs: ord.length - 1,           // 第一回合有幾個人可以猜
           rules: R
         }
@@ -570,6 +579,26 @@ const MP = MPCore.create((function () {
           '</div>').join("");
         box.classList.remove("hidden");
       }
+      /* ★★ 賽末獎項(v1.163.0)。使用者要的「娛樂性」有一半在這裡:
+         總分表講的是誰贏,獎項講的是**這一場發生過什麼**(誰手最快、誰畫得沒人看懂)。
+         ⚠ 資料一定是 dw.st —— 那是每回合結算時累加的(見 toShow),
+           結果卡這一刻的 dw.hits / dw.miss 只剩最後一回合。
+         ⚠ 沒有人夠格就整塊收起來(第一回合就散場的房會是空的),
+           不要留一塊寫著「無」的空盒子。 */
+      const aw = $("dwAwards");
+      if (aw) {
+        const list = DWR.awards(aliveOrder(), (dw && dw.st) || {});
+        aw.innerHTML = list.length
+          ? '<div class="dw-st-h">這一場的名場面</div>' + list.map(a =>
+              '<div class="dw-aw-row' + (a.id === me ? " me" : "") + '">' +
+                '<span class="dw-aw-ic">' + a.ic + '</span>' +
+                '<span class="dw-aw-t">' + esc(a.t) + '</span>' +
+                '<span class="dw-aw-n">' + esc(ctx.dispName(a.id)) + '</span>' +
+                '<span class="dw-aw-v">' + esc(a.v) + '</span>' +
+              '</div>').join("")
+          : "";
+        aw.classList.toggle("hidden", !list.length);
+      }
       const mine = pts[me] || 0;
       if (isDraw) return { word: "平手!", msg: "最高分同分 🤝 你這場拿了 <b>" + mine + "</b> 分" };
       if (iWon) return { word: "你贏了!", msg: "這場最高分,漂亮 🎉 <b>" + mine + "</b> 分" };
@@ -608,7 +637,7 @@ const MP = MPCore.create((function () {
         rules = next; ctx.syncSetup(); ctx.updateGoal(); ruleHint(); savePrefs();
       },
       // 診斷 / e2e 用:目前這一場的狀態(不對外顯示)
-      state: () => (dw ? { n: dw.n, ph: dw.ph, seq: dw.seq, w: dw.w, hits: dw.hits, miss: dw.miss, pts: dw.pts } : null)
+      state: () => (dw ? { n: dw.n, ph: dw.ph, seq: dw.seq, w: dw.w, hits: dw.hits, miss: dw.miss, pts: dw.pts, st: dw.st } : null)
     }
   };
 })());

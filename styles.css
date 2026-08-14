@@ -7243,9 +7243,15 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
     transition:transform .12s,border-color .12s}
   .dw-sw:active{transform:scale(.88)}
   .dw-sw.on{border-color:var(--accent);transform:scale(1.18)}
-  /* 擦布按下去要看得出來「現在拿的是擦布」—— 不然使用者會以為筆壞了(畫不出東西) */
+  /* 擦布按下去要看得出來「現在拿的是擦布」—— 不然使用者會以為筆壞了(畫不出東西)。
+     ⚠ 直線鈕(.dw-ln)沿用同一條:兩顆都是「切換式」的工具,亮起來 = 現在拿著它。 */
   .dw-tool.on{border-color:var(--accent);background:rgba(255,255,255,.22)}
+  /* 復原沒東西可撤時是真的 disabled(見 js/draw/board.js 的 syncTool)——
+     ⚠ 一定要把 pointer-events 也關掉:不然手機上按了會有 :active 的縮放動畫,
+       看起來像「按到了但沒反應」,比灰著更讓人以為壞掉。 */
+  .dw-tool:disabled{opacity:.35;cursor:default;pointer-events:none}
   .dw-ink.erasing{cursor:cell}
+  .dw-ink.lining{cursor:crosshair}
 
   /* ---------- 猜題訊息列 ----------
      ⚠ 高度固定成三行左右並自己捲:讓它跟著內容長高的話,每有人猜一次
@@ -7302,6 +7308,22 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-st-p{font-family:'Fredoka',sans-serif;font-weight:700;font-size:17px;color:var(--accent);flex:none}
   .dw-st-p em{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 
+  /* ---------- 賽末獎項(v1.163.0)----------
+     「這一場發生過什麼」——猜題王 / 手最快 / 神之筆 / 抽象大師 / 亂槍打鳥。
+     ⚠ 一列要塞四塊(圖示 + 獎名 + 得主 + 數值),而結果卡在 360px 手機上只有約 300px:
+       **只有得主的名字可以縮**(.dw-aw-n 是唯一的 flex:1 + ellipsis),
+       獎名與數值都是 flex:none —— 獎名被截掉就看不懂這是什麼獎了。
+     ⚠ 字級刻意比總分表小一階:它是配菜,搶掉主秀(誰贏了)的視線就本末倒置。 */
+  .dw-awards{display:flex;flex-direction:column;gap:3px;margin:6px 0 10px;text-align:left}
+  .dw-aw-row{display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:9px;
+    background:rgba(255,255,255,.05);font-size:12.5px}
+  .dw-aw-row.me{background:rgba(255,255,255,.13)}
+  .dw-aw-ic{flex:none;font-size:14px;line-height:1}
+  .dw-aw-t{flex:none;font-weight:800;color:var(--accent-2)}
+  .dw-aw-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    font-weight:800;color:var(--text)}
+  .dw-aw-v{flex:none;color:var(--muted);font-weight:700}
+
   /* 賽後表情列(沿用五子棋的 .gmk-react 外觀,只換容器 class) */
   .dw-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
 
@@ -7313,6 +7335,18 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   @media (max-width:430px){
     .dw-word-lbl{display:none}
     .dw-clr-t{display:none}
+    /* ★★ v1.163.0 又多了直線 📏 與復原 ↩️ —— 這一列變成「題目 + 四色 + **四顆**工具鈕」,
+       而原本的 padding:6px 12px 在 360px 上會把題目擠成兩個字加省略號。
+       → 窄畫面把工具鈕改成 30px 的**正方形圖示鈕**(那三顆的文字本來就已經藏起來了),
+         並把兩處 gap 收緊 8→6 / 5→4。
+       ⚠ 絕對不可以改成讓 .dw-tools 換行:它是 flex:none,換行就是從畫布身上拿走高度。
+       ⚠ 題目是畫家唯一要讀的字 —— 改動這一段之後一定要用**裝置模擬**量一次
+         `#dwTools` 的 scrollWidth - clientWidth(必須是 0),Edge 視窗壓不到 360px。 */
+    .dw-tools{gap:6px}
+    .dw-pens{gap:4px}
+    .dw-tool{padding:0;width:30px;height:30px;display:inline-flex;align-items:center;
+      justify-content:center;font-size:15px}
+    .dw-word{font-size:17px}
     /* 字數晶片在窄畫面只留數字(「答案 3 字」→「3 字」)——
        同一列上還有回合數 + 畫家名字 + 放大鈕 + 倒數環,而那顆環是 34px 不可壓。 */
     .dw-len-l{display:none}

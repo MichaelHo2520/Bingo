@@ -33,6 +33,15 @@
       猜題列是廣播給全房看的(那是笑點來源),但把猜中的內容播出去 = 第一個猜中的人
       幫所有人報了答案。這裡的 addSay() **只收猜錯的**;猜中一律走 addHit()(只講「誰猜中了」)。
       → 這條與暗棋「不漏牌情」同一型,寫進 adapter 的 guess() 與這裡兩道。
+
+   ⑤ **復原與直線(v1.163.0)——「手機上畫圖很辛苦」的兩個主因。**
+      使用者:「目前畫畫這件事情其實是有一點辛苦的,因為大家都是用手機」。
+      · **復原**是新的第三種線上記錄 `"u<sid>"`(把某一筆標成撤銷)。⚠ 它**不可以**
+        真的把那一筆從 strokes 裡刪掉 —— 這一頁的真相是照順序 replay,而擦布是靠
+        **疊在墨水上面**才有效果;抽掉中間一筆會讓後面每一筆擦布擦到不同的東西。
+        所以撤銷只是掛一個 `un` 旗標,repaint() 跳過它。
+      · **直線**是「只有兩個點的一筆」—— **線上格式一個字都不必改**(舊版也看得懂),
+        這是它 CP 值最高的地方。手指在手機上畫不出直線,而房子 / 車窗 / 桌子全是直線。
    ========================================================================== */
 
 const DWB = (function () {
@@ -78,6 +87,11 @@ const DWB = (function () {
   let mySids = new Set();
   let curC = DEF_C, curW = DEF_W;
   let curEr = false;                      // 現在拿的是擦布嗎(只影響自己這一端要送 s 還是 e)
+  /* ★ 直線模式(v1.163.0):按下去記起點、放開才成一筆。中間那段只是**預覽**,
+     不進 strokes、也不送出去 —— 一條直線最後只推送一次(兩個點)。
+     ⚠ 直線走的是完全獨立的路徑,不碰 drawing / pend / flush(那三個是徒手畫的節流機制)。 */
+  let curLine = false;
+  let lineFrom = null, lineTo = null;
   /* 畫布四周留這麼多(v1.155.2):`.dw-stage` 是 overflow:hidden,而紙有一圈 3px 的外框
      (`.dw-ink` 的第一段 box-shadow)—— 貼死就會被削掉,看起來像沒有邊。 */
   const INK_PAD = 4;
@@ -184,8 +198,9 @@ const DWB = (function () {
   function repaint() {
     clearCanvas();
     /* ⚠ 重畫一定要**照原本的順序**一筆一筆畫(含擦布那幾筆)——
-       擦布是靠疊在墨水上面才有效果,順序換掉就會擦錯東西。 */
-    for (let i = 0; i < strokes.length; i++) strokePath(strokes[i]);
+       擦布是靠疊在墨水上面才有效果,順序換掉就會擦錯東西。
+       ⚠ 被撤銷的那幾筆(un)只是跳過,**留在陣列裡不動**(見 applyRec 的 "u" 那段)。 */
+    for (let i = 0; i < strokes.length; i++) if (!strokes[i].un) strokePath(strokes[i]);
   }
   /* 增量畫「這一筆最後兩個點之間那一段」—— 整張重畫在筆劃多的時候會掉幀 */
   function drawTail(s) {
@@ -205,7 +220,10 @@ const DWB = (function () {
        一筆推送就是一個字串:
          "s<sid>,<c>,<w>,<x>,<y>,<x>,<y>,…"   一段筆劃(可以是同一 sid 的續段)
          "e<sid>,<c>,<w>,<x>,<y>,…"           一段**擦除**(v1.157.0;格式與 s 完全同形,c 不用)
+         "u<sid>"                              **撤銷**那一筆(v1.163.0;見下面 applyRec 那段)
          "x"                                   清空
+       ★ **直線不是新的一種記錄** —— 它就是「只有兩個點的 s」,所以線上格式一個字
+         都不必改,舊版本收到照樣畫得出來(見檔頭 ⑤)。
        ★ 每一批都**自帶 c / w** → 每一筆推送是自足的,不依賴前面收到過什麼;
          重連只要照順序重放整包就一定畫得出一樣的圖。
        ★ 座標是 0~999 / 0~749 的整數 → 一個點約 7~8 個位元組。
@@ -223,8 +241,31 @@ const DWB = (function () {
   }
   function applyRec(rec) {
     if (typeof rec !== "string" || !rec) return;
-    if (rec.charAt(0) === "x") { strokes = []; byId = {}; mySids.clear(); clearCanvas(); return; }
+    /* ⚠ 清空也要同步復原鈕:本地按 🗑 走的是 clearInk()(那一支自己會叫 syncTool),
+       但**收到別人 / 自己回音的 "x"** 走的是這一條 —— 少了它,清空之後畫布明明是空的、
+       復原鈕卻還亮著,按下去會送出一筆撤銷一張根本不存在的圖。
+       ★ 三個會改變「有沒有可撤的筆」的分支(x / u / 新筆)一律要叫它,一個都不能漏。 */
+    if (rec.charAt(0) === "x") { strokes = []; byId = {}; mySids.clear(); clearCanvas(); syncTool(); return; }
     const kind = rec.charAt(0);
+    /* ★★★ 撤銷一筆(v1.163.0)。**刻意用新的開頭字母,理由同擦布那一段**:
+       v1.162.x 以前的舊版第一件事就是「不是 s 也不是 e 就整筆忽略」→ 舊版最壞的下場是
+       「他那台看到被撤銷的那一筆還在」,而那是可以接受的;
+       若改成塞進既有欄位(例如某個特殊的 c / w),舊版會照樣把它畫出來,更難解釋。
+       ⚠⚠ **絕對不可以真的從 strokes 裡刪掉那一筆** —— 這一頁的真相是照順序 replay,
+         而擦布是靠疊在墨水上面才有效;抽掉中間一筆會讓它後面每一筆擦布擦到不同的東西
+         (症狀:撤銷一條線,結果畫面上另一個地方多了一塊沒擦乾淨的墨)。
+         掛旗標 + repaint 跳過,順序與層次都保住。
+       ⚠ 自己的回音照樣要擋(mySids)—— 本地在按下去的當下就已經撤銷了。 */
+    if (kind === "u") {
+      const usid = +rec.slice(1);
+      if (!isFinite(usid) || mySids.has(usid)) return;
+      const t = byId[usid];
+      if (!t || t.un) return;
+      t.un = true;
+      repaint();
+      syncTool();                      // 可撤的筆變少了 → 復原鈕可能要鎖起來
+      return;
+    }
     if (kind !== "s" && kind !== "e") return;
     const a = rec.slice(1).split(",");
     if (a.length < 5) return;                                   // sid,c,w + 至少一個點
@@ -256,7 +297,10 @@ const DWB = (function () {
     let s = byId[sid];
     /* ⚠ er 記在**這一筆**上(不是全域狀態):同一 sid 的續段一定是同一種筆,
        而不同 sid 之間筆與擦布會交錯 —— repaint() 靠這個旗標才畫得回原樣。 */
-    if (!s) { s = { sid: sid, c: c, w: w, p: [], er: kind === "e" }; byId[sid] = s; strokes.push(s); }
+    /* ⚠ 這裡也要同步復原鈕:**畫家中途重連**時整包 ink 是靠這條路重放回來的
+       (attachRound → resetInk → child_added 整批重放)—— 少了它,重連之後
+       畫布上明明有東西,復原鈕卻一直灰著。 */
+    if (!s) { s = { sid: sid, c: c, w: w, p: [], er: kind === "e" }; byId[sid] = s; strokes.push(s); syncTool(); }
     const fresh = !s.p.length;
     s.p = s.p.concat(pts);
     if (fresh) strokePath(s);
@@ -274,8 +318,9 @@ const DWB = (function () {
   function resetInk() {
     strokes = []; byId = {}; drawing = null;
     pend = []; pendSid = -1; pendEr = false; nextSid = 1;
-    /* ★ 每一回合把筆歸零:換人畫的時候不該繼承上一位畫家挑的顏色 / 還拿著擦布。 */
+    /* ★ 每一回合把筆歸零:換人畫的時候不該繼承上一位畫家挑的顏色 / 還拿著擦布 / 還在直線模式。 */
     curC = DEF_C; curW = DEF_W; curEr = false;
+    curLine = false; lineFrom = null; lineTo = null;
     syncTool();
     mySids.clear();                       // ⚠ 一定要跟著清:重連重放整包時它必須是空的
     if (flushT) { clearTimeout(flushT); flushT = null; }
@@ -302,11 +347,45 @@ const DWB = (function () {
     if (flushT) return;
     flushT = setTimeout(() => { flushT = null; flush(); }, FLUSH_MS);
   }
+  /* ---------- 直線模式的預覽(v1.163.0)----------
+     ⚠⚠ `globalAlpha` 與 `globalCompositeOperation` 一樣是 canvas 的**全域狀態** ——
+       漏還原的症狀是「之後畫的每一筆都是半透明的」,而且 DOM / 記錄全部正常。
+       這裡用 try 之外的方式保證:設完立刻在同一支函式裡還原(不要跨函式)。
+     ⚠ 預覽**不進 strokes、不送出去**:它每次 pointermove 都會被 repaint() 蓋掉重畫。 */
+  function previewLine() {
+    if (!ctx || !lineFrom || !lineTo) return;
+    penStyle({ c: curC, w: curW, er: curEr });
+    if (!curEr) ctx.globalAlpha = 0.55;                 // 擦布不透明化(destination-out 看不出深淺)
+    ctx.beginPath();
+    ctx.moveTo(sx(lineFrom[0]), sy(lineFrom[1]));
+    ctx.lineTo(sx(lineTo[0]), sy(lineTo[1]));
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    penEnd();
+  }
+  /* 直線放手 → 成一筆(兩個點)並**一次推送完畢**。
+     ⚠ 不走 pend / flush:那套節流是給徒手畫的連續取樣用的,一條直線只有兩個點。
+     ⚠ 但要先 flush() —— 上一筆徒手畫可能還有沒送出去的點,順序反了對方會看到接錯。 */
+  function commitLine() {
+    const a = lineFrom, b = lineTo || lineFrom;
+    lineFrom = null; lineTo = null;
+    if (!a) return;
+    flush();
+    const sid = nextSid++;
+    const s = { sid: sid, c: curC, w: curW, p: [a[0], a[1], b[0], b[1]], er: curEr };
+    byId[sid] = s; strokes.push(s);
+    mySids.add(sid);                      // 這一筆的回音要擋掉(見 applyRec)
+    repaint();                            // ⚠ 一定要整張重畫:預覽那條半透明的線還在畫布上
+    cb.onStroke && cb.onStroke(encode(sid, curC, curW, s.p, curEr));
+    syncTool();
+  }
   function onDown(e) {
     if (!enabled || e.button > 0) return;
     e.preventDefault();
     try { cv.setPointerCapture(e.pointerId); } catch (_) {}
     const p = pos(e);
+    // ★ 直線:按下去只記起點,放開才成筆(中間都是預覽)
+    if (curLine) { lineFrom = p; lineTo = p; return; }
     const sid = nextSid++;
     drawing = { sid: sid, c: curC, w: curW, p: [p[0], p[1]], er: curEr };
     byId[sid] = drawing; strokes.push(drawing);
@@ -316,9 +395,25 @@ const DWB = (function () {
     if (pendSid !== sid) { flush(); pendSid = sid; pendEr = curEr; }
     pend.push(p[0], p[1]);
     armFlush();
+    /* ⚠ 一定要在這裡叫一次:復原鈕的 disabled 是看「有沒有可撤的筆」(見 syncTool),
+       而畫下第一筆之後沒有任何別的地方會再同步它 —— 漏掉的症狀是
+       **畫了東西但復原鈕一直灰著**,而且畫布本身完全正常。
+       ⚠ 放在 onDown(一筆一次)而不是 onMove(一秒幾十次)。 */
+    syncTool();
   }
   function onMove(e) {
-    if (!enabled || !drawing) return;
+    if (!enabled) return;
+    // ★ 直線:拖到哪就預覽到哪(⚠ 這一段一定要排在 drawing 那道守衛前面)
+    if (lineFrom) {
+      e.preventDefault();
+      const q = pos(e);
+      const ddx = q[0] - lineTo[0], ddy = q[1] - lineTo[1];
+      if (ddx * ddx + ddy * ddy < MIN_D * MIN_D) return;        // 動太小就別重畫(整張 repaint 有成本)
+      lineTo = q;
+      repaint(); previewLine();
+      return;
+    }
+    if (!drawing) return;
     e.preventDefault();
     const p = pos(e);
     const n = drawing.p.length;
@@ -330,6 +425,12 @@ const DWB = (function () {
     if (pend.length >= MAX_PTS * 2) flush(); else armFlush();
   }
   function onUp(e) {
+    // ★ 直線:放手才成一筆(⚠ 排在 drawing 那道守衛前面 —— 直線期間 drawing 一直是 null)
+    if (lineFrom) {
+      try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
+      commitLine();
+      return;
+    }
     if (!drawing) return;
     try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
     drawing = null;
@@ -348,6 +449,8 @@ const DWB = (function () {
     box.addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
       if (b.id === "dwErase") { toggleEraser(); return; }
+      if (b.id === "dwUndo") { undo(); return; }        // v1.163.0
+      if (b.id === "dwLine") { toggleLine(); return; }  // v1.163.0
       const m = /^dwSw(\d)$/.exec(b.id || "");
       if (m) pickColor(+m[1]);
     });
@@ -360,22 +463,52 @@ const DWB = (function () {
     cv.addEventListener("pointermove", onMove);
     cv.addEventListener("pointerup", onUp);
     cv.addEventListener("pointercancel", onUp);
-    cv.addEventListener("pointerleave", e => { if (drawing) onUp(e); });
+    // ⚠ 直線也要收(lineFrom):手指滑出畫布時那一筆得結掉,不然它會一直預覽著
+    cv.addEventListener("pointerleave", e => { if (drawing || lineFrom) onUp(e); });
   }
   function setEnabled(on) {
     enabled = !!on;
     if (!enabled && drawing) { drawing = null; flush(); }
+    /* ⚠ 時間到的那一刻可能正拖著一條還沒放手的直線 —— 丟掉(不是 commit):
+       相位已經換了,adapter 的 ink() 也寫不進去,留著只會在畫布上掛一條預覽線。 */
+    if (!enabled && lineFrom) { lineFrom = null; lineTo = null; repaint(); }
     if (cv) cv.classList.toggle("live", enabled);
   }
   // 清空:本地立刻生效,同時請 adapter 推一筆 "x"(讓別人也清)
   function clearInk() {
     if (!enabled) return;
     drawing = null; pend = []; pendSid = -1;
+    lineFrom = null; lineTo = null;   // 拖到一半的直線也一起丟掉
     if (flushT) { clearTimeout(flushT); flushT = null; }
     strokes = []; byId = {}; mySids.clear(); clearCanvas();
     curEr = false;                    // 清空之後回到筆(擦空白的紙沒有意義)
     syncTool();
     cb.onClear && cb.onClear();
+  }
+
+  /* ---------- 復原(v1.163.0)----------
+     ★★ 使用者要的第一件事:「畫壞了只能整張清空」是手機上最大的挫折來源
+       —— 手指粗、60 秒倒數,錯一筆等於整張重畫。
+     ⚠ 撤銷的是「**還沒被撤銷的最後一筆**」,而且只掛旗標不刪除(見 applyRec 的 "u")。
+     ⚠⚠ 一定要**先 flush()**:剛畫完的那一筆可能還有點卡在 pend 裡(70ms 的批次)。
+       順序反了的話對方會先收到 "u<sid>" 再收到那一筆的後半段 →
+       **那一筆在他那台會復活一半**,而自己這台看起來完全正常。
+     ⚠ 沒有 redo(刻意):一顆鈕解決 95% 的情況,兩顆鈕在 360px 的工具列上放不下,
+       而且「復原完又想還原」在 60 秒的回合裡幾乎不會發生。 */
+  function lastLive() {
+    for (let i = strokes.length - 1; i >= 0; i--) if (!strokes[i].un) return strokes[i];
+    return null;
+  }
+  function undo() {
+    if (!enabled) return;
+    flush();                          // ⚠ 見上面那段(順序錯了那一筆會在別人那台復活一半)
+    const s = lastLive();
+    if (!s) return;
+    s.un = true;
+    if (drawing === s) drawing = null;
+    repaint();
+    syncTool();
+    cb.onStroke && cb.onStroke("u" + s.sid);
   }
   function setBrush(c, w) {
     if (COLORS[c]) curC = c;
@@ -396,7 +529,14 @@ const DWB = (function () {
     }
     const er = $("dwErase");
     if (er) { er.classList.toggle("on", curEr); er.setAttribute("aria-pressed", curEr ? "true" : "false"); }
-    if (cv) cv.classList.toggle("erasing", curEr);   // 只改鼠標樣式,不影響任何幾何
+    const ln = $("dwLine");
+    if (ln) { ln.classList.toggle("on", curLine); ln.setAttribute("aria-pressed", curLine ? "true" : "false"); }
+    /* ⚠ 復原鈕沒東西可撤時要**真的鎖住**(disabled),不是只調透明度 ——
+       按了沒反應比灰著更讓人以為壞了。 */
+    const un = $("dwUndo");
+    if (un) un.disabled = !lastLive();
+    // 只改鼠標樣式,不影響任何幾何(擦布優先 —— 兩個可以並用時鼠標講的是「會擦掉」)
+    if (cv) { cv.classList.toggle("erasing", curEr); cv.classList.toggle("lining", curLine && !curEr); }
   }
   function pickColor(i) {
     if (!COLORS[i]) return;
@@ -404,6 +544,13 @@ const DWB = (function () {
   }
   function toggleEraser(on) {
     curEr = (on === undefined) ? !curEr : !!on;
+    syncTool();
+  }
+  /* 直線模式。⚠ 與擦布**刻意可以並用**(擦一條直線是很自然的需求),
+     所以這裡不去動 curEr —— 兩個旗標各自獨立。 */
+  function toggleLine(on) {
+    curLine = (on === undefined) ? !curLine : !!on;
+    if (!curLine && lineFrom) { lineFrom = null; lineTo = null; repaint(); }
     syncTool();
   }
 
@@ -657,15 +804,21 @@ const DWB = (function () {
 
   return {
     init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush,
-    pickColor, toggleEraser, syncTool,
+    pickColor, toggleEraser, toggleLine, undo, syncTool,
     setCd, stopCd, setRoundInfo, setLen, setZoom,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
     LW, LH, COLORS, WIDTHS,
-    // 診斷 / 測試用:目前畫了幾筆、共幾個點、畫布現在多大
-    stats: () => ({ n: strokes.length, pts: strokes.reduce((a, s) => a + s.p.length / 2, 0),
-                    er: strokes.filter(s => s.er).length,     // 幾筆是擦除(v1.157.0)
-                    c: curC, tool: curEr ? "er" : "pen",      // 現在拿的是什麼
-                    w: boxW, h: boxH })
+    /* 診斷 / 測試用:目前畫了幾筆、共幾個點、畫布現在多大。
+       ⚠ n / pts 一律只算**看得見的**(跳過被撤銷的)—— 那才是「畫面上有什麼」;
+         被撤銷了幾筆另外走 un(v1.163.0)。 */
+    stats: () => {
+      const live = strokes.filter(s => !s.un);
+      return { n: live.length, pts: live.reduce((a, s) => a + s.p.length / 2, 0),
+               er: live.filter(s => s.er).length,        // 幾筆是擦除(v1.157.0)
+               un: strokes.length - live.length,         // 幾筆被撤銷了(v1.163.0)
+               c: curC, tool: curEr ? "er" : (curLine ? "line" : "pen"),
+               line: curLine, w: boxW, h: boxH };
+    }
   };
 })();

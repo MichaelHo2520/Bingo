@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.162.0 -->
-<meta name="version" content="1.162.0">
+<!-- 你畫我猜 · v1.163.0 -->
+<meta name="version" content="1.163.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -73,7 +73,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <img class="dw-art" src="dw-icon.png" alt="畫筆與畫板" width="192" height="192">
       <div class="home-tagline">一人畫、其他人打字搶答</div>
     </div>
-    <div class="home-hint dw-intro">2~6 人:輪流當畫家,每人畫 <b>2</b> 次。越早猜中分數越高,畫家依「有幾個人猜懂」拿分。</div>
+    <!-- ⚠ 這一句與 js/draw/adapter.js 的 ruleHint() 講的是同一件事,**改一邊要改另一邊**。
+         ★ v1.163.0 起畫家是「跟著大家的分數抽成」(舊版是依人數查表,而那在數學上
+           獎勵故意畫爛 —— 完整推導在 js/draw/rules.js 的 drawerPts 上面)。 -->
+    <div class="home-hint dw-intro">2~6 人:輪流當畫家,每人畫 <b>2</b> 次。越早猜中分數越高,而畫家<b>跟著大家的分數抽成</b> —— 讓越多人猜懂,自己拿越多。</div>
 
     <div class="field">
       <span class="field-label">你的暱稱(必填)</span>
@@ -232,7 +235,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="dw-sw" id="dwSw2" type="button" aria-label="藍筆"></button>
         <button class="dw-sw" id="dwSw3" type="button" aria-label="綠筆"></button>
       </span>
+      <!-- ★★ 直線(v1.163.0)。使用者:「畫畫這件事情其實是有一點辛苦的,因為大家都是用手機」——
+           手指畫不出直線,而房子 / 車窗 / 桌子 / 電視全是直線。
+           ⚠ 它**不是新的線上記錄**:一條直線就是「只有兩個點的一筆 s」,線上格式一個字都沒改
+             (見 js/draw/board.js 檔頭 ⑤)。⚠ 與擦布刻意可以並用(擦一條直線很自然)。 -->
+      <button class="dw-tool dw-ln" id="dwLine" type="button" aria-pressed="false" aria-label="直線" title="直線(拉一條直的)">📏</button>
       <button class="dw-tool dw-er" id="dwErase" type="button" aria-pressed="false" aria-label="擦布" title="擦布(擦掉一部分)">🧽</button>
+      <!-- ★★ 復原(v1.163.0)。在此之前畫壞了只能整張清空 —— 那是手機上最大的挫折來源。
+           ⚠ 沒東西可撤時是真的 disabled(見 board.js 的 syncTool):按了沒反應比灰著更像壞掉。 -->
+      <button class="dw-tool dw-un" id="dwUndo" type="button" aria-label="復原" title="復原(退掉最後一筆)" disabled>↩️</button>
       <button class="dw-tool" id="dwClear" type="button" title="整張清空">🗑<span class="dw-clr-t"> 清空</span></button>
     </div>
     <div class="dw-say" id="dwSay" aria-live="polite"></div>
@@ -255,6 +266,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="win-card dw-win" id="dwWinCard">
       <div class="word display" id="winWord">完成!</div>
       <p id="winMsg"></p>
+      <!-- ★★ 賽末獎項(v1.163.0)。總分表講的是「誰贏」,這一塊講的是
+           「這一場發生過什麼」—— 誰手最快、誰畫得沒人看得懂,那才是聚會裡會笑出來的東西。
+           ⚠ 資料來源是 game.dw.st(每一回合結算時累加的)——**不可以**在這裡拿 hits/miss 算,
+             那兩包每一回合都會被清成 null,打完只剩最後一回合(見 js/draw/adapter.js 的 toShow)。
+           ⚠ 沒有人夠格就整塊收起來,不要留一個寫著「無」的空盒子。 -->
+      <div class="dw-awards hidden" id="dwAwards"></div>
       <div class="dw-stats hidden" id="dwStats"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
