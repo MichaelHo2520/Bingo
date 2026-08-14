@@ -535,22 +535,40 @@ const DWB = (function () {
        按了沒反應比灰著更讓人以為壞了。 */
     const un = $("dwUndo");
     if (un) un.disabled = !lastLive();
-    // 只改鼠標樣式,不影響任何幾何(擦布優先 —— 兩個可以並用時鼠標講的是「會擦掉」)
-    if (cv) { cv.classList.toggle("erasing", curEr); cv.classList.toggle("lining", curLine && !curEr); }
+    // 只改鼠標樣式,不影響任何幾何。⚠ 三種模式互斥,所以這兩個 class 不可能同時掛上
+    if (cv) { cv.classList.toggle("erasing", curEr); cv.classList.toggle("lining", curLine); }
   }
+  /* ==========================================================================
+     ★★★ 筆 / 直線 / 擦布是**三選一的模式**(v1.165.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「擦布跟直線工具不要同時用,現在工具有點不容易了解在幹嘛」。
+       v1.163.0~v1.164.0 讓直線與擦布**各自獨立**(想法是「擦一條直線很自然」),
+       代價是畫面上會出現「兩顆同時亮著」,而使用者根本推不出那代表什麼 ——
+       兩個獨立的布林 = 四種狀態,但工具列只講得出「哪幾顆亮著」。
+       → 現在是互斥的三種模式,**永遠只有一顆亮**(或都不亮 = 一般筆)。
+       ⚠ 畫面上的分組與填色在 draw.html / styles.css,但**互斥的真相在這裡** ——
+         只改 CSS 的話兩個旗標還是會同時成立,而 stats().tool 會說謊。
+     ========================================================================== */
+  function modeToast(txt) { try { showToast(txt, 1100); } catch (e) {} }
+  /* 選色。⚠ 從**擦布**回到筆(擦布模式下顏色沒有意義),但**直線模式保留** ——
+     在直線模式下換顏色是合理的需求,把人踢回一般筆很煩。 */
   function pickColor(i) {
     if (!COLORS[i]) return;
-    curC = i; curEr = false; syncTool();
+    curC = i;
+    if (curEr) { curEr = false; modeToast("✏️ 換回筆"); }
+    syncTool();
   }
   function toggleEraser(on) {
     curEr = (on === undefined) ? !curEr : !!on;
+    if (curEr && curLine) { curLine = false; lineFrom = null; lineTo = null; }   // 互斥
+    modeToast(curEr ? "🧽 擦布:擦掉一部分" : "✏️ 一般筆");
     syncTool();
   }
-  /* 直線模式。⚠ 與擦布**刻意可以並用**(擦一條直線是很自然的需求),
-     所以這裡不去動 curEr —— 兩個旗標各自獨立。 */
   function toggleLine(on) {
     curLine = (on === undefined) ? !curLine : !!on;
+    if (curLine && curEr) curEr = false;                                          // 互斥
     if (!curLine && lineFrom) { lineFrom = null; lineTo = null; repaint(); }
+    modeToast(curLine ? "📐 直線:按住拉一條直的" : "✏️ 一般筆");
     syncTool();
   }
 

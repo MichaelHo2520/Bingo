@@ -7249,11 +7249,20 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-word-lbl{font-size:11.5px;color:var(--muted);font-weight:800;flex:none}
   .dw-word{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-family:'Fredoka',sans-serif;font-weight:700;font-size:20px;color:var(--accent-2)}
-  .dw-tool{flex:none;border:1px solid var(--panel-line);border-radius:11px;padding:6px 12px;
+  /* ⚠ 一律 inline-flex 置中:直線那顆裡面是 SVG,靠 baseline 排會掉下去一點點
+     (只有並排時看得出來,而那正是最容易被忽略的一種歪)。 */
+  .dw-tool{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:2px;
+    border:1px solid var(--panel-line);border-radius:11px;padding:6px 12px;
     background:rgba(255,255,255,.08);color:var(--text);font-family:'Nunito',sans-serif;
     font-weight:800;font-size:13px;cursor:pointer;transition:.15s}
   .dw-tool:hover{background:rgba(255,255,255,.16)}
   .dw-tool:active{transform:scale(.94)}
+  /* ★★ 模式(直線 / 擦布)與動作(復原 / 清空)之間的分組線(v1.165.0)——
+     使用者:「現在工具有點不容易了解在幹嘛」。這一條線幾乎不佔寬度(1px),
+     但它是「這兩顆是切換、那兩顆是按一下就做」最便宜的說明。
+     ⚠ 只放**一條**:色塊是圓的、工具鈕是圓角方的,那一組本來就分得出來,
+       再多一條就是從題目那一格身上拿寬度(360px 上題目只剩 80 幾 px)。 */
+  .dw-sep{flex:none;width:1px;height:20px;background:var(--panel-line);opacity:.8}
   /* ---------- 四色 + 擦布(v1.157.0)----------
      ⚠ 色塊的 background **不在這裡寫** —— 由 js/draw/board.js 讀 COLORS[i] 設 inline style
        (單一真相,見 draw.html 那段註解)。這裡只管形狀與「哪一顆亮著」。
@@ -7265,9 +7274,14 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
     transition:transform .12s,border-color .12s}
   .dw-sw:active{transform:scale(.88)}
   .dw-sw.on{border-color:var(--accent);transform:scale(1.18)}
-  /* 擦布按下去要看得出來「現在拿的是擦布」—— 不然使用者會以為筆壞了(畫不出東西)。
-     ⚠ 直線鈕(.dw-ln)沿用同一條:兩顆都是「切換式」的工具,亮起來 = 現在拿著它。 */
-  .dw-tool.on{border-color:var(--accent);background:rgba(255,255,255,.22)}
+  /* ★★ 「現在拿的是這個」一定要**整顆填色**(v1.165.0)。
+     在此之前只換邊框 + 加一點白 —— 在 30px 的鈕上根本看不出來,而這一頁的三種模式
+     (筆 / 直線 / 擦布)是互斥的,「哪一顆亮著」就是使用者判斷現在能做什麼的**唯一線索**。
+     使用者:「現在工具有點不容易了解在幹嘛」。
+     ⚠ 文字色要夠深:填的是 --accent(亮橘),白字在上面會糊掉。 */
+  .dw-tool.on{border-color:var(--accent);background:var(--accent);color:#2a1136;
+    box-shadow:0 2px 10px rgba(0,0,0,.28)}
+  .dw-tool.on:hover{background:var(--accent)}
   /* 復原沒東西可撤時是真的 disabled(見 js/draw/board.js 的 syncTool)——
      ⚠ 一定要把 pointer-events 也關掉:不然手機上按了會有 :active 的縮放動畫,
        看起來像「按到了但沒反應」,比灰著更讓人以為壞掉。 */

@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.164.0 -->
-<meta name="version" content="1.164.0">
+<!-- 你畫我猜 · v1.165.0 -->
+<meta name="version" content="1.165.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -235,12 +235,19 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="dw-sw" id="dwSw2" type="button" aria-label="藍筆"></button>
         <button class="dw-sw" id="dwSw3" type="button" aria-label="綠筆"></button>
       </span>
-      <!-- ★★ 直線(v1.163.0)。使用者:「畫畫這件事情其實是有一點辛苦的,因為大家都是用手機」——
-           手指畫不出直線,而房子 / 車窗 / 桌子 / 電視全是直線。
-           ⚠ 它**不是新的線上記錄**:一條直線就是「只有兩個點的一筆 s」,線上格式一個字都沒改
-             (見 js/draw/board.js 檔頭 ⑤)。⚠ 與擦布刻意可以並用(擦一條直線很自然)。 -->
-      <button class="dw-tool dw-ln" id="dwLine" type="button" aria-pressed="false" aria-label="直線" title="直線(拉一條直的)">📏</button>
+      <!-- ★★★ 這一列有**兩種**鈕,而 v1.165.0 之前它們長得一模一樣 —— 使用者:
+           「擦布跟直線工具不要同時用,現在工具有點不容易了解在幹嘛」。
+           ① **模式**(直線 / 擦布):三選一,與「一般筆」互斥,**亮起來的那顆就是現在拿的**
+           ② **動作**(復原 / 清空):按一下做一件事,沒有狀態
+           → 中間用一條 .dw-sep 分開,而且模式亮起來時是**整顆填色**(只換邊框在小尺寸看不出來)。
+           ⚠ 互斥的邏輯在 js/draw/board.js 的 toggleLine / toggleEraser,不是只有畫面。 -->
+      <!-- 直線:圖示刻意用 **SVG 的一條斜線 + 兩端端點**,不用 📏(那是「尺」,
+           在 30px 上看不出「畫一條直線」;四顆裡只有它會被誤讀,所以只換它)。 -->
+      <button class="dw-tool dw-ln" id="dwLine" type="button" aria-pressed="false" aria-label="直線" title="直線(按住拉一條直的)">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5.5 18.5L18.5 5.5"/><circle cx="5.5" cy="18.5" r="2" fill="currentColor" stroke="none"/><circle cx="18.5" cy="5.5" r="2" fill="currentColor" stroke="none"/></svg>
+      </button>
       <button class="dw-tool dw-er" id="dwErase" type="button" aria-pressed="false" aria-label="擦布" title="擦布(擦掉一部分)">🧽</button>
+      <span class="dw-sep" aria-hidden="true"></span>
       <!-- ★★ 復原(v1.163.0)。在此之前畫壞了只能整張清空 —— 那是手機上最大的挫折來源。
            ⚠ 沒東西可撤時是真的 disabled(見 board.js 的 syncTool):按了沒反應比灰著更像壞掉。 -->
       <button class="dw-tool dw-un" id="dwUndo" type="button" aria-label="復原" title="復原(退掉最後一筆)" disabled>↩️</button>
