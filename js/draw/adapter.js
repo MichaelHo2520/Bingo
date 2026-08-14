@@ -60,7 +60,25 @@ const MP = MPCore.create((function () {
   // 這一回合有資格猜的人(不含畫家);用現在還在房裡的人算
   function guesserIds() { const d = drawerId(); return aliveOrder().filter(id => id !== d); }
   function ptsOf(id) { return (dw && dw.pts && dw.pts[id]) || 0; }
-  function wordOf() { return dw && dw.w >= 0 ? DWGen.wordAt(dw.w) : null; }
+  /* ★★★ 這一回合的答案。v1.171.0 起有**兩個來源**,而這一支是唯一的合流點:
+       · 畫家自己出的題(`dw.cw`,字串)—— 優先
+       · 三選一挑的題庫題(`dw.w`,索引整數)
+     ⚠⚠ 自訂題目**每次讀都要再洗一次**(cleanCustom):寫入端洗過了不代表讀到的是乾淨的
+       (手改 DB、或以後哪一版寫入端改壞)。洗兩次的成本是零,而髒字串的症狀是
+       「全場都猜不中,而且沒有人看得出來為什麼」。
+     ⚠ 自訂題目沒有同義詞(a:[]) —— 畫家自己想的字,沒有人有立場幫他決定什麼算同義。
+     ⚠⚠ 有了兩個來源之後,「題目選好了沒」**一律問 wordOf(),不可以再寫 `dw.w >= 0`**:
+       自訂題目的 `dw.w` 留在 -1(它不進 d.used,那是題庫索引的清單),
+       寫 `dw.w >= 0` 的地方在自訂題目那一回合會全部靜靜地當成「還沒選題」——
+       症狀是猜題者那顆字數晶片整回合不出現。 */
+  function wordOf() {
+    const c = DWR.cleanCustom(dw && dw.cw);
+    if (c) return { w: c, a: [] };
+    return dw && dw.w >= 0 ? DWGen.wordAt(dw.w) : null;
+  }
+  /* 答案幾個字 —— 頂列晶片 / 猜題框 placeholder / 系統訊息 / 分享圖**四處同一個真相**。
+     ⚠ 一律 Array.from 數字元(理由見 DWGen.lenAt 那一段)。 */
+  function wordLen() { const w = wordOf(); return w ? Array.from(w.w).length : 0; }
 
   /* ★★★ 筆劃 / 猜題訊息的節點路徑一定要帶 **mid(這一場的識別碼)**。
      回合索引每一場都從 0 重新算 —— 只用 ink/{n} 的話,同一間房打第二場時
@@ -98,8 +116,23 @@ const MP = MPCore.create((function () {
       const cand = Array.isArray(d.cand) ? d.cand : [];
       const w = cand[k] !== undefined ? cand[k] : cand[0];
       if (w === undefined) return false;
-      d.w = w;
+      d.w = w; d.cw = null;               // ⚠ cw 一定要清:上一回合的自訂題目會蓋掉這一題(wordOf 讓 cw 優先)
       d.used = (Array.isArray(d.used) ? d.used : []).concat(w);
+      d.ph = "draw"; d.at = Date.now(); d.seq = seq + 1;
+    });
+  }
+
+  /* ①' 自己出題 → 開始畫(v1.171.0)。text 已經在 pickOwn 洗過,這裡再洗一次
+        (交易的回呼會被重跑,而它拿到的是**呼叫時捕獲的 text**,洗兩次不會變貴)。
+     ⚠ `d.w` 留在 -1、也**不進 d.used** —— used 是題庫索引的清單,自訂題目沒有索引。
+       所以下一回合的三選一不會因為這一題而少掉任何候選,那是對的。 */
+  function toDrawOwn(text, seq) {
+    const cw = DWR.cleanCustom(text);
+    if (!cw) return;
+    ctx.txGame(g => {
+      const d = g.dw;
+      if (!d || d.ph !== "pick" || d.seq !== seq) return false;
+      d.cw = cw; d.w = -1;
       d.ph = "draw"; d.at = Date.now(); d.seq = seq + 1;
     });
   }
@@ -155,7 +188,7 @@ const MP = MPCore.create((function () {
       }
       d.n = nx; d.ph = "pick"; d.at = Date.now(); d.seq = seq + 1;
       d.cand = DWGen.pick3(R.diff, d.used || []);
-      d.w = -1; d.hits = null; d.miss = null; d.last = null;
+      d.w = -1; d.cw = null; d.hits = null; d.miss = null; d.last = null;
       d.gv = null; d.fin = null;                        // 放棄名單 / 「畫完了」都是**這一回合**的(v1.168.0)
       // 這一回合有幾個人可以猜(見 toShow 的說明)
       const nextDrawer = DWR.drawerAt(order, nx);
@@ -193,6 +226,19 @@ const MP = MPCore.create((function () {
     if (!dw || dw.ph !== "pick") return;
     if (!iAmDrawer()) { showToast("這一回合不是你畫 🙂"); return; }
     toDraw(k | 0, dw.seq);
+  }
+
+  /* 畫家自己出題(v1.171.0)。使用者:「再多一個制定題目的功能,字數最長只能有四個字」。
+     ⚠ 洗完是空字串就**不送出、只跳提示** —— 那表示他打的全是標點 / 表情,
+       送出去的話全場會對著一個沒有人打得出來的答案畫 60 秒。
+     ⚠ 洗完只留 4 個字是**靜靜截掉**的(輸入框也有 maxlength,這裡是第二道):
+       跳一則「太長了」再要他重打,在 15 秒的選題相位裡只是把人逼到超時。 */
+  function pickOwn(text) {
+    if (!dw || dw.ph !== "pick") return;
+    if (!iAmDrawer()) { showToast("這一回合不是你畫 🙂"); return; }
+    const cw = DWR.cleanCustom(text);
+    if (!cw) { showToast("題目要是 1~" + DWR.CUSTOM_MAX + " 個中文 / 英數字 ✏️", 1800); return; }
+    toDrawOwn(cw, dw.seq);
   }
 
   /* 送出一段筆劃 / 清空。
@@ -402,10 +448,12 @@ const MP = MPCore.create((function () {
     /* ★★ 猜題者的字數提示(v1.161.0)。使用者:「我覺得要猜的人應該要知道有幾個字,
        這樣才不會太廣泛」—— 沒有它的話「四隻腳的動物」可以是貓 / 狗 / 牛 / 長頸鹿。
        ⚠ 三個條件都要:**在畫的相位**(pick 還沒選、show 已經公布)、**我不是畫家**
-         (畫家看的是工具列那一格題目)、**題目真的選好了**(dw.w >= 0)。
+         (畫家看的是工具列那一格題目)、**題目真的選好了**(wordOf() 不是 null)。
+       ⚠⚠ 第三個條件從 v1.171.0 起**一定要問 wordOf()**,不可以退回 `dw.w >= 0`:
+         畫家自己出題那一回合 dw.w 留在 -1(見 wordOf 那一段)。
        ⚠ 傳出去的只有**數字**,題目文字一個字都不進 DOM(見 DWB.setLen 那段)。 */
-    const lenOn = dw.ph === "draw" && !iAmDrawer() && dw.w >= 0;
-    DWB.setLen(lenOn ? DWGen.lenAt(dw.w) : 0);
+    const lenOn = dw.ph === "draw" && !iAmDrawer() && !!wordOf();
+    DWB.setLen(lenOn ? wordLen() : 0);
     const ms = phaseMs(dw);
     if (ms && dw.ph !== "over") DWB.setCd((dw.at || 0) + ms, ms, dw.ph + "#" + dw.seq);
     else DWB.setCd(0, 0);
@@ -424,7 +472,7 @@ const MP = MPCore.create((function () {
     // 放棄了(v1.168.0):輸入列留著、但鎖住並說清楚原因(不能反悔,見 giveUp)
     if (dw.gv && dw.gv[me]) { DWB.setGuess({ show: true, can: false, why: "🏳️ 你放棄了這一題" }); return; }
     // ★ len:正解幾個字(v1.161.0)—— placeholder 上也講一次,打字時眼睛就在這一格
-    DWB.setGuess({ show: true, can: true, coolEnd: coolEnd, len: DWGen.lenAt(dw.w) });
+    DWB.setGuess({ show: true, can: true, coolEnd: coolEnd, len: wordLen() });
   }
   /* 工具列。★★ v1.170.0 起有**兩種角色**共用這一列:
        · 畫家 —— 題目 + 五色 + 直線 / 擦布 / 復原 / 清空(全套)
@@ -463,8 +511,8 @@ const MP = MPCore.create((function () {
       /* ★★ 分享圖要用的兩件事(v1.164.0):誰畫的 + 答案幾個字。
          ⚠⚠ **題目文字刻意不傳** —— 使用者:「我覺得題目不要分享出來」,
            那讓分享圖變成一道給 LINE 群組玩的謎題(完整說明在 board.js 第八節)。
-         ⚠ 字數走 DWGen.lenAt(正解),與頂列那顆晶片同一個真相。 */
-      DWB.setShotInfo({ drawer: ctx.dispName(d || ""), len: dw.w >= 0 ? DWGen.lenAt(dw.w) : 0 });
+         ⚠ 字數走 wordLen(),與頂列那顆晶片同一個真相(v1.171.0 起自訂題目也算得到)。 */
+      DWB.setShotInfo({ drawer: ctx.dispName(d || ""), len: wordLen() });
       DWB.paintShow(w ? w.w : "?", rows);
       return;
     }
@@ -576,7 +624,7 @@ const MP = MPCore.create((function () {
         dw: {
           mid: Date.now(),              // 這一場的識別碼(筆劃節點的路徑要用,見 inkPath)
           seq: 1, n: 0, ph: "pick", at: Date.now(),
-          cand: DWGen.pick3(R.diff, []), w: -1, used: [],
+          cand: DWGen.pick3(R.diff, []), w: -1, cw: null, used: [],
           hits: null, miss: null, gv: null, fin: null, last: null, pts: null,
           st: null,                     // 娛樂統計(整場累積,見 toShow)
           gs: ord.length - 1,           // 第一回合有幾個人可以猜
@@ -613,7 +661,7 @@ const MP = MPCore.create((function () {
           /* ★ 字數在猜題列也報一次(v1.161.0)——「幾個字」是猜題者唯一的提示,而眼睛
              在畫布與猜題列上,頂列那顆晶片很容易被忽略。⚠ 畫家不必收(他看得到題目);
              ⚠ 一定要排在上面那段 attachRound() 後面 —— 它會 clearSay(),順序反了這一行會被清掉。 */
-          if (!iAmDrawer()) DWB.sysSay("題目是 " + DWGen.lenAt(dw.w) + " 個字 ✏️");
+          if (!iAmDrawer()) DWB.sysSay("題目是 " + wordLen() + " 個字 ✏️");
           /* ★★ 共同作畫開著就講一次(v1.170.0)。⚠ **整場只講一次**(saidCo):
              這是房規、不是每一回合的新消息,每回合都跳一則就是刷版。
              ⚠ 刻意不寫進 .dw-bar 那一列 —— 那一列在 360px 上已經是回合數 + 角色 +
@@ -783,7 +831,7 @@ const MP = MPCore.create((function () {
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
-      pick, ink, inkClear, guess, giveUp, setFin,
+      pick, pickOwn, ink, inkClear, guess, giveUp, setFin,
       zoom: () => zoom,
       toggleZoom() { zoom = !zoom; DWB.setZoom(zoom); savePrefs(); },
       rules: () => DWR.normRules(rules),
@@ -799,7 +847,8 @@ const MP = MPCore.create((function () {
         rules = next; ctx.syncSetup(); ctx.updateGoal(); ruleHint(); savePrefs();
       },
       // 診斷 / e2e 用:目前這一場的狀態(不對外顯示)
-      state: () => (dw ? { n: dw.n, ph: dw.ph, seq: dw.seq, w: dw.w, hits: dw.hits, miss: dw.miss,
+      state: () => (dw ? { n: dw.n, ph: dw.ph, seq: dw.seq, w: dw.w, cw: dw.cw || "", len: wordLen(),
+                           hits: dw.hits, miss: dw.miss,
                            gv: dw.gv, fin: dw.fin, pts: dw.pts, st: dw.st } : null)
     }
   };

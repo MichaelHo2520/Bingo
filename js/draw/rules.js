@@ -101,6 +101,39 @@ const DWR = (function () {
     return false;
   }
 
+  /* ---------- ★★★ 自訂題目(v1.171.0)----------
+     使用者:「再多一個制定題目的功能,字數最長只能有四個字」。
+     畫家在選題那一頁除了三選一,還可以自己打一個題目;打的字經過這一支洗過才算數。
+
+     ⚠⚠ **這一支是唯一的正規化入口,而且要洗兩次**:畫家送出時洗一次(擋掉亂打),
+       每一台從 DB 讀出來時再洗一次(`wordOf()` 裡)。只洗送出端的話,手改 DB 或
+       舊版寫進來的髒字串會直接變成答案,而症狀是「全場都猜不中,且沒有人知道為什麼」。
+     ⚠⚠ 為什麼要自己一個字元一個字元挑,而不是「`norm` 之後 slice(0,4)」:
+       ① 提示講的是**幾個字**,所以答案裡一個空白 / 標點都不能留(CLAUDE.md 那條:
+          `norm` 會把它們吃掉 → 顯示 4 個字而實際只要打 3 個,比不給提示更糟)。
+       ② 表情符號要擋掉:留著的話那一題**沒有人打得出來**(猜題框沒有 emoji 鍵盤),
+          整回合白白過去。順帶一提,擋掉補充平面(U+10000 以上)之後
+          `cleanCustom(s).length === Array.from(cleanCustom(s)).length` 永遠成立
+          —— 字數提示那條紅線在這裡是結構性成立的,不必再靠斷言守。
+       ③ `norm` 會把英文轉小寫,而那是**比對用的**形式,不是**顯示用的**形式:
+          畫家打 "PM2.5" 卻在工具列上看到 "pm25" 會以為自己打錯了。
+     ⚠ 白名單刻意只收「猜題框打得出來的字」:中日韓漢字 · 注音 · 假名 · 英數。
+       全形英數先折成半形再判(全形與半形的 A 在畫面上分不出來)。
+     ⚠ 同上面 norm 那條:字元類別**一律寫成 \u 碼點**,不要真的把那些字打進來。
+         3040-30FF 平假名 / 片假名 · 3105-312F 注音 · 3400-4DBF 漢字擴充 A
+         4E00-9FFF 漢字基本區 · F900-FAFF 相容漢字 */
+  const CUSTOM_MAX = 4;
+  const OKCH = /[0-9A-Za-z\u3040-\u30FF\u3105-\u312F\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/;
+  function cleanCustom(s) {
+    const src = String(s == null ? "" : s).replace(WIDE, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
+    let out = "";
+    for (const ch of src) {
+      if (out.length >= CUSTOM_MAX) break;
+      if (OKCH.test(ch)) out += ch;
+    }
+    return out;
+  }
+
   /* ---------- 猜錯的冷卻 ----------
      ★★ v1.167.0 起一律 **3 秒,不累積、不限次數**。使用者:「猜錯答案時只要凍結 3 秒,
        不需要累積,不需要限制次數,反正就是猜錯就凍結 3 秒,然後就可以再繼續猜」。
@@ -343,7 +376,7 @@ const DWR = (function () {
 
   return {
     PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, COS, DEF_SEC, DEF_ROUNDS, DEF_DIFF, DEF_CO,
-    normRules, sameRules, mayInk, norm, hit, COOL_MS, coolMs,
+    normRules, sameRules, mayInk, norm, hit, cleanCustom, CUSTOM_MAX, COOL_MS, coolMs,
     drawerAt, totalOf, plan, nextLive,
     guessPts, drawerPts, settle, roundDone,
     blankSt, tally, awards,

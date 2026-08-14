@@ -81,7 +81,7 @@ const DWB = (function () {
   const MAX_PTS = 24;                    // 一批最多幾個點(超過就立刻送)
   const MIN_D = 4;                       // 與上一個取樣點的距離小於這麼多(邏輯單位)就丟掉
 
-  let cb = {};                           // { onStroke, onClear, onGuess, onPick }
+  let cb = {};                           // { onStroke, onClear, onGuess, onPick, onPickOwn, onGiveUp, onFin }
   let cv = null, ctx = null, dpr = 1;
   let boxW = 0, boxH = 0;                // 畫布的 CSS 尺寸(px)
   let strokes = [], byId = {};           // 這一回合畫了什麼(重畫 / 重連歸位的來源)
@@ -723,20 +723,34 @@ const DWB = (function () {
        ⚠⚠ 三選一的按鈕**只有畫家畫得出來**。畫面上絕不可以先畫好再用 CSS 藏起來:
          那等於把答案放進每個人的 DOM 裡,而偷看 DOM 比偷看 DB 容易太多了。
      ========================================================================== */
+  /* ⚠ 這一支順手清掉 `dataset.pk`(paintPick 的重畫守衛,見下面那一段)——
+     清在這裡而不是各呼叫端:蓋板換過內容之後那個 key 一定不再成立,漏清一處的症狀是
+     「選題卡整回合不更新」,而它只在極少數的相位序列下才看得出來。 */
   function showOver(html, cls) {
     const box = $("dwOver"); if (!box) return;
     box.className = "dw-over" + (cls ? " " + cls : "");
     box.innerHTML = html;
+    box.dataset.pk = "";
     box.classList.remove("hidden");
   }
-  function hideOver() { const box = $("dwOver"); if (box) { box.classList.add("hidden"); box.innerHTML = ""; } }
+  function hideOver() { const box = $("dwOver"); if (box) { box.classList.add("hidden"); box.innerHTML = ""; box.dataset.pk = ""; } }
 
-  /* 畫家的三選一。cands = 題目索引陣列;mine = 我是不是畫家。
-     ⚠ mine 為 false 時**連題目文字都不產生**(見上面那條)。 */
+  /* 畫家的三選一 + 「✏️ 自己出題」(v1.171.0)。cands = 題目索引陣列;mine = 我是不是畫家。
+     ⚠ mine 為 false 時**連題目文字都不產生**(見上面那條)。
+     ⚠⚠ **同一張卡不可以重畫**(dataset.pk 守衛)。蓋板是「每一份 game 快照都重畫一次」的,
+       在自訂題目那一格出現之前這頂多是閃一下;現在那一格是 <input> ——
+       別人送一個表情、有人重連、有人改暱稱,都會讓畫家**打到一半的字整個消失**,
+       而畫面上沒有任何線索,他只會覺得這一頁壞掉了。
+       key 包含 mine / 候選 / 畫家名字 = 這張卡會長得不一樣的全部理由;一樣就整段不動。
+     ⚠ 相位換掉時 showOver / hideOver 會把 key 清空 —— 所以下一回合一定重畫得出來。 */
   function paintPick(cands, mine, drawerName) {
+    const box = $("dwOver");
+    const key = (mine ? "m|" : "o|") + (cands || []).join(",") + "|" + (drawerName || "");
+    if (box && !box.classList.contains("hidden") && box.dataset.pk === key) return;
     if (!mine) {
       showOver('<div class="dw-ov-card"><div class="dw-ov-t">' + esc(drawerName || "畫家") + ' 正在選題目…</div>' +
                '<div class="dw-ov-s">選好就開始畫,準備好猜了嗎 👀</div></div>', "wait");
+      if (box) box.dataset.pk = key;
       return;
     }
     const btns = (cands || []).map((idx, k) =>
@@ -744,23 +758,46 @@ const DWB = (function () {
         '<span class="dw-pk-ic">' + DWGen.iconAt(idx) + '</span>' +
         '<span class="dw-pk-w">' + esc(DWGen.textAt(idx)) + '</span>' +
       '</button>').join("");
+    /* ✏️ 自己出題。⚠ maxlength 只是第一道:貼上、注音選字、手改 DOM 都繞得過,
+       真正的上限在 DWR.cleanCustom(送出端與每一台的讀取端各洗一次)。 */
+    const own = '<div class="dw-own">' +
+      '<input id="dwOwnI" class="dw-own-i" type="text" maxlength="' + DWR.CUSTOM_MAX + '" ' +
+        'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
+        'placeholder="自己出題(最多 ' + DWR.CUSTOM_MAX + ' 個字)" aria-label="自己出題">' +
+      '<button class="dw-own-b" type="button" aria-label="用自己出的題目">✏️ 就畫這個</button>' +
+      '</div>';
     showOver('<div class="dw-ov-card"><div class="dw-ov-t">你是畫家 · 選一個來畫</div>' +
-             '<div class="dw-picks">' + btns + '</div>' +
+             '<div class="dw-picks">' + btns + '</div>' + own +
              '<div class="dw-ov-s">不選的話時間到會幫你選第一個</div></div>', "pick");
+    if (box) box.dataset.pk = key;
   }
-  /* 三顆題目鈕的點擊。⚠ 用**事件委派、而且只綁一次** —— 綁在 paintPick 裡的話
+  /* 三顆題目鈕 + 自己出題的送出。⚠ 用**事件委派、而且只綁一次** —— 綁在 paintPick 裡的話
      每重畫一次就多疊一個監聽(相位快照一動就重畫),按一下會送出好幾次。 */
+  function ownSubmit() {
+    const el = $("dwOwnI"); if (!el) return;
+    cb.onPickOwn && cb.onPickOwn(el.value);
+  }
   function bindPick() {
     const box = $("dwOver"); if (!box) return;
     box.addEventListener("click", e => {
       /* 分享鈕與題目鈕共用這一個委派(蓋板每換一次相位就整段重畫,綁在 paintShow 裡
          會每重畫一次多疊一個監聽 → 按一下送出好幾次)。 */
       if (e.target.closest(".dw-shbtn")) { shareShot(); return; }
+      if (e.target.closest(".dw-own-b")) { ownSubmit(); return; }
       const b = e.target.closest(".dw-pickbtn"); if (!b) return;
       const k = +b.dataset.k;
       if (!isFinite(k)) return;
       box.querySelectorAll(".dw-pickbtn").forEach(x => x.classList.toggle("on", x === b));
       cb.onPick && cb.onPick(k);
+    });
+    /* Enter 直接送出(v1.171.0)—— 選題只有 15 秒,打完還要伸手去按鈕太慢。
+       ⚠ isComposing 要擋:注音 / 日文輸入法選字時按 Enter 是「確定這個字」,
+         不擋的話一按就把還沒選完的字送出去了。 */
+    box.addEventListener("keydown", e => {
+      if (e.key !== "Enter" || e.isComposing) return;
+      if (!e.target.closest(".dw-own-i")) return;
+      e.preventDefault();
+      ownSubmit();
     });
   }
 

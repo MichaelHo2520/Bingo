@@ -46,6 +46,8 @@ DWB.init({
   onClear() { MP.inkClear(); },
   onGuess(text) { MP.guess(text); },
   onPick(k) { MP.pick(k); },
+  // ★ v1.171.0:畫家自己出題(最多 4 個字)。字串怎麼洗、空的要不要送,一律由 adapter 判定
+  onPickOwn(text) { MP.pickOwn(text); },
   /* ★ v1.168.0 的兩顆。⚠ 這裡收到的一律當真:
        · onGiveUp —— 誤觸的防線是**兩段式**,而它整段留在 board.js(第一次按只是武裝)
        · onFin —— 純提示,adapter 只寫 game.dw.fin,不碰相位也不鎖畫布 */

@@ -7249,6 +7249,23 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
   .dw-pickbtn.on{border-color:var(--accent);background:rgba(255,255,255,.20)}
   .dw-pk-ic{font-size:22px;line-height:1;flex:none}
   .dw-pk-w{font-family:'Fredoka',sans-serif;font-weight:700;font-size:18px}
+  /* ✏️ 自己出題(v1.171.0)。三選一下面多一列「輸入框 + 就畫這個」。
+     ⚠⚠ 輸入框的 font-size **不可以小於 16px**:iOS Safari 對小於 16px 的輸入框會
+       自動放大整頁,而這一頁的畫布尺寸是算出來的(fit())—— 放大之後回不去,
+       症狀是「在 iPhone 上選完題目畫布就歪掉」。360px 的斷點那一段也不縮它。
+     ⚠ 這一列刻意**不設 min-width**:三顆題目鈕已經把卡片撐到 190px 以上,
+       再給它一個下限只會在窄畫面上多一條橫捲。 */
+  .dw-own{display:flex;gap:6px;margin-top:8px}
+  .dw-own-i{flex:1;min-width:0;border-radius:11px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.10);color:var(--text);
+    font-family:'Nunito',sans-serif;font-weight:700;font-size:16px;padding:8px 11px}
+  .dw-own-i::placeholder{color:var(--muted);font-weight:600;font-size:13px}
+  .dw-own-i:focus{outline:none;border-color:var(--accent)}
+  .dw-own-b{flex:none;border:1px solid var(--panel-line);border-radius:11px;padding:8px 12px;
+    background:rgba(255,255,255,.10);color:var(--text);cursor:pointer;
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;transition:.15s}
+  .dw-own-b:hover{background:rgba(255,255,255,.18)}
+  .dw-own-b:active{transform:scale(.97)}
   /* 公布答案的分數表 */
   .dw-sh-list{display:flex;flex-direction:column;gap:4px;margin-top:4px;text-align:left}
   .dw-sh-row{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted)}
