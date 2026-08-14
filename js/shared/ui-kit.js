@@ -744,7 +744,14 @@ function efFly(m){
   const lane=efLane(m.who), t=EF_POS[lane]||0;                            // t:-1(最左)~ 0(正中央)~ +1(最右)
   efLaneAt[lane]=Date.now(); efLaneBy[lane]=m.who;
   const span=Math.min(innerWidth*0.72, Math.max(bw,300))/2;               // 發位鋪在盤面寬度上,窄盤面也至少散開 300px
-  const dur=2.05+Math.random()*0.4;                                      // 時長微擾:同時起飛的也不會整批同步
+  /* 時長微擾:同時起飛的也不會整批同步。
+     ★ v1.166.0 從 2.05~2.45 秒拉長到 2.9~3.3 秒 —— 使用者:「emoji 顯示的時間太短」。
+       起飛與展開的**節奏刻意沒有變**:styles.css 的 emoteFloat 把 15%/32% 同步改成 11%/24%,
+       換算回絕對時間仍是約 0.34s / 0.74s。多出來的一秒全部加在「看得清楚」的那一段 ——
+       不透明度撐到 72% 才開始淡出,而不是從 15% 就一路淡到底。
+     ⚠ 這一行與 styles.css 的 --ef-dur 預設值要一起看:兩邊對不上的話,電子書模式
+       (animation:none)之外沒人會發現,但 6 秒後 DB 記錄就被 sendEmote 刪掉了 —— 別再拉長。 */
+  const dur=2.9+Math.random()*0.4;
   const el=document.createElement("div");
   el.className="emote-fly"+(m.kind==="text"?" is-text":"")+(m.kind==="voice"?" is-voice":"")
             +((efCount()+1>=EF_SMALL)?" ef-sm":"");

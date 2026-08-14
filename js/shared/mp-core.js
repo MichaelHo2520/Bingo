@@ -19,8 +19,20 @@
 
 const MPCore = (function(){
 
-  const GRACE_MS = 20000;                 // 斷線寬限(手機切 App 常見情境)
-  const ALONE_MS = 8000;                  // 對手離開後仍只剩自己 → 退回等待
+  /* ---------- 四個寬限期(v1.166.0 拆成兩組:「斷線」給滿一分鐘,「按下離開」照舊很快) ----------
+     使用者:「離開視窗後再回來…改成 1 分鐘內回來都沒問題」。切去 LINE 回訊息、接個電話,
+     手機馬上凍結分頁 → WebSocket 斷 → 伺服器依 onDisconnect 把 players/{我} 移掉,
+     於是**別人那一台**會在寬限期到期時把這局作廢 / 把自己退出房間。所以要能撐一分鐘的
+     是 GRACE_MS 與 ALONE_MS 這兩顆**別人身上的計時器**,不是回來的人自己。
+     ⚠ 但寬限期一拉長,「真的按了離開」的那條路徑會跟著變慢(對手退出後房主要乾等一分鐘)——
+       所以明確的離開訊號另外走短的:
+         · 房主按離開 → host 欄位不見了(關房訊號,見 leave())→ CLOSE_MS
+         · 訪客按離開 → 走 bye/{pid} 記號(見 leave() / byeIds)     → BYE_MS
+       兩者都是「當事人還連著的時候自己寫下的」,所以看到就等於確定,不必再等。 */
+  const GRACE_MS = 60000;                 // 斷線寬限(手機切 App 常見情境):一分鐘內回來就當沒事
+  const ALONE_MS = 60000;                 // 對手**斷線**後仍只剩自己 → 退回等待
+  const CLOSE_MS = 1200;                  // 房主按了「離開房間」= 明確關房,訪客不必等滿寬限
+  const BYE_MS   = 8000;                  // 對手按了「離開房間」= 明確走人,照舊短寬限(= 改動前的 ALONE_MS)
 
   function create(A){
     const ROOMS = A.ns.rooms, INDEX = A.ns.index;
@@ -96,7 +108,8 @@ const MPCore = (function(){
     let outcomeShown=false, abandoned=false, autoStarting=false;
     let prevIds=null, sawPlayers=false, sawMe=false, hostId=null, sawHost=false;
     let connRef=null, connected=null, resyncing=false, resyncTimer=null;
-    let graceTimer=null, aloneTimer=null, aloneTick=null;
+    let graceTimer=null, graceAt=0, aloneTimer=null, aloneTick=null, aloneWaitMs=0;
+    let byeIds={};                          // 「自己按了離開房間」的人(bye/{pid});見上面四個寬限期
     let emotesReady=false;
     let playedRound=null;                   // 已經 enterPlaying() 過的那個 roundId(見 CONT_ROUND)
     /* 出手順序(只有 ORDER_PICK 的遊戲會動到):方式、猜拳中的狀態、揭曉資料,
@@ -286,7 +299,7 @@ const MPCore = (function(){
                pickFreeCode 的迴圈(最多試五次、全撞就放棄並告訴使用者),不是 update()。
            ⚠ adapter 自己的房內節點(A.extraNodes,例如數獨/消消樂的 progress、
              台灣麻將的 tai、你畫我猜的 ink/say)也要一起清 —— 它們是**上一局**的資料。 */
-        const wipe={ players:null, scores:null, hostName:null, closedAt:null };
+        const wipe={ players:null, scores:null, hostName:null, closedAt:null, bye:null };
         (A.extraNodes||[]).forEach(k=>{ wipe[k]=null; });
         const payload=Object.assign(wipe, {
           host:meId, roomName:roomName,
@@ -343,7 +356,9 @@ const MPCore = (function(){
         return p;
       },(err,committed)=>{
         const ok=!err&&committed;
-        if(ok) roomRef.child("players/"+meId).onDisconnect().remove();
+        /* ⚠ 搶到位子就要把自己的 bye 記號清掉:留著的話「上次是按離開走的」會一直算數,
+           下次真的斷線時別人會用短寬限把這局作廢(而這一支 resume() 也會呼叫 → 回來就清乾淨)。 */
+        if(ok){ roomRef.child("players/"+meId).onDisconnect().remove(); roomRef.child("bye/"+meId).remove(); }
         done&&done(ok);
       });
     }
@@ -457,6 +472,7 @@ const MPCore = (function(){
       online=true; ready=false; curPhase="lobby";
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0; playedRound=null;   // ★ 進新房必歸零(見檔頭 #1)
+      byeIds={}; aloneWaitMs=0;      // 同上:上一間房「誰按了離開」不可以帶進新房(見四個寬限期)
       clearPlayCount(); statDone=false;   // 熱門度計數:一間房記一次 → 進新房要重新起算
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();
       stopRoomWatch();
@@ -517,8 +533,11 @@ const MPCore = (function(){
     function listen(){
       roomRef.child("host").on("value",s=>{
         hostId=s.val()||null; if(hostId)sawHost=true;
-        if(hostGone()) scheduleRecheck();
+        if(hostGone()) scheduleRecheck(recheckWait());
       });
+      /* 誰是「自己按了離開房間」走的(v1.166.0)。⚠ 這一份與 players 是**兩個節點兩個事件**,
+         到達順序不保證 → 晚到時要把已經在跑的長寬限縮回短的(retuneAloneCheck)。 */
+      roomRef.child("bye").on("value",s=>{ byeIds=s.val()||{}; retuneAloneCheck(); });
       roomRef.child("players").on("value",s=>{
         players=s.val()||{};
         { const ids=Object.keys(players);
@@ -529,7 +548,7 @@ const MPCore = (function(){
         if(iWasKicked() && stableOnline()){ showToast("你已被房主移出房間"); leave(); return; }
         const alone=isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1;
         if(alone) scheduleAloneCheck(); else clearAloneCheck();
-        if(iWasKicked() || hostGone()) scheduleRecheck(); else clearRecheck();
+        if(iWasKicked() || hostGone()) scheduleRecheck(recheckWait()); else clearRecheck();
         renderPlayers(); updateStartBtn();
         if(isHost) updateRoomIndex();
         if(curPhase==="lobby") syncSetup();
@@ -1128,7 +1147,15 @@ const MPCore = (function(){
     }
 
     /* ---------- 斷線復原 / 離開 / 踢人 ---------- */
-    function hostGone(){ return !isHost && online && sawHost && sawPlayers && (!hostId || !players[hostId]); }
+    /* 房主不見了的**兩種**情況(v1.166.0 拆開,之前是同一個判斷、同一個寬限):
+         · hostClosed() —— host 這個欄位不見了 = 房主按了離開,房是真的關了(CLAUDE.md 紅線 5)
+                           → 沒有「等他回來」這回事,CLOSE_MS 之後直接退出
+         · hostAway()   —— host 還在,只是他的 players 那一格被 onDisconnect 移掉了 = 切 App / 斷線
+                           → 給滿 GRACE_MS,他一分鐘內回來就當沒事(claimSeat 會把他寫回來) */
+    function hostClosed(){ return !isHost && online && sawHost && !hostId; }
+    function hostAway(){ return !isHost && online && sawHost && sawPlayers && !!hostId && !players[hostId]; }
+    function hostGone(){ return hostClosed() || hostAway(); }
+    function recheckWait(){ return hostClosed() ? CLOSE_MS : GRACE_MS; }
     function iWasKicked(){ return !isHost && online && sawMe && !players[meId]; }
     function stableOnline(){ return connected===true && !resyncing && !document.hidden; }
     function watchConn(){
@@ -1154,31 +1181,58 @@ const MPCore = (function(){
         if(msg) showToast(msg,1500);
       });
     }
-    function scheduleRecheck(){ if(!graceTimer)graceTimer=setTimeout(()=>{ graceTimer=null; recheckPresence(); },GRACE_MS); }
-    function clearRecheck(){ if(graceTimer){ clearTimeout(graceTimer); graceTimer=null; } }
+    /* ⚠ 已經排了一顆時**只准往前挪、不准往後延**:先看到「房主斷線」(GRACE_MS)、
+       接著才收到「房主真的關房」(CLOSE_MS)的話,要照後者立刻走;反過來的順序則不能被拖長,
+       否則每次 players 有風吹草動都重排一次 = 寬限期永遠到不了期。 */
+    function scheduleRecheck(ms){
+      ms=ms||GRACE_MS;
+      const at=Date.now()+ms;
+      if(graceTimer && at>=graceAt) return;
+      clearRecheck(); graceAt=at;
+      graceTimer=setTimeout(()=>{ graceTimer=null; recheckPresence(); },ms);
+    }
+    function clearRecheck(){ if(graceTimer){ clearTimeout(graceTimer); graceTimer=null; } graceAt=0; }
     function recheckPresence(){
       if(!online||!roomRef)return;
       if(iWasKicked() && connected){ showToast("你已被房主移出房間"); leave(); return; }
-      if(hostGone()){ showToast("房主已離開,房間已關閉"); leave(); return; }
+      if(hostGone()){ showToast(hostClosed()?"房主已離開,房間已關閉":"房主斷線太久,房間已關閉"); leave(); return; }
       if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1) hostAloneToLobby();
     }
-    function paintAloneCountdown(sec){ const el=$("mpStatusTxt"); if(!el)return; el.classList.add("wait"); el.textContent="對手離開了,"+sec+" 秒後回到等待…"; }
+    function paintAloneCountdown(sec){
+      const el=$("mpStatusTxt"); if(!el)return; el.classList.add("wait");
+      // 措辭跟著寬限期走:斷線是「可能會回來」,按了離開是「不會回來了」——現場看得懂在等什麼
+      el.textContent=(aloneWaitMs<=BYE_MS?"對手離開了,":"對手斷線了,")+sec+" 秒後回到等待…";
+    }
+    /* 剩下的人全都是「自己按了離開房間」走的嗎?(v1.166.0)
+       ⚠ 名單用 **order**(這一局的參賽者)而不是 prevIds:prevIds 在同一個回呼裡早就被
+         覆蓋成新的一份,問不出「剛剛不見的是誰」。order 為空(還在決定順序)→ 回 false,
+         也就是走保守的長寬限。 */
+    function foesByeOnly(){
+      const gone=(order||[]).filter(id=>id!==meId && !players[id]);
+      return gone.length>0 && gone.every(id=>!!byeIds[id]);
+    }
     function scheduleAloneCheck(){
       if(aloneTimer)return;
-      let left=Math.ceil(ALONE_MS/1000);
+      aloneWaitMs=foesByeOnly()?BYE_MS:ALONE_MS;
+      let left=Math.ceil(aloneWaitMs/1000);
       paintAloneCountdown(left);
       aloneTick=setInterval(()=>{ left--; if(left>0)paintAloneCountdown(left); },1000);
       syncSubrow();   // 對戰中平常收起狀態列,倒數這種盤面上看不到的訊息要放出來
       aloneTimer=setTimeout(()=>{
         aloneTimer=null; if(aloneTick){ clearInterval(aloneTick); aloneTick=null; syncSubrow(); }
         if(isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1) hostAloneToLobby();
-      },ALONE_MS);
+      },aloneWaitMs);
+    }
+    // bye 記號比 players 的移除晚到 → 把已經在跑的長寬限縮回短的(只縮不放,免得來回重排永遠不到期)
+    function retuneAloneCheck(){
+      if(!aloneTimer || aloneWaitMs<=BYE_MS || !foesByeOnly())return;
+      clearAloneCheck(); scheduleAloneCheck();
     }
     function clearAloneCheck(){ if(aloneTimer){ clearTimeout(aloneTimer); aloneTimer=null; } if(aloneTick){ clearInterval(aloneTick); aloneTick=null; syncSubrow(); } }
     function hostAloneToLobby(){
       if(curPhase==="lobby")return;
       abandoned=true;
-      showToast("對手離開了,這局作廢,回到等待…",2600);
+      showToast((aloneWaitMs>BYE_MS?"對手一直沒回來":"對手離開了")+",這局作廢,回到等待…",2600);
       resetRoomToLobby();
     }
     // 房主:把整房清回大廳(本局作廢;此時無 winner 要保留)
@@ -1228,7 +1282,7 @@ const MPCore = (function(){
     function leave(){
       try{
         if(roomRef){
-          ["host","players","game","scoreMode","winGoal","scores","emotes"]
+          ["host","players","game","scoreMode","winGoal","scores","emotes","bye"]
             .concat(ORDER_PICK ? ["orderMethod"] : [])
             .concat(Object.keys(A.roomFields ? A.roomFields() : {}))
             .concat(A.extraNodes || [])
@@ -1265,12 +1319,18 @@ const MPCore = (function(){
                    (svGet(rooms/code)),面板每開一次最多下載 30 間 × 40 KB。
                ⚠ 這一段是**雙胞胎**,js/online.js 的 leave() 有對應的一份(紅線 5)——
                  但 Bingo 沒有 extraNodes,所以那一份**刻意**不加這一圈(見它那條註解)。 */
-            const ups={ host:null, players:null, game:null,
+            const ups={ host:null, players:null, game:null, bye:null,
                         hostName:meName||"", closedAt:Date.now() };
             (A.extraNodes||[]).forEach(k=>{ ups[k]=null; });
             roomRef.update(ups);
           }else if(meId){
             const pr=roomRef.child("players/"+meId);
+            /* ★ v1.166.0:先留下「我是自己按離開的」記號,再把自己移掉。
+               斷線的寬限期拉到一分鐘之後,房主分不出「對手切去 LINE」與「對手不玩了」就只能一律等滿
+               —— 這一筆就是差別:當事人還連著的時候自己寫的,看到就等於確定(見檔頭四個寬限期)。
+               ⚠ 順序不能反:先 remove 再寫 bye 的話,節點都不在了還替他長回一格 bye 出來。
+               ⚠ 記號由重新入座的 claimSeat 清掉(不是這裡),不然自己又溜回來時它會一直算數。 */
+            roomRef.child("bye/"+meId).set(true);
             pr.onDisconnect().cancel(); pr.remove();
             /* ★★ v1.97.0:**不再刪掉自己的分數**(舊版是 scores/{meId}.remove())——
                誤按一下就把整場成績歸零太痛,而斷線那條路徑本來就留著、兩種離開下場不一致。
@@ -1290,6 +1350,7 @@ const MPCore = (function(){
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       roomRef=null; code=null; online=false; ready=false; isHost=false;
       players={}; scores={}; order=[]; winner=null; status="lobby"; curPhase="lobby";
+      byeIds={}; aloneWaitMs=0;
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0; lastIndexSig=null; outcomeShown=false; abandoned=false;
       scoredThisRound=false; myRoundWin=false; autoStarting=false; emotesReady=false;

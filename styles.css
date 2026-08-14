@@ -754,9 +754,9 @@
   :root[data-theme="arcade"] .voice-gate{color:var(--daub-ink)}
 
   .emote-fly-layer{position:fixed;inset:0;pointer-events:none;z-index:64}
-  /* --ef-dx / --ef-dur 由 showEmote 逐則寫入(發位越外側漂越多、時長微擾),沒寫時就是原本的正中央 2.2s */
+  /* --ef-dx / --ef-dur 由 showEmote 逐則寫入(發位越外側漂越多、時長微擾),沒寫時就是正中央 3.1s */
   .emote-fly{position:absolute;--ef-dx:0px;transform:translate(-50%,-50%);display:flex;flex-direction:column;
-    align-items:center;gap:3px;animation:emoteFloat var(--ef-dur,2.2s) ease-out forwards}
+    align-items:center;gap:3px;animation:emoteFloat var(--ef-dur,3.1s) ease-out forwards}
   .emote-fly .ef-emo{font-size:46px;line-height:1;filter:drop-shadow(0 3px 8px rgba(0,0,0,.4))}
   .emote-fly .ef-cap{font-family:'Fredoka';font-weight:600;font-size:12px;color:#fff;white-space:nowrap;
     background:rgba(0,0,0,.5);padding:2px 9px;border-radius:999px}
@@ -775,10 +775,16 @@
   .emote-fly.ef-sm .ef-emo{font-size:34px}
   .emote-fly.ef-sm .ef-cap{font-size:11px;padding:1px 7px}
   .emote-fly.ef-sm.is-text .ef-emo{font-size:16px;padding:6px 12px;border-radius:13px}
+  /* ★ v1.166.0 把整段時長從 2.2s 拉到 3.1s(使用者:「emoji 顯示的時間太短」)。
+     兩個關鍵幀的百分比跟著往前挪(15→11、32→24),換算回**絕對時間**與拉長前一樣約 0.34s / 0.74s
+     —— 彈出的節奏一動都不動,只有「浮著給人看」的那一段變長。
+     ⚠ 多加的 72% 才是真正解決「看不清楚」的那一行:原本 15% 之後就一路線性淡到 0,
+       整趟有八成時間是半透明的;現在撐到 72% 才開始淡出。 */
   @keyframes emoteFloat{
     0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}
-    15%{opacity:1;transform:translate(calc(-50% + var(--ef-dx) * .15),-90%) scale(1.15)}
-    32%{transform:translate(calc(-50% + var(--ef-dx) * .35),-140%) scale(1)}
+    11%{opacity:1;transform:translate(calc(-50% + var(--ef-dx) * .15),-90%) scale(1.15)}
+    24%{transform:translate(calc(-50% + var(--ef-dx) * .35),-140%) scale(1)}
+    72%{opacity:1}
     100%{opacity:0;transform:translate(calc(-50% + var(--ef-dx)),-360%) scale(1)}
   }
 

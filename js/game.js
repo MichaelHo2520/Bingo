@@ -1492,7 +1492,8 @@
     const lane=efLane(m.who), t=EF_POS[lane]||0;                            // t:-1(最左)~ 0(正中央)~ +1(最右)
     efLaneAt[lane]=Date.now(); efLaneBy[lane]=m.who;
     const span=Math.min(innerWidth*0.72, Math.max(bw,300))/2;               // 發位鋪在賓果卡寬度上,窄卡也至少散開 300px
-    const dur=2.05+Math.random()*0.4;                                      // 時長微擾:同時起飛的也不會整批同步
+    // 時長微擾 + v1.166.0 拉長停留(2.9~3.3 秒);理由與節奏換算見 js/shared/ui-kit.js 的同一行
+    const dur=2.9+Math.random()*0.4;
     const el=document.createElement("div");
     el.className="emote-fly"+(m.kind==="text"?" is-text":"")+(m.kind==="voice"?" is-voice":"")
               +((efCount()+1>=EF_SMALL)?" ef-sm":"");
