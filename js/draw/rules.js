@@ -81,11 +81,15 @@ const DWR = (function () {
   }
 
   /* ---------- 猜錯的冷卻 ----------
-     第 1 次錯 → 5 秒、第 2 次 → 10 秒、第 3 次 → 本題失格(回 -1)。
-     ⚠ 傳進來的 n 是「**含這一次**的累積錯誤數」。 */
-  const COOL = [5000, 10000];
-  function coolMs(n) { return n >= 3 ? -1 : (COOL[n - 1] || 0); }
-  function out(n) { return (n || 0) >= 3; }              // 這一題已經失格
+     ★★ v1.167.0 起一律 **3 秒,不累積、不限次數**。使用者:「猜錯答案時只要凍結 3 秒,
+       不需要累積,不需要限制次數,反正就是猜錯就凍結 3 秒,然後就可以再繼續猜」。
+     ⚠ 所以這一支**不吃參數** —— 舊版是「第 1 次 5 秒 / 第 2 次 10 秒 / 第 3 次本題失格(-1)」,
+       連帶 `out()`(這一題失格了沒)整支拿掉:**沒有「失格」這個狀態了**。
+       回傳值恆為正數 → 呼叫端不必再分「負數 = 失格」那條路。
+     ⚠ `d.miss` 還是要記:它是娛樂統計「亂槍打鳥」的來源(見 tally),
+       只是不再影響「還能不能猜」,也不再影響「這一回合結束了沒」(見 roundDone)。 */
+  const COOL_MS = 3000;
+  function coolMs() { return COOL_MS; }
 
   /* ---------- 這一回合誰是畫家 ----------
      ★ order 是開局凍結的座位表;第 n 回合(0-based)由 order[n % order.length] 畫。
@@ -216,15 +220,14 @@ const DWR = (function () {
   /* ---------- 這一回合結束了沒 ----------
      ★ 兩個條件任一成立:時間到(由 adapter 的計時器管)、或**所有猜題者都猜中了**
        (規則書第 13 節)—— 這一支只回答後者。
-     ⚠ 「失格的人」不算在「還沒猜中」裡 —— 三次猜錯的人永遠不會猜中,
-       等他等於整房乾等到 60 秒(而畫面上完全看不出在等誰)。
+     ⚠⚠ v1.167.0 起**猜錯不會失格** → 這一支**不看 miss**(連參數都不收):沒猜中的人
+       永遠算「還在猜」,所以沒人猜出來的那一題就是乾等到時間到 —— 那正是新規則要的
+       (猜錯凍 3 秒、冷完繼續猜,不會有人被踢出這一題)。
+       ⚠ 舊版有第三個參數 miss,用來把「三次猜錯的人」當成不必等 —— 別再加回來。
      ⚠ 一個猜題者都沒有(人都跑光了)回 true:那一回合已經沒有意義,直接收掉。 */
-  function roundDone(guesserIds, hits, miss) {
-    hits = hits || {}; miss = miss || {};
-    for (let i = 0; i < guesserIds.length; i++) {
-      const id = guesserIds[i];
-      if (!hits[id] && !out(miss[id])) return false;
-    }
+  function roundDone(guesserIds, hits) {
+    hits = hits || {};
+    for (let i = 0; i < guesserIds.length; i++) if (!hits[guesserIds[i]]) return false;
     return true;
   }
 
@@ -314,7 +317,7 @@ const DWR = (function () {
 
   return {
     PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, DEF_SEC, DEF_ROUNDS, DEF_DIFF,
-    normRules, sameRules, norm, hit, coolMs, out,
+    normRules, sameRules, norm, hit, COOL_MS, coolMs,
     drawerAt, totalOf, plan, nextLive,
     guessPts, drawerPts, settle, roundDone,
     blankSt, tally, awards,

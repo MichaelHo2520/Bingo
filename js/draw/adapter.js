@@ -205,7 +205,6 @@ const MP = MPCore.create((function () {
     const me = ctx.me();
     if (iAmDrawer()) { showToast("你是畫家,不能猜 🎨"); return; }
     if (dw.hits && dw.hits[me]) { showToast("你已經猜中了,看別人猜吧 👀"); return; }
-    if (DWR.out(dw.miss && dw.miss[me])) { showToast("這一題你已經沒有機會了 😅"); return; }
     if (coolEnd > Date.now()) { showToast("冷卻中,先看看畫面 🥶", 1200); return; }
 
     const w = wordOf();
@@ -228,10 +227,10 @@ const MP = MPCore.create((function () {
       return;
     }
 
-    // 猜錯 → 冷卻(第 3 次直接失格)+ 把內容 push 到 say(全房看得到,這是笑點)
-    const n = ((dw.miss && dw.miss[me]) || 0) + 1;
-    const ms = DWR.coolMs(n);
-    coolEnd = ms > 0 ? Date.now() + ms : 0;
+    /* 猜錯 → 凍結 3 秒 + 把內容 push 到 say(全房看得到,這是笑點)。
+       ★★ v1.167.0:冷卻**不累積、不限次數、不會失格** —— 冷完就可以再猜(見 DWR.coolMs)。
+       ⚠ `d.miss` 照樣要 +1:它是娛樂統計「亂槍打鳥」的來源,只是不再影響能不能猜。 */
+    coolEnd = Date.now() + DWR.coolMs();
     const seq = dw.seq;
     ctx.txGame(g => {
       const d = g.dw;
@@ -243,7 +242,6 @@ const MP = MPCore.create((function () {
     const ref = ctx.ref(sayPath(dw));
     if (ref) ref.push().set({ f: me, t: String(text).slice(0, 16) });
     try { Sound.lose(); } catch (e) {}
-    if (ms < 0) showToast("三次都沒猜中,這一題換你看戲了 😅", 2200);
     paintGuessRow();
   }
 
@@ -319,7 +317,6 @@ const MP = MPCore.create((function () {
     if (iAmDrawer()) { DWB.setGuess({ show: false }); return; }
     if (dw.ph !== "draw") { DWB.setGuess({ show: true, can: false, why: dw.ph === "pick" ? "畫家正在選題目…" : "這一回合結束了" }); return; }
     if (dw.hits && dw.hits[me]) { DWB.setGuess({ show: true, can: false, why: "✅ 你已經猜中了" }); return; }
-    if (DWR.out(dw.miss && dw.miss[me])) { DWB.setGuess({ show: true, can: false, why: "😅 這一題你沒有機會了" }); return; }
     // ★ len:正解幾個字(v1.161.0)—— placeholder 上也講一次,打字時眼睛就在這一格
     DWB.setGuess({ show: true, can: true, coolEnd: coolEnd, len: DWGen.lenAt(dw.w) });
   }
@@ -375,7 +372,7 @@ const MP = MPCore.create((function () {
        這一句要講清楚,因為它直接影響畫家的策略:**畫得越好、自己拿越多**
        (舊規則反過來,畫爛才划算,而那是玩家自己會算出來的)。 */
     el.innerHTML = "一人畫、其他人打字搶答。<b>越早猜中分數越高</b>(200 / 150 / 100 / 50)," +
-      "而<b>畫家跟著大家的分數抽成</b> —— 讓越多人猜懂,自己拿越多;猜錯會冷卻,三次就換你看戲。" +
+      "而<b>畫家跟著大家的分數抽成</b> —— 讓越多人猜懂,自己拿越多;猜錯只凍結 <b>3 秒</b>,冷完繼續猜。" +
       "<br>每人當 <b>" + rules.rounds + "</b> 次畫家 · 一回合 <b>" + rules.sec + "</b> 秒 · 題目「" +
       L.label + "」(" + L.desc + ")";
   }
@@ -479,7 +476,7 @@ const MP = MPCore.create((function () {
 
       /* 所有猜題者都猜中了 → 不必等到 60 秒(規則書第 13 節)。
          ⚠ 每一台都會看到同一份快照,所以每一台都會叫這一支 —— 交易的 seq 守衛保證只有第一個算數。 */
-      if (dw.ph === "draw" && DWR.roundDone(guesserIds(), dw.hits, dw.miss)) toShow(dw.seq);
+      if (dw.ph === "draw" && DWR.roundDone(guesserIds(), dw.hits)) toShow(dw.seq);
       armPhaseT();
     },
 
