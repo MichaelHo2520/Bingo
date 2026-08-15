@@ -1071,6 +1071,22 @@ const M16B = (function(){
      ⚠ 回 0(量不到 / 這一列收起來)= 完全退回 v1.176.0 的行為:會疊,但不會塌。 */
   const RESERVE_MAX = 0.46;      // 最多讓出明牌帶的幾成寬
   const RESERVE_GAP = 8;         // 明牌與那一格之間的間距
+  /* ★★ 量到之後**往上取整到 RESERVE_STEP 的倍數**(v1.178.2)。
+     使用者:「吃牌區會因為最右邊的文字,導致手上的花牌跟吃牌一直動來動去」。
+     成因:留位是拿**當下**那一格的內容量出來的,而那一格每一手都在換 ——
+       「輪到 小碰…」→「輪到 阿華美美子…」名字差幾個字就是幾十 px,
+       → `--m16aw` 每手都變 → 明牌帶的 padding-right 跟著變 → 明牌 / 花牌**重新換行**。
+     ★ 取整之後,名字長短的差落在同一格裡 → 那個數字整局不動,牌就不會跳。
+     ⚠⚠ **一定要往上取整(ceil)不可以四捨五入**:留位比實際窄一 px 就是「疊回去」,
+       而這一整條規則存在的理由就是不要疊。
+     ⚠⚠ 修法刻意**不記狀態**(v1.178.2 第一版寫成「只增不減」的地板,像 fitTw 那樣)——
+       那樣會踩到兩件事:① e2e M2 節的對照組是「把 --m16aw 設成 0,明牌應該往右長」,
+       地板會立刻把它填回去 → 對照組永遠紅;② 盤面變窄時留位放不掉,連牌寬夾取
+       都跟著算錯(實測 L2 節「盤面變窄 → 牌寬跟著變小」當場紅)。
+       **這一支必須是純函式**:同樣的畫面 → 同樣的數字,不帶上一手的記憶。
+     ⚠ 級距 48px ≈ 三個字:再大就等於「永遠讓 46%」(明牌被擠成一行一組),
+       再小則名字差兩個字就會跨格,等於沒改。 */
+  const RESERVE_STEP = 48;
   function actsReserve(acts, br){
     if(!br.width || acts.classList.contains("hidden")) return 0;
     let left = Infinity;
@@ -1081,7 +1097,7 @@ const M16B = (function(){
       if(r.width > 0) left = Math.min(left, r.left);
     });
     if(left === Infinity) return 0;
-    const w = Math.round(br.right - left) + RESERVE_GAP;
+    const w = Math.ceil((Math.round(br.right - left) + RESERVE_GAP) / RESERVE_STEP) * RESERVE_STEP;
     return Math.max(0, Math.min(Math.round(br.width * RESERVE_MAX), w));
   }
 
