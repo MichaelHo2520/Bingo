@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 90bc7647d992d7f9a61fbcc7b2e8361082a1dca40702f5b23316be42913d364b)
+    真相在 styles.src.css(sha256 2ecfe9ddfb1bcc951857e1629df712b7dc5a52b157cc27645c1b07ad7dd460f6)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3788,3 +3788,15 @@ body.gmk-big .gmk-lvtag,
 body.sdk-big .sdk-lvtag,
 body.mj-big .mj-lvtag,
 body.cy-big .cy-lvtag{display:none}
+body.gmk-big .gmk-solobar .tools-docked,
+body.sdk-big .sdk-solobar .tools-docked,
+body.mj-big .mj-solobar .tools-docked,
+body.cy-big .cy-solobar .tools-docked{display:none}
+body.gmk-big .gmk-solobar .row:has(> .tools-docked),
+body.sdk-big .sdk-solobar .row:has(> .tools-docked),
+body.mj-big .mj-solobar .row:has(> .tools-docked),
+body.cy-big .cy-solobar .row:has(> .tools-docked){padding-right:0}
+body.gmk-big .gmk-solobar .gmk-rec,
+body.sdk-big .sdk-solobar .sdk-timer,
+body.mj-big .mj-solobar .mj-timer,
+body.cy-big .cy-solobar .cy-timer{margin-left:auto}

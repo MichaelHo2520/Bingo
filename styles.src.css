@@ -8289,3 +8289,26 @@ body.gmk-big .gmk-lvtag,
 body.sdk-big .sdk-lvtag,
 body.mj-big .mj-lvtag,
 body.cy-big .cy-lvtag{display:none}
+
+/* ---------- ⚠ 單機列(.XX-solobar)也要照全站規則(v1.178.6 補)----------
+   使用者:「變成大棋盤或是牌桌模式,全螢幕跟設定按鈕就隱藏掉,然後那個小的按鈕是在右邊,
+   我希望全部的遊戲都是一致的」。
+   v1.178.5 漏掉這四頁的**單機列**:上面那組收 ⛶ / ⚙️ 的選擇器寫的是 `.XX-room`,
+   而五子棋 / 數獨 / 消消樂 / 成語接龍的單機列 class 是 `.XX-solobar`(不是 room)——
+   於是大模式收了頂列、dockTools() 把那兩顆搬進單機列,然後**沒有人把它們藏起來**。
+   ⚠⚠ 兩條要一起寫,少一條就是白留一格(同 .XX-room 那組:讓位的 84px 要跟著歸零)。
+   ★ 第三條是「小」要靠右:那條列本來靠 `.XX-lvtag`(flex:1)把後面的東西推到右緣,
+     而大模式把標籤收掉了 → 不補一個 auto,整組會塌到左邊(看起來像卡在中間)。
+     ⚠ 補在**標籤後面第一個還看得見的元素**上:五子棋是戰績,其餘三頁是計時。 */
+body.gmk-big .gmk-solobar .tools-docked,
+body.sdk-big .sdk-solobar .tools-docked,
+body.mj-big .mj-solobar .tools-docked,
+body.cy-big .cy-solobar .tools-docked{display:none}
+body.gmk-big .gmk-solobar .row:has(> .tools-docked),
+body.sdk-big .sdk-solobar .row:has(> .tools-docked),
+body.mj-big .mj-solobar .row:has(> .tools-docked),
+body.cy-big .cy-solobar .row:has(> .tools-docked){padding-right:0}
+body.gmk-big .gmk-solobar .gmk-rec,
+body.sdk-big .sdk-solobar .sdk-timer,
+body.mj-big .mj-solobar .mj-timer,
+body.cy-big .cy-solobar .cy-timer{margin-left:auto}

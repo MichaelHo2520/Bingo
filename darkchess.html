@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>象棋暗棋 ｜ 本機對戰 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.178.5 -->
-<meta name="version" content="1.178.5">
+<!-- 象棋暗棋 · v1.178.6 -->
+<meta name="version" content="1.178.6">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -170,13 +170,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label dc-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
-        <!-- 大棋盤(v1.178.5,十一頁共用 BigMode):收掉頂列與房名 / 規則徽章,房間框壓成一行。
+        <!-- 大棋盤(v1.178.6,十一頁共用 BigMode):收掉頂列與房名 / 規則徽章,房間框壓成一行。
              ⚠ class 是 .dc-bigbtn,而狀態掛在 body 上的是 .dc-big —— 兩個名字**一定要不一樣**。
              ⚠ 擺在最左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
              ⚠ 單機列也有一顆(#dcSoloBig),兩顆共用 .dc-bigbtn 一起同步。 -->
-        <button class="icon-btn dc-bigbtn" id="dcBig" type="button" title="大棋盤" aria-label="大棋盤">大</button>
         <!-- 投降(連線那一顆)。★ 與單機列那一顆是雙胞胎 —— 見 #dcSoloResign 的註解。 -->
         <button class="mp-act-btn dc-resign" id="dcMpResign" type="button" title="投降" aria-label="投降">🏳</button>
+        <button class="icon-btn dc-bigbtn" id="dcBig" type="button" title="大棋盤" aria-label="大棋盤">大</button>
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
         </button>
@@ -201,11 +201,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </button>
       <span class="label dc-room-title">電腦對決 <b id="dcSoloLv" class="display">普通</b></span>
       <span class="mp-goal" id="dcSoloRec" aria-label="戰績"></span>
-      <!-- 大棋盤:單機這一份(說明見 #dcBig)。⚠ 擺在 🏳 左邊,與連線那一列同一個順序 -->
-      <button class="icon-btn dc-bigbtn" id="dcSoloBig" type="button" title="大棋盤" aria-label="大棋盤">大</button>
       <!-- 投降(單機那一顆)。★ 與房間橫幅那一顆是**雙胞胎**:兩顆都開同一張確認卡
            #resignVeil,分流在 js/darkchess/main.js 的 confirmResign()。 -->
       <button class="icon-btn dc-resign" id="dcSoloResign" type="button" title="投降" aria-label="投降">🏳</button>
+      <!-- 大棋盤:單機這一份(說明見 #dcBig)。★ 一律排在**最後一顆** ——
+           全站規則:大模式下「小」在那一列的最右邊(連線時 🎤 / 😀 才排在它後面)。 -->
+      <button class="icon-btn dc-bigbtn" id="dcSoloBig" type="button" title="大棋盤" aria-label="大棋盤">大</button>
     </div>
     <div class="dc-room-foot">
       <div id="dcSoloPlayers" class="mp-players"></div>
