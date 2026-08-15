@@ -377,8 +377,9 @@ function shellMsg(act){
 // 是不是已經滿版(iOS standalone / 桌機 app 視窗)。在 iframe 裡 navigator.standalone 測不準,以外殼回報為準。
 function fsStandalone(){
   if(framed) return shellEnv ? !!shellEnv.standalone : true;   // 外殼還沒回報就當作已滿版,寧可不囉嗦
+  // ⚠ manifest 的 display 是 **fullscreen**(v1.178.1)→ 裝起來的 App 不吃 standalone,要兩個一起認
   return ("standalone" in navigator && navigator.standalone) ||
-         (matchMedia&&matchMedia("(display-mode: standalone)").matches);
+         (matchMedia&&matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches);
 }
 function fsFallbackTip(){
   showToast(fsStandalone()?"已是全螢幕模式 👍":"iOS 請按 Safari 分享鈕 → 加入主畫面,即可全螢幕",3000);

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 a7bd24cc96756f3c73e84c1d1d550141657f3cc66aa441983172844803a88c78)
+    真相在 styles.src.css(sha256 d51d1421a94a1cbfdacef350361a97ad7655c1d4f186a882da59f379180deb9e)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1595,11 +1595,23 @@ body.m16-solo .topbar{width:min(98vw - 16px,944px)}
 .m16-bigbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
 body.m16-big .topbar{display:none}
 body.m16-big{padding:6px;gap:4px}
-body.m16-big .mj-room{padding-top:4px;padding-bottom:4px}
-body.m16-big .mj-room-foot{margin-top:3px}
-body.m16-big .mp-chip{padding:2px 8px}
+body.m16-big .mj-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
+body.m16-big .mj-room .mj-room-top{flex:none;order:3}
+body.m16-big .mj-room .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.m16-big .mj-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
 body.m16-big .mj-play{gap:4px}
+body.m16-big .mj-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
+body.m16-big .mj-room .m16-seat{display:none}
+body.m16-big .mj-room .you-badge{display:none}
+body.m16-big .mj-room .gmk-nm{max-width:3.4em}
+body.m16-big .mj-room .m16-pts{font-size:11px;margin-left:2px}
+body.m16-big .mj-room-foot .mp-players{
+  -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
+  mask-image:linear-gradient(to right,#000 90%,transparent)}
 body.m16-big .mj-room-title{display:none}
+body.m16-big .mj-room .mp-leave-btn{display:none}
+body.m16-big .mj-room .mp-goal{display:none}
 body.m16-big .mj-room-top .mp-actions{margin-left:auto}
 body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
 body.m16-big .mj-room .tools-docked{display:none}
@@ -1630,6 +1642,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   body.m16-mp .mj-room .mj-room-title b,body.m16-solo .mj-room .mj-room-title b{font-size:13px}
   .m16-bigbtn{display:none}
   body.m16-big .mj-room .mj-room-title{display:block}
+  body.m16-big .mj-room .mp-leave-btn{display:grid}
+  body.m16-big .mj-room .mp-goal{display:inline}
   body.m16-mp .mp-chip,body.m16-solo .mp-chip{padding:2px 7px;font-size:11px}
   body.m16-mp .mj-play,body.m16-solo .mj-play{gap:4px}
   .m16-stage{display:grid;

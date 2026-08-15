@@ -2922,13 +2922,21 @@ body.m16-solo .topbar{width:min(98vw - 16px,944px)}    /* 同上面 body.m16-mp 
      ⚠ 同一個理由,這裡碰 `.mj-room` 只寫 padding-top / padding-bottom,
        **不可以**寫成 `padding:` 簡寫 —— 簡寫會把橫向那 72px 一起洗掉。
 
-   ── ⚠ 直向**做不到「壓成一行」**,這是量出來的,不是偷懶 ──────────────────
-     360px 直向把晶片併進第一列的預算:整列扣掉 .tools-docked 讓出的 80px、
-     局數徽章、三顆 34px 的鈕與間距之後,晶片只剩約 78px —— 四家的名字 + 台數
-     一格都排不下。所以直向的做法是**把兩層都壓薄**(頂列整條 + 內距 + 晶片),
-     晶片列維持自己一列(使用者要的就是「晶片留著」:台數 / 風 / 輪到誰都在上面)。
-     ⚠ 想再往下省只剩「收掉晶片、改一條迷你資訊條」(你畫我猜 v1.169.0 的做法),
-       那是**另一個決定**,不要順手做掉。
+   ── ★★ 直向**壓成一行**(v1.178.1)——「人物 + 大 / 小 (+ 🎤 / 😀)」 ─────────
+     使用者:「在(大)的模式下,我希望的是只顯示一行,也就是留人物跟『小』按鈕…
+     當連線對戰的時候,最右邊是麥克風跟 emoji」。→ 晶片列併進第一列,
+     返回鍵 / 房名 / 局數徽章三個全收(收掉它們讓出來的寬度就是給晶片的)。
+     ⚠⚠ v1.174.0~v1.178.0 這裡寫的是「直向做不到壓成一行」,那個結論**是對的、
+       但前提沒了**:當時的預算要扣掉 .tools-docked 的 80px + 局數徽章 + 返回鍵,
+       晶片只剩約 78px;v1.177.1 收掉 ⛶ / ⚙️(padding-right 歸零)、這一版再收掉
+       返回鍵與局數之後,390px 直向量到晶片有 226px —— 夠四家站一排。
+     ★ 排法**照抄橫向那一段**(下面 ② 的「三層並排成一行」):同一組宣告
+       (`.mj-room{display:flex}` + `.mj-room-top{flex:none}` + `foot{flex:1;min-width:0}`),
+       所以兩段同時生效時不會打架 —— 橫向那份在後面、值又一樣,誰贏都一樣。
+     ⚠ 只有「收返回鍵 / 收局數」是這一段獨有的 → **橫向必須還原**(那邊寬度夠,
+       收了只是白白少東西),還原寫在橫向那一段的 .mj-room-title 還原條旁邊。
+     ⚠ 晶片放左、鈕放右靠的是 order(DOM 順序是 top → subrow → foot),
+       不是改 HTML —— 那條列連線與單機共用,而單機那份沒有 .mp-actions。
 
    ── ⚠ 狀態列(.mp-subrow)不必在這裡收 ────────────────────────────────────
      mp-core 的 syncSubrow() 在 curPhase==="playing" 時本來就把它收起來了
@@ -2964,18 +2972,50 @@ body.m16-solo .topbar{width:min(98vw - 16px,944px)}    /* 同上面 body.m16-mp 
        兩顆鈕跟著頂列一起消失(放大時就是按不到設定);麻將這邊按得到。 */
 body.m16-big .topbar{display:none}
 body.m16-big{padding:6px;gap:4px}
-/* ② 房間框壓薄:內距 9 → 4(上下共 10px)、晶片列的上緣間距 6 → 3。 */
-body.m16-big .mj-room{padding-top:4px;padding-bottom:4px}
-body.m16-big .mj-room-foot{margin-top:3px}
-body.m16-big .mp-chip{padding:2px 8px}
+/* ② 房間框壓薄 + **三層並排成一行**(v1.178.1)。
+   ⚠ 上下內距 9 → **6** 而不是 4:v1.174.0~v1.178.0 是 4px,使用者回報
+     「上面那個『小』,他是不是有一點太靠近邊框了」—— 34px 的鈕上下各只剩 4px,
+     而它是這一列**唯一貼到框邊的東西**(晶片只有 22px 高,看起來不擠)。
+     6px 讓那顆鈕與框邊的呼吸感和左右內距(12px 的一半)對得起來,而一行版
+     本來就比兩行省 28px,多這 4px 不影響「把空間讓給盤面」的目的。
+   ⚠ padding 只寫上下**不可以寫簡寫** —— 簡寫會把橫向那段的 44px 右內距洗掉(見檔頭)。
+   ★ order:晶片列(foot)在 DOM 裡是最後一個,靠 order 把它拉到最左邊;
+     落單倒數的 .mp-subrow 夾在中間(平常 syncSubrow 會把它收起來)。 */
+body.m16-big .mj-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
+body.m16-big .mj-room .mj-room-top{flex:none;order:3}
+body.m16-big .mj-room .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.m16-big .mj-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
 body.m16-big .mj-play{gap:4px}
-/* ③ 房名 / 「單機 普通」收掉:那一列的高度是 34px 的鈕決定的,收字**省不到高度**,
-   省的是**寬度** —— 收掉之後晶片列(橫向)與那幾顆鈕才不必互相擠。
-   ⚠ 局數徽章 .mp-goal 刻意留著:大牌桌把頂列收了,那是「第幾局」唯一還看得到的地方。
-   ⚠ .mj-room-title 原本是 flex:1,靠它把後面的東西推到最右邊;收掉之後要自己補
-     margin-left:auto,否則整排鈕會滑到局數徽章旁邊。兩份都要:連線那份包在
-     .mp-actions 裡,單機那份(沒有 🎤 / 😀)是 .mj-room-top 的直接子元素。 */
+/* ②-a 晶片縮成**迷你版**(v1.178.1)—— 一行版的晶片只有 214px 可用,而原尺寸的四家
+   量出來要 571px(自己那張 190、別人各 127)。縮的是「重複的東西」,不是資訊:
+     · 座位色點 .m16-seat:風字徽章 .m16-cw 本來就是同一個顏色系統,兩個記號講同一件事
+     · 「你」徽章:.mp-chip.me 已經有 accent-2 的光環,同一格裡不必再寫一次
+     · 名字夾到 3.4em + ellipsis:四個字以上的暱稱不該讓其他三家看不到
+   ⚠ **風 / 莊 / 台數一個都不收** —— 那三個是大牌桌唯一看得到的局勢資訊
+     (頂列與局數徽章都收掉了),收了就變成「一行但什麼都沒有」。
+   ⚠⚠ 即使縮到這樣,四家仍然排不下(量出來見 tools/shot-m16-band.ps1 的「晶片可視/需要」)
+     → 晶片列**保持 .oneline 的橫捲**,右緣用 mask 淡出(你畫我猜 .dw-mini 同一套):
+     切一半的字用漸層收掉,看起來才像「還有」而不是「壞了」。 */
+body.m16-big .mj-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
+body.m16-big .mj-room .m16-seat{display:none}
+body.m16-big .mj-room .you-badge{display:none}
+body.m16-big .mj-room .gmk-nm{max-width:3.4em}
+body.m16-big .mj-room .m16-pts{font-size:11px;margin-left:2px}
+body.m16-big .mj-room-foot .mp-players{
+  -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
+  mask-image:linear-gradient(to right,#000 90%,transparent)}
+/* ③ 返回鍵 / 房名 / 局數徽章**三個一起收**(v1.178.1;v1.174.0 只收房名)——
+   收掉它們讓出來的寬度就是給晶片的那 226px,少收一個就排不下四家。
+   ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」(你畫我猜同一套,
+     那一頁連 ⛶ / ⚙️ 都跟著頂列一起消失)。手機的實體返回鍵不受影響。
+   ⚠ 局數看不到是**刻意的**(v1.174.0 曾經刻意留著它,理由是「頂列收了之後那是
+     第幾局唯一看得到的地方」)—— 一行版沒有那個預算,要看局數就按「小」。
+   ⚠ .mj-room-title 原本是 flex:1,靠它把後面的東西推到最右邊;現在改由
+     foot 的 flex:1 負責,兩條 margin-left:auto 只在橫向(房名還原)時還有作用。 */
 body.m16-big .mj-room-title{display:none}
+body.m16-big .mj-room .mp-leave-btn{display:none}
+body.m16-big .mj-room .mp-goal{display:none}
 body.m16-big .mj-room-top .mp-actions{margin-left:auto}
 body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
 
@@ -3120,6 +3160,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        而且轉向不該偷改使用者存的設定。 */
   .m16-bigbtn{display:none}
   body.m16-big .mj-room .mj-room-title{display:block}
+  /* ⚠ v1.178.1 起大牌桌還收了**返回鍵與局數徽章**(直向要那點寬度給四家晶片),
+     橫向一樣要還原 —— 理由同上一條:橫向寬度用不完,收了換不到任何東西,
+     只會變成「橫著玩就沒有返回鍵」。
+     ⚠ 還原值要寫死原本的 display(`.icon-btn` 是 grid、`.mp-goal` 是行內 span),
+       `revert` 這一族在舊 WebKit 上靠不住。
+     ⚠ 照紅線 6:兩條分開寫,不與上面那條併成群組選擇器。 */
+  body.m16-big .mj-room .mp-leave-btn{display:grid}
+  body.m16-big .mj-room .mp-goal{display:inline}
   body.m16-mp .mp-chip,body.m16-solo .mp-chip{padding:2px 7px;font-size:11px}
   body.m16-mp .mj-play,body.m16-solo .mj-play{gap:4px}
 
