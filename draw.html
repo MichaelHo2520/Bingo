@@ -12,11 +12,11 @@
 <!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.175.0 -->
-<meta name="version" content="1.175.0">
+<!-- 你畫我猜 · v1.176.0 -->
+<meta name="version" content="1.176.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -70,7 +70,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            首頁是 .gc-art.dw-cart 46px)。
            ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十二張的規則寫在 index.html
               的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這些雙胞胎)。 -->
-      <img class="dw-art" src="dw-icon.png" alt="畫筆與畫板" width="192" height="192">
+      <img class="dw-art" src="img/dw-icon.png" alt="畫筆與畫板" width="192" height="192">
       <div class="home-tagline">一人畫、其他人打字搶答</div>
     </div>
     <!-- ⚠ 這一句與 js/draw/adapter.js 的 ruleHint() 講的是同一件事,**改一邊要改另一邊**。

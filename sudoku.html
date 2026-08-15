@@ -13,11 +13,11 @@
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
 <title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.175.0 -->
-<meta name="version" content="1.175.0">
+<!-- 數獨 · v1.176.0 -->
+<meta name="version" content="1.176.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -62,7 +62,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
              首頁是 .gc-art.sk-cart 46px)—— 在此之前兩頁各有一份逐字相同的手繪 SVG。
              ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十一張的規則寫在 index.html
                 的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這十一對雙胞胎)。 -->
-        <img class="sdk-art" src="sk-icon.png" alt="數獨盤" width="192" height="192">
+        <img class="sdk-art" src="img/sk-icon.png" alt="數獨盤" width="192" height="192">
         <div class="home-tagline">填滿 1~9,每列每行每宮不重複</div>
       </div>
       <button class="btn primary block-btn home-btn" id="sdkGoOnline">🌐 連線對戰</button>

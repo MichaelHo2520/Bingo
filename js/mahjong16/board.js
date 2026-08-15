@@ -653,8 +653,20 @@ const M16B = (function(){
       const hr = hand.getBoundingClientRect();
       bottom = pr.bottom - hr.top + 10;                  // 貼在手牌上緣之上
     }
-    /* 夾在容器裡:太高會衝出盤面上緣(橫向手機盤面只有 ~161px),太低會壓到動作列那行字。 */
-    bottom = Math.max(6, Math.min(bottom, Math.max(6, pr.height - ph - 4)));
+    /* 夾在**整片對局區**裡:太高會衝出盤面上緣(橫向手機盤面只有 ~161px),太低會壓到手牌。
+       ⚠⚠ v1.176.0:夾取的基準從 `pr`(offsetParent)換成 `.mj-play` ——
+         動作列改成絕對定位之後,`p.offsetParent` 就是**動作列自己**,而它只有一條明牌
+         那麼高(34~55px)。拿它的 height 去夾,`pr.height - ph - 4` 永遠是負的
+         → 夾完永遠是下限 6px,面板從此貼在明牌帶上、整個夾取形同虛設。
+         ★ `--m16cb` 仍然是「離 offsetParent 底邊多遠」(CSS 那邊一個字都沒改,
+           倒數環 .m16-acts.m16-hush 吃的也是同一個值)—— 所以這裡是**換算過去夾、
+           再換算回來**,不是改變那個變數的意思。 */
+    const play = host && host.parentNode;                // .mj-play(#m16Play)
+    const vr = play ? play.getBoundingClientRect() : pr;
+    const off = vr.bottom - pr.bottom;                   // offsetParent 底邊離對局區底邊多遠
+    let vb = bottom + off;                               // 面板底邊離**對局區**底邊多遠
+    vb = Math.max(6, Math.min(vb, Math.max(6, vr.height - ph - 4)));
+    bottom = vb - off;
     box.style.setProperty("--m16cb", Math.round(bottom) + "px");
     box.style.setProperty("--m16ch", Math.round(ph) + "px");
   }
@@ -913,6 +925,40 @@ const M16B = (function(){
     paintNames();
     if(cb.onClaimUI) cb.onClaimUI(co, copt);             // 動作列跟著換(✔ / 胡 / 過)
     placeWall(pool);                                     // ★ 一定是最後一步,見那一支
+    placeActs();                                         // ★ 動作列的落點,理由同上(見那一支)
+  }
+
+  /* ---------- 動作列的落點(v1.176.0)----------------------------------------
+     把 `#m16Acts`(倒數環 + 「輪到 ○○…」+ 已宣告聽牌那一排 + 宣告面板)貼到
+     **我這一排明牌**(`.m16-mymelds`,補花吃碰那一帶)的右端 —— 也就是手牌的右上方。
+     使用者:「最下方會告知現在要換誰跟倒數的地方,我想把那行移到我們手牌的右上方,
+     也就是補花吃牌的區域右邊」。
+
+     ★★ 搬的是**位置不是節點**:倒數環是持久節點,移動 DOM = CSS 動畫重跑 = 倒數彈回
+       滿格(adapter 的 ensureCd());而 `.m16-mymelds` 在 `#m16Stage` 裡、每次 render
+       會被 innerHTML 重建最多七次。所以 `#m16Acts` 一直待在 `.mj-play` 底下不動,
+       只由這裡寫兩個 CSS 變數把它「畫」過去(定位規則在 styles.css 的 .m16-acts)。
+
+     ★★ 這三條施工紀律與 placeWall() 完全相同,理由也相同:
+       ① **排在 render() 的最後**(比 paintNames() / onClaimUI 都晚)—— 那兩支都會在
+          盤面畫完之後改變幾何(名字填進去會讓橫向的對手欄變寬;動作列的內容一換,
+          橫向 `align-content:safe end` 會讓整塊往下移)。排在前面就會停在上一輪的位置。
+       ② 用 `getBoundingClientRect()` 相減,**不要用 offsetTop** —— 橫向的
+          `.m16-mine{display:contents}` 讓明牌列直接變成 grid item,offsetParent 是誰
+          跟直向不一樣。
+       ③ 量不到明牌列就**原地不動**(不要寫 0):寫 0 會讓那一列瞬間跳到盤面頂端。
+          正常情況下量得到 —— paint() 從 v1.176.0 起一律畫這一排。
+     ⚠ 這一支**不會**造成 v1.58.4 那個沒收斂的迴圈:動作列是絕對定位,它的位置與高度
+       對盤面高度零影響 → 「量 → 寫變數」只有單一方向,不會回頭改變被量的東西。 */
+  function placeActs(){
+    const acts = document.getElementById("m16Acts");
+    const play = host && host.parentNode;                // .mj-play(#m16Play)
+    if(!acts || !play) return;
+    const band = host.querySelector(".m16-mymelds");
+    if(!band) return;
+    const br = band.getBoundingClientRect(), pr = play.getBoundingClientRect();
+    acts.style.setProperty("--m16ty", Math.round(br.top - pr.top) + "px");
+    acts.style.setProperty("--m16th", Math.round(br.height) + "px");
   }
 
   /* ---------- 牌山晶片的落點(v1.104.0)-------------------------------------
@@ -1007,12 +1053,16 @@ const M16B = (function(){
     const shown = [];
     if((st.flowers[me]||[]).length) shown.push(flowerHTML(st.flowers[me], mtw));
     (st.melds[me]||[]).forEach(m=>shown.push(meldHTML(m, mtw)));
-    /* ★ 橫向:這一列**一律畫出來**(空的也畫),CSS 用 --m16w 給它一個預留高度。
-       理由與檔頭①「摸進來那一格一律預留」完全相同 —— 橫向盤面只有 200px 出頭,
-       「有沒有明牌」差 48px,不預留的話補一張花、碰一組,整副牌就得重算一次大小
-       (實測會在 30 / 36 / 38 之間跳三次)。直向空間夠、地板吃得住,維持原樣不畫。 */
-    if(shown.length || landscape())
-      html += '<div class="m16-mymelds" style="--m16w:'+mtw+'px">'+shown.join("")+'</div>';
+    /* ★★ 這一列**一律畫出來**(空的也畫),CSS 用 --m16w / min-height 給它預留高度。
+       ★ v1.174.0 以前只有橫向這樣做,理由是檔頭①「摸進來那一格一律預留」:橫向盤面
+         只有 200px 出頭,「有沒有明牌」差 48px,不預留的話補一張花、碰一組,整副牌
+         就得重算一次大小(實測會在 30 / 36 / 38 之間跳三次)。
+       ★★ v1.176.0 推到**直向**,而且多了一個更硬的理由:這一排是**動作列的錨點** ——
+         倒數環與「輪到 ○○…」現在浮在它的右端(手牌右上方,見 styles.css 的 .m16-acts
+         與下面的 placeActs())。量不到它,那一列會掉回 top:0 蓋在對手列上。
+         ⚠ 所以這個條件**不可以再加回任何 if** —— 「有明牌才畫」等於「沒碰過牌的時候
+           倒數環會跑到畫面最上面」,而那只有真的開一局才看得出來。 */
+    html += '<div class="m16-mymelds" style="--m16w:'+mtw+'px">'+shown.join("")+'</div>';
 
     /* --- 我的手牌 --- */
     const inClaim = co.length>0;

@@ -203,20 +203,42 @@ const HomeLive = (function(){
   }
 
   /* ---------- 畫面 ---------- */
-  // 遊戲卡上的小徽章:可加入優先講「幾間可加入」,全都在對戰中就講「對戰中」,沒房間就收起來
+  /* 遊戲卡右上角的小徽章:可加入優先算「幾間可加入」,全都在對戰中就算「幾間對戰中」,
+     沒房間就收起來。
+
+     ★★ v1.176.0:文字從「🟢 2 間可加入 · 11 人」縮成**只剩房間數**(顏色講剩下那一半)。
+       原本那一長串帶 white-space:nowrap,而 .gc-grid 的欄寬是 1fr(= minmax(auto,1fr),
+       auto 最小值 = min-content)→ 那一欄被撐開、**把別欄的寬度搶走**:390px 直向實測
+       三欄變成 61 / 143 / 105px,BINGO 剩 61px、「象棋暗棋」擠成兩行。
+       使用者:「這個的顯示把其他的項目變得很奇怪」。
+       CSS 那邊同時把徽章改成絕對定位、欄寬改成 minmax(0,1fr)(見 styles.src.css);
+       這裡負責的是「別再塞得下那麼多字」。
+     ★ 完整那句話沒有消失,改掛在 title / aria-label:滑鼠停留與讀螢幕照樣拿得到,
+       而房名 / 人數 / 房主本來就在上面那塊「現在有人在玩」看板裡一列一間。
+     ⚠ 徽章文字**只放數字**,那顆狀態點是 CSS 的 ::before 畫的 —— 不要改回 🟢 / 🟠 emoji:
+       各裝置的 emoji 字型大小與基線都不同,在右上角這麼小的一顆上對不齊。 */
   function paintBadge(g){
     const el=$(g.badge); if(!el)return;
     const list=rooms[g.key]||[];
     const open=list.filter(r=>joinable(g,r));
-    if(!list.length){ el.classList.add("hidden"); el.textContent=""; return; }
+    if(!list.length){
+      el.classList.add("hidden"); el.textContent="";
+      el.removeAttribute("title"); el.removeAttribute("aria-label");
+      return;
+    }
+    let full;
     if(open.length){
       const people=open.reduce((n,r)=>n+r.count,0);
-      el.textContent="🟢 "+open.length+" 間可加入 · "+people+" 人";
+      el.textContent=String(open.length);
+      full=open.length+" 間可加入 · "+people+" 人";
       el.setAttribute("data-state","open");
     }else{
-      el.textContent="🟠 "+list.length+" 間對戰中";
+      el.textContent=String(list.length);
+      full=list.length+" 間對戰中";
       el.setAttribute("data-state","busy");
     }
+    el.setAttribute("title",g.name+" · "+full);
+    el.setAttribute("aria-label",g.name+" · "+full);
     el.classList.remove("hidden");
   }
   // 房間列只列「可加入」的 —— 點下去一定進得去。對戰中的房間只在徽章上交代,
@@ -263,7 +285,10 @@ const HomeLive = (function(){
   }
   function hideAll(){
     const box=$("hlLive"); if(box) box.classList.add("hidden");
-    GAMES.forEach(g=>{ const el=$(g.badge); if(el){ el.classList.add("hidden"); el.textContent=""; } });
+    GAMES.forEach(g=>{ const el=$(g.badge); if(el){
+      el.classList.add("hidden"); el.textContent="";
+      el.removeAttribute("title"); el.removeAttribute("aria-label");   // 徽章的完整說明也要一起收(見 paintBadge)
+    } });
   }
 
   /* ---------- 監聽的開關 ---------- */

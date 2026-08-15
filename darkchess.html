@@ -11,11 +11,11 @@
 <!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
 <title>象棋暗棋 ｜ 本機對戰 + 2 人連線</title>
-<!-- 象棋暗棋 · v1.175.0 -->
-<meta name="version" content="1.175.0">
+<!-- 象棋暗棋 · v1.176.0 -->
+<meta name="version" content="1.176.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -68,7 +68,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
              (這裡是 .dc-art 96px、首頁是 .gc-art.dc-cart 46px)——
              tools/test-pages.js 的 E 節在守這十一對雙胞胎。
              ⚠ 動檔名要三處一起改:兩頁的 img + sw.js 的 CORE。 -->
-        <img class="dc-art" src="dc-icon.png" alt="象棋暗棋" width="192" height="192">
+        <img class="dc-art" src="img/dc-icon.png" alt="象棋暗棋" width="192" height="192">
         <div class="home-tagline">32 顆象棋蓋著擺滿,翻到什麼算什麼</div>
       </div>
       <button class="btn primary block-btn home-btn" id="dcGoOnline">🌐 連線對戰</button>

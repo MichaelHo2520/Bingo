@@ -15,13 +15,13 @@
      apple-touch-icon 只有 iOS 在用,兩者都不會變成 favicon;沒有這行就只會退回找網域根的
      /favicon.ico,而 GitHub Pages 走子路徑,那個位置不存在 → 書籤列空白(v1.52.2 修)。
      外殼是頂層 document,書籤圖示取自它,四頁都要有這行。 -->
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v1.175.0 -->
-<meta name="version" content="1.175.0">
+<!-- 外殼(shell)· v1.176.0 -->
+<meta name="version" content="1.176.0">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 

@@ -150,8 +150,19 @@
        而且 padding 在各 media query 怎麼變都不用重算。
      ⚠ 尺寸不必寫:各遊戲既有的 `.gmk-room .icon-btn` / `.mj-room .icon-btn`(34px、
        橫向再壓到 28px)會接手 → 跟列內原本那顆返回鈕一樣大,這是「協調」的來源。
-     ⚠ padding-right 是給鈕讓位的,否則列尾的文字會被鈕蓋住。 */
-  .row:has(> .tools-docked){position:relative;padding-right:80px}
+     ⚠ padding-right 是給鈕讓位的,否則列尾的文字會被鈕蓋住。
+     ⚠⚠ 那個數字要**算得剛好等於列內的 gap**(v1.176.0 由 80 改成 84)。
+       使用者:「他除了垂直沒有對齊,左右的間隔也沒有抓好」——量出來是:
+         `.tools` 實寬 = 34 × 2 + gap 8 = **76**,而它 `right:0` 貼齊列的右緣
+         → 讓位 80px 的話,列尾最後一顆鈕與 `⛶` 之間只剩 **80 − 76 = 4px**,
+           而 `⛶` 與 `⚙️` 之間是 8px、列內其他間距也是 8px。
+         → **一整列只有那一格是半個間距**,而且緊鄰的兩顆長得不一樣(方角的「大 / 小」
+           配圓角的 ⛶),看起來就是「那顆鈕黏過去了」。
+       84 = 76 + 8 → 每一格都是 8px。⚠ 改 `.tools` 的 gap 或 `.icon-btn` 的寬度時
+         這個數字要跟著重算(五頁共用這一條:五子棋 / 數獨 / 消消樂 / 排七 / 台灣麻將)。
+       ⚠ 橫向的台灣麻將**走另一條**(`body.m16-mp .mj-room` 那段自己的 72px,
+         鈕縮成 28px、`right:8px`),那一段的列尾是可伸縮的晶片列不是鈕,不在這次的範圍。 */
+  .row:has(> .tools-docked){position:relative;padding-right:84px}
   .tools.tools-docked{position:absolute;right:0;top:50%;transform:translateY(-50%);flex:none}
   .icon-btn{
     width:42px;height:42px;border-radius:13px;border:1px solid var(--panel-line);
@@ -1129,7 +1140,15 @@
      ⚠ 驗收點仍然是「**最後一張卡的下緣還在視窗裡嗎**」
        (`getBoundingClientRect().bottom <= innerHeight`)——
        **不可以問 `document.scrollHeight`**:捲的是 `#home`,壞掉時照樣回「不用捲」。 */
-  .gc-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr;gap:8px;margin-top:10px}
+  /* ⚠⚠ 欄寬一律 `minmax(0,1fr)` 而**不是** `1fr`(v1.176.0 修)。
+     `1fr` 展開是 `minmax(auto,1fr)`,而 grid 項目的 auto 最小值 = **min-content** ——
+     於是卡片裡只要有一個 `white-space:nowrap` 的東西比欄寬長,那一欄就會**把別欄的寬度搶走**。
+     實測(390px 直向,三張卡冒出「現在有人在玩」的徽章):三欄變成 **61 / 143 / 105px**,
+     BINGO 被壓成 61px、「象棋暗棋」擠成兩行 —— 而畫面上看起來只是「首頁忽然亂掉」,
+     完全看不出來是徽章造成的。徽章改成絕對定位之後這條已經不會再被觸發,
+     但**留著它是為了下一次**:任何人往卡裡加一個 nowrap 的東西都會重演。
+     ⚠ 三處都要(這條 + 矮視窗五欄 + 檔尾大螢幕四欄)。 */
+  .gc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:1fr;gap:8px;margin-top:10px}
 
   /* 遊戲卡:插圖在上、名稱在下、整張居中(button 與 <a> 共用同一個外觀)。
      ⚠ 名稱**不設 nowrap** —— 「麻將消消樂」在窄機上要換行也好過被裁掉;
@@ -1156,8 +1175,9 @@
   .gc-body{display:flex;flex-direction:column;align-items:center;gap:2px;
     flex:1 1 auto;width:100%;min-width:0}
   .gc-name{font-size:15.5px;font-weight:700;line-height:1.15;letter-spacing:0}
-  /* 即時徽章在窄卡裡要跟著居中(它自己那條是 align-self:flex-start,給一列一張的版型用的) */
-  .gc-body .hl-badge{align-self:center}
+  /* 註:即時徽章 .hl-badge 從 v1.176.0 起是**絕對定位的角落徽章**(見「現在有人在玩」那一段),
+     不再是 .gc-body 裡的一個 flex 項目 → 原本那條 `.gc-body .hl-badge{align-self:center}`
+     已經沒有作用,一起刪掉(留著就是永遠不生效的死規則)。 */
 
   /* 熱門度排名徽章(v1.112.0):1~10,數字小的排前面(= 大家真的玩得最多的那幾個)。
      編號文字與先後都由 js/home-live.js 的 applyRank() 寫進去(style.order + 這顆的文字),
@@ -1211,12 +1231,16 @@
          拿它當「要不要捲」會報 needScroll=no 的假綠。 */
     /* ⚠ v1.106.0:四欄 → **五欄**。九張卡在四欄是 3 列,橫置矮視窗(900×430)又要捲了;
        五欄 = 2 列(5 + 4),連「現在有人在玩」看板一起出現都還有餘裕。 */
-    .gc-grid{grid-template-columns:repeat(5,1fr);gap:7px;margin-top:9px}
+    .gc-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;margin-top:9px}
     .game-card{padding:8px 5px;gap:5px}
     .gc-art{width:40px;height:40px}
     .gc-name{font-size:14px}
     /* 卡片縮一階,排名徽章跟著縮(它是絕對定位、不佔高度,但 11px 在五欄的窄格裡顯得重) */
     .gc-rank{top:4px;left:4px;min-width:14px;font-size:10px;line-height:14px}
+    /* ⚠ 右上角那顆即時徽章 .hl-badge 要縮的**同一組數字**寫在「現在有人在玩」那一段的
+       同名 @media 裡,不寫在這裡 —— 它的本體定義在這一段**後面**,而兩者權重都是
+       (0,1,0)、media query 不加權 → 寫在這裡會被後面的本體(font: 簡寫帶著字級與行高)
+       整條蓋掉,結果是「位置縮了、字沒縮」。★ 改一顆記得改另一顆,兩顆是一對。 */
   }
 
   /* ==========================================================================
@@ -1672,18 +1696,45 @@
      排七那一段),這裡只管尺寸小圖跟文字之間的對齊與間距,同時給 .svs-name(伺服器狀態
      面板)共用。 */
   .hl-card-ic{vertical-align:middle;margin:-2px 2px 0 0}
-  /* 遊戲卡上的即時徽章:接在 .gc-name 下面自成一行(.gc-body 是 column)。
-     ⚠ v1.89.0 首頁改成一行兩張的窄卡之後,居中那條在上面
-       (.gc-body .hl-badge{align-self:center},兩層 → 蓋掉這裡的 flex-start)。 */
-  .hl-badge{align-self:flex-start;margin-top:2px;font-size:11.5px;font-weight:800;
-    padding:2px 8px;border-radius:999px;white-space:nowrap;
-    background:rgba(34,197,94,.16);color:#22c55e}
-  .hl-badge[data-state="busy"]{background:rgba(249,115,22,.16);color:#f97316}
+  /* 遊戲卡上的即時徽章 —— ★★ v1.176.0 改成**右上角的絕對定位小徽章**
+     (左上角 .gc-rank 排名徽章的鏡像),內容只剩「一顆點 + 房間數」。
+     ── 為什麼要改(不是為了好看,是壞掉了)────────────────────────────────
+       舊版是「接在 .gc-name 下面自成一行」的長標籤(`🟢 2 間可加入 · 11 人`),
+       帶 `white-space:nowrap`。而 .gc-grid 的欄寬當時是 `1fr`(= minmax(auto,1fr)),
+       grid 項目的 auto 最小值是 **min-content** → 那顆 nowrap 的徽章直接把整欄撐開,
+       **把別欄的寬度搶走**。實測 390px 直向、三張卡有房間時:
+         三欄 = 61 / 143 / 105px,BINGO 剩 61px、「象棋暗棋」擠成兩行。
+       使用者的話是「這個的顯示把其他的項目變得很奇怪」。
+     ── 這一版一次拆掉兩個成因 ─────────────────────────────────────────────
+       ① 徽章**離開流**(position:absolute)→ 不再參與欄寬計算,也不再把每一列
+          撐高一行(.gc-grid 是 grid-auto-rows:1fr,一張卡長高 = 十二張一起長高)。
+       ② 欄寬改成 `minmax(0,1fr)`(見 .gc-grid 那條)→ 下一個 nowrap 也擠不動它。
+     ── ⚠ 資訊量刻意縮到「幾間」───────────────────────────────────────────
+       房名 / 人數 / 房主本來就在上面那塊「現在有人在玩」看板裡,一列一間、點了就進去;
+       卡上這一顆的工作只有「這個遊戲**現在有人**」。完整那句話放 title / aria-label,
+       滑過去與讀螢幕的人照樣拿得到。
+     ⚠ 定位脈絡吃的是 `.game-card[data-gk]{position:relative}`(排名徽章那條),
+       徽章的 DOM 位置(.gc-body 裡)刻意不動 —— 搬 DOM 會動到 e2e 的
+       「只設 order 不搬 DOM」那條斷言。
+     ⚠ 那顆點用 `::before` 的 currentColor 畫,**不用 🟢 / 🟠 emoji**:
+       emoji 在各裝置的字型不同,大小與基線都對不齊右上角這麼小的一顆。 */
+  .hl-badge{position:absolute;top:5px;right:6px;z-index:1;
+    display:inline-flex;align-items:center;gap:3px;
+    min-width:16px;padding:0 4px;border-radius:6px;
+    font:800 11px/16px 'Nunito',sans-serif;font-variant-numeric:tabular-nums;
+    background:rgba(34,197,94,.18);color:#22c55e}
+  .hl-badge::before{content:"";flex:none;width:5px;height:5px;border-radius:50%;
+    background:currentColor}
+  /* 綠 = 有房間可以加入 · 橘 = 全部都在對戰中(進不去,但「有人在玩」照樣值得知道) */
+  .hl-badge[data-state="busy"]{background:rgba(249,115,22,.18);color:#f97316}
 
   @media (max-height:560px){
     .hl-live{margin-bottom:10px;padding:9px}
     .hl-head{margin-bottom:7px}
-    .hl-badge{font-size:11px}
+    /* 卡片縮一階,右上角這顆跟著縮 —— 與左上角 .gc-rank 那條(遊戲卡那一段的同名 @media)
+       **逐項對稱**,改一顆要改另一顆。⚠ 這一條非得寫在這裡不可:本體 .hl-badge 定義在
+       遊戲卡那一段後面,寫在那邊會被本體的 `font:` 簡寫蓋掉字級與行高。 */
+    .hl-badge{top:4px;right:4px;min-width:14px;font:800 10px/14px 'Nunito',sans-serif}
   }
 
   /* ==========================================================================
@@ -2239,6 +2290,16 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
    ★ v1.58.2:①不再把「跟人要來的那張」橫放 —— 26~40px 的牌轉 90° 之後糊成一塊,
      看起來像壞掉的牌而不是資訊;②每一組加底色框,一眼數得出攤了幾組。 */
 .m16-mymelds,.m16-fmelds{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+/* ★★ 我這一排明牌(花 + 吃碰槓)**一律畫出來,而且一律至少 34px 高**(v1.176.0)。
+   兩個理由,兩個都不是裝飾:
+     ① 它是**動作列的錨點** —— 倒數環與「輪到 ○○…」現在浮在這一帶的右端
+        (見 .m16-acts 那一整段)。量不到它,那一列會掉回 top:0 蓋在對手列上。
+     ② 順手解掉直向的一個老毛病:原本沒有明牌時這一排**根本不畫**,於是補一張花、
+        碰一組就多出一整排 → 整副牌得重算一次大小。橫向早就因為同一個理由一律預留
+        (見橫向那段的 min-height),v1.176.0 把它推到直向。
+   ⚠ 34px = 倒數環的高度(那是這一帶要裝得下的最高的東西);有明牌時它自然被撐高,
+     這裡只是地板。⚠ 橫向另有一條更大的地板(一排明牌的高度),定義在後面 → 那邊贏。 */
+.m16-mymelds{min-height:34px}
 .m16-meld{display:inline-flex;align-items:flex-end;gap:1px;
   padding:3px;border-radius:8px;background:rgba(255,255,255,.10)}
 /* 暗槓底色不同:它在算台時是暗刻,和攤出來的碰不是同一回事 */
@@ -2370,9 +2431,42 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
        盤面高度 = 容器 − 這一列  → 與內容無關,迴圈就斷了。
      ⚠ 不要改用 .m16-stage{flex:1 1 0} 去解 —— column flex 下 basis 會**蓋掉 height**,
        開發頁 tools/t-mj16-fx.html 把盤面的高度寫死來截圖,那樣做整頁塌成 0(試過)。
-     ⚠ 動作列本來就不該被壓縮:它是「過 / 胡」在的地方,少一個像素都不能少。 */
-.m16-acts{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;align-items:center;
-  padding:4px 0;width:100%;min-height:38px;flex:none}
+     ⚠ 動作列本來就不該被壓縮:它是「過 / 胡」在的地方,少一個像素都不能少。
+
+   ★★★ v1.176.0:上面那兩段講的問題**整個消失了** —— 這一列改成
+     **絕對定位,搬到明牌帶(補花吃碰那一排)的右端**,也就是手牌的右上方。
+     使用者:「最下方會告知現在要換誰跟倒數的地方,我想把那行移到我們手牌的右上方,
+     也就是補花吃牌的區域右邊」。
+
+   ── ★★★ 為什麼是「整條列改 absolute」而不是「把環與字搬過去」 ───────────────
+     倒數環 `.m16-cd` 是**持久節點,DOM 一個字都不准動**(移動節點 = CSS 動畫重跑 =
+     倒數彈回滿格,見 js/mahjong16/adapter.js 的 ensureCd());而目標位置
+     `.m16-mymelds` 住在 `#m16Stage` 裡,那一塊**每次 render 會被 innerHTML 重建最多七次**
+     → 把環搬進去 = 每次重畫都銷毀它一次。所以搬的只能是**這一整條列**
+     (它是 `.mj-play` 的直接子元素,board.js 從來不碰),而且只搬「位置」不搬節點。
+     ★ 附帶的好處:`.m16-claim` 與 `.m16-cd` 的絕對定位都是相對**同一個 offsetParent**
+       (以前是 .mj-play,現在是這一列自己),而 `--m16cb` / `--m16ch` 本來就是
+       「離 offsetParent 底邊多遠」→ **兩者的相對關係一個字都不必改**。
+       唯一要跟著改的是 placeClaim() 裡那道夾取(它原本拿 offsetParent 的高度當
+       「整片對局區的高度」,而現在 offsetParent 只有一條明牌那麼高)。
+
+   ── ⚠⚠ **不可以**改用負 margin 把它拉上去 ─────────────────────────────────
+     `.mj-play` 是 flex column,負 margin 會被盤面(flex:1 1 auto)吸收 → 盤面長高
+     → 手牌變高 → 要拉的距離變大 → …,正是上面 v1.58.4 那個沒收斂的迴圈。
+     絕對定位則**完全不進 flex 流**:盤面高度 = 容器高度,與這一列的內容無關 ——
+     連原本 `flex:none` 與 `min-height:38px` 要防的事情都一併消失(所以兩者都拿掉了)。
+
+   ── ⚠ 落點由 board.js 的 placeActs() 每次量(比照既有的 placeWall / placeClaim)──
+     `--m16ty` = 明牌帶上緣離 `.mj-play` 多遠 · `--m16th` = 明牌帶多高。
+     ⚠⚠ 因此 `.m16-mymelds` **一律要畫出來**(v1.176.0 起直向也畫,原本只有橫向畫)
+       —— 量不到錨點的話這一列會掉回 top:0,蓋在對手列上。
+   ⚠ pointer-events:none 掛在容器、由子元素自己收回來:這一列橫跨整個寬度而左半邊是空的,
+     不放掉的話會擋住底下明牌與手牌的點擊。 */
+.m16-acts{position:absolute;left:0;right:0;
+  top:var(--m16ty,0px);height:var(--m16th,34px);
+  display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap;
+  padding:0;z-index:2;pointer-events:none}
+.m16-acts > *{pointer-events:auto}
 .m16-act{border:0;border-radius:11px;padding:8px 15px;cursor:pointer;
   font:800 14px/1 'Nunito',sans-serif;color:#fff;background:var(--mj-z)}
 .m16-act.win{background:var(--mj-jz)}
@@ -2383,8 +2477,12 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
 .m16-act.pass{background:rgba(255,255,255,.26);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
 .m16-act:active{transform:scale(.95)}
 .m16-more{opacity:.75;font-size:11px}
-/* 宣告視窗的說明字:不遮畫面(同消消樂僵局那條 —— 遮住的那一瞬間別人剛好動作,感受就是「被搶了」) */
-.m16-timer{font:800 12px/1 'Nunito',sans-serif;opacity:.85;align-self:center}
+/* 「輪到 ○○…」/「已表態,等其他人…」。
+   ⚠ v1.176.0 起這一格浮在**明牌帶**上(見 .m16-acts),背後可能是攤出來的明牌 →
+     補一層半透明底才讀得出來;原本它在畫面最底一整片空白上,裸字就夠。 */
+.m16-timer{font:800 12px/1 'Nunito',sans-serif;align-self:center;
+  padding:4px 8px;border-radius:999px;white-space:nowrap;
+  background:rgba(9,15,12,.55);color:var(--text)}
 
 /* ---------- 已宣告聽牌的那一排(v1.66.0 起,v1.67.0 改成只在宣告後出現) ----------
    宣告聽牌之後,動作列列出「我聽哪幾張」——「聽 / 地聽 / 天聽」的標籤 + 牌面。
@@ -2571,7 +2669,11 @@ body.m16-mp .mj-play,body.m16-solo .mj-play{position:relative}
      再叫一次 render() → 又是那個沒收斂的迴圈(`.m16-acts` 的 flex:none 整段註解在講的東西)。
      實測 v1.111.0 的單機 e2e 三跑三次都丟「ResizeObserver loop completed with undelivered
      notifications」,而面板之前的版本三次都沒有 —— 那不是雜訊,是「這一輪沒收斂」的告示。 */
-.m16-acts.m16-hush:has(.m16-cd:not(.hidden)){min-height:42px}
+/* ★★★ v1.176.0 拿掉了原本這裡的 `.m16-acts.m16-hush:has(.m16-cd:not(.hidden)){min-height:42px}`
+   ——上面那一整段(以及橫向那份 38px)講的是「環一脫離流,這一列就矮 4px → 整副牌縮一次」,
+   而 v1.176.0 起**這一列整條都不在流裡**(絕對定位,見 .m16-acts):它的高度對盤面
+   已經沒有任何影響,那個補償連同它要防的迴圈一起消失。
+   ⚠ 不要「為了保險」把它加回來:加回來是死規則,而死規則會讓下一個人以為這一列還在流裡。 */
 .m16-acts.m16-hush .m16-cd{position:absolute;left:50%;margin-left:-17px;
   bottom:calc(var(--m16cb,36%) + var(--m16ch,120px) - 17px);z-index:7;pointer-events:none;
   background:radial-gradient(closest-side,rgba(9,15,12,.94) 68%,rgba(9,15,12,0));
@@ -2796,8 +2898,22 @@ body.m16-solo .topbar{width:min(92vw,960px)}    /* 同上面 body.m16-mp 那條(
      不一樣**(你畫我猜 v1.155.0 兩邊同名,`body.dw-zoom` 直接吃到鈕的 width/height,
      整個 body 變成 30px 高的格線容器)。那是 CLAUDE.md 紅線 6 最難想到的一種:自己撞自己。
    ⚠ 字面是「大 / 小」中文字(js/mahjong16/board.js 的 applyBig 在換),不是 ⤢ / ⤡ ——
-     那兩個箭頭在手機上細得像雜訊。 */
-.m16-bigbtn{font-family:'Nunito',sans-serif;font-weight:800;line-height:1}
+     那兩個箭頭在手機上細得像雜訊。
+   ⚠⚠ **不可以再加回 `line-height:1`**(v1.176.0 修)。使用者:「那個跑進房間框的小按鈕,
+     跟旁的按鈕沒有垂直對齊」—— 量出來是真的:「大」字的**墨跡**中心比鈕框中心
+     **高 1.12px**(上留白 9.0px / 下留白 11.2px,4 倍截圖逐像素量)。
+     成因不是 place-items:center 沒生效,是**行框的基線**:
+       `line-height:1` 把行框壓成 font-size 那麼高,而行框裡基線的位置由**第一個可用字型**
+       (Nunito)的 ascent / descent 決定 —— Nunito 沒有中日韓字,「大」是**後備字型**畫的,
+       兩套字型的垂直度量對不起來,字就浮上去了。旁邊的 🎤 / 😀 是 emoji、墨跡撐滿整顆圓,
+       所以只有這一顆看起來歪。
+     ★ 修法是**刪掉那一行**、讓它回到 line-height:normal(行框改由 Nunito 的自然度量決定,
+       量出來偏移剩 0.12px),不是加 padding-top 或 translateY 那種魔術數字 ——
+       實測 `padding-top:.19em` 會矯正過頭變成 +0.88px(字偏低)。
+     ★ Nunito 是**我們自己載的網頁字型**,度量在每台裝置上都一樣 → 這個修法不挑裝置。
+     ⚠ 同一個坑在你畫我猜的 .dw-zoombtn(同一個「大 / 小」字面、同一組 font/line-height),
+       v1.176.0 一起改掉了 —— 兩處要一起看。 */
+.m16-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
 .m16-bigbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
 /* ① 頂列整條讓出(直向約 44px,這一段最大的一塊)。
    ★ 收掉之後 ui-kit 的 dockTools() 會**自動**把 ⛶ / ⚙️ 搬進房間框那一列
@@ -2901,6 +3017,21 @@ body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
   body.m16-mp .mj-room .quick-voice .qv-ico{font-size:15px}
   body.m16-mp .mj-room .mj-room-title,body.m16-solo .mj-room .mj-room-title{font-size:12px}
   body.m16-mp .mj-room .mj-room-title b,body.m16-solo .mj-room .mj-room-title b{font-size:13px}
+
+  /* ---- ②-b 大牌桌那顆鈕:橫向**收起來**(v1.176.0)-------------------------------
+     使用者:「橫向模式的時候,那個大跟小感覺沒有什麼差異,如果是沒有差異的情況就不要顯示了」。
+     ★ 真的沒有差異,而且是**這一段自己造成的** —— 大牌桌做的三件事,橫向這裡每一件都已經做過:
+         ① 收頂列     → 上面 ① `body.m16-mp .topbar{display:none}` 已經收了
+         ② 房間框壓薄 → 上面 ② 的 `padding:4px …` 比大牌桌的 4px 還多做了「三層併一行」;
+                        兩者權重相同(0,2,1)而這一段在後面 → 這裡本來就贏
+         ③ 收房名     → 房名在橫向只吃**寬度**,而橫向缺的是**高度** → 盤面一個 px 都不會變大
+       (直向不同:①與②在直向都是大牌桌獨有的,所以直向那顆鈕照舊留著。)
+     ⚠ 一起把 ③ **還原**:只藏鈕不還原的話,橫著玩時房名會「有時候在、有時候不在」——
+       取決於使用者上一次在直向按了沒,而那個差別換不到任何好處,只會像壞掉。
+     ⚠ 偏好裡的狀態**刻意不動**(不去 JS 裡強制關掉大牌桌):轉回直向時鈕與大牌桌都要回來,
+       而且轉向不該偷改使用者存的設定。 */
+  .m16-bigbtn{display:none}
+  body.m16-big .mj-room .mj-room-title{display:block}
   body.m16-mp .mp-chip,body.m16-solo .mp-chip{padding:2px 7px;font-size:11px}
   body.m16-mp .mj-play,body.m16-solo .mj-play{gap:4px}
 
@@ -2970,7 +3101,11 @@ body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
   .m16-foe .m16-lz{height:15px;padding:0 4px;font-size:10px;margin-left:2px}
   .m16-foe .m16-foename{max-width:4em}
   .m16-fmelds{display:flex;flex-wrap:wrap;gap:2px}
-  .m16-acts{min-height:34px;padding:2px 0}
+  /* ⚠ v1.176.0:原本這裡是 `min-height:34px;padding:2px 0` —— 那是「這一列還在 flex 流裡」
+     的年代在調它的高度。現在它是絕對定位、高度由 board.js 量到的明牌帶決定
+     (`--m16th`),橫向不必再寫一份;倒數環在橫向縮一號,免得比明牌帶還高。 */
+  .m16-acts .m16-cd{width:28px;height:28px}
+  .m16-acts .m16-cdn{font-size:12px}
   /* ★ 宣告面板收一號(v1.111.0):橫向的盤面總高只有 ~161px,面板照直向那個尺寸
      會從盤面上緣衝出去(board.js 的 placeClaim() 會夾住,但夾完就貼在頂上、
      跟房間框黏成一塊)。牌面本身由 board.js 的 CLAIM_TW_LAND 收成 30px。
@@ -2983,7 +3118,9 @@ body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
   .m16-claim .m16-act{padding:8px 13px;font-size:14px;border-radius:11px}
   .m16-claim .m16-more{font-size:10.5px}
   .m16-crow{gap:6px}
-  .m16-acts.m16-hush:has(.m16-cd:not(.hidden)){min-height:38px}
+  /* ⚠ v1.176.0:原本這裡還有一條 `.m16-acts.m16-hush:has(.m16-cd:not(.hidden)){min-height:38px}`
+     (橫向版的高度補償)。動作列改成絕對定位之後,它的高度已經不影響盤面 → 整條刪掉,
+     理由與直向那一份寫在同一處(見 .m16-acts.m16-hush .m16-cd 上面那段)。 */
 }
 
 /* ==========================================================================
@@ -7235,10 +7372,14 @@ body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
        ⤢ 箭頭,擺在 34px 的橘色圓環旁邊 —— 大小、形狀、顏色三樣都對不上
        (使用者:「你倒數旁邊的縮放,好難看啊」)。字面也改成「大 / 小」,見 board.js setZoom()。
      ⚠ 它會被 fit() 用 .hidden 藏起來(直向手機上按了不會有事)—— .hidden 是
-       display:none!important,壓得過下面這條 display:grid。 */
+       display:none!important,壓得過下面這條 display:grid。
+     ⚠⚠ **不可以加回 `line-height:1`**(v1.176.0 拿掉)—— 那會讓「大 / 小」的墨跡浮上去
+       約 1px:行框裡基線的位置由**第一個可用字型**(Nunito,沒有中日韓字)的度量決定,
+       而字是**後備字型**畫的,兩套度量對不起來。完整的量測與否決掉的兩種修法寫在
+       台灣麻將 .m16-bigbtn 那一條旁邊(同一個坑、同一個字面,兩處要一起看)。 */
   .dw-zoombtn{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;
     border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--muted);
-    font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;line-height:1;
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;
     cursor:pointer;transition:.15s}
   .dw-zoombtn:hover{background:rgba(255,255,255,.16)}
   .dw-zoombtn:active{transform:scale(.9)}
@@ -7785,7 +7926,7 @@ body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
          (看板 #hlLive 是遊戲卡的兄弟,一起變格子會被壓成半格寬 —— 紅線 10)。
        ⚠ 驗收點沒有變:「最後一張卡的下緣還在視窗裡嗎」,而且**不可以問
          document.scrollHeight**(捲的是 #home)。 */
-    .gc-grid{grid-template-columns:repeat(4,1fr)}
+    .gc-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
   }
 
   /* ==========================================================================

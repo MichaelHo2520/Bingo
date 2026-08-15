@@ -13,11 +13,11 @@
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
 <title>五子棋 ｜ 連線對戰 · 本機對戰</title>
-<!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v1.175.0 -->
-<meta name="version" content="1.175.0">
+<!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v1.176.0 -->
+<meta name="version" content="1.176.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -58,7 +58,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 第一層:選怎麼玩(連線在上,與數獨同順序) -->
     <div id="gmkPickMode">
       <div class="gmk-hero">
-        <img class="gmk-art" src="gk-icon.png" alt="五子棋盤" width="192" height="192">
+        <img class="gmk-art" src="img/gk-icon.png" alt="五子棋盤" width="192" height="192">
         <div class="home-tagline">橫、豎、斜任一方向連成 5 顆就贏</div>
       </div>
       <button class="btn primary block-btn home-btn" id="gmkGoOnline">🌐 連線對戰</button>

@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.175.0";
+const VERSION = "1.176.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -205,24 +205,24 @@ const CORE = [
   "./mp3/沒禮貌.m4a",
   "./mp3/你禮貌嗎.m4a",
   "./manifest.json",
-  "./icon.svg",
+  "./img/icon.svg",
   /* ★★★ v1.149.0:十一個遊戲的圖示全部是去背的 PNG 貼圖(每一張都是「index.html 首頁卡
      + 該遊戲進場插圖**同一個檔案**」;v1.145.0 暗棋、v1.148.0 台灣麻將是頭兩張)。
      漏列一張的症狀是「離線時那張卡是破圖」—— 而 addAll() 是**全有全無**,
      所以檔名打錯的症狀更慘:**離線整個不能玩**。
      ⚠ 加新遊戲 / 換檔名要三處一起改:兩頁的 img + 這裡。 */
-  "./bc-icon.png",     // BINGO(首頁卡 + 第二層「選擇玩法」那張 hero)
-  "./gk-icon.png",     // 五子棋
-  "./sk-icon.png",     // 數獨
-  "./mk-icon.png",     // 麻將消消樂
-  "./m16-icon.png",    // 台灣 16 張麻將
-  "./sv-icon.png",     // 排七
-  "./b2-icon.png",     // 大老二
-  "./bj-icon.png",     // 台式 21 點
-  "./un-icon.png",     // UNO
-  "./dc-icon.png",     // 象棋暗棋
-  "./cy-icon.png",     // 成語接龍
-  "./dw-icon.png"      // 你畫我猜(★ 目前是 tools/gen-dw-icon.py 產的佔位圖,不是那套手繪插畫)
+  "./img/bc-icon.png",     // BINGO(首頁卡 + 第二層「選擇玩法」那張 hero)
+  "./img/gk-icon.png",     // 五子棋
+  "./img/sk-icon.png",     // 數獨
+  "./img/mk-icon.png",     // 麻將消消樂
+  "./img/m16-icon.png",    // 台灣 16 張麻將
+  "./img/sv-icon.png",     // 排七
+  "./img/b2-icon.png",     // 大老二
+  "./img/bj-icon.png",     // 台式 21 點
+  "./img/un-icon.png",     // UNO
+  "./img/dc-icon.png",     // 象棋暗棋
+  "./img/cy-icon.png",     // 成語接龍
+  "./img/dw-icon.png"      // 你畫我猜(★ 目前是 tools/gen-dw-icon.py 產的佔位圖,不是那套手繪插畫)
 ];
 /* 筒條萬的牌名語音(v1.72.0,27 個)。★ 用算式接上去而**不是手列 27 行** —— 規律與
    js/mahjong16/sfx.js 的編碼一致(0..8 萬 w / 9..17 條 b / 18..26 筒 d)。

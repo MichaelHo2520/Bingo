@@ -20,13 +20,13 @@
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <!-- 分頁與書籤圖示:Chrome 只認 rel="icon"(manifest 的 icons 只給 PWA 安裝,apple-touch-icon 只有 iOS 用) -->
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.175.0 -->
-<meta name="version" content="1.175.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.176.0 -->
+<meta name="version" content="1.176.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -103,7 +103,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="gc-grid">
       <button class="game-card" id="pickBingo" type="button" data-gk="bingo">
         <span class="gc-rank" aria-hidden="true">1</span>
-        <img class="gc-art bc-cart" src="bc-icon.png" alt="賓果卡" width="192" height="192">
+        <img class="gc-art bc-cart" src="img/bc-icon.png" alt="賓果卡" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">BINGO</span>
           <span class="hl-badge hidden" id="hlBadgeBingo"></span>
@@ -112,7 +112,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       <a class="game-card as-link" href="gomoku.html" data-gk="gomoku">
         <span class="gc-rank" aria-hidden="true">2</span>
-        <img class="gc-art gk-cart" src="gk-icon.png" alt="五子棋盤" width="192" height="192">
+        <img class="gc-art gk-cart" src="img/gk-icon.png" alt="五子棋盤" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">五子棋</span>
           <span class="hl-badge hidden" id="hlBadgeGomoku"></span>
@@ -121,7 +121,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       <a class="game-card as-link" href="sudoku.html" data-gk="sudoku">
         <span class="gc-rank" aria-hidden="true">3</span>
-        <img class="gc-art sk-cart" src="sk-icon.png" alt="數獨盤" width="192" height="192">
+        <img class="gc-art sk-cart" src="img/sk-icon.png" alt="數獨盤" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">數獨</span>
           <span class="hl-badge hidden" id="hlBadgeSudoku"></span>
@@ -130,7 +130,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
       <a class="game-card as-link" href="mahjong.html" data-gk="mahjong">
         <span class="gc-rank" aria-hidden="true">4</span>
-        <img class="gc-art mk-cart" src="mk-icon.png" alt="麻將牌" width="192" height="192">
+        <img class="gc-art mk-cart" src="img/mk-icon.png" alt="麻將牌" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">麻將消消樂</span>
           <span class="hl-badge hidden" id="hlBadgeMahjong"></span>
@@ -147,7 +147,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
                  換圖只能看 46px 的截圖確認兩張麻將卡還認得出誰是誰。 -->
       <a class="game-card as-link" href="mahjong16.html" data-gk="mj16">
         <span class="gc-rank" aria-hidden="true">5</span>
-        <img class="gc-art m16-cart" src="m16-icon.png" alt="台灣麻將牌" width="192" height="192">
+        <img class="gc-art m16-cart" src="img/m16-icon.png" alt="台灣麻將牌" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">台灣麻將</span>
           <span class="hl-badge hidden" id="hlBadgeMj16"></span>
@@ -159,7 +159,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
              (這張 / 大老二 / 21點)在 46px 下就靠「連號 vs 四張 2 vs 金色 21」分家。 -->
       <a class="game-card as-link" href="sevens.html" data-gk="sevens">
         <span class="gc-rank" aria-hidden="true">6</span>
-        <img class="gc-art sv-cart" src="sv-icon.png" alt="撲克牌 排七" width="192" height="192">
+        <img class="gc-art sv-cart" src="img/sv-icon.png" alt="撲克牌 排七" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">排七</span>
           <span class="hl-badge hidden" id="hlBadgeSevens"></span>
@@ -171,7 +171,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               四張才講得出「大老二」(v1.144.0 手繪那版就是為此由兩張改四張,新圖沿用同一構圖)。 -->
       <a class="game-card as-link" href="big2.html" data-gk="big2">
         <span class="gc-rank" aria-hidden="true">7</span>
-        <img class="gc-art b2-cart" src="b2-icon.png" alt="撲克牌 大老二" width="192" height="192">
+        <img class="gc-art b2-cart" src="img/b2-icon.png" alt="撲克牌 大老二" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">大老二</span>
           <span class="hl-badge hidden" id="hlBadgeBig2"></span>
@@ -184,7 +184,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
                 就比另外幾張高一截)—— 十一張的規則寫在 .gc-grid 上面那段。 -->
       <a class="game-card as-link" href="blackjack.html" data-gk="bj">
         <span class="gc-rank" aria-hidden="true">8</span>
-        <img class="gc-art bj-cart" src="bj-icon.png" alt="撲克牌 台式21點" width="192" height="192">
+        <img class="gc-art bj-cart" src="img/bj-icon.png" alt="撲克牌 台式21點" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">台式21點</span>
           <span class="hl-badge hidden" id="hlBadgeBj"></span>
@@ -197,7 +197,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               ⚠ 顏色是 UNO 的規則本體 —— 任何主題、任何換圖都不准把四色轉黑白。 -->
       <a class="game-card as-link" href="uno.html" data-gk="uno">
         <span class="gc-rank" aria-hidden="true">9</span>
-        <img class="gc-art un-cart" src="un-icon.png" alt="UNO 牌" width="192" height="192">
+        <img class="gc-art un-cart" src="img/un-icon.png" alt="UNO 牌" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">UNO</span>
           <span class="hl-badge hidden" id="hlBadgeUno"></span>
@@ -215,7 +215,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠ 這件事**斷言測不到**(E 節只驗得到「兩頁同一個檔案」),只能看 46px 的截圖。 -->
       <a class="game-card as-link" href="darkchess.html" data-gk="dc">
         <span class="gc-rank" aria-hidden="true">10</span>
-        <img class="gc-art dc-cart" src="dc-icon.png" alt="象棋暗棋" width="192" height="192">
+        <img class="gc-art dc-cart" src="img/dc-icon.png" alt="象棋暗棋" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">象棋暗棋</span>
           <span class="hl-badge hidden" id="hlBadgeDc"></span>
@@ -228,7 +228,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
              去講),所以它只負責被認出是「成語」那一款,玩法本體由進場頁的說明講。 -->
       <a class="game-card as-link" href="chengyu.html" data-gk="chengyu">
         <span class="gc-rank" aria-hidden="true">11</span>
-        <img class="gc-art cy-cart" src="cy-icon.png" alt="成語填字盤" width="192" height="192">
+        <img class="gc-art cy-cart" src="img/cy-icon.png" alt="成語填字盤" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">成語接龍</span>
           <span class="hl-badge hidden" id="hlBadgeChengyu"></span>
@@ -242,7 +242,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               不是 design-refs 那套手繪插畫的一員 —— 補進總圖重切之後才算完成。 -->
       <a class="game-card as-link" href="draw.html" data-gk="dw">
         <span class="gc-rank" aria-hidden="true">12</span>
-        <img class="gc-art dw-cart" src="dw-icon.png" alt="畫筆與畫板" width="192" height="192">
+        <img class="gc-art dw-cart" src="img/dw-icon.png" alt="畫筆與畫板" width="192" height="192">
         <span class="gc-body">
           <span class="gc-name display">你畫我猜</span>
           <span class="hl-badge hidden" id="hlBadgeDraw"></span>
@@ -260,7 +260,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="subtitle">選擇玩法</span>
     </div>
     <div class="home-hero">
-      <img class="bc-art" src="bc-icon.png" alt="賓果卡" width="192" height="192">
+      <img class="bc-art" src="img/bc-icon.png" alt="賓果卡" width="192" height="192">
       <div class="home-tagline">和朋友連線比賽,或自己單機練習</div>
     </div>
     <button class="btn primary block-btn home-btn" id="homeOnline">🌐 連線對戰</button>

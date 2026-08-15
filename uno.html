@@ -11,11 +11,11 @@
 <!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.175.0 -->
-<meta name="version" content="1.175.0">
+<!-- UNO · v1.176.0 -->
+<meta name="version" content="1.176.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -62,7 +62,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
                 (兩色的紙牌講不出是 UNO)。⚠ 顏色是 UNO 的規則本體,不准轉黑白。
              ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十一張的規則寫在 index.html
                 的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這十一對雙胞胎)。 -->
-        <img class="un-art" src="un-icon.png" alt="UNO 牌" width="192" height="192">
+        <img class="un-art" src="img/un-icon.png" alt="UNO 牌" width="192" height="192">
         <div class="home-tagline">搶著把手上的牌出完,剩一張要喊 UNO</div>
       </div>
       <button class="btn primary block-btn home-btn" id="unGoOnline">🌐 連線對戰</button>

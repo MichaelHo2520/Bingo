@@ -22,9 +22,9 @@ tools/
 #                             (tools/cut-icons.py 演算法裁切,可重跑)
 #   back.jpg                  早期實驗殘留,沒有任何頁面引用
 # ⚠ v1.149.0 把這裡的檔名全部改成看得懂的中文(原本是 file_00000000xxxx.png 那種亂碼)。
-# ⚠ 真正在用的圖不在這裡,留在根目錄(黑名單制 → 自動上傳):
-#   icon.svg      PWA 圖示(十一頁 + manifest.json + sw.js 都引用它)
-#   <前綴>-icon.png  ★ 十一個遊戲的圖示(v1.149.0;bc gk sk mk m16 sv b2 bj un dc cy)——
+# ⚠ 真正在用的圖不在這裡,收在 **img/**(v1.176.0 從專案根搬過去;黑名單制 → 自動上傳):
+#   img/icon.svg      PWA 圖示(十三頁 + manifest.json + sw.js 都引用它)
+#   img/<前綴>-icon.png  ★ 十二個遊戲的圖示(v1.149.0;bc gk sk mk m16 sv b2 bj un dc cy dw)——
 #                 每一張都是「index.html 首頁卡 + 該遊戲進場插圖」同一個檔案,而且列進 sw.js 的 CORE
 # ⚠⚠ 頁面**絕對不可以**直接指向 design-refs/ —— 那是「本機好好的、線上永遠破圖」。
 design-refs/
