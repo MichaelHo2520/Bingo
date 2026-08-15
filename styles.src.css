@@ -8132,64 +8132,160 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
 body.un-big .topbar,
 body.b2-big .topbar,
 body.bj-big .topbar,
-body.dc-big .topbar{display:none}
+body.dc-big .topbar,
+body.gmk-big .topbar,
+body.sdk-big .topbar,
+body.mj-big .topbar,
+body.sv-big .topbar,
+body.cy-big .topbar{display:none}
 /* ① 三層並排成一行。⚠ 上下內距 6px 不是 4px:34px 的鈕是這一列唯一貼到框邊的東西
    (晶片只有 22px 高),4px 看起來就是黏著框(台灣麻將 v1.178.1 的上手回報)。 */
 body.un-big .un-room,
 body.b2-big .b2-room,
 body.bj-big .bj-room,
-body.dc-big .dc-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
+body.dc-big .dc-room,
+body.gmk-big .gmk-room,
+body.sdk-big .sdk-room,
+body.mj-big .mj-room,
+body.sv-big .sv-room,
+body.cy-big .cy-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 /* ② order:晶片列(foot)在 DOM 裡是最後一個,拉到最左邊;鈕那一列(.row)推到最右。
    ⚠ 連線與單機共用同一組 class(兩條列都是 .XX-room),所以一次到位。 */
 body.un-big .un-room > .row,
 body.b2-big .b2-room > .row,
 body.bj-big .bj-room > .row,
-body.dc-big .dc-room > .row{flex:none;order:3;margin-top:0}
+body.dc-big .dc-room > .row,
+body.gmk-big .gmk-room > .row,
+body.sdk-big .sdk-room > .row,
+body.mj-big .mj-room > .row,
+body.sv-big .sv-room > .row,
+body.cy-big .cy-room > .row{flex:none;order:3;margin-top:0}
 body.un-big .un-room > .mp-subrow,
 body.b2-big .b2-room > .mp-subrow,
 body.bj-big .bj-room > .mp-subrow,
-body.dc-big .dc-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
+body.dc-big .dc-room > .mp-subrow,
+body.gmk-big .gmk-room > .mp-subrow,
+body.sdk-big .sdk-room > .mp-subrow,
+body.mj-big .mj-room > .mp-subrow,
+body.sv-big .sv-room > .mp-subrow,
+body.cy-big .cy-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.un-big .un-room-foot,
 body.b2-big .b2-room-foot,
 body.bj-big .bj-room-foot,
-body.dc-big .dc-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
+body.dc-big .dc-room-foot,
+body.gmk-big .gmk-room-foot,
+body.sdk-big .sdk-room-foot,
+body.mj-big .mj-room-foot,
+body.sv-big .sv-room-foot,
+body.cy-big .cy-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
 /* ③ 返回鍵 / 房名 / 局數三個一起收 —— 收掉它們讓出來的寬度就是給晶片的。
    ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」,手機實體返回鍵也不受影響。 */
 body.un-big .un-room .mp-leave-btn,
 body.b2-big .b2-room .mp-leave-btn,
 body.bj-big .bj-room .mp-leave-btn,
-body.dc-big .dc-room .mp-leave-btn{display:none}
+body.dc-big .dc-room .mp-leave-btn,
+body.gmk-big .gmk-room .mp-leave-btn,
+body.sdk-big .sdk-room .mp-leave-btn,
+body.mj-big .mj-room .mp-leave-btn,
+body.sv-big .sv-room .mp-leave-btn,
+body.cy-big .cy-room .mp-leave-btn{display:none}
 body.un-big .un-room .mp-goal,
 body.b2-big .b2-room .mp-goal,
 body.bj-big .bj-room .mp-goal,
-body.dc-big .dc-room .mp-goal{display:none}
+body.dc-big .dc-room .mp-goal,
+body.gmk-big .gmk-room .mp-goal,
+body.sdk-big .sdk-room .mp-goal,
+body.mj-big .mj-room .mp-goal,
+body.sv-big .sv-room .mp-goal,
+body.cy-big .cy-room .mp-goal{display:none}
 body.un-big .un-room-title,
 body.b2-big .b2-room-title,
 body.bj-big .bj-room-title,
-body.dc-big .dc-room-title{display:none}
+body.dc-big .dc-room-title,
+body.gmk-big .gmk-room-title,
+body.sdk-big .sdk-room-title,
+body.mj-big .mj-room-title,
+body.sv-big .sv-room-title,
+body.cy-big .cy-room-title{display:none}
 /* ④ ⛶ / ⚙️ 跟著頂列一起消失(兩條是同一件事的兩半,見檔頭) */
 body.un-big .un-room .tools-docked,
 body.b2-big .b2-room .tools-docked,
 body.bj-big .bj-room .tools-docked,
-body.dc-big .dc-room .tools-docked{display:none}
+body.dc-big .dc-room .tools-docked,
+body.gmk-big .gmk-room .tools-docked,
+body.sdk-big .sdk-room .tools-docked,
+body.mj-big .mj-room .tools-docked,
+body.sv-big .sv-room .tools-docked,
+body.cy-big .cy-room .tools-docked{display:none}
 body.un-big .un-room .row:has(> .tools-docked),
 body.b2-big .b2-room .row:has(> .tools-docked),
 body.bj-big .bj-room .row:has(> .tools-docked),
-body.dc-big .dc-room .row:has(> .tools-docked){padding-right:0}
+body.dc-big .dc-room .row:has(> .tools-docked),
+body.gmk-big .gmk-room .row:has(> .tools-docked),
+body.sdk-big .sdk-room .row:has(> .tools-docked),
+body.mj-big .mj-room .row:has(> .tools-docked),
+body.sv-big .sv-room .row:has(> .tools-docked),
+body.cy-big .cy-room .row:has(> .tools-docked){padding-right:0}
 /* ⑤ 晶片縮成迷你版:收掉「你」徽章(.mp-chip.me 已經有光環,同一格不必再寫一次),
    其餘一個都不收(名字 / 分數 / 輪到誰是這一列存在的理由)。 */
 body.un-big .un-room .mp-chip,
 body.b2-big .b2-room .mp-chip,
 body.bj-big .bj-room .mp-chip,
-body.dc-big .dc-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
+body.dc-big .dc-room .mp-chip,
+body.gmk-big .gmk-room .mp-chip,
+body.sdk-big .sdk-room .mp-chip,
+body.mj-big .mj-room .mp-chip,
+body.sv-big .sv-room .mp-chip,
+body.cy-big .cy-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
 body.un-big .un-room .you-badge,
 body.b2-big .b2-room .you-badge,
 body.bj-big .bj-room .you-badge,
-body.dc-big .dc-room .you-badge{display:none}
+body.dc-big .dc-room .you-badge,
+body.gmk-big .gmk-room .you-badge,
+body.sdk-big .sdk-room .you-badge,
+body.mj-big .mj-room .you-badge,
+body.sv-big .sv-room .you-badge,
+body.cy-big .cy-room .you-badge{display:none}
 body.un-big .un-room-foot .mp-players,
 body.b2-big .b2-room-foot .mp-players,
 body.bj-big .bj-room-foot .mp-players,
-body.dc-big .dc-room-foot .mp-players{
+body.dc-big .dc-room-foot .mp-players,
+body.gmk-big .gmk-room-foot .mp-players,
+body.sdk-big .sdk-room-foot .mp-players,
+body.mj-big .mj-room-foot .mp-players,
+body.sv-big .sv-room-foot .mp-players,
+body.cy-big .cy-room-foot .mp-players{
   -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
   mask-image:linear-gradient(to right,#000 90%,transparent)}
+
+/* ---------- 「大 / 小」那一顆鈕本身(九頁共用,v1.178.5)----------
+   尺寸不必寫:各頁既有的 `.XX-room .icon-btn`(34px)已經定好了,這裡只補
+   字面的字重與「開著」的狀態色(BigMode 會在鈕上掛 .on)。
+   ⚠⚠ **不可以加 `line-height:1`** —— 字面是「大 / 小」中日韓字,而第一順位的 Nunito
+     沒有中日韓字:`line-height:1` 把行框壓到 font-size,行框裡基線的位置由**第一個可用字型**
+     決定,而字是後備字型畫的 → 墨跡浮上去約 1.1px,看起來就是「跟旁邊的 🎤 / 😀 沒對齊」。
+     ⚠ DOM 量測完全看不出來(三顆鈕的 box 中線差 0.0px),只有放大截圖逐像素量得到。
+     台灣麻將 v1.176.0 踩過這一格,notes/11 第〇節第 4 條。 */
+.gmk-bigbtn,.sdk-bigbtn,.mj-bigbtn,.sv-bigbtn,.cy-bigbtn,
+.un-bigbtn,.b2-bigbtn,.bj-bigbtn,.dc-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
+.gmk-bigbtn.on,.sdk-bigbtn.on,.mj-bigbtn.on,.sv-bigbtn.on,.cy-bigbtn.on,
+.un-bigbtn.on,.b2-bigbtn.on,.bj-bigbtn.on,.dc-bigbtn.on{
+  border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
+
+/* ---------- 單機列是 .XX-solobar 的那四頁(五子棋 / 數獨 / 消消樂 / 成語接龍)----------
+   那條列**沒有玩家晶片**(單人玩,沒有「人物」可留)→ 不做一行版,只做兩件事:
+     ① 頂列收掉(上面那組群組已經做了,它掛在 body 上)
+     ② 難度 / 盤面標籤收掉 + 上下內距壓薄 —— 省下來的高度全部給盤面
+   ⚠⚠ **工具列不收**(悔棋 / 重新一局 / 提示 / 筆記):那是對局中的動作,收掉就等於
+     「按了大之後這局不能提示也不能悔棋」。同理**返回鍵也不收** ——
+     單機沒有別的出口(連線那一側按「小」還看得到房間框的返回鍵)。
+   ⚠ 計時 / 失誤 / ⏸ 一律留著:那是這四頁唯一的局勢資訊(頂列已經收掉了)。 */
+body.gmk-big .gmk-solobar,
+body.sdk-big .sdk-solobar,
+body.mj-big .mj-solobar,
+body.cy-big .cy-solobar{padding-top:6px;padding-bottom:6px}
+body.gmk-big .gmk-lvtag,
+body.sdk-big .sdk-lvtag,
+body.mj-big .mj-lvtag,
+body.cy-big .cy-lvtag{display:none}

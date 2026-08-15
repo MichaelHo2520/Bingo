@@ -429,8 +429,11 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { mode:mode, diff:diff, assist:assist }; },
+    // ⚠ big = 大 / 小(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs(){ return { mode:mode, diff:diff, assist:assist, big: BigMode.get() }; },
     usePrefs(o){
+      // 大 / 小(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+      BigMode.set(!!o.big);
       if(o.mode==="race"||o.mode==="grab") mode=o.mode;
       if(SGen.LEVELS[o.diff]) diff=o.diff;
       if(typeof o.assist==="boolean") assist=o.assist;

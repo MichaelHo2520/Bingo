@@ -220,8 +220,11 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { boardSize:boardSize, swapFirst:swapFirst }; },
+    // ⚠ big = 大 / 小(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs(){ return { boardSize:boardSize, swapFirst:swapFirst, big: BigMode.get() }; },
     usePrefs(o){
+      // 大 / 小(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+      BigMode.set(!!o.big);
       if(SIZES.indexOf(o.boardSize)>=0) boardSize=o.boardSize;
       if(typeof o.swapFirst==="boolean") swapFirst=o.swapFirst;
     },

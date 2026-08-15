@@ -34,6 +34,11 @@ function showScreen(which){
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("mjSoloBar");
   else undockTools();
+  /* 大盤面:每次換畫面都**無條件**重套一次(v1.178.5,見 ui-kit 的 BigMode)。
+     進對局把偏好記著的狀態套回來、離開時把 body 上的 class 脫掉 —— 那個 class 會收掉
+     整條頂列(⛶ / ⚙️ 都在裡面),而兩顆鈕住在房間框 / 單機列裡,留著就再也關不回來。
+     ⚠ 守衛在 BigMode 自己,這裡不要再判斷一次 which;⚠ 一定要排在 dockTools() 之後。 */
+  BigMode.sync();
   if(which==="home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始
   syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
   // 盤面大小綁容器高度:剛切過來時容器才剛拿到尺寸,補量一次
@@ -161,6 +166,12 @@ initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過�
 
 /* ---------- 啟動 ---------- */
 buildSwatches();
+/* 大盤面(v1.178.5):⚠ 一定要排在 loadPrefs() **之前** —— 偏好會回頭叫 BigMode.set()。 */
+BigMode.init({
+  cls:"mj-big", btn:"mj-bigbtn", name:"大盤面",
+  live:()=>{ const el=$("mjPlay"); return !!el && !el.classList.contains("hidden"); },
+  save:savePrefs
+});
 loadPrefs();          // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 麻將的連線偏好 + 同款高亮
 Solo.loadOwn();       // 單機盤面大小(獨立 key,不與連線的設定互相覆蓋)
 syncSettingsUI();

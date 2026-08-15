@@ -28,6 +28,11 @@ function showScreen(which){
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("sdkSoloBar");
   else undockTools();
+  /* 大盤面:每次換畫面都**無條件**重套一次(v1.178.5,見 ui-kit 的 BigMode)。
+     進對局把偏好記著的狀態套回來、離開時把 body 上的 class 脫掉 —— 那個 class 會收掉
+     整條頂列(⛶ / ⚙️ 都在裡面),而兩顆鈕住在房間框 / 單機列裡,留著就再也關不回來。
+     ⚠ 守衛在 BigMode 自己,這裡不要再判斷一次 which;⚠ 一定要排在 dockTools() 之後。 */
+  BigMode.sync();
   if(which==="home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始(比照 Bingo 的 enterHome)
   syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
 }
@@ -145,6 +150,12 @@ initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過�
 
 /* ---------- 啟動 ---------- */
 buildSwatches();
+/* 大盤面(v1.178.5):⚠ 一定要排在 loadPrefs() **之前** —— 偏好會回頭叫 BigMode.set()。 */
+BigMode.init({
+  cls:"sdk-big", btn:"sdk-bigbtn", name:"大盤面",
+  live:()=>{ const el=$("sdkPlay"); return !!el && !el.classList.contains("hidden"); },
+  save:savePrefs
+});
 loadPrefs();          // 主題 / 音量 / 暱稱(與 Bingo 共用)+ 數獨的連線偏好
 Solo.loadOwn();       // 單機難度(獨立 key,不與連線的難度互相覆蓋)
 syncSettingsUI();

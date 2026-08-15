@@ -540,8 +540,11 @@ const MP = MPCore.create((function(){
     /* ---------- 偏好(mahjong.prefs.v1;ui-kit 的 savePrefs/loadPrefs 會呼叫這兩支)----------
        ★ 同款高亮不是連線設定,但它的家在這裡 —— 這支 adapter 是 mahjong.prefs.v1 的擁有者,
          而 loadPrefs() 在單機模式也會跑,所以單機一樣吃得到。真相存在 MB 裡,這裡只轉手。 */
-    ownPrefs(){ return { mode:mode, diff:diff, same:MB.sameHint() }; },
+    // ⚠ big = 大 / 小(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs(){ return { mode:mode, diff:diff, same:MB.sameHint(), big: BigMode.get() }; },
     usePrefs(o){
+      // 大 / 小(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+      BigMode.set(!!o.big);
       if(o.mode==="race"||o.mode==="grab") mode=o.mode;
       if(MGen.LEVELS[o.diff]) diff=o.diff;
       MB.setSameHint(o.same===true);      // 沒存過就是 false(預設不提醒)

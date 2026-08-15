@@ -373,8 +373,11 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { turnSec: turnSec }; },
+    // ⚠ big = 大 / 小(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs(){ return { turnSec: turnSec, big: BigMode.get() }; },
     usePrefs(o){
+      // 大 / 小(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+      BigMode.set(!!o.big);
       if(typeof o.turnSec === "number" && (o.turnSec === 0 || (o.turnSec >= 10 && o.turnSec <= 90))) turnSec = o.turnSec;
     },
 

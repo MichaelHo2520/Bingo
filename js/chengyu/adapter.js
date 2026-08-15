@@ -347,8 +347,12 @@ const MP = MPCore.create((function () {
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs() { return { diff: diff }; },
-    usePrefs(o) { if (CYGen.LEVELS[o.diff]) diff = o.diff; },
+    // ⚠ big = 大字盤(v1.178.5):存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs() { return { diff: diff, big: BigMode.get() }; },
+    usePrefs(o) {
+      BigMode.set(!!o.big);                       // 這一刻畫面還在選單,BigMode 的守衛會壓著不生效
+      if (CYGen.LEVELS[o.diff]) diff = o.diff;
+    },
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {

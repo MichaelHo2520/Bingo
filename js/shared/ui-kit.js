@@ -1227,12 +1227,20 @@ addEventListener("resize", syncTools);
      body 會吃到鈕的 width/height,整頁塌成一顆鈕那麼大(你畫我猜 v1.155.0 踩過)。
    ========================================================================== */
 const BigMode = (function(){
-  let cfg = null, want = false;
+  let cfg = null, want = false, last = null;
   function live(){ return !cfg || !cfg.live || !!cfg.live(); }
   function apply(){
     if(!cfg) return;
     document.body.classList.toggle(cfg.cls, want && live());
     const on = document.body.classList.contains(cfg.cls);
+    /* ★★ 只有**狀態真的變了**才往下做重算(v1.178.5)。sync() 每次換畫面都會被叫到,
+       而換畫面十次裡有九次這個狀態沒動 —— 每次都補一發 resize + after() 是白工,
+       而且**量得到**:t-topbar-fit / t-zfold-fit 那兩支在「補 body class 之後等 60ms 再量」
+       (那個 60ms 是量出來的下限,寫在測試頁自己的註解裡),載入時多出來的排版工作
+       會把它們推過門檻 → 十一頁一起紅,而症狀長得跟真的 CSS 權重問題一模一樣。
+       ⚠ 這一行不是效能微調,是**別把別人的時間預算吃掉**。 */
+    const changed = (last !== on);
+    last = on;
     const btns = document.querySelectorAll("." + cfg.btn);
     for(let i=0;i<btns.length;i++){
       const b = btns[i];
@@ -1244,6 +1252,7 @@ const BigMode = (function(){
     /* 頂列一收掉,⛶ / ⚙️ 就得搬進房間框那一列(syncTools 自己判斷頂列在不在)——
        ⚠ 各頁的 CSS 可以再決定要不要連那兩顆一起藏(你畫我猜與台灣麻將都藏)。 */
     if(typeof syncTools === "function") syncTools();
+    if(!changed) return;
     /* 盤面重算:大部分頁面靠 CSS + ResizeObserver 自己會動,但有量測式排版的
        (五子棋的 fit / 大老二的 fitTrick / UNO 的手牌寬)只認 resize —— 補一發。
        ⚠ 一定要在 class 切完之後,不然量到的是舊版面。 */
