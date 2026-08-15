@@ -33,6 +33,13 @@ function showScreen(which){
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("unSoloBar");
   else undockTools();
+  /* 大牌桌:每次換畫面都**無條件**重套一次(v1.178.3,見 ui-kit 的 BigMode)。
+     一行做兩件事:進牌桌把偏好記著的狀態套回來、離開牌桌把 body 上的 class 脫掉 ——
+     那個 class 會收掉整條頂列(⛶ / ⚙️ 都在裡面),而兩顆鈕住在房間框 / 單機列裡,
+     留著就再也關不回來。⚠ 守衛在 BigMode 自己(它看對局畫面在不在),
+       所以這裡不要再判斷一次 which,條件只准有一份。
+     ⚠ 一定要排在 dockTools() **之後**:BigMode 會叫 syncTools()。 */
+  BigMode.sync();
   if(which==="home") showHomeLayer("pick");   // 回主選單一律從「選玩法」開始
   syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
 }
@@ -250,6 +257,13 @@ initFullscreenKeep();   // 全螢幕跨頁保持:從主選單帶著全螢幕過�
 
 /* ---------- 啟動 ---------- */
 buildSwatches();
+/* 大牌桌(v1.178.3):⚠ 一定要排在 loadPrefs() **之前** —— 偏好會回頭叫 BigMode.set(),
+   還沒 init 的話那個狀態就掉了(症狀:上一場開著大牌桌,下次進來卻是一般大小)。 */
+BigMode.init({
+  cls:"un-big", btn:"un-bigbtn", name:"大牌桌",
+  live:()=>{ const el=$("unPlay"); return !!el && !el.classList.contains("hidden"); },
+  save:savePrefs
+});
 loadPrefs();       // 主題 / 音量 / 暱稱(與 Bingo 共用)+ UNO 的連線偏好
 Solo.loadOwn();    // 電腦對決的難度 / 人數 / 戰績(獨立 key,不與連線那組互相覆蓋)
 syncSettingsUI();

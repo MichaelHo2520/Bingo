@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.178.2 -->
-<meta name="version" content="1.178.2">
+<!-- UNO · v1.178.3 -->
+<meta name="version" content="1.178.3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -165,6 +165,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label un-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
+        <!-- 大牌桌(v1.178.3,十一頁共用 BigMode):收掉頂列與房名 / 局數,房間框壓成一行。
+             ⚠ class 是 .un-bigbtn,而狀態掛在 body 上的是 .un-big —— 兩個名字**一定要不一樣**。
+             ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
+             ⚠ 單機列也有一顆(#unSoloBig),兩顆共用 .un-bigbtn 一起同步。 -->
+        <button class="icon-btn un-bigbtn" id="unBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
         </button>
@@ -189,6 +194,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </button>
       <span class="label un-room-title">電腦對決 <b id="unSoloLv" class="display">普通</b></span>
       <span class="mp-goal" id="unSoloRec" aria-label="戰績"></span>
+      <!-- 大牌桌:單機這一份(說明見 #unBig)。⚠ 這條列沒有 .mp-actions(單機沒有 🎤 / 😀) -->
+      <button class="icon-btn un-bigbtn" id="unSoloBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
     </div>
     <div class="un-room-foot">
       <div id="unSoloPlayers" class="mp-players"></div>

@@ -538,12 +538,16 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { turnSec: turnSec, unRules: UN.normRules(rules) }; },
+    // ⚠ big = 大牌桌(v1.178.3):存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs(){ return { turnSec: turnSec, unRules: UN.normRules(rules), big: BigMode.get() }; },
     usePrefs(o){
       if(typeof o.turnSec === "number" && (o.turnSec === 0 || (o.turnSec >= 10 && o.turnSec <= 120))) turnSec = o.turnSec;
       /* ★ 我上次當房主設的房規 → 下次建房自動帶回來(同 turnSec)。
          ⚠ 一律 normRules:那份 JSON 住在 localStorage,版本一換就可能有認不出的值。 */
       if(o.unRules) rules = UN.normRules(o.unRules);
+      // 大牌桌(v1.178.3):舊偏好沒有這欄 → 預設關。⚠ 這一刻畫面還在選單,
+      // BigMode 的守衛會把它壓著不生效,等 showScreen("play"/"solo") 才套上去。
+      BigMode.set(!!o.big);
     },
 
     /* ---------- 額外暴露給 main.js ---------- */

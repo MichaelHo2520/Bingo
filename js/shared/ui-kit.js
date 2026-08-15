@@ -1200,6 +1200,77 @@ function syncTools(){
 }
 addEventListener("resize", syncTools);
 
+/* ==========================================================================
+   大 / 小 —— 收掉周邊 UI,把畫面全部讓給盤面(v1.178.3,十一頁共用)
+   ──────────────────────────────────────────────────────────────────────────
+     使用者:「你畫我猜那個大小畫板蠻不錯的,其他遊戲也可以加入,但不能直接叫大小」
+     →**名字各頁在地化**(大牌桌 / 大畫板 / 大棋盤…),機制共用這一支。
+     v1.178.1 起的樣子是「房間框壓成**一行**:人物 + 大/小 (+ 🎤 / 😀)」。
+
+   ── 為什麼放在共用檔而不是各頁一份 ────────────────────────────────────────
+     九頁要接同一件事(切 class、兩顆鈕同步字面、存偏好、重算盤面),各寫一份就是
+     九份會慢慢走鐘的邏輯。這一支**不含任何遊戲專屬判斷**(沒有 if (game === …)),
+     差異全部由 init() 的設定物件帶進來 —— 照 CLAUDE.md 紅線 3。
+   ⚠ 台灣麻將**刻意不改用這一支**:它的 applyBig() 還要處理牌寬地板(resetFit)與
+     暖身期,那是那一頁獨有的;動它的風險遠大於少一份重複。兩邊行為要一致的話,
+     改這裡也要看 js/mahjong16/board.js 的 applyBig()。
+
+   ── 三條紅線 ──────────────────────────────────────────────────────────────
+   ★★★ ① **只在對局畫面生效**(live())。這個 class 會收掉整條頂列,而**鈕住在
+     房間框 / 單機列裡面**,那兩層在選單與大廳都是 hidden → class 一旦留在非對局
+     畫面上,就沒有任何東西可以把它關回來(你畫我猜 v1.161.0 用一個 bug 換來的教訓)。
+     ⚠ 而且必然會發生:狀態記在偏好裡,開頁那一刻就套用。
+   ★★ ② 換畫面時要叫 sync() —— class 掛在 body 上,離開對局沒人脫它就留著。
+   ★ ③ 兩顆鈕(連線 / 單機)共用同一份狀態,字面一起換,不要各自 textContent。
+   ⚠ 字面是「大 / 小」中文字,不是 ⤢ / ⤡(那兩個箭頭在手機上細得像雜訊)。
+   ⚠ class 名要**兩個不一樣**:body 上的 `XX-big` 與鈕的 `XX-bigbtn` —— 同名的話
+     body 會吃到鈕的 width/height,整頁塌成一顆鈕那麼大(你畫我猜 v1.155.0 踩過)。
+   ========================================================================== */
+const BigMode = (function(){
+  let cfg = null, want = false;
+  function live(){ return !cfg || !cfg.live || !!cfg.live(); }
+  function apply(){
+    if(!cfg) return;
+    document.body.classList.toggle(cfg.cls, want && live());
+    const on = document.body.classList.contains(cfg.cls);
+    const btns = document.querySelectorAll("." + cfg.btn);
+    for(let i=0;i<btns.length;i++){
+      const b = btns[i];
+      b.classList.toggle("on", on);
+      b.textContent = on ? "小" : "大";
+      b.title = on ? "回一般大小" : (cfg.name || "放大");
+      b.setAttribute("aria-label", b.title);
+    }
+    /* 頂列一收掉,⛶ / ⚙️ 就得搬進房間框那一列(syncTools 自己判斷頂列在不在)——
+       ⚠ 各頁的 CSS 可以再決定要不要連那兩顆一起藏(你畫我猜與台灣麻將都藏)。 */
+    if(typeof syncTools === "function") syncTools();
+    /* 盤面重算:大部分頁面靠 CSS + ResizeObserver 自己會動,但有量測式排版的
+       (五子棋的 fit / 大老二的 fitTrick / UNO 的手牌寬)只認 resize —— 補一發。
+       ⚠ 一定要在 class 切完之後,不然量到的是舊版面。 */
+    try{ dispatchEvent(new Event("resize")); }catch(e){}
+    if(cfg.after) cfg.after(on);
+  }
+  return {
+    /* c = { cls, btn, live, save, after, name }
+       cls  body 上的 class(例:"un-big")· btn 兩顆鈕共用的 class(例:"un-bigbtn")
+       live 回傳「現在是不是對局畫面」· save 按下之後存偏好 · after 額外重算 · name 鈕的 title */
+    init(c){
+      cfg = c;
+      const btns = document.querySelectorAll("." + c.btn);
+      for(let i=0;i<btns.length;i++){
+        btns[i].addEventListener("click", function(){
+          want = !want; apply();
+          if(cfg.save) cfg.save();
+        });
+      }
+      apply();
+    },
+    get(){ return want; },              // 存偏好時用(存的是「意願」,不是當下有沒有生效)
+    set(v){ want = !!v; apply(); },     // 讀偏好時用
+    sync(){ apply(); }                  // ★ 每次 showScreen() 都要叫(見紅線 ②)
+  };
+})();
+
 /* ---------- 共用啟動樣板(各遊戲 main.js 的重複部分) ---------- */
 // 版號:單一來源是 <meta name="version">
 function paintVersion(){

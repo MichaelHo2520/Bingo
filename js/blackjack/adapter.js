@@ -887,7 +887,8 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { bjRules: rules }; },
+    // ⚠ big = 大牌桌(v1.178.3):存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs(){ return { bjRules: rules, big: BigMode.get() }; },
     /* ⚠⚠ v1.93.0:還原偏好時**丟掉 bjPay** —— 面板已經沒有那一列了(兩個階都賠 2 倍),
        曾經選過 1.5 的人**沒有任何按鈕改得回來**,會永遠卡在 1.5(而且他當房主時
        全桌都吃那個值)。★ 這是「寫入收緊」;讀取那一側(readRoom / onRoomField)
@@ -895,6 +896,9 @@ const MP = MPCore.create((function(){
        ⚠ 這一段與 solo.loadOwn 是**同一件事的兩份**(單機與連線的偏好各存一包),
          改一邊記得改另一邊。 */
     usePrefs(o){
+      /* 大牌桌(v1.178.3):⚠ 一定要放在下面那個 early return **之前** ——
+         沒存過房規的人(只玩過單機)`o.bjRules` 是空的,擺在後面就永遠讀不到。 */
+      if(o) BigMode.set(!!o.big);
       if(!o || !o.bjRules) return;
       const r0 = Object.assign({}, o.bjRules);
       delete r0.bjPay;
