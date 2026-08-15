@@ -252,6 +252,15 @@ const M16B = (function(){
     ? matchMedia("(orientation:landscape) and (max-height:560px) and (pointer:coarse)") : null;
   function landscape(){ return !!(LAND && LAND.matches); }
   function poolRows(){ return landscape() ? POOL_ROWS_LAND : POOL_ROWS; }
+  /* ★★ 橫向「寬裕版」(v1.178.0):牌河的牌與對手明牌各大一號。
+     橫向的牌寬上限是**寬度**決定的 → 高度通常有剩(見 fillPool),那一截與其空著,
+     不如給「打出去的牌」與「別人攤了什麼」—— 使用者:「其他人吃牌區域顯示卻很小」。
+     ⚠⚠ 但它**只在不必付出任何代價時才成立**:render() 先照寬裕版畫一次,塞不下就
+       整組退回原本的小尺寸(0.46 / 0.40)。**絕對不可以**讓它去換手牌變小 ——
+       實測 660×268(iPhone SE 橫置)寬裕版讓盤面溢出 23px,手牌下緣當場被切掉,
+       而那正是整段橫向版面當初存在的理由。
+     ⚠ 由 render() 每次重算(它是 paint 的輸入,不是狀態);landscape() 為假時恆為假。 */
+  let landBig = false;
 
   /* ---------- 小工具 ---------- */
   /* inner:牌面之後再疊上去的東西(目前只有宣告視窗的候選小點)。
@@ -457,11 +466,16 @@ const M16B = (function(){
        17 掉回 16,反而更明顯;而張數要主動去數才看得出來(見 adapter.js renderActs)。 */
     const cnt  = st.hands[seat].length + ((st.turn===seat && st.drawn>=0)?1:0);
     const fl   = st.flowers[seat];
-    /* ★ 橫向的對手明牌再縮一號(v1.73.0):分欄之後對手三家是**直排在右側窄欄**裡,
-       0.52 倍的明牌會把那一欄撐到換行 → 右欄比牌河還高 → 整副手牌反而被夾得更小
-       (實測 844×390 卡在 TILE_MIN)。對手明牌本來就只是「他攤了什麼」的提示,
-       縮到 0.40 仍分得出筒條萬,換來手牌從 20px 回到 40px 以上,這筆交易很划算。 */
-    const mtw  = Math.round(tw*(landscape() ? 0.40 : 0.52));
+    /* ★★ 明牌 0.52 倍;**只有「橫向而且塞不下」**才收成 0.40(v1.178.0,見 landBig)。
+       ⚠ v1.73.0~v1.177.x 橫向一律 0.40,理由是分欄之後對手三家直排在右側窄欄,
+         0.52 會把那一欄撐到換行 → 右欄比牌河還高 → 整副手牌反而被夾得更小
+         (實測 844×390 卡在 TILE_MIN)。那是「盤面總高只有 ~161px」那個年代的補償。
+       ★ 這一版讓它在放得下的機型回到 0.52,靠的是三件事(缺一不可,要改回去一起看):
+         ① 右欄放寬到 40vw(styles.css)→ 花 + 兩組明牌照樣排得下,不換行
+         ② 剩下的高度由 fillPool() 交給牌河 → 對手那一欄長高幾 px 也吃得下
+         ③ **塞不下就整組退回小尺寸**(landBig),絕不拿手牌去換
+       使用者回報:「其他人吃牌區域顯示卻很小,這裡的擺放看起來非常的奇怪」。 */
+    const mtw  = Math.round(tw*(landscape() && !landBig ? 0.40 : 0.52));
     /* ★ 宣告聽牌是**公開**的(v1.67.0):誰宣告了全桌都要看得到 —— 不然玩家不知道
        該不該小心放槍,那一台就變成偷襲而不是宣告。⚠ 與「誰在考慮吃碰」剛好相反。 */
     const tk = (typeof MJT !== "undefined" && MJT.tingOf) ? MJT.tingOf(st, seat) : null;
@@ -857,8 +871,29 @@ const M16B = (function(){
        (吸收 = scrollHeight 恆等於 clientHeight = 下面兩點量測拿到同一個值,S 變垃圾;
         v1.73.1 試過,連「量測時暫時把它收成 0」都救不回來)。詳見 styles.css 那一段。 */
     let cur = tw;
-    const draw = t => { cur = t; host.innerHTML = paint(plan, t, hasDraw, canAct, co, myWin); return host.scrollHeight; };
+    /* ⚠⚠ 名字要在**量高度之前**填進去(v1.178.0)。paint() 只畫得出空的 `.m16-foename`
+       (名字由外面餵,見 paintNames),而橫向的對手那一列是 `flex-wrap:wrap` ——
+       名字一填就可能把明牌擠到第二行,那一家立刻高一倍。名字填在量測之後的話,
+       這裡量到的每一個數字都是**沒有名字**的版本:
+         · 下面那道牌寬夾取會低估總高(舊有的坑,只是以前沒人量到)
+         · 這一版的「寬裕版塞不塞得下」會整個判斷錯 —— 實測 660×268 判成塞得下,
+           填完名字溢出 23px,手牌下緣被切掉。
+       ⚠ 因此 render() 收尾**不再另外叫一次 paintNames()**(每次 draw 都做過了)。 */
+    const draw = t => {
+      cur = t;
+      host.innerHTML = paint(plan, t, hasDraw, canAct, co, myWin);
+      paintNames();
+      return host.scrollHeight;
+    };
+    /* ★★ 橫向寬裕版:先照「牌河與對手明牌各大一號」畫一次,**塞不下就整組退回**
+       (見上面 landBig)。順序很重要 —— 這一步排在下面那道牌寬夾取**之前**:
+       放大對手明牌與牌河永遠不可以拿手牌的尺寸去換,所以先把它降級,再讓夾取
+       用同一組(小)尺寸去算,不然那條直線會為了「養大對手那一欄」而把手牌砍小。
+       ⚠ 一局結束(攤牌)不參與:那時整桌的牌都翻開,本來就該捲(見下面那條),
+         降級救不了溢出,只會讓攤開的牌在結算那一刻縮一次。 */
+    landBig = landscape();
     let h1 = draw(tw);
+    if(landBig && !st.over && hh > 80 && h1 > hh + 2){ landBig = false; h1 = draw(tw); }
 
     /* ★★ 高度也要夾(v1.58.2)——「碰完牌就消失了」的真正機制在這裡。
        牌寬原本只受**寬度**約束,但每攤一組明牌就多出一整排(0.82×tw×1.32 ≈ 半張牌高),
@@ -917,15 +952,61 @@ const M16B = (function(){
        ⚠ 暖身期內只畫不記 —— 那幾幀量到的高度還不可信(見上面 WARM_MS 那段)。 */
     if(!st.over && hh > 80 && !(warmUntil && Date.now() < warmUntil)) fitTw = cur;
 
-    /* 牌河高度寫死成 POOL_ROWS 排 → 打超過就要捲,而**最新那張永遠得看得見** */
     const pool = host.querySelector(".m16-pool");
-    if(pool) pool.scrollTop = pool.scrollHeight;
 
     host.classList.toggle("m16-myturn", canAct);
-    paintNames();
     if(cb.onClaimUI) cb.onClaimUI(co, copt);             // 動作列跟著換(✔ / 胡 / 過)
+    fillPool(pool);                                      // ★ 橫向:剩下的高度交給牌河(見那一支)
+    /* 牌河高度寫死成 POOL_ROWS 排 → 打超過就要捲,而**最新那張永遠得看得見**。
+       ⚠ 一定要排在 fillPool() **之後**:那一支會把牌河加高,加高之後該捲多少就變了。 */
+    if(pool) pool.scrollTop = pool.scrollHeight;
     placeWall(pool);                                     // ★ 一定是最後一步,見那一支
     placeActs();                                         // ★ 動作列的落點,理由同上(見那一支)
+  }
+
+  /* ---------- 橫向:把「沒人吃得掉」的那一截高度交給牌河(v1.178.0)-------------
+     使用者:「中間整個區域,有一大片的地方是空白的,然後其他人吃牌區域顯示卻很小,
+     這裡的擺放看起來非常的奇怪」。
+
+     ── 那一片空白是什麼 ──────────────────────────────────────────────────────
+     橫向的牌寬**上限是寬度決定的**(803×344 實測:一排 17 張剛好排滿 → tw = 44,
+     已經是這個寬度的極限),所以螢幕比較高 / 進了全螢幕時,盤面剩下來的高度
+     **沒有任何一塊會去用它** —— 量出來閒著 53px,而 `.m16-stage` 是
+     `align-content:safe end` → 那 53px 全部堆在房間框與牌河之間,看起來就是
+     「盤面整個沉在下面、上面掛著一大塊黑」。
+
+     ── 為什麼是「量出來再寫死」,不是一條 1fr 的彈性列 ───────────────────────
+     ⚠⚠ styles.css 那一段記著:用 `minmax(0,1fr)` 去吸收剩餘空間會讓 `scrollHeight`
+       恆等於 `clientHeight` → render() 那道「量 tw 與 0.7×tw 兩點解一條直線」的
+       牌寬夾取當場失效(兩個點被鉗在同一個值),牌寬開始在 30/36/38 之間跳。
+     ★ 這一支安全的理由有兩個,少一個都不成立:
+       ① 它跑在**牌寬定案之後**,而且只在「還有剩」時把剩的交出去 —— 給的是 slack,
+          不是把內容擠小,tw 一個 px 都不會動;
+       ② 它是**冪等**的:每次 render 都由 paint() 重畫牌河(--m16ph 回到 POOL_ROWS
+          算出來的基準),這裡才在基準上加一次 → 不會一輪一輪往上長。
+     ★ 牌河長高**只是多看得到幾排**(牌本身的大小照舊由 tw 推),所以它不算
+       檔頭②那條「牌河長高就讓整副牌縮一次」—— 那條講的是**它擠壓盤面**的方向。
+
+     ⚠ 只有橫向做:直向的牌河是滿寬的第二塊、上下都貼著東西,沒有這一截空白。
+     ⚠ 留 2px 餘裕,不要剛好貼齊(差 1px 就讓盤面出捲軸不划算)。
+     ⚠ 排在 placeWall() **之前**:牌山晶片貼的是牌河的右上角,牌河一長高就得重貼。
+     ⚠ 一局結束(攤牌)時對手那一欄會暴增 → 這裡量到的 spare 是負的 → 自動不做,
+       那正是想要的(那時盤面本來就該捲,見上面「一局結束不再重新夾牌寬」)。 */
+  function fillPool(pool){
+    if(!landscape() || !host) return;
+    const pl = pool || host.querySelector(".m16-pool");
+    const fs = host.querySelector(".m16-foes");
+    if(!pl || !fs) return;
+    const top = host.getBoundingClientRect().top +
+                (parseFloat(getComputedStyle(host).paddingTop) || 0);
+    const pr = pl.getBoundingClientRect(), fr = fs.getBoundingClientRect();
+    const rowTop = Math.min(pr.top, fr.top);
+    const spare = Math.round(rowTop - top) - 2;
+    if(spare <= 0) return;
+    /* 這一列的高度是 max(牌河, 對手欄) —— 加高到「整列 + 剩下的」才是真的把空白吃完
+       (只加 spare 的話,對手欄比牌河高的那一段會白白留在上面)。 */
+    const rowH = Math.round(Math.max(pr.bottom, fr.bottom) - rowTop);
+    pl.style.setProperty("--m16ph", (rowH + spare) + "px");
   }
 
   /* ---------- 動作列的落點(v1.176.0)----------------------------------------
@@ -1052,8 +1133,13 @@ const M16B = (function(){
          ②**高度寫死** POOL_ROWS 排(不是 min~max 之間長)。牌河換一排就多 20~30px,
            而牌寬受總高度約束 → 那一刻整副牌會縮一次。寫死之後這個來源就沒了。
            滿了就捲(render() 收尾會捲到底,最新那張一定看得見)。 */
-    const pw   = Math.max(14, Math.round(tw*0.46));      // 舊牌:小
-    const pwL  = Math.max(20, Math.round(tw*0.78));      // 最新那張:大
+    /* ★ 橫向寬裕版的牌河**整體大一號**(v1.178.0,見上面 landBig):一個 800px 寬的
+       畫面上,44px 的手牌配 20px 的牌河沒有道理 —— 打出去的牌本來就是要看的。
+       ⚠ 只放大**倍率**,排法與「幾排」照舊 → 牌河高度仍然只由 tw 推得出來
+         (檔頭②那條「牌河高度不可以跟著內容跑」原封不動)。
+       ⚠ 直向與「塞不下的橫向」不動:那邊高度本來就不夠,放大等於直接扣手牌的尺寸。 */
+    const pw   = Math.max(14, Math.round(tw*(landBig ? 0.58 : 0.46)));   // 舊牌:小
+    const pwL  = Math.max(20, Math.round(tw*(landBig ? 0.90 : 0.78)));   // 最新那張:大
     /* ★ v1.73.2:被吃 / 碰 / 明槓 / 食胡拿走時(st.taken)**整條牌河都不標最新那張**。
        那一張已經從 discards 裡 pop 掉,照舊算 length-1 的話紅框大牌會退回到**上一張** ——
        而上一張早就過了宣告視窗,看起來卻像現在可以吃 / 碰(使用者:「很容易會以為

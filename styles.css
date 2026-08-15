@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 9501380adbe9f13c3d211e51c1a6af0a4129211c8e763b51fbd818f2c70bc7c2)
+    真相在 styles.src.css(sha256 a7bd24cc96756f3c73e84c1d1d550141657f3cc66aa441983172844803a88c78)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1609,9 +1609,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   body.m16-mp,body.m16-solo{padding:6px;gap:4px}
   body.m16-mp .mj-room,body.m16-solo .mj-room{
     position:relative;
-    padding:4px 72px 4px 10px;display:flex;align-items:center;gap:8px}
+    padding:4px 44px 4px 10px;display:flex;align-items:center;gap:8px}
   body.m16-mp .mj-room .tools-docked,body.m16-solo .mj-room .tools-docked{
     display:flex;position:absolute;right:8px;top:50%;transform:translateY(-50%);gap:6px}
+  body.m16-mp .mj-room .tools-docked #settingsBtn{display:none}
+  body.m16-solo .mj-room .tools-docked #settingsBtn{display:none}
+  body.m16-mp #mpBar{padding:4px 44px 4px 10px}
   body.m16-mp .mj-room .row:has(> .tools-docked),
   body.m16-solo .mj-room .row:has(> .tools-docked){position:static;padding-right:0}
   body.m16-mp .mj-room .mj-room-top,body.m16-solo .mj-room .mj-room-top{flex:none}
@@ -1638,12 +1641,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .m16-pool{grid-area:pool;min-width:0;--m16wl:54px}
   .m16-wall{padding:1px 6px;font-size:10px}
   .m16-wall b{font-size:12px}
-  .m16-foes{grid-area:foes;max-width:34vw}
+  .m16-foes{grid-area:foes;max-width:40vw}
   .m16-mine{display:contents}
   .m16-mymelds{grid-area:melds;justify-content:center;gap:6px;
     min-height:calc(var(--m16w,20px) * 1.32)}
   .m16-hand{grid-area:hand}
-  .m16-foes{gap:3px}
+  .m16-foes{gap:3px;justify-content:space-between}
   .m16-foe{flex-wrap:wrap;padding:2px 6px;gap:4px;font-size:10.5px}
   .m16-foe .m16-wind{width:17px;height:17px;font-size:10px;line-height:17px}
   .m16-foe .m16-dz{min-width:16px;height:15px;font-size:10px}

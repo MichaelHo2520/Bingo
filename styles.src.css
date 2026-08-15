@@ -3049,19 +3049,44 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        三個子元素本來就是上下堆疊的三個 block,並排之後 foot 吃掉剩下的寬度。 */
   body.m16-mp .mj-room,body.m16-solo .mj-room{
     position:relative;   /* ★ 給下面 .tools-docked 的 absolute 當定位錨點 */
-    padding:4px 72px 4px 10px;display:flex;align-items:center;gap:8px}
-  /* ★ 橫向的 ⛶ / ⚙️ 要貼**整條列**的右緣,所以這裡把它從流裡拉出來:
+    padding:4px 44px 4px 10px;display:flex;align-items:center;gap:8px}
+  /* ★ 橫向的 ⛶ 要貼**整條列**的右緣,所以這裡把它從流裡拉出來:
      橫向的 .mj-room 是「三層並排成一行」,而 .tools 是被 dockTools 掛在第一層
      (.mj-room-top)的尾端 → 留在流裡會落在「局數」與晶片列之間,也就是整條列的中間。
      改成相對房間框 absolute 貼右緣 + 垂直居中 → 位置永遠對齊那條列的中線
      (比 v1.73.1 的 position:fixed 穩:fixed 是相對視窗,房間框高度一變就錯位)。
-     右邊那 72px 的 padding 就是留給它的位置:28×2 + gap 6 + right 8 = 70。 */
+     右邊那 44px 的 padding 就是留給它的位置:28 + right 8 + 與晶片的間距 8。
+     ⚠⚠ 這個數字與下面那條「⚙️ 收掉」是**同一件事的兩半**:⚙️ 又放回來的話這裡要改回
+       72(28×2 + gap 6 + right 8 = 70),否則兩顆鈕會壓到晶片列上。 */
   /* ⚠⚠ `display:flex` 是**還原**用的,不是裝飾(v1.177.1):大牌桌那一段把
      `body.m16-big .mj-room .tools-docked` 藏起來了,而橫向這裡**沒有**「大 / 小」那顆鈕
      (v1.176.0 收掉了)—— 跟著藏就等於橫著玩再也開不了設定、也回不了全螢幕。
      同權重(0,3,1)而這一段在後面 → 這條贏。⚠ 不要「順手」把它刪掉。 */
   body.m16-mp .mj-room .tools-docked,body.m16-solo .mj-room .tools-docked{
     display:flex;position:absolute;right:8px;top:50%;transform:translateY(-50%);gap:6px}
+  /* ---- ②-a ⚙️ 橫向**收掉、⛶ 留著**(v1.178.0)-----------------------------------
+     使用者:「橫向的那一張,全螢幕的時候不需要放那一顆設定按鈕」。
+     ★ 與大牌桌同一套想法(那邊 v1.177.1 把 ⛶ / ⚙️ 兩顆一起收了):橫著玩 = 把畫面
+       全部讓給盤面,設定是「開打前調好」的東西,對局中幾乎不按 —— 轉回直向就在那裡。
+     ★ ⛶ **刻意留著**:橫向不等於已經在全螢幕(手機轉個方向而已),那一顆還得進得去。
+     ⚠⚠ 收掉之後房間框右邊的 padding 要跟著從 72 收成 44(上面那條)——
+       只藏鈕不收 padding 的症狀是「晶片列莫名其妙離右緣一大段」(v1.177.1 在大牌桌
+       那一段踩過同一個坑,那邊是 `.row:has(> .tools-docked){padding-right:0}`)。
+     ⚠ `#settingsBtn` 是**五頁共用的那一顆**(ui-kit 的 bindCommonUI 綁在它身上),
+       所以一定要連 `body.m16-mp / body.m16-solo` 一起限定 —— 只寫 id 會把另外四頁
+       的設定鈕也一起藏掉。
+     ⚠ 照 CLAUDE.md 紅線 6:`#id` 一律自己一條,不可以跟 class 併成一組群組選擇器
+       (併了的話同一組裡每個 class 都拿到 id 權重)。所以這裡刻意寫成兩條。 */
+  body.m16-mp .mj-room .tools-docked #settingsBtn{display:none}
+  body.m16-solo .mj-room .tools-docked #settingsBtn{display:none}
+  /* ⚠⚠ 連線那一份要**自己再寫一次內距**(v1.178.0 才發現)。全域那條
+     `@media (max-height:560px){ #mpBar{padding:9px 12px} }` 是 **id 選擇器**(1,0,0),
+     壓得過上面那條 `body.m16-mp .mj-room`(0,2,1)—— 也就是說 v1.73.0 以來
+     **連線的房間框從頭到尾沒有吃到橫向這一段的內距**(單機列吃得到,因為它沒有 id 規則)。
+     兩個症狀:① 那一列比單機厚 10px,盤面就矮 10px;② 右邊沒有讓位 →
+     絕對定位的 ⛶ 直接蓋在最後一張玩家晶片上。
+     ⚠ 照 CLAUDE.md 紅線 6:`#id` 一律自己一條,不可以跟上面那組併成群組選擇器。 */
+  body.m16-mp #mpBar{padding:4px 44px 4px 10px}
   /* ⚠⚠ 錨點要**還原**成外層的 .mj-room。通用那條把 `.row:has(> .tools-docked)` 設成
      position:relative(相對「那一列」貼右緣,直向要的就是這個);但橫向的 .mj-room 是
      三層並排成一行,第一層 .mj-room-top 只佔左邊一小段 —— 相對它貼右緣的話,鈕會落在
@@ -3130,7 +3155,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .m16-pool{grid-area:pool;min-width:0;--m16wl:54px}
   .m16-wall{padding:1px 6px;font-size:10px}
   .m16-wall b{font-size:12px}
-  .m16-foes{grid-area:foes;max-width:34vw}
+  /* ⚠ 34vw → 40vw(v1.178.0):同一版把對手明牌從 0.40 放大回 0.52(見 board.js 的
+     foeHTML),34vw 會讓「花 + 兩組明牌」換到第二行 —— 換行就是那一欄長高,
+     正是下面那段在防的事。牌河讓出 6vw 完全付得起(它現在有 4 排以上,見 fillPool)。 */
+  .m16-foes{grid-area:foes;max-width:40vw}
   /* ★★ display:contents —— 這一行是「不改 board.js 的 paint() 就重排」的關鍵。
      `.m16-mine` 是「我的明牌 + 我的手牌」的外框(直向靠它 margin-top:auto 整組貼底)。
      橫向要的是**明牌自己一列、手牌自己一列**:明牌若跟著手牌擠在同一格,
@@ -3154,10 +3182,16 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      換行「不溢出」了,代價是整欄長高,等於沒解。所以這裡把每一家壓成**一行**:
        · 名字 6em → 4em(暱稱長的截斷,晶片列上還有完整的)
        · 字級 / 內距 / 風圈各收一號
-       · 明牌另外由 board.js 縮成 0.40 倍(CSS 蓋不掉 inline 的 --m16w)
+       · 明牌另外由 board.js 縮一號(CSS 蓋不掉 inline 的 --m16w;v1.178.0 起是 0.52,
+         與直向同一個數字 —— 縮到 0.40 是「盤面高度不夠」那個年代的補償,
+         現在多出來的高度由 fillPool() 交給牌河了,對手這一欄不必再犧牲辨識度)
      ⚠ 明牌還是留 wrap:碰 / 槓 / 花攤到三四組時**寧可讓那一家長高**,
-       也不可以把整欄撐寬 —— 撐寬會反過來擠窄牌河 → 牌河換排 → 整副牌又縮一次。 */
-  .m16-foes{gap:3px}
+       也不可以把整欄撐寬 —— 撐寬會反過來擠窄牌河 → 牌河換排 → 整副牌又縮一次。
+     ★ justify-content:space-between(v1.178.0):這一欄是 grid item,預設 stretch →
+       牌河被 fillPool() 撐到滿高之後,它也跟著變高。三家擠在最上面、下面吊一段空白
+       就是使用者說的「擺放看起來非常奇怪」;攤開之後三家與牌河**上下切齊**。
+     ⚠ 只有「這一欄比內容高」時才看得出差別(空間不夠時 space-between 本來就等於沒寫)。 */
+  .m16-foes{gap:3px;justify-content:space-between}
   .m16-foe{flex-wrap:wrap;padding:2px 6px;gap:4px;font-size:10.5px}
   .m16-foe .m16-wind{width:17px;height:17px;font-size:10px;line-height:17px}
   .m16-foe .m16-dz{min-width:16px;height:15px;font-size:10px}
