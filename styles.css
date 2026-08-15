@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 07018fa220fdd3257e70dd38732dc8232c7bb33dd432a4a563dbbc475b28116b)
+    真相在 styles.src.css(sha256 39ac365743fdc6d9877d835d8d3a9b17719b26f734f130c177e07c0c489c8073)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1583,6 +1583,17 @@ body.m16-solo .topbar{width:min(92vw,960px)}
 @media (min-width:400px){
   .m16-vrow .m16-vseg{flex:0 1 auto}
 }
+.m16-bigbtn{font-family:'Nunito',sans-serif;font-weight:800;line-height:1}
+.m16-bigbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
+body.m16-big .topbar{display:none}
+body.m16-big{padding:6px;gap:4px}
+body.m16-big .mj-room{padding-top:4px;padding-bottom:4px}
+body.m16-big .mj-room-foot{margin-top:3px}
+body.m16-big .mp-chip{padding:2px 8px}
+body.m16-big .mj-play{gap:4px}
+body.m16-big .mj-room-title{display:none}
+body.m16-big .mj-room-top .mp-actions{margin-left:auto}
+body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
 @media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
   body.m16-mp .topbar,body.m16-solo .topbar{display:none}
   body.m16-mp,body.m16-solo{padding:6px;gap:4px}

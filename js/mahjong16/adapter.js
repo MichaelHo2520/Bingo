@@ -1166,7 +1166,7 @@ const MP = MPCore.create((function(){
 
     ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, baseTai:baseTai,
                          voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode(),
-                         autoTing:M16B.autoTingOn() }; },
+                         autoTing:M16B.autoTingOn(), big:M16B.bigOn() }; },
     usePrefs(o){
       if(goalOK(+o.handsGoal)) handsGoal = +o.handsGoal;
       /* ⚠ 這裡要 snapSec():v1.103.0 換掉整組秒數之後,舊玩家偏好裡的 8 / 12 / 20
@@ -1191,6 +1191,12 @@ const MP = MPCore.create((function(){
          聽牌提示)沒有人讀了 —— 兩顆開關都已經拿掉,讀不到就忽略,無害。 */
       // 聽牌後自動摸切(v1.119.0):舊偏好沒有這欄 → undefined → 預設**關**,不是新功能就自己幫人開了。
       M16B.setAutoTing(!!o.autoTing);
+      /* 大牌桌(v1.174.0):舊偏好沒有這欄 → 預設關。
+         ⚠⚠ 這一刻是**開頁那一瞬間**,畫面還在選單 —— 直接掛 class 會把頂列收掉,而鈕住在
+           房間框 / 單機列裡(那時都是 hidden)= 再也關不回來。setBig() 裡那道
+           「只在牌桌畫面生效」的守衛就是為了這一行(見 js/mahjong16/board.js 的 applyBig)。
+           這裡照樣呼叫是對的:它會把**狀態**記下來,等 showScreen("play"/"solo") 再套上去。 */
+      M16B.setBig(!!o.big);
     },
 
     api:{

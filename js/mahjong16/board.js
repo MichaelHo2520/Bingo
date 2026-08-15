@@ -130,6 +130,13 @@ const M16B = (function(){
      ⚠ **不要**跟著 clearSel() 一起清掉:那支在「換局 / 吃碰成立 / 我表態完」都會被叫到,
        它們與「我要不要自動摸切」這個人偏好無關(同 fitTw / ord 那兩條紅線的理由)。 */
   let autoTing = false;
+  /* 大牌桌(v1.174.0)。使用者:「你畫我猜那個大小畫板蠻不錯的,其他遊戲也可以加入」。
+     ★ 與 autoTing 同一個模式:**跨單機與連線共用的一份狀態**,存在 mahjong16.prefs.v1
+       (adapter.js 的 ownPrefs/usePrefs 負責讀寫)。單機與連線共用同一個盤面,
+       各留一份就會出現「單機開著、切回連線又縮回去」。
+     ⚠ 真正的樣式在 styles.src.css 的 `body.m16-big` 那一段;這裡只負責切 class、
+       同步兩顆鈕的字面、然後**把牌寬重新量一次**(見 setBig 的註解)。 */
+  let big = false;
   /* 「只縮不放」的地板(見檔頭④):fitTw = 目前用的牌寬,一局裡單調不遞增。
      ★ v1.70.1 拿掉了原本一起記的 fitKey(容器寬 × 高,一變就把地板放掉)——
        「盤面變矮」有兩種,而尺寸值分不出來:
@@ -166,6 +173,12 @@ const M16B = (function(){
 
   /* 把地板放掉,下一次 render() 從頭量一次;橫向另外開一段暖身期(見上)。
      ★ 只有**換局 / 離開牌桌 / 視窗真的變了**該叫 —— 盤面自己的 ResizeObserver 不可以。 */
+  /* ⚠ v1.174.0 一度在這裡加過一個 forceWarm 參數,讓大牌桌(applyBig)在**直向**也開暖身期
+     —— 理由是「切 class 那一瞬間版面整個換一套,ResizeObserver 會在那幾幀跟著量」,
+     與轉向同類。做出來之後跑突變測試:**加不加它,e2e 都是綠的**(見 gen-mj16-solo-e2e
+     的 J2 節),而它的代價是每按一次大牌桌、牌就多花 1.2 秒才安定。
+     照 CLAUDE.md 紅線 17 的紀律(守門的守門是突變測試)整段拿掉了 ——
+     ⚠ 想加回來之前,先寫得出「哪一條斷言會因為它而紅」。 */
   function resetFit(){
     fitTw = 0;
     if(!landscape()){ warmUntil = 0; return; }
@@ -174,6 +187,57 @@ const M16B = (function(){
       warmTimer = setTimeout(function(){ warmTimer = 0; render(); }, WARM_MS + 60);
   }
 
+  /* ==========================================================================
+     大牌桌(v1.174.0)—— 收掉頂列與房名 / 狀態字,把空間全部讓給盤面
+     ──────────────────────────────────────────────────────────────────────────
+       ★★★ **只在牌桌畫面生效**(你畫我猜 v1.161.0 用一個 bug 換來的教訓,原文在
+         js/draw/board.js 的 setZoom)。`body.m16-big` 會收掉整條頂列,而頂列裡是
+         **遊戲名稱 + ⛶ + ⚙️**;鈕住在房間框 / 單機列裡面,那兩層在選單與大廳都是
+         hidden → 一旦 class 在非對局畫面留著,**沒有任何東西可以把它關回來**。
+       ⚠⚠ 而且必然會發生:狀態記在偏好裡,loadPrefs() 在**開頁那一刻**就套用 ——
+         上一場忘了關,之後每次開這一頁都少了名稱與那兩顆鈕。
+       ⚠ 守衛擋在這裡而不是各個呼叫端:`body.m16-big` 只有這一行在掛,擋在源頭就不必
+         要求每一條路(偏好 / 兩顆鈕 / 換畫面)各記得判斷一次。
+       ⚠ 連帶一條:**離開牌桌的那一刻要再叫一次** —— class 掛在 body 上,沒人脫它就留著。
+         那一半在 js/mahjong16/main.js 的 showScreen()(每次換畫面都無條件叫)。
+
+       ⚠⚠ **一定要 resetFit()**,不是只 render():牌寬的地板是「只縮不放」的(見上面
+         let fitTw),而大牌桌是唯一一種「盤面**變高**」的情形 —— 不放掉地板的話,
+         按下去畫面重排了、牌卻一個 px 都不會變大(你畫我猜同一顆鈕踩過這一格)。
+       ⚠ 盤面自己的 ResizeObserver 只 render() 不放地板,**指望不上它**(那是刻意的)。
+
+       ★ syncTools():頂列一消失,ui-kit 就會把 ⛶ / ⚙️ 搬進房間框那一列
+         (它自己判斷 `.topbar` 的 computed display 是不是 none)。所以這一頁的大牌桌
+         **設定與全螢幕照樣按得到** —— 你畫我猜刻意讓那兩顆跟著頂列一起消失,
+         理由是它那條列塞不下第五、六顆鈕;麻將這邊通用的
+         `.row:has(> .tools-docked){padding-right:80px}` 已經把位置讓好了,不會壓到 😀。 */
+  function playLive(){
+    const el = document.getElementById("m16Play");
+    return !!el && !el.classList.contains("hidden");
+  }
+  function applyBig(){
+    document.body.classList.toggle("m16-big", big && playLive());
+    const on = document.body.classList.contains("m16-big");
+    /* 兩顆鈕(連線 #m16Big / 單機 #m16SoloBig)一起同步 —— 同一份狀態,不可以各說各話。
+       ⚠ 字面用「大 / 小」不用 ⤢ / ⤡:那兩個箭頭在手機上細得像雜訊
+         (使用者對你畫我猜第一版的原話:「好難看啊」)。 */
+    const btns = document.querySelectorAll(".m16-bigbtn");
+    for(let i=0;i<btns.length;i++){
+      const b = btns[i];
+      b.classList.toggle("on", on);
+      b.textContent = on ? "小" : "大";
+      b.title = on ? "回一般大小" : "大牌桌";
+      b.setAttribute("aria-label", b.title);
+    }
+    if(typeof syncTools === "function") syncTools();
+    /* ⚠⚠ **一定要 resetFit(),不可以只 render()** —— 牌寬的地板是「只縮不放」的
+       (見上面 let fitTw),而大牌桌是這一頁唯一一種「盤面**變高**」的事件:
+       不放掉地板的話,畫面確實重排了、盤面確實變高了,而**牌一個 px 都不會變大**。
+       ⚠ 那個症狀完全不像是地板的問題(看起來像 CSS 沒生效),你畫我猜的同款按鈕踩過。
+       ⚠ 盤面自己的 ResizeObserver 只 render() 不放地板(那是刻意的),指望不上它。
+       ★ 突變驗過:把 resetFit() 拿掉,e2e 的 J2 節當場紅(牌寬 22 → 22)。 */
+    resetFit(); render();
+  }
   /* 有滑鼠 = 一段式(hover 已經給了「是哪一張」的回饋);觸控 = 兩段式。
      ⚠ 一定要跟 styles.css 那條 @media 用同一個字串,否則會出現「牌浮起來卻要點兩次」。 */
   const FINE = (typeof matchMedia==="function")
@@ -1554,6 +1618,14 @@ const M16B = (function(){
        呼叫端(solo.js / adapter.js)自己決定看到 true 之後要不要排一次延遲打牌。 */
     autoTingOn(){ return autoTing; },
     setAutoTing(v){ autoTing = !!v; },
+    /* 大牌桌(見上面 applyBig 的檔頭)。三個呼叫端:
+         · 鈕      → toggleBig()(js/mahjong16/main.js 綁的)
+         · 偏好    → setBig()(adapter.js 的 usePrefs)
+         · 換畫面  → setBig(M16B.bigOn())(main.js 的 showScreen,每次無條件重套)
+       ⚠ 三條路都經過 applyBig() 那道「只在牌桌畫面生效」的守衛,不要繞過去自己 toggle class。 */
+    bigOn(){ return big; },
+    setBig(v){ big = !!v; applyBig(); },
+    toggleBig(){ big = !big; applyBig(); return big; },
     /* 宣告視窗:動作列問「現在是哪一組」,按下 ✔ 時回頭拿它送出 */
     claimOpts(){ return claimOpts(); },
     claimCur(){ const co=claimOpts(); return co.length ? co[Math.min(copt,co.length-1)] : null; },

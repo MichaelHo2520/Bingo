@@ -37,6 +37,15 @@ function showScreen(which){
   if(which==="play") dockTools("mpBar");
   else if(which==="solo") dockTools("m16SoloBar");
   else undockTools();
+  /* 大牌桌:每次換畫面都**無條件**把記住的狀態重套一次(v1.174.0)。
+     兩件事一行做完:進牌桌時把偏好裡記著的大牌桌套回來、離開牌桌時把 body 上的
+     class 脫掉 —— 那個 class 會收掉整條頂列(遊戲名稱 + ⛶ + ⚙️),而兩顆鈕都住在
+     房間框 / 單機列裡面,留著就再也關不回來。
+     ⚠ 真正的守衛在 M16B.setBig() 裡(它自己看牌桌畫面在不在),所以這裡無條件傳
+       現在的狀態值就對 —— 不要在這裡再判斷一次 which,條件只准有一份。
+     ⚠ 一定要排在上面 dockTools() **之後**:setBig 會叫 syncTools(),而它要先知道
+       這一相位「如果要搬,搬去哪」(toolsPanelId)。 */
+  M16B.setBig(M16B.bigOn());
   if(which==="home") showHomeLayer("pick");    // 回主選單一律從「選玩法」開始
   syncPageBack();   // 返回鍵:換一個畫面就重算「現在在第幾層」(見 ui-kit 的 bindPageBack)
 }
@@ -114,6 +123,12 @@ $("m16StartSolo").addEventListener("click",()=>{ markAudioArmed(); Sound.wake();
 
 /* ---------- 單機牌桌 ---------- */
 $("m16SoloExit").addEventListener("click",()=>askSoloQuit());
+/* 大牌桌:連線與單機各一顆鈕,同一份狀態(見 js/mahjong16/board.js 的 applyBig)。
+   ⚠ 按完要 savePrefs():這是個人偏好,下次進牌桌要記得上一場是開著還是關著。
+   ⚠ 兩顆鈕的字面 / .on 由 applyBig() 一起同步,這裡不要自己改 textContent。 */
+["m16Big","m16SoloBig"].forEach(id=>{
+  const b=$(id); if(b) b.addEventListener("click",()=>{ M16B.toggleBig(); savePrefs(); });
+});
 $("m16SoloAgain").addEventListener("click",()=>Solo.again());
 $("m16SoloHome").addEventListener("click",()=>Solo.quit());
 /* 離開確認沿用連線那張卡(#leaveVeil)—— 一整場打到一半退出,值得問一句。

@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.172.0 -->
-<meta name="version" content="1.172.0">
+<!-- 台灣 16 張麻將 · v1.174.0 -->
+<meta name="version" content="1.174.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -171,6 +171,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label mj-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="局數"></span>
       <div class="mp-actions">
+        <!-- 大牌桌(v1.174.0):收掉頂列與房名 / 狀態字,把空間全部讓給盤面。
+             ⚠ class 是 .m16-bigbtn,而狀態掛在 body 上的是 .m16-big —— 兩個名字**一定要不一樣**
+               (你畫我猜 v1.155.0 兩邊同名,body 直接吃到鈕的 width/height 整頁塌掉)。
+             ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
+             ⚠ 字面用「大 / 小」不用 ⤢ / ⤡ —— 那兩個箭頭在手機上細得像雜訊(見 js/draw/board.js setZoom)。
+             ⚠ 單機那條列也有一顆(#m16SoloBig),兩顆共用 .m16-bigbtn 一起同步。 -->
+        <button class="icon-btn m16-bigbtn" id="m16Big" type="button" title="大牌桌" aria-label="大牌桌">大</button>
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
         </button>
@@ -196,6 +203,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </button>
       <span class="label mj-room-title">單機 <b id="m16SoloLv" class="display">普通</b></span>
       <span class="mp-goal" id="m16SoloGoal" aria-label="局數"></span>
+      <!-- 大牌桌:單機這一份(說明見 #m16Big)。⚠ 這條列沒有 .mp-actions(單機沒有 🎤 / 😀),
+           所以直接掛在 .mj-room-top 尾端;.mj-room-title 是 flex:1,會自己把它推到最右。 -->
+      <button class="icon-btn m16-bigbtn" id="m16SoloBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
     </div>
     <div class="mj-room-foot">
       <div id="m16SoloPlayers" class="mp-players"></div>
