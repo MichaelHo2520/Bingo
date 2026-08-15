@@ -462,6 +462,8 @@
       armPresence({ name:meName, lines:me.lines||0, ready:!!ready });   // 保留目前線數/準備狀態
       if(isHost) armRoomIndex();   // 房主重連 → 重掛索引 onDisconnect 並重寫,房間重新出現在大廳
       if(msg)showToast(msg,1500);
+      // ★ 重連後重新套用一次 game 快照(v1.177.3):把 resyncing 窗口裡的真相推一次,不必等別人動作
+      roomRef.child("game").once("value",s=>onGame(s.val()));
     }
     /* 有人「暫時不見」時,排一個寬限期後的複查。
        ⚠ 已經排了一顆時**只准往前挪、不准往後延**:先看到「房主斷線」(GRACE_MS)、接著才收到
@@ -772,14 +774,30 @@
     }
 
     /* ----- game 節點:單一版本化狀態的寫入輔助 + 派發 ----- */
+    /* ⚠⚠⚠ **離線期間一律不寫 game**(v1.177.3;與 js/shared/mp-core.js 的 canWriteGame 逐字平行)。
+       Firebase 的寫入 / 交易在離線時會**先套用到本地快取**、照樣發 value 事件 → onGame 把
+       gameRev 一路墊高,比伺服器高;回線之後這些交易被伺服器退回,退回來那一份的 rev
+       **比本地小** → 撞上 `rev<gameRev` 被靜靜丟掉,這台就永遠停在一個伺服器上不存在的
+       幻影狀態(暗棋現場回報的症狀是「一個人斷線回來,兩個人都動不了、也都不報錯」)。
+       ⚠ connected===null(還沒問到 .info/connected)一律放行 —— 只擋**明確知道斷線**的時候。 */
+    let offToastAt=0;
+    function canWriteGame(){
+      if(!roomRef)return false;
+      if(connected===false){
+        const t=Date.now();
+        if(t-offToastAt>=3000){ offToastAt=t; showToast("連線中斷,正在重新連線…",2000); }
+        return false;
+      }
+      return true;
+    }
     // 房主推進相位:覆寫整個 game 節點(開新局 / 全清回大廳),單一原子寫入 + 新 rev。
-    function setGame(g){ if(!roomRef)return; g.rev=gameRev+1; roomRef.child("game").set(g); }
+    function setGame(g){ if(!canWriteGame())return; g.rev=gameRev+1; roomRef.child("game").set(g); }
     // 房主推進相位:只改部分欄位(其餘保留;update 為合併,不會清掉未列出的欄位),同時遞增 rev。
-    function patchGame(p){ if(!roomRef)return; p.rev=gameRev+1; roomRef.child("game").update(p); }
+    function patchGame(p){ if(!canWriteGame())return; p.rev=gameRev+1; roomRef.child("game").update(p); }
     // 需原子遞增 rev 的多寫者操作(叫號 tap、達標 tryWin、跳過斷線者):用 transaction 避免併發覆蓋。
     // mut(g) 直接改 g;回傳 false 代表中止交易(不寫,例如號碼已被叫過、已有贏家)。
     function txGame(mut){
-      if(!roomRef)return;
+      if(!canWriteGame())return;
       roomRef.child("game").transaction(g=>{
         if(!g)return;                   // 節點不存在/尚未快取 → 回傳 undefined 中止交易(勿回傳 null,那會寫入 null 刪掉節點)
         if(mut(g)===false)return;       // mut 要求中止(號碼已被叫過、已有贏家等)→ 中止,不寫
@@ -793,7 +811,11 @@
     function onGame(g){
       g=g||{};
       const rev=(typeof g.rev==="number")?g.rev:0;
-      if(rev<gameRev)return;            // 過期快照,丟棄
+      /* 過期快照丟棄 —— **但重連歸位的那一段窗口(resyncing)例外**:伺服器把離線期間的
+         樂觀交易退回來時,退回來的那一份 rev 一定**比本地小**,照丟就永遠停在幻影狀態
+         (見上面 canWriteGame)。第一道保險(離線不寫)擋不住「.info/connected 還沒察覺
+         斷線」的那幾十秒,只有這裡收得回來。 */
+      if(rev<gameRev && !resyncing)return;
       gameRev=rev;
       order=g.order||[]; turnIndex=g.turnIndex||0; calledList=g.calledList||[];
       rps=g.rps||null; revealData=g.reveal||null; roundId=g.roundId||null;

@@ -15,6 +15,9 @@
    5. 斷線復原兩層:.info/connected 重連歸位 + GRACE_MS 寬限期
    6. 遊戲操作一律綁點擊、由 adapter 自行判定並給回饋(不用 disabled 靜默吃掉點擊)
    7. 入座用 players 節點的 transaction 搶位(once+set 擋不住同時加入的競態)
+   8. 離線期間**一個字都不准寫 game**,而且重連的窗口裡 rev 變小也要收
+      —— 否則本地樂觀交易會把 gameRev 墊到伺服器之上,回線後兩台各看各的、都動不了
+      (見 canWriteGame / onGame 的註解)
    ========================================================================== */
 
 const MPCore = (function(){
@@ -587,14 +590,34 @@ const MPCore = (function(){
     }
 
     /* ---------- game 節點:寫入輔助 + 派發 ---------- */
-    function setGame(g){ if(!roomRef)return; g.rev=gameRev+1; roomRef.child("game").set(g); }
-    function patchGame(p){ if(!roomRef)return; p.rev=gameRev+1; roomRef.child("game").update(p); }
+    /* ⚠⚠⚠ **離線期間一律不寫 game**(v1.177.3,暗棋現場回報「一個人斷線回來之後兩個人都動不了」)。
+       Firebase 的寫入 / 交易在離線時會**先套用到本地快取**、照樣發 value 事件 ——
+       於是 onGame 把 gameRev 一路墊高:走棋倒數到期時自己幫自己代打一手(而且套用完
+       又重新排一顆計時器 → 每 turnSec 秒墊高一次,等於一台離線的裝置自己跟自己把
+       整局打完)、使用者多點兩下、連吃連送好幾手,每一筆都讓**本地 rev 比伺服器高**。
+       回線之後這些交易被伺服器退回,退回來那一份的 rev **比本地小** → 撞上
+       `rev<gameRev` 被靜靜丟掉,這台就永遠停在一個伺服器上不存在的幻影盤面:
+       自己看到「輪到對手」、對手看到「輪到你」,**兩個人都動不了而且都不報錯**。
+       ⚠ 擋在這三支寫入口一次擋掉十一個遊戲的 send / 認輸 / 逾時代打 / 結算 / 相位推進。
+       ⚠ connected===null(還沒問到 .info/connected)一律放行 —— 只擋**明確知道斷線**的時候。 */
+    let offToastAt=0;
+    function canWriteGame(){
+      if(!roomRef)return false;
+      if(connected===false){
+        const t=Date.now();
+        if(t-offToastAt>=3000){ offToastAt=t; showToast("連線中斷,正在重新連線…",2000); }
+        return false;
+      }
+      return true;
+    }
+    function setGame(g){ if(!canWriteGame())return; g.rev=gameRev+1; roomRef.child("game").set(g); }
+    function patchGame(p){ if(!canWriteGame())return; p.rev=gameRev+1; roomRef.child("game").update(p); }
     /* opts.local===false → 交易**不做本地樂觀套用**(Firebase 的第三個參數 applyLocally)。
        代價是自己那一手要等一趟往返才看得到,換來的是「本地永遠不會出現一個之後會被推翻的
        狀態」。決定勝負的那種寫入要用它 —— 樂觀的贏家會觸發計分/彩帶/音效,而那些副作用
        在另一個節點,交易回退救不回來(見 showOutcome 的反向修正)。 */
     function txGame(mut,opts){
-      if(!roomRef)return;
+      if(!canWriteGame())return;
       roomRef.child("game").transaction(g=>{
         if(!g)return;                 // ★ 回傳 undefined 中止;回傳 null 會刪掉節點(見檔頭 #4)
         if(mut(g)===false)return;
@@ -605,7 +628,12 @@ const MPCore = (function(){
     function onGame(g){
       g=g||{};
       const rev=(typeof g.rev==="number")?g.rev:0;
-      if(rev<gameRev)return;          // 過期快照
+      /* 過期快照直接丟 —— **但重連歸位的那一段窗口(resyncing)例外**:
+         伺服器把離線期間的樂觀交易退回來時,退回來的那一份 rev 一定**比本地小**,
+         照丟的話畫面就永遠停在幻影盤面(見上面 canWriteGame 的註解)。
+         ⚠ 這一條是那個死結的**第二道**保險:第一道(不寫)擋不住「.info/connected
+           還沒察覺斷線」的那幾十秒,那段時間照樣墊得高,只有這裡收得回來。 */
+      if(rev<gameRev && !resyncing)return;
       gameRev=rev;
       order=g.order||[]; roundId=g.roundId||null;
       rps=g.rps||null; revealData=g.reveal||null;
@@ -1179,6 +1207,13 @@ const MPCore = (function(){
         roomRef.child("players/"+meId).update({ name:meName, ready:!!ready });
         if(isHost) armRoomIndex();
         if(msg) showToast(msg,1500);
+        /* ★ 重連後重新套用一次 game 快照(v1.177.3)。兩件事靠它:
+             ① 離線期間 adapter 的計時器(走棋倒數 / 逾時代打)因為寫入被擋掉而**沒有
+                重新排**(armTurnT 只在 applyGame 裡叫)—— 不補這一下就再也不會響;
+             ② 順手把 resyncing 窗口裡的真相推一次,不必等對手動作。
+           ⚠ 同一份快照重跑對 adapter 是安全的:applyGame 一律從 deal+moves 重算,
+             台灣麻將的檔頭本來就明講「房主中途重連會重收一次 over 快照」。 */
+        roomRef.child("game").once("value",s=>onGame(s.val()));
       });
     }
     /* ⚠ 已經排了一顆時**只准往前挪、不准往後延**:先看到「房主斷線」(GRACE_MS)、
