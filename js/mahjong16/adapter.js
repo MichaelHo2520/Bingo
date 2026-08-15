@@ -356,7 +356,13 @@ const MP = MPCore.create((function(){
   function tingPicking(me){
     return !!(M16B.tingPicking && M16B.tingPicking() && MJT.canDeclareTing(st, me));
   }
-  function renderActs(){
+  /* ★ v1.177.1:真正畫的那一支是 paintActsRow(),這裡多包一層只為了最後那一行 ——
+     這一列畫完之後要叫 M16B.placeActs(),明牌帶才知道右邊要讓多寬(見 board.js 的
+     actsReserve)。⚠ 包一層而不是逐個 return 前補一行:那一支有七條 return,
+     早晚漏掉一條,而漏掉的症狀是「只有某一種動作出現時會疊到明牌」。
+     ⚠ solo.js 的 paintActs() 是**另一份**,同樣包了一層(grep m16Acts)。 */
+  function renderActs(){ paintActsRow(); M16B.placeActs(); }
+  function paintActsRow(){
     const box = $("m16Acts"); if(!box) return;
     ensureCd();                       // 先建好,倒數環才永遠是這一列的第一個
     clearActs(box);

@@ -956,9 +956,52 @@ const M16B = (function(){
     if(!acts || !play) return;
     const band = host.querySelector(".m16-mymelds");
     if(!band) return;
-    const br = band.getBoundingClientRect(), pr = play.getBoundingClientRect();
+    const pr = play.getBoundingClientRect();
+    let br = band.getBoundingClientRect();
+    /* ★ 先把「右邊那一格要留多寬」寫進去,**再**量明牌帶(見 actsReserve)——
+       留位會讓明牌多換一行,順序反過來就是「量到留位前的高度」,那一列會短一截。 */
+    host.style.setProperty("--m16aw", actsReserve(acts, br) + "px");
+    br = band.getBoundingClientRect();
     acts.style.setProperty("--m16ty", Math.round(br.top - pr.top) + "px");
     acts.style.setProperty("--m16th", Math.round(br.height) + "px");
+  }
+
+  /* 動作列那一格實際佔多寬 → 明牌帶右邊要讓出多少(v1.177.1)。
+     使用者:「他有可能會跟吃牌區域有重疊,建議把吃牌的區域往左靠,然後倒數跟指示
+     換誰的顯示往右靠」。留位本身在 CSS(`.m16-mymelds{padding-right:var(--m16aw)}`),
+     這裡只負責那個數字。
+
+     ★★ 為什麼量「子元素的左緣」而不是 `acts.getBoundingClientRect().width`:
+       這一列是 `left:0;right:0` 橫跨整個寬度的(左半邊刻意留空,見 .m16-acts),
+       量它自己永遠是 100% —— 明牌帶會被擠到零寬。
+       這一列是 `justify-content:flex-end`,所以「最左邊那個子元素的左緣」到明牌帶右緣
+       就是要讓出來的寬度。
+     ⚠⚠ 前提是**明牌帶滿寬**(styles.css 的 `.m16-mymelds{width:100%}`)—— 它原本是
+       「縮到內容寬 + 置中」的,那樣的話「明牌帶右緣」會跟著明牌有幾組一起跑,
+       而留位又讓置中的盒子往兩邊各長一半 → 右緣更靠右 → 留位更寬,來回抖。
+       那一行與這一支是同一件事的兩半,**不要只留一邊**。
+     ⚠⚠ **絕對定位的子元素要跳過**,不然量出來是垃圾:
+       ① 宣告面板 `.m16-claim` 跳在盤面正中間(它的 DOM 在這一列裡,見 claimPanel)
+       ② 宣告視窗中倒數環會飛到面板上緣(`.m16-acts.m16-hush .m16-cd`)
+       兩個都不在這一列的流裡,left 卻都在畫面中央 → 會一路留到剩半條縫。
+     ⚠ 上限 RESERVE_MAX:自己的回合這一格可能同時有「自摸! / 暗槓 東 / 加槓 南 /
+       宣告聽牌」好幾顆鈕,不夾的話明牌整組被擠成一行一組。夾到之後寧可讓那幾顆鈕
+       疊回明牌上(它們是實心底、只出現幾秒),也不要讓已經攤在桌上的牌沒地方站。
+     ⚠ 回 0(量不到 / 這一列收起來)= 完全退回 v1.176.0 的行為:會疊,但不會塌。 */
+  const RESERVE_MAX = 0.46;      // 最多讓出明牌帶的幾成寬
+  const RESERVE_GAP = 8;         // 明牌與那一格之間的間距
+  function actsReserve(acts, br){
+    if(!br.width || acts.classList.contains("hidden")) return 0;
+    let left = Infinity;
+    [].slice.call(acts.children).forEach(function(c){
+      const cs = getComputedStyle(c);
+      if(cs.display === "none" || cs.position === "absolute") return;
+      const r = c.getBoundingClientRect();
+      if(r.width > 0) left = Math.min(left, r.left);
+    });
+    if(left === Infinity) return 0;
+    const w = Math.round(br.right - left) + RESERVE_GAP;
+    return Math.max(0, Math.min(Math.round(br.width * RESERVE_MAX), w));
   }
 
   /* ---------- 牌山晶片的落點(v1.104.0)-------------------------------------
@@ -1635,6 +1678,14 @@ const M16B = (function(){
        ⚠ 清動作列時要用 isClaim() 跳過它(同倒數環):它是持久節點,
          每次重建就是每次重播進場動畫。兩邊的 clearActs / paintActs 各一行。 */
     claimPanel, hideClaim,
+    /* 動作列那一格的落點 + 明牌帶要讓多寬(v1.177.1,見 placeActs / actsReserve)。
+       ★★ **兩份 renderActs 畫完動作列之後都要叫一次**(adapter.js / solo.js 各一行,
+         grep m16Acts 找得到)。理由:呼叫順序是 `M16B.render()` → `renderActs()`,
+         而留位是量「這一列現在有什麼」量出來的 —— 只在 render() 裡量的話,量到的
+         永遠是**上一手**的內容,於是「自摸! / 暗槓 東 / 宣告聽牌」那幾顆鈕跳出來的
+         那一輪不會留位,正好是最需要留位的那一輪。
+       ⚠ 它只讀不寫遊戲狀態,重複叫沒有副作用(量 → 寫兩個 CSS 變數)。 */
+    placeActs,
     isClaim(el){ return !!(el && el.classList && el.classList.contains("m16-claim")); },
     /* 只清「選取 / 宣告選項」那一組狀態。
        ⚠⚠ **不動牌寬的地板 fitTw**(v1.70.1,見檔頭⑤下面那條):這一支在

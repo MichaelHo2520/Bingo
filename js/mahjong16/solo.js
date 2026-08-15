@@ -507,7 +507,12 @@ const Solo = (function(){
   function tingPicking(){
     return !!(st && M16B.tingPicking && M16B.tingPicking() && MJT.canDeclareTing(st, ME));
   }
-  function paintActs(){
+  /* ★ v1.177.1:真正畫的那一支是 paintActsRow(),這裡多包一層只為了最後那一行 ——
+     這一列畫完之後要叫 M16B.placeActs(),明牌帶才知道右邊要讓多寬(見 board.js 的
+     actsReserve)。⚠ 包一層而不是逐個 return 前補一行(那一支有五條 return)。
+     ⚠ adapter.js 的 renderActs() 是**另一份**,同樣包了一層(grep m16Acts)。 */
+  function paintActs(){ paintActsRow(); M16B.placeActs(); }
+  function paintActsRow(){
     const box = $("m16Acts");
     if(!box) return;
     /* ⚠ 清空但**留下宣告面板與倒數環**(v1.111.0):兩者都是持久節點 ——

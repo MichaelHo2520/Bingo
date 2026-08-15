@@ -2298,8 +2298,33 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
         碰一組就多出一整排 → 整副牌得重算一次大小。橫向早就因為同一個理由一律預留
         (見橫向那段的 min-height),v1.176.0 把它推到直向。
    ⚠ 34px = 倒數環的高度(那是這一帶要裝得下的最高的東西);有明牌時它自然被撐高,
-     這裡只是地板。⚠ 橫向另有一條更大的地板(一排明牌的高度),定義在後面 → 那邊贏。 */
-.m16-mymelds{min-height:34px}
+     這裡只是地板。⚠ 橫向另有一條更大的地板(一排明牌的高度),定義在後面 → 那邊贏。
+
+   ★★ padding-right = **右邊那一格讓給動作列**(v1.177.1)。使用者:「上個版本我們把最下面的
+     狀態跟倒數移到手牌的右上方,他有可能會跟吃牌區域有重疊,建議把吃牌的區域往左靠,
+     然後倒數跟指示換誰的顯示往右靠」。
+     兩者現在**佔同一條帶**(動作列是 absolute 疊上來的,見 .m16-acts),所以攤到第三、
+     第四組明牌時,牌就會鑽到倒數環與「輪到 ○○…」底下 —— 而那一格有半透明底,
+     疊上去是真的看不清楚。
+   ⚠ 寬度**只能量不能寫死**:那一格的內容從一行 12px 的字(「輪到 ○○…」)到
+     「自摸! / 暗槓 東 / 宣告聽牌」好幾顆鈕都有,而名字長度也是使用者決定的。
+     值由 js/mahjong16/board.js 的 placeActs() 每次量進 `--m16aw`(它同時夾一個上限,
+     不讓明牌被擠到只剩一條縫);量不到就退回 0 = 舊行為(會疊,但不會塌)。
+   ⚠ 它掛在 `#m16Stage` 上而不是這一列身上 —— 這一列每次 render 被 innerHTML 重建
+     最多七次,寫在它自己身上等於每畫一次就掉一次。
+
+   ★★ `width:100%` = 這一帶**滿寬、靠左**(v1.177.1,與上面那條留位是同一件事的兩半)。
+     ⚠ 這一行不是排版偏好,**沒有它留位會來回抖**:父層 `.m16-mine` 是
+       `align-items:center`,所以這一列原本是「縮到內容寬 + 置中」的 ——
+       置中的盒子加 padding-right 只會讓盒子**往兩邊各長一半**,右緣反而更靠右
+       → 下一次量到的留位又更寬 → 再長…(量 → 寫 → 影響被量的東西,正是 placeActs
+       檔頭說「不會發生」的那種迴圈,而 align-items:center 會把它變成會發生)。
+     ★ 滿寬之後右緣就固定是盤面的右內緣,量出來的留位與明牌有幾組無關 → 單向、收斂。
+     ★ 順帶就是使用者要的那一半:「建議把吃牌的區域往左靠」—— 靠左是 flex 的預設,
+       這一列滿寬之後自然成立(原本置中,兩三組明牌時看起來就像浮在手牌中間)。
+     ⚠ 橫向不受影響:那邊 `.m16-mine{display:contents}`,這一列是 grid item 本來就滿寬
+       (而且刻意維持 justify-content:center,見橫向那一段)。 */
+.m16-mymelds{width:100%;min-height:34px;padding-right:var(--m16aw,0px)}
 .m16-meld{display:inline-flex;align-items:flex-end;gap:1px;
   padding:3px;border-radius:8px;background:rgba(255,255,255,.10)}
 /* 暗槓底色不同:它在算台時是暗刻,和攤出來的碰不是同一回事 */
@@ -2938,6 +2963,24 @@ body.m16-big .mj-room-title{display:none}
 body.m16-big .mj-room-top .mp-actions{margin-left:auto}
 body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
 
+/* ④ ⛶ / ⚙️ 跟著頂列**一起消失**(v1.177.1)—— 🎤 / 😀 留著。
+   使用者:「按成大牌桌模式,房間框裡不用顯示全螢幕跟設定按鈕,麥克風跟 emoji 需要留著,
+   然後那個小的按鈕需要注意間隔跟對齊」。
+   ★ 這是刻意**改回**你畫我猜那一套(上面 ① 原本寫「麻將這邊按得到」):大牌桌是
+     「把畫面全部讓給盤面」的模式,那兩顆在對局中本來就幾乎不按;要按就先按「小」出來。
+   ★★ 兩條要**一起寫,少一條就是白留一格**:`.tools` 是 absolute 貼列的右緣,而讓位靠的是
+     `.row:has(> .tools-docked){padding-right:84px}`(見檔案上方那條的長註解)。
+     只 display:none 的話那 84px 還在 → 🎤 / 😀 會停在離右緣 84px 的地方,
+     看起來就是「那三顆鈕莫名其妙靠中間」。歸零之後 `.mp-actions{margin-left:auto}`
+     會把「大 / 小 · 🎤 · 😀」整組推到右緣,列內每一格都是 8px。
+   ⚠⚠ **橫向必須還原** —— 下面那一段(橫向)把頂列也收了,而橫向**沒有**「小」那顆鈕
+     (v1.176.0 收掉了),這裡若跟著藏,橫著玩就再也開不了設定、也回不了全螢幕。
+     還原寫在那一段的 `.tools-docked` 那條(`display:flex`),它同權重(0,3,1)且在後面 → 它贏。
+     ⚠ 所以那兩條的**選擇器不可以只留一邊**:這裡藏的是 `body.m16-big …`,
+       還原的是 `body.m16-mp / body.m16-solo …`,兩組互不包含,靠的就是「後面的贏」。 */
+body.m16-big .mj-room .tools-docked{display:none}
+body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
+
 /* ==========================================================================
    台灣 16 張麻將 — 手機橫向版面(v1.73.0)
    ── 為什麼要有這一段 ──────────────────────────────────────────────────────
@@ -2997,8 +3040,12 @@ body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
      改成相對房間框 absolute 貼右緣 + 垂直居中 → 位置永遠對齊那條列的中線
      (比 v1.73.1 的 position:fixed 穩:fixed 是相對視窗,房間框高度一變就錯位)。
      右邊那 72px 的 padding 就是留給它的位置:28×2 + gap 6 + right 8 = 70。 */
+  /* ⚠⚠ `display:flex` 是**還原**用的,不是裝飾(v1.177.1):大牌桌那一段把
+     `body.m16-big .mj-room .tools-docked` 藏起來了,而橫向這裡**沒有**「大 / 小」那顆鈕
+     (v1.176.0 收掉了)—— 跟著藏就等於橫著玩再也開不了設定、也回不了全螢幕。
+     同權重(0,3,1)而這一段在後面 → 這條贏。⚠ 不要「順手」把它刪掉。 */
   body.m16-mp .mj-room .tools-docked,body.m16-solo .mj-room .tools-docked{
-    position:absolute;right:8px;top:50%;transform:translateY(-50%);gap:6px}
+    display:flex;position:absolute;right:8px;top:50%;transform:translateY(-50%);gap:6px}
   /* ⚠⚠ 錨點要**還原**成外層的 .mj-room。通用那條把 `.row:has(> .tools-docked)` 設成
      position:relative(相對「那一列」貼右緣,直向要的就是這個);但橫向的 .mj-room 是
      三層並排成一行,第一層 .mj-room-top 只佔左邊一小段 —— 相對它貼右緣的話,鈕會落在
