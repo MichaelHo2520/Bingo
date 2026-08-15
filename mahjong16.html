@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.178.6 -->
-<meta name="version" content="1.178.6">
+<!-- 台灣 16 張麻將 · v1.178.7 -->
+<meta name="version" content="1.178.7">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -71,7 +71,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="home-tagline">真的打麻將:摸打吃碰槓,湊 5 組面子 + 1 對將</div>
       </div>
       <button class="btn primary block-btn home-btn" id="m16GoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="m16GoSolo">🤖 單機對電腦</button>
+      <button class="btn ghost block-btn home-btn" id="m16GoSolo">🎮 單機遊玩</button>
       <div class="home-hint">
         <b>2~4 人</b>都能開:4 人用整副 144 張,<b>2~3 人去掉萬子</b>(108 張)。<br>
         計分照麻將的<b>相互算台</b>——自摸三家付、放槍一家付。<br>
@@ -86,7 +86,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="icon-btn" id="m16SoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <span class="subtitle">單機對電腦</span>
+        <span class="subtitle">單機遊玩</span>
       </div>
       <div class="field">
         <span class="field-label">電腦強度</span>
@@ -126,7 +126,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-base="5">底 5 台</button>
         </div>
       </div>
-      <button class="btn primary block-btn home-btn" id="m16StartSolo">開始 ▸</button>
+      <button class="btn primary block-btn home-btn" id="m16StartSolo">開始</button>
       <div class="home-hint" id="m16SoloHint"></div>
     </div>
   </section>
@@ -201,7 +201,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <button class="icon-btn mp-leave-btn" id="m16SoloExit" title="離開牌桌" aria-label="離開牌桌">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label mj-room-title">單機 <b id="m16SoloLv" class="display">普通</b></span>
+      <span class="label mj-room-title">單機遊玩 <b id="m16SoloLv" class="display">普通</b></span>
       <span class="mp-goal" id="m16SoloGoal" aria-label="局數"></span>
       <!-- 大牌桌:單機這一份(說明見 #m16Big)。⚠ 這條列沒有 .mp-actions(單機沒有 🎤 / 😀),
            所以直接掛在 .mj-room-top 尾端;.mj-room-title 是 flex:1,會自己把它推到最右。 -->
@@ -271,7 +271,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="wg-group hidden" id="wgGroup">
             <span class="wg-lbl">先到</span>
             <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+              <button class="mini" id="wgMinus" aria-label="減少目標勝場">－</button>
               <span class="target-val display" id="winGoalVal">3</span>
               <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
             </div>
@@ -341,7 +341,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
            id 刻意與數獨 / 消消樂同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
       <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="m16SoloAgain">下一局 ▸</button>
+        <button class="btn primary" id="m16SoloAgain">下一局</button>
         <button class="btn ghost" id="m16SoloHome">回選單</button>
       </div>
       <button class="peek-link" id="winPeek">先看看牌桌 👀</button>

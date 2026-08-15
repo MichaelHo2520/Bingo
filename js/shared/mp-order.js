@@ -114,7 +114,7 @@ const MPOrder = (function(){
           '<div class="mp-veil-title">👑 房主排順序</div>' +
           '<div class="rps-hint" id="mpoOrdHint"></div>' +
           '<div class="order-list" id="mpoList"></div>' +
-          '<div class="actions"><button class="btn primary hidden" id="mpoConfirm">確定順序,開始 ▸</button></div>' +
+          '<div class="actions"><button class="btn primary hidden" id="mpoConfirm">確定順序,開始</button></div>' +
         '</div>' +
         // 逃生出口:有人一直不出拳 / 房主在排順序時卡住,總是要能走
         '<button class="peek-link" id="mpoLeave">離開房間</button>' +

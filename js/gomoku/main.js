@@ -67,7 +67,7 @@ function syncOppFields(){
   const aiField=$("gmkAiField"), firstField=$("gmkFirstField"), sub=$("gmkLevelSubtitle");
   if(aiField) aiField.classList.toggle("hidden", friend);
   if(firstField) firstField.classList.toggle("hidden", friend);
-  if(sub) sub.textContent = friend ? "本機對戰 · 朋友" : "本機對戰 · 選難度";
+  if(sub) sub.textContent = friend ? "單機遊玩 · 朋友" : "單機遊玩 · 選難度";
 }
 // 膠囊列高亮(三個 seg 共用):資料屬性的值對得上就亮
 function segOn(segId, key, val){

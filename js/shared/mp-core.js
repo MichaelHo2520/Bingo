@@ -240,7 +240,7 @@ const MPCore = (function(){
         const nm=r.name||("房間 "+r.code);
         /* ⚠ JOIN_MID 的遊戲進不去只有一個理由(滿了)—— 標「對戰中」會讓人以為
            等一下就能進,而它其實永遠不會空出來(直到有人離開)。 */
-        const cta=ok ? '<span class="join-cta">加入 ▸</span>'
+        const cta=ok ? '<span class="join-cta">加入</span>'
                      : '<span class="busy-tag">'+((r.count>=MAX_PLAYERS&&(JOIN_MID||r.status==="lobby"))?"🔒 已滿":"🔒 對戰中")+'</span>';
         it.innerHTML='<span class="room-main"><span class="rn">🏠 '+esc(nm)+'</span>'+
           '<span class="meta">'+hostTag+'👥 '+r.count+' / '+MAX_PLAYERS+' 人</span></span>'+cta;

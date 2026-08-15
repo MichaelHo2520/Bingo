@@ -660,7 +660,7 @@ const BJB = (function(){
                    不然「我押了多少」在最需要看的那一刻反而消失。 */
                 '<span class="bj-bamt' + (done ? " ok" : "") + '"><i>押</i><b>' + amt + '</b></span>' +
                 (done ? "" : '<button class="btn primary bj-bok bj-act" data-act="bet" data-bet="' +
-                             betPend + '">押注 ▸</button>') +
+                             betPend + '">押注</button>') +
               '</div>';
       h += '<div class="bj-btns bj-bsteps' + (done ? " locked" : "") + '">';
       const steps = R.betSteps(max);
@@ -711,7 +711,7 @@ const BJB = (function(){
        ⚠ 不合法時只是**變暗**、照樣按得動 → 跳 BJ.denyTxt 那句(不用 disabled)。 */
     if(info.isDealer)
       h += '<button class="btn ghost bj-act' + (lg.grab ? "" : " dim") +
-           '" data-act="gopen">抓人 ▸</button>';
+           '" data-act="gopen">抓人</button>';
     h += '</div>';
     return h;
   }

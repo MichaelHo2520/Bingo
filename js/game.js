@@ -428,7 +428,7 @@
   // 單機交給這裡、連線轉給 MP.refreshHint()(它握有 players/ready/isHost 等狀態)
   function refreshActionHint(){
     if(state.online){ if(MP&&MP.refreshHint)MP.refreshHint(); return; }
-    if(state.mode==="setup" && state.fill==="manual" && state.card.some(n=>!n)) setActionHint("把空格都填上號碼,就能開始 ▸");
+    if(state.mode==="setup" && state.fill==="manual" && state.card.some(n=>!n)) setActionHint("把空格都填上號碼,就能開始");
     else setActionHint("");
   }
 

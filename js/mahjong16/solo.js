@@ -652,7 +652,7 @@ const Solo = (function(){
     $("winMsg").innerHTML = msg;
 
     const again = $("m16SoloAgain");
-    if(again) again.textContent = last ? "🔄 再來一場" : "下一局 ▸";
+    if(again) again.textContent = last ? "🔄 再來一場" : "下一局";
     if(iWon){ Sound.win(); burst(); }
     else if(o.type === "win") Sound.lose();
     showResult();

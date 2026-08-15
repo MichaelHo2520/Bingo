@@ -16,8 +16,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.178.6 -->
-<meta name="version" content="1.178.6">
+<!-- 數獨 · v1.178.7 -->
+<meta name="version" content="1.178.7">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -66,7 +66,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="home-tagline">填滿 1~9,每列每行每宮不重複</div>
       </div>
       <button class="btn primary block-btn home-btn" id="sdkGoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="sdkPickSolo">🎯 單機練習</button>
+      <button class="btn ghost block-btn home-btn" id="sdkPickSolo">🎮 單機遊玩</button>
       <div class="home-hint">連線 2~6 人:<b>搶格</b>(同一張盤面搶著填)或<b>競速</b>(各解各的比快);單機自己練一題</div>
     </div>
 
@@ -76,7 +76,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="icon-btn" id="sdkLevelBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <span class="subtitle">單機練習 · 選難度</span>
+        <span class="subtitle">單機遊玩 · 選難度</span>
       </div>
       <div class="field">
         <span class="field-label">難度</span>
@@ -86,7 +86,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-diff="h9">困難 9×9</button>
         </div>
       </div>
-      <button class="btn primary block-btn home-btn" id="sdkStartSolo">開始練習 ▸</button>
+      <button class="btn primary block-btn home-btn" id="sdkStartSolo">開始練習</button>
       <div class="home-hint" id="sdkLevelHint"></div>
     </div>
   </section>
@@ -131,7 +131,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label sdk-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="玩法與難度"></span>
       <div class="mp-actions">
-        <!-- 大盤面(v1.178.6,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
+        <!-- 大盤面(v1.178.7,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
              ⚠ class 是 .sdk-bigbtn,而狀態掛在 body 上的是 .sdk-big —— 兩個名字**一定要不一樣**。
              ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
              ⚠ 單機列也有一顆(#sdkSoloBig),兩顆共用 .sdk-bigbtn 一起同步。 -->
@@ -192,7 +192,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="wg-group hidden" id="wgGroup">
             <span class="wg-lbl">先到</span>
             <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+              <button class="mini" id="wgMinus" aria-label="減少目標勝場">－</button>
               <span class="target-val display" id="winGoalVal">3</span>
               <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
             </div>
@@ -271,7 +271,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
       <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="soloAgain">再來一局 ▸</button>
+        <button class="btn primary" id="soloAgain">再來一局</button>
         <button class="btn ghost" id="soloHome">回選單</button>
       </div>
       <button class="peek-link" id="winPeek">先看看盤面 👀</button>

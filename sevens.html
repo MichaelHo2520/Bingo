@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>排七（接龍） ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- 排七(接龍) · v1.178.6 -->
-<meta name="version" content="1.178.6">
+<!-- 排七(接龍) · v1.178.7 -->
+<meta name="version" content="1.178.7">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -67,7 +67,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="home-tagline">從 7 往兩邊接龍,蓋掉的牌算你的罰分</div>
       </div>
       <button class="btn primary block-btn home-btn" id="svGoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="svGoSolo">🤖 電腦對決</button>
+      <button class="btn ghost block-btn home-btn" id="svGoSolo">🎮 單機遊玩</button>
       <div class="home-hint">
         52 張全發給 <b>2~6 人</b>。拿到 <b>♠︎7</b> 的人先出,之後輪流出<b>同花色、點數相鄰</b>的牌
         (往上 8…K、往下 6…A),或開一條新花色的 7。<br>
@@ -82,7 +82,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="icon-btn" id="svSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <span class="subtitle">電腦對決</span>
+        <span class="subtitle">單機遊玩</span>
       </div>
       <div class="field">
         <span class="field-label">電腦強度</span>
@@ -102,7 +102,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-seats="6">6 人</button>
         </div>
       </div>
-      <button class="btn primary block-btn home-btn" id="svStartSolo">開始對局 ▸</button>
+      <button class="btn primary block-btn home-btn" id="svStartSolo">開始對局</button>
       <div class="home-hint" id="svSoloHint"></div>
     </div>
   </section>
@@ -145,7 +145,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label sv-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
-        <!-- 大牌桌(v1.178.6,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
+        <!-- 大牌桌(v1.178.7,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
              ⚠ class 是 .sv-bigbtn,而狀態掛在 body 上的是 .sv-big —— 兩個名字**一定要不一樣**。
              ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
              ⚠ 單機列也有一顆(#svSoloBig),兩顆共用 .sv-bigbtn 一起同步。 -->
@@ -172,7 +172,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <button class="icon-btn mp-leave-btn" id="svSoloExit" title="離開牌桌" aria-label="離開牌桌">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label sv-room-title">電腦對決 <b id="svSoloLv" class="display">普通</b></span>
+      <span class="label sv-room-title">單機遊玩 <b id="svSoloLv" class="display">普通</b></span>
       <span class="mp-goal" id="svSoloRec" aria-label="戰績"></span>
       <!-- 大牌桌:單機這一份(說明見 #svBig) -->
       <button class="icon-btn sv-bigbtn" id="svSoloBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
@@ -208,7 +208,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="wg-group hidden" id="wgGroup">
             <span class="wg-lbl">先到</span>
             <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+              <button class="mini" id="wgMinus" aria-label="減少目標勝場">－</button>
               <span class="target-val display" id="winGoalVal">3</span>
               <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
             </div>
@@ -263,7 +263,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
            id 刻意與數獨 / 消消樂 / 台灣麻將同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
       <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="svSoloAgain">再來一局 ▸</button>
+        <button class="btn primary" id="svSoloAgain">再來一局</button>
         <button class="btn ghost" id="svSoloHome">回選單</button>
       </div>
       <button class="peek-link" id="winPeek">先看看牌桌 👀</button>

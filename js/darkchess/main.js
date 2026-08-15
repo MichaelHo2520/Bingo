@@ -85,7 +85,7 @@ function syncOppFields(){
   const lvField = $("dcLvField"), firstField = $("dcFirstField"), sub = $("dcSoloSubtitle");
   if(lvField) lvField.classList.toggle("hidden", friend);
   if(firstField) firstField.classList.toggle("hidden", friend);
-  if(sub) sub.textContent = friend ? "本機對戰 · 朋友" : "本機對戰 · 選難度";
+  if(sub) sub.textContent = friend ? "單機遊玩 · 朋友" : "單機遊玩 · 選難度";
 }
 
 /* ==========================================================================

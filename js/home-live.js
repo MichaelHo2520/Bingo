@@ -249,7 +249,7 @@ const HomeLive = (function(){
     const inner='<span class="hl-tag">'+g.icon+' '+esc(g.name)+'</span>'+
       '<span class="room-main"><span class="rn">🏠 '+esc(nm)+'</span>'+
       '<span class="meta">'+hostTag+'👥 '+r.count+' 人</span></span>'+
-      '<span class="join-cta">加入 ▸</span>';
+      '<span class="join-cta">加入</span>';
     let el;
     if(g.href){
       // 別頁的遊戲:帶房號過去(換的是 iframe 內的頁面,外殼不動 → 全螢幕不掉)

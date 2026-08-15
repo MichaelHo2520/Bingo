@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.178.6 -->
-<meta name="version" content="1.178.6">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.178.7 -->
+<meta name="version" content="1.178.7">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -264,7 +264,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="home-tagline">和朋友連線比賽,或自己單機練習</div>
     </div>
     <button class="btn primary block-btn home-btn" id="homeOnline">🌐 連線對戰</button>
-    <button class="btn ghost block-btn home-btn" id="homeSolo">🎯 單機練習</button>
+    <button class="btn ghost block-btn home-btn" id="homeSolo">🎮 單機遊玩</button>
     <div class="home-hint">連線可同房比賽、計分;單機自己玩一張卡</div>
     </div><!-- /#homeBingo -->
   </section>
@@ -299,7 +299,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <button class="icon-btn" id="soloBack" type="button" title="回主選單" aria-label="回主選單">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
-    <span class="subtitle">單機練習</span>
+    <span class="subtitle">單機遊玩</span>
   </div>
 
   <!-- 房間分頁列:✏️填號 / ⚙️設定(做成底線頁籤,和下方的選項膠囊 .seg 明顯不同;填號在前=多數人的主要動作) -->
@@ -326,7 +326,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="field" id="targetRow">
       <span class="field-label">達成幾條線算贏</span>
       <div class="stepper-bar">
-        <button class="mini" id="tMinus" aria-label="減少">−</button>
+        <button class="mini" id="tMinus" aria-label="減少">－</button>
         <span class="target-val display" id="targetVal">5</span>
         <button class="mini" id="tPlus" aria-label="增加">＋</button>
       </div>
@@ -350,7 +350,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="wg-group hidden" id="wgGroup">
           <span class="wg-lbl">先到</span>
           <div class="wg-stepper">
-            <button class="mini" id="wgMinus" aria-label="減少目標勝場">−</button>
+            <button class="mini" id="wgMinus" aria-label="減少目標勝場">－</button>
             <span class="target-val display" id="winGoalVal">3</span>
             <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
           </div>
@@ -430,7 +430,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="subtitle">安排出手順序</div>
       <div class="rps-hint" id="orderHint">用上下箭頭排好先後,然後開始。</div>
       <div class="order-list" id="orderList"></div>
-      <div class="actions"><button class="btn primary hidden" id="orderConfirm">確定順序,開始 ▸</button></div>
+      <div class="actions"><button class="btn primary hidden" id="orderConfirm">確定順序,開始</button></div>
     </div>
   </div>
   </div><!-- /scroll-area -->
@@ -439,9 +439,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   <div class="primary-bar hidden" id="primaryBar">
     <div class="action-hint hidden" id="actionHint"></div>
     <div class="actions" id="primaryActions">
-      <button class="btn primary" id="startBtn">開始遊戲 ▸</button>
+      <button class="btn primary" id="startBtn">開始遊戲</button>
       <button class="btn primary hidden" id="mpReadyBtn">準備好了</button>
-      <button class="btn primary hidden" id="mpStartBtn">開始對戰 ▸</button>
+      <button class="btn primary hidden" id="mpStartBtn">開始對戰</button>
     </div>
   </div>
 

@@ -224,7 +224,7 @@
         it.type="button"; it.className="room-item"+(joinable?" joinable":" busy"); it.disabled=!joinable;
         const hostTag=r.host?'<span class="host">👑 '+esc(r.host)+'</span> · ':'';
         const nm=r.name||("房間 "+r.code);   // 舊房間沒房名時,退回用號碼當名字
-        const cta=joinable ? '<span class="join-cta">加入 ▸</span>'
+        const cta=joinable ? '<span class="join-cta">加入</span>'
                            : '<span class="busy-tag">🔒 遊戲中</span>';
         it.innerHTML='<span class="room-main"><span class="rn">🏠 '+esc(nm)+'</span>'+
           '<span class="meta">'+hostTag+'👥 '+r.count+' 人</span></span>'+cta;
