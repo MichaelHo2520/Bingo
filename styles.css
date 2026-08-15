@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 39ac365743fdc6d9877d835d8d3a9b17719b26f734f130c177e07c0c489c8073)
+    真相在 styles.src.css(sha256 49c22d5178e880f79713e5369f685d17f3575fa0b7cfdfc7b4434756e89a5004)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3588,3 +3588,41 @@ body.m16-big .mj-room-top > .m16-bigbtn{margin-left:auto}
   }
   @keyframes bootShow{from{opacity:0}to{opacity:1}}
   @keyframes bootHide{from{opacity:1}to{opacity:0}}
+  @media (min-width:700px) and (min-height:640px){
+    .scroll-area,.panel,.mp-panel,.board-wrap,.actions,.status,
+    .room-tabs,.primary-bar,.solo-head{width:min(92vw,680px)}
+    .topbar{width:min(92vw,680px)}
+    #fillRow{width:min(92vw,680px)}
+    .gmk-stage{width:min(92vw,680px)}
+    .sdk-play,.cy-play{width:min(92vw,680px)}
+    .grid{--board:min(92vw,680px,max(160px,var(--boardpx,680px)))}
+    .sdk-stage{height:min(100%,92vw,640px)}
+    .mj-play{width:min(96vw,880px)}
+    :root{--sv-tw:min(96vw,780px)}
+    body.sv-mp .sv-room,body.sv-solo .sv-room{width:min(96vw,780px)}
+    body.sv-mp .topbar,body.sv-solo .topbar{width:min(96vw,780px)}
+    :root{--b2-tw:min(96vw,780px)}
+    body.b2-mp .b2-room,body.b2-solo .b2-room{width:min(96vw,780px)}
+    body.b2-mp .topbar,body.b2-solo .topbar{width:min(96vw,780px)}
+    :root{--bj-tw:min(96vw,860px)}
+    body.bj-mp .bj-room,body.bj-solo .bj-room{width:min(96vw,860px)}
+    body.bj-mp .topbar,body.bj-solo .topbar{width:min(96vw,860px)}
+    .un-play{width:min(96vw,860px)}
+    body.un-mp .un-room,body.un-solo .un-room{width:min(96vw,860px)}
+    body.un-mp .topbar,body.un-solo .topbar{width:min(96vw,860px)}
+    .dc-play{width:min(96vw,880px)}
+    body.dc-on .dc-room{width:min(96vw,880px)}
+    body.dc-on .topbar{width:min(96vw,880px)}
+    .dw-play{width:min(96vw,900px)}
+    body:has(.dw-play:not(.hidden)) .dw-room,
+    body:has(.dw-play:not(.hidden)) .topbar{width:min(96vw,900px)}
+    .gc-grid{grid-template-columns:repeat(4,1fr)}
+  }
+  @media (min-width:700px) and (min-height:720px){
+    :root{--sv-cw:clamp(27px,7.6vw,52px)}
+    :root{--b2-cw:clamp(27px,7.6vw,52px)}
+    :root{--bj-cw:clamp(44px,12.5vw,74px)}
+    .un-play{--un-cw:clamp(44px,12.5vw,70px)}
+    .gc-art{width:58px;height:58px}
+    .gc-name{font-size:17px}
+  }
