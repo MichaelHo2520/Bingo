@@ -8102,7 +8102,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   }
 
 /* ==========================================================================
-   大牌桌 —— UNO / 大老二 / 21 點(body.un-big · body.b2-big · body.bj-big,v1.178.3)
+   大牌桌 / 大棋盤 —— UNO · 大老二 · 21 點(v1.178.3)+ 暗棋(v1.178.4)
+   body.un-big · body.b2-big · body.bj-big · body.dc-big
    ──────────────────────────────────────────────────────────────────────────
      使用者:「大的模式下我希望只顯示一行,也就是留人物跟『小』按鈕;
      當連線對戰的時候,最右邊是麥克風跟 emoji」→ 與台灣麻將 v1.178.1 同一個樣子,
@@ -8120,57 +8121,75 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      要按設定或全螢幕就先按「小」出來。
    ⚠ 晶片列**保持橫捲**(.mp-players.oneline 本來就是),右緣用 mask 淡出 ——
      人多時排不下是常態,切一半的字用漸層收掉比硬切好看。
-   ⚠ 三頁的規則一字不差,所以併成群組選擇器;⚠ 照紅線 6,群組裡**只有 class 沒有 #id**
+   ⚠ 四頁的規則一字不差,所以併成群組選擇器;⚠ 照紅線 6,群組裡**只有 class 沒有 #id**
      (混一個 id 進來會讓同組每一個 class 都拿到 id 權重)。
+
+   ── ⚠ 暗棋(dc)只有一處刻意不同:🏳 **投降不收** ──────────────────────────
+     那一列的其他東西(返回 / 房名 / 局數)都是「離開這一局才會用」,收掉沒差;
+     **投降是對局中的動作**,而且暗棋只有兩個人 → 晶片只佔兩格,那一顆留得下。
+     ⚠ 所以這一段裡**沒有** `.dc-resign{display:none}` —— 不要「順手補齊」。
    ========================================================================== */
 body.un-big .topbar,
 body.b2-big .topbar,
-body.bj-big .topbar{display:none}
+body.bj-big .topbar,
+body.dc-big .topbar{display:none}
 /* ① 三層並排成一行。⚠ 上下內距 6px 不是 4px:34px 的鈕是這一列唯一貼到框邊的東西
    (晶片只有 22px 高),4px 看起來就是黏著框(台灣麻將 v1.178.1 的上手回報)。 */
 body.un-big .un-room,
 body.b2-big .b2-room,
-body.bj-big .bj-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
+body.bj-big .bj-room,
+body.dc-big .dc-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 /* ② order:晶片列(foot)在 DOM 裡是最後一個,拉到最左邊;鈕那一列(.row)推到最右。
    ⚠ 連線與單機共用同一組 class(兩條列都是 .XX-room),所以一次到位。 */
 body.un-big .un-room > .row,
 body.b2-big .b2-room > .row,
-body.bj-big .bj-room > .row{flex:none;order:3;margin-top:0}
+body.bj-big .bj-room > .row,
+body.dc-big .dc-room > .row{flex:none;order:3;margin-top:0}
 body.un-big .un-room > .mp-subrow,
 body.b2-big .b2-room > .mp-subrow,
-body.bj-big .bj-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
+body.bj-big .bj-room > .mp-subrow,
+body.dc-big .dc-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.un-big .un-room-foot,
 body.b2-big .b2-room-foot,
-body.bj-big .bj-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
+body.bj-big .bj-room-foot,
+body.dc-big .dc-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
 /* ③ 返回鍵 / 房名 / 局數三個一起收 —— 收掉它們讓出來的寬度就是給晶片的。
    ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」,手機實體返回鍵也不受影響。 */
 body.un-big .un-room .mp-leave-btn,
 body.b2-big .b2-room .mp-leave-btn,
-body.bj-big .bj-room .mp-leave-btn{display:none}
+body.bj-big .bj-room .mp-leave-btn,
+body.dc-big .dc-room .mp-leave-btn{display:none}
 body.un-big .un-room .mp-goal,
 body.b2-big .b2-room .mp-goal,
-body.bj-big .bj-room .mp-goal{display:none}
+body.bj-big .bj-room .mp-goal,
+body.dc-big .dc-room .mp-goal{display:none}
 body.un-big .un-room-title,
 body.b2-big .b2-room-title,
-body.bj-big .bj-room-title{display:none}
+body.bj-big .bj-room-title,
+body.dc-big .dc-room-title{display:none}
 /* ④ ⛶ / ⚙️ 跟著頂列一起消失(兩條是同一件事的兩半,見檔頭) */
 body.un-big .un-room .tools-docked,
 body.b2-big .b2-room .tools-docked,
-body.bj-big .bj-room .tools-docked{display:none}
+body.bj-big .bj-room .tools-docked,
+body.dc-big .dc-room .tools-docked{display:none}
 body.un-big .un-room .row:has(> .tools-docked),
 body.b2-big .b2-room .row:has(> .tools-docked),
-body.bj-big .bj-room .row:has(> .tools-docked){padding-right:0}
+body.bj-big .bj-room .row:has(> .tools-docked),
+body.dc-big .dc-room .row:has(> .tools-docked){padding-right:0}
 /* ⑤ 晶片縮成迷你版:收掉「你」徽章(.mp-chip.me 已經有光環,同一格不必再寫一次),
    其餘一個都不收(名字 / 分數 / 輪到誰是這一列存在的理由)。 */
 body.un-big .un-room .mp-chip,
 body.b2-big .b2-room .mp-chip,
-body.bj-big .bj-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
+body.bj-big .bj-room .mp-chip,
+body.dc-big .dc-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
 body.un-big .un-room .you-badge,
 body.b2-big .b2-room .you-badge,
-body.bj-big .bj-room .you-badge{display:none}
+body.bj-big .bj-room .you-badge,
+body.dc-big .dc-room .you-badge{display:none}
 body.un-big .un-room-foot .mp-players,
 body.b2-big .b2-room-foot .mp-players,
-body.bj-big .bj-room-foot .mp-players{
+body.bj-big .bj-room-foot .mp-players,
+body.dc-big .dc-room-foot .mp-players{
   -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
   mask-image:linear-gradient(to right,#000 90%,transparent)}

@@ -480,8 +480,11 @@ const MP = MPCore.create((function(){
     },
 
     /* ---------- 偏好 ---------- */
-    ownPrefs(){ return { turnSec: turnSec, dcRules: DC.normRules(rules), skin: skin }; },
+    // ⚠ big = 大棋盤(v1.178.4):存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs(){ return { turnSec: turnSec, dcRules: DC.normRules(rules), skin: skin, big: BigMode.get() }; },
     usePrefs(o){
+      // 大棋盤:舊偏好沒有這欄 → 預設關。這一刻畫面還在選單,BigMode 的守衛會壓著不生效。
+      BigMode.set(!!o.big);
       if(typeof o.turnSec === "number" && (o.turnSec === 0 || (o.turnSec >= 10 && o.turnSec <= 180))) turnSec = o.turnSec;
       /* ★ 我上次當房主設的房規 → 下次建房自動帶回來(同 turnSec)。
          ⚠ 一律 normRules:那份 JSON 住在 localStorage,版本一換就可能有認不出的值。 */

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 25b3e6a8ee06deecfe70103bd02d00baa4c1616c0e2511372ab286690876dd79)
+    真相在 styles.src.css(sha256 666d3453b7a22c8228de7ff2871101e735e6186f0ac81f60f0f7f5a1dd460c44)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3657,43 +3657,56 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   }
 body.un-big .topbar,
 body.b2-big .topbar,
-body.bj-big .topbar{display:none}
+body.bj-big .topbar,
+body.dc-big .topbar{display:none}
 body.un-big .un-room,
 body.b2-big .b2-room,
-body.bj-big .bj-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
+body.bj-big .bj-room,
+body.dc-big .dc-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 body.un-big .un-room > .row,
 body.b2-big .b2-room > .row,
-body.bj-big .bj-room > .row{flex:none;order:3;margin-top:0}
+body.bj-big .bj-room > .row,
+body.dc-big .dc-room > .row{flex:none;order:3;margin-top:0}
 body.un-big .un-room > .mp-subrow,
 body.b2-big .b2-room > .mp-subrow,
-body.bj-big .bj-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
+body.bj-big .bj-room > .mp-subrow,
+body.dc-big .dc-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.un-big .un-room-foot,
 body.b2-big .b2-room-foot,
-body.bj-big .bj-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
+body.bj-big .bj-room-foot,
+body.dc-big .dc-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
 body.un-big .un-room .mp-leave-btn,
 body.b2-big .b2-room .mp-leave-btn,
-body.bj-big .bj-room .mp-leave-btn{display:none}
+body.bj-big .bj-room .mp-leave-btn,
+body.dc-big .dc-room .mp-leave-btn{display:none}
 body.un-big .un-room .mp-goal,
 body.b2-big .b2-room .mp-goal,
-body.bj-big .bj-room .mp-goal{display:none}
+body.bj-big .bj-room .mp-goal,
+body.dc-big .dc-room .mp-goal{display:none}
 body.un-big .un-room-title,
 body.b2-big .b2-room-title,
-body.bj-big .bj-room-title{display:none}
+body.bj-big .bj-room-title,
+body.dc-big .dc-room-title{display:none}
 body.un-big .un-room .tools-docked,
 body.b2-big .b2-room .tools-docked,
-body.bj-big .bj-room .tools-docked{display:none}
+body.bj-big .bj-room .tools-docked,
+body.dc-big .dc-room .tools-docked{display:none}
 body.un-big .un-room .row:has(> .tools-docked),
 body.b2-big .b2-room .row:has(> .tools-docked),
-body.bj-big .bj-room .row:has(> .tools-docked){padding-right:0}
+body.bj-big .bj-room .row:has(> .tools-docked),
+body.dc-big .dc-room .row:has(> .tools-docked){padding-right:0}
 body.un-big .un-room .mp-chip,
 body.b2-big .b2-room .mp-chip,
-body.bj-big .bj-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
+body.bj-big .bj-room .mp-chip,
+body.dc-big .dc-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
 body.un-big .un-room .you-badge,
 body.b2-big .b2-room .you-badge,
-body.bj-big .bj-room .you-badge{display:none}
+body.bj-big .bj-room .you-badge,
+body.dc-big .dc-room .you-badge{display:none}
 body.un-big .un-room-foot .mp-players,
 body.b2-big .b2-room-foot .mp-players,
-body.bj-big .bj-room-foot .mp-players{
+body.bj-big .bj-room-foot .mp-players,
+body.dc-big .dc-room-foot .mp-players{
   -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
   mask-image:linear-gradient(to right,#000 90%,transparent)}
