@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 bc2a5b5a8b4eeb4bb5126077de61fc9f40841f8953b98890b17e9b0cd8578c7c)
+    真相在 styles.src.css(sha256 9501380adbe9f13c3d211e51c1a6af0a4129211c8e763b51fbd818f2c70bc7c2)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1310,8 +1310,8 @@
 .mj-bk{fill:var(--m16-back)}
 .mj-bkl{fill:none;stroke:var(--m16-backl);stroke-width:3;stroke-linejoin:round}
 body.m16-mp .mj-play{width:min(98vw,960px)}
-body.m16-mp .mj-room{width:min(92vw,960px)}
-body.m16-mp .topbar{width:min(92vw,960px)}
+body.m16-mp .mj-room{width:min(98vw - 16px,944px)}
+body.m16-mp .topbar{width:min(98vw - 16px,944px)}
 body.m16-mp,body.m16-solo{user-select:none;-webkit-user-select:none}
 body.m16-mp input,body.m16-mp textarea,
 body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:text}
@@ -1584,8 +1584,8 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
   font:700 12px/1.5 'Nunito',sans-serif;color:var(--muted)}
 .m16-next b{font-weight:800;font-size:1.15em;color:var(--accent)}
 body.m16-solo .mj-play{width:min(98vw,960px)}
-body.m16-solo .mj-room{width:min(92vw,960px)}
-body.m16-solo .topbar{width:min(92vw,960px)}
+body.m16-solo .mj-room{width:min(98vw - 16px,944px)}
+body.m16-solo .topbar{width:min(98vw - 16px,944px)}
 .set-row.m16-vrow{flex-wrap:wrap}
 .m16-vrow .m16-vseg{flex:1 1 100%}
 @media (min-width:400px){
