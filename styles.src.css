@@ -8371,7 +8371,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     --tq-line:#d8bf94;
     --tq-ink:#4a3a22;
     --tq-tw:min(96vw,560px);
-    /* ★ 木托盤(v1.181.0)。⚠ 這一組**只給木框用**,絕不可以碰到星形凹槽裡面 ——
+    /* ★ 木托盤(v1.180.2)。⚠ 這一組**只給木框用**,絕不可以碰到星形凹槽裡面 ——
        棋子踩的那一面必須保持淺色(見上面那條「棋盤本身也刻意是固定的淺色」),
        深木頭只出現在星尖以外那一圈。
        ⚠⚠ 木頭要**低飽和的棕**,不可以往金黃走:第一版是 #c08a45 / #9a6428,
@@ -8459,7 +8459,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
            display:flex;flex-direction:column;align-items:center;gap:6px}
   /* ⚠ overflow:auto 是**保險**不是常態:fitBoard() 的間距有下限(16px),極端矮的視窗上
      盤面會比舞台高 —— 沒有這一條就是「盤面壓在提示列上面」。
-     ★★★ 但**捲軸一定要隱形**(v1.181.0,使用者:「盤面的縮放一直跳來跳去」)。
+     ★★★ 但**捲軸一定要隱形**(v1.180.2,使用者:「盤面的縮放一直跳來跳去」)。
        這一格同時是 fitBoard() 量的那個容器,而桌機的實體捲軸會**吃掉 15px 的
        clientWidth** → 盤面縮一階 → 放得下了 → 捲軸消失 → 又放大 → 又放不下…
        **它會自己震盪下去**,而且只有桌機(有實體捲軸的平台)看得到。
@@ -8469,7 +8469,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
             display:flex;align-items:center;justify-content:center;
             overflow:auto;scrollbar-width:none}
   .tq-stage::-webkit-scrollbar{width:0;height:0}
-  /* ★★★ 這一列的高度是**寫死的**,不是 min-height(v1.181.0,使用者:「盤面一直跳來跳去」)。
+  /* ★★★ 這一列的高度是**寫死的**,不是 min-height(v1.180.2,使用者:「盤面一直跳來跳去」)。
      ⚠⚠ 它是 fitBoard() 那條尺寸鏈的一環:`盤面能有多高 = .tq-play − .tq-acts` ——
        只要這一列會長高,盤面就會跟著縮一階(一階 ≈ 14px 寬,很明顯)。
        而它本來**每一回合都會變高兩次**:
@@ -8481,7 +8481,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
            gap:12px;width:100%;position:relative}
 
   /* ---------- 棋盤 ----------
-     ★★ v1.181.0 起板子本身**沒有背景** —— 木托盤整個是 board.js 產生的一張 SVG
+     ★★ v1.180.2 起板子本身**沒有背景** —— 木托盤整個是 board.js 產生的一張 SVG
        (`.tq-tray`,盤面的第一個子元素),形狀一律由 rules.js 的幾何算出來。
        ⚠ 所以這裡的 border-radius / box-shadow 全部拿掉了:留著會在六邊形外面
          多一個看得見的矩形殼。外陰影改掛在 SVG 上(drop-shadow 跟著形狀走)。
@@ -8573,7 +8573,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          **對角**,不是邊,所以 37% × √2 ≈ 52%)。再大就開始吃掉顏色,
          而顏色是規則本體(六色那一條),不可以為了數字好讀把色環讓掉。
 
-     ── ★★★ 為什麼又長不一樣了(v1.181.0,使用者:「棋盤跟棋子都不太滿意」)──────
+     ── ★★★ 為什麼又長不一樣了(v1.180.2,使用者:「棋盤跟棋子都不太滿意」)──────
        v1.180.1 的彈珠有形體、也讀得清楚,但**六家長得一模一樣,只差顏色** ——
        所以它只有「顏色」一個識別維度。改成**六隻小動物**:同一顆球加上各家不同的頭飾
        (舞獅鬃 · 火鳥冠 · 貓耳 · 龍角 · 熊貓圓耳 · 獨角獸角)+ 一對眼睛 + 胸前的號碼牌。
@@ -8589,7 +8589,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      球體由上而下(★ background 的第一層在最上面):
        ① 高光      左上那一點,玻璃的第一反射
        ② 眼睛 ×2   ★ 疊在號碼牌之前 —— 兩者會碰到,眼睛要在上面
-       ③ 號碼牌    座號的底(白色的「胸牌」,v1.181.0 從正中央移到下方)
+       ③ 號碼牌    座號的底(白色的「胸牌」,v1.180.2 從正中央移到下方)
        ④ 底部反光  桌面把光彈回來 —— 少了它球會像貼紙
        ⑤ 球體明暗  左上亮、右下收深(⚠ 用 ellipse 50% 50% 而不是 circle:
                    circle 的尺寸只吃長度,寫百分比不合法,而預設 farthest-corner
@@ -8653,7 +8653,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     clip-path:polygon(50% 0%,100% 100%,0% 100%)}
   /* ★ 色盲的第二訊號:座號。六色比四色更難分,這個數字在這一頁**不是裝飾**。
      ⚠ 顏色吃 --cd(專門調過的深色),不是 --c —— 黃與橙直接印上去讀不到。
-     ⚠ v1.181.0 從 flex 置中改成絕對定位:它要對齊的是**號碼牌**(66%),不是球心。
+     ⚠ v1.180.2 從 flex 置中改成絕對定位:它要對齊的是**號碼牌**(66%),不是球心。
        translateY 在**孫元素**上,不碰 .tq-pc 那一格 transform(紅線 15)。 */
   .tq-pn{position:absolute;left:0;right:0;top:66%;transform:translateY(-50%);text-align:center;
          font-family:'Fredoka',sans-serif;font-weight:800;color:var(--cd,#4a3a22);
@@ -8680,7 +8680,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .tq-board[data-turn="5"] .tq-pc[data-c="5"]::after{opacity:1;animation:tqTurn 2.1s ease-in-out infinite}
   @keyframes tqTurn{0%,100%{opacity:.45}50%{opacity:1}}
   /* 選中的那一顆:光環。
-     ⚠ v1.181.0 拿掉了 inset 那一段 —— .tq-pc 現在沒有背景(球體在 .tq-ball 裡),
+     ⚠ v1.180.2 拿掉了 inset 那一段 —— .tq-pc 現在沒有背景(球體在 .tq-ball 裡),
        inset 陰影畫不到任何東西,留著只會讓人以為它還有作用。 */
   .tq-pc.on{z-index:9;box-shadow:0 3px 6px rgba(58,38,6,.5),
                                 0 0 0 2.4px #fff,0 0 12px 3px var(--accent);
