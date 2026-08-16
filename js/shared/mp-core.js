@@ -114,6 +114,9 @@ const MPCore = (function(){
     let graceTimer=null, graceAt=0, aloneTimer=null, aloneTick=null, aloneWaitMs=0;
     let byeIds={};                          // 「自己按了離開房間」的人(bye/{pid});見上面四個寬限期
     let emotesReady=false;
+    /* 即時語音:現在有誰正在說話(talk.js 本地量出來的,不進 DB)。
+       talkingSig 是上一次畫過的簽章 —— 只在真的變了才重畫晶片列(見 onState)。 */
+    let talkingIds=[], talkingSig="";
     let playedRound=null;                   // 已經 enterPlaying() 過的那個 roundId(見 CONT_ROUND)
     /* 出手順序(只有 ORDER_PICK 的遊戲會動到):方式、猜拳中的狀態、揭曉資料,
        以及房主端的兩顆計時器。orderAnnounced = 這一局公告過順序了沒(order 可能比
@@ -302,7 +305,10 @@ const MPCore = (function(){
                pickFreeCode 的迴圈(最多試五次、全撞就放棄並告訴使用者),不是 update()。
            ⚠ adapter 自己的房內節點(A.extraNodes,例如數獨/消消樂的 progress、
              台灣麻將的 tai、你畫我猜的 ink/say)也要一起清 —— 它們是**上一局**的資料。 */
-        const wipe={ players:null, scores:null, hostName:null, closedAt:null, bye:null };
+        /* ⚠ rtc 一定要進 wipe(紅線 5:撞號重抽擋不住**已關閉**的房間)——
+           留著的話新房一開就有上一批人的 SDP 躺在那裡,而語音會照著它去撥打
+           早就不存在的對象。 */
+        const wipe={ players:null, scores:null, hostName:null, closedAt:null, bye:null, rtc:null };
         (A.extraNodes||[]).forEach(k=>{ wipe[k]=null; });
         const payload=Object.assign(wipe, {
           host:meId, roomName:roomName,
@@ -475,7 +481,7 @@ const MPCore = (function(){
       online=true; ready=false; curPhase="lobby";
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0; playedRound=null;   // ★ 進新房必歸零(見檔頭 #1)
-      byeIds={}; aloneWaitMs=0;      // 同上:上一間房「誰按了離開」不可以帶進新房(見四個寬限期)
+      byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";      // 同上:上一間房「誰按了離開」不可以帶進新房(見四個寬限期)
       clearPlayCount(); statDone=false;   // 熱門度計數:一間房記一次 → 進新房要重新起算
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();
       stopRoomWatch();
@@ -533,7 +539,35 @@ const MPCore = (function(){
     }
 
     /* ---------- 監聽 ---------- */
+    /* ---------- 即時語音(js/shared/talk.js)----------
+       ⚠⚠ **一定要 feature-detect,不可以直接寫 Talk.xxx**:talk.js 是**選配**的,
+         只有接了語音的頁面才載入它。核心是十三頁共用的 —— 沒載入的頁面直接引用
+         `Talk` 會是 ReferenceError,而那會把整個 listen() / leave() 打斷
+         (症狀是「某幾頁一進房就整頁死掉」,跟語音看起來毫無關係)。
+       ⚠ 判斷用 typeof 而不是 window.Talk:這一份也可能被非瀏覽器環境(mock 測試)載入。 */
+    function talkOn(){
+      try{ return (typeof Talk !== "undefined" && Talk && Talk.supported()) ? Talk : null; }
+      catch(e){ return null; }
+    }
+
     function listen(){
+      { const T=talkOn(); if(T) T.attach({
+          /* ref 直接轉給核心的 roomRef —— 語音的 signaling 住在房間底下的 rtc 節點。
+             ⚠ 回 null 是**正常情況**(還沒進房 / 剛離房),talk.js 那邊有防護。 */
+          ref:(path)=>roomRef?roomRef.child(path):null,
+          me:()=>meId,
+          players:()=>players,
+          nameOf:(id)=>dispName(id),
+          /* ⚠ 「誰在說話」是 talk.js **在本地量出來的**(分析收到的音訊),
+             不經過 DB —— 寫 DB 的話等於每個人每秒好幾筆,比語音本身還貴。
+             ⚠ 只有真的變了才重畫:這個回呼在有人講話時每 120ms 就可能來一次,
+               無條件 renderPlayers() 會把整條晶片列每秒重建八次。 */
+          onState:(st)=>{
+            renderTalkUi(st);
+            const sig=(st&&st.speaking||[]).slice().sort().join(",");
+            if(sig!==talkingSig){ talkingSig=sig; talkingIds=(st&&st.speaking)||[]; renderPlayers(); }
+          }
+        }); }
       roomRef.child("host").on("value",s=>{
         hostId=s.val()||null; if(hostId)sawHost=true;
         if(hostGone()) scheduleRecheck(recheckWait());
@@ -553,6 +587,10 @@ const MPCore = (function(){
         if(alone) scheduleAloneCheck(); else clearAloneCheck();
         if(iWasKicked() || hostGone()) scheduleRecheck(recheckWait()); else clearRecheck();
         renderPlayers(); updateStartBtn();
+        /* 語音的 mesh 要跟著「房裡現在有誰」動:有人進來就拉線、有人走就拆線。
+           ⚠ 一定要掛在 players 這個事件上 —— 那是唯一權威的來源(斷線的人由
+             onDisconnect 從這裡移掉,沒有別的地方會通知我們)。 */
+        { const T=talkOn(); if(T) T.refresh(); }
         if(isHost) updateRoomIndex();
         if(curPhase==="lobby") syncSetup();
         else if(curPhase==="playing"){ A.refresh && A.refresh(); if(winner) showOutcome(); }
@@ -1072,7 +1110,9 @@ const MPCore = (function(){
         const p=players[id]||{};
         const isTurn=curPhase==="playing" && !winner && turn===id;
         const chip=document.createElement("div");
-        chip.className="mp-chip clickable"+(p.ready?" ready":"")+(id===meId?" me":"")+(isTurn?" turn":"");
+        // tk-talking:那個人正在說話(即時語音);沒接語音的頁面 talkingIds 永遠是空的
+        chip.className="mp-chip clickable"+(p.ready?" ready":"")+(id===meId?" me":"")+(isTurn?" turn":"")
+                      +(talkingIds.indexOf(id)>=0?" tk-talking":"");
         chip.dataset.id=id;
         chip.title=id===meId?"點一下傳送互動表情給全部人":"點一下傳送互動表情";
         chip.addEventListener("click",()=>openEmote(id===meId?"all":id));
@@ -1331,9 +1371,16 @@ const MPCore = (function(){
     function closeLeaveAsk(){ pendingLeaveAct=null; $("leaveVeil").classList.remove("show"); }
     function confirmLeave(){ const act=pendingLeaveAct; closeLeaveAsk(); if(act)act(); }
     function leave(){
+      /* ★★★ 語音要**第一個**拆,而且一定要在 roomRef 還在的時候拆:
+         talk.js 的 stop() 要自己 off 掉 rtc/{我}/{每個人} 底下的子節點監聽、
+         並把自己的信箱 remove 掉 —— 下面那一圈 off() 只收得到 roomRef.child("rtc")
+         本身,收不到子節點(同你畫我猜 ink 的那條紅線)。
+         ⚠ 漏掉的下場:離開房間之後還在收上一間的 SDP,而且麥克風不會關
+           (系統的錄音指示燈一直亮著)。 */
+      { const T=talkOn(); if(T) T.stop(); }
       try{
         if(roomRef){
-          ["host","players","game","scoreMode","winGoal","scores","emotes","bye"]
+          ["host","players","game","scoreMode","winGoal","scores","emotes","bye","rtc"]
             .concat(ORDER_PICK ? ["orderMethod"] : [])
             .concat(Object.keys(A.roomFields ? A.roomFields() : {}))
             .concat(A.extraNodes || [])
@@ -1370,7 +1417,9 @@ const MPCore = (function(){
                    (svGet(rooms/code)),面板每開一次最多下載 30 間 × 40 KB。
                ⚠ 這一段是**雙胞胎**,js/online.js 的 leave() 有對應的一份(紅線 5)——
                  但 Bingo 沒有 extraNodes,所以那一份**刻意**不加這一圈(見它那條註解)。 */
-            const ups={ host:null, players:null, game:null, bye:null,
+            /* ⚠ rtc 也要清(同 extraNodes 的道理):那是語音的 signaling 殘留 ——
+               SDP 一筆就好幾 KB,而房間關掉之後那些完全沒有用。 */
+            const ups={ host:null, players:null, game:null, bye:null, rtc:null,
                         hostName:meName||"", closedAt:Date.now() };
             (A.extraNodes||[]).forEach(k=>{ ups[k]=null; });
             roomRef.update(ups);
@@ -1401,7 +1450,7 @@ const MPCore = (function(){
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       roomRef=null; code=null; online=false; ready=false; isHost=false;
       players={}; scores={}; order=[]; winner=null; status="lobby"; curPhase="lobby";
-      byeIds={}; aloneWaitMs=0;
+      byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0; lastIndexSig=null; outcomeShown=false; abandoned=false;
       scoredThisRound=false; myRoundWin=false; autoStarting=false; emotesReady=false;

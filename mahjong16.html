@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 台灣 16 張麻將 · v1.181.3 -->
-<meta name="version" content="1.181.3">
+<!-- 台灣 16 張麻將 · v1.182.0 -->
+<meta name="version" content="1.182.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -36,6 +36,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
+      <!-- 即時語音的兩顆鈕(v1.182.0)。**聽**與**講**刻意分開:只想聽的人不該被要求
+           麥克風權限,想講的人也不一定想被別人的聲音吵。
+           ⚠ 一定要放在 `.tools` 裡面 —— 那一整塊會被 syncTools() 在頂列被收掉時
+             整組搬進房間框。放外面的話「大牌桌」一開就再也按不到了。
+           ⚠ 字面不可以用 🎤:那顆是**語音留言**(錄一段送出),是另一個功能。
+           ⚠ 擺在 ⛶ 左邊,讓 ⚙️ 保持在最右邊(那是使用者已經習慣的位置)。 -->
+      <button class="icon-btn tk-btn" id="tkListenBtn" type="button" title="打開語音(聽別人說話)" aria-label="打開語音,聽別人說話" aria-pressed="false">🔇</button>
+      <button class="icon-btn tk-btn" id="tkSpeakBtn" type="button" title="打開麥克風(讓別人聽到你)" aria-label="打開麥克風,讓別人聽到你" aria-pressed="false">🎙</button>
       <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
       <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
     </div>
@@ -529,6 +537,10 @@ const FIREBASE_CONFIG = {
      → adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
+<!-- 即時語音(WebRTC mesh)。**選配** —— 只有接了語音的頁面載入它,
+     mp-core 與 ui-kit 兩邊都是 feature-detect(typeof Talk),沒有它照樣跑。
+     ⚠ 要排在 mp-core **之前**:核心在 listen() 裡就會 Talk.attach()。 -->
+<script src="js/shared/talk.js"></script>
 <script src="js/shared/mp-core.js"></script>
 <script src="js/shared/mj-faces.js"></script>
 <script src="js/mahjong16/rules.js"></script>

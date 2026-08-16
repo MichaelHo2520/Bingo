@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 d0613b07db0335093e0982296efe997f73856586030d7477e764ef124944cfdd)
+    真相在 styles.src.css(sha256 404530843afc0bcd91aaa9f421af3d95dbeffca11dd83e574c03fde3e0ebca4f)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -90,6 +90,7 @@
   }
   .tools{display:flex;gap:8px}
   .row:has(> .tools-docked){position:relative;padding-right:84px}
+  body.mp-on .row:has(> .tools-docked .tk-btn){padding-right:168px}
   .tools.tools-docked{position:absolute;right:0;top:50%;transform:translateY(-50%);flex:none}
   .icon-btn{
     width:42px;height:42px;border-radius:13px;border:1px solid var(--panel-line);
@@ -101,6 +102,11 @@
   .icon-btn.active{background:var(--accent);border-color:var(--accent)}
   .icon-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
   .icon-btn:focus-visible,.btn:focus-visible,.cell:focus-visible,.mini:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
+  body:not(.mp-on) .tk-btn{display:none}
+  .tk-btn.on{background:var(--accent);border-color:var(--accent);color:#1a1020}
+  .tk-btn.bad{background:#c0392b;border-color:#e74c3c;color:#fff;animation:tk-warn 1.4s ease-in-out infinite}
+  @keyframes tk-warn{0%,100%{opacity:1}50%{opacity:.55}}
+  .mp-chip.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
   .panel{
     width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
     border-radius:20px;padding:16px;backdrop-filter:blur(10px);
@@ -1626,6 +1632,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     display:flex;position:absolute;right:8px;top:50%;transform:translateY(-50%);gap:6px}
   body.m16-mp .mj-room .tools-docked #settingsBtn{display:none}
   body.m16-solo .mj-room .tools-docked #settingsBtn{display:none}
+  body.m16-mp .mj-room .tools-docked .tk-btn,body.m16-solo .mj-room .tools-docked .tk-btn{display:none}
   body.m16-mp #mpBar{padding:4px 44px 4px 10px}
   body.m16-mp .mj-room .row:has(> .tools-docked),
   body.m16-solo .mj-room .row:has(> .tools-docked){position:static;padding-right:0}

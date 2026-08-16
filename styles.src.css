@@ -163,6 +163,14 @@
        ⚠ 橫向的台灣麻將**走另一條**(`body.m16-mp .mj-room` 那段自己的 72px,
          鈕縮成 28px、`right:8px`),那一段的列尾是可伸縮的晶片列不是鈕,不在這次的範圍。 */
   .row:has(> .tools-docked){position:relative;padding-right:84px}
+  /* ★ 接了即時語音的頁面 `.tools` 裡是**四顆**鈕(⛶ ⚙️ 🔊 🎙),讓位要跟著重算:
+       34 × 4 + gap 8 × 3 = 160,+ 8 的間距 = **168**(算法與上面那條 84 完全一樣)。
+     ⚠ 一定要限定 `body.mp-on`:語音鈕在單機是 display:none(見 .tk-btn 那一段),
+       不限定的話單機列會平白多讓 84px —— 症狀就是上面註解說的「晶片列莫名其妙
+       離右緣一大段」。
+     ⚠ 權重刻意停在 (0,4,0) 並且**排在這裡**(靠前):後面 `body.m16-big …{padding-right:0}`
+       與橫向的還原那兩條同權重、在後面 → 它們照樣贏,大牌桌與橫向的行為一行都不變。 */
+  body.mp-on .row:has(> .tools-docked .tk-btn){padding-right:168px}
   .tools.tools-docked{position:absolute;right:0;top:50%;transform:translateY(-50%);flex:none}
   .icon-btn{
     width:42px;height:42px;border-radius:13px;border:1px solid var(--panel-line);
@@ -175,6 +183,27 @@
   .icon-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
 
   .icon-btn:focus-visible,.btn:focus-visible,.cell:focus-visible,.mini:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
+
+  /* ---------- 即時語音的兩顆鈕(js/shared/talk.js)----------
+     🔊 / 🔇 = 要不要聽 · 🎙 = 要不要講。兩顆都住在 `.tools` 裡(⛶ 旁邊)——
+     那一整塊會被 syncTools() 在頂列被收掉時整組搬進房間框,所以鈕自己不必知道
+     「大牌桌」的存在。⚠ 不要為了排版把它們挪出 .tools。
+     ⚠ 字面刻意不用 🎤:那顆是**語音留言**(錄一段送出),是另一個功能。
+     ★ 只在連線中出現:單機沒有講話的對象,那時留一顆按了沒反應的鈕只會讓人困惑。
+       ⚠ 判斷用 body.mp-on(核心進房時掛、leave 時脫),不是 .hidden ——
+         .hidden 要靠 JS 每次換畫面同步,而這件事 CSS 自己就答得出來。 */
+  body:not(.mp-on) .tk-btn{display:none}
+  .tk-btn.on{background:var(--accent);border-color:var(--accent);color:#1a1020}
+  /* 連不上(沒有 TURN 時對稱 NAT 會失敗)—— 一定要看得見:那時使用者以為自己在講話,
+     其實沒有人聽得到,是最難自己發現的一種壞掉。 */
+  .tk-btn.bad{background:#c0392b;border-color:#e74c3c;color:#fff;animation:tk-warn 1.4s ease-in-out infinite}
+  @keyframes tk-warn{0%,100%{opacity:1}50%{opacity:.55}}
+
+  /* 誰在說話:綠色光環 + 輕微放大。
+     ⚠ 這個狀態是 talk.js **在本地量收到的音訊**得到的,不進 DB(見 talk.js 檔頭)。
+     ⚠ 不可以用 transform 放大 —— `.mp-chip.turn` 已經佔用了 transform(scale 1.04),
+       兩個一起套的話後面那條會整個蓋掉前面那條,「輪到誰」就不見了。改用 box-shadow。 */
+  .mp-chip.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
 
   /* ---------- Panel ---------- */
   .panel{
@@ -3119,6 +3148,16 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        (併了的話同一組裡每個 class 都拿到 id 權重)。所以這裡刻意寫成兩條。 */
   body.m16-mp .mj-room .tools-docked #settingsBtn{display:none}
   body.m16-solo .mj-room .tools-docked #settingsBtn{display:none}
+  /* ---- ②-b 即時語音的兩顆鈕:橫向**跟著 ⚙️ 一起收掉**(v1.182.0)---------------
+     ★ 同上一條的理由 —— 橫向這條列的右邊只留給 ⛶ 那 44px(28 + right 8 + 間距 8),
+       再塞兩顆 28px + gap 就是 112,而多出來的 68px 只能從**晶片列**身上拿
+       (那條列是唯一可伸縮的),四個人的台數 / 風 / 輪到誰會跟著被擠掉。
+     ★★ 所以這裡刻意選「藏起來」而不是「重算 padding」:轉回直向就在那裡,
+       跟 ⚙️ 是同一套想法。⚠ **也因此上面那條 44px 完全不用動** —— 這是刻意的,
+       不要看到多了兩顆鈕就「順手」把它改成 112(改了就是晶片列莫名其妙變窄)。
+     ⚠ 這兩顆是 class 不是 id,併成一組群組選擇器沒有紅線 6 第六類的問題
+       (那條講的是「群組裡混一個 #id」);寫成一條是為了跟上面兩條區分開來。 */
+  body.m16-mp .mj-room .tools-docked .tk-btn,body.m16-solo .mj-room .tools-docked .tk-btn{display:none}
   /* ⚠⚠ 連線那一份要**自己再寫一次內距**(v1.178.0 才發現)。全域那條
      `@media (max-height:560px){ #mpBar{padding:9px 12px} }` 是 **id 選擇器**(1,0,0),
      壓得過上面那條 `body.m16-mp .mj-room`(0,2,1)—— 也就是說 v1.73.0 以來
