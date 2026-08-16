@@ -8334,6 +8334,282 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   }
 
   /* ==========================================================================
+     跳棋(tiaoqi.html 與 js 底下的 tiaoqi 那一組)—— 第十四個遊戲(v1.180.0)
+     ──────────────────────────────────────────────────────────────────────────
+       盤面是 121 個洞的六角星,一個「格間距」由 js/tiaoqi/board.js 的 fitBoard()
+       量出來、寫進 --tq-cell(★ 用 JS 算不用 aspect-ratio,同暗棋 / 成語接龍 / 飛行棋)
+       → 這一整段裡**沒有任何一處在算洞的大小或位置**,一律乘 --tq-cell。
+       洞與棋子的 left / top / width / height 都是 board.js 產生的 inline style
+       (座標查 rules.js 的幾何表),這裡只管長相。
+       ⚠⚠ 外接框**不是正方形**:13 個間距寬 × 14.856 個間距高 ——
+         不要照抄飛行棋那條 width:height 都等於 14 格的寫法。
+
+     ── ★★ 六色是規則本體,任何主題都不准把它轉黑白 ────────────────────────
+       --tq-c0..5 決定三件事:誰的棋、誰的角、以及**我該往哪一個角走**
+       (目標永遠是「對面那個顏色」)。與 UNO 的四色、飛行棋的四色同一個性質
+       → **刻意不吃主題變數**,四個主題底下都是同一組顏色。
+       ⚠ 六色比四色更難分,所以第二訊號(棋子上的座號 .tq-pn)在這一頁**更重要**,
+         不要順手把那個數字拿掉。
+       ★ 顏色順序刻意是彩虹序(紅橙黃綠藍紫),而角的索引 0..5 在盤面上是**順時針** ——
+         所以「對面那一角」在畫面上與色環的正對面完全一致,一眼認得出來。
+     ── ★ 棋盤本身也刻意是固定的淺色(同飛行棋 / 你畫我猜的紙)────────────────
+       它模擬的是桌上真的擺了一塊板;跟著 midnight / arcade 變深的話六色會整組失真。
+     ========================================================================== */
+  :root{
+    --tq-c0:#e8384f; --tq-c1:#f5821f; --tq-c2:#d9a400;
+    --tq-c3:#1ea55c; --tq-c4:#2f7ff0; --tq-c5:#9a5bd6;
+    --tq-s0:#ffd6dc; --tq-s1:#ffe2c2; --tq-s2:#f7ecb4;
+    --tq-s3:#c3ead2; --tq-s4:#cddfff; --tq-s5:#e6d5f8;
+    --tq-felt:#fff6e6;      /* 板子 */
+    --tq-hole:#efe0c4;      /* 洞(凹進去的那一格) */
+    --tq-line:#d8bf94;
+    --tq-ink:#4a3a22;
+    --tq-tw:min(96vw,560px);
+  }
+  .tq-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+            line-height:1.05;letter-spacing:.5px;
+            background:linear-gradient(135deg,var(--accent),var(--accent-2));
+            -webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* ---------- 玩法說明 ----------
+     ★★ 跳棋與五子棋 / 大老二不同:**跳與連跳沒玩過完全猜不到**,所以說明要寫詳細
+       (飛行棋 v1.179.3 的同一個教訓)。
+     ⚠ 刻意**不用 .home-hint**:那一格是 12.5px / opacity .8 的小字附註,
+       用來放七條教學會變成一坨看不下去的灰字。
+     ⚠⚠ **只讓「說明」自己捲,不要整頁捲**(飛行棋 v1.179.4):app-shell 的 body 是
+       height:100dvh + overflow:hidden → 溢出的部分是**完全拿不到**的(不是捲不到,是不存在)。
+       做法用 flex 自己吃掉剩餘高度,不寫死 max-height。
+     ⚠⚠⚠ **收縮鏈每一層都要能縮,斷在中間那一層就整條失效** ——
+       `.tq-home > *{flex:none}` 本來只想鎖住標題列,但它也會命中中間的 `.tq-pick`,
+       於是外層縮了、中間那層沒縮,照樣被切掉。症狀與「完全沒生效」一模一樣,
+       **只有量 computed flex-shrink 才看得出來**(飛行棋踩過)。 */
+  .tq-home{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .tq-home > *{flex:none}
+  .tq-home > .tq-pick{flex:0 1 auto;min-height:0}
+  .tq-pick{display:flex;flex-direction:column;min-height:0}
+  .tq-pick > *{flex:none}
+
+  .tq-howto{margin-top:18px;padding:14px 14px 12px;border-radius:14px;
+            background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
+            text-align:left;font-size:13px;line-height:1.62;color:var(--text);
+            flex:0 1 auto;min-height:150px;overflow-y:auto;overscroll-behavior:contain;
+            box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
+  .tq-howto-h{font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:15.5px;
+              color:var(--accent-2);margin-bottom:6px}
+  .tq-howto-h2{font-weight:800;font-size:12.5px;color:var(--muted);margin:12px 0 6px}
+  .tq-howto-goal{margin:0 0 10px}
+  .tq-howto-list{margin:0;padding-left:1.35em}
+  .tq-howto-list > li{margin-bottom:7px}
+  .tq-howto-list > li::marker{color:var(--accent-2);font-weight:800}
+  .tq-howto-sub{margin:5px 0 0;padding-left:1.1em;list-style:disc;color:var(--muted);font-size:12.5px}
+  .tq-howto-sub li{margin-bottom:3px}
+  .tq-howto-foot{margin-top:11px;padding-top:9px;border-top:1px solid var(--panel-line);
+                 font-size:12.5px;color:var(--muted)}
+  /* 圖例:一個真的盤面洞 + 一行字。
+     ⚠ .tq-hole 在盤面裡是絕對定位 + inline 尺寸(board.js 寫的);圖例在盤面**外面**,
+       所以尺寸與 --c / --cs 都要自己再掛一次。 */
+  .tq-legend{display:flex;flex-wrap:wrap;gap:7px 14px}
+  .tq-legend-i{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+  .tq-legend .tq-hole{position:static;width:20px;height:20px;flex:none}
+  .tq-legend [data-c="0"]{--c:var(--tq-c0);--cs:var(--tq-s0)}
+  .tq-legend [data-c="1"]{--c:var(--tq-c1);--cs:var(--tq-s1)}
+  .tq-legend [data-c="2"]{--c:var(--tq-c2);--cs:var(--tq-s2)}
+  .tq-legend [data-c="3"]{--c:var(--tq-c3);--cs:var(--tq-s3)}
+  .tq-legend [data-c="4"]{--c:var(--tq-c4);--cs:var(--tq-s4)}
+  .tq-legend [data-c="5"]{--c:var(--tq-c5);--cs:var(--tq-s5)}
+  .tq-legend [data-g="0"]{--g:var(--tq-c0)}
+
+  .tq-hero{text-align:center;margin:14px 0 4px}
+  .tq-art{width:96px;height:96px;display:block;margin:0 auto 8px}
+  .tq-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
+
+  /* ---------- 房間框 / 單機列(照飛行棋的 .fc-room)---------- */
+  .tq-room{padding:9px 12px}
+  .tq-room .row{margin-top:0}
+  .tq-room-top{flex-wrap:nowrap;gap:8px}
+  .tq-room .tq-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+                          font-size:13px}
+  .tq-room .tq-room-title b{font-size:15px;color:var(--text)}
+  .tq-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .tq-room .quick-voice,.tq-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .tq-room .quick-voice .qv-ico{font-size:18px}
+  .tq-room .mp-subrow{margin-top:5px}
+  .tq-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .tq-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+
+  /* ---------- 對局區 ----------
+     ⚠ .tq-acts 一定要 flex:none —— .tq-play 底下只能有一個可壓縮的兄弟(同排七 / 飛行棋)。 */
+  .tq-play{flex:1 1 auto;min-height:0;width:var(--tq-tw);margin:8px auto 0;
+           display:flex;flex-direction:column;align-items:center;gap:6px}
+  /* ⚠ overflow:auto 是**保險**不是常態:fitBoard() 的間距有下限(16px),極端矮的視窗上
+     盤面會比舞台高 —— 沒有這一條就是「盤面壓在提示列上面」。 */
+  .tq-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;z-index:0;
+            display:flex;align-items:center;justify-content:center;overflow:auto}
+  .tq-acts{flex:none;min-height:40px;display:flex;align-items:center;justify-content:center;
+           gap:12px;width:100%;position:relative}
+
+  /* ---------- 棋盤 ----------
+     ★ 板子做成六角星外框的感覺:圓角矩形 + 很淡的點點(同飛行棋),
+       真正的星形是 121 個洞自己排出來的 —— 不要用 clip-path 去切一個星,
+       那會讓四個尖角的洞貼在裁切邊上。 */
+  .tq-board{position:relative;--tq-cell:22px;flex:none;
+            background:
+              radial-gradient(rgba(200,170,120,.22) 1.1px,transparent 1.2px)
+                0 0 / calc(var(--tq-cell) * .5) calc(var(--tq-cell) * .5),
+              radial-gradient(circle at 50% 42%,#fffdf4,var(--tq-felt) 78%);
+            border-radius:22px;
+            box-shadow:0 10px 26px rgba(60,40,10,.30),
+                       inset 0 0 0 3px rgba(255,255,255,.8),
+                       inset 0 0 0 5px rgba(216,191,148,.45)}
+  .tq-board > *{position:absolute;box-sizing:border-box}
+  /* 六色掛在 data-c 上,底下的洞 / 棋子 / 點點全部靠 --c 取用(只有這六條認得顏色)。
+     --cs = 角的底色(淺版) */
+  .tq-board [data-c="0"],.tq-dot[data-c="0"]{--c:var(--tq-c0);--cs:var(--tq-s0)}
+  .tq-board [data-c="1"],.tq-dot[data-c="1"]{--c:var(--tq-c1);--cs:var(--tq-s1)}
+  .tq-board [data-c="2"],.tq-dot[data-c="2"]{--c:var(--tq-c2);--cs:var(--tq-s2)}
+  .tq-board [data-c="3"],.tq-dot[data-c="3"]{--c:var(--tq-c3);--cs:var(--tq-s3)}
+  .tq-board [data-c="4"],.tq-dot[data-c="4"]{--c:var(--tq-c4);--cs:var(--tq-s4)}
+  .tq-board [data-c="5"],.tq-dot[data-c="5"]{--c:var(--tq-c5);--cs:var(--tq-s5)}
+  .tq-board [data-g="0"]{--g:var(--tq-c0)}
+  .tq-board [data-g="1"]{--g:var(--tq-c1)}
+  .tq-board [data-g="2"]{--g:var(--tq-c2)}
+  .tq-board [data-g="3"]{--g:var(--tq-c3)}
+  .tq-board [data-g="4"]{--g:var(--tq-c4)}
+  .tq-board [data-g="5"]{--g:var(--tq-c5)}
+
+  /* 洞:凹進去的小圓。★ 角落那 60 個染上該角的淺色 —— 「誰的家在哪」是規則的一部分。
+     ⚠ 洞是 <button> 而不是 <div>:它要能被點(落點就是點洞)、也要能被鍵盤走訪。
+       所以 appearance / border / padding 都要自己歸零。 */
+  .tq-hole{appearance:none;-webkit-appearance:none;padding:0;margin:0;cursor:pointer;
+           border:1px solid rgba(150,120,70,.30);border-radius:50%;
+           background:var(--cs,var(--tq-hole));
+           box-shadow:inset 0 1.5px 3px rgba(90,65,25,.28)}
+  /* 我的目標角:一圈我的顏色的虛線環。⚠ 用 outline 而不是 border ——
+     border 會改變盒模型,而洞的尺寸是 inline style 寫死的(蓋不掉,飛行棋踩過)。 */
+  .tq-hole.goal{outline:2px dashed var(--g,var(--accent));outline-offset:1px}
+  /* 走得到的落點。★ 兩級:單步(.spot)與連跳(.far)——
+     ⚠ 連跳那一級要**明顯不同**:「這一顆能飛多遠」是跳棋最重要的一眼資訊。 */
+  .tq-hole.spot{background:#fff;border-color:var(--accent);
+                box-shadow:0 0 0 2px var(--accent),0 0 10px rgba(255,255,255,.55);
+                animation:tqSpot 1.25s ease-in-out infinite}
+  .tq-hole.far{border-color:var(--accent-2);
+               box-shadow:0 0 0 3px var(--accent-2),0 0 14px rgba(255,255,255,.7)}
+  @keyframes tqSpot{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
+
+  /* ---------- 棋子 ----------
+     ⚠ 位置一律走 transform(不是 left/top):transition 只有 transform 走得動 GPU。
+     ⚠⚠ **不要給 transition** —— 這一頁的動畫是 rAF 每一幀自己算位置的
+       (見 board.js 第四節:位置 = f(now))。加上 transition 等於讓 CSS 再插一層補間,
+       兩套補間疊在一起就是「棋子走完之後還會滑一下」。 */
+  .tq-pc{left:0;top:0;border-radius:50%;pointer-events:auto;cursor:pointer;z-index:5;
+         background:radial-gradient(circle at 34% 28%,#fff 4%,var(--c) 46%,rgba(0,0,0,.35) 130%);
+         box-shadow:0 2px 4px rgba(40,25,0,.42),inset 0 -2px 4px rgba(0,0,0,.28),
+                    0 0 0 1.6px rgba(255,255,255,.92);
+         display:flex;align-items:center;justify-content:center}
+  /* ★ 色盲的第二訊號:座號。六色比四色更難分,這個數字在這一頁**不是裝飾**。 */
+  .tq-pn{font-family:'Fredoka',sans-serif;font-weight:700;color:#fff;
+         font-size:calc(var(--tq-cell) * .34);line-height:1;pointer-events:none;
+         text-shadow:0 1px 1.5px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.5)}
+  .tq-pc.mine{z-index:6}
+  /* 選中的那一顆:光環 + 稍微放大 */
+  .tq-pc.on{z-index:9;box-shadow:0 2px 6px rgba(40,25,0,.5),inset 0 -2px 4px rgba(0,0,0,.28),
+                                0 0 0 2.4px #fff,0 0 12px 3px var(--accent);
+            animation:tqPick 1.1s ease-in-out infinite}
+  @keyframes tqPick{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
+  /* 送出中(★ 純視覺 —— 它擋不住任何操作,見 adapter.js 第一條) */
+  .tq-pc.wait{opacity:.55;animation:tqWait .9s ease-in-out infinite}
+  @keyframes tqWait{0%,100%{opacity:.55}50%{opacity:.85}}
+  .tq-pc.home{box-shadow:0 2px 4px rgba(40,25,0,.42),inset 0 -2px 4px rgba(0,0,0,.28),
+                         0 0 0 2px #fff,0 0 0 3.4px var(--c)}
+  .tq-pc.fly{z-index:10;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
+
+  .tq-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
+           line-height:1.35;text-align:left}
+
+  /* ---------- 出手倒數的環 ----------
+     ★★ 與台灣麻將 / 21 點 / UNO / 暗棋 / 飛行棋**同一顆**:SVG 環圈 + 中間秒數,
+       最後 3 秒轉紅脈動。關鍵影格直接沿用共用的 m16cd / m16beat / m16cdhot,
+       **不再定義一份同名的環**(同一件事只有一種畫法)。 */
+  .tq-cdwrap{display:flex;align-items:center;justify-content:center;flex:none}
+  .tq-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+  .tq-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .tq-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  .tq-cdbg{stroke:rgba(255,255,255,.16)}
+  /* 107 ≈ 2πr(r=17)。從 0 排到滿 = 環圈整圈消失 */
+  .tq-cdfg{stroke:var(--accent-2);stroke-dasharray:107;stroke-dashoffset:0;
+    animation:m16cd var(--cd-dur,40s) linear var(--cd-delay,0s) forwards}
+  .tq-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .tq-cdn.tq-beat{animation:m16beat .34s ease-out}
+  .tq-cd.tq-hot .tq-cdfg{stroke:var(--daub)}
+  .tq-cd.tq-hot .tq-cdn{color:var(--daub)}
+  .tq-cd.tq-hot{animation:m16cdhot .9s ease-in-out infinite}
+  /* 會動的東西一律尊重系統的「減少動態效果」(同 m16 那條) */
+  @media (prefers-reduced-motion:reduce){
+    .tq-cd.tq-hot{animation:none}
+    .tq-cdn.tq-beat{animation:none}
+    .tq-hole.spot{animation:none}
+    .tq-pc.on{animation:none}
+  }
+
+  /* ---------- 晶片上的東西 ---------- */
+  .tq-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--c);
+          box-shadow:0 0 0 1.5px rgba(255,255,255,.85);flex:none}
+  .tq-ct{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;
+         color:var(--muted);background:rgba(0,0,0,.06);border-radius:8px;padding:1px 5px}
+  .tq-ct-ic{width:8px;height:8px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}
+
+  /* ---------- 結果卡 ---------- */
+  .tq-result{margin:2px 0 12px}
+  .tq-rank{width:100%;border-collapse:collapse;font-size:13px}
+  .tq-rank th{font-size:11px;color:var(--muted);font-weight:800;padding:3px 4px;
+              border-bottom:1px solid rgba(0,0,0,.10)}
+  .tq-rank td{padding:5px 4px;border-bottom:1px solid rgba(0,0,0,.06);text-align:center}
+  .tq-rank td:nth-child(2){text-align:left;display:flex;align-items:center;gap:5px}
+  .tq-rank tr.me{background:rgba(0,0,0,.05);font-weight:800}
+  .tq-rank tr.top td{color:var(--accent-2)}
+  .tq-plus{color:var(--accent-2)}
+  .tq-rank-foot{margin-top:6px;font-size:11px;color:var(--muted);text-align:center}
+  .tq-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  body.solo-on .tq-react-row{display:none}
+
+  /* ---------- 對局中把棋盤放寬(大廳與選單維持 .panel 的 520)----------
+     ⚠ 紅線 7:放寬房間框就要**同時**放寬 .topbar,而且同一個數字
+       (守門 tools\run-e2e.ps1 t-topbar-fit,它斷言兩者寬度完全相等)。 */
+  body.tq-mp .tq-room,body.tq-solo .tq-room{width:min(92vw,560px)}
+  body.tq-mp .topbar,body.tq-solo .topbar{width:min(92vw,560px)}
+
+  /* ---------- 矮視窗 ---------- */
+  @media (max-height:620px){
+    /* ★★ 橫置手機:標題 + 插圖 + 兩顆鈕就吃掉大半,規則框硬留 150px 會把鈕擠出畫面。
+       這種高度下「只捲規則」本來就不成立 → 改成**整個面板捲**(至少每一樣都到得了)。
+       ⚠ 直向手機不會走到這裡(844 / 780 / 932 都在 620 以上)。 */
+    .tq-home{overflow-y:auto;overscroll-behavior:contain}
+    .tq-home > .tq-pick{flex:none}
+    .tq-howto{min-height:0;overflow:visible;box-shadow:none}
+    .tq-hero{margin:6px 0 2px}
+    .tq-art{width:66px;height:66px}
+    .tq-play{gap:4px;margin-top:4px}
+    .tq-room{padding:6px 10px}
+    .tq-room .mp-subrow,.tq-room-foot{margin-top:3px}
+    .tq-acts{min-height:36px}
+    .tq-cd{width:30px;height:30px}
+    .tq-cdn{font-size:12.5px}
+    .tq-hint{font-size:12px}
+  }
+
+  /* ---------- ★★ 橫置:提示那一列搬到右邊,整個高度讓給棋盤 ----------
+     與飛行棋同一個道理:盤面接近正方形(13 × 14.86),橫置時真正稀缺的是高度。
+     ⚠ 這一段刻意**不加 pointer:coarse** —— 矮而寬的桌機視窗同樣受益,而且加了就只能靠
+       tools/t-phone.html 才量得到(headless 一律是 pointer:fine)。
+     ⚠ 560 這個門檻與全站既有的緊湊斷點對齊,不要另外挑一個數字。 */
+  @media (orientation:landscape) and (max-height:560px){
+    .tq-play{flex-direction:row;align-items:center;gap:10px}
+    .tq-acts{flex:none;width:150px;min-height:0;height:100%;flex-direction:column;
+             justify-content:center;gap:10px}
+    .tq-hint{flex:none;text-align:center;font-size:12px}
+  }
+
+  /* ==========================================================================
      大螢幕 / 摺疊機展開(Galaxy Z Fold 7)—— 第一段:版面放寬
      ──────────────────────────────────────────────────────────────────────────
        使用者:「想要增加支援 z fold 7 折疊機展開螢幕的解析度…打開變大螢幕的時候,
@@ -8467,6 +8743,13 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     :root{--fc-tw:min(96vw,700px)}
     body.fc-mp .fc-room,body.fc-solo .fc-room{width:min(96vw,700px)}
     body.fc-mp .topbar,body.fc-solo .topbar{width:min(96vw,700px)}
+
+    /* 跳棋:560 → 700(同飛行棋)。盤面接近正方形而且 fitBoard() 對寬高各除一次再取小的,
+       所以真正的瓶頸多半是**高度** —— 700 只是把「寬度先卡住」這件事拿掉。
+       ⚠ 房間框與頂列成對放寬、同一個數字(紅線 7)。 */
+    :root{--tq-tw:min(96vw,700px)}
+    body.tq-mp .tq-room,body.tq-solo .tq-room{width:min(96vw,700px)}
+    body.tq-mp .topbar,body.tq-solo .topbar{width:min(96vw,700px)}
 
     /* ---- ③ 首頁:三欄 → 四欄(十二張卡剛好三列)----
        ⚠ 四欄掛在 index.html 自己包的 .gc-grid 上,**不可以**改成 #homePick{display:grid}

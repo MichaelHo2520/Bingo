@@ -123,7 +123,15 @@ const HomeLive = (function(){
          也不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
        ⚠ **不帶 joinMid** —— 飛機已經在盤上跑了,中途進來的人沒有位置(比照 UNO / 暗棋);
          這一條要與 adapter 沒有開 joinMidGame 保持一致。 */
-    { key:"fc", index:"fc_index", rooms:"fc_rooms", name:"飛行棋", icon:"✈️", badge:"hlBadgeFly", max:4, href:"flychess.html" }
+    { key:"fc", index:"fc_index", rooms:"fc_rooms", name:"飛行棋", icon:"✈️", badge:"hlBadgeFly", max:4, href:"flychess.html" },
+    /* ★ 第十四個遊戲(v1.180.0):跳棋(中國跳棋 · 六角星)。
+       max 必須與 js/tiaoqi/adapter.js 的 maxPlayers 一致(**6** —— 六角星有六個角)。
+       ⚠ 同上一條的紀律:key / index / rooms / 圖檔 / CSS 前綴一律同一個縮寫 tq,
+         而且 key 必須等於 index 去掉 "_index"。index.html 那張卡的 data-gk 也是 "tq"。
+       ⚠ icon 用 ⬢(U+2B22 黑色六邊形)—— 與另外十三個都不撞(🎲⚫🔢🀄🀄🎴🎴🌈🔴🧩🎨✈️),
+         也不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
+       ⚠ **不帶 joinMid** —— 棋子已經在盤上,中途進來的人沒有角可以坐(比照 UNO / 暗棋 / 飛行棋)。 */
+    { key:"tq", index:"tq_index", rooms:"tq_rooms", name:"跳棋", icon:"⬢", badge:"hlBadgeTq", max:6, href:"tiaoqi.html" }
   ];
 
   /* ==========================================================================

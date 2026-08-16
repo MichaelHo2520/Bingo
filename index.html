@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.179.7 -->
-<meta name="version" content="1.179.7">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.180.0 -->
+<meta name="version" content="1.180.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -249,7 +249,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </span>
       </a>
 
-      <!-- 第十三個遊戲(v1.179.7):飛行棋。
+      <!-- 第十三個遊戲(v1.180.0):飛行棋。
            ★ 圖上是四色機場的棋盤 + 一架飛機 + 一顆骰子 —— 這一款的三個identity。
            ★ 它是十三個裡**唯一以運氣為主**的競技遊戲(Bingo 之外),小孩與長輩贏得了大人。
            ⚠ fc-icon.png 目前是**佔位圖**(tools/gen-fc-icon.py 用程式畫的幾何圖形),
@@ -260,6 +260,21 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <span class="gc-body">
           <span class="gc-name display">飛行棋</span>
           <span class="hl-badge hidden" id="hlBadgeFly"></span>
+        </span>
+      </a>
+
+      <!-- 十四:跳棋(中國跳棋 · 六角星,v1.180.0)
+           ★ 圖上是六角星盤 + 幾顆彩色彈珠 —— 這一款的 identity。
+           ★ 它補的是「**3 人以上的純技巧棋**」這個位置:五子棋與暗棋都只有 2 人。
+           ⚠ tq-icon.png 目前是**佔位圖**(tools/gen-tq-icon.py 用程式畫的),
+              不是 design-refs 那套手繪插畫的一員 —— 現在一共有三張佔位圖
+              (dw / fc / tq),補進總圖重切之後才算完成。 -->
+      <a class="game-card as-link" href="tiaoqi.html" data-gk="tq">
+        <span class="gc-rank" aria-hidden="true">14</span>
+        <img class="gc-art tq-cart" src="img/tq-icon.png" alt="六角星跳棋盤" width="192" height="192">
+        <span class="gc-body">
+          <span class="gc-name display">跳棋</span>
+          <span class="hl-badge hidden" id="hlBadgeTq"></span>
         </span>
       </a>
       </div><!-- /.gc-grid -->

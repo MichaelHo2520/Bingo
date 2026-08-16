@@ -6,33 +6,33 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
-<meta name="apple-mobile-web-app-title" content="排七">
+<meta name="apple-mobile-web-app-title" content="跳棋">
 <meta name="theme-color" content="#2a1136">
 <!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
 <meta name="color-scheme" content="only light">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
-<title>排七（接龍） ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- 排七(接龍) · v1.180.0 -->
+<title>跳棋 ｜ 單機對電腦 + 2~6 人連線</title>
+<!-- 跳棋 · v1.180.0 -->
 <meta name="version" content="1.180.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
-  location.replace("app.html#sevens");
+  location.replace("app.html#tiaoqi");
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
 <!-- 共用 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
-     id 與 class;牌面與軌道是檔尾追加的 .sv-* 段落 -->
+     id 與 class;盤面與棋子是檔尾追加的 .tq-* 段落 -->
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <div class="topbar">
     <div class="brand">
-      <div class="sv-brand display">排七</div>
+      <div class="tq-brand display">跳棋</div>
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
@@ -42,11 +42,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
 
   <!-- ====== 進場選單(兩層)======
-       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度與人數。
-       與台灣麻將 #m16Home、消消樂 #mjHome 同一套結構。 -->
-  <section class="panel" id="svHome">
-    <!-- 回 index.html 的返回列。只在第一層顯示 —— 第二層有自己的返回(回第一層) -->
-    <div class="mp-head" id="svHomeHead">
+       第一層選玩法(連線在上、單機在下),點單機才進第二層挑難度與人數。 -->
+  <section class="panel tq-home" id="tqHome">
+    <div class="mp-head" id="tqHomeHead">
       <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </a>
@@ -54,39 +52,78 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
 
     <!-- 第一層:選怎麼玩 -->
-    <div id="svPickMode">
-      <div class="sv-hero">
-        <!-- ★ v1.149.0:與首頁卡**指向同一個檔案**(這裡是 .sv-art 96px、
-             首頁是 .gc-art.sv-cart 46px)—— 在此之前兩頁各有一份逐字相同的手繪 SVG。
-             ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十一張的規則寫在 index.html
-                的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這十一對雙胞胎)。
-             ⚠⚠ 這一頁**連註解裡的花色符號都要帶 U+FE0E** —— t-sevens-solo-e2e 那條
-                「每個花色符號都帶 U+FE0E」掃的是 body.innerHTML(只排除 #__log 與
-                <script>),所以註解也算進去。要舉反例請寫碼點(U+2660)不要真的打那個字。 -->
-        <img class="sv-art" src="img/sv-icon.png" alt="撲克牌 排七" width="192" height="192">
-        <div class="home-tagline">從 7 往兩邊接龍,蓋掉的牌算你的罰分</div>
+    <div id="tqPickMode" class="tq-pick">
+      <div class="tq-hero">
+        <!-- ★ 與首頁卡**指向同一個檔案**(這裡是 .tq-art 96px、首頁是 .gc-art.tq-cart 46px)。
+             ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改。 -->
+        <img class="tq-art" src="img/tq-icon.png" alt="六角星跳棋盤" width="192" height="192">
+        <div class="home-tagline">把整組棋子搬到對面的角,連跳一口氣飛過半個盤面</div>
       </div>
-      <button class="btn primary block-btn home-btn" id="svGoOnline">🌐 連線對戰</button>
-      <button class="btn ghost block-btn home-btn" id="svGoSolo">🎮 單機遊玩</button>
-      <div class="home-hint">
-        52 張全發給 <b>2~6 人</b>。拿到 <b>♠︎7</b> 的人先出,之後輪流出<b>同花色、點數相鄰</b>的牌
-        (往上 8…K、往下 6…A),或開一條新花色的 7。<br>
-        <b>有牌可出就一定要出</b>;真的沒牌可出才蓋掉一張(蓋什麼別人看不到)。<br>
-        大家的牌都出完後,<b>蓋掉的點數加起來最少的人贏</b>(A=1、K=13)。
+      <button class="btn primary block-btn home-btn" id="tqGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="tqGoSolo">🎮 單機遊玩</button>
+      <!-- ★★ 玩法說明刻意寫得很細。跳棋與五子棋 / 大老二不一樣:**跳與連跳的規則沒玩過
+           完全猜不到**(飛行棋 v1.179.3 的同一個教訓)。
+           ⚠ 三件最多人卡住的事一定要各自獨立講清楚,不可以壓成一句:
+             ① 跳是「越過**緊鄰的一顆**落到**正後方**」,不是「跳過幾格都可以」
+             ② 連跳可以一直接下去,但**走一格就結束**(兩者不能混)
+             ③ **誰的棋都能當跳板** —— 對手的棋是橋不是牆,這是全局唯一用得到別人的地方
+           ⚠ 底下的圖例用的是**盤面上真的那幾個 class**(.tq-hole / .tq-pc),
+             不是另外畫一組 —— 兩邊長得不一樣的話,說明反而幫倒忙。 -->
+      <div class="tq-howto">
+        <div class="tq-howto-h">⬢ 怎麼玩</div>
+        <p class="tq-howto-goal">
+          目標:把你角落的棋子<b>全部搬到正對面那個角</b>。<b>先搬完的人贏。</b>
+        </p>
+        <ol class="tq-howto-list">
+          <li><b>每一手只動一顆</b> —— 先點自己的一顆棋,盤面會把它<b>走得到的洞全部亮起來</b>,
+              再點你要去的那個洞。</li>
+          <li><b>走一格</b> —— 往旁邊六個方向之一,走到<b>緊鄰的空洞</b>。走完這一手就結束。</li>
+          <li><b>跳</b> —— 旁邊<b>緊鄰</b>有一顆棋、而它<b>正後方</b>是空的 → 可以跳過去。
+            <ul class="tq-howto-sub">
+              <li>只能越過<b>一顆</b>,而且落點必須<b>剛好在它正後方那一格</b>。</li>
+              <li>隔兩顆、或後面也有棋,<b>都不能跳</b>。</li>
+            </ul>
+          </li>
+          <li><b>連跳(這個遊戲最爽的地方)</b> —— 跳完之後如果<b>還跳得動</b>,
+              可以在<b>同一手之內一直跳下去</b>,一口氣飛過半個盤面。
+            <ul class="tq-howto-sub">
+              <li>⚠ 但<b>走一格就結束</b>:不能走一格再接著跳。</li>
+              <li>你只要點<b>最後要停的那個洞</b>,中間的路系統會自己走。</li>
+            </ul>
+          </li>
+          <li><b>★ 誰的棋都能當跳板</b> —— 越過的可以是<b>自己人,也可以是對手</b>。
+              對手的棋<b>不是障礙,是橋</b>:他擺在那裡剛好讓你飛過去。
+              把自己的棋<b>排成一條鏈</b>,後面的就能一路連跳。</li>
+          <li><b>不吃子</b> —— 跳過去<b>不會</b>把人打掉。棋子只會移動,不會消失,
+              所以這個遊戲<b>不會有人被打回原點</b>。</li>
+          <li><b>卡住怎麼辦</b> —— 你的目標角就是<b>對面那家的老家</b>。
+              他要是有一顆賴著不走,那個洞就算你<b>已經填到了</b>(不然會永遠玩不完)。</li>
+        </ol>
+        <div class="tq-howto-h2">盤面上的記號</div>
+        <div class="tq-legend">
+          <span class="tq-legend-i"><i class="tq-hole" data-c="0"></i>普通的洞</span>
+          <span class="tq-legend-i"><i class="tq-hole goal" data-c="3" data-g="0"></i>你的目標角</span>
+          <span class="tq-legend-i"><i class="tq-hole spot"></i>走一格到得了</span>
+          <span class="tq-legend-i"><i class="tq-hole spot far"></i>連跳到得了</span>
+        </div>
+        <div class="tq-howto-foot">
+          <b>2~6 人</b>,每人 <b>3 / 6 / 10 顆</b>(房主決定)。單機可以先跟電腦練一局。
+          ⚠ <b>5 人</b>時六個角坐五個人,會有一家的目標角是空的(略佔便宜)。
+        </div>
       </div>
     </div>
 
     <!-- 第二層:單機設定 -->
-    <div id="svPickSolo" class="hidden">
+    <div id="tqPickSolo" class="hidden">
       <div class="home-sub-head">
-        <button class="icon-btn" id="svSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+        <button class="icon-btn" id="tqSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <span class="subtitle">單機遊玩</span>
       </div>
       <div class="field">
         <span class="field-label">電腦強度</span>
-        <div class="seg" id="svLvSeg" aria-label="電腦強度">
+        <div class="seg" id="tqLvSeg" aria-label="電腦強度">
           <button data-lv="easy">🙂 新手</button>
           <button class="on" data-lv="normal">🤔 普通</button>
           <button data-lv="hard">😈 高手</button>
@@ -94,16 +131,23 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </div>
       <div class="field">
         <span class="field-label">幾個人玩</span>
-        <div class="seg" id="svSeatSeg" aria-label="幾個人玩">
-          <button data-seats="2">2 人</button>
+        <div class="seg" id="tqSeatSeg" aria-label="幾個人玩">
+          <button class="on" data-seats="2">2 人</button>
           <button data-seats="3">3 人</button>
-          <button class="on" data-seats="4">4 人</button>
-          <button data-seats="5">5 人</button>
+          <button data-seats="4">4 人</button>
           <button data-seats="6">6 人</button>
         </div>
       </div>
-      <button class="btn primary block-btn home-btn" id="svStartSolo">開始對局</button>
-      <div class="home-hint" id="svSoloHint"></div>
+      <div class="field">
+        <span class="field-label">每人幾顆</span>
+        <div class="seg" id="tqPieceSoloSeg" aria-label="每人幾顆棋子">
+          <button data-pieces="3">3 顆</button>
+          <button class="on" data-pieces="6">6 顆</button>
+          <button data-pieces="10">10 顆</button>
+        </div>
+      </div>
+      <button class="btn primary block-btn home-btn" id="tqStartSolo">開始對局</button>
+      <div class="home-hint" id="tqSoloHint"></div>
     </div>
   </section>
 
@@ -136,20 +180,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </section>
 
   <!-- ====== 房間橫幅 ====== -->
-  <div class="panel sv-room hidden" id="mpBar">
-    <div class="row sv-room-top">
+  <div class="panel tq-room hidden" id="mpBar">
+    <div class="row tq-room-top">
       <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <!-- v1.105.0:拿掉「房間」字首(房名預設就是「XXX的房間」,前面再加一次是重複) -->
-      <span class="label sv-room-title"><b id="mpRoomTitle" class="display">–</b></span>
+      <span class="label tq-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
-        <!-- 大牌桌(v1.180.0,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
-             ⚠ class 是 .sv-bigbtn,而狀態掛在 body 上的是 .sv-big —— 兩個名字**一定要不一樣**。
-             ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
-             ⚠ 單機列也有一顆(#svSoloBig),兩顆共用 .sv-bigbtn 一起同步。 -->
-        <button class="icon-btn sv-bigbtn" id="svBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
+        <!-- 大棋盤(十四頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
+             ⚠ class 是 .tq-bigbtn,而狀態掛在 body 上的是 .tq-big —— 兩個名字**一定要不一樣**。
+             ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。 -->
+        <button class="icon-btn tq-bigbtn" id="tqBig" type="button" title="大棋盤" aria-label="大棋盤">大</button>
         <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
           <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
         </button>
@@ -159,43 +201,69 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="mp-subrow" id="mpSubrow">
       <span class="mp-status" id="mpStatusTxt">等待中…</span>
     </div>
-    <div class="sv-room-foot">
+    <div class="tq-room-foot">
       <div id="mpPlayers" class="mp-players"></div>
     </div>
   </div>
 
   <!-- ====== 單機的牌桌列 ======
-       刻意沿用房間橫幅同一組 .sv-room / .mp-chip 外觀:連線與單機長得一樣才有一致感。
-       晶片由 js/sevens/solo.js 自己畫 —— mp-core 的 renderPlayers() 是連線專屬的。 -->
-  <div class="panel sv-room hidden" id="svSoloBar">
-    <div class="row sv-room-top">
-      <button class="icon-btn mp-leave-btn" id="svSoloExit" title="離開牌桌" aria-label="離開牌桌">
+       刻意沿用房間橫幅同一組 .tq-room / .mp-chip 外觀:連線與單機長得一樣才有一致感。
+       晶片由 js/tiaoqi/solo.js 自己畫 —— mp-core 的 renderPlayers() 是連線專屬的。 -->
+  <div class="panel tq-room hidden" id="tqSoloBar">
+    <div class="row tq-room-top">
+      <button class="icon-btn mp-leave-btn" id="tqSoloExit" title="離開棋局" aria-label="離開棋局">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label sv-room-title">單機遊玩 <b id="svSoloLv" class="display">普通</b></span>
-      <span class="mp-goal" id="svSoloRec" aria-label="戰績"></span>
-      <!-- 大牌桌:單機這一份(說明見 #svBig) -->
-      <button class="icon-btn sv-bigbtn" id="svSoloBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
+      <span class="label tq-room-title">單機遊玩 <b id="tqSoloLv" class="display">普通</b></span>
+      <span class="mp-goal" id="tqSoloRec" aria-label="戰績"></span>
+      <button class="icon-btn tq-bigbtn" id="tqSoloBig" type="button" title="大棋盤" aria-label="大棋盤">大</button>
     </div>
-    <div class="sv-room-foot">
-      <div id="svSoloPlayers" class="mp-players"></div>
+    <div class="tq-room-foot">
+      <div id="tqSoloPlayers" class="mp-players"></div>
     </div>
   </div>
 
   <!-- ====== 大廳設定 ====== -->
-  <div class="scroll-area sv-scroll hidden" id="scrollArea">
-    <section class="panel hidden" id="svSetup">
+  <div class="scroll-area tq-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="tqSetup">
       <div class="subtitle">對戰設定</div>
-      <!-- 出牌倒數:多人回合制沒有它,一個人切到 LINE 就全桌卡死(台灣麻將 v1.59.0 踩過)。
-           ★ 一定是**房間設定**不是各人偏好 —— 到期自動出牌是「誰的 timer 先響誰用交易搶」,
-             各自設定的話全房會被最短的那台決定(見 js/sevens/adapter.js 檔頭)。 -->
+      <!-- ★★ 誰先走:跳棋的先手有一點點價值(先佔到中間的路),值得讓人選。
+           三種方式與 Bingo / 暗棋 / 飛行棋同一套(猜拳蓋板 / 房主排 / 隨機)。
+           ⚠ 預設**隨機**:每一局都要大家點一次拳,連打十局就要猜十次。
+           ⚠ data-base 是給核心用的:訪客端會變成「誰先走(房主決定)」。
+           ⚠ 三顆鈕的 data-order 要與 mp-core 的白名單逐字相同(random / rps / host)。 -->
+      <div class="field" id="mpOrderRow">
+        <span class="field-label" id="mpOrderLabel" data-base="誰先走">誰先走</span>
+        <div class="seg" id="mpOrderSeg" aria-label="誰先走">
+          <button class="on" data-order="random">🎲 隨機</button>
+          <button data-order="rps">✊ 猜拳</button>
+          <button data-order="host">👑 房主排</button>
+        </div>
+      </div>
+      <!-- ★★ 每人幾顆是「這局要打多久」的唯一旋鈕,而預設值是**量出來的**
+           (node 自我對局,見 notes/23):6 顆在 2 人局約 7 分鐘、4 人 12 分、6 人 15 分。
+           ⚠ 不要把預設改成 10 顆 —— 6 人局會變成 20 分鐘,那是「開一次就不會再有人點」的長度
+             (飛行棋 v1.179.0 的教訓)。
+           ⚠ 也不要以為 3 顆會快很多:棋子少 → 沒有跳板 → 連跳鏈變短,每顆反而爬得更慢。 -->
       <div class="field">
-        <span class="field-label" id="svSecLabel">出牌倒數</span>
-        <div class="seg" id="svSecSeg" aria-label="出牌倒數">
+        <span class="field-label" id="tqPieceLabel">每人幾顆</span>
+        <div class="seg" id="tqPieceSeg" aria-label="每人幾顆棋子">
+          <button data-pieces="3">3 顆 · 快</button>
+          <button class="on" data-pieces="6">6 顆 · 標準</button>
+          <button data-pieces="10">10 顆 · 完整</button>
+        </div>
+      </div>
+      <!-- 出手倒數:多人回合制沒有它,一個人切到 LINE 就全桌卡死(台灣麻將 v1.59.0 踩過)。
+           ★ 一定是**房間設定**不是各人偏好 —— 到期自動出手是「誰的 timer 先響誰用交易搶」,
+             各自設定的話全房會被最短的那台決定。
+           ⚠ 跳棋要想的比飛行棋久(沒有骰子替你決定),所以預設 40 秒不是 30。 -->
+      <div class="field">
+        <span class="field-label" id="tqSecLabel">出手倒數</span>
+        <div class="seg" id="tqSecSeg" aria-label="出手倒數">
           <button data-sec="0">關</button>
-          <button data-sec="15">15 秒</button>
-          <button class="on" data-sec="30">30 秒</button>
-          <button data-sec="60">60 秒</button>
+          <button data-sec="20">20 秒</button>
+          <button class="on" data-sec="40">40 秒</button>
+          <button data-sec="90">90 秒</button>
         </div>
       </div>
       <div class="field" id="scoreRow">
@@ -208,27 +276,29 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <div class="wg-group hidden" id="wgGroup">
             <span class="wg-lbl">先到</span>
             <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標勝場">－</button>
+              <button class="mini" id="wgMinus" aria-label="減少目標分數">－</button>
               <span class="target-val display" id="winGoalVal">3</span>
-              <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+              <button class="mini" id="wgPlus" aria-label="增加目標分數">＋</button>
             </div>
-            <span class="wg-lbl">勝奪冠</span>
+            <span class="wg-lbl">分奪冠</span>
           </div>
           <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
           <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
         </div>
       </div>
-      <div class="hint" id="svRuleHint"></div>
+      <div class="hint" id="tqRuleHint"></div>
     </section>
   </div>
 
-  <!-- ====== 牌桌 ======
-       單機與連線**共用這一整塊**(軌道 SVB + 動作列),差別只在上面那條列與
-       結果卡的按鈕組 —— 靠 body.solo-on 切換(同五子棋 / 數獨 / 消消樂 / 台灣麻將)。 -->
-  <div class="sv-play hidden" id="svPlay">
-    <!-- 軌道 / 對手列 / 我的蓋牌 / 我的手牌,全部由 SVB.render() 畫 -->
-    <div class="sv-stage" id="svStage"></div>
-    <div class="sv-acts hidden" id="svActs"></div>
+  <!-- ====== 棋盤 ======
+       單機與連線**共用這一整塊**(盤面 TQB + 提示列),差別只在上面那條列與
+       結果卡的按鈕組 —— 靠 body.solo-on 切換。 -->
+  <div class="tq-play hidden" id="tqPlay">
+    <div class="tq-stage" id="tqStage">
+      <!-- 121 個洞與棋子全部由 TQB 產生;尺寸由 fitBoard() 用 JS 算(不用 aspect-ratio) -->
+      <div class="tq-board" id="tqBoard"></div>
+    </div>
+    <div class="tq-acts hidden" id="tqActs"></div>
   </div>
 
   <!-- ====== 主要動作列 ====== -->
@@ -241,14 +311,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
   <!-- ====== 結果卡 ====== -->
   <div class="veil" id="veil">
-    <div class="win-card sv-win" id="svWinCard">
+    <div class="win-card tq-win" id="tqWinCard">
       <div class="word display" id="winWord">本局結束</div>
       <p id="winMsg"></p>
-      <!-- 排名表:★ 這裡是**唯一**會翻開別人蓋牌的地方(對局中一律只顯示張數) -->
-      <div class="sv-result hidden" id="svResult"></div>
+      <div class="tq-result hidden" id="tqResult"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>
-      <div class="sv-react-row" id="svReactRow">
+      <div class="tq-react-row" id="tqReactRow">
         <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
         <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
         <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
@@ -261,12 +330,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <button class="btn ghost" id="mpLeaveWin">離開房間</button>
       </div>
       <!-- 單機那組(與上面那組在同一格位置輪流出現,靠 body.solo-on 切換;
-           id 刻意與數獨 / 消消樂 / 台灣麻將同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
+           id 刻意與其他頁同名 —— 樣式那條 body:not(.solo-on) #soloWinBtns 通用) -->
       <div class="actions" id="soloWinBtns">
-        <button class="btn primary" id="svSoloAgain">再來一局</button>
-        <button class="btn ghost" id="svSoloHome">回選單</button>
+        <button class="btn primary" id="tqSoloAgain">再來一局</button>
+        <button class="btn ghost" id="tqSoloHome">回選單</button>
       </div>
-      <button class="peek-link" id="winPeek">先看看牌桌 👀</button>
+      <button class="peek-link" id="winPeek">先看看棋盤 👀</button>
     </div>
   </div>
   <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
@@ -329,7 +398,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
       <button class="btn primary" id="setClose">完成</button>
-      <div class="set-foot">排七(接龍) · <span id="setVer"></span> · 開發者 Michael Ho</div>
+      <div class="set-foot">跳棋 · <span id="setVer"></span> · 開發者 Michael Ho</div>
     </div>
   </div>
 
@@ -399,7 +468,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
 <script>
 /* ============================================================
-   與其他五個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 sevens_rooms / sevens_index。
+   與其他十三個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 tq_rooms / tq_index。
    ⚠ 需在資料庫規則開放那兩段 —— 整份規則在 notes/firebase-rules.json,可直接複製貼上。
    ============================================================ */
 const FIREBASE_CONFIG = {
@@ -413,19 +482,20 @@ const FIREBASE_CONFIG = {
 };
 </script>
 
-<!-- 載入順序固定:ui-kit(定義 $)→ mp-core(連線核心)
+<!-- 載入順序固定:ui-kit(定義 $)→ mp-order(★ 必須在 mp-core **之前**,
+     核心在 create() 裡就 MPOrder.attach())→ mp-core(連線核心)
      → rules(規則,純函式)→ ai(電腦對手,只相依 rules)
      → board(盤面)→ solo(單機,要 board 與 ai)
      → adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
+<script src="js/shared/mp-order.js"></script>
 <script src="js/shared/mp-core.js"></script>
-<script src="js/shared/pk-faces.js"></script>
-<script src="js/sevens/rules.js"></script>
-<script src="js/sevens/ai.js"></script>
-<script src="js/sevens/board.js"></script>
-<script src="js/sevens/solo.js"></script>
-<script src="js/sevens/adapter.js"></script>
-<script src="js/sevens/main.js"></script>
+<script src="js/tiaoqi/rules.js"></script>
+<script src="js/tiaoqi/ai.js"></script>
+<script src="js/tiaoqi/board.js"></script>
+<script src="js/tiaoqi/solo.js"></script>
+<script src="js/tiaoqi/adapter.js"></script>
+<script src="js/tiaoqi/main.js"></script>
 </body>
 </html>
