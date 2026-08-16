@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.178.9";
+const VERSION = "1.179.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -116,7 +116,7 @@ const CORE = [
   "./js/chengyu/adapter.js",
   "./js/chengyu/main.js",
   /* 你畫我猜(第十二個遊戲,v1.154.0;獨立頁面)。
-     ★★ 十二個裡**唯一沒有 solo.js 也沒有 ai.js** 的一頁 —— 沒有 AI 畫家、也沒有 AI 猜圖者,
+     ★★ 十三個裡**唯一沒有 solo.js 也沒有 ai.js** 的一頁 —— 沒有 AI 畫家、也沒有 AI 猜圖者,
        所以它只有連線。⚠ 連帶:**這一頁離線是玩不了的**(快取只讓進場頁畫得出來),
        那與另外十一頁不同,不是漏列檔案。
      ★ 這一頁不新增任何 mp3:動作聲全是 Sound.tone() 的合成音(同暗棋 / 成語接龍)。 */
@@ -126,6 +126,18 @@ const CORE = [
   "./js/draw/board.js",
   "./js/draw/adapter.js",
   "./js/draw/main.js",
+  /* 飛行棋(第十三個遊戲,v1.179.0;獨立頁面)。
+     ★ 這一頁多載一支共用檔:js/shared/mp-order.js(猜拳決定誰先擲)——
+       它上面已經列過(暗棋也吃它),不必再列一次。
+     ★ 這一頁不新增任何 mp3:骰子 / 走格 / 踩人的聲音全是 Sound.tone() 的合成音
+       (同暗棋 / 成語接龍 / 你畫我猜)。 */
+  "./flychess.html",
+  "./js/flychess/rules.js",
+  "./js/flychess/ai.js",
+  "./js/flychess/board.js",
+  "./js/flychess/solo.js",
+  "./js/flychess/adapter.js",
+  "./js/flychess/main.js",
   "./mp3/bgm.mp3",
   "./mp3/Sunday_Morning.mp3",
   "./mp3/win.wav",
@@ -222,7 +234,8 @@ const CORE = [
   "./img/un-icon.png",     // UNO
   "./img/dc-icon.png",     // 象棋暗棋
   "./img/cy-icon.png",     // 成語接龍
-  "./img/dw-icon.png"      // 你畫我猜(★ 目前是 tools/gen-dw-icon.py 產的佔位圖,不是那套手繪插畫)
+  "./img/dw-icon.png",     // 你畫我猜(★ 目前是 tools/gen-dw-icon.py 產的佔位圖,不是那套手繪插畫)
+  "./img/fc-icon.png"      // 飛行棋(★ 目前是 tools/gen-fc-icon.py 產的佔位圖,不是那套手繪插畫)
 ];
 /* 筒條萬的牌名語音(v1.72.0,27 個)。★ 用算式接上去而**不是手列 27 行** —— 規律與
    js/mahjong16/sfx.js 的編碼一致(0..8 萬 w / 9..17 條 b / 18..26 筒 d)。

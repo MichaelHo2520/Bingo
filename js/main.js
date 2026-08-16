@@ -241,7 +241,7 @@
     if(document.hidden || navigator.onLine===false)return;
     if(Date.now()-updLastAt < updGap)return;              // updGap:正常 5 分鐘,慢速重試中 30 分鐘
     updLastAt=Date.now();
-    /* ★★ 只抓前 4 KB(v1.156.0)。要的只有 <meta name="version"> 那一個標籤,而它在十二頁
+    /* ★★ 只抓前 4 KB(v1.156.0)。要的只有 <meta name="version"> 那一個標籤,而它在十三頁
        全部落在前 2,160 B 之內;抓整份是 21~40 KB(index.html 是最大的那一頁)。
        ⚠ 伺服器不支援 Range 就回 200 全檔 → 下面的 .match() 自動退回舊行為。
        ⚠⚠ 必須與 sw.js 的 cache.put 一起改(206 的 res.ok 是 true,而 Cache.put 對 206 會 reject)。
@@ -374,7 +374,7 @@
     },1000);
   }
   /* 讓設定頁的版號可以按。★ 刻意**不動 HTML** —— `.set-foot` 那一行的 <span id="setVer">
-     十二頁一字不差,在 JS 裡加 class 就十二頁一起有了。
+     十三頁一字不差,在 JS 裡加 class 就十三頁一起有了。
      ⚠ 頂列的 #topVer 刻意**不綁**:那顆在對局中一直看得到,誤按的代價太大
        (雖然 hardRefresh() 有 updSafe 擋著,但少一個誤觸點就是少一個)。 */
   function armHardRefresh(el){
@@ -391,7 +391,7 @@
      那段期間按鈕的 addEventListener 一行都還沒跑,使用者按了完全沒反應、也沒有任何提示
      (使用者回報「暗棋按了沒反應,等久一點又會可以」就是這個)。
      ⚠ 漏呼叫的下場是「那一頁的按鈕永遠灰著」—— 比原本的問題更糟,所以有測試守著
-       (tools/test-boot.js:十二頁都要有 class、十二支 main.js 都要呼叫)。
+       (tools/test-boot.js:十三頁都要有 class、十三支 main.js 都要呼叫)。
      ⚠ 一定要放在**同步啟動流程跑完之後**;setTimeout 裡的收尾(例如 maybeShowInstallTip)
        不算,那些晚一點跑不影響「按鈕能不能按」。
      ★ 提示條與灰化都是純 CSS(計時器是 animation 的 delay)—— 這一刻壞掉的東西正是 JS,

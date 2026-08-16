@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v1.178.9 -->
-<meta name="version" content="1.178.9">
+<!-- 你畫我猜 · v1.179.0 -->
+<meta name="version" content="1.179.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -43,7 +43,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
 
   <!-- ====== 連線畫面 = 這一頁的**第一層**(暱稱 / 建房 / 大廳清單)======
-       ★★ 這一頁**只有連線對戰,沒有單機** —— 十二個遊戲裡唯一的一個。
+       ★★ 這一頁**只有連線對戰,沒有單機** —— 十三個遊戲裡唯一的一個。
           你畫我猜需要一個會畫圖的人與會看圖的人,兩邊都沒有 AI 做得到。
        ★★★ v1.155.3 起**沒有獨立的進場選單**(原本的 #dwHome 整段刪掉):
           那一層只有一顆「🌐 連線對戰」,按下去必定走同一條路 = 純粹多一下。
@@ -68,7 +68,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="dw-hero">
       <!-- ★ v1.149.0 起的規則:與首頁卡**指向同一個檔案**(這裡是 .dw-art 92px、
            首頁是 .gc-art.dw-cart 46px)。
-           ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十二張的規則寫在 index.html
+           ⚠ 換圖 / 動檔名要兩頁 + sw.js 的 CORE 一起改;十三張的規則寫在 index.html
               的 .gc-grid 上面那段(tools/test-pages.js 的 E 節在守這些雙胞胎)。 -->
       <img class="dw-art" src="img/dw-icon.png" alt="畫筆與畫板" width="192" height="192">
       <div class="home-tagline">一人畫、其他人打字搶答</div>

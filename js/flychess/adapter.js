@@ -1,0 +1,506 @@
+"use strict";
+
+/* ============================================================================
+   飛行棋 — 連線適配器(接上 js/shared/mp-core.js)
+
+   ── DB 上只有兩個欄位就夠了 ──────────────────────────────────────────────
+     `fc`(這一局凍結的房規)+ `moves`(一手一個整數),與排七 / 五子棋同構,
+     所以核心的 rev / 交易 / 斷線重建原封不動就能用。
+     每台裝置各自 FC.replay(fc, n, moves) 算出完整局面 → **重連歸位不必特別處理**。
+
+   ── ★★ 房規必須在開局那一刻凍結(比照 21 點)─────────────────────────────
+     replay 是拿「現在的房規」重跑整局的 —— 房規一變,同一份 moves 會 replay 出
+     **完全不同的盤面**(這件事有測試守著,見 test-fc-rules 的 E 節)。
+     所以 newGame() 把當下的房規整包寫進 `g.fc`,對局中改大廳設定完全影響不到這一局。
+
+   ── ★★★ 批次同步絕對不可以連播動畫 ───────────────────────────────────────
+     這是十三個遊戲裡第一個有棋子位移動畫的一頁。斷線重連時 moves 會一口氣多幾十筆,
+     照著演就是**二十幾秒的慢動作**,而且那段期間畫面完全不能操作。
+     → 只有「剛好多一筆」才演(animOf());其餘一律直接落到終局座標。
+
+   ── ★ 骰子的點數是寫進 moves 的,不是算出來的 ────────────────────────────
+     刻意不用決定性 PRNG(理由見 rules.js 檔頭②)。Math.random() 在這一支只出現在
+     兩個地方:玩家自己按擲骰(sendRoll)、以及倒數到期替人代打(autoPlay)。
+
+   ── ★ 決定勝負的交易一定要帶 { local:false } ─────────────────────────────
+     notes/07 踩坑 #8:Firebase 交易會先在本地樂觀套用,搶最後一手時搶輸的那台會
+     **先**看到「我贏」而往 scores/ 寫分數,game 回退時分數不會跟著回退。
+   ========================================================================== */
+
+const MP = MPCore.create((function(){
+
+  const SECS = [0, 15, 30, 60];        // 出手倒數的選項;預設值也寫在 flychess.html 的 .on
+  let turnSec = 30;
+  let rules = { planes: 2, launch: "one6", goal: 0, exact: false };   // 大廳裡「下一局要用」的房規
+  let ctx = null;
+
+  let moves = [], st = null, gRules = null;   // gRules = 這一局凍結下來的房規
+  let curRound = null;
+  let lastLen = -1, turnAt = 0;
+  let turnT = null;
+  let busy = false;                    // 動畫演到一半:不要在中間再畫一次(會把飛機瞬移)
+  /* ★ 開局那一刻每個人的累積分數快照(結果卡的「累計」欄用)。
+     為什麼不當場讀 scores:那個節點是**結算之後**每台各自寫自己的分,而結果卡是
+     **結算當下**就要畫出來 —— 直接讀會少一次,而且沒有人會重畫這張卡。 */
+  let baseWins = {};
+
+  const seatOf = id => ctx.order().indexOf(id);
+  const mySeat = () => seatOf(ctx.me());
+  const nPlayers = () => ctx.order().length;
+  const secOn = () => turnSec > 0;
+  const playing = () => ctx.phase() === "playing" && !ctx.winner() && !ctx.abandoned();
+  const rulesOf = g => FC.normRules((g && g.fc) || rules);
+  function nameOfSeat(s){
+    const id = ctx.order()[s];
+    return id ? ctx.dispName(id) : ("玩家" + (s + 1));
+  }
+
+  /* ---------- 輪到誰 ----------
+     ★ 一律問 replay 出來的 st.turn,不可以用 moves.length 取模 ——
+       擲到 6 會再擲一次(回合停在同一個人身上),而且一手不一定是兩筆。 */
+  function turnId(){
+    if(!st || st.over) return null;
+    return ctx.order()[st.turn] || null;
+  }
+  const isMyTurn = () => !!(st && !st.over && playing() && st.turn === mySeat());
+
+  /* ==========================================================================
+     一、畫面
+     ========================================================================== */
+  function hintText(){
+    if(!st || st.over) return "";
+    const who = esc(nameOfSeat(st.turn));
+    if(!isMyTurn()) return who + (st.die ? " 擲出 " + st.die + ",正在選飛機…" : " 要擲骰了…");
+    if(!st.die) return "輪到你了 —— 按骰子";
+    const L = FC.legalMoves(st, mySeat());
+    if(!L.length) return "這個點數沒得走";
+    return "點一架要動的飛機" + (st.die === 6 ? "(擲到 6,走完可以再擲一次)" : "");
+  }
+
+  function paint(anim, done){
+    if(!st) return;
+    const me = mySeat();
+    const can = (isMyTurn() && st.die && !busy) ? FC.legalMoves(st, me).map(m => m.plane) : [];
+    FCB.render({ st: st, mySeat: me, can: can, anim: anim || null, onDone: done || null });
+    FCB.renderActs({
+      canRoll: isMyTurn() && !st.die && !busy,
+      hint: hintText(),
+      // 倒數給全桌看(誰還剩幾秒是公開資訊,大家才知道在等什麼)
+      cdMs: secOn() ? turnSec * 1000 : 0,
+      cdEnd: secOn() ? turnAt + turnSec * 1000 : 0
+    });
+    ctx.renderPlayers();
+  }
+
+  /* ==========================================================================
+     二、送出一手
+     ──────────────────────────────────────────────────────────────────────────
+       交易內原子 append:即使兩端同時點也不會覆蓋彼此。
+       ⚠ 交易裡一定要拿**伺服器的 moves** 重跑一次規則再寫 —— 本地畫面對不代表
+         伺服器上對(同排七 send() 的守衛)。
+     ========================================================================== */
+  function push(step, mkMove, guard){
+    const n = nPlayers();
+    ctx.txGame(g => {
+      if(g.status !== "playing" || g.winner) return false;
+      const mv = Array.isArray(g.moves) ? g.moves : [];
+      if(mv.length !== step) return false;                  // 這一手已被推進 → 中止,等快照
+      const chk = FC.replay(rulesOf(g), n, mv);
+      if(!chk || chk.over) return false;
+      if(guard && !guard(chk)) return false;
+      const one = mkMove(chk);
+      if(one == null || one < 0) return false;
+      if(!FC.step(chk, one)) return false;                  // 伺服器真值上不合法 → 不寫
+      g.moves = mv.concat(one);
+    });
+  }
+
+  function sendRoll(){
+    const me = mySeat(), step = moves.length;
+    // ★ 這是這一支唯二准用 Math.random() 的地方之一
+    const d = 1 + Math.floor(Math.random() * 6);
+    push(step, () => FC.encRoll(d), chk => chk.turn === me && !chk.die);
+  }
+  function sendMove(plane){
+    const me = mySeat(), step = moves.length;
+    push(step, () => FC.encMove(plane), chk =>
+      chk.turn === me && !!chk.die && FC.legalMoves(chk, me).some(m => m.plane === plane));
+  }
+
+  /* ---------- 玩家操作 ---------- */
+  function roll(){
+    if(ctx.phase() !== "playing"){ return; }
+    if(ctx.winner() || ctx.abandoned()){ return; }
+    if(!st || st.over) return;
+    if(busy) return;
+    if(!isMyTurn()){ showToast("還沒輪到你"); return; }
+    if(st.die){ showToast("先選一架飛機"); return; }
+    sendRoll();
+  }
+  function tapPlane(plane){
+    if(ctx.phase() !== "playing"){ return; }
+    if(ctx.winner() || ctx.abandoned()){ return; }
+    if(!st || st.over || busy) return;
+    if(!isMyTurn()){ showToast("還沒輪到你"); return; }
+    if(!st.die){ showToast("先按骰子"); return; }
+    const L = FC.legalMoves(st, mySeat());
+    if(!L.some(m => m.plane === plane)){ showToast(whyNot(plane)); return; }
+    sendMove(plane);
+  }
+  // 「為什麼這一架動不了」。★ 不用 disabled 讓飛機靜默吃掉點擊
+  function whyNot(plane){
+    const q = st.planes[mySeat()][plane];
+    if(q >= FC.GOAL) return "這一架已經到家了";
+    if(q === 0) return st.rules.launch === "six" ? "要擲到 6 才能起飛" : "要擲到 1 或 6 才能起飛";
+    if(st.rules.exact) return "點數太大,終點要剛好走到";
+    return "這一架這個點數動不了";
+  }
+
+  /* ==========================================================================
+     三、出手倒數 —— 到期幫他走一手
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 不指定房主:每一台都排 timer,誰先響誰用交易搶(房主剛好斷線也不會全桌卡死)。
+         按座位錯開只是少幾次註定白跑的交易。
+       ⚠ 下限 1200ms 兜底 —— 錨點是本地時鐘,慢半拍收到快照的那台會算出「已經過期」
+         而一收到就代打(台灣麻將踩過)。
+       ⚠ 動畫演到一半不排 timer:等演完 applyGame 的 onDone 會再叫一次。
+     ========================================================================== */
+  function clearTurnT(){ if(turnT){ clearTimeout(turnT); turnT = null; } }
+
+  function armTurnT(){
+    clearTurnT();
+    if(!secOn() || !st || st.over || !playing() || busy) return;
+    const seat = st.turn, me = mySeat();
+    const wait = Math.max(1200, turnAt + turnSec * 1000 - Date.now()) + Math.max(0, me) * 150;
+    turnT = setTimeout(() => { autoPlay(seat, moves.length); }, wait);
+  }
+
+  function autoPlay(seat, step){
+    turnT = null;
+    if(!st || st.over || st.turn !== seat || !playing()) return;
+    // ★ 替人代打一律用「普通」,不套任何人的難度 —— 幫人打不該幫他打得特別好
+    push(step, chk => FCAI.autoMove(chk, seat), chk => chk.turn === seat);
+  }
+
+  /* ==========================================================================
+     四、結算
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 不指定房主(同上),誰先算完誰寫;交易保證只有第一個算數。
+       ★ 一定要帶 { local:false } —— 見檔頭與 notes/07 踩坑 #8。
+       ★ winner.pts = 名次分(核心為大老二加的能力)—— 靠它「第一名出線就結算」,
+         不必等最後一名慢慢爬回家。
+     ========================================================================== */
+  function maybeSettle(){
+    if(!st || !st.over || ctx.winner() || !playing()) return;
+    const n = nPlayers(), ord = ctx.order();
+    ctx.txGame(g => {
+      if(g.winner) return false;
+      const chk = FC.replay(rulesOf(g), n, Array.isArray(g.moves) ? g.moves : []);
+      if(!chk || !chk.over) return false;
+      const sc = FC.score(chk);
+      const pts = {};
+      sc.rows.forEach(r => { const id = ord[r.seat]; if(id) pts[id] = r.pts; });
+      g.winner = { ids: sc.winners.map(s => ord[s]).filter(Boolean), pts: pts, by: "rank" };
+    }, { local: false });
+  }
+
+  /* ==========================================================================
+     五、這一手要不要演
+     ──────────────────────────────────────────────────────────────────────────
+       ★★★ 只有「剛好多一筆」才演。多兩筆以上 = 批次同步(重連歸位 / 分頁被凍結過),
+           照著演會變成幾十秒的慢動作,而且那段時間完全不能操作。
+     ========================================================================== */
+  function applyOne(one, after){
+    if(FC.isRoll(one)){
+      busy = true;
+      FCB.rollDie(one, () => { busy = false; after(); });
+      return;
+    }
+    // 走子:st.last 就是動畫要的那一包(rules.js 的 step() 填的)
+    busy = true;
+    const mv = st.last;
+    if(mv && mv.eaten && mv.eaten.length){
+      const who = mv.eaten.map(e => esc(nameOfSeat(e.seat))).join("、");
+      showToast(esc(nameOfSeat(mv.seat)) + " 踩掉了 " + who + " 的飛機 💥", 1700);
+    }else if(mv){
+      const t = FC.moveText(st, mv);
+      if(t) showToast(esc(nameOfSeat(mv.seat)) + " " + t, 1400);
+    }
+    paint(mv, () => { busy = false; after(); });
+  }
+
+  /* ==========================================================================
+     六、mp-core 的 adapter 介面
+     ========================================================================== */
+  function ruleHint(){
+    /* ⚠ 這一格只寫**規則**,不寫設計理由也不寫感想(台灣麻將 v1.67.1 的教訓)。 */
+    const sec = secOn() ? ("每一手 <b>" + turnSec + " 秒</b>,時間到系統會幫他走一步")
+                        : "<b>不限時</b>——沒人催,有人離開就全桌一直等";
+    const goal = rules.goal ? ("先送 <b>" + rules.goal + " 架</b>回家") : "把 <b>全部</b>飛機送回家";
+    return "每人 <b>" + rules.planes + " 架</b>飛機,輪流擲骰再挑一架走。<br>" +
+           "起飛要擲到 <b>" + (rules.launch === "six" ? "6" : "1 或 6") + "</b>;" +
+           "停在<b>自己顏色</b>的格子再跳 <b>4</b> 格,停在<b>航線格</b>直接飛 <b>12</b> 格。<br>" +
+           "停下來那一格上有別人的飛機 → <b>他整架回機場</b>(自己人可以疊)。<br>" +
+           "擲到 <b>6 可以再擲一次</b>,但<b>連三次 6 這一輪作廢</b>;" +
+           "終點<b>" + (rules.exact ? "要剛好走到" : "超過就算到") + "</b>。<br>" +
+           goal + "的人贏,其餘依到家架數排名次(第一名 5 分、第二 3 分、第三 1 分)。<br>" +
+           "出手倒數:" + sec + "。";
+  }
+
+  /* 房間設定的通用套用。★ 守門用**範圍**而不是白名單 —— 舊房間 / 手改 DB 的值也要能用 */
+  const FIELDS = {
+    turnSec: { get: () => turnSec, ok: v => typeof v === "number" && (v === 0 || (v >= 10 && v <= 90)),
+               set: v => { turnSec = v; } },
+    planes:  { get: () => rules.planes, ok: v => typeof v === "number" && v >= FC.MIN_PLANES && v <= FC.MAX_PLANES,
+               set: v => { rules.planes = v; } },
+    launch:  { get: () => rules.launch, ok: v => v === "one6" || v === "six",
+               set: v => { rules.launch = v; } },
+    goal:    { get: () => rules.goal, ok: v => typeof v === "number" && v >= 0 && v <= FC.MAX_PLANES,
+               set: v => { rules.goal = v; } },
+    exact:   { get: () => rules.exact, ok: v => typeof v === "boolean", set: v => { rules.exact = v; } }
+  };
+
+  return {
+    ns: { rooms: "fc_rooms", index: "fc_index" },
+    minPlayers: 2, maxPlayers: 4,          // ★ 改這裡要同步改 js/home-live.js 的 GAMES.max
+    prefsKey: "flychess.prefs.v1",
+    emoteAnchor: "fcStage",
+    winCardId: "fcWinCard",
+    hasResign: false,                      // 多人局「認輸」語意不清(同數獨 / 排七)
+    orderPick: true,                       // 誰先擲:猜拳 / 隨機 / 房主排(js/shared/mp-order.js)
+    /* 名次分(核心為大老二加的能力):第一名 5 / 第二 3 / 第三 1 分。
+       ⚠ 單位是「分」不是「勝」→ 搶勝的目標值也要跟著放大(3 勝 → 10 分)。 */
+    scoreUnit: "分", goalDefault: 10, goalMax: 50,
+
+    init(c){ ctx = c; },
+
+    /* ---------- 房間層級設定 ---------- */
+    roomFields(){
+      return { turnSec: turnSec, planes: rules.planes, launch: rules.launch,
+               goal: rules.goal, exact: rules.exact };
+    },
+    onRoomField(k, v){
+      const f = FIELDS[k];
+      if(!f || !f.ok(v) || v === f.get()) return;
+      f.set(v);
+      ctx.unreadyOnFieldChange();
+      ctx.syncSetup(); ctx.updateGoal();
+      if(ctx.phase() === "playing" && k === "turnSec"){ armTurnT(); paint(); }
+    },
+    readRoom(r){
+      Object.keys(FIELDS).forEach(k => { if(FIELDS[k].ok(r[k])) FIELDS[k].set(r[k]); });
+    },
+
+    /* ---------- 一局的生命週期 ---------- */
+    lobbyGame(){ return { fc: null, moves: [] }; },
+    resetRound(){
+      clearTurnT();
+      moves = []; st = null; gRules = null; curRound = null; lastLen = -1; busy = false;
+      FCB.reset();
+    },
+    /* ★ picked 是 orderPick 決定出來的順序(第三個參數)。
+       ⚠ 不可以自己去寫 game.order —— 那一格在大廳裝的是**上一局**的順序(notes/07)。
+       ⚠⚠ 房規在這裡整包凍結:對局中改大廳設定影響不到這一局。 */
+    newGame(ids, prev, picked){
+      let ord = (picked && picked.length === ids.length) ? picked.slice() : ids.slice();
+      if(!picked || picked.length !== ids.length){
+        for(let i = ord.length - 1; i > 0; i--){
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = ord[i]; ord[i] = ord[j]; ord[j] = t;
+        }
+      }
+      return { order: ord, fc: FC.normRules(rules), moves: [] };
+    },
+    applyGame(g, isPlaying){
+      const next = Array.isArray(g.moves) ? g.moves : [];
+      const prevLen = moves.length;
+      const rid = ctx.roundId();
+      const fresh = (rid !== curRound);        // ★ 新局一律看 roundId
+      gRules = rulesOf(g);
+      moves = next.slice();
+      if(!isPlaying){ st = null; return; }
+      if(fresh){ curRound = rid; lastLen = -1; busy = false; FCB.reset(); }
+
+      st = FC.replay(gRules, nPlayers(), moves);
+      if(!st){ return; }                        // 房規壞掉(理論上不會)→ 等下一個快照
+
+      // 這一手的錨點:手數變了就重新起算(公開動作,全桌看得到)
+      if(moves.length !== lastLen){
+        lastLen = moves.length;
+        turnAt = Date.now();
+      }
+
+      /* ★★★ 只有「剛好多一筆」才演;換局與批次同步一律直接落定 */
+      if(!fresh && moves.length === prevLen + 1){
+        applyOne(moves[moves.length - 1], () => {
+          if(isMyTurn() && !st.die) Sound.turn();
+          armTurnT();
+          paint();
+          maybeSettle();
+        });
+        return;
+      }
+      armTurnT();
+      paint();
+      maybeSettle();
+    },
+
+    /* ---------- 相位的專屬畫面 ----------
+       各相位只說「要哪個畫面」,實際的 hidden 切換交給 main.js 的 showScreen() */
+    openConnect(){ showScreen("connect"); },
+    enterLobby(){ clearTurnT(); showScreen("lobby"); },
+    backToLobby(){
+      clearTurnT();
+      moves = []; st = null; curRound = null; lastLen = -1; busy = false;
+      FCB.reset();
+      showScreen("lobby");
+    },
+    enterPlaying(){
+      showScreen("play");
+      busy = false;
+      FCB.reset();
+      // ★ 這一局開打前大家各幾分(結果卡的「累計」欄要拿它加上去;見宣告處)
+      baseWins = {};
+      ctx.order().forEach(id => { baseWins[id] = ctx.scoreOf(id); });
+      FCB.fitBoard();
+      paint();
+    },
+    onLeave(){
+      clearTurnT();
+      moves = []; st = null; gRules = null; curRound = null; lastLen = -1; busy = false;
+      baseWins = {};
+      FCB.reset();
+    },
+
+    /* ---------- 大廳設定列 / 房間框徽章 ---------- */
+    syncSetup(){
+      const isHost = ctx.isHost();
+      const segs = [
+        ["fcSecSeg", "sec", turnSec, "fcSecLabel", "出手倒數"],
+        ["fcPlanesSeg", "planes", rules.planes, "fcPlanesLabel", "每人幾架"],
+        ["fcLaunchSeg", "launch", rules.launch, "fcLaunchLabel", "怎麼起飛"],
+        ["fcGoalSeg", "goal", rules.goal, "fcGoalLabel", "怎麼算贏"],
+        ["fcExactSeg", "exact", rules.exact ? 1 : 0, "fcExactLabel", "終點"]
+      ];
+      segs.forEach(([segId, attr, val, lblId, base]) => {
+        const seg = $(segId);
+        if(seg){
+          seg.classList.toggle("readonly", !isHost);
+          [...seg.children].forEach(b => b.classList.toggle("on", String(b.dataset[attr]) === String(val)));
+        }
+        const lbl = $(lblId);
+        if(lbl) lbl.textContent = isHost ? base : (base + "(房主決定)");
+      });
+      const hint = $("fcRuleHint");
+      if(hint) hint.innerHTML = ruleHint();
+    },
+    updateGoal(){
+      const g = $("mpBarGoal");
+      if(!g) return;
+      g.textContent = "✈️" + rules.planes + " · " + (rules.goal ? ("回" + rules.goal) : "全回") +
+                      " · " + (secOn() ? (turnSec + "秒") : "不限時");
+      g.classList.remove("hidden");
+    },
+
+    /* ---------- 名單 / 文案 ---------- */
+    turnId,
+    /* ★ 晶片前面掛顏色點 —— 這一頁「你是哪一色」是規則的一部分(要知道哪些格子可以跳),
+       不是裝飾。⚠ 大廳裡 order 是空的 → 算不出顏色就不掛(掛一顆算錯的比不掛更誤導)。 */
+    chipLead(id){
+      if(!st) return null;
+      const s = seatOf(id);
+      if(s < 0 || s >= st.n) return null;
+      return '<span class="fc-dot" data-c="' + st.colors[s] + '"></span>';
+    },
+    // 晶片尾巴:到家幾架 / 目標幾架(措辭與單機那份 solo.js tailOf() 一樣)
+    chipTail(id){
+      if(!st) return "";
+      const s = seatOf(id);
+      if(s < 0 || s >= st.n) return "";
+      return '<span class="fc-ct" title="到家幾架"><i class="fc-ct-ic"></i>' +
+             FC.homeCount(st, s) + "/" + st.rules.goal + "</span>";
+    },
+    lobbyStatusText(ids){ return ids.length < 2 ? "等待其他人加入…" : "等待大家準備…"; },
+    readyHint(ids, ready){
+      return ids.length < 2 ? "等別人加入…(房間可分享給朋友)"
+                            : (ready ? "等其他人按準備…" : "按「準備好了」就開始");
+    },
+    refresh(){ if(st && !busy) paint(); },
+
+    /* ---------- 結果 ---------- */
+    outcome(w, { iWon, ids }){
+      clearTurnT();
+      FCB.stopCd();
+      const ord = ctx.order();
+      const sc = (st && st.over) ? FC.score(st) : null;
+      const box = $("fcResult");
+      if(box && sc){
+        const names = ord.map(id => ctx.dispName(id));
+        /* ★ 累積分數併進排名表 —— 連線的結果卡從此只有**一張表**。
+           底數用開局快照,所以不必等 scores 節點同步回來。 */
+        const wins = ord.map((id, s) => {
+          const plus = (w && w.pts && w.pts[id]) || 0;
+          const base = (typeof baseWins[id] === "number") ? baseWins[id] : ctx.scoreOf(id);
+          return { n: base + plus, plus: plus };
+        });
+        box.innerHTML = FCB.resultHTML(sc, names, mySeat(), "", wins);
+        box.classList.remove("hidden");
+      }
+      if(st && !busy) paint();
+      const me = mySeat();
+      const row = sc ? sc.rows[me] : null;
+      /* ★ 一句話就好:底下的排名表已經逐列寫著「誰第幾名 / 到家幾架 / 拿幾分」。
+         ⚠ 名字要自己 esc() —— msg 是當 HTML 塞進 #winMsg 的(notes/07 踩坑 #9)。
+         ⚠ 措辭與單機那份(solo.js 的 finish())刻意寫成同一個格式。 */
+      if(iWon){
+        return { word: "你贏了!",
+                 msg: row ? ("你的 <b>" + row.home + "</b> 架先回到家 🎉") : "你先把飛機送回家了 🎉" };
+      }
+      const ws = ((w && w.ids) || []).map(id => esc(ctx.dispName(id))).join("、");
+      return { word: row ? ("第 " + row.rank + " 名") : "這局結束",
+               msg: (ws ? (ws + " 先回家") : "這局結束") +
+                    (row ? (" · 你到家 <b>" + row.home + "</b> 架 · 這局 <b>+" + row.pts + "</b> 分") : "") };
+    },
+
+    /* ---------- 偏好 ---------- */
+    // ⚠ big = 大 / 小:存的是「意願」,BigMode 自己決定這一刻要不要生效
+    ownPrefs(){
+      return { turnSec: turnSec, planes: rules.planes, launch: rules.launch,
+               goal: rules.goal, exact: rules.exact, big: BigMode.get() };
+    },
+    usePrefs(o){
+      BigMode.set(!!o.big);
+      Object.keys(FIELDS).forEach(k => { if(FIELDS[k].ok(o[k])) FIELDS[k].set(o[k]); });
+    },
+
+    /* ---------- 額外暴露給 main.js ---------- */
+    api: {
+      roll, tapPlane, isMyTurn,
+      turnSec: () => turnSec,
+      rules: () => JSON.parse(JSON.stringify(rules)),
+      setTurnSec(v){ setField("turnSec", v, SECS.indexOf(v) >= 0, "倒數"); },
+      setPlanes(v){ setField("planes", v, v >= FC.MIN_PLANES && v <= FC.MAX_PLANES, "架數"); },
+      setLaunch(v){ setField("launch", v, v === "one6" || v === "six", "起飛條件"); },
+      setGoal(v){ setField("goal", v, v >= 0 && v <= FC.MAX_PLANES, "勝利條件"); },
+      setExact(v){ setField("exact", !!v, true, "終點規則"); },
+      // 給 e2e 用:直接讀當下的局面(不經過畫面)
+      _st: () => st,
+      _moves: () => moves.slice(),
+      /* 給 e2e 用:動畫演到一半時 roll() / tapPlane() 會被擋掉(那是對的 —— 兩件事
+         疊在一起玩家看不懂)。測試少了這個入口就只能用固定秒數猜,而猜錯的症狀是
+         **偶發**紅在「按了沒反應」。 */
+      _busy: () => busy,
+      /* 給 e2e 用:把這一手的錨點往回撥,免得測「到期自動走棋」要真的等 30 秒。
+         同排七的 _ageTurn() —— 那類機制只有時間會觸發,e2e 等不了。 */
+      _ageTurn(ms){ turnAt -= (+ms || 0); armTurnT(); paint(); }
+    }
+  };
+
+  function setField(key, val, valid, what){
+    if(!valid) return;
+    if(!ctx.setRoomField(key, val, { lobbyOnly: true, denyMsg: "只有房主能改" + what,
+                                     busyMsg: "對戰中不能改" + what })) return;
+    FIELDS[key].set(val);
+    ctx.syncSetup(); ctx.updateGoal(); savePrefs();
+  }
+})());

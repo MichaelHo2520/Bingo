@@ -74,7 +74,7 @@ const HomeLive = (function(){
     /* ⚠⚠ v1.156.0 修:這一列的 max 從 v1.86.0 起就漏跟 adapter(停在 5,而 adapter 是 6)。
        症狀是首頁把 5 人的 21 點房間當成滿房**整列藏起來**,第六個人在首頁看到的結論是「滿了」,
        而 blackjack.html 的大廳與核心 MAX_PLAYERS 一直是對的 → 兩個入口互相矛盾。
-       21 點又是十二個裡唯一開 joinMidGame 的一個,壞掉的正是它最主要的使用情境。
+       21 點又是十三個裡唯一開 joinMidGame 的一個,壞掉的正是它最主要的使用情境。
        ★ 守門在 tools/test-twins.js 第四節:GAMES 每一列的 max / joinMid 對 adapter 逐一比。 */
     { key:"bj",      index:"bj_index",      rooms:"bj_rooms",      name:"台式21點", icon:miniCard("A","diamond",true), badge:"hlBadgeBj",   max:6, href:"blackjack.html", joinMid:true },
     /* ★ 第九個遊戲(v1.106.0)。max 必須與 js/uno/adapter.js 的 maxPlayers 一致(**6**)。
@@ -112,7 +112,18 @@ const HomeLive = (function(){
          也不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
        ⚠ **不帶 joinMid** —— 一場就是一場(每人要當滿 N 次畫家),中途進來的人湊不齊次數;
          這一條要與 adapter 沒有開 joinMidGame 保持一致。 */
-    { key:"dw", index:"dw_index", rooms:"dw_rooms", name:"你畫我猜", icon:"🎨", badge:"hlBadgeDraw", max:6, href:"draw.html" }
+    { key:"dw", index:"dw_index", rooms:"dw_rooms", name:"你畫我猜", icon:"🎨", badge:"hlBadgeDraw", max:6, href:"draw.html" },
+    /* ★ 第十三個遊戲(v1.179.0):飛行棋。
+       max 必須與 js/flychess/adapter.js 的 maxPlayers 一致(**4** —— 盤面只有四個機場)。
+       ⚠⚠ key / index / rooms / 圖檔 / CSS 前綴**一律用同一個縮寫 fc** ——
+         key 必須等於 index 去掉 "_index"(fc_index → fc),不一致的話 game_stats 永遠對不上,
+         那個遊戲的熱門度永遠是 0 而**沒有任何測試會紅**(暗棋 v1.118.1 踩過)。
+         index.html 那張卡的 data-gk 也是 "fc"(applyRank 是靠它找卡片的)。
+       ⚠ icon 用 ✈️(U+2708 + U+FE0F)—— 與另外十二個都不撞(🎲⚫🔢🀄🀄🎴🎴🌈🔴🧩🎨),
+         也不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
+       ⚠ **不帶 joinMid** —— 飛機已經在盤上跑了,中途進來的人沒有位置(比照 UNO / 暗棋);
+         這一條要與 adapter 沒有開 joinMidGame 保持一致。 */
+    { key:"fc", index:"fc_index", rooms:"fc_rooms", name:"飛行棋", icon:"✈️", badge:"hlBadgeFly", max:4, href:"flychess.html" }
   ];
 
   /* ==========================================================================

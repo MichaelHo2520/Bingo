@@ -212,7 +212,7 @@ function soloPause(){ if(typeof Solo!=="undefined"&&Solo.togglePause)Solo.toggle
 /* 返回鍵先關掉最上層的浮層(手機上的直覺),沒有浮層開著才回傳 false 交給呼叫端處理。
    ⚠ 結果卡(#veil)刻意不列 —— 它是強制回應視窗,要離開只能按卡片上的按鈕(見各頁 main.js)。
      順序 = 疊在上面的先關;這一頁沒有的 id(投降只有五子棋、猜拳只有 Bingo)自動跳過。
-   ⚠⚠ 這個陣列是**十二頁所有蓋板的登記表**,而且是雙胞胎(兩份都要列全部 id,
+   ⚠⚠ 這個陣列是**十三頁所有蓋板的登記表**,而且是雙胞胎(兩份都要列全部 id,
      不存在的自動跳過)。漏登記一張蓋板的下場不是「按返回沒反應」,而是按返回**穿過去**
      做了更下面那一層的事 —— 在房裡是跳「離開房間?」(誤按 = 房主關房、全房重開),
      在單機是把這一局丟掉還留一張蓋板。v1.156.0 一次補了漏掉的四張(見下面)。 */
@@ -1368,7 +1368,7 @@ function bindAudioLifecycle(){
    那段期間按鈕的 addEventListener 一行都還沒跑,使用者按了完全沒反應、也沒有任何提示
    (使用者回報「暗棋按了沒反應,等久一點又會可以」就是這個)。
    ⚠ 漏呼叫的下場是「那一頁的按鈕永遠灰著」—— 比原本的問題更糟,所以有測試守著
-     (tools/test-boot.js:十二頁都要有 class、十二支 main.js 都要呼叫)。
+     (tools/test-boot.js:十三頁都要有 class、十三支 main.js 都要呼叫)。
    ⚠ 一定要放在**同步啟動流程跑完之後**;setTimeout 裡的收尾(例如 maybeShowInstallTip)
      不算,那些晚一點跑不影響「按鈕能不能按」。
    ★ 提示條與灰化都是純 CSS(計時器是 animation 的 delay)—— 這一刻壞掉的東西正是 JS,
@@ -1449,7 +1449,7 @@ function updTick(){
   if(document.hidden || navigator.onLine===false)return;
   if(Date.now()-updLastAt < updGap)return;              // updGap:正常 5 分鐘,慢速重試中 30 分鐘
   updLastAt=Date.now();
-  /* ★★ 只抓前 4 KB(v1.156.0)。要的只有 <meta name="version"> 那一個標籤,而它在十二頁
+  /* ★★ 只抓前 4 KB(v1.156.0)。要的只有 <meta name="version"> 那一個標籤,而它在十三頁
      **全部落在前 2,160 B 之內**(最遠的是 index.html 的 2160);抓整份是 21~40 KB。
      單頁三小時 ≈ 36 次 × 30 KB ≈ 1.1 MB,六支手機同場 ≈ 7 MB,而 no-store 明確繞過 HTTP 快取。
      更糟的是 updTick 只擋 hidden / onLine / 間隔三道閘,**不擋「正在對局」** ——
@@ -1510,7 +1510,7 @@ const HARD_FROM_KEY="bingo.hardfrom";
 const HARD_WARM_MS=4000;          // 重抓資源的總時限:網路很差的手機不可以卡在「正在清除快取」不動
 let hardGoing=false;
 
-/* 這一頁實際載入了哪些同源資源 —— 從 DOM 撈,十二頁自動正確,不必維護第二份清單
+/* 這一頁實際載入了哪些同源資源 —— 從 DOM 撈,十三頁自動正確,不必維護第二份清單
    (sw.js 的 CORE 那種手列清單是漏檔的主要來源)。
    ⚠ 外部資源(Firebase SDK / Google Fonts)刻意不碰:sw.js 的 fetch 也不攔它們。
    ⚠ sw.js 自己也列進來 —— 規範其實已經讓 SW 主腳本的更新請求繞過 HTTP 快取,
@@ -1589,8 +1589,8 @@ function hardRefreshLanded(){
     else showToast("快取已清除(伺服器上還是 v"+v+")",3000);
   },1000);
 }
-/* 讓設定頁的版號可以按。★ 刻意**不動十二個 HTML** —— `.set-foot` 那一行的
-   <span id="setVer"> 十二頁一字不差,在這裡加 class 就十二頁一起有了。
+/* 讓設定頁的版號可以按。★ 刻意**不動十三個 HTML** —— `.set-foot` 那一行的
+   <span id="setVer"> 十三頁一字不差,在這裡加 class 就十三頁一起有了。
    ⚠ 頂列的 #topVer 刻意**不綁**:那顆在對局中一直看得到,誤按的代價太大
      (雖然 hardRefresh() 有 updSafe 擋著,但少一個誤觸點就是少一個)。 */
 function armHardRefresh(el){

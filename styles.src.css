@@ -7939,6 +7939,230 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @keyframes bootHide{from{opacity:1}to{opacity:0}}
 
   /* ==========================================================================
+     飛行棋(flychess.html 與 js 底下的 flychess 那一組)—— 第十三個遊戲(v1.179.0)
+     ──────────────────────────────────────────────────────────────────────────
+       盤面是 14×14 的格子,一格的邊長由 js/flychess/board.js 的 fitBoard() 量出來、
+       寫進 --fc-cell(★ 用 JS 算不用 aspect-ratio,同暗棋與成語接龍)——
+       所以這一整段裡**沒有任何一處在算格子大小**,一律乘 --fc-cell。
+       格子的 left / top / width / height 也是 board.js 產生的 inline style
+       (座標查 rules.js 的幾何表),這裡只管長相。
+
+     ── ★★ 四色是規則本體,任何主題都不准把它轉黑白 ────────────────────────
+       --fc-c0..3 同時決定三件事:哪一格是自家色(停上去可以再跳 4 格)、
+       誰的飛機、誰的回家跑道。它與 UNO 的四色是同一個性質(notes/18)
+       → **刻意不吃主題變數**,四個主題底下都是同一組顏色。
+       ⚠ 色盲的第二訊號是飛機身上的座號數字(.fc-pn),不是只有顏色 ——
+         不要「順手」把那個數字拿掉。
+     ── ★ 棋盤本身也刻意是固定的淺色(同你畫我猜的 --dw-paper)────────────────
+       它模擬的是桌上真的擺了一塊板;讓它跟著 midnight / arcade 變深,
+       四色會整組失真(而那是規則)。
+     ========================================================================== */
+  :root{
+    --fc-c0:#e5484d; --fc-c1:#e8930c; --fc-c2:#3b7ff5; --fc-c3:#1f9d63;
+    --fc-s0:#fadadb; --fc-s1:#fbe8c6; --fc-s2:#d8e5fd; --fc-s3:#cfeede;
+    --fc-felt:#f6ecd8;      /* 板子 */
+    --fc-cellbg:#fffdf7;    /* 一般格子 */
+    --fc-line:#cbb994;
+    --fc-goalbg:#fff2cf;
+    --fc-ink:#4a3a22;
+    --fc-tw:min(96vw,560px);
+  }
+  .fc-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+            line-height:1.05;letter-spacing:.5px;
+            background:linear-gradient(135deg,var(--accent),var(--accent-2));
+            -webkit-background-clip:text;background-clip:text;color:transparent}
+  .fc-hero{text-align:center;margin:14px 0 4px}
+  .fc-art{width:96px;height:96px;display:block;margin:0 auto 8px}
+  .fc-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
+
+  /* ---------- 房間框 / 單機列(照排七的 .sv-room)---------- */
+  .fc-room{padding:9px 12px}
+  .fc-room .row{margin-top:0}
+  .fc-room-top{flex-wrap:nowrap;gap:8px}
+  .fc-room .fc-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+                          font-size:13px}
+  .fc-room .fc-room-title b{font-size:15px;color:var(--text)}
+  .fc-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+  .fc-room .quick-voice,.fc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+  .fc-room .quick-voice .qv-ico{font-size:18px}
+  .fc-room .mp-subrow{margin-top:5px}
+  .fc-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+  .fc-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+
+  /* ---------- 對局區 ----------
+     ⚠ .fc-acts 一定要 flex:none —— .fc-play 底下只能有一個可壓縮的兄弟(同排七),
+       兩個都可壓縮時瀏覽器會把骰子那一列一起壓掉,而那是唯一的操作入口。 */
+  .fc-play{flex:1 1 auto;min-height:0;width:var(--fc-tw);margin:8px auto 0;
+           display:flex;flex-direction:column;align-items:center;gap:8px}
+  /* ⚠ overflow:auto 是**保險**不是常態:fitBoard() 的格子有下限(13px),極端矮的視窗上
+     棋盤會比舞台高 —— 沒有這一條就是「盤面壓在動作列上面」,而且骰子按不到。 */
+  .fc-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;z-index:0;
+            display:flex;align-items:center;justify-content:center;overflow:auto}
+  .fc-acts{flex:none;min-height:64px;display:flex;align-items:center;justify-content:center;
+           gap:12px;width:100%;position:relative;padding-top:6px}
+
+  /* ---------- 棋盤 ---------- */
+  .fc-board{position:relative;--fc-cell:22px;flex:none;
+            background:var(--fc-felt);border-radius:14px;
+            box-shadow:0 6px 18px rgba(60,40,10,.22),inset 0 0 0 2px rgba(255,255,255,.5)}
+  .fc-board > *{position:absolute;box-sizing:border-box}
+  /* 四色掛在 data-c 上,底下的格子 / 飛機 / 點點全部靠 --c 取用(只有這四條認得顏色) */
+  .fc-board [data-c="0"],.fc-dot[data-c="0"]{--c:var(--fc-c0);--cs:var(--fc-s0)}
+  .fc-board [data-c="1"],.fc-dot[data-c="1"]{--c:var(--fc-c1);--cs:var(--fc-s1)}
+  .fc-board [data-c="2"],.fc-dot[data-c="2"]{--c:var(--fc-c2);--cs:var(--fc-s2)}
+  .fc-board [data-c="3"],.fc-dot[data-c="3"]{--c:var(--fc-c3);--cs:var(--fc-s3)}
+
+  .fc-cell{border:1px solid var(--fc-line);border-radius:3px;background:var(--fc-cellbg);
+           display:flex;align-items:center;justify-content:center}
+  /* 自家色格 / 起飛點 / 航線格:底色換成該色的淺版,一眼看得出「這一段是誰的」 */
+  .fc-cell.jump,.fc-cell.fly,.fc-cell.start{background:var(--cs);border-color:var(--c)}
+  .fc-cell.start{box-shadow:inset 0 0 0 2px var(--c)}
+  /* 格子上的記號。⚠ 一律用 CSS 畫,不用文字 —— 19px 的格子放不下任何一個字。
+     ⚠⚠ **只有起飛點與航線格有記號**;「可以跳」的格子刻意只靠底色 ——
+       52 格每一格都是某一家的自家色格,每格都畫就是整圈一片三角形(見 board.js 的註解)。 */
+  .fc-mk{display:block}
+  .fc-mk.fly{width:46%;height:46%;background:var(--c);border-radius:2px;
+             transform:rotate(45deg);box-shadow:0 0 0 1.5px rgba(255,255,255,.8)}
+  .fc-mk.start{width:46%;height:46%;border:2.5px solid var(--c);border-radius:50%;
+               background:rgba(255,255,255,.75)}
+
+  .fc-lane{border:1px solid var(--c);border-radius:3px;background:var(--cs)}
+  /* ⚠⚠ 機場**內部要接近白色**,不可以填自己的色 —— 停在自己機場裡的飛機正好是同一個顏色,
+     填了就是「同色疊同色」,四架飛機在自己家裡幾乎看不見(v1.179.0 第一版量過:
+     fill 明明是 rgb(229,72,77),但看起來一片粉紅)。顏色改用**外框 + 內圈**來講。 */
+  .fc-hangar{border-radius:10px;background:var(--fc-cellbg);border:2px solid var(--c);
+             box-shadow:inset 0 0 0 4px var(--cs)}
+  /* 輪到誰:他的機場整塊亮起來(比在小格子上做記號好認得多) */
+  .fc-hangar.turn{opacity:1;box-shadow:0 0 0 3px var(--c),0 0 14px rgba(0,0,0,.18)}
+  .fc-slot{border:2px dashed var(--c);border-radius:50%;opacity:.5;
+           width:calc(var(--fc-cell) * .8);height:calc(var(--fc-cell) * .8);
+           margin:calc(var(--fc-cell) * .1)}
+  .fc-goal{background:var(--fc-goalbg);border:2px solid var(--fc-line);border-radius:50%;
+           display:flex;align-items:center;justify-content:center;
+           box-shadow:inset 0 0 0 3px rgba(255,255,255,.7)}
+  .fc-goal span{font-size:calc(var(--fc-cell) * 1.05);line-height:1}
+
+  /* ---------- 飛機 ----------
+     ⚠ 位置一律走 transform(不是 left/top):transition 只有 transform 走得動 GPU,
+       14 格 × 一格一段的走位在低階手機上才不會掉格。 */
+  .fc-plane{left:0;top:0;width:var(--fc-cell);height:var(--fc-cell);
+            border:0;background:none;padding:0;margin:0;cursor:pointer;
+            display:flex;align-items:center;justify-content:center;
+            z-index:5;transition-property:transform;transition-timing-function:ease-in-out;
+            transition-duration:0ms}
+  /* ⚠⚠ **paint-order:stroke 是必要的,不是裝飾。** 機翼末端在 viewBox 裡只有 8 單位寬,
+     預設的「先填色再描邊」會讓 1.4 的白邊從兩側各吃掉一半 → 整架飛機看起來是白的
+     (v1.179.0 第一版截圖就是這樣,連身上的座號都白底白字看不見)。
+     paint-order:stroke 讓描邊畫在填色**底下**,白邊變成外框、機身仍然是自己的顏色。 */
+  .fc-plane svg{width:88%;height:88%;fill:var(--c);stroke:#fff;stroke-width:1.6;
+                paint-order:stroke;stroke-linejoin:round;
+                filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.45))}
+  /* ★ 色盲的第二訊號:座號。大棋盤模式下它是 15px 上下,一眼讀得到 */
+  .fc-pn{position:absolute;font-family:'Fredoka',sans-serif;font-weight:700;color:#fff;
+         font-size:calc(var(--fc-cell) * .36);line-height:1;pointer-events:none;
+         text-shadow:0 1px 1px rgba(0,0,0,.55)}
+  .fc-plane.mine{z-index:6}
+  /* 動得了的那幾架:呼吸光環。⚠ 不用 disabled 擋別的 —— 點了要講得出原因 */
+  .fc-plane.can{z-index:8;animation:fcPulse 1.15s ease-in-out infinite}
+  .fc-plane.home{opacity:.55}
+  .fc-plane.hop svg{transform:scale(1.22)}
+  .fc-plane.flying{z-index:9}
+  .fc-plane.flying svg{transform:scale(1.35) rotate(-12deg)}
+  .fc-plane.eaten{z-index:9;animation:fcHit .42s ease-in-out}
+  @keyframes fcPulse{0%,100%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}
+                     50%{filter:drop-shadow(0 0 6px rgba(255,255,255,.95))}}
+  @keyframes fcHit{0%,100%{transform-origin:center}
+                   25%{filter:brightness(2.2)}75%{filter:brightness(2.2)}}
+
+  /* ---------- 骰子 ----------
+     ⚠ 點數是**別人給的**(住在 moves 裡),這裡只負責演;.rolling 期間顯示的那幾面
+       純粹是視覺,與規則無關(見 board.js 第六節)。 */
+  .fc-die{width:58px;height:58px;flex:none;border-radius:14px;
+          background:linear-gradient(155deg,#fffdf6,#f0e3c8);
+          border:2px solid var(--fc-line);padding:7px;
+          display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+          gap:2px;cursor:pointer;
+          box-shadow:0 3px 8px rgba(60,40,10,.28),inset 0 1px 0 rgba(255,255,255,.9);
+          transition:transform .14s,box-shadow .14s,filter .14s}
+  .fc-pip{border-radius:50%;background:transparent}
+  .fc-pip.on{background:var(--fc-ink);box-shadow:inset 0 -1px 0 rgba(255,255,255,.25)}
+  .fc-die.live{box-shadow:0 3px 10px rgba(60,40,10,.3),0 0 0 3px var(--accent),
+               inset 0 1px 0 rgba(255,255,255,.9);animation:fcDieCall 1.5s ease-in-out infinite}
+  .fc-die.idle{filter:saturate(.5) opacity(.62);cursor:default}
+  .fc-die.rolling{animation:fcDieRoll .12s linear infinite}
+  .fc-die.pop{animation:fcDiePop .28s ease-out}
+  @keyframes fcDieCall{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  @keyframes fcDieRoll{0%{transform:rotate(-9deg) scale(1.04)}50%{transform:rotate(9deg) scale(.96)}
+                       100%{transform:rotate(-9deg) scale(1.04)}}
+  @keyframes fcDiePop{0%{transform:scale(1.28)}60%{transform:scale(.95)}100%{transform:scale(1)}}
+
+  .fc-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
+           line-height:1.35;text-align:left}
+  /* 出手倒數(全桌看得到誰還剩幾秒,大家才知道在等什麼) */
+  .fc-cd{position:absolute;left:0;right:0;top:0;height:4px;border-radius:3px;
+         background:rgba(0,0,0,.10);overflow:hidden}
+  .fc-cd-bar{display:block;height:100%;width:100%;border-radius:3px;background:var(--accent);
+             transition:width .12s linear}
+  .fc-cd-bar.warn{background:var(--danger,#e5484d)}
+
+  /* ---------- 晶片上的東西 ---------- */
+  .fc-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--c);
+          box-shadow:0 0 0 1.5px rgba(255,255,255,.85);flex:none}
+  .fc-ct{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;
+         color:var(--muted);background:rgba(0,0,0,.06);border-radius:8px;padding:1px 5px}
+  /* ⚠ 這一顆是「到家」的記號,不可以做成三角形 —— 那與盤面上「可以跳」的意思會混在一起 */
+  .fc-ct-ic{width:8px;height:8px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}
+
+  /* ---------- 結果卡 ---------- */
+  .fc-result{margin:2px 0 12px}
+  .fc-rank{width:100%;border-collapse:collapse;font-size:13px}
+  .fc-rank th{font-size:11px;color:var(--muted);font-weight:800;padding:3px 4px;
+              border-bottom:1px solid rgba(0,0,0,.10)}
+  .fc-rank td{padding:5px 4px;border-bottom:1px solid rgba(0,0,0,.06);text-align:center}
+  .fc-rank td:nth-child(2){text-align:left;display:flex;align-items:center;gap:5px}
+  .fc-rank tr.me{background:rgba(0,0,0,.05);font-weight:800}
+  .fc-rank tr.top td{color:var(--accent-2)}
+  .fc-plus{color:var(--accent-2)}
+  .fc-rank-foot{margin-top:6px;font-size:11px;color:var(--muted);text-align:center}
+  .fc-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
+  body.solo-on .fc-react-row{display:none}
+
+  /* ---------- 對局中把棋盤放寬(大廳與選單維持 .panel 的 520)----------
+     ⚠ 紅線 7:放寬房間框就要**同時**放寬 .topbar,而且同一個數字
+       (守門 tools\run-e2e.ps1 t-topbar-fit,它斷言兩者寬度完全相等)。 */
+  body.fc-mp .fc-room,body.fc-solo .fc-room{width:min(92vw,560px)}
+  body.fc-mp .topbar,body.fc-solo .topbar{width:min(92vw,560px)}
+
+  /* ---------- 矮視窗 ---------- */
+  @media (max-height:620px){
+    .fc-hero{margin:6px 0 2px}
+    .fc-art{width:66px;height:66px}
+    .fc-play{gap:5px;margin-top:4px}
+    .fc-room{padding:6px 10px}
+    .fc-room .mp-subrow,.fc-room-foot{margin-top:3px}
+    .fc-acts{min-height:52px;padding-top:4px}
+    .fc-die{width:48px;height:48px;padding:5px}
+    .fc-hint{font-size:12px}
+  }
+
+  /* ---------- ★★ 橫置:骰子那一列搬到右邊,整個高度讓給棋盤 ----------
+     這一頁與另外十二個不同的地方:**盤面是正方形的**,所以橫置時真正稀缺的是高度。
+     直排版在 900×430 上量出來舞台只剩 120px 高 → fitBoard() 只能給到下限 13px 一格
+     (盤面 182px,反而比舞台還高)。改成左右並排之後高度全歸棋盤。
+     ⚠ 這一段刻意**不加 pointer:coarse** —— 矮而寬的桌機視窗同樣受益,而且加了就只能靠
+       tools/t-phone.html 才量得到(headless 一律是 pointer:fine)。
+     ⚠ 560 這個門檻與全站既有的緊湊斷點對齊(見檔尾大螢幕段的註解:560 / 600 / 620),
+       不要另外挑一個數字。 */
+  @media (orientation:landscape) and (max-height:560px){
+    .fc-play{flex-direction:row;align-items:center;gap:10px}
+    .fc-acts{flex:none;width:150px;min-height:0;height:100%;flex-direction:column;
+             justify-content:center;gap:10px;padding-top:0}
+    /* 倒數條在直排版是絕對定位貼在動作列頂端;橫排時改成一般流排在骰子上面 */
+    .fc-cd{position:static;width:100%;flex:none}
+    .fc-hint{flex:none;text-align:center;font-size:12px}
+  }
+
+  /* ==========================================================================
      大螢幕 / 摺疊機展開(Galaxy Z Fold 7)—— 第一段:版面放寬
      ──────────────────────────────────────────────────────────────────────────
        使用者:「想要增加支援 z fold 7 折疊機展開螢幕的解析度…打開變大螢幕的時候,
@@ -8066,6 +8290,13 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     body:has(.dw-play:not(.hidden)) .dw-room,
     body:has(.dw-play:not(.hidden)) .topbar{width:min(96vw,900px)}
 
+    /* 飛行棋:560 → 700。盤面是正方形而且 fitBoard() 取 min(寬,高),所以真正的
+       瓶頸多半是**高度** —— 700 只是把「寬度先卡住」這件事拿掉,不是強制放大。
+       ⚠ 房間框與頂列成對放寬、同一個數字(紅線 7)。 */
+    :root{--fc-tw:min(96vw,700px)}
+    body.fc-mp .fc-room,body.fc-solo .fc-room{width:min(96vw,700px)}
+    body.fc-mp .topbar,body.fc-solo .topbar{width:min(96vw,700px)}
+
     /* ---- ③ 首頁:三欄 → 四欄(十二張卡剛好三列)----
        ⚠ 四欄掛在 index.html 自己包的 .gc-grid 上,**不可以**改成 #homePick{display:grid}
          (看板 #hlLive 是遊戲卡的兄弟,一起變格子會被壓成半格寬 —— 紅線 10)。
@@ -8137,6 +8368,7 @@ body.gmk-big .topbar,
 body.sdk-big .topbar,
 body.mj-big .topbar,
 body.sv-big .topbar,
+body.fc-big .topbar,
 body.cy-big .topbar{display:none}
 /* ① 三層並排成一行。⚠ 上下內距 6px 不是 4px:34px 的鈕是這一列唯一貼到框邊的東西
    (晶片只有 22px 高),4px 看起來就是黏著框(台灣麻將 v1.178.1 的上手回報)。 */
@@ -8148,6 +8380,7 @@ body.gmk-big .gmk-room,
 body.sdk-big .sdk-room,
 body.mj-big .mj-room,
 body.sv-big .sv-room,
+body.fc-big .fc-room,
 body.cy-big .cy-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 /* ② order:晶片列(foot)在 DOM 裡是最後一個,拉到最左邊;鈕那一列(.row)推到最右。
    ⚠ 連線與單機共用同一組 class(兩條列都是 .XX-room),所以一次到位。 */
@@ -8159,6 +8392,7 @@ body.gmk-big .gmk-room > .row,
 body.sdk-big .sdk-room > .row,
 body.mj-big .mj-room > .row,
 body.sv-big .sv-room > .row,
+body.fc-big .fc-room > .row,
 body.cy-big .cy-room > .row{flex:none;order:3;margin-top:0}
 body.un-big .un-room > .mp-subrow,
 body.b2-big .b2-room > .mp-subrow,
@@ -8168,6 +8402,7 @@ body.gmk-big .gmk-room > .mp-subrow,
 body.sdk-big .sdk-room > .mp-subrow,
 body.mj-big .mj-room > .mp-subrow,
 body.sv-big .sv-room > .mp-subrow,
+body.fc-big .fc-room > .mp-subrow,
 body.cy-big .cy-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.un-big .un-room-foot,
@@ -8178,6 +8413,7 @@ body.gmk-big .gmk-room-foot,
 body.sdk-big .sdk-room-foot,
 body.mj-big .mj-room-foot,
 body.sv-big .sv-room-foot,
+body.fc-big .fc-room-foot,
 body.cy-big .cy-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
 /* ③ 返回鍵 / 房名 / 局數三個一起收 —— 收掉它們讓出來的寬度就是給晶片的。
    ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」,手機實體返回鍵也不受影響。 */
@@ -8189,6 +8425,7 @@ body.gmk-big .gmk-room .mp-leave-btn,
 body.sdk-big .sdk-room .mp-leave-btn,
 body.mj-big .mj-room .mp-leave-btn,
 body.sv-big .sv-room .mp-leave-btn,
+body.fc-big .fc-room .mp-leave-btn,
 body.cy-big .cy-room .mp-leave-btn{display:none}
 body.un-big .un-room .mp-goal,
 body.b2-big .b2-room .mp-goal,
@@ -8198,6 +8435,7 @@ body.gmk-big .gmk-room .mp-goal,
 body.sdk-big .sdk-room .mp-goal,
 body.mj-big .mj-room .mp-goal,
 body.sv-big .sv-room .mp-goal,
+body.fc-big .fc-room .mp-goal,
 body.cy-big .cy-room .mp-goal{display:none}
 body.un-big .un-room-title,
 body.b2-big .b2-room-title,
@@ -8207,6 +8445,7 @@ body.gmk-big .gmk-room-title,
 body.sdk-big .sdk-room-title,
 body.mj-big .mj-room-title,
 body.sv-big .sv-room-title,
+body.fc-big .fc-room-title,
 body.cy-big .cy-room-title{display:none}
 /* ④ ⛶ / ⚙️ 跟著頂列一起消失(兩條是同一件事的兩半,見檔頭) */
 body.un-big .un-room .tools-docked,
@@ -8217,6 +8456,7 @@ body.gmk-big .gmk-room .tools-docked,
 body.sdk-big .sdk-room .tools-docked,
 body.mj-big .mj-room .tools-docked,
 body.sv-big .sv-room .tools-docked,
+body.fc-big .fc-room .tools-docked,
 body.cy-big .cy-room .tools-docked{display:none}
 body.un-big .un-room .row:has(> .tools-docked),
 body.b2-big .b2-room .row:has(> .tools-docked),
@@ -8226,6 +8466,7 @@ body.gmk-big .gmk-room .row:has(> .tools-docked),
 body.sdk-big .sdk-room .row:has(> .tools-docked),
 body.mj-big .mj-room .row:has(> .tools-docked),
 body.sv-big .sv-room .row:has(> .tools-docked),
+body.fc-big .fc-room .row:has(> .tools-docked),
 body.cy-big .cy-room .row:has(> .tools-docked){padding-right:0}
 /* ⑤ 晶片縮成迷你版:收掉「你」徽章(.mp-chip.me 已經有光環,同一格不必再寫一次),
    其餘一個都不收(名字 / 分數 / 輪到誰是這一列存在的理由)。 */
@@ -8237,6 +8478,7 @@ body.gmk-big .gmk-room .mp-chip,
 body.sdk-big .sdk-room .mp-chip,
 body.mj-big .mj-room .mp-chip,
 body.sv-big .sv-room .mp-chip,
+body.fc-big .fc-room .mp-chip,
 body.cy-big .cy-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
 body.un-big .un-room .you-badge,
 body.b2-big .b2-room .you-badge,
@@ -8246,6 +8488,7 @@ body.gmk-big .gmk-room .you-badge,
 body.sdk-big .sdk-room .you-badge,
 body.mj-big .mj-room .you-badge,
 body.sv-big .sv-room .you-badge,
+body.fc-big .fc-room .you-badge,
 body.cy-big .cy-room .you-badge{display:none}
 body.un-big .un-room-foot .mp-players,
 body.b2-big .b2-room-foot .mp-players,
@@ -8255,6 +8498,7 @@ body.gmk-big .gmk-room-foot .mp-players,
 body.sdk-big .sdk-room-foot .mp-players,
 body.mj-big .mj-room-foot .mp-players,
 body.sv-big .sv-room-foot .mp-players,
+body.fc-big .fc-room-foot .mp-players,
 body.cy-big .cy-room-foot .mp-players{
   -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
   mask-image:linear-gradient(to right,#000 90%,transparent)}
@@ -8268,9 +8512,9 @@ body.cy-big .cy-room-foot .mp-players{
      ⚠ DOM 量測完全看不出來(三顆鈕的 box 中線差 0.0px),只有放大截圖逐像素量得到。
      台灣麻將 v1.176.0 踩過這一格,notes/11 第〇節第 4 條。 */
 .gmk-bigbtn,.sdk-bigbtn,.mj-bigbtn,.sv-bigbtn,.cy-bigbtn,
-.un-bigbtn,.b2-bigbtn,.bj-bigbtn,.dc-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
+.un-bigbtn,.b2-bigbtn,.bj-bigbtn,.dc-bigbtn,.fc-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
 .gmk-bigbtn.on,.sdk-bigbtn.on,.mj-bigbtn.on,.sv-bigbtn.on,.cy-bigbtn.on,
-.un-bigbtn.on,.b2-bigbtn.on,.bj-bigbtn.on,.dc-bigbtn.on{
+.un-bigbtn.on,.b2-bigbtn.on,.bj-bigbtn.on,.dc-bigbtn.on,.fc-bigbtn.on{
   border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
 
 /* ---------- 單機列是 .XX-solobar 的那四頁(五子棋 / 數獨 / 消消樂 / 成語接龍)----------
