@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>飛行棋 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 飛行棋 · v1.179.1 -->
-<meta name="version" content="1.179.1">
+<!-- 飛行棋 · v1.179.2 -->
+<meta name="version" content="1.179.2">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -183,7 +183,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   <div class="scroll-area fc-scroll hidden" id="scrollArea">
     <section class="panel hidden" id="fcSetup">
       <div class="subtitle">對戰設定</div>
-      <!-- ★★ 誰先擲(v1.179.1):飛行棋的先手很實在(先起飛就先佔到路),所以值得讓人選。
+      <!-- ★★ 誰先擲(v1.179.2):飛行棋的先手很實在(先起飛就先佔到路),所以值得讓人選。
            三種方式與 Bingo / 暗棋同一套(猜拳蓋板 / 房主排 / 隨機),機制在
            js/shared/mp-order.js + mp-core 的 orderPick 旗標。
            ⚠ 預設**隨機**:每一局都要大家點一次拳,連打十局就要猜十次。

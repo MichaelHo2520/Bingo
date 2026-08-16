@@ -7998,8 +7998,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      棋盤會比舞台高 —— 沒有這一條就是「盤面壓在動作列上面」,而且骰子按不到。 */
   .fc-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;z-index:0;
             display:flex;align-items:center;justify-content:center;overflow:auto}
-  .fc-acts{flex:none;min-height:64px;display:flex;align-items:center;justify-content:center;
-           gap:12px;width:100%;position:relative;padding-top:6px}
+  .fc-acts{flex:none;min-height:52px;display:flex;align-items:center;justify-content:center;
+           gap:12px;width:100%;position:relative}
 
   /* ---------- 棋盤 ---------- */
   .fc-board{position:relative;--fc-cell:22px;flex:none;
@@ -8098,12 +8098,34 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
 
   .fc-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
            line-height:1.35;text-align:left}
-  /* 出手倒數(全桌看得到誰還剩幾秒,大家才知道在等什麼) */
-  .fc-cd{position:absolute;left:0;right:0;top:0;height:4px;border-radius:3px;
-         background:rgba(0,0,0,.10);overflow:hidden}
-  .fc-cd-bar{display:block;height:100%;width:100%;border-radius:3px;background:var(--accent);
-             transition:width .12s linear}
-  .fc-cd-bar.warn{background:var(--danger,#e5484d)}
+
+  /* ---------- 出手倒數的環(v1.179.1)----------
+     ★★ 與台灣麻將 / 21 點 / UNO / 暗棋**同一顆**:SVG 環圈 + 中間秒數,最後 3 秒轉紅脈動。
+       關鍵影格直接沿用共用的 **m16cd / m16beat / m16cdhot**,不再定義一份同名的環
+       (同一件事只有一種畫法,同 .bj-cd / .un-cd / .dc-cd 那份紀律)。
+     ⚠ v1.179.1 之前這裡是一條橫的進度條(絕對定位貼在動作列頂端,還要 padding-top
+       替它讓出一條高度)。使用者:「不要用這種方式…可以省掉那一條進度條的空間」。
+       → 現在它是動作列裡的一員(排在提示右邊),`.fc-acts` 的 padding-top 也一併拿掉。
+     ⚠ 環是**每次 renderActs() 都重建的節點**(同 21 點 / 暗棋)——
+       接得上靠負的 animation-delay,見 board.js 的 syncCd()。 */
+  .fc-cdwrap{display:flex;align-items:center;justify-content:center;flex:none}
+  .fc-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+  .fc-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .fc-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  .fc-cdbg{stroke:rgba(255,255,255,.16)}
+  /* 107 ≈ 2πr(r=17)。從 0 排到滿 = 環圈整圈消失 */
+  .fc-cdfg{stroke:var(--accent-2);stroke-dasharray:107;stroke-dashoffset:0;
+    animation:m16cd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .fc-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .fc-cdn.fc-beat{animation:m16beat .34s ease-out}
+  .fc-cd.fc-hot .fc-cdfg{stroke:var(--daub)}
+  .fc-cd.fc-hot .fc-cdn{color:var(--daub)}
+  .fc-cd.fc-hot{animation:m16cdhot .9s ease-in-out infinite}
+  /* 會動的東西一律尊重系統的「減少動態效果」(同 m16 那條) */
+  @media (prefers-reduced-motion:reduce){
+    .fc-cd.fc-hot{animation:none}
+    .fc-cdn.fc-beat{animation:none}
+  }
 
   /* ---------- 晶片上的東西 ---------- */
   .fc-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--c);
@@ -8140,8 +8162,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .fc-play{gap:5px;margin-top:4px}
     .fc-room{padding:6px 10px}
     .fc-room .mp-subrow,.fc-room-foot{margin-top:3px}
-    .fc-acts{min-height:52px;padding-top:4px}
+    .fc-acts{min-height:46px}
     .fc-die{width:48px;height:48px;padding:5px}
+    .fc-cd{width:30px;height:30px}
+    .fc-cdn{font-size:12.5px}
     .fc-hint{font-size:12px}
   }
 
@@ -8157,8 +8181,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .fc-play{flex-direction:row;align-items:center;gap:10px}
     .fc-acts{flex:none;width:150px;min-height:0;height:100%;flex-direction:column;
              justify-content:center;gap:10px;padding-top:0}
-    /* 倒數條在直排版是絕對定位貼在動作列頂端;橫排時改成一般流排在骰子上面 */
-    .fc-cd{position:static;width:100%;flex:none}
+    /* 直排時是「骰子 → 提示 → 環」一列;橫排改成上下疊,環在最下面 */
     .fc-hint{flex:none;text-align:center;font-size:12px}
   }
 

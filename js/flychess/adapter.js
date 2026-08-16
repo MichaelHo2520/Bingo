@@ -163,13 +163,18 @@ const MP = MPCore.create((function(){
          按座位錯開只是少幾次註定白跑的交易。
        ⚠ 下限 1200ms 兜底 —— 錨點是本地時鐘,慢半拍收到快照的那台會算出「已經過期」
          而一收到就代打(台灣麻將踩過)。
-       ⚠ 動畫演到一半不排 timer:等演完 applyGame 的 onDone 會再叫一次。
+       ⚠⚠ **不可以因為 busy 就不排 timer**(v1.179.2 修)。倒數代打是**全桌唯一的救援**:
+         它走 txGame,與本地動畫演到哪裡完全無關。第一版寫成 `|| busy` 就 return,
+         於是「動畫被取消 → busy 卡住」的那一台**連倒數都不會武裝** ——
+         沒有人幫他走,全桌就永遠停在那裡(這正是「三個人玩、一個人卡死但沒斷線」的
+         後半段:前半段是 busy 卡住,見 board.js 的 bump())。
+         ★ 兩道修正刻意互為多餘:就算哪天 busy 又被卡住,倒數還是會把局面推下去。
      ========================================================================== */
   function clearTurnT(){ if(turnT){ clearTimeout(turnT); turnT = null; } }
 
   function armTurnT(){
     clearTurnT();
-    if(!secOn() || !st || st.over || !playing() || busy) return;
+    if(!secOn() || !st || st.over || !playing()) return;
     const seat = st.turn, me = mySeat();
     const wait = Math.max(1200, turnAt + turnSec * 1000 - Date.now()) + Math.max(0, me) * 150;
     turnT = setTimeout(() => { autoPlay(seat, moves.length); }, wait);
@@ -351,6 +356,11 @@ const MP = MPCore.create((function(){
         });
         return;
       }
+      /* ★ 第三道保險:走到這裡就代表「這一張快照不演動畫」——
+         那麼**不管上一手演到哪裡,都不該再擋著操作**。
+         (board.js 的 bump() 已經會把 onDone 交出去,這一行是刻意的多餘:
+          全桌卡死的代價太高,寧可兩邊都寫。) */
+      busy = false;
       armTurnT();
       paint();
       maybeSettle();

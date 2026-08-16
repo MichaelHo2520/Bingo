@@ -40,7 +40,9 @@ const FCB = (function(){
   let shown = null;                    // 上一次畫出來的進度快照(動畫的起點)
   let shownColors = null;
   let animGen = 0, animating = false;
-  let cdT = null;
+  /* ★ 在飛的那一手的 onDone。bump() 取消動畫時**一定要把它交出去**(見 bump 的註解)。 */
+  let pendingDone = null;
+  let cdT = null, cdKey = "", cdEnd = 0;   // 倒數環:用 key 去重,**不看 timer**(見 syncCd)
 
   /* 這一頁的音效。★ 走 Sound.tone()(audio.js 開給各遊戲寫自己樂句的入口)——
      吃靜音開關與總音量,不必自己管。⚠ 走一格的 tick 要**很輕**:一手可能連走六格,
@@ -223,7 +225,21 @@ const FCB = (function(){
        ★ 世代記號:換局 / 離場 / 下一手插隊時,舊的 timer 一律不執行
          (同 solo.js 的 later();台灣麻將踩過「離場後電腦繼續打牌」那個坑)。
      ========================================================================== */
-  function bump(){ animGen++; animating = false; }
+  /* ★★★ bump() 取消在飛的動畫時,**一定要把那個 onDone 交出去**(v1.179.2 修)。
+     ⚠⚠ 這是「三個人玩、一個人卡死但沒斷線」那個回報的病灶,而且是**必然**不是機率:
+       adapter 演一手時會 `busy = true`,而 busy 只在 onDone 裡清掉;
+       只要在動畫還沒演完時來了一張**不演動畫**的快照(批次同步 / 換局 / 重畫),
+       render() 就會走 bump() → later() 那條鏈整條失效 → onDone 永遠不會叫
+       → **busy 永遠停在 true**:那台從此擲不了骰、也走不了棋。
+       他不會斷線、畫面也還在更新,所以看起來就是「他沒同步,全桌等他」。
+     ★ 排到下一拍再叫:bump() 常常是在 render() 中途被叫的,當場回呼會重入 render()。
+     ⚠ 一定要**先清掉 pendingDone 再叫**,不然重入時會叫第二次。 */
+  function bump(){
+    animGen++;
+    animating = false;
+    const d = pendingDone; pendingDone = null;
+    if(d) setTimeout(() => { try{ d(); }catch(e){} }, 0);
+  }
   function later(g, fn, ms){ setTimeout(() => { if(g === animGen) fn(); }, ms); }
 
   // hops → 一步一步的清單(走格是一格一段,跳 / 飛各一段)
@@ -249,12 +265,17 @@ const FCB = (function(){
   }
 
   function runMove(st, mv, done){
+    /* ⚠ 不可以走 bump():這裡是**接手**一段新動畫,舊的那個 onDone 要在這裡就交出去,
+       但不能等到下一拍(下一拍時 pendingDone 已經是新的這一個了)。 */
+    const prevDone = pendingDone; pendingDone = null;
+    if(prevDone) setTimeout(() => { try{ prevDone(); }catch(e){} }, 0);
     const g = ++animGen;
     animating = true;
+    pendingDone = done || null;
     const seat = mv.seat, idx = mv.plane;
     const el = planeEls[seat] && planeEls[seat][idx];
     const fromQ = (shown && shown[seat]) ? shown[seat][idx] : 0;
-    if(!el){ finish(); return; }
+    if(!el){ finish(); return; }        // finish() 自己會把 pendingDone 交出去
 
     // 先把「這一手沒有動到的飛機」擺到定位(被踩的那幾架先留在原地)
     const mid = st.planes.map(row => row.slice());
@@ -311,7 +332,9 @@ const FCB = (function(){
       animating = false;
       shown = st.planes.map(r => r.slice());
       shownColors = st.colors.slice();
-      if(done) done();
+      // ⚠ 先清掉再叫 —— 不清的話 bump() 之後會把同一個回呼再叫一次
+      const d = pendingDone; pendingDone = null;
+      if(d) d();
     }
   }
 
@@ -376,7 +399,7 @@ const FCB = (function(){
     return h;
   }
 
-  let dieEl = null, rollT = null, rollGen = 0;
+  let dieEl = null, rollT = null, rollGen = 0, rollDone = null;
   function setDie(v){
     if(!dieEl) return;
     dieEl.innerHTML = dieHTML(v || 0);
@@ -385,9 +408,13 @@ const FCB = (function(){
   /* 擲骰動畫:亂跳幾面之後停在真值。done 在停下來的那一刻叫。
      ⚠ 亂跳的那幾面只是**視覺**,與規則無關(真值是參數帶進來的)。 */
   function rollDie(v, done){
+    // ★ 同 runMove:接手新的一段之前,先把上一段沒交出去的回呼交出去
+    const prevDone = rollDone; rollDone = null;
+    if(prevDone) setTimeout(() => { try{ prevDone(); }catch(e){} }, 0);
     const g = ++rollGen;
     if(rollT){ clearTimeout(rollT); rollT = null; }
     if(!dieEl){ if(done) done(); return; }
+    rollDone = done || null;
     dieEl.classList.add("rolling");
     let k = 0;
     (function spin(){
@@ -397,7 +424,8 @@ const FCB = (function(){
         setDie(v);
         dieEl.classList.remove("pop"); void dieEl.offsetWidth; dieEl.classList.add("pop");
         SFX.dice();
-        if(done) done();
+        const d = rollDone; rollDone = null;
+        if(d) d();
         return;
       }
       setDie(1 + (k * 3 + 2) % 6);
@@ -411,9 +439,9 @@ const FCB = (function(){
     if(!acts.dataset.built){
       acts.dataset.built = "1";
       acts.innerHTML =
-        '<div class="fc-cd" id="fcCd"><span class="fc-cd-bar" id="fcCdBar"></span></div>' +
         '<button class="fc-die" id="fcDie" type="button" aria-label="擲骰子"></button>' +
-        '<div class="fc-hint" id="fcHint"></div>';
+        '<div class="fc-hint" id="fcHint"></div>' +
+        '<div class="fc-cdwrap" id="fcCdWrap"></div>';
       dieEl = $("fcDie");
       dieEl.addEventListener("click", () => { if(cb.onDice) cb.onDice(); });
       setDie(0);
@@ -426,26 +454,68 @@ const FCB = (function(){
       die.disabled = false;                       // ★ 不用 disabled:點了要講得出原因
     }
     if(hint) hint.innerHTML = o.hint || "";
-    startCd(o.cdMs, o.cdEnd);
+    syncCd(o.cdMs, o.cdEnd);
   }
 
-  function startCd(ms, end){
-    stopCd();
-    const box = $("fcCd"), bar = $("fcCdBar");
-    if(!box || !bar) return;
-    if(!ms || !end){ box.classList.add("hidden"); return; }
-    box.classList.remove("hidden");
-    const tick = () => {
-      const left = Math.max(0, end - Date.now());
-      const pct = Math.max(0, Math.min(100, left / ms * 100));
-      bar.style.width = pct + "%";
-      bar.classList.toggle("warn", left < ms * 0.3);
-      if(left <= 0){ stopCd(); return; }
-      cdT = setTimeout(tick, 120);
-    };
-    tick();
+  /* ---------- 出手倒數的環 ----------
+     ★★ 與台灣麻將 / 21 點 / UNO / 暗棋**同一顆**(SVG 環圈 + 中間秒數,最後 3 秒轉紅脈動)——
+       關鍵影格直接沿用共用的 m16cd / m16beat / m16cdhot,**不再定義一份同名的環**
+       (同一件事只有一種畫法)。
+       ⚠ v1.179.1 之前這裡是一條橫的進度條,與另外幾頁長得不一樣,而且要在動作列上方
+         多留一條的高度。使用者:「不要用這種方式…可以省掉那一條進度條的空間」。
+
+     ★ 全桌都看得到,不是只有當事人 —— 「輪到誰、還剩幾秒」是公開資訊,
+       大家才知道為什麼卡著(判準同台灣麻將 / 排七)。
+
+     ⚠ 兩個從台灣麻將 / 21 點繼承的坑:
+       ① 用**負的 animation-delay** 接續播放,duration 永遠是這一手的總長
+          —— 這樣 e2e 才量得到設定值(量 --cd-dur)。
+       ② 去重的 key **不可以看 cdT 還在不在**:數字走到 0 之後 tickCd() 就把 interval
+          停了,而 timer 本身還有幾百毫秒沒響;那段空窗裡只要再叫一次 renderActs()
+          (resize 就會)環就會彈回滿格,而那個彈跳本身就是雜訊。
+     ⚠ 這裡的環是**每次 renderActs 都重建的節點**(同 21 點 / 暗棋,不是 m16 的持久節點)——
+       重建照樣接得上,靠的就是①那個負延遲。 */
+  const CD_HOT = 3000;
+  function syncCd(cdMs, endAt){
+    const box = $("fcCdWrap");
+    if(!box) return;
+    if(!cdMs || !endAt){ stopCd(); return; }
+    const left = endAt - Date.now();
+    if(left <= 0){ stopCd(); return; }
+    const key = cdMs + ":" + endAt;
+    cdEnd = endAt;
+    box.innerHTML =
+      '<span class="fc-cd' + (left <= CD_HOT ? " fc-hot" : "") + '" id="fcCd" aria-hidden="true"' +
+        ' style="--cd-dur:' + (cdMs / 1000) + 's;--cd-delay:' + (-(cdMs - left) / 1000) + 's">' +
+        '<svg viewBox="0 0 40 40"><circle class="fc-cdbg" cx="20" cy="20" r="17"/>' +
+        '<circle class="fc-cdfg" cx="20" cy="20" r="17"/></svg>' +
+        '<b class="fc-cdn">' + Math.ceil(left / 1000) + '</b>' +
+      '</span>';
+    if(key === cdKey && cdT) return;          // 同一段倒數:重畫畫面不重跑動畫
+    cdKey = key;
+    if(cdT) clearInterval(cdT);
+    cdT = setInterval(tickCd, 200);
   }
-  function stopCd(){ if(cdT){ clearTimeout(cdT); cdT = null; } }
+  /* 只換中間那個數字與 hot 狀態 —— 環圈本身完全交給 CSS 動畫(理由見上面①) */
+  function tickCd(){
+    const el = $("fcCd");
+    if(!el){ if(cdT){ clearInterval(cdT); cdT = null; } return; }
+    const left = cdEnd - Date.now();
+    const n = el.querySelector(".fc-cdn");
+    const s = String(Math.max(0, Math.ceil(left / 1000)));
+    if(n && n.textContent !== s){
+      n.textContent = s;
+      n.classList.remove("fc-beat"); void n.offsetWidth; n.classList.add("fc-beat");
+    }
+    el.classList.toggle("fc-hot", left <= CD_HOT);
+    if(left <= 0){ clearInterval(cdT); cdT = null; }
+  }
+  function stopCd(){
+    if(cdT){ clearInterval(cdT); cdT = null; }
+    cdKey = ""; cdEnd = 0;
+    const box = $("fcCdWrap");
+    if(box) box.innerHTML = "";
+  }
 
   /* ==========================================================================
      七、★★ 踩人 / 到家的「現場效果」
@@ -542,6 +612,9 @@ const FCB = (function(){
     rollGen++;
     if(rollT){ clearTimeout(rollT); rollT = null; }
     if(dieEl) dieEl.classList.remove("rolling");
+    // ★ 與 bump() 同一條規矩:取消動畫也要把回呼交出去,否則呼叫端的 busy 永遠不會清
+    const rd = rollDone; rollDone = null;
+    if(rd) setTimeout(() => { try{ rd(); }catch(e){} }, 0);
     stopCd();
     shown = null; shownColors = null;
     if(board){ board.dataset.pk = ""; planeEls.forEach(r => r.forEach(el => el.remove())); planeEls = []; }
