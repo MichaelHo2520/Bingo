@@ -789,6 +789,16 @@ const MP = MPCore.create((function(){
   function clearNext(){
     nextKey = "";
     const el = $("m16Next"); if(el){ el.classList.add("hidden"); el.innerHTML = ""; }
+    /* ★★ 鈕也要一起收回原狀(v1.181.2,成語接龍那邊先修的同一條)。
+       paintNext() 按過之後會把它變成「等待中」+ disabled,而 clearNext() 以前只收腳註
+       —— 那個 disabled 就**跟著活到下一局**:下一局的結果卡只要 outcome() 因為任何理由
+       沒重畫到,那顆鈕就永遠按不下去(而畫面上完全看不出來)。
+       ⚠ 還原成「下一局」= HTML 的預設字,也正是最後一局那條路要的樣子。
+       ⚠⚠ 一定要先問「現在是不是真的被鎖著」才動 DOM:這一支**掛在每份快照都會跑的路上**
+         (applyGame 收到沒有 over 的狀態就呼叫一次),無條件寫 textContent 等於每打一張牌
+         就讓那顆鈕重排一次 —— CLAUDE.md 紅線 7 的「不要在每次換畫面的路徑上做重算」。 */
+    const b = $("mpAgain");
+    if(b && b.disabled){ b.textContent = "下一局"; b.disabled = false; b.classList.add("primary"); b.classList.remove("ghost"); }
   }
   /* 腳註那一行。★ 兩種身分要講不同的事(而且是同一行,不要多長一列出來):
        還沒按 —— 提示「按了就會接著打」
@@ -1132,10 +1142,8 @@ const MP = MPCore.create((function(){
         paintNext();
       }else{
         // 最後一局(或只打一局):回到原本的「下一局 = 回大廳重新準備」
+        // ⚠ 鈕的還原 v1.181.2 起收進 clearNext() 裡(它是唯一該負責的地方),這裡不再各寫一份
         clearNext();
-        const b = $("mpAgain");
-        if(b){ b.textContent = "下一局"; b.disabled = false;
-               b.classList.add("primary"); b.classList.remove("ghost"); }
       }
 
       /* 大字:四種輸法分開講(v1.70.0)。文案表與挑選規則在 M16B.overWord() —— 單機那份

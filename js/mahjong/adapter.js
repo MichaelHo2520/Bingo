@@ -90,12 +90,15 @@ const MP = MPCore.create((function(){
   }
 
   /* ---------- 消牌 ---------- */
+  /* ⚠ 每一條 return 都要講一句話(v1.181.2):這一頁沒有「輪到誰」,牌有沒有消掉就是
+     使用者唯一的回饋 —— 靜靜 return 的下場是回報上來只有「點下去沒反應」。 */
   function onPair(i,j){
-    if(ctx.phase()!=="playing"||ctx.winner())return;
+    if(ctx.phase()!=="playing")return;              // 不在對局裡 —— 這條不必講話
+    if(ctx.winner()){ showToast("這一局結束了,等下一局開始 👀",1400); return; }
     if(gMode==="grab") grabPair(i,j); else racePair(i,j);
   }
   function grabPair(i,j){
-    const seat=mySeat(); if(seat<0)return;
+    const seat=mySeat(); if(seat<0){ showToast("座位還在同步,等一下再試 ⏳",1400); return; }
     ctx.txGame(g=>{
       if(g.status!=="playing"||g.winner)return false;
       const arr=Array.isArray(g.moves)?g.moves:[];
@@ -389,14 +392,22 @@ const MP = MPCore.create((function(){
       const rid=ctx.roundId();
       if(g.tiles && rid!==curRound){
         clearAuto();                    // 上一局排的自動重洗絕不能洗到新的盤面上
-        curRound=rid; shufN=g.shuf||0;
+        shufN=g.shuf||0;
+        /* ⚠ curRound 一定要**等 setBoard 真的做完**才寫進去(v1.181.2,成語接龍那邊先修的
+           同一條):先寫的話,setBoard 丟例外的那一台從此 rid === curRound,
+           這一局再也進不來這個分支 —— 盤面停在上一局,而且沒有任何錯誤訊息。 */
         MB.setBoard({ level:gDiff, shape:gShape, tiles:g.tiles });
+        curRound=rid;
         total=MB.total();
         moves=[]; tally=[]; myShuf=0; startedAt=Date.now();
-        MB.setEnabled(true);
         stallOn();                        // 僵局時鐘跟著這一局起跑(total 這時才有值)
         if(gMode==="race") pushProgress();
       }
+      /* ★★★ 解鎖**不綁在「新局」那個分支裡**(v1.181.2)。舊寫法只有重建盤面那一拍會
+         setEnabled(true) —— 那一拍沒跑到(漏收快照 / 重連歸位 / 分支上一行丟例外)
+         這一台就整局鎖著:牌看得到、點下去完全沒反應,而且再也沒有第二次機會。
+         成語接龍(同一族的搶字實作)在現場踩到的就是這個形狀 → 改成每份快照都重申一次。 */
+      if(!ctx.winner()) MB.setEnabled(true);
       if(!total) return;
 
       if(gMode==="grab"){

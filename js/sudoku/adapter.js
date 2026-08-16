@@ -98,8 +98,12 @@ const MP = MPCore.create((function(){
   }
 
   /* ---------- 填格 ---------- */
+  /* ⚠ 這一支的每一條 return 都要講一句話(v1.181.2):這一頁沒有「輪到誰」,
+     格子有沒有變就是使用者唯一的回饋 —— 靜靜 return 的下場是回報上來只有
+     「點下去沒反應」,連是哪一條都不知道(成語接龍那次就是這樣查了很久)。 */
   function play(i,v){
-    if(ctx.phase()!=="playing"||ctx.winner()){ return; }
+    if(ctx.phase()!=="playing"){ return; }            // 不在對局裡(單機 / 大廳)—— 這條不必講話
+    if(ctx.winner()){ showToast("這一局結束了,等下一局開始 👀",1400); return; }
     if(SB.frozen()){ return; }                        // 提示已由 SB 自己給
     if(SB.isGiven(i)){ showToast("這格是題目給的,不能改"); return; }
     if(gMode==="grab") playGrab(i,v); else playRace(i,v);
@@ -107,7 +111,7 @@ const MP = MPCore.create((function(){
   /* 搶格:填對才寫進 fills(交易內再檢查一次有沒有被搶走);填錯也寫,但只用來計錯與通知對手 */
   function playGrab(i,v){
     if(SB.valueAt(i)){ showToast("這格已經被填走了"); return; }
-    const seat=mySeat(); if(seat<0)return;
+    const seat=mySeat(); if(seat<0){ showToast("座位還在同步,等一下再試 ⏳",1400); return; }
     const right=(SB.solAt(i)===v);
     if(!right){
       myMiss++;
@@ -282,14 +286,21 @@ const MP = MPCore.create((function(){
       // 題目換了(新的一局)→ 重建盤面
       if(g.puzzle && g.puzzle!==puzKey){
         const L=SGen.levelOf(gDiff);
-        puzKey=g.puzzle;
+        /* ⚠ puzKey 一定要**等 setPuzzle 真的做完**才寫進去(v1.181.2,成語接龍那邊先修的
+           同一條):先寫的話,setPuzzle 丟例外的那一台從此 g.puzzle === puzKey,
+           這一局再也進不來這個分支 —— 盤面停在上一盤,而且沒有任何錯誤訊息。 */
         SB.setPuzzle({ n:L.n, bw:L.bw, bh:L.bh, puzzle:g.puzzle, sol:g.sol });
+        puzKey=g.puzzle;
         holes=SB.remaining();
         fills=[]; tally=[]; myMiss=0; startedAt=Date.now();
-        SB.setEnabled(true);
         SB.setSel(SB.firstEmpty());
         if(gMode==="race") pushProgress();
       }
+      /* ★★★ 解鎖**不綁在「題目換了」那個分支裡**(v1.181.2)。舊寫法只有重建盤面那一拍
+         會 setEnabled(true) —— 那一拍沒跑到(漏收快照 / 重連歸位 / 分支上一行丟例外)
+         這一台就整局鎖著:盤面看得到、鍵盤淡掉、點下去完全沒反應,而且再也沒有第二次機會。
+         成語接龍(這一頁的孿生實作)在現場踩到的就是這個形狀 → 改成每一份快照都重申一次。 */
+      if(!ctx.winner()) SB.setEnabled(true);
       if(gMode==="grab"){
         const next=Array.isArray(g.fills)?g.fills:[];
         const pops=[];                 // 這批要飄的分數變動 (seat, delta)
