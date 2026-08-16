@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>飛行棋 ｜ 單機對電腦 + 2~4 人連線</title>
-<!-- 飛行棋 · v1.179.2 -->
-<meta name="version" content="1.179.2">
+<!-- 飛行棋 · v1.179.3 -->
+<meta name="version" content="1.179.3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -61,12 +61,50 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </div>
       <button class="btn primary block-btn home-btn" id="fcGoOnline">🌐 連線對戰</button>
       <button class="btn ghost block-btn home-btn" id="fcGoSolo">🎮 單機遊玩</button>
-      <div class="home-hint">
-        <b>2~4 人</b>,每人 2~4 架飛機。輪到你先擲骰,再選一架飛機走。<br>
-        擲到 <b>1 或 6</b> 才能從機場起飛(房主可改成只有 6)。
-        走完停在<b>自己顏色</b>的格子可以再<b>跳 4 格</b>;停在自己的<b>航線格</b>直接<b>飛 12 格</b>。<br>
-        停下來那一格上有別人的飛機,<b>他整架回機場</b>(自己人可以疊在一起)。<br>
-        擲到 <b>6 可以再擲一次</b>,但<b>連三次 6 這一輪作廢</b>。<b>先把飛機送回家的人贏</b>。
+      <!-- ★★ 玩法說明刻意寫得很細(v1.179.3)。使用者:「飛行棋其實很多人都不太會玩,
+           所以規則的說明很重要…例如什麼狀況可以吃掉別人的棋子,或是什麼狀況可以跳」。
+           ⚠ 三件最多人卡住的事一定要各自獨立講清楚,不可以壓成一句:
+             ① 什麼叫「自己顏色的格子」(外圈是四色輪流的,所以每 4 格就輪到你一次)
+             ② 「踩人」只算**停下來**那一格,飛越過去的不算
+             ③ 回家跑道與機場裡的飛機是**安全的**,踩不到
+           ⚠ 底下的圖例用的是**盤面上真的那幾個記號**(.fc-cell / .fc-mk),
+             不是另外畫一組 —— 兩邊長得不一樣的話,說明反而幫倒忙。 -->
+      <div class="fc-howto">
+        <div class="fc-howto-h">✈️ 怎麼玩</div>
+        <p class="fc-howto-goal">
+          目標:把你的飛機從<b>角落的機場</b>送到<b>中央的終點 🏁</b>。<b>先送完的人贏。</b>
+        </p>
+        <ol class="fc-howto-list">
+          <li><b>擲骰</b> —— 輪到你先按骰子,再點一架飛機走。擲幾點就<b>沿著外圈順時針走幾格</b>。</li>
+          <li><b>起飛</b> —— 飛機一開始都停在機場。擲到 <b>1 或 6</b> 才能放一架出來,
+              放在你的<b>起飛點</b>(有 ⭕ 記號那一格)。</li>
+          <li><b>跳 4 格</b> —— 外圈的格子是<b>四種顏色輪流排</b>的,所以每隔 4 格就有一格是你的顏色。
+              走完<b>剛好停在自己顏色</b>的格子上 → <b>再往前 4 格</b>。</li>
+          <li><b>飛 12 格</b> —— 你那一圈上有<b>一格航線格</b>(你的顏色 + ◆ 記號)。
+              停在它上面 → <b>直接飛 12 格</b>,而且落點又是你的顏色,所以會<b>再跳 4 格</b>
+              —— 一口氣前進 <b>16 格</b>。</li>
+          <li><b>踩人(吃掉別人)</b> —— <b>停下來</b>的那一格上如果有<b>別人的</b>飛機,
+              他那幾架<b>通通回機場重來</b>。三件事要記住:
+            <ul class="fc-howto-sub">
+              <li>只算<b>停下來</b>那一格 —— 中途<b>經過</b>的不算,跳 / 飛<b>越過</b>的也不算。</li>
+              <li><b>自己人可以疊在一起</b>,不會踩到自己。</li>
+              <li>已經轉進<b>回家跑道</b>、還有待在<b>機場</b>裡的飛機是<b>安全的</b>,踩不到。</li>
+            </ul>
+          </li>
+          <li><b>擲到 6</b> —— 走完可以<b>再擲一次</b>。但<b>連續三次 6</b> 這一輪作廢,直接換人。</li>
+          <li><b>回家</b> —— 繞完外圈一圈之後轉進<b>自己顏色的回家跑道</b>,走到終點就完成一架。
+              終點預設<b>超過就算到</b>(房主可改成要剛好)。</li>
+        </ol>
+        <div class="fc-howto-h2">盤面上的記號</div>
+        <div class="fc-legend">
+          <span class="fc-legend-i"><i class="fc-cell start" data-c="0"><i class="fc-mk start"></i></i>起飛點</span>
+          <span class="fc-legend-i"><i class="fc-cell fly" data-c="0"><i class="fc-mk fly"></i></i>航線格(飛 12)</span>
+          <span class="fc-legend-i"><i class="fc-cell jump" data-c="0"></i>你的顏色(可以跳 4)</span>
+          <span class="fc-legend-i"><i class="fc-cell jump" data-c="2"></i>別人的顏色(對你沒作用)</span>
+        </div>
+        <div class="fc-howto-foot">
+          <b>2~4 人</b>,每人 <b>2~4 架</b>(房主決定)。單機可以先跟電腦練一局。
+        </div>
       </div>
     </div>
 
@@ -183,7 +221,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   <div class="scroll-area fc-scroll hidden" id="scrollArea">
     <section class="panel hidden" id="fcSetup">
       <div class="subtitle">對戰設定</div>
-      <!-- ★★ 誰先擲(v1.179.2):飛行棋的先手很實在(先起飛就先佔到路),所以值得讓人選。
+      <!-- ★★ 誰先擲(v1.179.3):飛行棋的先手很實在(先起飛就先佔到路),所以值得讓人選。
            三種方式與 Bingo / 暗棋同一套(猜拳蓋板 / 房主排 / 隨機),機制在
            js/shared/mp-order.js + mp-core 的 orderPick 旗標。
            ⚠ 預設**隨機**:每一局都要大家點一次拳,連打十局就要猜十次。

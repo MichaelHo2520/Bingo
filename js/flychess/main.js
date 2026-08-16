@@ -60,6 +60,9 @@ function paintSoloHint(){
   el.innerHTML = "<b>" + L.emoji + " " + L.name + "</b>:" + esc(L.desc) + "<br>" +
     "你固定是<b>第一家</b>,誰先擲由這一局隨機決定。每人 <b>" + Solo.planes() +
     " 架</b>,全部送回家的人贏。<br>" +
+    /* ★ 指回上一層的玩法說明 —— 直接點「單機遊玩」進來的人會跳過那一整段,
+       而這個遊戲「不會玩」的比例很高(v1.179.3 使用者回報)。 */
+    "<b>不熟規則?</b>按左上角 ‹ 回上一層,那裡有完整的玩法說明(跳 / 飛 / 踩人)。<br>" +
     '<span class="fc-warn">✈️ ' + esc(Solo.recLine(Solo.level())) + "</span>";
 }
 /* 選擇列共用的「點一下亮起來」 */

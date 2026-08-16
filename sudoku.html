@@ -16,8 +16,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v1.179.2 -->
-<meta name="version" content="1.179.2">
+<!-- 數獨 · v1.179.3 -->
+<meta name="version" content="1.179.3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -131,7 +131,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label sdk-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="玩法與難度"></span>
       <div class="mp-actions">
-        <!-- 大盤面(v1.179.2,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
+        <!-- 大盤面(v1.179.3,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
              ⚠ class 是 .sdk-bigbtn,而狀態掛在 body 上的是 .sdk-big —— 兩個名字**一定要不一樣**。
              ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
              ⚠ 單機列也有一顆(#sdkSoloBig),兩顆共用 .sdk-bigbtn 一起同步。 -->
