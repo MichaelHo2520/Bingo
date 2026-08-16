@@ -20,8 +20,8 @@
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v1.181.2 -->
-<meta name="version" content="1.181.2">
+<!-- 外殼(shell)· v1.181.3 -->
+<meta name="version" content="1.181.3">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
@@ -53,8 +53,15 @@
 <script>
 (function(){
   "use strict";
-  // 只認得這幾個 key —— hash 是外面來的字串,不可以直接拿去當 src
-  var PAGES = { bingo:"index.html", gomoku:"gomoku.html", sudoku:"sudoku.html", mahjong:"mahjong.html", mahjong16:"mahjong16.html", sevens:"sevens.html", big2:"big2.html", blackjack:"blackjack.html", uno:"uno.html", darkchess:"darkchess.html", chengyu:"chengyu.html", draw:"draw.html" };
+  /* 只認得這幾個 key —— hash 是外面來的字串,不可以直接拿去當 src
+     ⚠⚠ **加新遊戲一定要補進這張表**(v1.181.3 補上漏掉的 flychess / tiaoqi)。
+       漏了的症狀有兩個,而且都不會報錯:
+         ① app.html#<新遊戲> 的深層連結退回 Bingo(keyOfHash 找不到 key);
+         ② 從首頁點進新遊戲後,內層 hello 回報的 page 不在表裡 → cur 停在舊值、
+            hash 也不會更新 → 之後**按上一頁的行為會錯亂**。
+       ⚠ 而且這一頁自己不吃更新檢查(見上面那段),舊使用者手上的外殼是安裝當天那一份 ——
+         那正是下面 hardreload 註解說的「PWA 裝很久的人點新遊戲會被丟回 Bingo」。 */
+  var PAGES = { bingo:"index.html", gomoku:"gomoku.html", sudoku:"sudoku.html", mahjong:"mahjong.html", mahjong16:"mahjong16.html", sevens:"sevens.html", big2:"big2.html", blackjack:"blackjack.html", uno:"uno.html", darkchess:"darkchess.html", chengyu:"chengyu.html", draw:"draw.html", flychess:"flychess.html", tiaoqi:"tiaoqi.html" };
   var stage = document.getElementById("stage");
 
   function keyOfHash(){
