@@ -16,8 +16,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>五子棋 ｜ 連線對戰 · 本機對戰</title>
-<!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v1.179.6 -->
-<meta name="version" content="1.179.6">
+<!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v1.179.7 -->
+<meta name="version" content="1.179.7">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -153,7 +153,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="mp-goal" id="mpBarGoal" aria-label="盤面"></span>
       <button class="gmk-resign hidden" id="resignBtn" type="button" title="認輸">🏳 認輸</button>
       <div class="mp-actions">
-        <!-- 大棋盤(v1.179.6,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
+        <!-- 大棋盤(v1.179.7,十一頁共用 BigMode):收掉頂列與房名 / 徽章,房間框壓成一行。
              ⚠ class 是 .gmk-bigbtn,而狀態掛在 body 上的是 .gmk-big —— 兩個名字**一定要不一樣**。
              ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
              ⚠ 單機列也有一顆(#gmkSoloBig),兩顆共用 .gmk-bigbtn 一起同步。 -->

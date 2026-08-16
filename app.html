@@ -20,8 +20,8 @@
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v1.179.6 -->
-<meta name="version" content="1.179.6">
+<!-- 外殼(shell)· v1.179.7 -->
+<meta name="version" content="1.179.7">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
@@ -97,7 +97,7 @@
   function fsEl(){ return document.fullscreenElement || document.webkitFullscreenElement; }
   function fsSupported(){ var de=document.documentElement; return !!(de.requestFullscreen || de.webkitRequestFullscreen); }
   /* 裝起來的 App(manifest 的 display 是 fullscreen)本來就滿版 —— 這時再呼叫 Fullscreen API
-     **只有負分,沒有任何好處**(v1.179.6):
+     **只有負分,沒有任何好處**(v1.179.7):
        ① Android 會蓋一句「從螢幕上方向下滑動…」的系統提示,那正是 v1.178.1 改 display 要消掉的東西;
        ② 進了 API 全螢幕之後,**系統返回的第一下會被瀏覽器拿去退出全螢幕**,不會導覽
           → 使用者的感覺是「按返回沒反應,而且畫面閃了一下」。

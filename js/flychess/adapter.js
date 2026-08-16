@@ -279,21 +279,21 @@ const MP = MPCore.create((function(){
        ⚠ 不要因為「表情本來就走 sendEmote」就順手改過去,理由見 board.js 第七節。
 
        ⚠⚠⚠ **整段一定要包在 try/catch 裡(v1.179.6)。** 這裡每一樣都是**純裝飾**
-         (表情 / 罐頭語音 / 震動 / 提示條),可是它們站在 `paint(mv, …)` 前面 ——
+         (表情 / 震動 / 提示條),可是它們站在 `paint(mv, …)` 前面 ——
          而那個回呼是**唯一**能把 busy 放掉、也是唯一會叫 armTurnT() 的地方。
-         少了這個 try/catch,一句罐頭語音丟例外就等於整台棋局停擺
+         少了這個 try/catch,任何一個裝飾丟例外就等於整台棋局停擺
          (現場回報:踩人的那一手之後兩台都說輪到對方)。
          **裝飾壞掉最多就是少一個效果,絕對不可以連帶把棋局卡住。**
-       ⚠ 語音那一條特別脆:iOS 的音訊解鎖 / 語音閘門是這個專案最常出事的地方
-         (notes/05),而「有人被踩」正好是它唯一會在對局中途自動觸發的時機。 */
+       ⚠ v1.179.7 之前這裡還會自動放一句罐頭語音,而那是最脆的一條(iOS 音訊解鎖)。
+         現在**不自動播了**(使用者:「比較希望這是自己去按出來,才會覺得好笑」),
+         但這個 try/catch 一個字都不能拿掉 —— 它擋的是「裝飾」這一整類,不是那一句語音。 */
     const me = mySeat();
     try{
       if(mv && mv.eaten && mv.eaten.length){
-        mv.eaten.forEach((e, k) => {
+        mv.eaten.forEach(e => {
           FCB.drama({ kind: "eat", byName: nameOfSeat(mv.seat), toName: nameOfSeat(e.seat),
                       toId: ctx.order()[e.seat] || ("s" + e.seat),
-                      mine: (mv.seat === me || e.seat === me), victim: e.seat === me,
-                      seed: moves.length + k });
+                      victim: e.seat === me });
         });
       }else if(mv && mv.home){
         FCB.drama({ kind: "home", byName: nameOfSeat(mv.seat), byId: ctx.order()[mv.seat] });

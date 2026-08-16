@@ -220,10 +220,9 @@ const Solo = (function(){
     /* ★★ 踩人 / 到家的現場效果走 FCB.drama()(單機與連線同一支,見 board.js 第七節)——
        toast 只留給「跳 / 飛」那種純資訊。 */
     if(mv.eaten && mv.eaten.length){
-      mv.eaten.forEach((e, k) => {
+      mv.eaten.forEach(e => {
         FCB.drama({ kind: "eat", byName: seatName(seat), toName: seatName(e.seat),
-                    toId: "s" + e.seat, mine: (seat === ME || e.seat === ME),
-                    victim: e.seat === ME, seed: moves.length + k });
+                    toId: "s" + e.seat, victim: e.seat === ME });
       });
     }else if(mv.home){
       FCB.drama({ kind: "home", byName: seatName(seat), byId: "s" + seat });
