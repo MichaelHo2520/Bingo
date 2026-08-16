@@ -37,8 +37,46 @@ const MP = MPCore.create((function(){
   let moves = [], st = null, gRules = null;   // gRules = 這一局凍結下來的房規
   let curRound = null;
   let lastLen = -1, turnAt = 0;
-  let turnT = null;
+  let turnT = null, armedLen = -1;
   let busy = false;                    // 動畫演到一半:不要在中間再畫一次(會把飛機瞬移)
+
+  /* ==========================================================================
+     ★★★ busy 的看門狗(v1.179.6)—— 現場回報「兩台都說輪到對方」的最後一道保險
+     ──────────────────────────────────────────────────────────────────────────
+       **busy 只有一條路會被放掉:動畫的 onDone。** 而那個回呼前面站著一整排
+       **純裝飾**的東西 —— 踩人的表情、罐頭語音、震動、提示條(applyOne)。
+       只要其中一個丟例外,這一台就永遠停在 busy = true,而且症狀非常難認:
+
+         · roll() / tapPlane() 開頭就 `if(busy) return`,而且是**靜默的**
+           → 玩家一直按骰子,什麼事都沒發生、也沒有任何訊息
+         · 那一手的 armTurnT() 排在**同一個回呼裡** → 連「幫別人代打」都不會武裝
+         · 畫面停在上一手 → 他看到的是「輪到對方」,而對方看到的是「輪到他」
+           → **兩台都說輪到對方**,而且只有對手那一顆倒數到期才救得回來
+           (使用者:「這一次最後他有解決可以繼續玩下去」= 對手的倒數把局面推過去了)
+
+     ⚠ 這一顆是**最後一道**保險,不是主要修正。三道刻意互為多餘,因為全桌卡死的代價太高:
+         ① 裝飾一律 try/catch(applyOne / FCB.drama)—— 讓它根本不會卡
+         ② 倒數在**動畫之前**就武裝(applyGame)—— 卡住了也還有代打
+         ③ 這一顆 —— 前面兩道都失效時,五秒後自己把 busy 放掉並重畫
+     ⚠ 上限要比最長的一手寬:走 6 格(6×105ms)+ 踩人回機場(120+420+420)量到約
+       1.6 秒;再留給低階手機與被節流的背景分頁 → 5 秒。
+     ========================================================================== */
+  let busyT = null, busyMax = 5000;
+  function setBusy(v){
+    busy = !!v;
+    if(busyT){ clearTimeout(busyT); busyT = null; }
+    if(!busy) return;
+    busyT = setTimeout(() => {
+      busyT = null;
+      if(!busy) return;
+      busy = false;
+      /* ⚠ 一定要順手把倒數重新武裝 + 重畫:單純放掉 busy 只是「按得動了」,
+         畫面還停在上一手。paint() 走的是 anim:null → FCB 的 bump() 會把卡住的
+         那條動畫鏈收掉,並且把它欠的 onDone 交出去(board.js 的 bump 註解)。 */
+      armTurnT();
+      paint();
+    }, busyMax);
+  }
   /* ★ 開局那一刻每個人的累積分數快照(結果卡的「累計」欄用)。
      為什麼不當場讀 scores:那個節點是**結算之後**每台各自寫自己的分,而結果卡是
      **結算當下**就要畫出來 —— 直接讀會少一次,而且沒有人會重畫這張卡。 */
@@ -177,6 +215,10 @@ const MP = MPCore.create((function(){
     if(!secOn() || !st || st.over || !playing()) return;
     const seat = st.turn, me = mySeat();
     const wait = Math.max(1200, turnAt + turnSec * 1000 - Date.now()) + Math.max(0, me) * 150;
+    /* ★ 記下「這顆計時器是照第幾手排的」。只給 e2e 用,但它是唯一問得出
+       **「倒數是照這一手武裝的、還是上一手留下來的」** 的方法 —— 只問「有沒有 timer」
+       的話,把 armTurnT() 搬回動畫後面照樣是綠的(上一手那顆還在)。 */
+    armedLen = moves.length;
     turnT = setTimeout(() => { autoPlay(seat, moves.length); }, wait);
   }
 
@@ -185,6 +227,13 @@ const MP = MPCore.create((function(){
     if(!st || st.over || st.turn !== seat || !playing()) return;
     // ★ 替人代打一律用「普通」,不套任何人的難度 —— 幫人打不該幫他打得特別好
     push(step, chk => FCAI.autoMove(chk, seat), chk => chk.turn === seat);
+    /* ★★ 沒寫成就自己補排一次(v1.179.6)。交易有可能整個沒寫成:被別人搶先、
+       伺服器上的真值不合法、或 canWriteGame() 因為離線把它擋下來。
+       **沒寫成 = 不會有新的快照,而 armTurnT() 只在 applyGame 裡叫**
+       → 這顆計時器就此死掉,這一台從此不再參與代打(全桌少一份保險)。
+       ⚠ 局面真的推進了的話,applyGame 會用新的錨點把它換掉,所以這一行只在
+         「什麼都沒發生」時生效;turnAt 沒變 → 走 armTurnT() 的 1200ms 下限重試。 */
+    if(!turnT) armTurnT();
   }
 
   /* ==========================================================================
@@ -217,32 +266,43 @@ const MP = MPCore.create((function(){
      ========================================================================== */
   function applyOne(one, after){
     if(FC.isRoll(one)){
-      busy = true;
-      FCB.rollDie(one, () => { busy = false; after(); });
+      setBusy(true);
+      FCB.rollDie(one, () => { setBusy(false); after(); });
       return;
     }
     // 走子:st.last 就是動畫要的那一包(rules.js 的 step() 填的)
-    busy = true;
+    setBusy(true);
     const mv = st.last;
     /* ★★★ 踩人 / 到家的現場效果走 FCB.drama() —— **完全在本地做,一個 DB 寫入都沒有**。
        「誰踩了誰」在 moves 裡是公開的,每一台各自 replay 都算得出同一件事;
        走 sendEmote 的話會變成 N 台各送一次(飛出 N 顆一樣的表情 + N 次 Firebase 寫入)。
-       ⚠ 不要因為「表情本來就走 sendEmote」就順手改過去,理由見 board.js 第七節。 */
+       ⚠ 不要因為「表情本來就走 sendEmote」就順手改過去,理由見 board.js 第七節。
+
+       ⚠⚠⚠ **整段一定要包在 try/catch 裡(v1.179.6)。** 這裡每一樣都是**純裝飾**
+         (表情 / 罐頭語音 / 震動 / 提示條),可是它們站在 `paint(mv, …)` 前面 ——
+         而那個回呼是**唯一**能把 busy 放掉、也是唯一會叫 armTurnT() 的地方。
+         少了這個 try/catch,一句罐頭語音丟例外就等於整台棋局停擺
+         (現場回報:踩人的那一手之後兩台都說輪到對方)。
+         **裝飾壞掉最多就是少一個效果,絕對不可以連帶把棋局卡住。**
+       ⚠ 語音那一條特別脆:iOS 的音訊解鎖 / 語音閘門是這個專案最常出事的地方
+         (notes/05),而「有人被踩」正好是它唯一會在對局中途自動觸發的時機。 */
     const me = mySeat();
-    if(mv && mv.eaten && mv.eaten.length){
-      mv.eaten.forEach((e, k) => {
-        FCB.drama({ kind: "eat", byName: nameOfSeat(mv.seat), toName: nameOfSeat(e.seat),
-                    toId: ctx.order()[e.seat] || ("s" + e.seat),
-                    mine: (mv.seat === me || e.seat === me), victim: e.seat === me,
-                    seed: moves.length + k });
-      });
-    }else if(mv && mv.home){
-      FCB.drama({ kind: "home", byName: nameOfSeat(mv.seat), byId: ctx.order()[mv.seat] });
-    }else if(mv){
-      const t = FC.moveText(st, mv);
-      if(t) showToast(esc(nameOfSeat(mv.seat)) + " " + t, 1400);
-    }
-    paint(mv, () => { busy = false; after(); });
+    try{
+      if(mv && mv.eaten && mv.eaten.length){
+        mv.eaten.forEach((e, k) => {
+          FCB.drama({ kind: "eat", byName: nameOfSeat(mv.seat), toName: nameOfSeat(e.seat),
+                      toId: ctx.order()[e.seat] || ("s" + e.seat),
+                      mine: (mv.seat === me || e.seat === me), victim: e.seat === me,
+                      seed: moves.length + k });
+        });
+      }else if(mv && mv.home){
+        FCB.drama({ kind: "home", byName: nameOfSeat(mv.seat), byId: ctx.order()[mv.seat] });
+      }else if(mv){
+        const t = FC.moveText(st, mv);
+        if(t) showToast(esc(nameOfSeat(mv.seat)) + " " + t, 1400);
+      }
+    }catch(e){ console.error("fc drama", e); }
+    paint(mv, () => { setBusy(false); after(); });
   }
 
   /* ==========================================================================
@@ -326,7 +386,7 @@ const MP = MPCore.create((function(){
     lobbyGame(){ return { fc: null, moves: [] }; },
     resetRound(){
       clearTurnT();
-      moves = []; st = null; gRules = null; curRound = null; lastLen = -1; busy = false;
+      moves = []; st = null; gRules = null; curRound = null; lastLen = -1; setBusy(false);
       FCB.reset();
     },
     /* ★ picked 是 orderPick 決定出來的順序(第三個參數)。
@@ -350,7 +410,7 @@ const MP = MPCore.create((function(){
       gRules = rulesOf(g);
       moves = next.slice();
       if(!isPlaying){ st = null; return; }
-      if(fresh){ curRound = rid; lastLen = -1; busy = false; FCB.reset(); }
+      if(fresh){ curRound = rid; lastLen = -1; setBusy(false); FCB.reset(); }
 
       st = FC.replay(gRules, nPlayers(), moves);
       if(!st){ return; }                        // 房規壞掉(理論上不會)→ 等下一個快照
@@ -360,6 +420,16 @@ const MP = MPCore.create((function(){
         lastLen = moves.length;
         turnAt = Date.now();
       }
+
+      /* ★★★ 倒數**一定要在動畫之前**就武裝(v1.179.6)。
+         它算的是**牆上時間**,與本地動畫演到哪裡完全無關 —— 排在 applyOne 的回呼裡
+         等於「動畫演完才有代打」,而只要那一手卡住(踩人的裝飾丟例外、onDone 沒被
+         交出去…),這一台就連代打都不會排:全桌只剩對手那一顆計時器撐著。
+         ⚠ 這與 v1.179.2 那條紅線是**同一個道理**(倒數代打不可以被 busy 擋住)——
+           那一次修的是「不要因為 busy 就 return」,這一次修的是「不要排在動畫後面」。
+         ⚠ 底下的回呼裡**仍然**留著一次 armTurnT():那一次是用演完之後的局面重排
+           (錨點沒變,所以只是覆寫同一顆,冪等)。 */
+      armTurnT();
 
       /* ★★★ 只有「剛好多一筆」才演;換局與批次同步一律直接落定 */
       if(!fresh && moves.length === prevLen + 1){
@@ -375,7 +445,7 @@ const MP = MPCore.create((function(){
          那麼**不管上一手演到哪裡,都不該再擋著操作**。
          (board.js 的 bump() 已經會把 onDone 交出去,這一行是刻意的多餘:
           全桌卡死的代價太高,寧可兩邊都寫。) */
-      busy = false;
+      setBusy(false);
       armTurnT();
       paint();
       maybeSettle();
@@ -387,13 +457,13 @@ const MP = MPCore.create((function(){
     enterLobby(){ clearTurnT(); showScreen("lobby"); },
     backToLobby(){
       clearTurnT();
-      moves = []; st = null; curRound = null; lastLen = -1; busy = false;
+      moves = []; st = null; curRound = null; lastLen = -1; setBusy(false);
       FCB.reset();
       showScreen("lobby");
     },
     enterPlaying(){
       showScreen("play");
-      busy = false;
+      setBusy(false);
       FCB.reset();
       // ★ 這一局開打前大家各幾分(結果卡的「累計」欄要拿它加上去;見宣告處)
       baseWins = {};
@@ -403,7 +473,7 @@ const MP = MPCore.create((function(){
     },
     onLeave(){
       clearTurnT();
-      moves = []; st = null; gRules = null; curRound = null; lastLen = -1; busy = false;
+      moves = []; st = null; gRules = null; curRound = null; lastLen = -1; setBusy(false);
       baseWins = {};
       FCB.reset();
     },
@@ -528,7 +598,14 @@ const MP = MPCore.create((function(){
       _busy: () => busy,
       /* 給 e2e 用:把這一手的錨點往回撥,免得測「到期自動走棋」要真的等 30 秒。
          同排七的 _ageTurn() —— 那類機制只有時間會觸發,e2e 等不了。 */
-      _ageTurn(ms){ turnAt -= (+ms || 0); armTurnT(); paint(); }
+      _ageTurn(ms){ turnAt -= (+ms || 0); armTurnT(); paint(); },
+      /* 給 e2e 用:把 busy 看門狗的上限調短(同 _ageTurn 的道理 —— 那顆只有時間會觸發,
+         照 5 秒等會讓整份 e2e 慢一大截)。⚠ 只改上限,不改行為。 */
+      _busyMax(ms){ busyMax = Math.max(20, +ms || 0); },
+      /* 給 e2e 用:倒數代打的計時器現在是照**第幾手**武裝的(沒武裝 = -1)。
+         ⚠ 不可以只回 true/false —— 上一手留下來的那顆也是 true,
+           把 armTurnT() 搬回動畫後面照樣量得到「有武裝」(那條突變會存活)。 */
+      _armed: () => turnT ? armedLen : -1
     }
   };
 

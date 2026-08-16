@@ -553,17 +553,29 @@ const FCB = (function(){
      ========================================================================== */
   const EAT_CLIPS = ["rude", "crying", "polite"];      // 沒禮貌 / 你是在哭喔 / 你禮貌嗎
 
+  /* ⚠⚠⚠ **這三件事全是裝飾,一個都不准把例外丟回呼叫端(v1.179.6)。**
+     呼叫端(adapter 的 applyOne)正站在「唯一能放掉 busy、也是唯一會武裝倒數代打的
+     那個回呼」前面 —— 這裡丟一個例外就等於整台棋局停擺,而畫面上的症狀是
+     **兩台都說輪到對方**(現場回報過,而且使用者自己指出是踩人叫罐頭語音那一下)。
+     ⚠ **各自**包而不是整段包:語音壞掉不該連表情跟震動也一起不見。
+     ⚠ 語音那一條特別脆 —— iOS 的音訊解鎖 / 語音閘門是整個專案最常出事的地方
+       (notes/05),而「有人被踩」正好是它唯一會在對局中途自動觸發的時機。
+     ⚠ 例外照樣 console.error 出來:吞掉不等於當作沒發生過。 */
+  function safe(what, fn){ try{ fn(); }catch(e){ console.error("fc drama:" + what, e); } }
+
   function drama(o){
     if(!o) return;
     if(o.kind === "eat"){
       /* who 傳被踩的那個人:表情飛出的發位是「同一個人 2.6 秒內沿用同一條」,
          傳受害者才會讓「連續被踩」在畫面上串成一條(efLane 的設計)。 */
-      showEmote("💥", esc(o.byName) + " 踩掉 " + esc(o.toName), o.toId || o.toName, "emoji");
-      if(o.mine) enqueueClip(EAT_CLIPS[(o.seed || 0) % EAT_CLIPS.length]);
+      safe("emote", () => showEmote("💥", esc(o.byName) + " 踩掉 " + esc(o.toName),
+                                    o.toId || o.toName, "emoji"));
+      if(o.mine) safe("clip", () => enqueueClip(EAT_CLIPS[(o.seed || 0) % EAT_CLIPS.length]));
       // 被踩的是我 → 手機震一下(單純的音效在吵的場合聽不到)
-      if(o.victim) buzz();
+      if(o.victim) safe("buzz", buzz);
     }else if(o.kind === "home"){
-      showEmote("🏁", esc(o.byName) + " 有一架到家了", o.byId || o.byName, "emoji");
+      safe("emote", () => showEmote("🏁", esc(o.byName) + " 有一架到家了",
+                                    o.byId || o.byName, "emoji"));
     }
   }
   function buzz(){

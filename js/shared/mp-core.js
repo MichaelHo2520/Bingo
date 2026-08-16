@@ -655,8 +655,17 @@ const MPCore = (function(){
       else if(ORDER_PICK && ORDER_PHASE[status]){ enterOrder(); }
       else { if(curPhase!=="lobby" && !winner) backToLobby(); }
 
-      // 遊戲狀態同步:交給 adapter(五子棋的 moves / 數獨的 fills 與進度)
-      A.applyGame && A.applyGame(g, curPhase==="playing");
+      /* 遊戲狀態同步:交給 adapter(五子棋的 moves / 數獨的 fills 與進度)
+         ⚠⚠ **一定要包起來(v1.179.6)。** onGame 是十二個遊戲唯一的狀態入口,而
+           adapter 在這裡除了推局面之外還會做一整排**純裝飾**的事(表情 / 罐頭語音 /
+           震動 / 提示條)。只要 adapter 丟一個例外,底下那一整段就會**整段被跳過**:
+             · winner / closeWin —— 結果卡不會跳,也不會收
+             · updateRoomIndex —— 大廳索引停在舊狀態
+             · updateStartBtn —— 續局時全房停在結果卡上(那是房主端唯一的推進)
+           飛行棋踩過這條:踩人時的罐頭語音丟例外 → 那一台從此少收一半的事件。
+         ⚠ 例外照樣 console.error 出來,不要靜靜吞掉 —— 吞掉會讓下一個 bug 沒有線索。 */
+      try{ A.applyGame && A.applyGame(g, curPhase==="playing"); }
+      catch(e){ console.error("applyGame", e); }
 
       if(winner){ onWinner(); }
       else if(hadWinner) closeWin();
