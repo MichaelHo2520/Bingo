@@ -7957,13 +7957,23 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        它模擬的是桌上真的擺了一塊板;讓它跟著 midnight / arcade 變深,
        四色會整組失真(而那是規則)。
      ========================================================================== */
+  /* ── ★★ 濃度本身就是可玩性(v1.179.5)────────────────────────────────────
+       使用者:「整體的配色也沒有非常的明顯」。第一版的 --fc-s0..3 淡到接近白
+       (#fadadb / #fbe8c6 / #d8e5fd / #cfeede),而外圈 **52 格每一格都是某一家的
+       自家色格**(見 board.js)—— 顏色認不出來就等於「這一格我能不能跳」認不出來。
+       四色是規則本體,所以「看得出是哪一色」不是美觀問題,是規則讀不讀得到。
+     ⚠ 深到什麼程度有上限:格子上會停**同一個顏色的飛機**,底色再深就變成同色疊同色
+       (機場那條紅線的同一個道理)。現在這一階量過:飛機的白外框仍然壓得住。 */
   :root{
-    --fc-c0:#e5484d; --fc-c1:#e8930c; --fc-c2:#3b7ff5; --fc-c3:#1f9d63;
-    --fc-s0:#fadadb; --fc-s1:#fbe8c6; --fc-s2:#d8e5fd; --fc-s3:#cfeede;
-    --fc-felt:#f6ecd8;      /* 板子 */
-    --fc-cellbg:#fffdf7;    /* 一般格子 */
-    --fc-line:#cbb994;
-    --fc-goalbg:#fff2cf;
+    --fc-c0:#ef3b52; --fc-c1:#f89a12; --fc-c2:#3a86ff; --fc-c3:#18a95f;
+    --fc-s0:#ffc6ce; --fc-s1:#ffdba6; --fc-s2:#c8dcff; --fc-s3:#b4e8c9;
+    /* ★ 回家跑道專用的第三階(比格子再深一階)—— 跑道與外圈長得一模一樣的話,
+       「這一段是回家的路、別人踩不到」在盤面上完全講不出來。 */
+    --fc-l0:#ff9fae; --fc-l1:#ffc76d; --fc-l2:#9dc4ff; --fc-l3:#7ddcaa;
+    --fc-felt:#fff5e3;      /* 板子 */
+    --fc-cellbg:#fffdf7;    /* 機場內部 */
+    --fc-line:#d8bf94;
+    --fc-goalbg:#fffaef;
     --fc-ink:#4a3a22;
     --fc-tw:min(96vw,560px);
   }
@@ -8065,46 +8075,109 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .fc-acts{flex:none;min-height:52px;display:flex;align-items:center;justify-content:center;
            gap:12px;width:100%;position:relative}
 
-  /* ---------- 棋盤 ---------- */
+  /* ---------- 棋盤 ----------
+     ★ 底下所有格子的圓角一律**跟著 --fc-cell 縮放**(v1.179.5):寫死 3px 在大棋盤
+       模式(格子 46px)上等於沒有圓角,在 13px 的手機上又快把格子啃掉一角。
+       盤子自己的圓角是例外(20px 固定)—— 它的尺寸是 14 格,不隨單格變。
+     ★ 中間那個十字形的空白(四個機場之間)是盤面上最大的一塊素面 —— 灑一層很淡的
+       點點才不會空。⚠ 點點鋪滿整塊板子沒關係:格子是不透明的,只有露出來的地方看得到。 */
   .fc-board{position:relative;--fc-cell:22px;flex:none;
-            background:var(--fc-felt);border-radius:14px;
-            box-shadow:0 6px 18px rgba(60,40,10,.22),inset 0 0 0 2px rgba(255,255,255,.5)}
+            background:
+              radial-gradient(rgba(200,170,120,.28) 1.1px,transparent 1.2px)
+                0 0 / calc(var(--fc-cell) * .5) calc(var(--fc-cell) * .5),
+              radial-gradient(circle at 50% 42%,#fffdf4,var(--fc-felt) 78%);
+            border-radius:20px;
+            box-shadow:0 10px 26px rgba(60,40,10,.30),
+                       inset 0 0 0 3px rgba(255,255,255,.8),
+                       inset 0 0 0 5px rgba(216,191,148,.45)}
   .fc-board > *{position:absolute;box-sizing:border-box}
-  /* 四色掛在 data-c 上,底下的格子 / 飛機 / 點點全部靠 --c 取用(只有這四條認得顏色) */
-  .fc-board [data-c="0"],.fc-dot[data-c="0"]{--c:var(--fc-c0);--cs:var(--fc-s0)}
-  .fc-board [data-c="1"],.fc-dot[data-c="1"]{--c:var(--fc-c1);--cs:var(--fc-s1)}
-  .fc-board [data-c="2"],.fc-dot[data-c="2"]{--c:var(--fc-c2);--cs:var(--fc-s2)}
-  .fc-board [data-c="3"],.fc-dot[data-c="3"]{--c:var(--fc-c3);--cs:var(--fc-s3)}
+  /* 四色掛在 data-c 上,底下的格子 / 飛機 / 點點全部靠 --c 取用(只有這四條認得顏色)。
+     --cs = 格子的底色,--cl = 回家跑道的底色(深一階) */
+  .fc-board [data-c="0"],.fc-dot[data-c="0"]{--c:var(--fc-c0);--cs:var(--fc-s0);--cl:var(--fc-l0)}
+  .fc-board [data-c="1"],.fc-dot[data-c="1"]{--c:var(--fc-c1);--cs:var(--fc-s1);--cl:var(--fc-l1)}
+  .fc-board [data-c="2"],.fc-dot[data-c="2"]{--c:var(--fc-c2);--cs:var(--fc-s2);--cl:var(--fc-l2)}
+  .fc-board [data-c="3"],.fc-dot[data-c="3"]{--c:var(--fc-c3);--cs:var(--fc-s3);--cl:var(--fc-l3)}
 
-  .fc-cell{border:1px solid var(--fc-line);border-radius:3px;background:var(--fc-cellbg);
+  /* ⚠ 這一條**也會命中玩法說明裡的圖例**(圖例用的是盤面上真的那幾個 class),
+     而圖例在盤面外面 —— 那裡沒有 --fc-cell → 一定要給 fallback,
+     不然 border-radius 整條算不出來直接變成 0(直角的圖例格)。 */
+  .fc-cell{border:1px solid var(--fc-line);border-radius:calc(var(--fc-cell,22px) * .26);
+           background:var(--fc-cellbg);
            display:flex;align-items:center;justify-content:center}
-  /* 自家色格 / 起飛點 / 航線格:底色換成該色的淺版,一眼看得出「這一段是誰的」 */
-  .fc-cell.jump,.fc-cell.fly,.fc-cell.start{background:var(--cs);border-color:var(--c)}
-  .fc-cell.start{box-shadow:inset 0 0 0 2px var(--c)}
+  /* 自家色格 / 起飛點 / 航線格:底色換成該色的淺版,一眼看得出「這一段是誰的」。
+     ★ 頂緣一道白高光 = 糖果鈕的做法,讓 52 格不會攤成一片死色塊 */
+  .fc-cell.jump,.fc-cell.fly,.fc-cell.start{background:var(--cs);border-color:var(--c);
+           box-shadow:inset 0 1.5px 0 rgba(255,255,255,.7)}
+  .fc-cell.start{box-shadow:inset 0 0 0 2px var(--c),inset 0 1.5px 0 rgba(255,255,255,.5)}
   /* 格子上的記號。⚠ 一律用 CSS 畫,不用文字 —— 19px 的格子放不下任何一個字。
      ⚠⚠ **只有起飛點與航線格有記號**;「可以跳」的格子刻意只靠底色 ——
        52 格每一格都是某一家的自家色格,每格都畫就是整圈一片三角形(見 board.js 的註解)。 */
   .fc-mk{display:block}
-  .fc-mk.fly{width:46%;height:46%;background:var(--c);border-radius:2px;
-             transform:rotate(45deg);box-shadow:0 0 0 1.5px rgba(255,255,255,.8)}
-  .fc-mk.start{width:46%;height:46%;border:2.5px solid var(--c);border-radius:50%;
-               background:rgba(255,255,255,.75)}
+  .fc-mk.fly{width:50%;height:50%;background:var(--c);border-radius:26%;
+             transform:rotate(45deg);box-shadow:0 0 0 1.5px rgba(255,255,255,.9)}
+  .fc-mk.start{width:52%;height:52%;border:2.5px solid var(--c);border-radius:50%;
+               background:#fff;box-shadow:0 0 0 1.5px rgba(255,255,255,.7)}
 
-  .fc-lane{border:1px solid var(--c);border-radius:3px;background:var(--cs)}
+  /* ---------- 回家跑道 ----------
+     ★ 底色走 --cl(深一階)+ 一個往終點指的小箭頭:跑道與外圈長得一樣的話,
+       「這一段是回家的路」只能用猜的。
+     ⚠ 箭頭方向**四家各不相同**(各自從自己那一邊往中心走)—— 靠 data-c 各轉一次,
+       角度對照 rules.js 的 LANE_DIR:紅↓ 黃← 藍↑ 綠→。 */
+  .fc-lane{border:1px solid var(--c);border-radius:calc(var(--fc-cell) * .26);
+           background:var(--cl);box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5);
+           display:flex;align-items:center;justify-content:center}
+  .fc-lane::after{content:"";width:22%;height:22%;border-radius:2px;
+                  border-top:calc(var(--fc-cell) * .085) solid rgba(255,255,255,.85);
+                  border-right:calc(var(--fc-cell) * .085) solid rgba(255,255,255,.85)}
+  .fc-lane[data-c="0"]::after{transform:rotate(135deg)}
+  .fc-lane[data-c="1"]::after{transform:rotate(-135deg)}
+  .fc-lane[data-c="2"]::after{transform:rotate(-45deg)}
+  .fc-lane[data-c="3"]::after{transform:rotate(45deg)}
+
   /* ⚠⚠ 機場**內部要接近白色**,不可以填自己的色 —— 停在自己機場裡的飛機正好是同一個顏色,
      填了就是「同色疊同色」,四架飛機在自己家裡幾乎看不見(v1.179.0 第一版量過:
      fill 明明是 rgb(229,72,77),但看起來一片粉紅)。顏色改用**外框 + 內圈**來講。 */
-  .fc-hangar{border-radius:10px;background:var(--fc-cellbg);border:2px solid var(--c);
-             box-shadow:inset 0 0 0 4px var(--cs)}
-  /* 輪到誰:他的機場整塊亮起來(比在小格子上做記號好認得多) */
-  .fc-hangar.turn{opacity:1;box-shadow:0 0 0 3px var(--c),0 0 14px rgba(0,0,0,.18)}
-  .fc-slot{border:2px dashed var(--c);border-radius:50%;opacity:.5;
-           width:calc(var(--fc-cell) * .8);height:calc(var(--fc-cell) * .8);
-           margin:calc(var(--fc-cell) * .1)}
-  .fc-goal{background:var(--fc-goalbg);border:2px solid var(--fc-line);border-radius:50%;
+  .fc-hangar{border-radius:calc(var(--fc-cell) * .62);
+             background:radial-gradient(circle at 32% 26%,#fff,var(--fc-cellbg) 72%);
+             border:max(2px,calc(var(--fc-cell) * .11)) solid var(--c);
+             box-shadow:inset 0 0 0 max(3px,calc(var(--fc-cell) * .15)) var(--cs),
+                        0 2px 7px rgba(60,40,10,.16)}
+  /* 輪到誰:他的機場整塊亮起來(比在小格子上做記號好認得多)。
+     ⚠ 內圈那一道要**留著**一起寫 —— box-shadow 是整份覆蓋,漏寫就是輪到誰的時候
+       他的機場反而少一圈顏色。 */
+  .fc-hangar.turn{opacity:1;
+                  box-shadow:inset 0 0 0 max(3px,calc(var(--fc-cell) * .15)) var(--cs),
+                             0 0 0 3px var(--c),0 0 16px rgba(0,0,0,.2);
+                  animation:fcHangar 1.6s ease-in-out infinite}
+  @keyframes fcHangar{0%,100%{filter:brightness(1)}50%{filter:brightness(1.07)}}
+  /* ⚠⚠ 虛線圈與飛機**一定要同心**(v1.179.5 修)。board.js 給的 inline style 已經寫死
+     一整格的 width/height,CSS 這邊再寫 width/height 是**蓋不掉的**(inline 權重較高)——
+     蓋得掉的只有那個 margin,於是圈整個往右下偏了 0.1 格、飛機停在左上角,
+     看起來就是「飛機沒有停在圈裡」(使用者回報的第二件事)。
+     → 盒子一格不動,只用 ::after 內縮把圈畫在正中間。 */
+  .fc-slot{border:0;background:none}
+  .fc-slot::after{content:"";position:absolute;inset:11%;border-radius:50%;
+                  border:2px dashed var(--c);opacity:.55}
+
+  /* ---------- 終點(中央)----------
+     ⚠⚠ **座標要從 GOAL_XY − 0.5 起算,不是 −1**(v1.179.5 修,寫在 board.js)——
+       GOAL_XY 回的是「一架飛機的左上角」(飛機一格見方)→ 視覺中心在 GOAL_XY + 0.5。
+       −1 的話整顆往左上偏半格,而盤面正中心就是四條跑道的交會點,偏了一眼就看得出來
+       (使用者回報的第一件事:「棋盤中間的賽車旗沒有置中」)。
+     ★ 四色風車:中央本來是盤面上**最沒有顏色**的一塊米色圈,可是它其實是四家共同的
+       目的地。做成四色扇形之後,每一家從自己的跑道看過去都對得到「我的那一扇」。
+     ⚠ 起始角 −63deg 不是隨手抓的:四條跑道是從**邊長的偏心處**進來的(終點是 2×2,
+       跑道貼的是其中一格),四個方向落在 −18/72/162/252 度 → 扇形邊界要退 45 度。
+       改成 0deg(對角線)的話,綠色跑道的盡頭會接到藍色那一扇。 */
+  .fc-goal{border-radius:50%;
+           background:conic-gradient(from -63deg,var(--fc-c0) 0 25%,var(--fc-c1) 0 50%,
+                                     var(--fc-c2) 0 75%,var(--fc-c3) 0);
            display:flex;align-items:center;justify-content:center;
-           box-shadow:inset 0 0 0 3px rgba(255,255,255,.7)}
-  .fc-goal span{font-size:calc(var(--fc-cell) * 1.05);line-height:1}
+           box-shadow:0 3px 9px rgba(60,40,10,.3),inset 0 0 0 2px rgba(255,255,255,.9)}
+  .fc-goal::before{content:"";position:absolute;inset:21%;border-radius:50%;
+                   background:var(--fc-goalbg);
+                   box-shadow:inset 0 0 0 2px rgba(255,255,255,.9),0 1px 3px rgba(60,40,10,.28)}
+  .fc-goal span{position:relative;font-size:calc(var(--fc-cell) * .85);line-height:1}
 
   /* ---------- 飛機 ----------
      ⚠ 位置一律走 transform(不是 left/top):transition 只有 transform 走得動 GPU,
@@ -8118,13 +8191,18 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      預設的「先填色再描邊」會讓 1.4 的白邊從兩側各吃掉一半 → 整架飛機看起來是白的
      (v1.179.0 第一版截圖就是這樣,連身上的座號都白底白字看不見)。
      paint-order:stroke 讓描邊畫在填色**底下**,白邊變成外框、機身仍然是自己的顏色。 */
-  .fc-plane svg{width:88%;height:88%;fill:var(--c);stroke:#fff;stroke-width:1.6;
-                paint-order:stroke;stroke-linejoin:round;
-                filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.45))}
-  /* ★ 色盲的第二訊號:座號。大棋盤模式下它是 15px 上下,一眼讀得到 */
+  /* ★ 白外框加粗到 1.9(v1.179.5):格子底色一起加濃了,1.6 的外框在自家色格上
+     已經快要糊掉 —— 飛機要在**任何一格**上都切得出來,不只在米色的空格上。 */
+  .fc-plane svg{width:92%;height:92%;fill:var(--c);stroke:#fff;stroke-width:1.9;
+                paint-order:stroke;stroke-linejoin:round;stroke-linecap:round;
+                filter:drop-shadow(0 1px 2px rgba(0,0,0,.42))}
+  /* ★ 色盲的第二訊號:座號。大棋盤模式下它是 17px 上下,一眼讀得到。
+     ⚠ 往下挪一點點:正中央是機身**最窄**的地方(只有 4 個單位寬),
+       數字擺在那裡兩側會露出來;下移到機翼根部才有底可以壓。 */
   .fc-pn{position:absolute;font-family:'Fredoka',sans-serif;font-weight:700;color:#fff;
-         font-size:calc(var(--fc-cell) * .36);line-height:1;pointer-events:none;
-         text-shadow:0 1px 1px rgba(0,0,0,.55)}
+         font-size:calc(var(--fc-cell) * .38);line-height:1;pointer-events:none;
+         transform:translateY(calc(var(--fc-cell) * .05));
+         text-shadow:0 1px 1.5px rgba(0,0,0,.7),0 0 2px rgba(0,0,0,.45)}
   .fc-plane.mine{z-index:6}
   /* 動得了的那幾架:呼吸光環。⚠ 不用 disabled 擋別的 —— 點了要講得出原因 */
   .fc-plane.can{z-index:8;animation:fcPulse 1.15s ease-in-out infinite}
@@ -8141,9 +8219,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* ---------- 骰子 ----------
      ⚠ 點數是**別人給的**(住在 moves 裡),這裡只負責演;.rolling 期間顯示的那幾面
        純粹是視覺,與規則無關(見 board.js 第六節)。 */
-  .fc-die{width:58px;height:58px;flex:none;border-radius:14px;
-          background:linear-gradient(155deg,#fffdf6,#f0e3c8);
-          border:2px solid var(--fc-line);padding:7px;
+  .fc-die{width:58px;height:58px;flex:none;border-radius:18px;
+          background:linear-gradient(155deg,#fffdf6,#f6e6c6);
+          border:2px solid var(--fc-line);padding:8px;
           display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
           gap:2px;cursor:pointer;
           box-shadow:0 3px 8px rgba(60,40,10,.28),inset 0 1px 0 rgba(255,255,255,.9);
@@ -8233,7 +8311,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .fc-room{padding:6px 10px}
     .fc-room .mp-subrow,.fc-room-foot{margin-top:3px}
     .fc-acts{min-height:46px}
-    .fc-die{width:48px;height:48px;padding:5px}
+    .fc-die{width:48px;height:48px;padding:6px;border-radius:15px}
     .fc-cd{width:30px;height:30px}
     .fc-cdn{font-size:12.5px}
     .fc-hint{font-size:12px}

@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "1.179.4";
+const VERSION = "1.179.5";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -126,7 +126,7 @@ const CORE = [
   "./js/draw/board.js",
   "./js/draw/adapter.js",
   "./js/draw/main.js",
-  /* 飛行棋(第十三個遊戲,v1.179.4;獨立頁面)。
+  /* 飛行棋(第十三個遊戲,v1.179.5;獨立頁面)。
      ★ 這一頁多載一支共用檔:js/shared/mp-order.js(猜拳決定誰先擲)——
        它上面已經列過(暗棋也吃它),不必再列一次。
      ★ 這一頁不新增任何 mp3:骰子 / 走格 / 踩人的聲音全是 Sound.tone() 的合成音
