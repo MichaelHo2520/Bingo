@@ -10,6 +10,17 @@
      比照暗棋 / 成語接龍 / 飛行棋。⚠ 這一頁的外接框**不是正方形**:
      13 個間距寬 × 14.856 個間距高(見 rules.js 的 BOARD_W / BOARD_H)——
      所以 fitBoard() 要對寬高各除一次再取小的,不可以照抄飛行棋的 min(w,h)/14。
+     ⚠⚠ v1.181.0 起**盤面框不再等於 rules.js 的 BOARD_W / BOARD_H**:外面多了一圈
+       六邊形木框(見下一段的 TRAY_W / TRAY_H)。要洞的位置一律 posXY() **再加 OX / OY**,
+       不可以直接拿 posXY() 當畫面座標(那會整個盤面往左上偏 0.3 / 0.6 格)。
+
+   ── ★★ 木框為什麼是「六邊形」而且只多花 6% 寬 ────────────────────────────
+     六角星的**凸包**就是一個正六邊形,而且那個六邊形的六個頂點正好一個對著一個星尖 ——
+     所以「把星包起來」的最小六邊形不必比星胖,只要沿半徑往外推 RIM 格就好。
+     ⚠ 這一點很反直覺,值得寫下來:直覺會挑「上下平、左右尖」的那一種擺法
+       (參考圖乍看像那樣),但那一種要**多 33% 的寬**才包得住同一顆星 ——
+       而這一頁在直向手機上正是被寬度卡住的(紅線 14)→ 等於棋子直接小四分之一。
+       正確的是「上下尖、左右平」:寬高各只多 6~7%。
 
    ── ★★★ 動畫是「t 的函式」,不是一條回呼鏈 ────────────────────────────────
      **這一頁與飛行棋最大的結構差別,而且是刻意的。**
@@ -40,12 +51,25 @@ const TQB = (function(){
   const CELL_MIN = 16;                 // 再小就點不到了(洞只有 0.72 格)
   const CELL_MAX = 54;
 
+  /* ---------- 木托盤的幾何(v1.181.0)----------
+     R_STAR = 星的外接圓半徑(格)。星的六個尖角都落在這個圓上 ——
+     ⚠ 直接由 BOARD_H 反推(高 = 上下兩個尖角 + 各半個洞),不要另外寫一個常數:
+       改了 rules.js 的 TIP 之後這裡要自己跟著對。 */
+  const RIM = 1.05;                    // 星尖外面留幾格木頭
+  const R_STAR = (R.BOARD_H - 1) / 2;  // 6.928
+  const R_HEX = R_STAR + RIM;
+  const TRAY_W = R_HEX * Math.sqrt(3); // 上下尖的正六邊形:寬 = √3 R、高 = 2R
+  const TRAY_H = R_HEX * 2;
+  const OX = TRAY_W / 2 - R.BOARD_W / 2;   // 洞座標要往右下平移多少(格)
+  const OY = TRAY_H / 2 - R.BOARD_H / 2;
+
   const MS_HOP = 150;                  // 一段跳多久
   const MS_STEP = 210;                 // 單步多久(只有一段,慢一點才看得到)
 
   let board = null, stage = null, acts = null;
   let cb = { onHole: null, onPiece: null };
   let built = false, cell = 0;
+  let fitW = 0, fitH = 0;              // 上一次「真的拿來算過」的舞台尺寸(死區用,見 fitBoard)
   let pieceEls = [];                   // pieceEls[seat][i]
   let holeEls = [];                    // holeEls[id]
   let shownKey = "";                   // 上一次畫的「幾家幾顆」(換局才重建棋子)
@@ -78,15 +102,134 @@ const TQB = (function(){
   const PC_R = 0.40;                   // 棋子的半徑
 
   function at(cx, cy, rad){
-    return 'style="left:calc(var(--tq-cell) * ' + (cx - rad) + ');' +
-                  'top:calc(var(--tq-cell) * ' + (cy - rad) + ');' +
+    return 'style="left:calc(var(--tq-cell) * ' + (cx + OX - rad) + ');' +
+                  'top:calc(var(--tq-cell) * ' + (cy + OY - rad) + ');' +
                   'width:calc(var(--tq-cell) * ' + (rad * 2) + ');' +
                   'height:calc(var(--tq-cell) * ' + (rad * 2) + ')"';
   }
 
+  /* ==========================================================================
+     一之一、★ 木托盤(v1.181.0)—— 一張 SVG,建盤面時畫一次就不再動
+     ──────────────────────────────────────────────────────────────────────────
+       四層由外而內:六邊形木板 → 金色內框 → 六角星凹槽 → 三角格線。
+
+     ★★ **一個座標都不是手打的**,全部問 rules.js:
+       ① 星的輪廓 = 12 個**真的洞**(六個角的尖端 + 中央六邊形的六個頂點),
+          走 idAt()/posXY() 拿 —— 所以 rules.js 的幾何改了它自己會跟著對。
+       ② 三角格線 = 對每個洞取 NB[id] 的 0(右)/ 1(右上)/ 5(右下) 三個方向各連一條,
+          **每條邊剛好被畫一次**(從左端點畫出去),而且只畫得出「真的有洞」的地方
+          → 星形是格線自己長出來的,不是裁出來的。
+       ⚠ 這正是紅線「不要用 clip-path 去切一個星」的正解:那樣切會讓尖角的洞貼在裁切邊上。
+
+     ★ 凹槽用「fill + stroke + stroke-linejoin:round」而不是再算一次外擴多邊形 ——
+       同一條路徑加一圈 PAN_W/2 格的圓角描邊,等距外擴而且六個尖角自動變圓。
+     ⚠ 顏色一律走 CSS(class + var),這裡只產生形狀:改配色不必動 JS。
+     ========================================================================== */
+  const PAN_W = 1.00;                  // 星形凹槽的外擴描邊(= 往外 0.5 格)
+  /* 星的 12 個頂點(立方座標的 x,z),順時針,從最上面那個尖角開始。
+     ⚠ 順序不可以亂:亂了就是自己穿過自己的星。 */
+  const HULL_XZ = [[4,-8],[4,-4],[8,-4],[4,0],[4,4],[0,4],[-4,8],[-4,4],[-8,4],[-4,0],[-4,-4],[0,-4]];
+
+  function f3(n){ return (Math.round(n * 1000) / 1000); }
+
+  function hullPath(){
+    let d = "";
+    HULL_XZ.forEach((v, i) => {
+      const p = R.posXY(R.idAt(v[0], v[1]));
+      d += (i ? "L" : "M") + f3(p.x + OX) + " " + f3(p.y + OY);
+    });
+    return d + "Z";
+  }
+  function hexPoints(shrink){
+    const cx = TRAY_W / 2, cy = TRAY_H / 2, r = R_HEX - shrink, s = r * Math.sqrt(3) / 2;
+    return [[cx, cy - r], [cx + s, cy - r / 2], [cx + s, cy + r / 2],
+            [cx, cy + r], [cx - s, cy + r / 2], [cx - s, cy - r / 2]]
+           .map(p => f3(p[0]) + "," + f3(p[1])).join(" ");
+  }
+  function gridPath(){
+    let d = "";
+    for(let id = 0; id < R.N_HOLES; id++){
+      const a = R.posXY(id);
+      [0, 1, 5].forEach(k => {
+        const j = R.NB[id][k];
+        if(j < 0) return;
+        const b = R.posXY(j);
+        d += "M" + f3(a.x + OX) + " " + f3(a.y + OY) + "L" + f3(b.x + OX) + " " + f3(b.y + OY);
+      });
+    }
+    return d;
+  }
+  /* ⚠ SVG 的 fill 吃不到 CSS 漸層 → 木紋與凹槽的漸層只能寫成 <defs>。
+       色票仍然留在 CSS(stop-color 吃 var()),這裡只排「哪一段接哪一段」。
+     ⚠⚠ id 是**整份文件共用的命名空間**,一律加 tq 前綴(同 CSS 前綴那條紅線的道理)。 */
+  function defsHTML(){
+    /* 木紋。★ 三件事一起才像木頭,少一件就像拉絲金屬(第一版)或斑馬(第二版):
+         ① **不等距** —— 等距的條紋眼睛一眼認出是程式畫的
+         ② **低對比** —— 亮暗差交給下面那層 shade,這一層只負責紋理
+         ③ **偶爾一條深的** —— 木頭的年輪線,間隔比淺紋大得多
+       ⚠ 漸層軸接近**垂直**(x2 小、y2 = 1)→ 紋路是接近水平的,那才是一塊桌板;
+         接近水平的軸會畫出直條,看起來像柵欄。
+       ⚠ 明暗另外疊一層 tq-tray-shade:混在同一條漸層裡就再也分不開調了。 */
+    const GRAIN = [[0,2],[4,1],[8,2],[13,1],[17,2],[19,3],[21,2],[26,1],[31,2],[35,1],
+                   [38,2],[41,3],[43,2],[48,1],[53,2],[57,1],[61,2],[65,3],[67,2],
+                   [72,1],[77,2],[81,1],[85,2],[89,3],[91,2],[95,1],[100,2]];
+    let wood = "";
+    GRAIN.forEach(g => {
+      wood += '<stop offset="' + g[0] + '%" stop-color="var(--tq-wood-' + g[1] + ')"/>';
+    });
+    return "<defs>" +
+             '<linearGradient id="tqWoodG" x1="0.14" y1="0" x2="0" y2="1">' + wood + "</linearGradient>" +
+             '<linearGradient id="tqShadeG" x1="0.2" y1="0" x2="0.8" y2="1">' +
+               '<stop offset="0%" stop-color="rgba(255,255,255,.20)"/>' +
+               '<stop offset="42%" stop-color="rgba(255,255,255,.02)"/>' +
+               '<stop offset="100%" stop-color="rgba(0,0,0,.32)"/>' +
+             "</linearGradient>" +
+             '<radialGradient id="tqPanG" cx="50%" cy="44%" r="62%">' +
+               '<stop offset="0%" stop-color="var(--tq-pan-1)"/>' +
+               '<stop offset="100%" stop-color="var(--tq-pan-2)"/>' +
+             "</radialGradient>" +
+           "</defs>";
+  }
+
+  /* ★ 六個角的淡色三角面板 —— 「誰的家在哪」在六色局裡是最常被問的一件事,
+     光靠 60 個洞的淺色底(--cs)在米色凹槽上讀不出來。
+     ⚠ 三個頂點一律從 CORNER_HOLES 取:尖端 = [0],底邊 = 最後那一列(索引 6..9)的兩端 ——
+       ⚠⚠ 取兩端要**自己比 x**,不可以假設那一列在陣列裡是由左到右排的。 */
+  function homePanels(){
+    let h = "";
+    for(let c = 0; c < 6; c++){
+      const list = R.CORNER_HOLES[c];
+      if(!list || list.length < 10) continue;
+      const row = list.slice(6, 10).map(id => R.posXY(id));
+      let a = row[0], b = row[0];
+      row.forEach(p => { if(p.x < a.x) a = p; if(p.x > b.x) b = p; });
+      const t = R.posXY(list[0]);
+      h += '<polygon class="tq-tray-home" data-c="' + c + '" points="' +
+           [t, a, b].map(p => f3(p.x + OX) + "," + f3(p.y + OY)).join(" ") + '"/>';
+    }
+    return h;
+  }
+
+  function trayHTML(){
+    const star = hullPath();
+    return '<svg class="tq-tray" viewBox="0 0 ' + f3(TRAY_W) + " " + f3(TRAY_H) + '" aria-hidden="true">' +
+             defsHTML() +
+             '<polygon class="tq-tray-wood" points="' + hexPoints(0) + '"/>' +
+             '<polygon class="tq-tray-shade" points="' + hexPoints(0) + '"/>' +
+             '<polygon class="tq-tray-gold" points="' + hexPoints(0.30) + '"/>' +
+             '<polygon class="tq-tray-gold2" points="' + hexPoints(0.50) + '"/>' +
+             '<path class="tq-tray-lip" d="' + star + '" stroke-width="' + f3(PAN_W + 0.20) + '"/>' +
+             '<path class="tq-tray-pan" d="' + star + '" stroke-width="' + PAN_W + '"/>' +
+             homePanels() +
+             '<path class="tq-tray-grid" d="' + gridPath() + '"/>' +
+           "</svg>";
+  }
+
   function build(){
     if(built || !board) return;
-    let h = "";
+    /* ⚠ 托盤一定要排在最前面:洞與棋子都是 position:absolute,繪製順序按 DOM ——
+       排到後面就會把 121 個洞整個蓋掉(而且它 pointer-events:none,看起來像點不到)。 */
+    let h = trayHTML();
     for(let id = 0; id < R.N_HOLES; id++){
       const p = R.posXY(id), c = R.cornerOf(id);
       h += '<button type="button" class="tq-hole" data-id="' + id + '"' +
@@ -108,21 +251,36 @@ const TQB = (function(){
     if(!board || !stage) return;
     const w = stage.clientWidth, h = stage.clientHeight;
     if(w <= 0) return;
+    /* ★★★ 死區(v1.181.0,使用者:「盤面的縮放一直跳來跳去」)。
+       `render()` 每一次都會叫 fitBoard(),而 render 每一手、外加每 3 秒的對帳心跳都會跑 ——
+       所以舞台只要抖一兩個 px,盤面就會**在對局中途自己跳一階**(一階 ≈ 14px 寬)。
+       抖動的來源不只一個,而且都是「一行字」等級的小事:
+         · 提示列的字數(已經在 CSS 那邊把 .tq-acts 改成固定高了,那是治本的一半)
+         · ⚠ 舞台是 overflow:auto —— 盤面剛好差一點點放不下時會冒出捲軸,
+           捲軸吃掉 15px 寬 → 盤面縮一階 → 放得下了 → 捲軸消失 → 又放大…
+           **這一條會自己震盪下去**,而且只在桌機(有實體捲軸)看得到。
+       ⚠ 判準是「量到的可用空間有沒有真的變」,不是「算出來的格子有沒有變」——
+         後者在邊界上照樣會 ±1 跳個不停。
+       ★ 真的 resize(轉向 / 摺疊機展開)一定遠大於 3px,擋不到。 */
+    if(cell && Math.abs(w - fitW) < 3 && Math.abs(h - fitH) < 3) return;
+    fitW = w; fitH = h;
     // 高度量不到(還沒排版完)就先只吃寬度,resize 會再叫一次
-    const byW = w / R.BOARD_W;
-    const byH = h > 40 ? h / R.BOARD_H : Infinity;
+    // ⚠ 除的是**托盤**的外框(含木邊),不是 rules.js 的 BOARD_W / BOARD_H
+    const byW = w / TRAY_W;
+    const byH = h > 40 ? h / TRAY_H : Infinity;
     let c = Math.floor(Math.min(byW, byH));
     if(c < CELL_MIN) c = CELL_MIN;
     if(c > CELL_MAX) c = CELL_MAX;
     if(c === cell) return;
     cell = c;
     board.style.setProperty("--tq-cell", c + "px");
-    /* ⚠ 盤面的**高**不是整數格(BOARD_H ≈ 14.856)—— 這裡刻意**不取整**:
+    /* ⚠ 托盤的寬高都不是整數格 —— 這裡刻意**兩個都不取整**:
        取整之後盤面框的中心會與 121 個洞的幾何中心差半個像素,
        而診斷頁的 ctrOff 就是拿這兩個比的(它該是 0,0)。
+       ⚠⚠ v1.180 的寬是整數格(13)所以只有高要小心;v1.181.0 之後**寬也會歪**。
        ★ 一格的邊長仍然是整數(上面的 Math.floor)—— 那一條才是「洞不會糊掉」的關鍵。 */
-    board.style.width = (c * R.BOARD_W) + "px";
-    board.style.height = (c * R.BOARD_H).toFixed(2) + "px";
+    board.style.width = (c * TRAY_W).toFixed(2) + "px";
+    board.style.height = (c * TRAY_H).toFixed(2) + "px";
     if(lastPaint) placeAll(lastPaint);
   }
 
@@ -145,7 +303,14 @@ const TQB = (function(){
         el.dataset.i = i;
         el.style.width = "calc(var(--tq-cell) * " + (PC_R * 2) + ")";
         el.style.height = "calc(var(--tq-cell) * " + (PC_R * 2) + ")";
-        el.innerHTML = '<b class="tq-pn">' + (s + 1) + "</b>";
+        /* ★ 三層(v1.181.0):球體 → 頭飾 → 座號。
+           ⚠ .tq-pc 自己**不再有背景** —— 它只剩「位置 + 那三圈狀態環」兩個職責,
+             因為每一幀被寫 transform 的是它(紅線 15),層數越少越不會出事。
+           ⚠ 頭飾疊在球**上面**(不是後面):棋子直徑只有 0.8 格,
+             而相鄰的洞只差 1 格 → 往外突得出來的只有 0.1 格(約 3px),
+             光靠那 3px 的剪影認不出是哪一種動物。 */
+        el.innerHTML = '<i class="tq-ball"></i><i class="tq-cap"></i>' +
+                       '<b class="tq-pn">' + (s + 1) + "</b>";
         board.appendChild(el);
         row.push(el);
       }
@@ -155,8 +320,8 @@ const TQB = (function(){
 
   // 把一顆棋放到某個座標(單位:格。中心點)
   function setPos(el, cx, cy){
-    el.style.transform = "translate(calc(var(--tq-cell) * " + (cx - PC_R) + "), " +
-                                   "calc(var(--tq-cell) * " + (cy - PC_R) + "))";
+    el.style.transform = "translate(calc(var(--tq-cell) * " + (cx + OX - PC_R) + "), " +
+                                   "calc(var(--tq-cell) * " + (cy + OY - PC_R) + "))";
   }
   function setHole(el, id){
     const p = R.posXY(id);

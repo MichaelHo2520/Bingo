@@ -8239,7 +8239,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @keyframes fcDiePop{0%{transform:scale(1.28)}60%{transform:scale(.95)}100%{transform:scale(1)}}
 
   .fc-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
-           line-height:1.35;text-align:left}
+           line-height:1.35;text-align:left;max-height:2.7em;overflow:hidden}
 
   /* ---------- 出手倒數的環(v1.179.1)----------
      ★★ 與台灣麻將 / 21 點 / UNO / 暗棋**同一顆**:SVG 環圈 + 中間秒數,最後 3 秒轉紅脈動。
@@ -8367,10 +8367,20 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     --tq-d0:#b01228; --tq-d1:#a04a00; --tq-d2:#7d5a00;
     --tq-d3:#0b6b38; --tq-d4:#1a4bab; --tq-d5:#5e2c96;
     --tq-felt:#fff6e6;      /* 板子 */
-    --tq-hole:#efe0c4;      /* 洞(凹進去的那一格) */
+    --tq-hole:#e5cfa2;      /* 洞(凹進去的那一格) */
     --tq-line:#d8bf94;
     --tq-ink:#4a3a22;
     --tq-tw:min(96vw,560px);
+    /* ★ 木托盤(v1.181.0)。⚠ 這一組**只給木框用**,絕不可以碰到星形凹槽裡面 ——
+       棋子踩的那一面必須保持淺色(見上面那條「棋盤本身也刻意是固定的淺色」),
+       深木頭只出現在星尖以外那一圈。
+       ⚠⚠ 木頭要**低飽和的棕**,不可以往金黃走:第一版是 #c08a45 / #9a6428,
+       看起來像拉絲黃銅而不是木頭,而且金邊整個融進去看不見了。 */
+    --tq-wood-1:#8d6440; --tq-wood-2:#7d5330; --tq-wood-3:#63401f; --tq-wood-4:#2f1c0a;
+    --tq-gold-1:#ffeab4; --tq-gold-2:#d8a63c;
+    --tq-pan-1:#fffaee;     /* 星形凹槽:中央 */
+    --tq-pan-2:#f0d9ae;     /* 星形凹槽:邊緣 */
+    --tq-grid:rgba(126,88,40,.30);
   }
   .tq-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
             line-height:1.05;letter-spacing:.5px;
@@ -8448,26 +8458,66 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .tq-play{flex:1 1 auto;min-height:0;width:var(--tq-tw);margin:8px auto 0;
            display:flex;flex-direction:column;align-items:center;gap:6px}
   /* ⚠ overflow:auto 是**保險**不是常態:fitBoard() 的間距有下限(16px),極端矮的視窗上
-     盤面會比舞台高 —— 沒有這一條就是「盤面壓在提示列上面」。 */
+     盤面會比舞台高 —— 沒有這一條就是「盤面壓在提示列上面」。
+     ★★★ 但**捲軸一定要隱形**(v1.181.0,使用者:「盤面的縮放一直跳來跳去」)。
+       這一格同時是 fitBoard() 量的那個容器,而桌機的實體捲軸會**吃掉 15px 的
+       clientWidth** → 盤面縮一階 → 放得下了 → 捲軸消失 → 又放大 → 又放不下…
+       **它會自己震盪下去**,而且只有桌機(有實體捲軸的平台)看得到。
+     ⚠ 這是「量的對象會被自己的量測結果改變」那一類 bug —— 加多大的死區都沒用
+       (一次跳 15px),只能讓捲軸不再佔版面。保險本身要留著:捲得動、只是看不到捲軸。 */
   .tq-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;z-index:0;
-            display:flex;align-items:center;justify-content:center;overflow:auto}
-  .tq-acts{flex:none;min-height:40px;display:flex;align-items:center;justify-content:center;
+            display:flex;align-items:center;justify-content:center;
+            overflow:auto;scrollbar-width:none}
+  .tq-stage::-webkit-scrollbar{width:0;height:0}
+  /* ★★★ 這一列的高度是**寫死的**,不是 min-height(v1.181.0,使用者:「盤面一直跳來跳去」)。
+     ⚠⚠ 它是 fitBoard() 那條尺寸鏈的一環:`盤面能有多高 = .tq-play − .tq-acts` ——
+       只要這一列會長高,盤面就會跟著縮一階(一階 ≈ 14px 寬,很明顯)。
+       而它本來**每一回合都會變高兩次**:
+         ① 提示字本身每回合換一句(「輪到你了…」/「點一個亮起來的洞」/「小雲 想想…」)
+         ② 倒數環出現 / 消失會把 .tq-hint 的可用寬度縮掉 46px → 同一句話忽然換行
+       兩件事都只差一行字,但一行字 = 盤面跳一階。
+     ★ 所以這一列改成固定高,提示字**寧可被截掉也不准把盤面推小**(兩行放得下)。 */
+  .tq-acts{flex:none;height:44px;display:flex;align-items:center;justify-content:center;
            gap:12px;width:100%;position:relative}
 
   /* ---------- 棋盤 ----------
-     ★ 板子做成六角星外框的感覺:圓角矩形 + 很淡的點點(同飛行棋),
-       真正的星形是 121 個洞自己排出來的 —— 不要用 clip-path 去切一個星,
-       那會讓四個尖角的洞貼在裁切邊上。 */
-  .tq-board{position:relative;--tq-cell:22px;flex:none;
-            background:
-              radial-gradient(rgba(200,170,120,.22) 1.1px,transparent 1.2px)
-                0 0 / calc(var(--tq-cell) * .5) calc(var(--tq-cell) * .5),
-              radial-gradient(circle at 50% 42%,#fffdf4,var(--tq-felt) 78%);
-            border-radius:22px;
-            box-shadow:0 10px 26px rgba(60,40,10,.30),
-                       inset 0 0 0 3px rgba(255,255,255,.8),
-                       inset 0 0 0 5px rgba(216,191,148,.45)}
+     ★★ v1.181.0 起板子本身**沒有背景** —— 木托盤整個是 board.js 產生的一張 SVG
+       (`.tq-tray`,盤面的第一個子元素),形狀一律由 rules.js 的幾何算出來。
+       ⚠ 所以這裡的 border-radius / box-shadow 全部拿掉了:留著會在六邊形外面
+         多一個看得見的矩形殼。外陰影改掛在 SVG 上(drop-shadow 跟著形狀走)。
+     ⚠ 舊註解說的「不要用 clip-path 去切一個星」仍然成立,而且做法就是現在這樣:
+       星形是**格線與凹槽路徑自己長出來的**,沒有任何一層在裁切。 */
+  .tq-board{position:relative;--tq-cell:22px;flex:none}
   .tq-board > *{position:absolute;box-sizing:border-box}
+
+  /* ---------- 木托盤(SVG,建盤面時畫一次)----------
+     ⚠ pointer-events:none 是必要的:它蓋滿整個盤面,不關掉就整盤點不到
+       (而症狀是「棋子沒反應」,很容易誤判成 adapter 壞了)。
+     ⚠ 尺寸單位是**格**(viewBox 用 board.js 的 TRAY_W / TRAY_H)——
+       所以底下所有 stroke-width 寫的都是「幾格」,不是 px。 */
+  .tq-tray{left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;
+           filter:drop-shadow(0 9px 16px rgba(45,24,0,.46))}
+  /* 木板:斜向的深淺條 = 木紋(⚠ 用 gradient 不用 pattern,pattern 在小尺寸會摩爾紋) */
+  .tq-tray-wood{fill:url(#tqWoodG);stroke:var(--tq-wood-4);stroke-width:.10;
+                stroke-linejoin:round}
+  /* 明暗另外疊一層(左上受光、右下收深)—— ⚠ 與木紋分成兩層是刻意的:
+     混在同一條漸層裡的話「條紋多細」與「哪邊比較亮」就再也分不開調了。 */
+  .tq-tray-shade{fill:url(#tqShadeG);stroke:none}
+  /* 金色內框兩條:粗的那條是主邊,細的那條讓它看起來是嵌進去的 */
+  .tq-tray-gold{fill:none;stroke:var(--tq-gold-2);stroke-width:.15;stroke-linejoin:round}
+  .tq-tray-gold2{fill:none;stroke:var(--tq-gold-1);stroke-width:.05;stroke-linejoin:round;opacity:.7}
+  /* 六個角的淡色三角面板:「誰的家在哪」。
+     ★ 顏色直接吃 --cs —— data-c 已經由上面那六條掛好了,這裡不必再認一次顏色。
+     ⚠ opacity 要壓到洞看得出來為止:面板與洞是**同一個 --cs**,不透明的話
+       那 60 個洞會整個溶進面板裡(只剩內陰影的一圈)。 */
+  .tq-tray-home{stroke:none;fill:var(--cs);opacity:.6}
+  /* 星形凹槽。★ fill + stroke + round 的 linejoin = 把 12 個頂點的星等距外擴半個
+     stroke-width,而且六個尖角自動變圓 —— 不必自己再算一次外擴多邊形。
+     `lip` 是比 `pan` 粗一點點的深色底,露出來的那一圈就是凹槽的邊。 */
+  .tq-tray-lip{fill:var(--tq-wood-4);stroke:var(--tq-wood-4);stroke-linejoin:round;opacity:.55}
+  .tq-tray-pan{fill:url(#tqPanG);stroke:var(--tq-pan-2);stroke-linejoin:round}
+  /* 三角格線:洞與洞之間的連線。★ 它同時是「這一步能往哪六個方向走」的說明。 */
+  .tq-tray-grid{fill:none;stroke:var(--tq-grid);stroke-width:.045;stroke-linecap:round}
   /* 六色掛在 data-c 上,底下的洞 / 棋子 / 點點全部靠 --c 取用(只有這六條認得顏色)。
      --cs = 角的底色(淺版) */
   .tq-board [data-c="0"],.tq-dot[data-c="0"]{--c:var(--tq-c0);--cs:var(--tq-s0);--cd:var(--tq-d0)}
@@ -8487,9 +8537,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ 洞是 <button> 而不是 <div>:它要能被點(落點就是點洞)、也要能被鍵盤走訪。
        所以 appearance / border / padding 都要自己歸零。 */
   .tq-hole{appearance:none;-webkit-appearance:none;padding:0;margin:0;cursor:pointer;
-           border:1px solid rgba(150,120,70,.30);border-radius:50%;
+           border:0;border-radius:50%;
            background:var(--cs,var(--tq-hole));
-           box-shadow:inset 0 1.5px 3px rgba(90,65,25,.28)}
+           box-shadow:inset 0 1.5px 2.5px rgba(96,64,20,.30),inset 0 -1px 1px rgba(255,255,255,.6),
+                      0 .5px 0 rgba(255,255,255,.5)}
   /* 我的目標角:一圈我的顏色的虛線環。⚠ 用 outline 而不是 border ——
      border 會改變盒模型,而洞的尺寸是 inline style 寫死的(蓋不掉,飛行棋踩過)。 */
   .tq-hole.goal{outline:2px dashed var(--g,var(--accent));outline-offset:1px}
@@ -8522,30 +8573,92 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          **對角**,不是邊,所以 37% × √2 ≈ 52%)。再大就開始吃掉顏色,
          而顏色是規則本體(六色那一條),不可以為了數字好讀把色環讓掉。
 
-     四層由上而下(★ background 的第一層在最上面):
+     ── ★★★ 為什麼又長不一樣了(v1.181.0,使用者:「棋盤跟棋子都不太滿意」)──────
+       v1.180.1 的彈珠有形體、也讀得清楚,但**六家長得一模一樣,只差顏色** ——
+       所以它只有「顏色」一個識別維度。改成**六隻小動物**:同一顆球加上各家不同的頭飾
+       (舞獅鬃 · 火鳥冠 · 貓耳 · 龍角 · 熊貓圓耳 · 獨角獸角)+ 一對眼睛 + 胸前的號碼牌。
+       ★ 頭飾是**第三種**識別訊號(顏色 · 座號 · 輪廓),而輪廓是唯一在「縮到 20px、
+         而且六家擠在一起」時還讀得出來的那一種。
+       ⚠⚠ **頭飾往外突得出來的只有 0.1 格**:棋子直徑 0.8 格,而相鄰的洞只差 1 格 ——
+         任何一點超過「離棋子中心 0.5 格」的裝飾,在自家角落那個密排三角形裡
+         就會直接壓到隔壁那一顆。所以六組頭飾的每一個頂點都算過那個半徑,
+         **改形狀之前先算一次**(座標系見底下 .tq-cap 的註解)。
+       ⚠ 因為突不出來,頭飾只好疊在球**上面** —— 但它一律是**同一個色相**
+         (var(--c) 壓暗),不是第七種顏色:六色仍然是規則本體。
+
+     球體由上而下(★ background 的第一層在最上面):
        ① 高光      左上那一點,玻璃的第一反射
-       ② 白芯      座號的底
-       ③ 底部反光  桌面把光彈回來 —— 少了它球會像貼紙
-       ④ 球體明暗  左上亮、右下收深(⚠ 用 ellipse 50% 50% 而不是 circle:
+       ② 眼睛 ×2   ★ 疊在號碼牌之前 —— 兩者會碰到,眼睛要在上面
+       ③ 號碼牌    座號的底(白色的「胸牌」,v1.181.0 從正中央移到下方)
+       ④ 底部反光  桌面把光彈回來 —— 少了它球會像貼紙
+       ⑤ 球體明暗  左上亮、右下收深(⚠ 用 ellipse 50% 50% 而不是 circle:
                    circle 的尺寸只吃長度,寫百分比不合法,而預設 farthest-corner
                    會把最深的那一段推到看不見的四個角外面 → 邊緣根本沒暗下去)
      ⚠ 底色(var(--c))一定要用 `background-color` **另外寫一行,而且在 background 之後**:
-       background 簡寫會把 background-color 重設成 transparent。 */
-  .tq-pc{left:0;top:0;border-radius:50%;pointer-events:auto;cursor:pointer;z-index:5;
-         background:
-           radial-gradient(ellipse 17% 12% at 30% 18%,rgba(255,255,255,.98),rgba(255,255,255,.72) 48%,rgba(255,255,255,0) 100%),
-           radial-gradient(circle at 50% 51%,#fffdf5 0 37%,rgba(255,255,255,.30) 39.5%,rgba(255,255,255,0) 43%),
-           radial-gradient(ellipse 44% 28% at 50% 93%,rgba(255,255,255,.30),rgba(255,255,255,0) 74%),
-           radial-gradient(ellipse 50% 50% at 33% 26%,rgba(255,255,255,.44),rgba(255,255,255,.05) 30%,
-                           rgba(255,255,255,0) 46%,rgba(0,0,0,.03) 66%,rgba(0,0,0,.30) 100%);
-         background-color:var(--c);
-         box-shadow:0 3px 5px -1px rgba(58,38,6,.44),0 0 0 1.4px rgba(255,255,255,.9);
-         display:flex;align-items:center;justify-content:center}
+       background 簡寫會把 background-color 重設成 transparent。
+     ⚠ radial 的百分比停止點是**沿著射線長度**算的,而射線預設到最遠的那個角 ——
+       所以「號碼牌要多大」不能直接寫直徑:34% × √(.5² + .66²) ≈ 0.28 → 直徑約 0.56 顆。 */
+  .tq-pc{left:0;top:0;border-radius:50%;pointer-events:auto;cursor:pointer;z-index:5}
+  .tq-ball{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+           background:
+             radial-gradient(ellipse 17% 12% at 30% 18%,rgba(255,255,255,.98),rgba(255,255,255,.72) 48%,rgba(255,255,255,0) 100%),
+             radial-gradient(circle at 34% 37%,#33260f 0 8%,rgba(51,38,15,0) 8.9%),
+             radial-gradient(circle at 66% 37%,#33260f 0 8%,rgba(51,38,15,0) 8.9%),
+             radial-gradient(circle at 50% 66%,#fffdf5 0 34%,rgba(255,255,255,.32) 36%,rgba(255,255,255,0) 39%),
+             radial-gradient(ellipse 44% 28% at 50% 93%,rgba(255,255,255,.30),rgba(255,255,255,0) 74%),
+             radial-gradient(ellipse 50% 50% at 33% 26%,rgba(255,255,255,.44),rgba(255,255,255,.05) 30%,
+                             rgba(255,255,255,0) 46%,rgba(0,0,0,.03) 66%,rgba(0,0,0,.30) 100%);
+           background-color:var(--c);
+           box-shadow:0 3px 5px -1px rgba(58,38,6,.44),0 0 0 1.4px rgba(255,255,255,.9)}
+  /* ---------- 頭飾:六家六種輪廓 ----------
+     ★ 座標系:.tq-cap 就是棋子的方框(邊長 = 一顆棋的直徑 D),所以底下每一個
+       %(left / top / width / height)都是「幾成的 D」,球心在 (50%, 50%)、球半徑 50%。
+     ⚠⚠ **每一個頂點離 (50%,50%) 都必須 <= 62.5%**(= 0.5 格 / D):
+       超過就會壓到隔壁那一顆棋。六組現有形狀的最大值都落在 55~62%。
+     ⚠ 用 filter 壓暗而不是另外給一個顏色:六色是規則本體,頭飾必須是同一個色相。
+     ⚠ drop-shadow 跟著 clip-path 的形狀走(box-shadow 不會)—— 白描邊只能這樣加。 */
+  .tq-cap{position:absolute;inset:0;pointer-events:none}
+  .tq-cap::before,.tq-cap::after{content:"";position:absolute;display:none;background:var(--c);
+    filter:brightness(.66) saturate(1.18) drop-shadow(0 0 .5px rgba(255,255,255,.85))}
+  /* 0 紅 · 舞獅:左右兩撮蓬鬆的鬃毛(多凸起 = 毛絨感) */
+  .tq-pc[data-c="0"] .tq-cap::before,.tq-pc[data-c="0"] .tq-cap::after{display:block;
+    top:2%;width:44%;height:34%}
+  .tq-pc[data-c="0"] .tq-cap::before{left:0;
+    clip-path:polygon(0% 52%,10% 16%,28% 36%,44% 6%,62% 30%,82% 12%,100% 44%,100% 100%,0% 100%)}
+  .tq-pc[data-c="0"] .tq-cap::after{right:0;
+    clip-path:polygon(100% 52%,90% 16%,72% 36%,56% 6%,38% 30%,18% 12%,0% 44%,0% 100%,100% 100%)}
+  /* 1 橙 · 火鳥:一撮往右後飄的冠羽(★ 六家裡唯一不對稱的,遠看就分得出來) */
+  .tq-pc[data-c="1"] .tq-cap::before{display:block;left:14%;top:-13%;width:64%;height:46%;
+    clip-path:polygon(0% 100%,8% 52%,22% 66%,26% 26%,44% 44%,54% 6%,68% 32%,84% 18%,100% 62%,92% 100%)}
+  /* 2 黃 · 貓:兩隻尖三角耳。⚠ 外側那條邊要**比較陡**(不是等腰),
+     等腰三角形擺在球的兩側看起來會像往外翹的牛角而不是耳朵。 */
+  .tq-pc[data-c="2"] .tq-cap::before,.tq-pc[data-c="2"] .tq-cap::after{display:block;
+    top:-1%;width:31%;height:37%}
+  .tq-pc[data-c="2"] .tq-cap::before{left:7%;clip-path:polygon(30% 0%,100% 100%,0% 88%)}
+  .tq-pc[data-c="2"] .tq-cap::after{right:7%;clip-path:polygon(70% 0%,100% 88%,0% 100%)}
+  /* 3 綠 · 龍:兩根往外撇的細角 */
+  .tq-pc[data-c="3"] .tq-cap::before,.tq-pc[data-c="3"] .tq-cap::after{display:block;
+    top:0;width:34%;height:36%}
+  .tq-pc[data-c="3"] .tq-cap::before{left:1%;
+    clip-path:polygon(62% 6%,84% 20%,46% 58%,30% 100%,14% 88%,34% 46%,20% 34%)}
+  .tq-pc[data-c="3"] .tq-cap::after{right:1%;
+    clip-path:polygon(38% 6%,16% 20%,54% 58%,70% 100%,86% 88%,66% 46%,80% 34%)}
+  /* 4 藍 · 熊貓:兩隻圓耳(★ 唯一全圓的,與貓的尖耳成對比) */
+  .tq-pc[data-c="4"] .tq-cap::before,.tq-pc[data-c="4"] .tq-cap::after{display:block;
+    top:3%;width:34%;height:34%;border-radius:50%}
+  .tq-pc[data-c="4"] .tq-cap::before{left:2%}
+  .tq-pc[data-c="4"] .tq-cap::after{right:2%}
+  /* 5 紫 · 獨角獸:正中央一根長角(★ 唯一單根的) */
+  .tq-pc[data-c="5"] .tq-cap::before{display:block;left:40.5%;top:-12%;width:19%;height:45%;
+    clip-path:polygon(50% 0%,100% 100%,0% 100%)}
   /* ★ 色盲的第二訊號:座號。六色比四色更難分,這個數字在這一頁**不是裝飾**。
-     ⚠ 顏色吃 --cd(專門調過的深色),不是 --c —— 黃與橙直接印上去讀不到。 */
-  .tq-pn{font-family:'Fredoka',sans-serif;font-weight:800;color:var(--cd,#4a3a22);
-         font-size:calc(var(--tq-cell) * .30);line-height:1;pointer-events:none;
-         position:relative;z-index:2;text-shadow:0 .5px 0 rgba(255,255,255,.9)}
+     ⚠ 顏色吃 --cd(專門調過的深色),不是 --c —— 黃與橙直接印上去讀不到。
+     ⚠ v1.181.0 從 flex 置中改成絕對定位:它要對齊的是**號碼牌**(66%),不是球心。
+       translateY 在**孫元素**上,不碰 .tq-pc 那一格 transform(紅線 15)。 */
+  .tq-pn{position:absolute;left:0;right:0;top:66%;transform:translateY(-50%);text-align:center;
+         font-family:'Fredoka',sans-serif;font-weight:800;color:var(--cd,#4a3a22);
+         font-size:calc(var(--tq-cell) * .28);line-height:1;pointer-events:none;
+         text-shadow:0 .5px 0 rgba(255,255,255,.9)}
   .tq-pc.mine{z-index:6}
   /* ★★ 輪到誰:那一家的棋子整組戴上一圈白色呼吸環(v1.180.1)。
        board.dataset.turn 是**那一家的角索引**,v1.180.0 就寫進 DOM 了但沒有人用。
@@ -8566,8 +8679,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .tq-board[data-turn="4"] .tq-pc[data-c="4"]::after,
   .tq-board[data-turn="5"] .tq-pc[data-c="5"]::after{opacity:1;animation:tqTurn 2.1s ease-in-out infinite}
   @keyframes tqTurn{0%,100%{opacity:.45}50%{opacity:1}}
-  /* 選中的那一顆:光環 */
-  .tq-pc.on{z-index:9;box-shadow:0 3px 6px rgba(58,38,6,.5),inset 0 -2px 4px rgba(0,0,0,.24),
+  /* 選中的那一顆:光環。
+     ⚠ v1.181.0 拿掉了 inset 那一段 —— .tq-pc 現在沒有背景(球體在 .tq-ball 裡),
+       inset 陰影畫不到任何東西,留著只會讓人以為它還有作用。 */
+  .tq-pc.on{z-index:9;box-shadow:0 3px 6px rgba(58,38,6,.5),
                                 0 0 0 2.4px #fff,0 0 12px 3px var(--accent);
             animation:tqPick 1.1s ease-in-out infinite}
   @keyframes tqPick{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
@@ -8577,10 +8692,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 到家了:金環。★ v1.180.0 是「白 + 自己的顏色」,但棋子本身就是那個顏色 ——
      等於「到家」與「沒到家」只差一圈幾乎看不出來的邊。金色是六色以外的顏色,
      一眼就分得出哪幾顆已經進門(⚠ 它不是第七家:只出現在環上,不進球體)。 */
-  .tq-pc.home{box-shadow:0 3px 5px -1px rgba(58,38,6,.46),inset 0 -2px 4px rgba(0,0,0,.24),
+  .tq-pc.home{box-shadow:0 3px 5px -1px rgba(58,38,6,.46),
                          0 0 0 1.6px #fff,0 0 0 3.4px #ffc93c,0 0 8px 1px rgba(255,186,50,.55)}
   .tq-pc.fly{z-index:10;filter:drop-shadow(0 5px 7px rgba(0,0,0,.42))}
 
+  /* ⚠ 一定要夾在兩行內:.tq-acts 是固定高的(見它的註解),第三行溢出去會蓋到盤面。 */
   .tq-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
            line-height:1.35;text-align:left}
 
@@ -8675,10 +8791,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .tq-play{gap:4px;margin-top:4px}
     .tq-room{padding:6px 10px}
     .tq-room .mp-subrow,.tq-room-foot{margin-top:3px}
-    .tq-acts{min-height:36px}
+    .tq-acts{height:38px}     /* ⚠ 一樣是**固定高**(不是 min-height),理由見它本尊那條 */
     .tq-cd{width:30px;height:30px}
     .tq-cdn{font-size:12.5px}
-    .tq-hint{font-size:12px}
+    .tq-hint{font-size:12px;max-height:2.6em}
   }
 
   /* ---------- ★★ 橫置:提示那一列搬到右邊,整個高度讓給棋盤 ----------
@@ -8688,9 +8804,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ 560 這個門檻與全站既有的緊湊斷點對齊,不要另外挑一個數字。 */
   @media (orientation:landscape) and (max-height:560px){
     .tq-play{flex-direction:row;align-items:center;gap:10px}
+    /* ★ 橫置時它是**直的一欄**,高度吃滿 —— 提示字長短再也影響不到盤面的高度,
+       所以這裡不必(也不可以)寫死高度。 */
     .tq-acts{flex:none;width:150px;min-height:0;height:100%;flex-direction:column;
              justify-content:center;gap:10px}
-    .tq-hint{flex:none;text-align:center;font-size:12px}
+    .tq-hint{flex:none;text-align:center;font-size:12px;max-height:none}
   }
 
   /* ==========================================================================
