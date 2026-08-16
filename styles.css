@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 404530843afc0bcd91aaa9f421af3d95dbeffca11dd83e574c03fde3e0ebca4f)
+    真相在 styles.src.css(sha256 a1f61335a8759db8db69b8a0a60c648c3c447a3801fda1d15c47a74854cc830e)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1317,6 +1317,7 @@
 .mj-bkl{fill:none;stroke:var(--m16-backl);stroke-width:3;stroke-linejoin:round}
 body.m16-mp .mj-play{width:min(98vw,960px)}
 body.m16-mp .mj-room{width:min(98vw - 16px,944px)}
+body.m16-mp .topbar .topver{display:none}
 body.m16-mp .topbar{width:min(98vw - 16px,944px)}
 body.m16-mp,body.m16-solo{user-select:none;-webkit-user-select:none}
 body.m16-mp input,body.m16-mp textarea,

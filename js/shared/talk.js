@@ -160,6 +160,23 @@ const Talk = (function () {
     if (!speak) audioSession("playback");
   }
 
+  /* 播放遠端音訊。失敗(多半是 iOS 的自動播放政策)就記一筆,等下一次手勢補播。 */
+  function playNow(P) {
+    if (!P.el || !P.stream) return;
+    try {
+      const p = P.el.play();
+      if (p && p.then) p.then(() => { P.needPlay = false; }).catch(() => { P.needPlay = true; });
+      else P.needPlay = false;
+    } catch (e) { P.needPlay = true; }
+  }
+  /* ★ 使用者按了任一顆鈕 = 一次貨真價實的手勢 → 把之前被擋下來的補播掉。
+     ⚠ 這一支要在**每次**按鈕時呼叫,不是只在開的時候:iPhone 上「連上了卻沒聲音」
+       多半只差這一下,而使用者的直覺就是再按一次(那正好也是一次手勢)。 */
+  function kickPlay() {
+    for (const id in peers) { const P = peers[id]; if (P.needPlay) playNow(P); }
+    try { if (acx && acx.state === "suspended") acx.resume(); } catch (e) { }
+  }
+
   /* ---------- 一條連線 ---------- */
   function peerOf(id) {
     if (peers[id]) return peers[id];
@@ -177,6 +194,8 @@ const Talk = (function () {
       ignoreOffer: false,
       tx: null,          // 我們唯一的 audio transceiver
       stream: null,
+      pend: [],          // 早到的 ICE candidate(remote 還沒落地);見 onCand
+      needPlay: false,   // iOS:play() 被擋掉了,等下一次使用者手勢補播
       analyser: null, data: null,
       speaking: false, lastLoud: 0,
       failed: false
@@ -193,9 +212,11 @@ const Talk = (function () {
     pc.ontrack = e => {
       P.stream = e.streams[0] || new MediaStream([e.track]);
       P.el.srcObject = P.stream;
-      /* iOS/Safari 常常需要一次 play();開關本身就是使用者手勢,所以這裡多半會成功。
-         失敗也不要吵使用者 —— 下一次按開關會再試一次。 */
-      try { const p = P.el.play(); if (p && p.catch) p.catch(() => { }); } catch (e) { }
+      /* iOS/Safari 常常需要一次 play()。⚠ ontrack 是**對方接上的那一刻**觸發的,
+         那通常**不在**我方的使用者手勢裡(我按完開關才輪到對方回應)→ 在 iPhone 上
+         很容易被自動播放政策擋掉,而症狀是「連線明明好了卻沒聲音」。
+         所以失敗要記下來,等下一次真的有手勢(按任一顆鈕)時補播 —— 見 kickPlay()。 */
+      playNow(P);
       armMeter(P);
       report();
     };
@@ -234,7 +255,10 @@ const Talk = (function () {
     return P;
   }
 
-  function dropPeer(id) {
+  /* keepMail=true:只拆本地這條 PC,**不要**動 DB 上對方寄來的信 ——
+     「收到新 offer 而舊 PC 已經死了 → 就地重建」那條路要用(見 onDesc)。
+     少了這個參數的話,重建會順手把正在處理的那封信連同後面的 candidate 一起刪掉。 */
+  function dropPeer(id, keepMail) {
     const P = peers[id];
     if (!P) return;
     try { P.pc.ontrack = P.pc.onicecandidate = P.pc.onnegotiationneeded = null; } catch (e) { }
@@ -244,7 +268,7 @@ const Talk = (function () {
     try { if (P.srcNode) P.srcNode.disconnect(); } catch (e) { }
     delete peers[id];
     // 對方留給我的信箱也清掉(不清的話重連時會讀到上一輪的舊 SDP)
-    try { if (sigRef) sigRef.child(id).remove(); } catch (e) { }
+    if (!keepMail) { try { if (sigRef) sigRef.child(id).remove(); } catch (e) { } }
   }
 
   /* ---------- signaling:rtc/{收件人}/{寄件人} ---------- */
@@ -267,17 +291,41 @@ const Talk = (function () {
     if (!d || !d.t || !d.s) return;
     // 兩個開關都關了還收到 SDP(對方比我慢一拍)→ 不要因此把連線建回來
     if (!on()) return;
+    /* ★★★ 舊的那條已經死了就**就地重建**(v1.182.1)。
+       這正是使用者「開開關關好幾次」會走到的路:我這邊關掉語音會 teardown 把 PC 整個
+       丟掉,重開時建的是**全新**的 PC;但對方那邊沒有 teardown,它手上那條還是舊的 ——
+       等它變成 failed / closed 之後,再怎麼送新的 offer 進去都不會活過來
+       (setRemoteDescription 在 closed 的 PC 上直接拋錯,而我們把例外吞掉 → 靜靜地連不上)。
+       ⚠ keepMail=true:不可以順手清掉 DB 上的信 —— 我正在處理的就是那一封,
+         後面還有屬於它的 candidate 要收。 */
+    {
+      const old = peers[fromId];
+      if (old) {
+        const cs = old.pc.connectionState, ss = old.pc.signalingState;
+        if (cs === "failed" || cs === "closed" || ss === "closed") dropPeer(fromId, true);
+      }
+    }
     const P = peerOf(fromId), pc = P.pc;
     const desc = { type: d.t, sdp: d.s };
     try {
-      /* Perfect Negotiation 的收端。衝突 = 對方送 offer 來的時候我自己也正在送。
-         polite 的一方讓步(把自己的回滾掉、收下對方的),impolite 的一方直接忽略。 */
+      /* Perfect Negotiation 的收端。衝突 = 對方送 offer 來的時候我自己也正在送。 */
       const offerCollision = desc.type === "offer" &&
         (P.makingOffer || pc.signalingState !== "stable");
-      P.ignoreOffer = !P.polite && offerCollision;
-      if (P.ignoreOffer) return;
+      if (offerCollision) {
+        // impolite:堅持自己的,對方會讓
+        if (!P.polite) { P.ignoreOffer = true; return; }
+        /* ★★★ polite:**明確**把自己那一半回滾掉,不可以只靠隱式 rollback(v1.182.1)。
+           Chrome 的 setRemoteDescription 遇到衝突會自己回滾,所以少寫這一行在 Chrome
+           上測不出來 —— 但 **Safari / iOS 對隱式 rollback 的支援不完整**,那邊會直接
+           丟 InvalidStateError,而我們把例外吞掉 → 這一條連線就靜靜地建不起來。
+           症狀正是使用者回報的「要開關好幾次」(重開剛好避開衝突那一次才通)。 */
+        try { await pc.setLocalDescription({ type: "rollback" }); } catch (e) { }
+      }
+      P.ignoreOffer = false;
 
       await pc.setRemoteDescription(desc);
+      // remote 落地了 → 把早到而排隊的 candidate 補進去(見 onCand)
+      await flushCand(P);
       if (desc.type === "offer") {
         await pc.setLocalDescription();
         sendDesc(fromId, pc.localDescription);
@@ -285,13 +333,26 @@ const Talk = (function () {
     } catch (e) { }
   }
 
+  /* ★★★ ICE candidate **一律先排隊**,不可以「拿到就 addIceCandidate,失敗就算了」
+     (v1.182.1 修 —— 這是「要開關好幾次」的主因)。
+     candidate 的封包比 SDP 小得多,Firebase 上**經常比 SDP 先到**;而在
+     setRemoteDescription 之前呼叫 addIceCandidate 一定拋錯 —— 舊版把它 catch 掉當沒事,
+     偏偏那一筆在 DB 上**同時就被 remove 了** → 那個 candidate 永遠消失。
+     少掉關鍵的 host / srflx candidate 就是連不上,而重開一次會重新收集、
+     有時順序剛好對了就通 → 使用者看到的就是「開開關關好幾次才會通」。
+     排隊之後一筆都不會掉,而且刪除時機也跟著改成「處理完才刪」。 */
   async function onCand(fromId, c) {
     const P = peers[fromId];
-    if (!P || !c || !c.d) return;
-    try {
-      await P.pc.addIceCandidate({ candidate: c.d, sdpMid: c.m, sdpMLineIndex: c.i });
-    } catch (e) {
-      // 忽略被丟掉的 candidate:offer 還沒落地時收到是正常的,perfect negotiation 會再補
+    if (!P || !c || !c.d) return false;
+    P.pend.push({ candidate: c.d, sdpMid: c.m, sdpMLineIndex: c.i });
+    if (P.pc.remoteDescription && P.pc.remoteDescription.type) await flushCand(P);
+    return true;
+  }
+  async function flushCand(P) {
+    if (!P.pend.length) return;
+    const q = P.pend.slice(); P.pend.length = 0;
+    for (let i = 0; i < q.length; i++) {
+      try { await P.pc.addIceCandidate(q[i]); } catch (e) { }
     }
   }
 
@@ -301,17 +362,28 @@ const Talk = (function () {
     if (sigRef || !hooks) return;
     sigRef = hooks.ref("rtc/" + me());
     if (!sigRef) return;
+    /* ⚠⚠ 這裡**絕對不可以** sigRef.remove() —— 清信箱要在 attach()(進房那一刻)做,
+       不是在這裡(開語音那一刻)。
+       理由:很常見的順序是「A 先開語音、B 過一會兒才開」。A 一開就把 offer 寫進
+       `rtc/B/A/d` 了;B 這時若把整個信箱清掉,**等於把 A 的邀請刪掉**,而 A 那邊
+       已經在 have-local-offer 等回音 —— 如果 A 剛好是 impolite,它還會忽略 B 後來
+       送的 offer(當成衝突)→ **兩邊互相等,永遠接不上**。
+       進房那一刻清就沒有這個問題:那時還沒有任何人在跟我協商。 */
     sigRef.on("child_added", snap => {
       const fromId = snap.key;
       if (fromId === me() || watched[fromId]) return;
       watched[fromId] = true;
       const slot = sigRef.child(fromId);   // ⚠ 別叫 box —— 上面那個 box() 是裝 <audio> 的容器
       slot.child("d").on("value", s => { const v = s.val(); if (v) onDesc(fromId, v); });
-      /* candidate 收完就刪:不刪的話一間房打一整晚會累積成千上萬筆,
+      /* candidate:**處理完(收下或排進佇列)才刪**。
+         ⚠ 舊版是「onCand 之後立刻 remove」,而 onCand 是 async —— 等於一定在處理完
+           之前就刪掉了,早到的那幾筆於是永遠消失(見 onCand 的長註解)。
+         刪除本身還是要做:不刪的話一間房打一整晚會累積成千上萬筆,
          而且重連的人會把上一輪的全部重放一次。 */
       slot.child("c").on("child_added", s => {
-        onCand(fromId, s.val());
-        try { s.ref.remove(); } catch (e) { }
+        onCand(fromId, s.val()).then(okd => {
+          if (okd) { try { s.ref.remove(); } catch (e) { } }
+        });
       });
     });
   }
@@ -330,9 +402,26 @@ const Talk = (function () {
     sigRef = null;
   }
 
-  /* ---------- 誰在說話:本地分析,不寫 DB ---------- */
+  /* ---------- 誰在說話:本地分析,不寫 DB ----------
+     ⚠⚠⚠ **WebKit(iPhone / iPad / macOS Safari)一律跳過這一整段**(v1.182.1)。
+       已知的 WebKit 行為:把一條 **remote** MediaStream 交給
+       `AudioContext.createMediaStreamSource()` 之後,原本在播它的 `<audio>` 元素
+       **就不出聲了** —— 等於「開了語音卻完全聽不到對方」,而畫面上一切正常
+       (連線是 connected、對方也真的在講)。
+       這個指示燈只是錦上添花,聽得到聲音才是本體 → 在 WebKit 上寧可不要它。
+     ⚠ 判斷要連 iOS 上的 Chrome / Edge 一起算:那些在 iOS 上**底層仍然是 WebKit**,
+       只看 UA 裡有沒有 "Safari" 會漏掉它們。 */
+  function isWebKit() {
+    const ua = navigator.userAgent || "";
+    if (/iPhone|iPad|iPod/i.test(ua)) return true;                 // iOS 一律 WebKit 核心
+    if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return true;  // iPadOS 桌面模式
+    return /Safari/i.test(ua) && !/Chrome|Chromium|Edg|OPR/i.test(ua);
+  }
+  const WEBKIT = isWebKit();
+
   function armMeter(P) {
     if (!P.stream) return;
+    if (WEBKIT) return;   // 見上面:接進 AudioContext 會讓 <audio> 靜音
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -433,18 +522,31 @@ const Talk = (function () {
          ref(path)  → roomRef.child(path)(沒進房時回 null)
          me()       → 我的 pid ·  players() → 現在房裡的人(物件)
          onState(s) → 狀態變了要重畫 UI */
-    attach(h) { hooks = h; },
+    /* ⚠ 進房那一刻**先把自己的信箱清乾淨**(v1.182.1)。
+       `d` 是 set() 寫的,而 `.on("value")` 一掛上就會立刻回一次現值 —— 上一輪殘留的
+       offer 會被當成新的收下來,然後對著一條早就不存在的連線協商(回一個沒有人要的
+       answer,還把自己的 PC 推進錯的 signalingState)。
+       ⚠ 房主開房時 create() 的 wipe 已經清過 rtc,但**訪客加入既有房間時不會** →
+         這裡是那條路徑唯一的清理點。
+       ⚠⚠ 一定要在這裡清、不可以搬到 watch() 裡:理由見 watch() 的長註解
+         (會刪掉別人剛送來的邀請 → 兩邊互相等)。 */
+    attach(h) {
+      hooks = h;
+      try { const r = hooks && hooks.ref && hooks.ref("rtc/" + hooks.me()); if (r) r.remove(); } catch (e) { }
+    },
     listening() { return listen; },
     speaking() { return speak; },
 
     async setListen(v) {
       listen = !!v;
+      kickPlay();      // 這一下是使用者手勢:把 iOS 擋掉的遠端音訊補播回來
       sync();
       return true;
     },
     /* ⚠ 回傳 false = 使用者不給權限 / 裝置沒有麥克風 —— 呼叫端要把鈕彈回去,
        不可以自顧自地顯示「已開麥」(那是「我以為我在講話」最糟的一種)。 */
     async setSpeak(v) {
+      kickPlay();      // 同 setListen:這一下是手勢,順手補播
       if (v) {
         try { await openMic(); } catch (e) { speak = false; sync(); return false; }
         speak = true; duck(true);
