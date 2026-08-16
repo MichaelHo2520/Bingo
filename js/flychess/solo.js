@@ -217,9 +217,16 @@ const Solo = (function(){
     moves.push(FC.encMove(plane));
     const mv = st.last;
     const txt = FC.moveText(st, mv);
+    /* ★★ 踩人 / 到家的現場效果走 FCB.drama()(單機與連線同一支,見 board.js 第七節)——
+       toast 只留給「跳 / 飛」那種純資訊。 */
     if(mv.eaten && mv.eaten.length){
-      const who = mv.eaten.map(e => esc(seatName(e.seat))).join("、");
-      showToast(esc(seatName(seat)) + " 踩掉了 " + who + " 的飛機 💥", 1700);
+      mv.eaten.forEach((e, k) => {
+        FCB.drama({ kind: "eat", byName: seatName(seat), toName: seatName(e.seat),
+                    toId: "s" + e.seat, mine: (seat === ME || e.seat === ME),
+                    victim: e.seat === ME, seed: moves.length + k });
+      });
+    }else if(mv.home){
+      FCB.drama({ kind: "home", byName: seatName(seat), byId: "s" + seat });
     }else if(txt){
       showToast(esc(seatName(seat)) + " " + txt, 1400);
     }

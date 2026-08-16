@@ -448,7 +448,45 @@ const FCB = (function(){
   function stopCd(){ if(cdT){ clearTimeout(cdT); cdT = null; } }
 
   /* ==========================================================================
-     七、排名表
+     七、★★ 踩人 / 到家的「現場效果」
+     ──────────────────────────────────────────────────────────────────────────
+       這是這個遊戲被做出來的理由之一(見 notes/22 第一節):飛行棋是十三個裡
+       **唯一「對某一個特定的人做壞事」有明確瞬間**的遊戲 —— 其他遊戲的勝負是抽象的
+       (誰先連成五子、誰先出完牌),這裡有一個具體的受害者。
+
+     ★★★ **完全在本地做,一個 DB 寫入都沒有。**
+       「誰踩了誰」在 `moves` 裡是公開的,每一台各自 replay 都算得出同一件事
+       → 走 `MP.sendEmote()` 的話會變成**N 台各送一次**(畫面上飛出 N 顆一樣的表情),
+         而且要多付 N 次 Firebase 寫入。這一點與「表情是使用者按出來的」正好相反,
+         不要因為「表情本來就走 sendEmote」就順手改過去。
+
+     ⚠ 語音只在**這一腳踩到我 / 我踩到人**時才播:一局會踩好幾次,每次都放罐頭
+       很快就會膩(而且旁觀的那兩家沒有情緒可以配)。表情與音效則是全場都有。
+     ⚠ 罐頭挑哪一句用 `seed`(= 這是第幾手)算,不用 Math.random() ——
+       各台要挑到**同一句**,不然四個人的手機會同時放出三句不一樣的話。
+     ⚠ 單機也吃這一段(showEmote / enqueueClip 都在 ui-kit,與連線同一份)。
+     ========================================================================== */
+  const EAT_CLIPS = ["rude", "crying", "polite"];      // 沒禮貌 / 你是在哭喔 / 你禮貌嗎
+
+  function drama(o){
+    if(!o) return;
+    if(o.kind === "eat"){
+      /* who 傳被踩的那個人:表情飛出的發位是「同一個人 2.6 秒內沿用同一條」,
+         傳受害者才會讓「連續被踩」在畫面上串成一條(efLane 的設計)。 */
+      showEmote("💥", esc(o.byName) + " 踩掉 " + esc(o.toName), o.toId || o.toName, "emoji");
+      if(o.mine) enqueueClip(EAT_CLIPS[(o.seed || 0) % EAT_CLIPS.length]);
+      // 被踩的是我 → 手機震一下(單純的音效在吵的場合聽不到)
+      if(o.victim) buzz();
+    }else if(o.kind === "home"){
+      showEmote("🏁", esc(o.byName) + " 有一架到家了", o.byId || o.byName, "emoji");
+    }
+  }
+  function buzz(){
+    try{ if(typeof vibrateOn !== "undefined" && vibrateOn && navigator.vibrate) navigator.vibrate([18, 40, 18]); }catch(e){}
+  }
+
+  /* ==========================================================================
+     八、排名表
      ──────────────────────────────────────────────────────────────────────────
        ★ 單機與連線共用同一支 —— 兩邊各寫一份的話,欄位與措辭一定會慢慢走鐘
          (而且走鐘了兩邊各自都不會壞,沒有東西抓得到)。
@@ -475,7 +513,7 @@ const FCB = (function(){
   }
 
   /* ==========================================================================
-     八、掛載
+     九、掛載
      ========================================================================== */
   function mount(o){
     cb = o || {};
@@ -511,7 +549,7 @@ const FCB = (function(){
   }
 
   return {
-    mount, render, renderActs, fitBoard, reset, resultHTML,
+    mount, render, renderActs, fitBoard, reset, resultHTML, drama,
     rollDie, setDie, animMs, stopCd,
     busy: () => animating,
     cell: () => cell

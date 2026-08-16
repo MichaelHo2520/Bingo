@@ -219,9 +219,20 @@ const MP = MPCore.create((function(){
     // 走子:st.last 就是動畫要的那一包(rules.js 的 step() 填的)
     busy = true;
     const mv = st.last;
+    /* ★★★ 踩人 / 到家的現場效果走 FCB.drama() —— **完全在本地做,一個 DB 寫入都沒有**。
+       「誰踩了誰」在 moves 裡是公開的,每一台各自 replay 都算得出同一件事;
+       走 sendEmote 的話會變成 N 台各送一次(飛出 N 顆一樣的表情 + N 次 Firebase 寫入)。
+       ⚠ 不要因為「表情本來就走 sendEmote」就順手改過去,理由見 board.js 第七節。 */
+    const me = mySeat();
     if(mv && mv.eaten && mv.eaten.length){
-      const who = mv.eaten.map(e => esc(nameOfSeat(e.seat))).join("、");
-      showToast(esc(nameOfSeat(mv.seat)) + " 踩掉了 " + who + " 的飛機 💥", 1700);
+      mv.eaten.forEach((e, k) => {
+        FCB.drama({ kind: "eat", byName: nameOfSeat(mv.seat), toName: nameOfSeat(e.seat),
+                    toId: ctx.order()[e.seat] || ("s" + e.seat),
+                    mine: (mv.seat === me || e.seat === me), victim: e.seat === me,
+                    seed: moves.length + k });
+      });
+    }else if(mv && mv.home){
+      FCB.drama({ kind: "home", byName: nameOfSeat(mv.seat), byId: ctx.order()[mv.seat] });
     }else if(mv){
       const t = FC.moveText(st, mv);
       if(t) showToast(esc(nameOfSeat(mv.seat)) + " " + t, 1400);
