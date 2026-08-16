@@ -20,8 +20,8 @@
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v1.178.8 -->
-<meta name="version" content="1.178.8">
+<!-- 外殼(shell)· v1.178.9 -->
+<meta name="version" content="1.178.9">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
@@ -96,6 +96,22 @@
   var FS_KEY = "bingo.fs";
   function fsEl(){ return document.fullscreenElement || document.webkitFullscreenElement; }
   function fsSupported(){ var de=document.documentElement; return !!(de.requestFullscreen || de.webkitRequestFullscreen); }
+  /* 裝起來的 App(manifest 的 display 是 fullscreen)本來就滿版 —— 這時再呼叫 Fullscreen API
+     **只有負分,沒有任何好處**(v1.178.9):
+       ① Android 會蓋一句「從螢幕上方向下滑動…」的系統提示,那正是 v1.178.1 改 display 要消掉的東西;
+       ② 進了 API 全螢幕之後,**系統返回的第一下會被瀏覽器拿去退出全螢幕**,不會導覽
+          → 使用者的感覺是「按返回沒反應,而且畫面閃了一下」。
+     所以只要視窗已經是 display-mode: fullscreen,這一層就完全不碰 API,⛶ 改回一句提示。
+     ⚠ 判定要窄:**只認 fullscreen,不可以連 standalone 一起認** —— 桌機安裝版是 standalone 視窗,
+       那裡的 ⛶ 是真的有用的,一起擋掉就等於把桌機的全螢幕拔了。
+     ⚠⚠ **進了 Fullscreen API 之後 `(display-mode: fullscreen)` 也會成立**(規格如此,不是瀏覽器的 bug)
+       → 少了第一行那個 fsEl() 排除,「再按一次 ⛶ 退出全螢幕」會被這條守衛自己擋死,
+       而且症狀是「按了完全沒反應」。(run-shell-e2e 的第 [6] 節就是守這個)
+     ⚠ 這件事量得準的地方只有這一層(頂層 document);內層在 iframe 裡不保證問得到 display-mode。 */
+  function displayFs(){
+    if(fsEl()) return false;   // 現在的滿版是「我們自己 request 來的」,不是 manifest 給的
+    return !!(window.matchMedia && matchMedia("(display-mode: fullscreen)").matches);
+  }
   function want(){ try{ return sessionStorage.getItem(FS_KEY) === "1"; }catch(e){ return false; } }
   function setWant(on){ try{ if(on) sessionStorage.setItem(FS_KEY,"1"); else sessionStorage.removeItem(FS_KEY); }catch(e){} }
   function request(){
@@ -123,7 +139,7 @@
   function env(){
     return {
       fsSupported: fsSupported(),
-      // ⚠ manifest 的 display 是 **fullscreen**(v1.178.8)→ 裝起來的 App 不吃
+      // ⚠ manifest 的 display 是 **fullscreen**(v1.178.1)→ 裝起來的 App 不吃
       //    (display-mode: standalone),要連 fullscreen 一起認,否則會誤判成「還沒滿版」
       standalone: ("standalone" in navigator && navigator.standalone) ||
                   (window.matchMedia && matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches)
@@ -148,12 +164,16 @@
       return;
     }
     if(d.act === "toggle"){
-      if(!fsSupported()){ tell("unsupported", env()); return; }
+      /* 回 "unsupported" 不是在說謊,它的語意就是「外殼不會幫你進 API 全螢幕」——
+         內層收到後跑 fsFallbackTip(),而它會依 standalone 分岔:安裝版跳「已是全螢幕模式 👍」,
+         iPhone Safari 才跳「加入主畫面」那句。所以這裡不必新增 act(內層那兩份雙胞胎一行都不用動)。 */
+      if(!fsSupported() || displayFs()){ tell("unsupported", env()); return; }
       toggle();
       return;
     }
     if(d.act === "gesture"){
       // 這一頁被 F5 重載過(全螢幕掉了但意願還記著)→ 借內層這一下手勢接回來
+      if(displayFs()) return;   // 安裝版已滿版,永遠不要自己跳進 API 全螢幕(理由見 displayFs)
       if(want() && !fsEl() && fsSupported()) request();
       return;
     }
