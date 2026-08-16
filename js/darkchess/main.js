@@ -68,7 +68,7 @@ function paintSoloHint(){
   if(!el) return;
   if(Solo.opponent() === "friend"){
     el.innerHTML = "👤 跟旁邊的朋友輪流動同一支手機,翻到什麼算什麼。<br>" +
-      "<b>房規</b>:" + esc(DC.rulesText(Solo.rules())) + "(按上面「⚙ 改規則」調整)<br>" +
+      "<b>房規</b>:" + esc(DC.rulesText(Solo.rules())) + "(按上面「📋 改規則」調整)<br>" +
       '<span class="dc-warn">' + esc(Solo.friendRecText()) + "</span>";
     return;
   }
@@ -76,7 +76,7 @@ function paintSoloHint(){
   el.innerHTML = "<b>" + L.emoji + " " + L.name + "</b>:" + esc(L.desc) + "<br>" +
     /* ★ 房規要講**現在設的是哪一種** —— 單機的房規存在自己的偏好裡、跨場黏著,
        不寫出來會忘記上次改過(同大老二 / UNO 第二層那條)。 */
-    "<b>房規</b>:" + esc(DC.rulesText(Solo.rules())) + "(按上面「⚙ 改規則」調整)<br>" +
+    "<b>房規</b>:" + esc(DC.rulesText(Solo.rules())) + "(按上面「📋 改規則」調整)<br>" +
     '<span class="dc-warn">' + esc(Solo.recLine(Solo.level())) + "</span>";
 }
 // 對手欄位切換:電腦 ↔ 朋友時,難度與先手兩塊只有電腦對決用得到,收起來給朋友模式的說明騰空間

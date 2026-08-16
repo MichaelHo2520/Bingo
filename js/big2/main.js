@@ -71,7 +71,7 @@ function paintSoloHint(){
     "(最後一名固定 0 分)。<br>"+
     /* ★★ v1.100.0:順子大小是房規 → 第二層一定要講**現在設的是哪一種**
        (單機的房規存在自己的偏好裡,跨場黏著 —— 不寫出來會忘記上次改過)。 */
-    "<b>"+esc(b2RulesText(Solo.rules()))+"</b>(按上面「⚙ 改規則」可換)。<br>"+
+    "<b>"+esc(b2RulesText(Solo.rules()))+"</b>(按上面「📋 改規則」可換)。<br>"+
     // ⚠ 圖示一律 🎴(U+1F3B4);小丑牌那顆是 U+1F0CF,落在被禁的區段(見 solo.js 那條註解)
     "<span class=\"b2-warn\">🎴 "+esc(Solo.recLine(Solo.level()))+"</span>";
 }

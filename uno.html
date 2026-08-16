@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v1.178.7 -->
-<meta name="version" content="1.178.7">
+<!-- UNO · v1.178.8 -->
+<meta name="version" content="1.178.8">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -120,7 +120,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            (照大老二 / 21點那一套:兩邊各一顆入口鈕 → 一組 DOM、一支 syncRules) -->
       <div class="field">
         <span class="field-label">房規</span>
-        <button class="btn ghost block-btn" id="unSoloRules" type="button">⚙️ 改規則</button>
+        <button class="btn ghost block-btn" id="unSoloRules" type="button">📋 改規則</button>
       </div>
       <button class="btn primary block-btn home-btn" id="unStartSolo">開始對局</button>
       <div class="home-hint" id="unSoloHint"></div>
@@ -165,7 +165,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label un-room-title"><b id="mpRoomTitle" class="display">–</b></span>
       <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
-        <!-- 大牌桌(v1.178.7,十一頁共用 BigMode):收掉頂列與房名 / 局數,房間框壓成一行。
+        <!-- 大牌桌(v1.178.8,十一頁共用 BigMode):收掉頂列與房名 / 局數,房間框壓成一行。
              ⚠ class 是 .un-bigbtn,而狀態掛在 body 上的是 .un-big —— 兩個名字**一定要不一樣**。
              ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。
              ⚠ 單機列也有一顆(#unSoloBig),兩顆共用 .un-bigbtn 一起同步。 -->
@@ -223,7 +223,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            這裡只有一顆入口鈕 + 一行摘要。⚠ 對戰中不給改(規則在開局那一刻就凍了) -->
       <div class="field">
         <span class="field-label" id="unRulesLabel">房規</span>
-        <button class="btn ghost block-btn" id="unRulesOpen" type="button">⚙️ 改規則</button>
+        <button class="btn ghost block-btn" id="unRulesOpen" type="button">📋 改規則</button>
       </div>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>

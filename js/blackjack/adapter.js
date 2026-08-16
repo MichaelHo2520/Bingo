@@ -790,7 +790,7 @@ const MP = MPCore.create((function(){
       // ★ 清單文案也只有一份;⚠ 「點名」那一位的名字由 main.js 的 bjFirstName 解讀 token
       if(hint) hint.innerHTML = BJB.rulesHTML(rules, bjFirstName(rules));
       const btn = $("bjRulesOpen");
-      if(btn) btn.textContent = ctx.isHost() ? "⚙ 改規則" : "📋 看規則";
+      if(btn) btn.textContent = ctx.isHost() ? "📋 改規則" : "📋 看規則";
     },
     /* ★★★ v1.90.0:**對戰中不畫「⏱ Ns」那一段**。
        使用者:「已經開始遊戲後,限時幾秒不要顯示,有機會影響到麥克風跟 emoji 的位置」。
