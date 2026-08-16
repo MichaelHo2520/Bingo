@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 be4fb87d7e3ad7097bdb8b145191826cd000eb29a1de57fa9df07963a8af34f9)
+    真相在 styles.src.css(sha256 666687cbe599855430df724a72f0bfecf10472e04ad7de40098e980886b648a4)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3842,6 +3842,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     --tq-c3:#1ea55c; --tq-c4:#2f7ff0; --tq-c5:#9a5bd6;
     --tq-s0:#ffd6dc; --tq-s1:#ffe2c2; --tq-s2:#f7ecb4;
     --tq-s3:#c3ead2; --tq-s4:#cddfff; --tq-s5:#e6d5f8;
+    --tq-d0:#b01228; --tq-d1:#a04a00; --tq-d2:#7d5a00;
+    --tq-d3:#0b6b38; --tq-d4:#1a4bab; --tq-d5:#5e2c96;
     --tq-felt:#fff6e6;
     --tq-hole:#efe0c4;
     --tq-line:#d8bf94;
@@ -3914,12 +3916,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                        inset 0 0 0 3px rgba(255,255,255,.8),
                        inset 0 0 0 5px rgba(216,191,148,.45)}
   .tq-board > *{position:absolute;box-sizing:border-box}
-  .tq-board [data-c="0"],.tq-dot[data-c="0"]{--c:var(--tq-c0);--cs:var(--tq-s0)}
-  .tq-board [data-c="1"],.tq-dot[data-c="1"]{--c:var(--tq-c1);--cs:var(--tq-s1)}
-  .tq-board [data-c="2"],.tq-dot[data-c="2"]{--c:var(--tq-c2);--cs:var(--tq-s2)}
-  .tq-board [data-c="3"],.tq-dot[data-c="3"]{--c:var(--tq-c3);--cs:var(--tq-s3)}
-  .tq-board [data-c="4"],.tq-dot[data-c="4"]{--c:var(--tq-c4);--cs:var(--tq-s4)}
-  .tq-board [data-c="5"],.tq-dot[data-c="5"]{--c:var(--tq-c5);--cs:var(--tq-s5)}
+  .tq-board [data-c="0"],.tq-dot[data-c="0"]{--c:var(--tq-c0);--cs:var(--tq-s0);--cd:var(--tq-d0)}
+  .tq-board [data-c="1"],.tq-dot[data-c="1"]{--c:var(--tq-c1);--cs:var(--tq-s1);--cd:var(--tq-d1)}
+  .tq-board [data-c="2"],.tq-dot[data-c="2"]{--c:var(--tq-c2);--cs:var(--tq-s2);--cd:var(--tq-d2)}
+  .tq-board [data-c="3"],.tq-dot[data-c="3"]{--c:var(--tq-c3);--cs:var(--tq-s3);--cd:var(--tq-d3)}
+  .tq-board [data-c="4"],.tq-dot[data-c="4"]{--c:var(--tq-c4);--cs:var(--tq-s4);--cd:var(--tq-d4)}
+  .tq-board [data-c="5"],.tq-dot[data-c="5"]{--c:var(--tq-c5);--cs:var(--tq-s5);--cd:var(--tq-d5)}
   .tq-board [data-g="0"]{--g:var(--tq-c0)}
   .tq-board [data-g="1"]{--g:var(--tq-c1)}
   .tq-board [data-g="2"]{--g:var(--tq-c2)}
@@ -3938,23 +3940,38 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                box-shadow:0 0 0 3px var(--accent-2),0 0 14px rgba(255,255,255,.7)}
   @keyframes tqSpot{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
   .tq-pc{left:0;top:0;border-radius:50%;pointer-events:auto;cursor:pointer;z-index:5;
-         background:radial-gradient(circle at 34% 28%,#fff 4%,var(--c) 46%,rgba(0,0,0,.35) 130%);
-         box-shadow:0 2px 4px rgba(40,25,0,.42),inset 0 -2px 4px rgba(0,0,0,.28),
-                    0 0 0 1.6px rgba(255,255,255,.92);
+         background:
+           radial-gradient(ellipse 17% 12% at 30% 18%,rgba(255,255,255,.98),rgba(255,255,255,.72) 48%,rgba(255,255,255,0) 100%),
+           radial-gradient(circle at 50% 51%,#fffdf5 0 37%,rgba(255,255,255,.30) 39.5%,rgba(255,255,255,0) 43%),
+           radial-gradient(ellipse 44% 28% at 50% 93%,rgba(255,255,255,.30),rgba(255,255,255,0) 74%),
+           radial-gradient(ellipse 50% 50% at 33% 26%,rgba(255,255,255,.44),rgba(255,255,255,.05) 30%,
+                           rgba(255,255,255,0) 46%,rgba(0,0,0,.03) 66%,rgba(0,0,0,.30) 100%);
+         background-color:var(--c);
+         box-shadow:0 3px 5px -1px rgba(58,38,6,.44),0 0 0 1.4px rgba(255,255,255,.9);
          display:flex;align-items:center;justify-content:center}
-  .tq-pn{font-family:'Fredoka',sans-serif;font-weight:700;color:#fff;
-         font-size:calc(var(--tq-cell) * .34);line-height:1;pointer-events:none;
-         text-shadow:0 1px 1.5px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.5)}
+  .tq-pn{font-family:'Fredoka',sans-serif;font-weight:800;color:var(--cd,#4a3a22);
+         font-size:calc(var(--tq-cell) * .30);line-height:1;pointer-events:none;
+         position:relative;z-index:2;text-shadow:0 .5px 0 rgba(255,255,255,.9)}
   .tq-pc.mine{z-index:6}
-  .tq-pc.on{z-index:9;box-shadow:0 2px 6px rgba(40,25,0,.5),inset 0 -2px 4px rgba(0,0,0,.28),
+  .tq-pc::after{content:"";position:absolute;inset:-1px;border-radius:50%;pointer-events:none;
+                box-shadow:0 0 0 1.5px rgba(255,255,255,.95),0 0 0 2.6px rgba(74,58,34,.5);
+                opacity:0;transition:opacity .2s linear}
+  .tq-board[data-turn="0"] .tq-pc[data-c="0"]::after,
+  .tq-board[data-turn="1"] .tq-pc[data-c="1"]::after,
+  .tq-board[data-turn="2"] .tq-pc[data-c="2"]::after,
+  .tq-board[data-turn="3"] .tq-pc[data-c="3"]::after,
+  .tq-board[data-turn="4"] .tq-pc[data-c="4"]::after,
+  .tq-board[data-turn="5"] .tq-pc[data-c="5"]::after{opacity:1;animation:tqTurn 2.1s ease-in-out infinite}
+  @keyframes tqTurn{0%,100%{opacity:.45}50%{opacity:1}}
+  .tq-pc.on{z-index:9;box-shadow:0 3px 6px rgba(58,38,6,.5),inset 0 -2px 4px rgba(0,0,0,.24),
                                 0 0 0 2.4px #fff,0 0 12px 3px var(--accent);
             animation:tqPick 1.1s ease-in-out infinite}
   @keyframes tqPick{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
   .tq-pc.wait{opacity:.55;animation:tqWait .9s ease-in-out infinite}
   @keyframes tqWait{0%,100%{opacity:.55}50%{opacity:.85}}
-  .tq-pc.home{box-shadow:0 2px 4px rgba(40,25,0,.42),inset 0 -2px 4px rgba(0,0,0,.28),
-                         0 0 0 2px #fff,0 0 0 3.4px var(--c)}
-  .tq-pc.fly{z-index:10;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
+  .tq-pc.home{box-shadow:0 3px 5px -1px rgba(58,38,6,.46),inset 0 -2px 4px rgba(0,0,0,.24),
+                         0 0 0 1.6px #fff,0 0 0 3.4px #ffc93c,0 0 8px 1px rgba(255,186,50,.55)}
+  .tq-pc.fly{z-index:10;filter:drop-shadow(0 5px 7px rgba(0,0,0,.42))}
   .tq-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
            line-height:1.35;text-align:left}
   .tq-cdwrap{display:flex;align-items:center;justify-content:center;flex:none}
@@ -3974,8 +3991,13 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .tq-cdn.tq-beat{animation:none}
     .tq-hole.spot{animation:none}
     .tq-pc.on{animation:none}
+    .tq-board[data-turn] .tq-pc::after{animation:none}
   }
-  .tq-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--c);
+  .tq-dot{display:inline-block;width:11px;height:11px;border-radius:50%;
+          background:
+            radial-gradient(ellipse 30% 22% at 32% 24%,rgba(255,255,255,.96),rgba(255,255,255,0) 72%),
+            radial-gradient(ellipse 50% 50% at 34% 27%,rgba(255,255,255,.42),rgba(255,255,255,0) 48%,rgba(0,0,0,.34) 100%);
+          background-color:var(--c);
           box-shadow:0 0 0 1.5px rgba(255,255,255,.85);flex:none}
   .tq-ct{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;
          color:var(--muted);background:rgba(0,0,0,.06);border-radius:8px;padding:1px 5px}
@@ -3994,6 +4016,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   body.solo-on .tq-react-row{display:none}
   body.tq-mp .tq-room,body.tq-solo .tq-room{width:min(92vw,560px)}
   body.tq-mp .topbar,body.tq-solo .topbar{width:min(92vw,560px)}
+  body.tq-big{--tq-tw:min(100vw,700px)}
+  body.tq-big .tq-play{margin-top:2px}
   @media (max-height:620px){
     .tq-home{overflow-y:auto;overscroll-behavior:contain}
     .tq-home > .tq-pick{flex:none}
@@ -4067,6 +4091,7 @@ body.sdk-big .topbar,
 body.mj-big .topbar,
 body.sv-big .topbar,
 body.fc-big .topbar,
+body.tq-big .topbar,
 body.cy-big .topbar{display:none}
 body.un-big .un-room,
 body.b2-big .b2-room,
@@ -4077,6 +4102,7 @@ body.sdk-big .sdk-room,
 body.mj-big .mj-room,
 body.sv-big .sv-room,
 body.fc-big .fc-room,
+body.tq-big .tq-room,
 body.cy-big .cy-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 body.un-big .un-room > .row,
 body.b2-big .b2-room > .row,
@@ -4087,6 +4113,7 @@ body.sdk-big .sdk-room > .row,
 body.mj-big .mj-room > .row,
 body.sv-big .sv-room > .row,
 body.fc-big .fc-room > .row,
+body.tq-big .tq-room > .row,
 body.cy-big .cy-room > .row{flex:none;order:3;margin-top:0}
 body.un-big .un-room > .mp-subrow,
 body.b2-big .b2-room > .mp-subrow,
@@ -4097,6 +4124,7 @@ body.sdk-big .sdk-room > .mp-subrow,
 body.mj-big .mj-room > .mp-subrow,
 body.sv-big .sv-room > .mp-subrow,
 body.fc-big .fc-room > .mp-subrow,
+body.tq-big .tq-room > .mp-subrow,
 body.cy-big .cy-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.un-big .un-room-foot,
@@ -4108,6 +4136,7 @@ body.sdk-big .sdk-room-foot,
 body.mj-big .mj-room-foot,
 body.sv-big .sv-room-foot,
 body.fc-big .fc-room-foot,
+body.tq-big .tq-room-foot,
 body.cy-big .cy-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
 body.un-big .un-room .mp-leave-btn,
 body.b2-big .b2-room .mp-leave-btn,
@@ -4118,6 +4147,7 @@ body.sdk-big .sdk-room .mp-leave-btn,
 body.mj-big .mj-room .mp-leave-btn,
 body.sv-big .sv-room .mp-leave-btn,
 body.fc-big .fc-room .mp-leave-btn,
+body.tq-big .tq-room .mp-leave-btn,
 body.cy-big .cy-room .mp-leave-btn{display:none}
 body.un-big .un-room .mp-goal,
 body.b2-big .b2-room .mp-goal,
@@ -4128,6 +4158,7 @@ body.sdk-big .sdk-room .mp-goal,
 body.mj-big .mj-room .mp-goal,
 body.sv-big .sv-room .mp-goal,
 body.fc-big .fc-room .mp-goal,
+body.tq-big .tq-room .mp-goal,
 body.cy-big .cy-room .mp-goal{display:none}
 body.un-big .un-room-title,
 body.b2-big .b2-room-title,
@@ -4138,6 +4169,7 @@ body.sdk-big .sdk-room-title,
 body.mj-big .mj-room-title,
 body.sv-big .sv-room-title,
 body.fc-big .fc-room-title,
+body.tq-big .tq-room-title,
 body.cy-big .cy-room-title{display:none}
 body.un-big .un-room .tools-docked,
 body.b2-big .b2-room .tools-docked,
@@ -4148,6 +4180,7 @@ body.sdk-big .sdk-room .tools-docked,
 body.mj-big .mj-room .tools-docked,
 body.sv-big .sv-room .tools-docked,
 body.fc-big .fc-room .tools-docked,
+body.tq-big .tq-room .tools-docked,
 body.cy-big .cy-room .tools-docked{display:none}
 body.un-big .un-room .row:has(> .tools-docked),
 body.b2-big .b2-room .row:has(> .tools-docked),
@@ -4158,6 +4191,7 @@ body.sdk-big .sdk-room .row:has(> .tools-docked),
 body.mj-big .mj-room .row:has(> .tools-docked),
 body.sv-big .sv-room .row:has(> .tools-docked),
 body.fc-big .fc-room .row:has(> .tools-docked),
+body.tq-big .tq-room .row:has(> .tools-docked),
 body.cy-big .cy-room .row:has(> .tools-docked){padding-right:0}
 body.un-big .un-room .mp-chip,
 body.b2-big .b2-room .mp-chip,
@@ -4168,6 +4202,7 @@ body.sdk-big .sdk-room .mp-chip,
 body.mj-big .mj-room .mp-chip,
 body.sv-big .sv-room .mp-chip,
 body.fc-big .fc-room .mp-chip,
+body.tq-big .tq-room .mp-chip,
 body.cy-big .cy-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
 body.un-big .un-room .you-badge,
 body.b2-big .b2-room .you-badge,
@@ -4178,6 +4213,7 @@ body.sdk-big .sdk-room .you-badge,
 body.mj-big .mj-room .you-badge,
 body.sv-big .sv-room .you-badge,
 body.fc-big .fc-room .you-badge,
+body.tq-big .tq-room .you-badge,
 body.cy-big .cy-room .you-badge{display:none}
 body.un-big .un-room-foot .mp-players,
 body.b2-big .b2-room-foot .mp-players,
@@ -4188,13 +4224,14 @@ body.sdk-big .sdk-room-foot .mp-players,
 body.mj-big .mj-room-foot .mp-players,
 body.sv-big .sv-room-foot .mp-players,
 body.fc-big .fc-room-foot .mp-players,
+body.tq-big .tq-room-foot .mp-players,
 body.cy-big .cy-room-foot .mp-players{
   -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
   mask-image:linear-gradient(to right,#000 90%,transparent)}
 .gmk-bigbtn,.sdk-bigbtn,.mj-bigbtn,.sv-bigbtn,.cy-bigbtn,
-.un-bigbtn,.b2-bigbtn,.bj-bigbtn,.dc-bigbtn,.fc-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
+.un-bigbtn,.b2-bigbtn,.bj-bigbtn,.dc-bigbtn,.fc-bigbtn,.tq-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
 .gmk-bigbtn.on,.sdk-bigbtn.on,.mj-bigbtn.on,.sv-bigbtn.on,.cy-bigbtn.on,
-.un-bigbtn.on,.b2-bigbtn.on,.bj-bigbtn.on,.dc-bigbtn.on,.fc-bigbtn.on{
+.un-bigbtn.on,.b2-bigbtn.on,.bj-bigbtn.on,.dc-bigbtn.on,.fc-bigbtn.on,.tq-bigbtn.on{
   border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
 body.gmk-big .gmk-solobar,
 body.sdk-big .sdk-solobar,

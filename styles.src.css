@@ -8360,6 +8360,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     --tq-c3:#1ea55c; --tq-c4:#2f7ff0; --tq-c5:#9a5bd6;
     --tq-s0:#ffd6dc; --tq-s1:#ffe2c2; --tq-s2:#f7ecb4;
     --tq-s3:#c3ead2; --tq-s4:#cddfff; --tq-s5:#e6d5f8;
+    /* ★ 第三組:座號印在棋子白芯上用的**深色**(v1.180.1)。
+       --tq-c* 直接印在白底上有兩個問題:黃(#d9a400)與橙(#f5821f)對比不足、
+       而六色印出來的濃淡不一致(紅很重、黃很輕)→ 一組專門調過的深色。
+       ⚠ 這一組**只給數字用**,不可以拿去畫棋子或洞(那會變成第七、第八種顏色)。 */
+    --tq-d0:#b01228; --tq-d1:#a04a00; --tq-d2:#7d5a00;
+    --tq-d3:#0b6b38; --tq-d4:#1a4bab; --tq-d5:#5e2c96;
     --tq-felt:#fff6e6;      /* 板子 */
     --tq-hole:#efe0c4;      /* 洞(凹進去的那一格) */
     --tq-line:#d8bf94;
@@ -8464,12 +8470,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .tq-board > *{position:absolute;box-sizing:border-box}
   /* 六色掛在 data-c 上,底下的洞 / 棋子 / 點點全部靠 --c 取用(只有這六條認得顏色)。
      --cs = 角的底色(淺版) */
-  .tq-board [data-c="0"],.tq-dot[data-c="0"]{--c:var(--tq-c0);--cs:var(--tq-s0)}
-  .tq-board [data-c="1"],.tq-dot[data-c="1"]{--c:var(--tq-c1);--cs:var(--tq-s1)}
-  .tq-board [data-c="2"],.tq-dot[data-c="2"]{--c:var(--tq-c2);--cs:var(--tq-s2)}
-  .tq-board [data-c="3"],.tq-dot[data-c="3"]{--c:var(--tq-c3);--cs:var(--tq-s3)}
-  .tq-board [data-c="4"],.tq-dot[data-c="4"]{--c:var(--tq-c4);--cs:var(--tq-s4)}
-  .tq-board [data-c="5"],.tq-dot[data-c="5"]{--c:var(--tq-c5);--cs:var(--tq-s5)}
+  .tq-board [data-c="0"],.tq-dot[data-c="0"]{--c:var(--tq-c0);--cs:var(--tq-s0);--cd:var(--tq-d0)}
+  .tq-board [data-c="1"],.tq-dot[data-c="1"]{--c:var(--tq-c1);--cs:var(--tq-s1);--cd:var(--tq-d1)}
+  .tq-board [data-c="2"],.tq-dot[data-c="2"]{--c:var(--tq-c2);--cs:var(--tq-s2);--cd:var(--tq-d2)}
+  .tq-board [data-c="3"],.tq-dot[data-c="3"]{--c:var(--tq-c3);--cs:var(--tq-s3);--cd:var(--tq-d3)}
+  .tq-board [data-c="4"],.tq-dot[data-c="4"]{--c:var(--tq-c4);--cs:var(--tq-s4);--cd:var(--tq-d4)}
+  .tq-board [data-c="5"],.tq-dot[data-c="5"]{--c:var(--tq-c5);--cs:var(--tq-s5);--cd:var(--tq-d5)}
   .tq-board [data-g="0"]{--g:var(--tq-c0)}
   .tq-board [data-g="1"]{--g:var(--tq-c1)}
   .tq-board [data-g="2"]{--g:var(--tq-c2)}
@@ -8496,32 +8502,84 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                box-shadow:0 0 0 3px var(--accent-2),0 0 14px rgba(255,255,255,.7)}
   @keyframes tqSpot{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
 
-  /* ---------- 棋子 ----------
+  /* ---------- 棋子:玻璃彈珠 ----------
      ⚠ 位置一律走 transform(不是 left/top):transition 只有 transform 走得動 GPU。
      ⚠⚠ **不要給 transition** —— 這一頁的動畫是 rAF 每一幀自己算位置的
        (見 board.js 第四節:位置 = f(now))。加上 transition 等於讓 CSS 再插一層補間,
-       兩套補間疊在一起就是「棋子走完之後還會滑一下」。 */
+       兩套補間疊在一起就是「棋子走完之後還會滑一下」。
+     ⚠⚠ 同一個理由:**任何掛在 .tq-pc 上的 CSS 動畫都不可以碰 transform**
+       (那一格是 board.js 每一幀在寫的)。要動就動 filter / opacity / box-shadow ——
+       既有的 tqPick / tqWait 都是這樣寫的,新增效果照辦。
+
+     ── ★★ 為什麼長這樣(v1.180.1,使用者:「棋子好沒有特色」)────────────────
+       v1.180.0 是**一層** radial-gradient 的色球 + 白字。問題有兩個:
+         ① 沒有形體:一層漸層畫不出「球」,看起來是貼在板子上的圓色塊。
+         ② 座號是白字壓黑影,而它是這一頁的**色盲第二訊號** ——
+            壓在黃色(#d9a400)與橙色(#f5821f)上時最該讀得清楚的兩家反而最糊。
+       改成真的彈珠 / 撞球:**球體打光 + 中央白芯 + 白芯上印深色座號**。
+       ★ 白芯順手解決了 ②:深色數字印在白底上,六家的可讀性一致(見 --tq-d0..5)。
+       ⚠ 白芯的半徑是 37% —— 換算回去約是棋子直徑的 52%(radial 的 100% 落在
+         **對角**,不是邊,所以 37% × √2 ≈ 52%)。再大就開始吃掉顏色,
+         而顏色是規則本體(六色那一條),不可以為了數字好讀把色環讓掉。
+
+     四層由上而下(★ background 的第一層在最上面):
+       ① 高光      左上那一點,玻璃的第一反射
+       ② 白芯      座號的底
+       ③ 底部反光  桌面把光彈回來 —— 少了它球會像貼紙
+       ④ 球體明暗  左上亮、右下收深(⚠ 用 ellipse 50% 50% 而不是 circle:
+                   circle 的尺寸只吃長度,寫百分比不合法,而預設 farthest-corner
+                   會把最深的那一段推到看不見的四個角外面 → 邊緣根本沒暗下去)
+     ⚠ 底色(var(--c))一定要用 `background-color` **另外寫一行,而且在 background 之後**:
+       background 簡寫會把 background-color 重設成 transparent。 */
   .tq-pc{left:0;top:0;border-radius:50%;pointer-events:auto;cursor:pointer;z-index:5;
-         background:radial-gradient(circle at 34% 28%,#fff 4%,var(--c) 46%,rgba(0,0,0,.35) 130%);
-         box-shadow:0 2px 4px rgba(40,25,0,.42),inset 0 -2px 4px rgba(0,0,0,.28),
-                    0 0 0 1.6px rgba(255,255,255,.92);
+         background:
+           radial-gradient(ellipse 17% 12% at 30% 18%,rgba(255,255,255,.98),rgba(255,255,255,.72) 48%,rgba(255,255,255,0) 100%),
+           radial-gradient(circle at 50% 51%,#fffdf5 0 37%,rgba(255,255,255,.30) 39.5%,rgba(255,255,255,0) 43%),
+           radial-gradient(ellipse 44% 28% at 50% 93%,rgba(255,255,255,.30),rgba(255,255,255,0) 74%),
+           radial-gradient(ellipse 50% 50% at 33% 26%,rgba(255,255,255,.44),rgba(255,255,255,.05) 30%,
+                           rgba(255,255,255,0) 46%,rgba(0,0,0,.03) 66%,rgba(0,0,0,.30) 100%);
+         background-color:var(--c);
+         box-shadow:0 3px 5px -1px rgba(58,38,6,.44),0 0 0 1.4px rgba(255,255,255,.9);
          display:flex;align-items:center;justify-content:center}
-  /* ★ 色盲的第二訊號:座號。六色比四色更難分,這個數字在這一頁**不是裝飾**。 */
-  .tq-pn{font-family:'Fredoka',sans-serif;font-weight:700;color:#fff;
-         font-size:calc(var(--tq-cell) * .34);line-height:1;pointer-events:none;
-         text-shadow:0 1px 1.5px rgba(0,0,0,.75),0 0 2px rgba(0,0,0,.5)}
+  /* ★ 色盲的第二訊號:座號。六色比四色更難分,這個數字在這一頁**不是裝飾**。
+     ⚠ 顏色吃 --cd(專門調過的深色),不是 --c —— 黃與橙直接印上去讀不到。 */
+  .tq-pn{font-family:'Fredoka',sans-serif;font-weight:800;color:var(--cd,#4a3a22);
+         font-size:calc(var(--tq-cell) * .30);line-height:1;pointer-events:none;
+         position:relative;z-index:2;text-shadow:0 .5px 0 rgba(255,255,255,.9)}
   .tq-pc.mine{z-index:6}
-  /* 選中的那一顆:光環 + 稍微放大 */
-  .tq-pc.on{z-index:9;box-shadow:0 2px 6px rgba(40,25,0,.5),inset 0 -2px 4px rgba(0,0,0,.28),
+  /* ★★ 輪到誰:那一家的棋子整組戴上一圈白色呼吸環(v1.180.1)。
+       board.dataset.turn 是**那一家的角索引**,v1.180.0 就寫進 DOM 了但沒有人用。
+     ⚠⚠ 一定要走 ::after 這一層,**不可以直接寫在 .tq-pc 上**:
+       這六條的權重是 (0,3,1),比 .tq-pc.on / .home / .wait 的 (0,2,0) 高 →
+       寫 box-shadow 就會把「選中」與「到家」的環整個蓋掉,而那兩個是規則資訊。
+     ⚠ 環的顏色是「白 + 一圈墨色」而不是純白:板子本身就是米白(--tq-felt #fff6e6),
+       純白環在上面**完全看不見**(第一版就是這樣,放大截圖才發現)。
+     ⚠ 環要**薄**:棋子在角落是密排的三角形,環一厚六顆的環就連成一團,
+       看起來像整組被框起來而不是「每一顆都能動」(第一版 2 + 3.4px 就是這樣)。 */
+  .tq-pc::after{content:"";position:absolute;inset:-1px;border-radius:50%;pointer-events:none;
+                box-shadow:0 0 0 1.5px rgba(255,255,255,.95),0 0 0 2.6px rgba(74,58,34,.5);
+                opacity:0;transition:opacity .2s linear}
+  .tq-board[data-turn="0"] .tq-pc[data-c="0"]::after,
+  .tq-board[data-turn="1"] .tq-pc[data-c="1"]::after,
+  .tq-board[data-turn="2"] .tq-pc[data-c="2"]::after,
+  .tq-board[data-turn="3"] .tq-pc[data-c="3"]::after,
+  .tq-board[data-turn="4"] .tq-pc[data-c="4"]::after,
+  .tq-board[data-turn="5"] .tq-pc[data-c="5"]::after{opacity:1;animation:tqTurn 2.1s ease-in-out infinite}
+  @keyframes tqTurn{0%,100%{opacity:.45}50%{opacity:1}}
+  /* 選中的那一顆:光環 */
+  .tq-pc.on{z-index:9;box-shadow:0 3px 6px rgba(58,38,6,.5),inset 0 -2px 4px rgba(0,0,0,.24),
                                 0 0 0 2.4px #fff,0 0 12px 3px var(--accent);
             animation:tqPick 1.1s ease-in-out infinite}
   @keyframes tqPick{0%,100%{filter:brightness(1)}50%{filter:brightness(1.18)}}
   /* 送出中(★ 純視覺 —— 它擋不住任何操作,見 adapter.js 第一條) */
   .tq-pc.wait{opacity:.55;animation:tqWait .9s ease-in-out infinite}
   @keyframes tqWait{0%,100%{opacity:.55}50%{opacity:.85}}
-  .tq-pc.home{box-shadow:0 2px 4px rgba(40,25,0,.42),inset 0 -2px 4px rgba(0,0,0,.28),
-                         0 0 0 2px #fff,0 0 0 3.4px var(--c)}
-  .tq-pc.fly{z-index:10;filter:drop-shadow(0 4px 6px rgba(0,0,0,.4))}
+  /* 到家了:金環。★ v1.180.0 是「白 + 自己的顏色」,但棋子本身就是那個顏色 ——
+     等於「到家」與「沒到家」只差一圈幾乎看不出來的邊。金色是六色以外的顏色,
+     一眼就分得出哪幾顆已經進門(⚠ 它不是第七家:只出現在環上,不進球體)。 */
+  .tq-pc.home{box-shadow:0 3px 5px -1px rgba(58,38,6,.46),inset 0 -2px 4px rgba(0,0,0,.24),
+                         0 0 0 1.6px #fff,0 0 0 3.4px #ffc93c,0 0 8px 1px rgba(255,186,50,.55)}
+  .tq-pc.fly{z-index:10;filter:drop-shadow(0 5px 7px rgba(0,0,0,.42))}
 
   .tq-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
            line-height:1.35;text-align:left}
@@ -8549,10 +8607,19 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .tq-cdn.tq-beat{animation:none}
     .tq-hole.spot{animation:none}
     .tq-pc.on{animation:none}
+    /* ⚠ 只關掉呼吸,環本身要留著(opacity 已經由上面那條設成 1)——
+       它帶的是「輪到誰」這個規則資訊,不是純裝飾。 */
+    .tq-board[data-turn] .tq-pc::after{animation:none}
   }
 
   /* ---------- 晶片上的東西 ---------- */
-  .tq-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--c);
+  /* 晶片上的小圓點:★ 與棋子同一套打光(縮小版)—— 晶片與盤面上是同一顆東西,
+     一邊是彈珠一邊是純色貼片的話,「那一家是我」要多看一眼才對得起來。 */
+  .tq-dot{display:inline-block;width:11px;height:11px;border-radius:50%;
+          background:
+            radial-gradient(ellipse 30% 22% at 32% 24%,rgba(255,255,255,.96),rgba(255,255,255,0) 72%),
+            radial-gradient(ellipse 50% 50% at 34% 27%,rgba(255,255,255,.42),rgba(255,255,255,0) 48%,rgba(0,0,0,.34) 100%);
+          background-color:var(--c);
           box-shadow:0 0 0 1.5px rgba(255,255,255,.85);flex:none}
   .tq-ct{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;
          color:var(--muted);background:rgba(0,0,0,.06);border-radius:8px;padding:1px 5px}
@@ -8577,6 +8644,23 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        (守門 tools\run-e2e.ps1 t-topbar-fit,它斷言兩者寬度完全相等)。 */
   body.tq-mp .tq-room,body.tq-solo .tq-room{width:min(92vw,560px)}
   body.tq-mp .topbar,body.tq-solo .topbar{width:min(92vw,560px)}
+
+  /* ---------- 大棋盤(body.tq-big):**這一頁多一條「放寬」** ----------
+     一行版的共用部分(收頂列 + 房間框壓成一行)寫在檔尾那一大組群組選擇器裡,
+     這裡只補跳棋獨有的一條。
+     ⚠⚠ **少了這一條,「大」在直向手機上幾乎沒有效果** —— 而那是最常見的握法:
+       fitBoard() 取的是 min(寬/13, 高/14.86),390px 的手機上
+         寬 → 374/13 = 28.8　高 → 約 640/14.86 = 43
+       **卡住的是寬度**,所以收掉再多的垂直空間(頂列 42 + 房間框 29)一格都換不到。
+       這與另外十三頁相反(它們的牌桌 / 手牌是被高度卡住的),不要照抄那邊的結論。
+     ★ 700 不是隨便挑的:board.js 的 CELL_MAX = 54 → 13 × 54 = 702 已經是盤面的天花板,
+       再寬只是留白。⚠ 改 CELL_MAX 要回頭改這個數字。
+     ⚠ 100vw 是刻意的(不是 96vw):大棋盤本來就是「把畫面整個讓給盤面」,
+       而盤面自己是置中的方框,貼邊的是它的圓角背景,不會有東西被裁掉。
+     ⚠ 這一條的權重 (0,2,0) 高過檔尾大螢幕段那條 `:root{--tq-tw:…}` (0,1,0) ——
+       兩段同時成立時本來就該是這一條贏(大螢幕按了「大」要更大,不是更小)。 */
+  body.tq-big{--tq-tw:min(100vw,700px)}
+  body.tq-big .tq-play{margin-top:2px}
 
   /* ---------- 矮視窗 ---------- */
   @media (max-height:620px){
@@ -8823,6 +8907,7 @@ body.sdk-big .topbar,
 body.mj-big .topbar,
 body.sv-big .topbar,
 body.fc-big .topbar,
+body.tq-big .topbar,
 body.cy-big .topbar{display:none}
 /* ① 三層並排成一行。⚠ 上下內距 6px 不是 4px:34px 的鈕是這一列唯一貼到框邊的東西
    (晶片只有 22px 高),4px 看起來就是黏著框(台灣麻將 v1.178.1 的上手回報)。 */
@@ -8835,6 +8920,7 @@ body.sdk-big .sdk-room,
 body.mj-big .mj-room,
 body.sv-big .sv-room,
 body.fc-big .fc-room,
+body.tq-big .tq-room,
 body.cy-big .cy-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 /* ② order:晶片列(foot)在 DOM 裡是最後一個,拉到最左邊;鈕那一列(.row)推到最右。
    ⚠ 連線與單機共用同一組 class(兩條列都是 .XX-room),所以一次到位。 */
@@ -8847,6 +8933,7 @@ body.sdk-big .sdk-room > .row,
 body.mj-big .mj-room > .row,
 body.sv-big .sv-room > .row,
 body.fc-big .fc-room > .row,
+body.tq-big .tq-room > .row,
 body.cy-big .cy-room > .row{flex:none;order:3;margin-top:0}
 body.un-big .un-room > .mp-subrow,
 body.b2-big .b2-room > .mp-subrow,
@@ -8857,6 +8944,7 @@ body.sdk-big .sdk-room > .mp-subrow,
 body.mj-big .mj-room > .mp-subrow,
 body.sv-big .sv-room > .mp-subrow,
 body.fc-big .fc-room > .mp-subrow,
+body.tq-big .tq-room > .mp-subrow,
 body.cy-big .cy-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body.un-big .un-room-foot,
@@ -8868,6 +8956,7 @@ body.sdk-big .sdk-room-foot,
 body.mj-big .mj-room-foot,
 body.sv-big .sv-room-foot,
 body.fc-big .fc-room-foot,
+body.tq-big .tq-room-foot,
 body.cy-big .cy-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
 /* ③ 返回鍵 / 房名 / 局數三個一起收 —— 收掉它們讓出來的寬度就是給晶片的。
    ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」,手機實體返回鍵也不受影響。 */
@@ -8880,6 +8969,7 @@ body.sdk-big .sdk-room .mp-leave-btn,
 body.mj-big .mj-room .mp-leave-btn,
 body.sv-big .sv-room .mp-leave-btn,
 body.fc-big .fc-room .mp-leave-btn,
+body.tq-big .tq-room .mp-leave-btn,
 body.cy-big .cy-room .mp-leave-btn{display:none}
 body.un-big .un-room .mp-goal,
 body.b2-big .b2-room .mp-goal,
@@ -8890,6 +8980,7 @@ body.sdk-big .sdk-room .mp-goal,
 body.mj-big .mj-room .mp-goal,
 body.sv-big .sv-room .mp-goal,
 body.fc-big .fc-room .mp-goal,
+body.tq-big .tq-room .mp-goal,
 body.cy-big .cy-room .mp-goal{display:none}
 body.un-big .un-room-title,
 body.b2-big .b2-room-title,
@@ -8900,6 +8991,7 @@ body.sdk-big .sdk-room-title,
 body.mj-big .mj-room-title,
 body.sv-big .sv-room-title,
 body.fc-big .fc-room-title,
+body.tq-big .tq-room-title,
 body.cy-big .cy-room-title{display:none}
 /* ④ ⛶ / ⚙️ 跟著頂列一起消失(兩條是同一件事的兩半,見檔頭) */
 body.un-big .un-room .tools-docked,
@@ -8911,6 +9003,7 @@ body.sdk-big .sdk-room .tools-docked,
 body.mj-big .mj-room .tools-docked,
 body.sv-big .sv-room .tools-docked,
 body.fc-big .fc-room .tools-docked,
+body.tq-big .tq-room .tools-docked,
 body.cy-big .cy-room .tools-docked{display:none}
 body.un-big .un-room .row:has(> .tools-docked),
 body.b2-big .b2-room .row:has(> .tools-docked),
@@ -8921,6 +9014,7 @@ body.sdk-big .sdk-room .row:has(> .tools-docked),
 body.mj-big .mj-room .row:has(> .tools-docked),
 body.sv-big .sv-room .row:has(> .tools-docked),
 body.fc-big .fc-room .row:has(> .tools-docked),
+body.tq-big .tq-room .row:has(> .tools-docked),
 body.cy-big .cy-room .row:has(> .tools-docked){padding-right:0}
 /* ⑤ 晶片縮成迷你版:收掉「你」徽章(.mp-chip.me 已經有光環,同一格不必再寫一次),
    其餘一個都不收(名字 / 分數 / 輪到誰是這一列存在的理由)。 */
@@ -8933,6 +9027,7 @@ body.sdk-big .sdk-room .mp-chip,
 body.mj-big .mj-room .mp-chip,
 body.sv-big .sv-room .mp-chip,
 body.fc-big .fc-room .mp-chip,
+body.tq-big .tq-room .mp-chip,
 body.cy-big .cy-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
 body.un-big .un-room .you-badge,
 body.b2-big .b2-room .you-badge,
@@ -8943,6 +9038,7 @@ body.sdk-big .sdk-room .you-badge,
 body.mj-big .mj-room .you-badge,
 body.sv-big .sv-room .you-badge,
 body.fc-big .fc-room .you-badge,
+body.tq-big .tq-room .you-badge,
 body.cy-big .cy-room .you-badge{display:none}
 body.un-big .un-room-foot .mp-players,
 body.b2-big .b2-room-foot .mp-players,
@@ -8953,6 +9049,7 @@ body.sdk-big .sdk-room-foot .mp-players,
 body.mj-big .mj-room-foot .mp-players,
 body.sv-big .sv-room-foot .mp-players,
 body.fc-big .fc-room-foot .mp-players,
+body.tq-big .tq-room-foot .mp-players,
 body.cy-big .cy-room-foot .mp-players{
   -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
   mask-image:linear-gradient(to right,#000 90%,transparent)}
@@ -8966,9 +9063,9 @@ body.cy-big .cy-room-foot .mp-players{
      ⚠ DOM 量測完全看不出來(三顆鈕的 box 中線差 0.0px),只有放大截圖逐像素量得到。
      台灣麻將 v1.176.0 踩過這一格,notes/11 第〇節第 4 條。 */
 .gmk-bigbtn,.sdk-bigbtn,.mj-bigbtn,.sv-bigbtn,.cy-bigbtn,
-.un-bigbtn,.b2-bigbtn,.bj-bigbtn,.dc-bigbtn,.fc-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
+.un-bigbtn,.b2-bigbtn,.bj-bigbtn,.dc-bigbtn,.fc-bigbtn,.tq-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
 .gmk-bigbtn.on,.sdk-bigbtn.on,.mj-bigbtn.on,.sv-bigbtn.on,.cy-bigbtn.on,
-.un-bigbtn.on,.b2-bigbtn.on,.bj-bigbtn.on,.dc-bigbtn.on,.fc-bigbtn.on{
+.un-bigbtn.on,.b2-bigbtn.on,.bj-bigbtn.on,.dc-bigbtn.on,.fc-bigbtn.on,.tq-bigbtn.on{
   border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
 
 /* ---------- 單機列是 .XX-solobar 的那四頁(五子棋 / 數獨 / 消消樂 / 成語接龍)----------
