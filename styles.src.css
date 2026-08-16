@@ -8465,10 +8465,39 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        **它會自己震盪下去**,而且只有桌機(有實體捲軸的平台)看得到。
      ⚠ 這是「量的對象會被自己的量測結果改變」那一類 bug —— 加多大的死區都沒用
        (一次跳 15px),只能讓捲軸不再佔版面。保險本身要留著:捲得動、只是看不到捲軸。 */
+  /* ★★ touch-action:none 是**雙指縮放的必要條件**(v1.181.0)——
+       沒有它,兩指一撐瀏覽器會先把手勢拿去做「捲舞台」,pointermove 收不到第二根手指;
+       單指拖曳也會被當成捲頁。
+     ⚠ 代價是那條 overflow:auto 的保險**捲不動了**(極矮視窗盤面比舞台高的情形)——
+       改由 board.js 的拖曳接手:panRoom() 判的是「盤面有沒有超出舞台」而不是「z>1」,
+       所以 z=1 但溢出時照樣拖得動。overflow 本身留著(捲軸仍然隱形)。 */
   .tq-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;z-index:0;
             display:flex;align-items:center;justify-content:center;
-            overflow:auto;scrollbar-width:none}
+            overflow:auto;scrollbar-width:none;touch-action:none}
   .tq-stage::-webkit-scrollbar{width:0;height:0}
+
+  /* 縮放列:浮在舞台右下角。
+     ⚠⚠ position:absolute 有兩個理由,少一個都會出事:
+       ① .tq-stage 是 flex 置中的容器 —— 參與佈局就把盤面擠歪了。
+       ② 那一格**正是 fitBoard() 量的容器**(紅線 18):任何會改變它
+          clientWidth/Height 的東西都會讓盤面在對局中途自己跳一階。
+     ★★★ 這一組是**橫排**,與五子棋的 .gmk-zoom(直排)刻意不同 ——
+       這一頁 z=1 時**盤面是不能平移的**(剛好放得下),被鈕蓋住的洞就是永遠點不到。
+       而盤面幾乎填滿舞台:390px 手機上直排的三顆佔 y 319~439,
+       右下那個星尖正好落在 (368, 320) → **那一家最外面那顆棋直接被蓋住**。
+       六邊形的底是**尖的**、左右兩側是空白 → 貼著底邊橫排就完全避得開
+       (390px 手機上鈕在 x 290~398,而盤面在那個高度只到 x=265)。
+       ⚠ 有測試守這件事(t-tq-solo-e2e F2 節「整盤時縮放鈕一個洞都沒蓋住」)。 */
+  .tq-zoom{position:absolute;right:6px;bottom:6px;z-index:3;display:flex;gap:6px}
+  .tq-zoom button{width:36px;height:36px;border:1px solid var(--panel-line);border-radius:12px;
+    background:rgba(0,0,0,.28);color:var(--text);font-family:'Fredoka',sans-serif;font-weight:700;
+    font-size:17px;line-height:1;cursor:pointer;display:grid;place-items:center;backdrop-filter:blur(6px)}
+  .tq-zoom button:active{transform:scale(.9)}
+  .tq-zoom button:disabled{opacity:.35;cursor:default}
+  :root[data-theme="bubblegum"] .tq-zoom button{background:rgba(255,255,255,.55)}
+  @media (max-height:560px){
+    .tq-zoom button{width:32px;height:32px;font-size:15px}
+  }
   /* ★★★ 這一列的高度是**寫死的**,不是 min-height(v1.180.2,使用者:「盤面一直跳來跳去」)。
      ⚠⚠ 它是 fitBoard() 那條尺寸鏈的一環:`盤面能有多高 = .tq-play − .tq-acts` ——
        只要這一列會長高,盤面就會跟著縮一階(一階 ≈ 14px 寬,很明顯)。
@@ -8487,7 +8516,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          多一個看得見的矩形殼。外陰影改掛在 SVG 上(drop-shadow 跟著形狀走)。
      ⚠ 舊註解說的「不要用 clip-path 去切一個星」仍然成立,而且做法就是現在這樣:
        星形是**格線與凹槽路徑自己長出來的**,沒有任何一層在裁切。 */
-  .tq-board{position:relative;--tq-cell:22px;flex:none}
+  /* ⚠ .tq-board 的 transform 由 board.js 的 applyView() 在寫(縮放 / 平移,v1.181.0)——
+     **這裡不要放任何 transform**,寫了會被 JS 蓋掉、看起來像沒生效。
+     transform-origin 明寫成正中央:整套 clamp 的算式(panRoom)就是照這個原點推的。 */
+  .tq-board{position:relative;--tq-cell:22px;flex:none;transform-origin:50% 50%}
   .tq-board > *{position:absolute;box-sizing:border-box}
 
   /* ---------- 木托盤(SVG,建盤面時畫一次)----------

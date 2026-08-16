@@ -271,7 +271,10 @@ const TQB = (function(){
     let c = Math.floor(Math.min(byW, byH));
     if(c < CELL_MIN) c = CELL_MIN;
     if(c > CELL_MAX) c = CELL_MAX;
-    if(c === cell) return;
+    /* ★ 舞台真的變了(轉向 / 摺疊機展開 / 切「大 / 小」)→ 使用者自己的縮放與平移要夾回範圍內。
+       ⚠ 這一句不能只寫在函式尾巴:下一行的 `c === cell` 也會跳出去,而「舞台變了、
+         但一格的邊長取整之後沒變」正是最常見的那一種(舞台差幾 px 就會走這條)。 */
+    if(c === cell){ clampView(); applyView(); return; }
     cell = c;
     board.style.setProperty("--tq-cell", c + "px");
     /* ⚠ 托盤的寬高都不是整數格 —— 這裡刻意**兩個都不取整**:
@@ -282,6 +285,132 @@ const TQB = (function(){
     board.style.width = (c * TRAY_W).toFixed(2) + "px";
     board.style.height = (c * TRAY_H).toFixed(2) + "px";
     if(lastPaint) placeAll(lastPaint);
+    clampView(); applyView();
+  }
+
+  /* ==========================================================================
+     二之一、★ 縮放 / 平移(v1.181.0,使用者:「三支手機只有一支縮得動棋盤」)
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠⚠ 起因不是 bug:十五個頁面的 viewport 都寫了 `user-scalable=no`,
+         **瀏覽器原生的雙指縮放整頁都不能用**。使用者那支縮得動的手機是開了
+         Chrome 的「強制啟用縮放」(或切到桌面版網站)才蓋過去的 —— 那是意外,
+         不是功能,所以三支手機的行為才會不一樣。要縮放只能自己做(同五子棋)。
+
+       ★★★ 縮放走 `.tq-board` 的 transform,**刻意不動 `--tq-cell`**。兩個理由:
+         ① `--tq-cell` 一改,121 個洞 + 最多 60 顆棋的 left/top/width/height 全部重排 ——
+            而**棋子的 transform 是動畫每一幀在寫的**(紅線 15),兩件事一起發生就是抖。
+         ② transform 不觸發 reflow → 手指拖著縮放才跟得上。
+       ★ 所以 z 是疊在 fitBoard() 那個大小**之上**的倍率:z=1 就是「整盤剛好放得下」,
+         也因此 **z=1 時的操作手感與 v1.180.2 完全一樣**(拖不動、tx/ty 夾完恆為 0)。
+
+       ⚠ clamp 用的是 `board.offsetWidth`(**layout 尺寸**,不含 transform)——
+         改用 getBoundingClientRect() 會量到縮放**後**的寬,自己乘自己會發散。
+       ⚠ 舞台的捲軸是隱形的(見 styles.src.css 的 .tq-stage)→ 放大後 transform 溢出
+         不會冒出捲軸、也就不會吃掉 clientWidth → **不會回到 v1.180.2 那個震盪**(紅線 18)。
+     ========================================================================== */
+  const ZMAX = 3;                      // 最大倍率(再大就只剩三四個洞在畫面上)
+  const TAP_SLOP = 8;                  // 位移小於這麼多 px 仍算「點一下」而不是拖曳
+  let z = 1, tx = 0, ty = 0;           // 倍率 / 平移(px,相對「置中」的偏移量)
+  /* ★ 這一次手勢有沒有真的拖動過 —— 拖過就要把隨後那一次 click 吞掉,
+     不然「拖著看盤面」放開的瞬間會順便選走一顆棋。
+     ⚠ 它在每一次新的 pointerdown 歸零,而 click 一定排在 pointerup 之後、
+       下一次 pointerdown 之前 → 不會有殘留。 */
+  let panned = false;
+
+  function applyView(){
+    if(!board) return;
+    board.style.transform = (z === 1 && !tx && !ty) ? ""
+      : "translate(" + tx.toFixed(1) + "px," + ty.toFixed(1) + "px) scale(" + z.toFixed(4) + ")";
+    syncZoomBtns();
+  }
+  // 盤面現在有沒有超出舞台(超出才拖得動)
+  function panRoom(){
+    if(!board || !stage) return { x: 0, y: 0 };
+    return { x: Math.max(0, (board.offsetWidth  * z - stage.clientWidth)  / 2),
+             y: Math.max(0, (board.offsetHeight * z - stage.clientHeight) / 2) };
+  }
+  function clampView(){
+    const r = panRoom();
+    tx = Math.min(r.x, Math.max(-r.x, tx));
+    ty = Math.min(r.y, Math.max(-r.y, ty));
+  }
+  /* 以「相對舞台中心的 (ax,ay)」為錨縮放到 nz —— 錨點底下的那個洞留在原地 */
+  function zoomTo(nz, ax, ay){
+    nz = Math.max(1, Math.min(ZMAX, nz));
+    if(ax == null){ ax = 0; ay = 0; }
+    const bx = (ax - tx) / z, by = (ay - ty) / z;
+    z = nz; tx = ax - bx * z; ty = ay - by * z;
+    clampView(); applyView();
+  }
+  function zoomReset(){ z = 1; tx = 0; ty = 0; applyView(); }
+  function syncZoomBtns(){
+    const zi = $("tqZoomIn"), zo = $("tqZoomOut");
+    if(zi) zi.disabled = z >= ZMAX - 1e-3;
+    if(zo) zo.disabled = z <= 1 + 1e-3;
+  }
+
+  function bindZoom(){
+    if(!stage) return;
+    const pts = new Map();             // pointerId -> {x,y}
+    let drag = null, pinch = null;
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    // 螢幕座標 → 相對舞台中心(★ 用 rect 算,舞台就算被捲過也不會偏)
+    function rel(x, y){
+      const rc = stage.getBoundingClientRect();
+      return { x: x - (rc.left + rc.width / 2), y: y - (rc.top + rc.height / 2) };
+    }
+    stage.addEventListener("pointerdown", e => {
+      // 三顆縮放鈕疊在舞台右下角,pointerdown 會冒泡到這裡 —— 沒擋掉就會變成「拖盤面」
+      if(e.target.closest(".tq-zoom")) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if(pts.size === 1){
+        drag = { x: e.clientX, y: e.clientY, tx, ty };
+        panned = false;
+      }else if(pts.size === 2){
+        const [a, b] = [...pts.values()], m = rel((a.x + b.x) / 2, (a.y + b.y) / 2);
+        pinch = { d: dist(a, b), z: z, ax: m.x, ay: m.y };
+        panned = true;                 // 兩根手指一定不是「點一下」
+      }
+    });
+    stage.addEventListener("pointermove", e => {
+      if(!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if(pts.size >= 2 && pinch){
+        const [a, b] = [...pts.values()], d = dist(a, b);
+        if(pinch.d > 0) zoomTo(pinch.z * (d / pinch.d), pinch.ax, pinch.ay);
+        return;
+      }
+      /* ⚠ 只有「盤面真的超出舞台」才拖得動。判準刻意不是 `z > 1`:
+         舞台極矮時(fitBoard 的間距有 16px 下限)盤面在 z=1 就已經比舞台高 ——
+         那正是 .tq-stage 那條 overflow:auto 本來在擋的情形,而 touch-action:none
+         之後捲不動了,只能由這裡接手。
+         ★ 反過來說,盤面放得下時 panRoom() 是 0,0 → panned 永遠不會變 true
+           → 點擊完全不受影響(與 v1.180.2 同手感)。 */
+      if(!drag) return;
+      const room = panRoom();
+      if(!room.x && !room.y) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if(!panned && Math.hypot(dx, dy) > TAP_SLOP) panned = true;
+      if(panned){ tx = drag.tx + dx; ty = drag.ty + dy; clampView(); applyView(); }
+    });
+    function endPointer(e){
+      pts.delete(e.pointerId);
+      if(pts.size < 2) pinch = null;
+      if(pts.size === 0) drag = null;
+    }
+    stage.addEventListener("pointerup", endPointer);
+    stage.addEventListener("pointercancel", endPointer);
+    // 桌機:滾輪以指標為錨縮放
+    stage.addEventListener("wheel", e => {
+      e.preventDefault();
+      const m = rel(e.clientX, e.clientY);
+      zoomTo(z * (e.deltaY < 0 ? 1.12 : 1 / 1.12), m.x, m.y);
+    }, { passive: false });
+    const zi = $("tqZoomIn"), zo = $("tqZoomOut"), zf = $("tqZoomFit");
+    if(zi) zi.addEventListener("click", () => zoomTo(z * 1.45));
+    if(zo) zo.addEventListener("click", () => zoomTo(z / 1.45));
+    if(zf) zf.addEventListener("click", zoomReset);
+    syncZoomBtns();
   }
 
   /* ==========================================================================
@@ -616,11 +745,15 @@ const TQB = (function(){
     /* 點擊一律綁在盤面上(洞與棋子都是動態產生的)。
        ⚠ 棋子疊在洞上面 → 先問棋子,再問洞。 */
     board.addEventListener("click", e => {
+      /* ⚠ 剛剛那一下是「拖盤面 / 雙指縮放」,不是點擊 —— 不吞掉的話手指放開的
+         瞬間會順便選走一顆棋(見 panned 的註解)。 */
+      if(panned) return;
       const pc = e.target.closest(".tq-pc");
       if(pc && cb.onPiece){ cb.onPiece(+pc.dataset.seat, +pc.dataset.i); return; }
       const hole = e.target.closest(".tq-hole");
       if(hole && cb.onHole) cb.onHole(+hole.dataset.id);
     });
+    bindZoom();
     let rt = null;
     window.addEventListener("resize", () => {
       if(rt) clearTimeout(rt);
@@ -632,6 +765,7 @@ const TQB = (function(){
   function reset(){
     stopFlight();
     stopCd();
+    zoomReset();            // 換一局就回到整盤(不然上一局放大的視角會帶進新局)
     shownKey = ""; lastPaint = null;
     if(board){
       pieceEls.forEach(r => r.forEach(el => el.remove()));
@@ -647,7 +781,10 @@ const TQB = (function(){
   return {
     mount, render, renderActs, fitBoard, reset, resultHTML, drama,
     animMs, stopCd, SFX,
+    zoomReset,
     cell: () => cell,
+    /* 給 e2e / 診斷頁用:目前的縮放倍率與平移量 */
+    _view: () => ({ z: z, tx: tx, ty: ty }),
     /* 給 e2e 用:畫面上「畫到哪一個局面」——★ 對帳心跳靠它(見 adapter 第四條)。
        ⚠ 回的是**畫面**的狀態,不是真相;兩者不同就是漏畫了。 */
     _shown: () => lastPaint ? lastPaint.map(r => r.slice()) : null,

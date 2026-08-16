@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>跳棋 ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- 跳棋 · v1.180.2 -->
-<meta name="version" content="1.180.2">
+<!-- 跳棋 · v1.181.0 -->
+<meta name="version" content="1.181.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -297,6 +297,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="tq-stage" id="tqStage">
       <!-- 121 個洞與棋子全部由 TQB 產生;尺寸由 fitBoard() 用 JS 算(不用 aspect-ratio) -->
       <div class="tq-board" id="tqBoard"></div>
+      <!-- 縮放(v1.181.0):viewport 設了 user-scalable=no → 原生雙指縮放整頁都不能用,
+           所以自己做一組(同五子棋 .gmk-zoom)。手勢在 board.js 的 bindZoom()。
+           ⚠ 一定要留在舞台**裡面**而且是 absolute:它要浮在盤面右下角,
+             又不可以參與 .tq-stage 的 flex 佈局(會把盤面擠歪)。 -->
+      <div class="tq-zoom">
+        <button type="button" id="tqZoomIn" title="放大" aria-label="放大棋盤">＋</button>
+        <button type="button" id="tqZoomFit" title="整盤" aria-label="顯示整個棋盤">⤢</button>
+        <button type="button" id="tqZoomOut" title="縮小" aria-label="縮小棋盤">－</button>
+      </div>
     </div>
     <div class="tq-acts hidden" id="tqActs"></div>
   </div>
