@@ -7978,9 +7978,41 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        所以字級、行高、層次都自己來。
      ⚠ 圖例用的是盤面上**真的那幾個 class**(.fc-cell / .fc-mk),不是另外畫一組 ——
        兩邊長得不一樣的話,說明反而幫倒忙。 */
+  /* ---------- ★★ 只讓「說明」自己捲,不要整頁捲(v1.179.4)----------
+     使用者:「最下面的東西都看不到,少了滑動視窗,我建議只滑動規則的部分不要全部整頁都滑」。
+     實測 390×844 的手機上這一塊高 866px、**溢出 453px**,而 app-shell 的 body 是
+     `height:100dvh; overflow:hidden` → 溢出的部分是**完全拿不到**的(不是捲不到,是不存在)。
+
+     ★ 做法用 **flex 自己吃掉剩餘高度**,不寫死 max-height:
+       `body` 本來就是 flex 直欄 → 面板是 flex item(預設 flex-shrink:1)
+       → 面板 `min-height:0` 就會被壓到剩餘高度
+       → 面板內只有 `.fc-howto` 可以縮(其餘 `flex:none`)→ 縮的全落在它身上 → 它捲。
+     ⚠ **不可以寫死 `max-height:40vh` 那種數字**:上面那一疊(標題 / 插圖 / 兩顆鈕)的高度
+       會隨矮視窗的緊湊段變動,寫死的話不是留一大塊空白就是還是被切掉。
+     ⚠ `min-height:0` 三層都要寫 —— flex item 的預設 `min-height:auto` 會擋住收縮,
+       少寫一層就整條鏈失效(看起來像完全沒生效)。
+     ⚠ 只掛在**第一層**(`.fc-pick`)身上:第二層(單機設定)內容短,整個面板拉滿高度
+       會在底下留一大片空白。
+     ⚠ `overscroll-behavior:contain` —— 捲到底之後不要把捲動傳給外層(iOS 會整頁彈)。 */
+  .fc-home{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .fc-home > *{flex:none}
+  /* ⚠⚠ 收縮鏈**每一層都要能縮**,斷在中間那一層就整條失效:
+     `.fc-home > *{flex:none}` 本來是要鎖住標題列,但它也命中了 `.fc-pick` ——
+     於是外層面板縮了(1314→756)、中間這層卻還是 1276,直接被 overflow:hidden 切掉。
+     症狀與「完全沒生效」一模一樣,只有量 computed flex-shrink 才看得出來。 */
+  .fc-home > .fc-pick{flex:0 1 auto;min-height:0}
+  .fc-pick{display:flex;flex-direction:column;min-height:0}
+  .fc-pick > *{flex:none}
+
   .fc-howto{margin-top:18px;padding:14px 14px 12px;border-radius:14px;
             background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
-            text-align:left;font-size:13px;line-height:1.62;color:var(--text)}
+            text-align:left;font-size:13px;line-height:1.62;color:var(--text);
+            /* ★ 這是面板裡唯一可以縮的東西 → 空間不夠時縮的全落在它身上,然後它自己捲 */
+            /* ⚠ 留一個下限:縮到剩幾十 px 的捲動框比看不到還糟(橫置手機量到過 30px)。
+               真的塞不下那個下限時,由下面的矮視窗段改成「整個面板捲」。 */
+            flex:0 1 auto;min-height:150px;overflow-y:auto;overscroll-behavior:contain;
+            /* 底緣一道很淡的內陰影:告訴人「下面還有」。⚠ 刻意做得很輕 —— 捲到底時它還在 */
+            box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
   .fc-howto-h{font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:15.5px;
               color:var(--accent-2);margin-bottom:6px}
   .fc-howto-h2{font-weight:800;font-size:12.5px;color:var(--muted);margin:12px 0 6px}
@@ -8189,6 +8221,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
 
   /* ---------- 矮視窗 ---------- */
   @media (max-height:620px){
+    /* ★★ 橫置手機:標題 + 插圖 + 兩顆鈕就吃掉 355/430,規則框硬留 150px 會把鈕擠出畫面。
+       這種高度下「只捲規則」本來就不成立 → 改成**整個面板捲**(至少每一樣都到得了)。
+       ⚠ 直向手機不會走到這裡(844 / 780 / 932 都在 620 以上),那邊仍然是「只捲規則」。 */
+    .fc-home{overflow-y:auto;overscroll-behavior:contain}
+    .fc-home > .fc-pick{flex:none}
+    .fc-howto{min-height:0;overflow:visible;box-shadow:none}
     .fc-hero{margin:6px 0 2px}
     .fc-art{width:66px;height:66px}
     .fc-play{gap:5px;margin-top:4px}
