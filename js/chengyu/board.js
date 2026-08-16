@@ -238,6 +238,9 @@ const CYB = (function () {
     init, setPuzzle, fill, clear, flashWrong, flashTaken, markDone,
     freeze, unfreeze, frozen, onKey, press,
     setEnabled(v) { enabled = !!v; if (wrap) wrap.classList.toggle("locked", !enabled); },
+    /* ★ 連線的對帳心跳要問「現在到底能不能按」(v1.181.1)——「按不動」在畫面上只有
+       一點點淡,量不出來;唯一問得到的就是這個旗標本身。 */
+    isEnabled: () => enabled,
     setSel(i) { sel = i; repaint(); },
     sel: () => sel,
     valueAt: i => vals[i] || "",

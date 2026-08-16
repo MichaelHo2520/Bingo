@@ -14,10 +14,22 @@
    ⚠ 只用了一個能力旗標:一場一局、搶字模式、不扣分、對局中不可加入,
      跟數獨一樣不碰 js/shared/mp-core.js 一行 —— 唯一例外是 contRound(v1.136.0,
      局間續局,比照台灣麻將):結果卡按「繼續」不回大廳,湊齊直接接下一盤。
+
+   ★★★ 「按不動」的三道保險(v1.181.1)——
+     現場回報:「結束第一局之後,繼續下一局,其中有一個人就沒辦法按了」(兩個人玩)。
+     這一頁能讓人按不動的狀態只有三種,而它們**以前都沒有第二次機會**:
+       ① 盤面鎖著(CYB.setEnabled(false))—— 舊版只有「題目換了」那一拍會解鎖,
+          那一拍沒跑到(漏收快照 / 重連歸位 / 上一行丟例外)就整局鎖死
+       ② 結果卡那顆「繼續」停在 disabled —— clearNext() 只收腳註,沒把鈕收回來
+       ③ 核心的 readyUp() 用**本地** ready 擋,而腳註畫的是 **DB** 的 ready:
+          兩邊不一致時,鈕看起來能按、按下去什麼都不會發生
+     現在 ①③ 一定救得回來(①另有每 3 秒的對帳心跳兜底,比照跳棋的第四條),
+     ②在 clearNext() 收乾淨。⚠ 不要把解鎖搬回「題目換了」那個分支裡。
    ========================================================================== */
 
 const MP = MPCore.create((function () {
   const FREEZE_MS = 3000;
+  const SYNC_MS = 3000;           // 對帳心跳:每 3 秒無條件比一次畫面與真相(比照跳棋)
   const COLORS = ["p0", "p1", "p2", "p3", "p4", "p5"];
   const V_MAX = 32;               // 一盤最多用到的相異字數上限(hard 難度實測 ≤22,留餘裕)
   let diff = "std";
@@ -26,6 +38,7 @@ const MP = MPCore.create((function () {
   let puzKey = null, holes = 0, fills = [], tally = [];
   let charList = [];               // 規範順序的字元清單,每個端算出來都一樣
   let nextKey = "";                 // 這一局要不要顯示續局腳註(outcome() 會被重複呼叫,見那裡)
+  let lastG = null, syncT = null;   // 對帳心跳:最後一份快照 + 那顆計時器
 
   /* ---------- fills 的整數編碼 ---------- */
   function encFill(i, v, seat, ok) { return ((i * V_MAX + v) * 8 + seat) * 2 + (ok ? 1 : 0); }
@@ -78,14 +91,18 @@ const MP = MPCore.create((function () {
     setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 900);
   }
 
-  /* ---------- 填格 ---------- */
+  /* ---------- 填格 ----------
+     ⚠ 這一支以前有四條**靜靜 return** 的路(結束了 / 沒座位 / 字不在這盤 / 凍結中)——
+       使用者看到的就只是「點下去沒反應」,而回報上來也只有這一句話,完全無從查起。
+       現在每一條都要講一句話:講錯話還有得修,不講話連哪一條都不知道。 */
   function play(i, ch) {
-    if (ctx.phase() !== "playing" || ctx.winner()) return;
-    if (CYB.frozen()) return;
+    if (ctx.phase() !== "playing") return;             // 不在對局裡(單機 / 大廳)—— 這條不必講話
+    if (ctx.winner()) { showToast("這一盤結束了,等下一盤開始 👀", 1400); return; }
+    if (CYB.frozen()) return;                          // press() 已經先講過「冷靜 N 秒」了
     if (CYB.isBlock(i) || CYB.isGiven(i)) { showToast("這格是題目給的,不能改"); return; }
     if (CYB.valueAt(i)) { showToast("這格已經被填走了"); return; }
-    const seat = mySeat(); if (seat < 0) return;
-    const v = charIdx(ch); if (v < 0) return;
+    const seat = mySeat(); if (seat < 0) { showToast("座位還在同步,等一下再試 ⏳", 1400); return; }
+    const v = charIdx(ch); if (v < 0) { showToast("這個字不在這一盤裡", 1400); return; }
     const right = (CYB.solAt(i) === ch);
     if (!right) {
       CYB.flashWrong(i);
@@ -107,6 +124,34 @@ const MP = MPCore.create((function () {
     });
   }
   function erase() { showToast("搶到的格子不能清掉"); }
+
+  /* ---------- 對帳心跳(v1.181.1,比照跳棋的第四條「無條件對帳」) ----------
+     每 3 秒問兩件事,不同就修 —— **不問「為什麼會不同」**:
+       ① 對局中而且還沒分出勝負 → 盤面一定要是解鎖的(這是「按不動」的唯一自癒管道)
+       ② 畫面上填了幾格 = 真相裡填對了幾格,對不上就整盤重畫
+     ⚠ 心跳只讀本地最後一份快照,不多打一次 Firebase(它修的是「快照收到了但沒套完」,
+       不是「沒收到快照」—— 後者由 Firebase 自己的重連補送)。
+     ⚠ 順手補一次結算:某一台漏了收尾的那一拍時,整局會停在填滿卻不結束的畫面上。 */
+  function okCount(g) {
+    let k = 0;
+    (Array.isArray(g.fills) ? g.fills : []).forEach(c => { if (decFill(c).ok) k++; });
+    return k;
+  }
+  function repaintFrom(g) {
+    const next = Array.isArray(g.fills) ? g.fills : [];
+    tally = [];
+    next.forEach(c => { const f = decFill(c); if (f.ok) CYB.fill(f.i, charList[f.v], colorOf(f.seat)); bump(tally, f.seat, f.ok); });
+    fills = next.slice();
+    renderHud();
+  }
+  function reconcile() {
+    if (ctx.phase() !== "playing" || !lastG || !puzKey) return;
+    if (!ctx.winner() && !CYB.isEnabled()) CYB.setEnabled(true);
+    if (CYB.filledCount() !== okCount(lastG)) repaintFrom(lastG);
+    if (holes > 0 && CYB.isComplete() && !ctx.winner()) settleGrab();
+  }
+  function startSync() { stopSync(); syncT = setInterval(reconcile, SYNC_MS); }
+  function stopSync() { if (syncT) { clearInterval(syncT); syncT = null; } }
 
   /* 盤面填滿就結算。誰看到誰寫,交易保證只有第一個成功(不指定「填最後一格的人」,
      免得那個人剛好斷線就沒人寫、整局卡住)——比照數獨的 settleGrab。
@@ -139,6 +184,12 @@ const MP = MPCore.create((function () {
   function clearNext() {
     nextKey = "";
     const el = $("cyNext"); if (el) { el.classList.add("hidden"); el.innerHTML = ""; }
+    /* ★★ 鈕也要一起收回原狀(v1.181.1)。paintNext() 按過之後會把它改成「等待中」+ disabled,
+       而 clearNext() 以前只收腳註 —— 那顆 disabled 就**跟著活到下一盤**:下一盤的結果卡
+       只要 outcome() 因為任何理由沒重畫到,那顆鈕就永遠按不下去(而畫面上完全看不出來)。
+       ⚠ 台灣麻將的同一支本來就有做這件事(最後一局把鈕改回「下一局」),這裡當初漏了。 */
+    const b = $("mpAgain");
+    if (b) { b.textContent = "繼續"; b.disabled = false; b.classList.add("primary"); b.classList.remove("ghost"); }
   }
   /* 腳註那一行。★ 兩種身分要講不同的事(而且是同一行,不要多長一列出來):
        還沒按 —— 提示「按了就會接著玩」
@@ -203,7 +254,7 @@ const MP = MPCore.create((function () {
 
     /* ---------- 一局的生命週期 ---------- */
     lobbyGame() { return { fills: [], puzzle: null, sol: null }; },
-    resetRound() { puzKey = null; fills = []; tally = []; charList = []; },
+    resetRound() { puzKey = null; fills = []; tally = []; charList = []; lastG = null; },
     newGame(ids, prev) {
       const q = CYGen.make(diff);
       let ord;
@@ -214,16 +265,24 @@ const MP = MPCore.create((function () {
     applyGame(g, playing) {
       if (!playing) return;
       gDiff = CYGen.LEVELS[g.diff] ? g.diff : "std";
+      lastG = g;                                    // 對帳心跳要用(見 reconcile)
       // 題目換了(新的一局)→ 重建盤面 + 重算規範字元清單
       if (g.puzzle && g.puzzle !== puzKey) {
-        puzKey = g.puzzle;
+        /* ⚠ puzKey 一定要**等 setPuzzle 真的做完**才寫進去:先寫的話,setPuzzle 丟例外的
+           那一台從此 g.puzzle === puzKey,這一局再也進不來這個分支 —— 盤面停在上一盤、
+           charList 也是舊的,而且沒有任何錯誤訊息。 */
         CYB.setPuzzle({ rows: g.rows, cols: g.cols, puzzle: g.puzzle, sol: g.sol });
+        puzKey = g.puzzle;
         charList = buildCharList(g.puzzle, g.sol);
         holes = CYB.remaining();
         fills = []; tally = [];
-        CYB.setEnabled(true);
         CYB.setSel(CYB.firstEmpty());
       }
+      /* ★★★ 解鎖**不綁在「題目換了」那個分支裡**(v1.181.1)。
+         舊寫法只有重建盤面那一拍會 setEnabled(true) —— 那一拍沒跑到的話這一台就整局鎖著:
+         盤面看得到、字卡淡掉、點下去完全沒反應,而且再也沒有第二次機會。
+         現場回報的「第二局其中一個人沒辦法按」就是這個形狀 → 改成每一份快照都重申一次。 */
+      if (!ctx.winner()) CYB.setEnabled(true);
       const next = Array.isArray(g.fills) ? g.fills : [];
       const pops = [];
       // 能延續就只補新的幾筆,否則整盤重建(重連 / 中途歸位)
@@ -272,7 +331,8 @@ const MP = MPCore.create((function () {
     backToLobby() {
       showScreen("lobby");
       $("mpBar").classList.remove("playing");
-      puzKey = null; fills = []; tally = []; charList = [];
+      puzKey = null; fills = []; tally = []; charList = []; lastG = null;
+      stopSync();
       CYB.setEnabled(false); CYB.unfreeze();
       clearNext();
       const box = $("cyHud"); if (box) { box.classList.add("hidden"); box.innerHTML = ""; }
@@ -285,10 +345,12 @@ const MP = MPCore.create((function () {
       /* ★ 續局時這支是上一盤的結果卡收掉、新的一盤開打的那一刻(核心已經 closeWin)——
          腳註一定要在這裡收乾淨,不然文案會活到下一盤的結果卡再多畫一次舊的。 */
       clearNext();
+      startSync();      // 對帳心跳:一開打就起跳(見 reconcile)
       Sound.start();
     },
     onLeave() {
-      puzKey = null; fills = []; tally = []; charList = [];
+      puzKey = null; fills = []; tally = []; charList = []; lastG = null;
+      stopSync();
       CYB.setEnabled(false); CYB.unfreeze();
       clearNext();
       const box = $("cyHud"); if (box) { box.classList.add("hidden"); box.innerHTML = ""; }

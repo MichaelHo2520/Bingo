@@ -862,8 +862,15 @@ const MPCore = (function(){
        ⚠ roundId 那道門同時擋掉網路版的同一件事:交易被伺服器判定過期而重跑時,
          手上的快照可能已經是下一局了(那時本地 status 也已經翻過)。
        ★ 守門:tools/gen-mj16-e2e.js 的 Y 段(房主當最後一個按的人)。 */
+    /* ⚠⚠ 擋第二次按的判準是「**本地與 DB 都說我準備好了**」(v1.181.1 改,原本只看本地)。
+         腳註那一行(adapter 的 paintNext)畫的是 **DB** 的 ready,而這裡以前擋的是**本地**的
+         —— 兩邊不一致時畫面說「可以按」、按下去卻整支 return false:一個字都不會寫出去,
+         也沒有任何訊息。使用者回報的形狀就是「其中一個人就沒辦法按了」。
+         兩邊一致時(正常情況)行為與舊版逐字相同 —— 只有不一致的那一台會多寫一次,
+         而那一次正是把它救回來的那一次。 */
     function readyUp(){
-      if(!CONT_ROUND || !roomRef || !meId || ready) return false;
+      if(!CONT_ROUND || !roomRef || !meId) return false;
+      if(ready && (players[meId]||{}).ready) return false;
       const rid=roundId, wasPlaying=(status!=="lobby");
       ready=true;
       roomRef.child("players/"+meId).update({ ready:true, name:meName });
