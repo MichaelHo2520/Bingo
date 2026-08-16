@@ -18,22 +18,26 @@
 
 <table>
   <tr>
-    <td align="center" width="110"><img src="img/bc-icon.png" width="72" alt="BINGO"><br><b>BINGO</b></td>
-    <td align="center" width="110"><img src="img/gk-icon.png" width="72" alt="五子棋"><br><b>五子棋</b></td>
-    <td align="center" width="110"><img src="img/sk-icon.png" width="72" alt="數獨"><br><b>數獨</b></td>
-    <td align="center" width="110"><img src="img/mk-icon.png" width="72" alt="麻將消消樂"><br><b>麻將消消樂</b></td>
-    <td align="center" width="110"><img src="img/m16-icon.png" width="72" alt="台灣麻將"><br><b>台灣麻將</b></td>
-    <td align="center" width="110"><img src="img/sv-icon.png" width="72" alt="排七"><br><b>排七</b></td>
+    <td align="center" width="25%"><b>🎲 BINGO</b><br><img src="screenshots/bingo.png" width="200" alt="BINGO 盤面:號碼劃記與連線"></td>
+    <td align="center" width="25%"><b>⚫ 五子棋</b><br><img src="screenshots/gomoku.png" width="200" alt="五子棋 19×19 棋盤"></td>
+    <td align="center" width="25%"><b>🔢 數獨</b><br><img src="screenshots/sudoku.png" width="200" alt="數獨 9×9 盤面與數字鍵盤"></td>
+    <td align="center" width="25%"><b>🀄 麻將消消樂</b><br><img src="screenshots/mahjong.png" width="200" alt="麻將消消樂:堆疊的牌陣"></td>
   </tr>
   <tr>
-    <td align="center"><img src="img/b2-icon.png" width="72" alt="大老二"><br><b>大老二</b></td>
-    <td align="center"><img src="img/bj-icon.png" width="72" alt="台式21點"><br><b>台式21點</b></td>
-    <td align="center"><img src="img/un-icon.png" width="72" alt="UNO"><br><b>UNO</b></td>
-    <td align="center"><img src="img/dc-icon.png" width="72" alt="象棋暗棋"><br><b>象棋暗棋</b></td>
-    <td align="center"><img src="img/cy-icon.png" width="72" alt="成語接龍"><br><b>成語接龍</b></td>
-    <td align="center"><img src="img/dw-icon.png" width="72" alt="你畫我猜"><br><b>你畫我猜</b></td>
+    <td align="center"><b>🀄 台灣麻將</b><br><img src="screenshots/mahjong16.png" width="200" alt="台灣 16 張麻將:手牌與三家對手"></td>
+    <td align="center"><b>♠︎ 排七</b><br><img src="screenshots/sevens.png" width="200" alt="排七:四門花色往兩邊接牌"></td>
+    <td align="center"><b>♥︎ 大老二</b><br><img src="screenshots/big2.png" width="200" alt="大老二:牌桌上的葫蘆與手牌"></td>
+    <td align="center"><b>♦︎ 台式21點</b><br><img src="screenshots/blackjack.png" width="200" alt="台式21點:要牌 / 停 / 抓人"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>🌈 UNO</b><br><img src="screenshots/uno.png" width="200" alt="UNO:四色手牌與功能牌"></td>
+    <td align="center"><b>🔴 象棋暗棋</b><br><img src="screenshots/darkchess.png" width="200" alt="象棋暗棋:32 顆蓋著擺滿 4×8"></td>
+    <td align="center"><b>🧩 成語接龍</b><br><img src="screenshots/chengyu.png" width="200" alt="成語接龍:交叉填字盤與待填的字"></td>
+    <td align="center"><b>🎨 你畫我猜</b><br><img src="screenshots/draw.png" width="200" alt="你畫我猜:建立房間 / 加入朋友的房間"></td>
   </tr>
 </table>
+
+每一款的玩法、可以幾個人一起玩、以及一個人能不能玩：
 
 | 遊戲 | 玩法一句話 | 連線人數 | 一個人玩 |
 | --- | --- | :---: | --- |
