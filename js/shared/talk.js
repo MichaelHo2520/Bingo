@@ -325,9 +325,30 @@ const Talk = (function () {
   /* ★ 使用者按了任一顆鈕 = 一次貨真價實的手勢 → 把之前被擋下來的補播掉。
      ⚠ 這一支要在**每次**按鈕時呼叫,不是只在開的時候:iPhone 上「連上了卻沒聲音」
        多半只差這一下,而使用者的直覺就是再按一次(那正好也是一次手勢)。 */
+  /* 把一顆 AudioContext 叫醒。⚠ 兩層都要吞:`resume()` 在 closed 的 context 上**同步拋錯**,
+     而它平常回的是 Promise —— 沒給 `.catch` 的話手機切回前景時會噴一整排
+     unhandledrejection(iOS 在沒有使用者手勢時本來就會拒絕這個請求)。 */
+  function resumeCtx(c) {
+    if (!c || c.state !== "suspended") return;
+    try { const p = c.resume(); if (p && p.catch) p.catch(() => { }); } catch (e) { }
+  }
+  /* 有沒有哪一顆分析用的 context 睡著了。⚠ **兩顆都要問**(v2.3.9):
+     只問遠端那顆 `acx` 的話,本地那顆(`lacx`)睡著時這道閘就把補救整個濾掉了 —— 見下面。 */
+  function ctxAsleep() {
+    return (!!acx && acx.state === "suspended") || (!!lacx && lacx.state === "suspended");
+  }
   function kickPlay() {
     for (const id in peers) { const P = peers[id]; if (P.needPlay) playNow(P); }
-    try { if (acx && acx.state === "suspended") acx.resume(); } catch (e) { }
+    resumeCtx(acx);
+    /* ★★★ v2.3.9:**本地麥克風那顆也要叫醒**。手機切去 LINE / 接個電話再回來,系統會把
+       **所有** AudioContext 壓成 suspended,而 suspended 的分析器
+       `getByteTimeDomainData()` 讀到的是**凍結的舊資料** —— 於是自己那個綠框
+       (v2.3.7 使用者點名要的「我到底有沒有在送話」)開始說謊,而且兩種說法都是錯的:
+         · 切走的那一刻剛好在講話 → 讀到的永遠是那一格響亮的波形 → **框永遠亮著**
+           (「我以為我在講話」那一類裡最糟的一種);
+         · 切走的那一刻是安靜的 → 框**再也不會亮**,使用者會以為麥克風壞了。
+       ⚠ 麥克風本身沒事、聲音照樣送得出去 —— 壞掉的**只有指示燈**,所以完全靠回報才看得見。 */
+    resumeCtx(lacx);
   }
 
   /* ---------- 一條連線 ---------- */
@@ -660,10 +681,17 @@ const Talk = (function () {
     if (!P.stream) return;
     if (WEBKIT) return;   // 見上面:接進 AudioContext 會讓 <audio> 靜音
     try {
+      /* ⚠ **同一個 peer 的 ontrack 是會來第二次的**(重新協商 / 方向改回 recvonly 時
+         receiver 換了一條新 track)—— 舊的 MediaStreamSource 沒有 disconnect 就會一直
+         掛在 `acx` 的 graph 上,而它扣著上一顆 stream 不放:一場派對裡開開關關十幾次,
+         就是十幾條沒人在讀的音訊路徑還在被處理(v2.3.9)。
+         ⚠ 先拆再建,不要拆完就 return:這一支的職責是「讓 P 身上掛著一組**現在這條** track
+           的分析器」,提早 return 會讓那組停在舊的 stream 上。 */
+      if (P.srcNode) { try { P.srcNode.disconnect(); } catch (e) { } P.srcNode = null; }
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       if (!acx) acx = new AC();
-      if (acx.state === "suspended") { try { acx.resume(); } catch (e) { } }
+      resumeCtx(acx);
       const src = acx.createMediaStreamSource(P.stream);
       const an = acx.createAnalyser();
       an.fftSize = 512;
@@ -686,7 +714,7 @@ const Talk = (function () {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
       if (!lacx) lacx = new AC();
-      if (lacx.state === "suspended") { try { lacx.resume(); } catch (e) { } }
+      resumeCtx(lacx);
       lsrc = lacx.createMediaStreamSource(localStream);
       const an = lacx.createAnalyser();
       an.fftSize = 512;
@@ -1144,11 +1172,31 @@ const Talk = (function () {
       if (!on()) return;
       let need = false;
       for (const id in peers) if (peers[id].needPlay) { need = true; break; }
-      if (need || (acx && acx.state === "suspended")) kickPlay();
+      /* ⚠ 這道閘 v2.3.9 之前只問 `acx` —— **本地那顆睡著時整個補救就被濾掉了**
+         (kickPlay 裡補了 resumeCtx(lacx) 也照樣走不到)。兩顆一起問。 */
+      if (need || ctxAsleep()) kickPlay();
     };
     try {
       document.addEventListener("pointerdown", h, true);
       document.addEventListener("touchend", h, true);
+    } catch (e) { }
+    /* ★★ 回到前景就**主動**試一次(v2.3.9),不必等使用者點螢幕。
+       ⚠ 為什麼「點螢幕」不夠:切回來的頭幾秒是最容易被判定「這東西壞了」的時候,
+         而使用者這時多半正盯著畫面找誰在講話,手還沒動。
+       ⚠ 這一下**沒有使用者手勢**,所以 iOS 很可能直接拒絕 → 它是加分項,不是替代品:
+         上面那兩個 listener 仍然是保證能救回來的那條路(resumeCtx 已經把拒絕吞掉了)。
+       ⚠ 判斷用 `document.hidden` 而不是 `visibilityState === "visible"`:
+         規格上還有 "prerender" 這種值,而那時候該做的事跟 visible 一樣。
+       ⚠ 也順手 armLocalMeter():長時間背景之後 context 有可能是 **closed**(叫不醒),
+         那時 lanalyser 已經連同它一起歸零 → 這一支會重新接一顆起來(它是冪等的)。 */
+    try {
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden || !on()) return;
+        resumeCtx(acx);
+        resumeCtx(lacx);
+        armLocalMeter();
+        kickPlay();
+      });
     } catch (e) { }
   }
 
@@ -1193,7 +1241,16 @@ const Talk = (function () {
 
   function teardown() {
     stopRepair();
-    Object.keys(peers).forEach(dropPeer);
+    /* ⚠⚠ **一定要包一層 `id => dropPeer(id)`,不可以直接 `forEach(dropPeer)`。**
+       `dropPeer(id, keepMail)` 有第二個參數,而 forEach 傳的是 `(值, 索引, 陣列)` →
+       裸寫的話**第二個 peer 起** `keepMail` 拿到 1、2、3…(truthy),
+       於是那道「把對方留給我的信箱清掉」整條被跳過。
+       ★ 目前救了它一命的是下一行的 `unwatch()`(它 remove 掉整個 `rtc/{我}`,連帶把漏掉的
+         一起帶走)—— 所以這個 bug **現在沒有症狀**。但它是個等著咬下一個人的陷阱:
+         哪天有人把這兩行對調、或讓 unwatch 不再整節刪,殘留的舊 offer 就會在下一次開語音時
+         被 `.on("value")` 當成新的收下來(見 attach 的長註解:那正是死鎖的入口)。
+       ⚠ sync() 裡那一行(拆走掉的人)本來就是包起來的 —— 兩處寫法不一致,這裡是漏的那個。 */
+    Object.keys(peers).forEach(id => dropPeer(id));
     unwatch();
     stopMeter();
     stopLocalMeter();
@@ -1358,6 +1415,51 @@ const Talk = (function () {
           gen: P.gen, rgen: P.rgen, pend: P.pend.length, needPlay: !!P.needPlay
         };
       });
+    },
+    /* 診斷用(產品碼不呼叫,同 diag() 的先例):**這條線的品質**,v2.3.9。
+       ★ 存在的理由:`diag()` 只回答「通不通」,而現場最常見的回報是
+         **「通了,但斷斷續續」** —— 那時要分的是兩件完全不同的事:
+           · `relay` + `rtt` 幾百毫秒 → 走的是**免費公共 TURN 中繼**(整條線都慢,誰都一樣);
+           · `host`/`srflx` 但 `loss` 很高 → 是**某一個人的網路在抖**(其他線好好的)。
+         猜不出來的話只會一直換 TURN 或一直重開語音,而那兩條路都修不到對方的 Wi-Fi。
+       ⚠ 一定要 async:`getStats()` 回 Promise,所以**不可以**塞進 diag()
+         (那一支是同步的,測試與 t-turn-check 都當它同步在用)。
+       ⚠ 拿不到就回 `null` 欄位,不要回 0 —— 「問不到」與「真的是 0」在診斷時差很多。
+       跑法:`await Talk.stats()` */
+    async stats() {
+      const ids = Object.keys(peers);
+      const out = [];
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i], P = peers[id];
+        const row = { id, state: P.pc.connectionState, kind: null, rtt: null, loss: null, jitter: null };
+        try {
+          const rs = await P.pc.getStats();
+          let pair = null, rtp = null, local = null;
+          const byId = Object.create(null);
+          rs.forEach(s => { byId[s.id] = s; });
+          rs.forEach(s => {
+            /* ⚠ 只認**選上的**那一對:候選對會有好幾組(每一種 candidate 都試過),
+               沒選上的那些 rtt 是垃圾。Chrome 標在 pair 上,Firefox 走 transport → 兩條都問。 */
+            if (s.type === "candidate-pair" && (s.selected || s.state === "succeeded") && !pair) pair = s;
+            if (s.type === "transport" && s.selectedCandidatePairId && byId[s.selectedCandidatePairId]) pair = byId[s.selectedCandidatePairId];
+            if (s.type === "inbound-rtp" && (s.kind === "audio" || s.mediaType === "audio")) rtp = s;
+          });
+          if (pair) {
+            if (typeof pair.currentRoundTripTime === "number") row.rtt = Math.round(pair.currentRoundTripTime * 1000);
+            local = pair.localCandidateId ? byId[pair.localCandidateId] : null;
+            if (local && local.candidateType) row.kind = local.candidateType;   // host / srflx / relay
+          }
+          if (rtp) {
+            if (typeof rtp.jitter === "number") row.jitter = Math.round(rtp.jitter * 1000);
+            const lost = rtp.packetsLost, got = rtp.packetsReceived;
+            if (typeof lost === "number" && typeof got === "number" && (lost + got) > 0) {
+              row.loss = Math.round((lost / (lost + got)) * 1000) / 10;        // 百分比,一位小數
+            }
+          }
+        } catch (e) { }
+        out.push(row);
+      }
+      return out;
     }
   };
 })();
