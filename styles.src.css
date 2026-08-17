@@ -246,9 +246,15 @@
   .mp-chip.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
 
   /* ---------- Panel ---------- */
+  /* ★★ 質感(v2.2.5):同一套「光從上方來」,但投影比結果卡弱一階 ——
+     它是頁面上常駐的底層容器,陰影跟蓋板一樣重的話整頁會糊成一團黑。
+     ⚠ 一樣一個 padding 都不准動(進場面板的高度在十四頁各有預算)。 */
   .panel{
-    width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
+    width:min(92vw,520px);
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0) 40%),var(--panel);
+    border:1px solid var(--panel-line);
     border-radius:20px;padding:16px;backdrop-filter:blur(10px);
+    box-shadow:0 1px 0 rgba(255,255,255,.11) inset,0 12px 30px -14px rgba(0,0,0,.5);
   }
   .subtitle{font-weight:800;font-size:15px;letter-spacing:.4px}
   .hint{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.5}
@@ -346,11 +352,21 @@
     flex:1;min-width:120px;border:0;border-radius:15px;padding:15px 16px;cursor:pointer;
     font-family:'Fredoka';font-weight:600;font-size:17px;transition:transform .15s, filter .2s;
   }
-  .btn:hover{transform:translateY(-2px)}
+  /* ⚠ hover 的位移要圈 (hover:hover) and (pointer:fine)(v2.2.5,同 .card-x 那條)——
+     觸控裝置點下去會發假 hover 且留在那個狀態,症狀是「按過的鈕從此浮高 2px」。
+     :active 不圈:那是真的按下去,觸控也要有回饋。 */
+  @media (hover:hover) and (pointer:fine){
+    .btn:hover{transform:translateY(-2px)}
+  }
   .btn:active{transform:translateY(0) scale(.98)}
-  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008}
+  /* ★★ 質感:主鈕的頂緣高光下在**白色 .28**(v2.2.5)—— 它的底是亮橘漸層,
+     用給暗色表面的 .13 完全看不出來。⚠ 投影要帶負擴散,不然橘光會整圈溢出來。 */
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008;
+    box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 6px 16px -6px rgba(0,0,0,.55)}
   :root[data-theme="midnight"] .btn.primary,:root[data-theme="arcade"] .btn.primary{color:var(--daub-ink)}
-  .btn.ghost{background:var(--panel);border:1px solid var(--panel-line);color:var(--text)}
+  .btn.ghost{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0) 55%),var(--panel);
+    border:1px solid var(--panel-line);color:var(--text);
+    box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 4px 12px -6px rgba(0,0,0,.5)}
 
   .status{width:min(92vw,520px);display:flex;justify-content:space-between;align-items:center;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:15px;padding:12px 16px}
@@ -358,8 +374,13 @@
   .status .lbl{color:var(--muted);font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
 
   /* ---------- Win overlay ---------- */
+  /* ⚠ 背板是**聚光燈**不是平塗的黑(v2.2.5):中央 .42 → 邊緣 .68。
+     平塗的話卡片四周跟畫面四角一樣暗,卡片等於沒有被「打光」;
+     中間留亮一點,眼睛自己就會往卡片上走。★ 這一手完全不花版面也不花效能
+     (同一層 background,沒有多一個節點)。 */
   .veil{position:fixed;inset:0;display:none;place-items:center;z-index:50;
-    background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:20px}
+    background:radial-gradient(125% 95% at 50% 45%,rgba(0,0,0,.42),rgba(0,0,0,.68));
+    backdrop-filter:blur(4px);padding:20px}
   /* 背板淡入(v2.2.1)。在這之前是 display:none → grid 直接跳:.55 的黑底連同 blur(4px)
      整片瞬間蓋上,卡片才慢慢彈進來 —— 十四頁的七種蓋板(結果卡 / 設定 / 表情 / 語音 /
      離開 / 踢人 / 房規)全部中招,而且是每一次開蓋板都看得到。
@@ -376,9 +397,32 @@
      使用者的回報是「按不到下面的『先看看牌桌』」:那顆鈕在卡的最後一列,是第一個掉出去的。
      ⚠ 高度用 calc(100dvh - 40px) 寫死而不是 max-height:100% —— 後者要靠 grid area
        的高度是 definite 才算得出來,寫死不必賭。40px = .veil 的上下 padding。 */
-  .win-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
+  /* ★★ 質感三件套(v2.2.5):微漸層 + 頂緣內高光 + 兩層投影。
+     ── 為什麼 ──────────────────────────────────────────────────────────────
+       在這之前這張卡是「平塗的半透明底 + 1px 框」,在深色盤面上讀起來就是一塊
+       比較亮的方塊 —— 沒有厚度、沒有邊緣、跟背景擠在同一個亮度帶。
+       使用者連續兩次的回報是「沒有多大的改進」,而那幾版改的全是**動畫**:
+       動畫是 200~900ms 的事,這張卡的表面才是他盯著看的那 99% 的時間。
+     ── 三件套各自在做什麼 ──────────────────────────────────────────────────
+       ① 由上而下的微漸層 → 光從上方來(整個介面的隱含光源),表面因此有方向
+       ② `inset 0 1px 0` 的頂緣高光 → **這一筆是「厚度」的來源**,少了它前兩件
+          都還是平的;它模擬的是卡片上緣被光打到的那條稜線
+       ③ 兩層投影(近景緊而深 + 遠景大而散)→ 單層投影看起來像貼紙,兩層才像浮著
+     ⚠⚠ **一個 padding / margin / font-size 都不准動**。這張卡是十四頁共用的,
+       而排七的結果卡底下還壓著一張 2~6 列的排名表 —— 一行多幾 px 就把「先看看牌桌」
+       那顆鈕推出畫面(notes/13 第十七節記過)。陰影與漸層**不佔版面空間**,
+       所以這一節安全;想「順便把內距調鬆一點」的話請先回去讀那一節。
+     ⚠ 漸層疊在 `var(--panel)` 上面(逗號的最後一層),不是取代它 ——
+       五個主題的底色差很多,寫死顏色會有主題整個走鐘。
+     ⚠ 投影用**負的擴散**(-12px / -4px):不縮的話陰影會從卡片四周整圈溢出來,
+       在小尺寸的確認框上看起來像發霉的黑邊。 */
+  .win-card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 42%),var(--panel);
+    border:1px solid var(--panel-line);border-radius:26px;
     padding:34px 30px;text-align:center;max-width:380px;backdrop-filter:blur(14px);
     max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;
+    box-shadow:0 1px 0 rgba(255,255,255,.13) inset,
+               0 18px 40px -12px rgba(0,0,0,.55),
+               0 4px 12px -4px rgba(0,0,0,.4);
     animation:popWin .34s cubic-bezier(.23,1,.32,1) .04s backwards}
   /* ⚠ 起點是 .94、不是 .7(v2.2.1 改)。`.7` 配上 1.56 的 overshoot,總擺幅超過 40% ——
      在結果卡上那叫歡慶,但同一條規則也套在**離開房間 / 認輸 / 踢人的確認框**上
@@ -416,13 +460,22 @@
   /* 連線計分:結果卡上的排行榜與「總冠軍」橫幅(標題→換行→大字顯示是誰→小字達標勝場) */
   .win-champ{display:flex;flex-direction:column;align-items:center;gap:3px;margin:2px 0 14px;line-height:1.2}
   .win-champ .champ-label{font-family:'Fredoka';font-weight:700;font-size:15px;color:var(--muted);letter-spacing:.5px}
+  /* ⚠ 光暈用 currentColor,不可以寫死顏色(v2.2.5)—— 這行的 color 是 var(--accent),
+     五個主題各不相同,寫死橘色的話在紫色 / 綠色主題上會變成一圈髒邊。
+     ★ 只加 text-shadow:純繪製,不佔版面(font-size / 行高一個字都沒動)。 */
   .win-champ .champ-name{font-family:'Fredoka';font-weight:700;font-size:clamp(24px,8vw,34px);color:var(--accent);
+    text-shadow:0 0 20px color-mix(in srgb,currentColor 45%,transparent);
     max-width:100%;overflow-wrap:anywhere}
   .win-champ .champ-goal{font-size:12.5px;font-weight:800;color:var(--muted);opacity:.85}
 
   .win-scores{width:100%;display:flex;flex-direction:column;gap:6px;margin:0 0 20px}
+  /* ⚠ 同上,只加漸層與內高光,不動 padding —— 這幾列是排七 / 大老二 / 21點 / 麻將
+     四頁的高度預算最緊的地方。★ 這裡的頂緣高光比卡片淡一階(.08 vs .13):
+     它是「卡片**上面**的一格」,比卡片本身亮的話層次就倒過來了。 */
   .win-scores .ws-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;
-    background:rgba(255,255,255,.08);border:1px solid var(--panel-line);font-weight:800;font-size:15px}
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015)),rgba(255,255,255,.05);
+    box-shadow:0 1px 0 rgba(255,255,255,.08) inset;
+    border:1px solid var(--panel-line);font-weight:800;font-size:15px}
   .win-scores .ws-row.lead{background:var(--accent);color:#1c1008;border-color:var(--accent)}
   .win-scores .ws-row.me{box-shadow:0 0 0 2px var(--accent-2)}
   .win-scores .ws-rank{flex:none;font-family:'Fredoka';opacity:.85;min-width:22px}
@@ -467,7 +520,14 @@
   .btn.danger:hover{filter:brightness(1.08)}
 
   /* ---------- Settings sheet ---------- */
-  .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
+  /* ⚠ 與 .win-card 同一族,質感三件套要一起給(v2.2.5)—— 只給結果卡的話,
+     開了設定就會覺得「這張卡沒跟上」,而那種不一致比兩張都平還明顯。
+     ⚠ 一樣一個 padding 都不准動(這張卡的高度已經被 max-height 夾著在捲)。 */
+  .set-card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 42%),var(--panel);
+    border:1px solid var(--panel-line);border-radius:26px;
+    box-shadow:0 1px 0 rgba(255,255,255,.13) inset,
+               0 18px 40px -12px rgba(0,0,0,.55),
+               0 4px 12px -4px rgba(0,0,0,.4);
     padding:22px 22px 24px;max-width:360px;width:100%;backdrop-filter:blur(14px);
     max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;   /* 螢幕不夠高時卡片內部可捲動,不再被切掉 */
     animation:pop .2s cubic-bezier(.23,1,.32,1) .04s backwards}
@@ -621,12 +681,21 @@
      ★ 這是「容器尺寸無關」的修法 —— 溢出量 ≈ 晶片寬 × 2%,名字越長溢得越多,
        單純加 padding 永遠會被更長的名字追上。 */
   .mp-players.oneline .mp-chip:first-child{transform-origin:left center}
+  /* ★★ 質感(v2.2.5):晶片是最低的一層,只給漸層 + 頂緣高光,**不給投影** ——
+     一排六個晶片各自帶影子的話那一列會變得很吵。
+     ⚠ box-shadow 會被 .mp-chip.tk-talking(綠光環)整條蓋掉,那是對的:
+       「誰在說話」比表面質感重要。 */
   .mp-chip{
-    display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.10);
+    display:flex;align-items:center;gap:7px;
+    background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.06));
+    box-shadow:0 1px 0 rgba(255,255,255,.10) inset;
     border:1px solid var(--panel-line);border-radius:999px;padding:6px 13px;font-weight:800;font-size:14px;
   }
   .mp-chip.clickable{cursor:pointer;transition:transform .1s,border-color .12s}
-  .mp-chip.clickable:hover{transform:translateY(-1px);border-color:var(--accent)}
+  /* ⚠ 同 .btn:hover,觸控的假 hover 會讓按過的晶片從此浮著(v2.2.5) */
+  @media (hover:hover) and (pointer:fine){
+    .mp-chip.clickable:hover{transform:translateY(-1px);border-color:var(--accent)}
+  }
   .mp-chip .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
   .mp-chip.ready .dot{background:var(--accent)}
   /* 本局完成線數:用底色膠囊包起來,和它前面純文字的 🏆 累積勝場明確區隔開 */

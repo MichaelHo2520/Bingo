@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 9d00759bedae0100341c12b4824c14f05a62e73d2eeb13c569fb6ffabf6d05da)
+    真相在 styles.src.css(sha256 fef2f448776c2c89a3d8e266cfd3feead15f9175cf9a8ea15b3a70d263c0be6b)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -120,8 +120,11 @@
   @keyframes tk-warn{0%,100%{opacity:1}50%{opacity:.55}}
   .mp-chip.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
   .panel{
-    width:min(92vw,520px);background:var(--panel);border:1px solid var(--panel-line);
+    width:min(92vw,520px);
+    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0) 40%),var(--panel);
+    border:1px solid var(--panel-line);
     border-radius:20px;padding:16px;backdrop-filter:blur(10px);
+    box-shadow:0 1px 0 rgba(255,255,255,.11) inset,0 12px 30px -14px rgba(0,0,0,.5);
   }
   .subtitle{font-weight:800;font-size:15px;letter-spacing:.4px}
   .hint{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.5}
@@ -197,22 +200,32 @@
     flex:1;min-width:120px;border:0;border-radius:15px;padding:15px 16px;cursor:pointer;
     font-family:'Fredoka';font-weight:600;font-size:17px;transition:transform .15s, filter .2s;
   }
-  .btn:hover{transform:translateY(-2px)}
+  @media (hover:hover) and (pointer:fine){
+    .btn:hover{transform:translateY(-2px)}
+  }
   .btn:active{transform:translateY(0) scale(.98)}
-  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008;
+    box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 6px 16px -6px rgba(0,0,0,.55)}
   :root[data-theme="midnight"] .btn.primary,:root[data-theme="arcade"] .btn.primary{color:var(--daub-ink)}
-  .btn.ghost{background:var(--panel);border:1px solid var(--panel-line);color:var(--text)}
+  .btn.ghost{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0) 55%),var(--panel);
+    border:1px solid var(--panel-line);color:var(--text);
+    box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 4px 12px -6px rgba(0,0,0,.5)}
   .status{width:min(92vw,520px);display:flex;justify-content:space-between;align-items:center;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:15px;padding:12px 16px}
   .status .big{font-family:'Fredoka';font-weight:700;font-size:20px}
   .status .lbl{color:var(--muted);font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
   .veil{position:fixed;inset:0;display:none;place-items:center;z-index:50;
-    background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:20px}
+    background:radial-gradient(125% 95% at 50% 45%,rgba(0,0,0,.42),rgba(0,0,0,.68));
+    backdrop-filter:blur(4px);padding:20px}
   .veil.show{display:grid;animation:veilIn .18s cubic-bezier(.23,1,.32,1)}
   @keyframes veilIn{from{opacity:0}to{opacity:1}}
-  .win-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
+  .win-card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 42%),var(--panel);
+    border:1px solid var(--panel-line);border-radius:26px;
     padding:34px 30px;text-align:center;max-width:380px;backdrop-filter:blur(14px);
     max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;
+    box-shadow:0 1px 0 rgba(255,255,255,.13) inset,
+               0 18px 40px -12px rgba(0,0,0,.55),
+               0 4px 12px -4px rgba(0,0,0,.4);
     animation:popWin .34s cubic-bezier(.23,1,.32,1) .04s backwards}
   @keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
   @keyframes popWin{
@@ -229,11 +242,14 @@
   .win-champ{display:flex;flex-direction:column;align-items:center;gap:3px;margin:2px 0 14px;line-height:1.2}
   .win-champ .champ-label{font-family:'Fredoka';font-weight:700;font-size:15px;color:var(--muted);letter-spacing:.5px}
   .win-champ .champ-name{font-family:'Fredoka';font-weight:700;font-size:clamp(24px,8vw,34px);color:var(--accent);
+    text-shadow:0 0 20px color-mix(in srgb,currentColor 45%,transparent);
     max-width:100%;overflow-wrap:anywhere}
   .win-champ .champ-goal{font-size:12.5px;font-weight:800;color:var(--muted);opacity:.85}
   .win-scores{width:100%;display:flex;flex-direction:column;gap:6px;margin:0 0 20px}
   .win-scores .ws-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;
-    background:rgba(255,255,255,.08);border:1px solid var(--panel-line);font-weight:800;font-size:15px}
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015)),rgba(255,255,255,.05);
+    box-shadow:0 1px 0 rgba(255,255,255,.08) inset;
+    border:1px solid var(--panel-line);font-weight:800;font-size:15px}
   .win-scores .ws-row.lead{background:var(--accent);color:#1c1008;border-color:var(--accent)}
   .win-scores .ws-row.me{box-shadow:0 0 0 2px var(--accent-2)}
   .win-scores .ws-rank{flex:none;font-family:'Fredoka';opacity:.85;min-width:22px}
@@ -262,7 +278,11 @@
   .confirm-title{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:8px}
   .btn.danger{background:#e03131;color:#fff}
   .btn.danger:hover{filter:brightness(1.08)}
-  .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
+  .set-card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 42%),var(--panel);
+    border:1px solid var(--panel-line);border-radius:26px;
+    box-shadow:0 1px 0 rgba(255,255,255,.13) inset,
+               0 18px 40px -12px rgba(0,0,0,.55),
+               0 4px 12px -4px rgba(0,0,0,.4);
     padding:22px 22px 24px;max-width:360px;width:100%;backdrop-filter:blur(14px);
     max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;
     animation:pop .2s cubic-bezier(.23,1,.32,1) .04s backwards}
@@ -378,11 +398,15 @@
   .mp-players.oneline .mp-chip{flex:none}
   .mp-players.oneline .mp-chip:first-child{transform-origin:left center}
   .mp-chip{
-    display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.10);
+    display:flex;align-items:center;gap:7px;
+    background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.06));
+    box-shadow:0 1px 0 rgba(255,255,255,.10) inset;
     border:1px solid var(--panel-line);border-radius:999px;padding:6px 13px;font-weight:800;font-size:14px;
   }
   .mp-chip.clickable{cursor:pointer;transition:transform .1s,border-color .12s}
-  .mp-chip.clickable:hover{transform:translateY(-1px);border-color:var(--accent)}
+  @media (hover:hover) and (pointer:fine){
+    .mp-chip.clickable:hover{transform:translateY(-1px);border-color:var(--accent)}
+  }
   .mp-chip .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
   .mp-chip.ready .dot{background:var(--accent)}
   .mp-chip .ln{font-family:'Fredoka';font-weight:700;font-size:12px;line-height:1;
