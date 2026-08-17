@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 0ebf78853d60ee4b339c5e53caa413d59c11684a5cb0cc8daba25bf3aa78a140)
+    真相在 styles.src.css(sha256 81832fa002ac3432b1256497f646dc6d289c57751e79b08f3dc160cc63c27b26)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4021,9 +4021,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   }
   .fc-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--c);
           box-shadow:0 0 0 1.5px rgba(255,255,255,.85);flex:none}
-  .fc-ct{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;
+  .fc-ct{display:inline-flex;align-items:center;font-size:11px;font-weight:800;
          color:var(--muted);background:rgba(0,0,0,.06);border-radius:8px;padding:1px 5px}
-  .fc-ct-ic{width:8px;height:8px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}
   .fc-result{margin:2px 0 12px}
   .fc-rank{width:100%;border-collapse:collapse;font-size:13px}
   .fc-rank th{font-size:11px;color:var(--muted);font-weight:800;padding:3px 4px;

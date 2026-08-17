@@ -94,7 +94,7 @@ const Solo = (function(){
   // 晶片尾巴:到家幾架 / 共幾架(連線那份在 adapter,措辭要一樣)
   function tailOf(s){
     if(!st) return "";
-    return '<span class="fc-ct" title="到家幾架"><i class="fc-ct-ic"></i>' +
+    return '<span class="fc-ct" title="到家幾架">' +
            FC.homeCount(st, s) + "/" + st.rules.goal + "</span>";
   }
 

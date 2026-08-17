@@ -523,7 +523,7 @@ const MP = MPCore.create((function(){
       if(!st) return "";
       const s = seatOf(id);
       if(s < 0 || s >= st.n) return "";
-      return '<span class="fc-ct" title="到家幾架"><i class="fc-ct-ic"></i>' +
+      return '<span class="fc-ct" title="到家幾架">' +
              FC.homeCount(st, s) + "/" + st.rules.goal + "</span>";
     },
     lobbyStatusText(ids){ return ids.length < 2 ? "等待其他人加入…" : "等待大家準備…"; },

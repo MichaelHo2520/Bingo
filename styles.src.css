@@ -8913,10 +8913,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* ---------- 晶片上的東西 ---------- */
   .fc-dot{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--c);
           box-shadow:0 0 0 1.5px rgba(255,255,255,.85);flex:none}
-  .fc-ct{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;
+  /* ⚠ 這一格裡**只有數字**(到家/目標)。v2.3.7 之前前面還掛一顆空心圓當「到家」的圖示,
+     使用者回報「名字與數字中間有一顆小 o,看不懂」→ 整顆拿掉:數字本身已經說完了,
+     而 title 也寫著「到家幾架」。所以這裡不需要 gap(只剩一個文字節點)。 */
+  .fc-ct{display:inline-flex;align-items:center;font-size:11px;font-weight:800;
          color:var(--muted);background:rgba(0,0,0,.06);border-radius:8px;padding:1px 5px}
-  /* ⚠ 這一顆是「到家」的記號,不可以做成三角形 —— 那與盤面上「可以跳」的意思會混在一起 */
-  .fc-ct-ic{width:8px;height:8px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}
 
   /* ---------- 結果卡 ---------- */
   .fc-result{margin:2px 0 12px}
