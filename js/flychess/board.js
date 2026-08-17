@@ -62,29 +62,45 @@ const FCB = (function(){
 
   /* 這一頁的音效。★ 走 Sound.tone()(audio.js 開給各遊戲寫自己樂句的入口)——
      吃靜音開關與總音量,不必自己管。⚠ 走一格的 tick 要**很輕**:一手可能連走六格,
-     用一般音量會變成連珠炮。 */
+     用一般音量會變成連珠炮。
+
+     ⚠⚠⚠ **基頻一律待在 600Hz 以上,要「厚」靠往下滑(slideTo)而不是把基頻壓低。**
+       第一版的骰子 rattle 寫在 150~260Hz、踩人的低頻厚度寫在 95Hz —— 在耳機上很飽滿,
+       **在手機喇叭上等於沒有**:小喇叭放不出那一段。使用者的回報就是這一條:
+       「我沒有感覺到骰子音效」(而且那時聲音**確實有播**,是聽不到不是沒響)。
+       量法:OfflineAudioContext 照 tone() 的包絡渲染一遍 → 過兩級 500Hz 高通(≈ 小喇叭
+       的低頻滾降)→ 比總能量。以「輪到你」那顆(最明顯的一顆)當 1.00 量到:
+         走格 tick 0.008 · 舊的整趟擲骰 **0.118** · 第一版的 plop **0.02**(等於靜音)
+         → 現在:整趟擲骰 **1.876**、撞擊 1.02、彈飛 0.55、落地 0.34。
+       數字與量法見 notes/22 第 12.1 節。**改任何一顆之前先照那個方法量,不要靠耳機聽。** */
   const SFX = {
     tick(){ T(1040, { type: "square", dur: 0.030, vol: 0.055 }); },
     jump(){ T(660, { type: "triangle", dur: 0.11, vol: 0.16, slideTo: 1180 }); },
     fly(){ T(300, { type: "sawtooth", dur: 0.38, vol: 0.10, slideTo: 1500 });
            T(760, { type: "sine", dur: 0.22, vol: 0.10, delay: 0.16, slideTo: 1320 }); },
     /* 踩人的三聲,與畫面的三段一一對上(由一聲擴成三聲)——
-       只有一聲「咚」的話,後面 1 秒的翻滾與落地在聽覺上是靜音的。 */
-    eat(){ T(520, { type: "square", dur: 0.05, vol: 0.24, slideTo: 90 });      // 撞上去
-           T(95,  { type: "triangle", dur: 0.30, vol: 0.26, delay: 0.01 });    // 低頻的實心感
-           T(260, { type: "sawtooth", dur: 0.20, vol: 0.11, delay: 0.02, slideTo: 62 }); },
-    eject(){ T(1500, { type: "sine", dur: 0.46, vol: 0.13, slideTo: 240 });    // 被彈飛的呼嘯
-             T(700,  { type: "triangle", dur: 0.38, vol: 0.08, delay: 0.05, slideTo: 170 }); },
-    plop(){ T(300, { type: "triangle", dur: 0.09, vol: 0.15, slideTo: 150 });  // 掉回機場
-            T(160, { type: "sine", dur: 0.15, vol: 0.13, delay: 0.04 }); },
+       只有一聲「咚」的話,後面 1 秒的翻滾與落地在聽覺上是靜音的。
+       ★ 撞擊是全場最大的一聲(= 輪到你那顆的 1.02 倍):一局只有幾次,而且是這個遊戲
+         唯一「對某一個人做壞事」的瞬間。 */
+    eat(){ T(1200, { type: "square", dur: 0.06, vol: 0.30, slideTo: 300 });     // 撞上去的脆響
+           T(520,  { type: "triangle", dur: 0.28, vol: 0.30, delay: 0.01, slideTo: 210 }); // 厚度(靠下滑,不靠低基頻)
+           T(2200, { type: "sawtooth", dur: 0.14, vol: 0.13, slideTo: 700 }); },// 碎裂
+    eject(){ T(2000, { type: "sine", dur: 0.45, vol: 0.15, slideTo: 520 });     // 被彈飛的呼嘯
+             T(1200, { type: "triangle", dur: 0.38, vol: 0.10, delay: 0.05, slideTo: 420 }); },
+    plop(){ T(900,  { type: "triangle", dur: 0.10, vol: 0.20, slideTo: 420 });  // 掉回機場
+            T(1400, { type: "sine", dur: 0.14, vol: 0.16, delay: 0.04, slideTo: 700 }); },
     /* 骰子:**轉的那 0.6 秒本來完全沒有聲音** —— 使用者:「骰子應該要有點音效」。
-       ⚠ rattle 一次擲會響七下,音量必須壓得比 tick 還克制(同一條「連珠炮」的規矩);
-         音高刻意每下不一樣,一樣的話聽起來像卡帶而不像骰子在杯子裡滾。 */
-    rattle(k){ T(150 + (k % 3) * 55, { type: "square", dur: 0.026, vol: 0.075 }); },
-    dice(){ T(240, { type: "square", dur: 0.07, vol: 0.20, slideTo: 95 });     // 落桌
-            T(900, { type: "triangle", dur: 0.10, vol: 0.15, delay: 0.02, slideTo: 1400 }); },
+       ⚠⚠ 第一版加了 rattle,使用者**還是說沒聽到** —— 不是沒響,是放在 150~260Hz
+         聽不到(見上面那條 600Hz 的規矩)。現在整趟擲骰是舊版的 16 倍能量。
+       ⚠ rattle 一次擲會響七下 → 單響控在「輪到你」的 5~6%(約走格 tick 的七倍),
+         夠清楚又不會變連珠炮;音高每下不同,一樣的話聽起來像卡帶而不像骰子在滾。 */
+    rattle(k){ const f = 1500 + (k % 3) * 260;
+               T(f, { type: "square", dur: 0.042, vol: 0.15, slideTo: f * 0.5 }); },
+    dice(){ T(1050, { type: "square", dur: 0.075, vol: 0.30, slideTo: 420 });   // 落桌那一記
+            T(620,  { type: "triangle", dur: 0.16, vol: 0.22, delay: 0.01, slideTo: 380 }); // 木頭的厚度
+            T(1900, { type: "triangle", dur: 0.11, vol: 0.22, delay: 0.03, slideTo: 2500 }); },
     // 擲到 6 = 「可以再擲一次」,給它一個聽得出來的向上兩音(規則本身的回饋)
-    six(){ [988, 1319].forEach((f, i) => T(f, { type: "sine", dur: 0.13, vol: 0.16, delay: 0.09 + i * 0.08 })); },
+    six(){ [988, 1319].forEach((f, i) => T(f, { type: "sine", dur: 0.13, vol: 0.20, delay: 0.09 + i * 0.08 })); },
     home(){ [659, 880, 1175].forEach((f, i) => T(f, { type: "sine", dur: 0.18, vol: 0.20, delay: i * 0.07 })); },
     launch(){ T(360, { type: "triangle", dur: 0.20, vol: 0.18, slideTo: 900 }); }
   };
