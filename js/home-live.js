@@ -413,7 +413,7 @@ const HomeLive = (function(){
     return (typeof FIREBASE_CONFIG!=="undefined" && FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL) || "";
   }
 
-  /* ---------- REST 併發閘(v2.1.0)----------
+  /* ---------- REST 併發閘(v2.2.2)----------
      ★ 這個面板原本**整串序列 await**:game_stats → 十四個遊戲一個接一個 → 每個遊戲裡再
        一間房一間房地讀 createdAt / 整包房間資料。十四個遊戲 × 最多 60 間 = 幾百趟往返
        排成一直線,行動網路一趟 150~300ms → 開一次面板要等好幾十秒,而且那期間
@@ -507,11 +507,59 @@ const HomeLive = (function(){
      ⚠ 上限仍然是各 30 間 —— 而且**要在畫面上講清楚被截掉幾間**
        (CLAUDE.md 紅線 17:靜靜截斷會讀成「就這些」)。 */
   const SV_MAX=30;
+
+  /* ==========================================================================
+     已關閉的房間:**絕不整包讀**
+     ──────────────────────────────────────────────────────────────────────────
+     > 使用者:「我們抓伺服器狀態,有需要把整個房間全部的內容都抓回來嗎?」—— 不需要。
+
+     這個面板一間房只顯示四樣:房名 / 誰開的 / 幾個人 / 什麼時候開的(見 svRoomHtml)。
+     而整包裡最大的是 `game`(deal + moves)與 extraNodes(你畫我猜的 ink+say、
+     數獨與消消樂的 progress、台灣麻將的 tai)—— **一間斷線殘留的你畫我猜約 40 KB**,
+     而我們真正要的那四樣加起來 300 B。實測 20 間(其中 2 間是那種)是 85 KB,
+     其中 94% 是那兩間的筆劃資料。
+
+     ⚠ REST **沒有「只取某幾個欄位」的查詢**(`shallow` 只回 key 名、`orderBy` 只能篩
+       不能投影),所以只有兩種形狀:整包一顆,或一個欄位一顆。做法是先花一顆
+       `shallow` 探這間房有哪些 key(~100 B),再決定走哪一種:
+         · **瘦房間**(正常按「離開房間」關的)→ **整包讀一顆就好**。leave() 已經把
+           game / players / extraNodes / rtc 全部清成 null,整包本來就只有 300 B,
+           拆成五顆反而白花四趟往返。
+         · **肥房間**(斷線 / 直接關分頁殘留)→ 只挑白名單裡**存在**的欄位各讀一顆。
+
+     ★★★ 判準是「有沒有 `game` 這個 key」,而這條是從 leave() 的清理契約推出來的:
+       那一包 `update({host:null, players:null, game:null, …extraNodes:null, rtc:null})`
+       是**原子的** → `game` 不見了就代表其他幾包也一起清了 →
+       **沒有 game = 這間房已經被清乾淨,整包讀是安全的**。
+     ⚠ `emotes` / `rtc` 是保險而不是判準:emotes 靠 `onDisconnect` + 15 秒自刪,
+       理論上不會留下來,但**一則 6 秒語音留言是 128 KB 的 base64**,萬一留下來
+       那一顆的成本就全在它身上。後面四個 extraNode 名字是再一層保險
+       (它們一定與 game 同進同出,列著不花錢;新遊戲的新 extraNode 漏列也沒關係,
+       因為那種房間一定同時有 game)。
+     ★ `closedAt` **刻意不讀**:抓了但畫面上從來沒顯示過(svRoomHtml 只用到
+       live / name / host / who / at / status)。
+     ========================================================================== */
+  const SV_WANT=["roomName","createdAt","hostName","host","players","scores"];
+  const SV_FAT=["game","emotes","rtc","ink","say","progress","tai"];
+  async function svStaleInfo(g,code){
+    const path=g.rooms+"/"+code;
+    const keys=Object.keys(await svTry(path,"shallow=true",{}));
+    let d=null;
+    if(keys.length){
+      if(!keys.some(k=>SV_FAT.indexOf(k)>=0)){
+        d=await svTry(path,"",null);                        // 瘦的:一顆整包
+      }else{
+        const want=SV_WANT.filter(k=>keys.indexOf(k)>=0);    // 肥的:只挑要的那幾個欄位
+        const vals=await Promise.all(want.map(k=>svTry(path+"/"+k,"",null)));
+        d={}; want.forEach((k,i)=>{ d[k]=vals[i]; });
+      }
+    }
+    return { code, live:false, name:(d&&d.roomName)||("房間 "+code), host:svHost(d),
+             who:svWho(d), at:(d&&d.createdAt)||0 };
+  }
+
   /* ⚠ 全部走 Promise.all(排隊上限交給 svRun)—— 這一支原本是三層巢狀的循序 await,
-       那是「開面板要等好幾十秒」的主因(見上面 SV_CONC 那段)。
-     ⚠ 已關閉的房間仍然是**整包**讀:那一包含 deal + moves(你畫我猜還有筆劃),
-       單間可能到數十 KB。REST 沒有「只取某幾個欄位」的查詢,拆成 7 個子路徑反而是
-       7 倍的往返 → 這裡選擇維持整包、改用併發把等待時間攤平。 */
+       那是「開面板要等好幾十秒」的主因(見上面 SV_CONC 那段)。 */
   async function svLoadGame(g,statsN,talkN){
     const [idx,rms]=await Promise.all([
       svTry(g.index,"",{}),
@@ -521,20 +569,15 @@ const HomeLive = (function(){
     const liveCodes=idxKeys.slice(0,SV_MAX);
     const staleCodes=rmKeys.filter(c=>idxKeys.indexOf(c)<0);
     const staleTop=staleCodes.slice(0,SV_MAX);
-    const [ats,ds]=await Promise.all([
+    const [ats,staleInfo]=await Promise.all([
       Promise.all(liveCodes.map(c=>svTry(g.rooms+"/"+c+"/createdAt","",0))),
-      Promise.all(staleTop.map(c=>svTry(g.rooms+"/"+c,"",null)))
+      Promise.all(staleTop.map(c=>svStaleInfo(g,c)))
     ]);
     const rooms=[];
     liveCodes.forEach((code,i)=>{
       const r=idx[code]||{};
       rooms.push({ code, live:true, name:r.name||("房間 "+code), host:r.host||"",
                    who:r.count||0, status:r.status||"", at:ats[i]||0 });
-    });
-    const staleInfo=staleTop.map((code,i)=>{
-      const d=ds[i];
-      return { code, live:false, name:(d&&d.roomName)||("房間 "+code), host:svHost(d),
-               who:svWho(d), at:(d&&d.createdAt)||0, closed:(d&&d.closedAt)||0 };
     });
     staleInfo.forEach(it=>rooms.push(it));
     // 新開的排前面(時間不明的排最後)
@@ -601,7 +644,7 @@ const HomeLive = (function(){
   }
 
   /* 打開面板時抓一次快照就好(比照 fetchRank 的一次性讀取),不掛常駐監聽 —— 這是給自己排查用,不必即時。
-     ★★ v2.1.0 漸進渲染:一拿到 game_stats 就先把十四列骨架畫出來,十四個遊戲**同時**去讀,
+     ★★ v2.2.2 漸進渲染:一拿到 game_stats 就先把十四列骨架畫出來,十四個遊戲**同時**去讀,
        誰先回來誰先就地換成正式那一列,頂上那行同步報「讀取中 5 / 14」。
        原本是全部讀完才一次 innerHTML → 中間那幾十秒畫面完全空白,使用者的回報是「以為死掉了」。
      ⚠ 排序(有資料的排前面)得等全部讀完才知道,所以骨架照 GAMES 原順序、**最後才重排一次**。
