@@ -182,12 +182,22 @@
        與橫向的還原那兩條同權重、在後面 → 它們照樣贏,大牌桌與橫向的行為一行都不變。 */
   body.mp-on .row:has(> .tools-docked .tk-btn){padding-right:168px}
   .tools.tools-docked{position:absolute;right:0;top:50%;transform:translateY(-50%);flex:none}
+  /* ⚠ 這幾顆是**全站最常出現**的元件(頂列的 ⛶ / ⚙️ / 返回 / 語音),
+     v2.2.5 那一批漏了它們 —— 卡片與按鈕都有厚度了、頂列還是平的,反而更顯眼。
+     漸層邊框的三層寫法見 .win-card(v2.2.6)。 */
   .icon-btn{
     width:42px;height:42px;border-radius:13px;border:1px solid var(--panel-line);
-    background:var(--panel);color:var(--text);font-size:19px;cursor:pointer;
+    background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 58%),var(--panel);
+    box-shadow:0 1px 0 rgba(255,255,255,.24) inset,
+               0 -1px 0 rgba(0,0,0,.20) inset,
+               0 4px 10px -5px rgba(0,0,0,.5);
+    color:var(--text);font-size:19px;cursor:pointer;
     display:grid;place-items:center;backdrop-filter:blur(6px);transition:transform .15s, background .2s;
   }
-  .icon-btn:hover{transform:translateY(-2px)}
+  /* ⚠ 同 .btn / .mp-chip:觸控的假 hover 會讓按過的鈕從此浮著(v2.2.6 補) */
+  @media (hover:hover) and (pointer:fine){
+    .icon-btn:hover{transform:translateY(-2px)}
+  }
   .icon-btn:active{transform:scale(.94)}
   .icon-btn.active{background:var(--accent);border-color:var(--accent)}
   .icon-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
@@ -251,10 +261,12 @@
      ⚠ 一樣一個 padding 都不准動(進場面板的高度在十四頁各有預算)。 */
   .panel{
     width:min(92vw,520px);
-    background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,0) 40%),var(--panel);
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0) 44%),var(--panel);
     border:1px solid var(--panel-line);
     border-radius:20px;padding:16px;backdrop-filter:blur(10px);
-    box-shadow:0 1px 0 rgba(255,255,255,.11) inset,0 12px 30px -14px rgba(0,0,0,.5);
+    box-shadow:0 1px 0 rgba(255,255,255,.20) inset,
+               0 -1px 0 rgba(0,0,0,.18) inset,
+               0 14px 34px -14px rgba(0,0,0,.55);
   }
   .subtitle{font-weight:800;font-size:15px;letter-spacing:.4px}
   .hint{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.5}
@@ -364,9 +376,16 @@
   .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#1c1008;
     box-shadow:0 1px 0 rgba(255,255,255,.28) inset,0 6px 16px -6px rgba(0,0,0,.55)}
   :root[data-theme="midnight"] .btn.primary,:root[data-theme="arcade"] .btn.primary{color:var(--daub-ink)}
-  .btn.ghost{background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0) 55%),var(--panel);
+  /* ⚠⚠ 次按鈕**坐在卡片上**,而卡片跟它同樣是 var(--panel) —— 兩塊同色的面疊在一起,
+     光靠一圈邊框撐不出「這是另一塊表面」。所以它的面要**自己提亮一階**
+     (.14 起,比卡片的 .085 亮)。★ 判準:把畫面縮到 25% 瞇著眼看,
+     這顆鈕還要能從卡片上「跳出來」。
+     ⚠ 斜面的兩條 inset 與那條「顏色只能放最後一層」的坑見 .win-card(v2.2.6)。 */
+  .btn.ghost{background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.045) 60%),var(--panel);
     border:1px solid var(--panel-line);color:var(--text);
-    box-shadow:0 1px 0 rgba(255,255,255,.10) inset,0 4px 12px -6px rgba(0,0,0,.5)}
+    box-shadow:0 1px 0 rgba(255,255,255,.26) inset,
+               0 -1px 0 rgba(0,0,0,.20) inset,
+               0 5px 14px -6px rgba(0,0,0,.55)}
 
   .status{width:min(92vw,520px);display:flex;justify-content:space-between;align-items:center;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:15px;padding:12px 16px}
@@ -416,13 +435,27 @@
        五個主題的底色差很多,寫死顏色會有主題整個走鐘。
      ⚠ 投影用**負的擴散**(-12px / -4px):不縮的話陰影會從卡片四周整圈溢出來,
        在小尺寸的確認框上看起來像發霉的黑邊。 */
-  .win-card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 42%),var(--panel);
+  /* ★★★ 斜面 + 環境光暈(v2.2.6)。
+     ⚠⚠⚠ **`background` 簡寫裡顏色只能放最後一層** —— 這一節試過用三層
+       (`漸層 padding-box, var(--panel) padding-box, 漸層 border-box`)做「漸層邊框」,
+       顏色放在中間 → **整條宣告無效被丟棄**,而且是**靜靜地**:
+       卡片連底色與邊框一起消失,只剩 box-shadow 撐著,截圖上還很像「變精緻了」。
+       ★ 抓法:`getComputedStyle(el).backgroundImage === "none"` —— 值明明寫了卻是 none,
+         就是整條被丟掉了。⚠ 眼睛看不出來,因為 box-shadow 是另一個屬性、照常生效。
+     ★ 所以「上緣被光打到」改用**斜面**做,可靠而且零風險:
+       亮的上緣內陰影 + 暗的下緣內陰影,上下不對稱就是「厚度」。
+       ⚠ 兩條要一起,只留上面那條的話下緣會虛掉、卡片像浮在半空的紙。
+     ★ 環境光暈 `0 0 90px -30px var(--accent)`:讓卡片看起來是**被照亮的**,不只是浮著。
+       ⚠ 負擴散 -30px 不可省,不然整片橘光會漫到畫面邊緣。 */
+  .win-card{background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,0) 46%),var(--panel);
     border:1px solid var(--panel-line);border-radius:26px;
     padding:34px 30px;text-align:center;max-width:380px;backdrop-filter:blur(14px);
     max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;
-    box-shadow:0 1px 0 rgba(255,255,255,.13) inset,
-               0 18px 40px -12px rgba(0,0,0,.55),
-               0 4px 12px -4px rgba(0,0,0,.4);
+    box-shadow:0 1px 0 rgba(255,255,255,.24) inset,
+               0 -1px 0 rgba(0,0,0,.22) inset,
+               0 0 90px -30px var(--accent),
+               0 22px 48px -14px rgba(0,0,0,.6),
+               0 5px 14px -5px rgba(0,0,0,.45);
     animation:popWin .34s cubic-bezier(.23,1,.32,1) .04s backwards}
   /* ⚠ 起點是 .94、不是 .7(v2.2.1 改)。`.7` 配上 1.56 的 overshoot,總擺幅超過 40% ——
      在結果卡上那叫歡慶,但同一條規則也套在**離開房間 / 認輸 / 踢人的確認框**上
@@ -523,11 +556,15 @@
   /* ⚠ 與 .win-card 同一族,質感三件套要一起給(v2.2.5)—— 只給結果卡的話,
      開了設定就會覺得「這張卡沒跟上」,而那種不一致比兩張都平還明顯。
      ⚠ 一樣一個 padding 都不准動(這張卡的高度已經被 max-height 夾著在捲)。 */
-  .set-card{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,0) 42%),var(--panel);
+  /* ⚠ 斜面的寫法與那條「顏色只能放最後一層」的坑見 .win-card(v2.2.6)。
+     這張卡**不給 accent 光暈** —— 它是工具卡(設定 / 表情 / 房規),不是慶祝的時刻,
+     染上主色會變得很吵。 */
+  .set-card{background:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,0) 46%),var(--panel);
     border:1px solid var(--panel-line);border-radius:26px;
-    box-shadow:0 1px 0 rgba(255,255,255,.13) inset,
-               0 18px 40px -12px rgba(0,0,0,.55),
-               0 4px 12px -4px rgba(0,0,0,.4);
+    box-shadow:0 1px 0 rgba(255,255,255,.24) inset,
+               0 -1px 0 rgba(0,0,0,.22) inset,
+               0 22px 48px -14px rgba(0,0,0,.6),
+               0 5px 14px -5px rgba(0,0,0,.45);
     padding:22px 22px 24px;max-width:360px;width:100%;backdrop-filter:blur(14px);
     max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;   /* 螢幕不夠高時卡片內部可捲動,不再被切掉 */
     animation:pop .2s cubic-bezier(.23,1,.32,1) .04s backwards}
@@ -8505,11 +8542,110 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .fc-plane.hop svg{transform:scale(1.22)}
   .fc-plane.flying{z-index:9}
   .fc-plane.flying svg{transform:scale(1.35) rotate(-12deg)}
-  .fc-plane.eaten{z-index:9;animation:fcHit .42s ease-in-out}
   @keyframes fcPulse{0%,100%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}
                      50%{filter:drop-shadow(0 0 6px rgba(255,255,255,.95))}}
-  @keyframes fcHit{0%,100%{transform-origin:center}
-                   25%{filter:brightness(2.2)}75%{filter:brightness(2.2)}}
+
+  /* ---------- 被踩掉:挨打 → 彈飛 → 落地(v2.2.6 重做)----------
+     使用者:「飛機被踩掉的動畫太差了,應該做的再誇張一點,時間長一點點沒關係」。
+     ⚠⚠⚠ **會動的一律是裡面那個 <svg>,不可以動 .fc-plane 自己的 transform** ——
+       飛機的**位置**就住在 .fc-plane 的 transform 上(board.js 的 place() 每一步都在寫它),
+       在同一個屬性上再掛一支動畫 = 兩邊互相蓋掉:症狀是飛機瞬間跳到盤面左上角
+       (動畫贏的時候)或整段動畫像沒發生過(transition 贏的時候)。
+       ⚠ v2.2.6 之前那支 fcHit 只動 filter,正是為了閃開這一條 —— 現在改成「大動作
+         全部放進 svg,位移仍然只由 place() 負責」,兩者永遠不會碰到同一個屬性。
+     ★ 三段接得起來的關鍵是**首尾對齊**:上一段的 100% 就是下一段的 0%
+       (挨打停在 scale(1.2) rotate(6deg) → 彈飛從那裡開始)。對不齊就會有一格閃跳。
+     ★ 翻滾停在 720deg = 剛好兩整圈,所以落地那一段從 rotate(0) 起算看起來是連續的。 */
+  .fc-plane.eaten,.fc-plane.eject,.fc-plane.plop{z-index:11}
+  .fc-plane.eaten svg{animation:fcHit .3s cubic-bezier(.2,.9,.3,1) both}
+  @keyframes fcHit{
+    0%{transform:scale(1) rotate(0);filter:brightness(1)}
+    16%{transform:scale(1.6) rotate(-18deg);filter:brightness(3.4) drop-shadow(0 0 8px #fff)}
+    40%{transform:scale(1.15) rotate(15deg);filter:brightness(2.4) drop-shadow(0 0 5px #fff)}
+    68%{transform:scale(1.36) rotate(-10deg);filter:brightness(1.7)}
+    100%{transform:scale(1.2) rotate(6deg);filter:brightness(1.35)}}
+  /* 彈飛:位移由 place() 用 MS_EJECT 的 transition 帶,這裡只負責「一路翻滾兩圈 + 縮小」。
+     ⚠ 位移的曲線刻意**不做尾端過衝**:終點是角落的機場,衝過頭就是飛出盤子邊界
+       → .fc-stage(overflow:auto)冒捲軸 → fitBoard 縮一階(同 .fc-fx 那一段)。 */
+  .fc-plane.eject{transition-timing-function:cubic-bezier(.3,.85,.25,1)}
+  .fc-plane.eject svg{animation:fcEject .7s cubic-bezier(.3,.5,.4,1) both}
+  @keyframes fcEject{
+    0%{transform:scale(1.2) rotate(6deg);filter:brightness(1.35)}
+    35%{transform:scale(.78) rotate(280deg);filter:brightness(1.1)}
+    100%{transform:scale(.9) rotate(720deg);filter:brightness(1)}}
+  /* 落地:壓扁再彈回來(回彈的 overshoot 在 svg 上,盒子沒動 → 不會撐大盤面) */
+  .fc-plane.plop svg{animation:fcPlop .26s cubic-bezier(.2,1.5,.4,1) both}
+  @keyframes fcPlop{
+    0%{transform:scale(.9)}
+    40%{transform:scale(1.3,.74)}
+    72%{transform:scale(.93,1.08)}
+    100%{transform:scale(1)}}
+  /* 踩人的那一架自己也踏一下 —— 看得出「是誰幹的」,而不是受害者莫名其妙飛走 */
+  .fc-plane.stomp{z-index:12}
+  .fc-plane.stomp svg{animation:fcStomp .3s cubic-bezier(.2,1.3,.4,1) both}
+  @keyframes fcStomp{
+    0%{transform:scale(1)}
+    22%{transform:scale(1.34,.76)}
+    55%{transform:scale(.94,1.12)}
+    100%{transform:scale(1)}}
+
+  /* ---------- 撞擊特效層(v2.2.6)----------
+     ⚠⚠ **overflow:hidden 是這一層存在的理由,不是順手加的。** 火花會噴出一格多,
+       而踩人常常發生在最外圈(貼著盤子的邊)—— 噴出去的部分會撐大 .fc-stage
+       (overflow:auto)的捲動範圍 → 冒出捲軸,而 fitBoard() 量的就是 stage 的可用空間
+       → 縮一階 → 捲軸消失 → 又放大(跳棋那條「捲軸自己震盪」的同構)。
+       關在自己的盒子裡之後,盤面上其他會超出邊界的東西(飛機的光暈、飛行時放大的機身)
+       一個都不必動。
+     ★ z-index 4 = 壓在飛機(5 起跳)**底下** —— 特效是背景的光,不可以蓋住主角。 */
+  .fc-fx{left:0;top:0;width:100%;height:100%;overflow:hidden;border-radius:20px;
+         pointer-events:none;z-index:4}
+  /* 爆點本身是個沒有大小的座標(左上角 + 半格 = 格子中心),底下三種零件各自以它為圓心 */
+  .fc-boom{position:absolute;width:0;height:0}
+  .fc-boom > i{position:absolute;left:0;top:0;display:block}
+  .fc-flash{width:calc(var(--fc-cell) * 2.4);height:calc(var(--fc-cell) * 2.4);
+            margin:calc(var(--fc-cell) * -1.2) 0 0 calc(var(--fc-cell) * -1.2);border-radius:50%;
+            background:radial-gradient(circle,rgba(255,255,255,.95) 0 32%,rgba(255,214,107,.55) 55%,rgba(255,214,107,0) 72%);
+            animation:fcFlash .34s ease-out both}
+  @keyframes fcFlash{0%{transform:scale(.28);opacity:1}100%{transform:scale(1);opacity:0}}
+  .fc-ring{width:var(--fc-cell);height:var(--fc-cell);
+           margin:calc(var(--fc-cell) * -.5) 0 0 calc(var(--fc-cell) * -.5);border-radius:50%;
+           border:calc(var(--fc-cell) * .14) solid rgba(255,255,255,.95);
+           animation:fcRing .52s cubic-bezier(.14,.7,.3,1) both}
+  @keyframes fcRing{0%{transform:scale(.25);opacity:1}100%{transform:scale(2.6);opacity:0}}
+  /* 八道火花。--a 由 board.js 逐個掛上去(角度是靜態值,所以 transform 內插得動) */
+  .fc-spark{width:calc(var(--fc-cell) * .15);height:calc(var(--fc-cell) * .4);
+            margin:calc(var(--fc-cell) * -.2) 0 0 calc(var(--fc-cell) * -.075);border-radius:99px;
+            background:linear-gradient(#fff,#ff9f1c);
+            animation:fcSpark .5s cubic-bezier(.16,.72,.3,1) both}
+  @keyframes fcSpark{
+    0%{transform:rotate(var(--a,0deg)) translateY(0) scaleY(.4);opacity:0}
+    14%{opacity:1}
+    100%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -1.05)) scaleY(1.15);opacity:0}}
+
+  /* 盤面挨一記。
+     ⚠⚠ **只准縮不准放,而且平移量必須 <(1−scale)/2**(百分比是元素自己的邊長)——
+       這樣位移後的外框永遠留在原本那個框裡面,一個像素都不會外溢。
+       盤子的大小是 fitBoard() 量剛好的:往外長一點點就讓 .fc-stage 冒出捲軸,
+       而捲軸一出現就會被下一次 fitBoard 量到 → 盤面縮一階 → 捲軸消失 → 又放大。
+       ⚠ 這也是為什麼不用 rotate:正方形轉 1 度,外框就長了 sin1°×邊長。 */
+  .fc-board.fc-quake{animation:fcQuake .42s cubic-bezier(.2,.7,.3,1)}
+  @keyframes fcQuake{
+    0%{transform:translate(0,0) scale(1)}
+    8%{transform:translate(1.8%,-1.2%) scale(.955)}
+    20%{transform:translate(-1.5%,1%) scale(.962)}
+    32%{transform:translate(1%,.8%) scale(.975)}
+    46%{transform:translate(-.6%,-.5%) scale(.985)}
+    60%{transform:translate(.25%,.2%) scale(.994)}
+    100%{transform:translate(0,0) scale(1)}}
+
+  /* 會動的東西一律尊重系統的「減少動態效果」。
+     ★ 只關掉**大範圍**的那兩樣(整塊盤面在震、滿天飛的火花)——
+       飛機自己的挨打 / 翻滾是**在講規則**(誰被踩掉了、他回機場了),關掉就看不懂了。 */
+  @media (prefers-reduced-motion:reduce){
+    .fc-board.fc-quake{animation:none}
+    .fc-spark{display:none}
+    .fc-flash,.fc-ring{animation-duration:.2s}
+  }
 
   /* ---------- 骰子 ----------
      ⚠ 點數是**別人給的**(住在 moves 裡),這裡只負責演;.rolling 期間顯示的那幾面
