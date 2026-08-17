@@ -813,6 +813,25 @@ const DC = (function(){
   }
   const blockedBetween = (st, a, b) => screensBetween(st, a, b) > 0;
 
+  /* 兩格之間**那一顆**擋著的子在哪 —— 也就是炮的「炮架 / 跳板」。
+     不同線 / 中間沒有子 / 中間不只一顆,一律回 -1。
+     ⚠⚠ 這一支只看「那一格有沒有東西」(occupied),**完全不碰 cells[i].p** ——
+       所以拿它去標跳板不違反牌情紅線(位置本來就是公開資訊,底下是什麼一個字都沒讀)。
+     ★ 為什麼放在規則層而不是 board.js 自己數:射線的走法(ray / 同行同列 / 步進)已經
+       在這裡了,畫面那邊再寫一份遲早會與 paoTargets() 走鐘,而且走鐘了兩邊都不會壞。 */
+  function screenIdx(st, a, b){
+    if(screensBetween(st, a, b) !== 1) return -1;
+    const ra = rowOf(a), ca = colOf(a), rb = rowOf(b), cb = colOf(b);
+    const dr = Math.sign(rb - ra), dc = Math.sign(cb - ca);
+    let r = ra + dr, c = ca + dc;
+    while(r !== rb || c !== cb){
+      const i = r * COLS + c;
+      if(st.cells[i]) return i;
+      r += dr; c += dc;
+    }
+    return -1;
+  }
+
   return {
     // 常數
     ROWS, COLS, NSQ, RED, BLACK, IDLE_DRAW, FULL_SUM, COUNTS, SIDE_NAME,
@@ -823,7 +842,7 @@ const DC = (function(){
     pChr, pUnchr, sqChr, unSq, encodeDeal, decodeDeal,
     encFlip, encMove, STOP, encResign,
     // 幾何
-    rowOf, colOf, nbs, adjacent, ray, screensBetween, blockedBetween,
+    rowOf, colOf, nbs, adjacent, ray, screensBetween, blockedBetween, screenIdx,
     // 房規
     defRules, normRules, rulesText, ruleLevel, setRuleLevel, LV_TEXT,
     // 規則

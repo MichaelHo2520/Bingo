@@ -191,6 +191,19 @@ const DCB = (function(){
     }else{
       sel = -1;
     }
+    /* ★ 選中炮的時候順便把**跳板**(炮架)標出來 —— 這是炮唯一「看不出來」的一段:
+       目標亮在三格外,而「為什麼打得到那一顆」全靠中間那顆子,盤面上完全沒有痕跡。
+       ⚠ 標的是**位置**,不是內容(DC.screenIdx() 只讀 occupied)—— 牌情紅線沒事。
+       ⚠⚠ 只有 kind === "jump" 才有跳板:車直衝(rush / rushDark)的定義正好相反
+         (中間**必須全空**),標它等於把一條空路標成有東西。 */
+    const screens = {};
+    if(canAct && sel >= 0){
+      for(const k in tgtMap){
+        if(tgtMap[k] !== "jump") continue;
+        const s = DC.screenIdx(st, sel, +k);
+        if(s >= 0) screens[s] = 1;
+      }
+    }
 
     const fresh = (cur.key !== lastKey);
     const L = st.last;
@@ -208,6 +221,7 @@ const DCB = (function(){
       if(!c) cls.push("dc-empty");
       if(i === sel) cls.push("dc-sel");
       if(tgtMap[i]) cls.push("dc-tgt", "dc-t-" + tgtMap[i]);
+      if(screens[i]) cls.push("dc-screen");
       if(L && fresh && (L.to === i)) cls.push("dc-hit");
       // ★ 落點的常駐標記(不受 fresh 限制)—— dc-hit 只在剛落地那一瞬間亮一下,
       //   翻攻吃不動 / 打到自己人這幾種「兩顆都留在原地」的手,亮完就什麼痕跡都沒有,
@@ -236,6 +250,10 @@ const DCB = (function(){
     /* ★ 吃子 / 翻攻的動畫與明確圖示 —— 一定要放在 fitBoard() 之後(算 rect 要用最終尺寸),
        而且只在「這一手真的是新的」時播(fresh),不然每次 setState 都重播一次。 */
     if(fresh && L) playMoveFx(L, wasHiddenAtTo);
+    /* ★ 兩塊浮層(悶局倒數 / 記牌盤)—— 掛在 .dc-stage 上、absolute、不佔版面,
+       所以**不影響 fitBoard()**(那正是它們不做成「動作列多一行」的原因,見四節的 ⚠⚠⚠)。 */
+    syncIdle(st);
+    syncTally();
   }
 
   /* ==========================================================================
@@ -419,8 +437,35 @@ const DCB = (function(){
     stage.querySelectorAll(".dc-reveal").forEach(el => { if(el.parentNode) el.parentNode.removeChild(el); });
   }
 
+  /* 炮打出去的那一下,**跳板**輕輕震一下(v2.3.7)。
+     ★ 要傳達的資訊只有一個:「這一炮是從哪一顆頭上飛過去的」——
+       炮的目標可能在三格外,不標的話畫面上只看得到「一顆子忽然飛走」。
+     ⚠⚠ 刻意**不做**砲彈 / 火花 / 爆炸 / 棋盤微震:那正是 v1.137.1 被否決掉的那一批
+       (使用者:「看起來太亂了」),結論寫在三之一節。這裡只借「已經在用的語彙」——
+       一個 0.42 秒的縮放脈動,跟落點光暈同一個量級。
+     ⚠⚠⚠ 動的是 **transform**(合成器)而不是 box-shadow:.dc-p 的底是六層漸層 +
+       九道陰影,動陰影要逐格重繪,而這一拍主執行緒正忙著攻擊方的滑動
+       (見 v1.137.5「兩個貴的東西同時搶主執行緒」那條)。
+     ⚠ 跳板那一格**不可能**同時是落點(dc-hit)或剛翻開那一格(.dc-flip3d)——
+       它是「中間那一顆」,兩邊都不是它 → 不會與 dcHitGlow / dcFlipIn 疊在同一顆子上。 */
+  const SCR_FX = 420;
+  function pulseScreen(from, to){
+    if(!cur || !cur.st || !board) return;
+    const i = DC.screenIdx(cur.st, from, to);
+    if(i < 0) return;
+    const sq = sqEl(i), p = sq && sq.querySelector(".dc-p");
+    if(!p) return;
+    p.classList.remove("dc-screen-fx");
+    void p.offsetWidth;                          // 強制 reflow:連兩炮打同一顆跳板時才會重播
+    p.classList.add("dc-screen-fx");
+    setTimeout(() => p.classList.remove("dc-screen-fx"), SCR_FX + 40);
+  }
+
   function playMoveFx(L, wasHiddenAtTo){
     if(SLIDE_KINDS[L.kind]) slidePiece(L.from, L.to);
+    /* ⚠ jumpSelf(炮打到自己人)也要 —— 那一手炮留在原地,畫面上**完全沒有東西在動**,
+       只有目標格翻開;不標跳板的話看起來像「隔壁那顆自己翻開了」。 */
+    if(L.kind === "jump" || L.kind === "jumpSelf") pulseScreen(L.from, L.to);
     /* ⚠⚠ 這一支要**立刻**掛,不可以再 setTimeout 等攻擊方滑到位(舊版等 220ms):
        paint() 已經把落點畫成攻擊方的子、被吃的那顆從 DOM 上消失了,晚 220ms 才掛的
        下場是「暗子瞬間不見 → 空了 0.22 秒 → 又冒出來 → 才翻開」,那個「不見又冒
@@ -476,13 +521,24 @@ const DCB = (function(){
     });
     return out;
   }
+  /* ⚠⚠⚠ 標籤是一顆 **<button>**(v2.3.7),不是 <span> —— 它是「記牌盤」的入口。
+     ★ 為什麼把入口做在既有的標籤上,而不是加一顆新的鈕:
+       · 加在吃子欄尾巴 → 那一列最寬的情況(七種 16 顆)在 390px 手機上只剩 47px 空隙、
+         ≤360px 只剩 5px,而 .dc-tray-pcs 是 overflow:hidden → **多一顆鈕就把棋子切掉**,
+         切掉的正是 v1.142.0 好不容易救回來的「每個字都看得完整」;
+       · 做成浮在盤面上的角落鈕 → 蓋住的那一格就永遠點不到(跳棋紅線同構)。
+       改成「標籤自己是鈕」= **一個像素都沒多佔**(同樣的字、同樣的字級),
+       affordance 靠一條虛線底線(不佔寬,高度也還在 min-height 裡面)。
+     ⚠ 樣式要把 button 的 appearance / border / padding / font 全部歸零,
+       不然它會長出瀏覽器預設的框與字體,把那一列撐高(= 盤面跟著縮)。 */
   function trayRow(label, caps){
     const gs = groupCaps(caps);
     const pcs = gs.map(g => '<span class="dc-cp">' + pieceHTML(g.p) +
                             (g.n > 1 ? '<i class="dc-cn">' + g.n + "</i>" : "") +
                             "</span>").join("");
     return '<div class="dc-tray-row">' +
-             '<span class="dc-tray-lbl">' + esc(label) + "</span>" +
+             '<button type="button" class="dc-tray-lbl" data-act="tally"' +
+               ' title="看還沒翻開的暗子">' + esc(label) + "</button>" +
              '<span class="dc-tray-pcs">' +
              (gs.length ? pcs : '<span class="dc-none">—</span>') + "</span></div>";
   }
@@ -609,6 +665,156 @@ const DCB = (function(){
   }
 
   /* ==========================================================================
+     四之一、兩塊浮層:悶局倒數 · 記牌盤
+     ──────────────────────────────────────────────────────────────────────────
+       ★★★ 兩塊都掛在 **.dc-stage** 上、`position:absolute`,所以**一個像素都不佔版面**。
+         這不是偷懶,是唯一做得對的地方:動作列的高度是規格(見四節的 ⚠⚠⚠),
+         多一行 / 少一行就是「每走一手盤面上下跳一下」;而它們兩個一個是
+         「只在快悶局時才出現」、一個是「開開關關」,**本質上就是會忽有忽無的東西**。
+         → 忽有忽無的東西一律走浮層,不准進 #dcActs。
+       ⚠ 浮層都掛在 stage(paint() 只重建 board.innerHTML,動不到它們)——
+         與 .dc-reveal 同一個理由、同一個父層,但**各認各的 class**,
+         clearReveals() 只掃 .dc-reveal,不會誤傷這兩塊。
+     ========================================================================== */
+
+  /* ---------- 悶局倒數(不受房規管)----------
+     ★ 「連續 40 步沒吃沒翻 → 比階級總和」是這一頁最重要、也最容易被當成 bug 的規則:
+       沒有任何預告的話,現場的體感是「棋還在下,忽然就跳結果卡了」。
+     ⚠ 這個數字**不是隱藏資訊**(兩邊各自數手數就算得出來),所以它與下面的記牌盤不同,
+       **不綁房規 foeCaps** —— 兩邊看到的本來就一樣。
+     ⚠⚠ pointer-events:none 是規格不是美觀:它浮在盤面上,吃得到點擊的話被它蓋住的那一格
+       就永遠點不到(跳棋那條紅線同構)。
+     ★ 只在最後 10 步才出現 —— 一開局就掛一個「0/40」是雜訊,而且天天看得到就沒人看了。 */
+  const IDLE_WARN = 10;             // 剩幾步以內才提醒
+  const IDLE_HOT  = 5;              // 剩幾步以內轉紅
+  function syncIdle(st){
+    if(!stage || !board) return;
+    let el = stage.querySelector(".dc-idle");
+    const left = DC.IDLE_DRAW - (st.idle | 0);
+    const show = !st.over && !cur.over && left <= IDLE_WARN && left > 0;
+    if(!show){ if(el && el.parentNode) el.parentNode.removeChild(el); return; }
+    if(!el){
+      el = document.createElement("div");
+      el.className = "dc-idle";
+      stage.appendChild(el);
+    }
+    el.classList.toggle("dc-idle-hot", left <= IDLE_HOT);
+    /* ⚠ 只有六個字,而那是**規格**:再長就會蓋到盤面上(見 styles 那條 ⚠⚠⚠)。
+       用詞跟進場說明與規則卡一致(那兩處寫的就是「比子」),不要另造新詞;
+       完整的一句話在記牌盤裡,結局那一句在 #winMsg。 */
+    el.innerHTML = '<b>' + left + "</b> 步後比子";
+    /* ★★★ 位置**用量的**,不是寫死的 CSS 角落。
+       試過寫死 `top:5px;right:7px`,六種視窗裡有兩種會蓋到格子:盤面在舞台裡是置中的,
+       而它有兩種擺法(4 欄 / 8 欄)—— 上方與側邊的空檔誰大誰小**每一種視窗都不一樣**,
+       沒有一個固定的角落是兩種都安全的。
+       ★ 規則只有一條:**讓浮標的下緣停在第一列格子的上緣**(= 盤面上緣 + PAD 那圈木框帶)、
+         右緣對齊盤面右緣。它因此只會壓在木框帶與更上面的空檔上,**一顆棋子都遮不到**;
+         而視覺上看起來就像貼在木框上的一張標籤。
+       ⚠ 上面完全沒有空檔時(舞台正好被盤面填滿)會被 max(0,…) 夾住,
+         最多壓進第一列 `高度 − PAD` ≈ 4px —— 那是一條細邊,不是遮住。
+       ⚠⚠ PAD 這個數字有三份(board.js 的常數、CSS 的 .dc-board padding、木框帶那條
+         box-shadow),這裡吃的就是本檔那一份,不要另外寫一個數字。
+       ⚠ 讀 offsetHeight 會逼一次 layout —— 只在最後 10 步才會走到這裡,不是每一手都付。 */
+    const br = board.getBoundingClientRect(), gr = stage.getBoundingClientRect();
+    const ir = el.getBoundingClientRect();
+    el.style.right = Math.max(0, Math.round(gr.right - br.right)) + "px";
+    /* ⚠ 用 getBoundingClientRect().height 不用 offsetHeight(後者是整數,少算的
+       那零點幾 px 就是壓在第一列格線上的毛邊),再往上讓 1px 保險。 */
+    el.style.top = Math.max(0, Math.floor(br.top - gr.top + PAD - ir.height - 1)) + "px";
+  }
+
+  /* ---------- 記牌盤:還沒翻開的暗子裡,兩邊各還有哪幾種 ----------
+     ★ 暗棋的博弈核心就是算牌(「將出來了沒」「他還有幾門炮」),而這件事目前只能硬記。
+       這一塊把 DCAI.unseenTally() 那個集合畫出來 —— **與 AI 看的是同一份**,
+       不多不少(32 顆 − 盤上已翻開的 − 已經被吃掉的),沒有任何位置資訊。
+
+     ⚠⚠⚠ 它**綁房規 foeCaps**,而這條耦合不是保守,是算出來的:
+       未現張數 = 總數 − 盤上明棋 − 雙方吃掉的。前兩項畫面上人人看得到、
+       「我吃掉的」永遠顯示 → **把未現張數攤開,等於把「對手吃掉了什麼」直接算給你看**。
+       而 foeCaps 預設關的時候,notes/19 那張房規表寫的就是「對手吃了什麼要自己記」。
+       → 記牌盤與 foeCaps 是**同一種東西(記憶輔助)**,不能一個關著一個開著。
+       ⚠ 順帶一提「階級總和」也一樣會漏(某方總和 = 52 − 他被吃掉那些子的階級和),
+         所以它跟著放在這一塊裡面,不另外找地方顯示。
+     ★ 房規沒開的時候**不是把入口藏起來**,是照樣打得開、裡面說清楚為什麼沒有 ——
+       藏起來的話沒有人會知道有這個東西,也學不到那條房規在管什麼(同 whyNot() 的精神)。
+     ⚠ 牌情紅線沒事:這裡一個 cells[i].p 都沒讀(unseenTally 走的是 knownAt()),
+       而且它畫在 .dc-stage 底下、不在 #dcBoard 裡 —— 兩支守門掃的都是 #dcBoard。 */
+  let tallyOpen = false;
+  const RANKS = [7, 6, 5, 4, 3, 2, 1];
+
+  function tallyCell(p, n){
+    return '<span class="dc-tv' + (n > 0 ? "" : " dc-tv-0") + '">' +
+             pieceHTML(p) + '<i class="dc-tn">' + n + "</i></span>";
+  }
+  function tallyBodyHTML(st){
+    const showAll = !!(st.rules && st.rules.foeCaps) && (typeof DCAI !== "undefined");
+    if(!showAll){
+      return '<p class="dc-tally-off">這一局的房規是「對手吃子 · 不顯示」。<br>' +
+             '未翻開的統計 <b>等於</b>把對手吃掉了什麼算出來(32 顆扣掉盤上看得到的、' +
+             '再扣掉自己吃掉的,剩下的就是他吃掉的)——' +
+             '所以這一局不提供,不然那條房規等於白開。<br>' +
+             '<b>下一局</b>把房規的「對手吃子」改成「顯示」,這裡就會列出兩邊還剩哪幾種。</p>';
+    }
+    const tally = DCAI.unseenTally(st);
+    let total = 0;
+    for(let p = 0; p < 14; p++) total += Math.max(0, tally[p] | 0);
+    const rows = RANKS.map(r =>
+      tallyCell(DC.pieceOf(DC.RED, r),   tally[DC.pieceOf(DC.RED, r)]   | 0) +
+      tallyCell(DC.pieceOf(DC.BLACK, r), tally[DC.pieceOf(DC.BLACK, r)] | 0)
+    ).join("");
+    return '<p class="dc-tally-sum">還沒翻開 <b>' + total + "</b> 顆</p>" +
+           '<div class="dc-tally-grid">' +
+             '<span class="dc-th dc-red-t">紅方</span><span class="dc-th dc-blk-t">黑方</span>' +
+             rows +
+           "</div>" +
+           '<p class="dc-tally-ft">階級總和(悶局比這個)· 紅 <b>' + DC.sumSide(st, DC.RED) +
+             "</b> · 黑 <b>" + DC.sumSide(st, DC.BLACK) + "</b></p>";
+  }
+  function tallyHTML(st){
+    return '<div class="dc-tally-card" role="dialog" aria-label="還沒翻開的暗子">' +
+             '<div class="dc-tally-hd"><b>未翻開的暗子</b>' +
+               '<button type="button" class="dc-tally-x" aria-label="關閉">✕</button></div>' +
+             tallyBodyHTML(st) +
+             '<p class="dc-tally-idle">連續 <b>' + (st.idle | 0) + "</b> 步沒吃沒翻 · 滿 " +
+               DC.IDLE_DRAW + " 步就比階級總和</p>" +
+           "</div>";
+  }
+  /* 每次 paint() 都跟著更新內容(開著的時候對手走一手,數字要跟著動)。
+     ⚠ 整段重建 innerHTML 就好 —— 這一塊沒有任何動畫,不會有「重建 = 重播」的問題。 */
+  function syncTally(){
+    if(!stage) return;
+    let el = stage.querySelector(".dc-tally");
+    const st = cur && cur.st;
+    const show = tallyOpen && !!st && !st.over && !cur.over;
+    if(!show){
+      tallyOpen = false;
+      if(el && el.parentNode) el.parentNode.removeChild(el);
+      return;
+    }
+    if(!el){
+      el = document.createElement("div");
+      el.className = "dc-tally";
+      // 蓋板本身吃掉點擊(不讓它穿到盤面),點哪裡都關掉 —— 含右上角那顆 ✕
+      el.addEventListener("click", () => { tallyOpen = false; syncTally(); });
+      stage.appendChild(el);
+    }
+    el.innerHTML = tallyHTML(st);
+  }
+  function toggleTally(){
+    if(!cur || !cur.st) return;
+    tallyOpen = !tallyOpen;
+    syncTally();
+  }
+  // 離場 / 換局:兩塊浮層都要收掉(它們掛在 stage 上,board.innerHTML = "" 帶不走)
+  function clearOverlays(){
+    tallyOpen = false;
+    if(!stage) return;
+    stage.querySelectorAll(".dc-tally,.dc-idle").forEach(el => {
+      if(el.parentNode) el.parentNode.removeChild(el);
+    });
+  }
+
+  /* ==========================================================================
      五、點擊流程
      ──────────────────────────────────────────────────────────────────────────
        ★ 點不了的格**不用 disabled 讓點擊靜默消失**(CLAUDE.md 的紅線)——
@@ -670,11 +876,20 @@ const DCB = (function(){
      ========================================================================== */
   /* mySeat = 我坐哪(沒帶就是 -1);回傳「這一局是怎麼結束的」一句話。
      ⚠ 認輸那一種**要看是誰認的** —— 其它幾種對兩邊講起來都一樣,只有它不是。 */
+  /* ⚠ 悶局那兩種**要把數字講出來**(v2.3.7):「比階級總和」這五個字沒有回答
+     「所以是幾比幾」,而那正是這一種結局唯一會被質疑的地方(現場的體感是
+     「棋還在下,忽然就跳結果卡、還判我輸」)。局都結束了,兩邊看到的字也一樣 ——
+     這裡把兩個數字攤開不涉及任何情報問題(對局中要看得綁房規,見四之一節)。
+     ⚠⚠ 但**只在悶局那兩種**講:其它三種結局跟階級總和沒有關係,寫了只是雜訊,
+       而且會把「這一局是怎麼結束的」這句話稀釋掉(六節開頭那條)。 */
+  function sumTail(st){
+    return "(紅 " + DC.sumSide(st, DC.RED) + " · 黑 " + DC.sumSide(st, DC.BLACK) + ")";
+  }
   function endText(st, mySeat){
     if(st.endBy === "wipe")  return "吃光對方所有棋子";
     if(st.endBy === "stuck") return "對方無子可動,也無暗棋可翻";
-    if(st.endBy === "count") return "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻 · 比階級總和";
-    if(st.endBy === "draw")  return "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻 · 階級總和相同";
+    if(st.endBy === "count") return "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻 · 比階級總和 " + sumTail(st);
+    if(st.endBy === "draw")  return "連續 " + DC.IDLE_DRAW + " 步沒吃沒翻 · 階級總和相同 " + sumTail(st);
     if(st.endBy === "resign"){
       if(typeof mySeat !== "number" || mySeat < 0) return "有一方認輸";
       return st.winner === mySeat ? "對手認輸" : "你認輸了";
@@ -715,7 +930,10 @@ const DCB = (function(){
     if(acts){
       acts.addEventListener("click", e => {
         const b = e.target.closest ? e.target.closest("[data-act]") : null;
-        if(b && b.dataset.act === "stop") fire(DC.STOP);
+        if(!b) return;
+        if(b.dataset.act === "stop") fire(DC.STOP);
+        // ★ 吃子欄的標籤自己就是「記牌盤」的入口(見 trayRow() 的註解)
+        else if(b.dataset.act === "tally") toggleTally();
       });
     }
     /* ⚠ 只在**方向真的變了**才重畫 DOM;純粹尺寸變化只重算格子大小。
@@ -750,6 +968,7 @@ const DCB = (function(){
     sel = -1; lastKey = -1; cur = null; prevUp = {};
     stopCd();
     clearReveals();                 // ⚠ 它掛在 stage 上,不會被下面那行 board.innerHTML 帶走
+    clearOverlays();                // ⚠ 同上:悶局倒數 / 記牌盤兩塊浮層也在 stage 上
     if(board) board.innerHTML = "";
     if(acts){ acts.innerHTML = ""; acts.classList.add("hidden"); }
   }

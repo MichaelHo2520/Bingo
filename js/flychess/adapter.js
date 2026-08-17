@@ -105,21 +105,32 @@ const MP = MPCore.create((function(){
   /* ==========================================================================
      一、畫面
      ========================================================================== */
+  /* ★ 連擲 6 的計數。**這是規則的一部分**(連續三次 6 這一輪作廢),而它以前在畫面上
+     完全沒有:玩家只知道「又是 6」,不知道自己已經第幾次了 —— 第三次忽然作廢就像 bug。
+     ⚠ 公開資訊(每台各自 replay 都算得出 st.sixes)→ 全桌都看得到,不只當事人。 */
+  function sixTag(){
+    return (st && st.sixes) ? ('<b class="fc-fire">🔥 連 ' + st.sixes + '/3</b> ') : "";
+  }
   function hintText(){
     if(!st || st.over) return "";
     const who = esc(nameOfSeat(st.turn));
-    if(!isMyTurn()) return who + (st.die ? " 擲出 " + st.die + ",正在選飛機…" : " 要擲骰了…");
-    if(!st.die) return "輪到你了 —— 按骰子";
+    if(!isMyTurn()) return sixTag() + who + (st.die ? " 擲出 " + st.die + ",正在選飛機…" : " 要擲骰了…");
+    if(!st.die) return sixTag() + "輪到你了 —— 按骰子";
     const L = FC.legalMoves(st, mySeat());
-    if(!L.length) return "這個點數沒得走";
-    return "點一架要動的飛機" + (st.die === 6 ? "(擲到 6,走完可以再擲一次)" : "");
+    if(!L.length) return sixTag() + "這個點數沒得走";
+    // 唯一的選項會自己出發(見二之二節)—— 一定要說出來,不然看起來像「我還沒按就動了」
+    if(autoOne && L.length === 1) return sixTag() + "只有這一架動得了 —— 自動出發…";
+    return sixTag() + "點一架要動的飛機" + (st.die === 6 ? "(擲到 6,走完可以再擲一次)" : "");
   }
 
   function paint(anim, done){
     if(!st) return;
     const me = mySeat();
-    const can = (isMyTurn() && st.die && !busy) ? FC.legalMoves(st, me).map(m => m.plane) : [];
-    FCB.render({ st: st, mySeat: me, can: can, anim: anim || null, onDone: done || null });
+    /* ★ 整包 legalMoves 傳下去(不只 plane index):盤面要靠它畫**落點預覽**與
+       「這一架踩得到人」那顆紅光 —— 反正這裡本來就算了一次,不必算第二次。 */
+    const L = (isMyTurn() && st.die && !busy) ? FC.legalMoves(st, me) : [];
+    FCB.render({ st: st, mySeat: me, can: L.map(m => m.plane), cans: L,
+                 anim: anim || null, onDone: done || null });
     FCB.renderActs({
       canRoll: isMyTurn() && !st.die && !busy,
       hint: hintText(),
@@ -192,6 +203,41 @@ const MP = MPCore.create((function(){
     if(q === 0) return st.rules.launch === "six" ? "要擲到 6 才能起飛" : "要擲到 1 或 6 才能起飛";
     if(st.rules.exact) return "點數太大,終點要剛好走到";
     return "這一架這個點數動不了";
+  }
+
+  /* ==========================================================================
+     二之二、★ 唯一的選項不必再點一次
+     ──────────────────────────────────────────────────────────────────────────
+       擲完只有一架飛機動得了時,「再點一下」是**純粹的手續**(零決策)——
+       單機那邊從第一版就自動走了(solo.js 的 doRoll()),連線這邊補上同一件事。
+     ⚠ 只在 legalMoves **剛好一個**的時候才走。兩架都動得了(例如兩架都在機場又擲到 6)
+       一定要讓人自己選 —— 那是真的有差別的。
+     ⚠ 送出走的仍然是 sendMove() → push() 的交易守衛(step 對不上就中止),
+       所以重複觸發是 no-op,不會多走一手。
+     ⚠⚠ **e2e 一律先 `MP._autoOne(false)` 關掉它**:不關的話「輪到我、還沒選飛機」
+       這個前提會被它自己吃掉,而症狀是**偶發**紅在「按了沒反應」
+       (那正是這一頁 e2e 最容易長出來的假紅,見 notes/22 第五節)。
+       ★ 它自己那一節在 gen-fc-e2e.js 的 D3(含「關掉就不該自動走」的反向對照)。
+     ========================================================================== */
+  const AUTO_ONE_MS = 420;             // 先讓人看清點數與盤面,再自己出發
+  let autoOne = true, autoOneT = null;
+  function clearAutoOne(){ if(autoOneT){ clearTimeout(autoOneT); autoOneT = null; } }
+  function armAutoOne(){
+    clearAutoOne();
+    if(!autoOne || busy || !st || st.over || !playing()) return;
+    if(!isMyTurn() || !st.die) return;
+    const L = FC.legalMoves(st, mySeat());
+    if(L.length !== 1) return;
+    const step = moves.length, plane = L[0].plane;
+    autoOneT = setTimeout(() => {
+      autoOneT = null;
+      // ⚠ 到期時要重新確認一次:這 420ms 之間可能被倒數代打搶走,或局面整個換了
+      if(busy || !st || st.over || !playing()) return;
+      if(!isMyTurn() || !st.die || moves.length !== step) return;
+      const L2 = FC.legalMoves(st, mySeat());
+      if(L2.length !== 1 || L2[0].plane !== plane) return;
+      sendMove(plane);
+    }, AUTO_ONE_MS);
   }
 
   /* ==========================================================================
@@ -385,7 +431,7 @@ const MP = MPCore.create((function(){
     /* ---------- 一局的生命週期 ---------- */
     lobbyGame(){ return { fc: null, moves: [] }; },
     resetRound(){
-      clearTurnT();
+      clearTurnT(); clearAutoOne();
       moves = []; st = null; gRules = null; curRound = null; lastLen = -1; setBusy(false);
       FCB.reset();
     },
@@ -434,10 +480,14 @@ const MP = MPCore.create((function(){
       /* ★★★ 只有「剛好多一筆」才演;換局與批次同步一律直接落定 */
       if(!fresh && moves.length === prevLen + 1){
         applyOne(moves[moves.length - 1], () => {
-          if(isMyTurn() && !st.die) Sound.turn();
           armTurnT();
           paint();
           maybeSettle();
+          armAutoOne();
+          /* ★ 「輪到我了」的一聲 + 自家機場一圈金光,排在 paint() **之後** ——
+             它是回饋不是狀態。4 人局輪轉很快,現場常常是「在看別人對決 → 沒注意到
+             輪到自己」(Gemini 建議書的「回合焦點感」)。 */
+          if(isMyTurn() && !st.die){ Sound.turn(); FCB.turnCue(); }
         });
         return;
       }
@@ -449,14 +499,15 @@ const MP = MPCore.create((function(){
       armTurnT();
       paint();
       maybeSettle();
+      armAutoOne();
     },
 
     /* ---------- 相位的專屬畫面 ----------
        各相位只說「要哪個畫面」,實際的 hidden 切換交給 main.js 的 showScreen() */
     openConnect(){ showScreen("connect"); },
-    enterLobby(){ clearTurnT(); showScreen("lobby"); },
+    enterLobby(){ clearTurnT(); clearAutoOne(); showScreen("lobby"); },
     backToLobby(){
-      clearTurnT();
+      clearTurnT(); clearAutoOne();
       moves = []; st = null; curRound = null; lastLen = -1; setBusy(false);
       FCB.reset();
       showScreen("lobby");
@@ -472,7 +523,7 @@ const MP = MPCore.create((function(){
       paint();
     },
     onLeave(){
-      clearTurnT();
+      clearTurnT(); clearAutoOne();
       moves = []; st = null; gRules = null; curRound = null; lastLen = -1; setBusy(false);
       baseWins = {};
       FCB.reset();
@@ -535,7 +586,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 結果 ---------- */
     outcome(w, { iWon, ids }){
-      clearTurnT();
+      clearTurnT(); clearAutoOne();
       FCB.stopCd();
       const ord = ctx.order();
       const sc = (st && st.over) ? FC.score(st) : null;
@@ -602,6 +653,10 @@ const MP = MPCore.create((function(){
       /* 給 e2e 用:把 busy 看門狗的上限調短(同 _ageTurn 的道理 —— 那顆只有時間會觸發,
          照 5 秒等會讓整份 e2e 慢一大截)。⚠ 只改上限,不改行為。 */
       _busyMax(ms){ busyMax = Math.max(20, +ms || 0); },
+      /* 給 e2e 用:把「唯一的選項自動走」關掉 / 打開(見二之二節)。
+         ⚠ 這不是偏好也不是房規 —— **正式玩一律是開的**,這個入口只給測試,
+           因為它會把「輪到我、還沒選飛機」那個前提自己吃掉(偶發假紅的來源)。 */
+      _autoOne(on){ autoOne = !!on; if(!autoOne) clearAutoOne(); else armAutoOne(); },
       /* 給 e2e 用:倒數代打的計時器現在是照**第幾手**武裝的(沒武裝 = -1)。
          ⚠ 不可以只回 true/false —— 上一手留下來的那顆也是 true,
            把 armTurnT() 搬回動畫後面照樣量得到「有武裝」(那條突變會存活)。 */

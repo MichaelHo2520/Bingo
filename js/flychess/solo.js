@@ -28,6 +28,7 @@ const Solo = (function(){
   let level = "normal", seats = 2, planes = 2;
   let st = null, moves = [], names = [];
   let active = false, over = false, busy = false;
+  let lastTurn = -1;                   // 「輪到你」只在換人那一刻提示一次(見 tick)
   let gen = 0;
   let rec = {};
 
@@ -98,24 +99,32 @@ const Solo = (function(){
            FC.homeCount(st, s) + "/" + st.rules.goal + "</span>";
   }
 
+  /* 連擲 6 的計數(措辭與連線那份 adapter.js 的 sixTag() 一樣)——
+     ★ 連續三次 6 這一輪作廢是**規則**,以前畫面上完全沒有,第三次忽然作廢很像 bug。 */
+  function sixTag(){
+    return (st && st.sixes) ? ('<b class="fc-fire">🔥 連 ' + st.sixes + '/3</b> ') : "";
+  }
   function hintText(){
     if(!st) return "";
     if(st.over) return "";
     const who = seatName(st.turn);
-    if(st.turn !== ME) return esc(who) + " 正在想…";
-    if(!st.die) return "輪到你了 —— 按骰子";
+    if(st.turn !== ME) return sixTag() + esc(who) + " 正在想…";
+    if(!st.die) return sixTag() + "輪到你了 —— 按骰子";
     const L = FC.legalMoves(st, ME);
-    if(!L.length) return "這個點數沒得走";
-    return "點一架要動的飛機" + (st.die === 6 ? "(擲到 6,走完可以再擲一次)" : "");
+    if(!L.length) return sixTag() + "這個點數沒得走";
+    if(L.length === 1) return sixTag() + "只有這一架動得了 —— 自動出發…";
+    return sixTag() + "點一架要動的飛機" + (st.die === 6 ? "(擲到 6,走完可以再擲一次)" : "");
   }
 
   /* anim 有值 = 這一手要演;done 在演完之後叫(當節拍器用,不要自己猜時間) */
   function paint(anim, done){
     if(!st) return;
     paintBar();
-    const can = (st.turn === ME && st.die && !over && !busy) ?
-                FC.legalMoves(st, ME).map(m => m.plane) : [];
-    FCB.render({ st: st, mySeat: ME, can: can, anim: anim || null, onDone: done || null });
+    /* ★ 整包 legalMoves 傳下去(不只 plane index):盤面靠它畫落點預覽與「踩得到」
+       那顆紅光(與連線那份 adapter.js 的 paint() 一致)。 */
+    const L = (st.turn === ME && st.die && !over && !busy) ? FC.legalMoves(st, ME) : [];
+    FCB.render({ st: st, mySeat: ME, can: L.map(m => m.plane), cans: L,
+                 anim: anim || null, onDone: done || null });
     FCB.renderActs({
       canRoll: st.turn === ME && !st.die && !over && !busy,
       hint: hintText()
@@ -128,6 +137,7 @@ const Solo = (function(){
     bumpGen();
     st = FC.replay(rulesNow(), seats, []);
     moves = [];
+    lastTurn = -1;
     names = [];
     for(let s = 0; s < seats; s++) names.push(NAMES[s]);
     over = false; busy = false; active = true;
@@ -142,7 +152,7 @@ const Solo = (function(){
   }
   function quit(){
     bumpGen();
-    active = false; over = false; busy = false; st = null; moves = [];
+    active = false; over = false; busy = false; st = null; moves = []; lastTurn = -1;
     FCB.reset();
     closeWin();
     showScreen("home");
@@ -159,6 +169,14 @@ const Solo = (function(){
   function tick(){
     if(!active || over || !st) return;
     if(st.over){ finish(); return; }
+    /* ★ 換人的那一刻才提示「輪到你」(一聲 + 自家機場一圈金光)——
+       ⚠ 一定要用「turn 變了」當條件,不可以只看 st.turn === ME:
+         擲到 6 會停在同一個人身上(紅線 1),照 turn 值判會每擲一次就再叫一次。
+       ⚠ 措辭 / 做法與連線那份(adapter.js 的 applyOne 回呼)刻意一樣。 */
+    if(st.turn !== lastTurn){
+      lastTurn = st.turn;
+      if(st.turn === ME){ Sound.turn(); FCB.turnCue(); }
+    }
     if(st.turn === ME){ busy = false; paint(); return; }     // 等玩家按骰子 / 點飛機
     busy = true;
     paint();

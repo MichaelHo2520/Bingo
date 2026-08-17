@@ -6928,6 +6928,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          --dc-cap-face:#f5ebd2;
          --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(52,28,8,.05);
          --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6;
+         /* ★ 炮的跳板(v2.3.7)。⚠ 它**一定要是這三個之外的第四種顏色** ——
+            跳板不是落點(點下去什麼都不會發生),第一版拿 --dc-tgt-eat 畫,
+            截圖一看就是「那顆好像也吃得到」。冷色在暖木盤上跳得最開,
+            而綠 / 紅 / 紫都已經被「走 / 吃 / 房規才有的吃」佔走了。 */
+         --dc-scr:#31c8d8;
          /* 棋盤那一塊木頭:深一階的胡桃色。★ 棋子是淺楓木,兩者的明度**一定要拉開** ——
             同一階的話子會埋進盤裡,小格子的手機上尤其看不出哪一格有子。 */
          --dc-slab:#8a5c30; --dc-slab-d:#6b4420; --dc-slab-l:#a06e3d;
@@ -7578,11 +7583,52 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift)}
   .dc-tgt{box-shadow:inset 0 0 0 3px var(--dc-tgt),var(--dc-groove)}
   .dc-tgt.dc-t-eat,.dc-tgt.dc-t-jump{box-shadow:inset 0 0 0 3px var(--dc-tgt-eat),var(--dc-groove)}
-  /* 遠距離的兩種(車直衝 / 連吃翻暗棋)另給一個顏色 —— 它們是房規才有的手,
-     與一般吃子分開,玩家才看得出「這一步是因為開了房規才存在的」 */
-  .dc-tgt.dc-t-rush,.dc-tgt.dc-t-dark{box-shadow:inset 0 0 0 3px var(--dc-tgt-far),var(--dc-groove)}
+  /* 遠距離的三種(車直衝 / 車直衝打暗子 / 連吃翻暗棋)另給一個顏色 —— 它們是房規才有的手,
+     與一般吃子分開,玩家才看得出「這一步是因為開了房規才存在的」
+     ⚠⚠ `rushDark` 一定要在這一組裡(v2.3.7 補的,v1.137.5 加那個 kind 時漏了)——
+       class 的比對是**逐字**的,`.dc-t-rush` 比不到 `.dc-t-rushDark`,漏掉的下場是
+       「車直衝打暗子」的落點退回最上面那條基準色(= 走空格的綠),看起來像「走過去」
+       而不是「打過去」。⚠ 加新 kind 一律回頭掃這三條,不然它會安安靜靜地退回基準色。 */
+  .dc-tgt.dc-t-rush,.dc-tgt.dc-t-rushDark,.dc-tgt.dc-t-dark{
+    box-shadow:inset 0 0 0 3px var(--dc-tgt-far),var(--dc-groove)}
   .dc-tgt.dc-empty::after{content:"";position:absolute;width:26%;height:26%;border-radius:50%;
     background:var(--dc-tgt);opacity:.75}
+  /* ★★ 「有東西可以吃」的落點再多一圈**貼著棋子的圓環**(v2.3.7)——
+     在這之前三種落點只差在**顏色**,而顏色是最弱的一種分級:盤面本身就是暖木色,
+     紅圈與紫圈在小尺寸的手機上掃過去幾乎一樣,而「走過去」與「吃掉他」是完全不同的決定。
+     加一個**形狀**的差異(方框 vs 方框+圓環)才是掃一眼就分得開的。
+     ⚠ 為什麼是 ::after 而不是再疊一層 box-shadow:.dc-sq 的 box-shadow 已經被
+       .dc-tgt / .dc-from 整份佔用(同一格可能同時是落點),box-shadow 只有一個值。
+     ⚠⚠ ::before 也不能用 —— 那是 .dc-lastto(上一手落點)的,而「上一手落點」
+       與「這一手能吃的目標」同一格完全可能同時成立(來回吃)。
+     ⚠ 空格那條走的也是 ::after,但兩者互斥(有子 vs 沒子),不會撞在同一格上。
+     ⚠ pointer-events:none:.dc-sq 才是按鈕,這一層不可以吃掉點擊。 */
+  .dc-tgt:not(.dc-empty)::after{content:"";position:absolute;inset:7%;border-radius:50%;
+    pointer-events:none;border:2px solid var(--dc-tgt-eat);opacity:.9}
+  .dc-tgt.dc-t-rush:not(.dc-empty)::after,
+  .dc-tgt.dc-t-rushDark:not(.dc-empty)::after,
+  .dc-tgt.dc-t-dark:not(.dc-empty)::after{border-color:var(--dc-tgt-far)}
+  /* ★★★ 炮的**跳板**(炮架):選中炮的時候,被它拿來當跳板的那幾顆亮一圈虛線。
+     這是炮唯一「畫面上完全看不出來」的一段 —— 目標亮在三格外,而「為什麼打得到」
+     全靠中間那顆子。標它等於把規則畫出來,新手不必翻說明。
+     ⚠⚠ 用 **outline** 而不是 box-shadow / ::before / ::after:那三個在這一格上
+       全都名花有主(box-shadow = .dc-tgt/.dc-from,::before = .dc-lastto,
+       ::after = 上面那兩條落點),而跳板那一格**同時是其中任何一種都完全可能**
+       (它自己也可能是我這一手吃得到的目標)。outline 是第四條互不干涉的路,
+       而且不佔版面、不影響 fitBoard()。
+     ⚠ outline-offset 給負值讓它縮在格子裡面,不然會壓到隔壁格的刻線上。 */
+  .dc-sq.dc-screen{outline:2px dashed var(--dc-scr);outline-offset:-3px;border-radius:4px}
+  /* 炮打出去那一下,跳板輕輕震一下(board.js 的 pulseScreen)。
+     ⚠⚠ 動 transform 不動 box-shadow:.dc-p 的底是六層漸層 + 九道陰影,動陰影要逐格重繪,
+       而這一拍主執行緒正忙著攻擊方的滑動(v1.137.5「兩個貴的東西同時搶主執行緒」)。
+     ⚠ .dc-p 本身**沒有** transform(它的「讓出厚度」走的是 margin-bottom,見上面那條的
+       註解)—— 所以這支動畫不會跟任何既有的位移打架。 */
+  .dc-p.dc-screen-fx{animation:dcScreenPulse .42s cubic-bezier(.3,.7,.4,1)}
+  @keyframes dcScreenPulse{
+    0%{transform:scale(1)}
+    38%{transform:scale(1.075)}
+    100%{transform:scale(1)}
+  }
   /* 剛剛動過的兩格:落點亮一下光暈,來源留一個淡框(看得出「他從哪走到哪」)。
      ⚠ v1.137.0 起改成只動 box-shadow(不動 transform)—— 落點這顆子現在還可能在
      board.js 用 JS 滑過來(見下面「吃子 / 移動的滑入動畫」),兩邊都動 transform 的話
@@ -7759,8 +7805,20 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-tray{width:100%;display:flex;flex-direction:column;gap:2px;
     padding-bottom:4px;border-bottom:1px solid var(--panel-line)}
   .dc-tray-row{display:flex;align-items:center;gap:6px;min-height:28px}
+  /* ⚠⚠⚠ v2.3.7 起這個標籤是一顆 **<button>**(記牌盤的入口,見 board.js 的 trayRow)——
+     所以 appearance / border / background / padding / margin / font-family 六樣**一定要歸零**:
+     少一樣它就長出瀏覽器預設的框或字體,而那一列高一格 = 舞台矮一格 = **盤面跟著縮**
+     (這一塊高度是規格不是美觀,見上面那條 ⚠⚠⚠)。
+     ★ affordance 走**虛線底線**而不是加一顆圖示鈕:底線一個像素都不佔寬,
+       而那一列最寬的情況(七種 16 顆)在 ≤360px 手機上只剩 5px 空隙 ——
+       多一顆鈕就等於把 v1.142.0 好不容易救回來的字再切掉一次。 */
   .dc-tray-lbl{flex:none;max-width:84px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    font-size:11px;font-weight:800;color:var(--muted)}
+    font-size:11px;font-weight:800;color:var(--muted);
+    appearance:none;-webkit-appearance:none;border:0;background:none;padding:0;margin:0;
+    font-family:inherit;line-height:1.25;text-align:left;cursor:pointer;
+    text-decoration:underline dotted;text-underline-offset:2px;
+    -webkit-tap-highlight-color:transparent}
+  .dc-tray-lbl:hover{color:var(--text)}
   .dc-tray-pcs{--dc-cell:28px;flex:1;min-width:0;display:flex;align-items:center;overflow:hidden}
   /* ---------- 吃子欄的棋子:刻意畫成「扁的」(v1.142.0)----------
      使用者:「被吃了什麼的區域看起來不清楚,這個部分的棋子可以不需要畫得這麼立體,
@@ -7774,19 +7832,21 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        只換掉 box-shadow 的話它們還在,26px 上看起來就是「一顆髒的圓餅」。
      ⚠ 紅 / 黑除了字色再加**一圈同色的邊**:整排都是米白圓餅時,一眼掃過去
        光靠字色分不出哪幾顆是誰的(紅線:兩方不可以塌成同一種樣子)。 */
-  .dc-tray-pcs .dc-p{width:26px;height:26px;flex:none;
+  /* ⚠ v2.3.7 起這幾條**記牌盤(.dc-tv)也吃**:同一種「扁的、看得清楚的小棋子」
+     只准有一份宣告 —— 各寫一份的話兩邊遲早分岔,而分岔了兩邊都不會壞、只有截圖看得出來。 */
+  .dc-tray-pcs .dc-p,.dc-tv .dc-p{width:26px;height:26px;flex:none;
     background:var(--dc-cap-face);
     box-shadow:0 0 0 1.5px rgba(36,31,28,.50);
     /* ⚠ 「讓出厚度」那條(v1.150.1)在這裡要**歸零**:這一排是刻意扁的,box-shadow 被整份
        覆蓋掉、根本沒有厚度可以讓 —— 留著只會讓整排圓餅無故上移一截、與標籤對不齊。 */
     margin-bottom:0}
-  .dc-tray-pcs .dc-p.dc-red{box-shadow:0 0 0 1.5px rgba(142,31,39,.60)}
-  .dc-tray-pcs .dc-p::after{display:none}
-  .dc-tray-pcs .dc-ring{display:none}
+  .dc-tray-pcs .dc-p.dc-red,.dc-tv .dc-p.dc-red{box-shadow:0 0 0 1.5px rgba(142,31,39,.60)}
+  .dc-tray-pcs .dc-p::after,.dc-tv .dc-p::after{display:none}
+  .dc-tray-pcs .dc-ring,.dc-tv .dc-ring{display:none}
   /* 字級 .60(盤上是 .42)—— 立體省下來的空間全給字;刻字的位移一律拿掉(要銳利)。
      ⚠ 分母是 .dc-tray-pcs 的 --dc-cell(28px)而不是棋子本身:與盤上同一個算式,
        所以矮視窗那段只要改 --dc-cell,字與圓餅會一起縮。 */
-  .dc-tray-pcs .dc-ch{font-size:calc(var(--dc-cell,28px) * .60);text-shadow:none}
+  .dc-tray-pcs .dc-ch,.dc-tv .dc-ch{font-size:calc(var(--dc-cell,28px) * .60);text-shadow:none}
   /* 一組「一顆 + 幾顆」(同一種子併成一顆,見 board.js 的 groupCaps())。
      ⚠ 數字放在**圓的外面**,不壓在角上:壓角必定蓋掉字的右下角,那等於把上面
        剛省下來的空間又還回去。一方最多七種子 → 最寬的情況
@@ -7801,6 +7861,76 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .dc-tray-pcs{--dc-cell:24px}
     .dc-tray-pcs .dc-p{width:22px;height:22px}
   }
+
+  /* ---------- 兩塊浮層:悶局倒數 · 記牌盤(v2.3.7)----------
+     ★★★ 兩塊都是 `.dc-stage` 的 absolute 子元素,**一個像素都不佔版面**。
+       這是刻意的:動作列的高度是規格(見上面那條 ⚠⚠⚠),而這兩塊本質上就是
+       「有時候有、有時候沒有」的東西 —— 進動作列就是每走一手盤面上下跳一下。
+     ⚠ `.dc-stage` 是 overflow:hidden,所以它們**撐不出捲軸**,fitBoard() 量的
+       clientWidth/clientHeight 一個字都不會變(跳棋那條「捲軸出現 → 盤面自己震盪」
+       的紅線在這裡構不成)。 */
+
+  /* 悶局倒數:剩 10 步以內才出現的小浮標。措辭用**這一頁自己的詞**「比子」
+     (進場說明與規則卡寫的就是「比子:連續 40 步沒吃沒翻…」),不要另造新詞。
+     ⚠⚠ pointer-events:none 是規格不是美觀 —— 它浮在盤面上,吃得到點擊的話
+       被它蓋住的那一格就永遠點不到(跳棋紅線同構)。
+     ⚠⚠⚠ **top / right 由 board.js 的 syncIdle() 量出來寫進 inline style**,
+       這裡那兩個值只是還沒量到之前的起點。寫死角落試過:盤面在舞台裡是置中的,
+       而它有 4 欄 / 8 欄兩種擺法 —— 上方與側邊誰有空檔**每一種視窗都不一樣**,
+       六種視窗量下來有兩種會蓋到格子。規則見那一支的註解(下緣貼第一列格子的上緣)。
+     ⚠ 字**只有六個**(「N 步後比子」)也是規格的一部分:再長就撐過木框帶的寬度。
+       完整的說明留給記牌盤與結果卡。
+       守門是 gen-dc-shot.js 的「浮標 vs 每一格」那一行(比的是格子,不是盤面外框 ——
+       外框有 16px 的木框帶,壓在那一圈上不遮任何棋子)。
+     ⚠⚠⚠⚠ **高度寫死 17px,而那是算出來的**:盤面外圈有 16px 的木框帶(PAD),
+       而舞台被盤面填滿時(4 欄的直立手機就是這樣)**上面一點空檔都沒有** ——
+       這時唯一不遮棋子的位置就是那圈木框帶本身。17px 讓最壞情況只壓進第一列 1px
+       (= 一條毛邊,棋子的圓周還在 3px 之外)。
+       ⚠ 用 height + flex 置中而不是靠 padding + line-height 疊出來:後者的實際高度會隨
+         字型微調而變,而這裡差 2px 就從「毛邊」變成「壓到棋子」。
+       ⚠ 第一版是 11px 字 + 3px 內距(高 20px)→ 七種視窗有四種壓進格子 5~7.5px。 */
+  .dc-idle{position:absolute;top:0;right:0;z-index:9;pointer-events:none;
+    height:17px;display:flex;align-items:center;gap:3px;
+    max-width:95px;white-space:nowrap;
+    padding:0 8px;border-radius:999px;
+    font-size:10px;font-weight:800;color:#f3e4c6;
+    background:rgba(38,19,4,.86);
+    box-shadow:0 0 0 1px rgba(255,238,205,.24),0 3px 8px rgba(0,0,0,.34)}
+  .dc-idle b{font-size:12px;color:var(--dc-tgt)}
+  .dc-idle-hot{background:rgba(104,22,12,.90)}
+  .dc-idle-hot b{color:#ffd0c4}
+
+  /* 記牌盤:蓋滿舞台的一張卡。⚠ 點哪裡都關掉(board.js 掛在最外層那個節點上),
+     所以整塊要吃得到點擊 —— 這裡**不可以**有 pointer-events:none。 */
+  .dc-tally{position:absolute;inset:0;z-index:12;display:flex;
+    align-items:center;justify-content:center;padding:8px;
+    background:rgba(16,10,4,.58);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+  .dc-tally-card{width:100%;max-width:300px;max-height:100%;overflow:auto;
+    padding:10px 12px 12px;border-radius:14px;
+    background:var(--panel);border:1px solid var(--panel-line);
+    box-shadow:0 14px 34px rgba(0,0,0,.45)}
+  .dc-tally-hd{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    margin-bottom:6px;font-size:13px}
+  .dc-tally-x{appearance:none;-webkit-appearance:none;border:0;background:none;
+    padding:0 2px;font-size:15px;line-height:1;color:var(--muted);cursor:pointer}
+  .dc-tally-sum{margin:0 0 6px;font-size:12px;color:var(--muted)}
+  .dc-tally-sum b{font-size:15px;color:var(--text)}
+  /* 兩欄(紅 / 黑)× 七列(階級由大到小)。⚠ 用 grid 而不是兩個並排的直欄:
+     同一階級的紅黑一定要**對齊在同一列**,不然「這一種還剩幾顆」要左右來回找。 */
+  .dc-tally-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;align-items:center}
+  .dc-tally-grid .dc-th{font-size:11px;font-weight:800;text-align:center;
+    padding-bottom:2px;border-bottom:1px solid var(--panel-line)}
+  /* 一格 = 一顆扁棋子 + 還剩幾顆。⚠ 棋子的扁樣式與吃子欄**共用同一份宣告**
+     (見上面 .dc-tray-pcs 那幾條的群組選擇器)—— 兩份各寫一次遲早會分岔,
+     而分岔了兩邊都不會壞、只有截圖看得出來。 */
+  .dc-tv{--dc-cell:28px;display:flex;align-items:center;justify-content:center;gap:5px}
+  .dc-tn{font-size:13px;font-weight:800;font-style:normal;color:var(--text);min-width:12px}
+  /* 「已經全部現身」那一種整格淡掉 —— 這才是玩家真正在找的東西(「將出來了沒」)。 */
+  .dc-tv-0{opacity:.28}
+  .dc-tally-ft,.dc-tally-idle{margin:7px 0 0;font-size:11px;color:var(--muted);line-height:1.5}
+  .dc-tally-ft b,.dc-tally-idle b{color:var(--text);font-size:12px}
+  .dc-tally-off{margin:0;font-size:12px;color:var(--muted);line-height:1.65;text-align:left}
+  .dc-tally-off b{color:var(--text)}
   /* ⚠ 沒有獨立的包裝 div 了(舊的 .dc-chain-row)—— 文字與按鈕直接是 .dc-actline
      的 flex 子項,跟走棋倒數環同一行並排,間距靠 .dc-actline 的 gap。 */
   .dc-chain-txt{font-size:13px;font-weight:800;color:var(--accent-2)}
@@ -8938,6 +9068,18 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                              0 0 0 3px var(--c),0 0 16px rgba(0,0,0,.2);
                   animation:fcHangar 1.6s ease-in-out infinite}
   @keyframes fcHangar{0%,100%{filter:brightness(1)}50%{filter:brightness(1.07)}}
+  /* ★ 「輪到我了」的一次性金光(見 board.js 的 turnCue())。4 人局輪轉很快,現場常常
+     是「大家在看別人對決 → 沒注意到已經輪到自己」。
+     ⚠ 兩支動畫並列:fcHangar 動的是 filter、fcCue 動的是 box-shadow → 不會互相蓋掉。
+       ⚠⚠ 但 box-shadow 是**整份覆蓋**:keyframes 裡一定要把 .turn 那道內圈一起寫進去,
+         漏了就是提示的這 1.4 秒他的機場少一圈顏色 —— 而那一圈是規則(誰是哪一色)。
+     ⚠ box-shadow 的 spread **不進捲動範圍** → 這一條不必關進 .fc-fx 裡。 */
+  .fc-hangar.cue{animation:fcHangar 1.6s ease-in-out infinite,fcCue .7s ease-out 2}
+  @keyframes fcCue{
+    0%{box-shadow:inset 0 0 0 max(3px,calc(var(--fc-cell) * .15)) var(--cs),
+                  0 0 0 0 var(--c),0 0 16px rgba(0,0,0,.2)}
+    100%{box-shadow:inset 0 0 0 max(3px,calc(var(--fc-cell) * .15)) var(--cs),
+                    0 0 0 max(10px,calc(var(--fc-cell) * .6)) transparent,0 0 16px rgba(0,0,0,.2)}}
   /* ⚠⚠ 虛線圈與飛機**一定要同心**(v1.179.5 修)。board.js 給的 inline style 已經寫死
      一整格的 width/height,CSS 這邊再寫 width/height 是**蓋不掉的**(inline 權重較高)——
      蓋得掉的只有那個 margin,於是圈整個往右下偏了 0.1 格、飛機停在左上角,
@@ -8970,9 +9112,16 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* ---------- 飛機 ----------
      ⚠ 位置一律走 transform(不是 left/top):transition 只有 transform 走得動 GPU,
        14 格 × 一格一段的走位在低階手機上才不會掉格。 */
+  /* ⚠ 三個 touch 相關的宣告是**落點預覽的前提**(按住一架飛機看它會停在哪,
+     見 js/flychess/board.js 第三之三節):少了它們,長按會跳出系統的選字 / 放大鏡
+     / 長按選單,而那正好蓋在使用者要看的那一格上面。
+     ⚠ 只到 manipulation,**不可以寫 touch-action:none** —— 舞台在極端矮的視窗上
+     是可以捲的(.fc-stage 的 overflow:auto),鎖掉就捲不動了。 */
   .fc-plane{left:0;top:0;width:var(--fc-cell);height:var(--fc-cell);
             border:0;background:none;padding:0;margin:0;cursor:pointer;
             display:flex;align-items:center;justify-content:center;
+            touch-action:manipulation;-webkit-touch-callout:none;
+            -webkit-user-select:none;user-select:none;
             z-index:5;transition-property:transform;transition-timing-function:ease-in-out;
             transition-duration:0ms}
   /* ⚠⚠ **paint-order:stroke 是必要的,不是裝飾。** 機翼末端在 viewBox 裡只有 8 單位寬,
@@ -8995,11 +9144,43 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 動得了的那幾架:呼吸光環。⚠ 不用 disabled 擋別的 —— 點了要講得出原因 */
   .fc-plane.can{z-index:8;animation:fcPulse 1.15s ease-in-out infinite}
   .fc-plane.home{opacity:.55}
-  .fc-plane.hop svg{transform:scale(1.22)}
-  .fc-plane.flying{z-index:9}
-  .fc-plane.flying svg{transform:scale(1.35) rotate(-12deg)}
   @keyframes fcPulse{0%,100%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}
                      50%{filter:drop-shadow(0 0 6px rgba(255,255,255,.95))}}
+  /* ★ 這一架這個點數**踩得到人** → 呼吸光換成紅金色(見 board.js 的 render)。
+     踩人是這一局唯一「對某一個特定的人做壞事」的瞬間,漏看它就等於這一手白擲了。
+     ⚠ 一律用 drop-shadow 打光,**不可以用 brightness** —— 那條紅線在踩人那一段:
+       格子底色接近白,打亮 = 飛機直接消失(而顏色在這一頁是規則本體)。
+     ⚠ 權重要比 .fc-plane.can 高一階(多一個 class),不然只會被呼吸光蓋過去。 */
+  .fc-plane.can.eat{animation:fcHunt .8s ease-in-out infinite}
+  @keyframes fcHunt{
+    0%,100%{filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+    50%{filter:drop-shadow(0 0 7px rgba(255,120,40,.98)) drop-shadow(0 0 13px rgba(255,55,40,.8))}}
+
+  /* ---------- 跳 / 飛:騰空的弧線 ----------
+     使用者要的是「看得出它飛起來了」,而位移本身是 place() 的一段線性 transition。
+     ⚠⚠ 這兩支動畫的時間是**雙胞胎**:board.js 的 MS_JUMP(260ms)/ MS_FLY(520ms)
+       各有一份。短了就是「還在半空中就被收掉」,長了就是「落地了機身還歪著」。
+     ⚠⚠⚠ **放大一律 ≤ 1.35**(= 紅線 17 那個量出來的上限),「更高」一律靠
+       translateY **往上** + 陰影變大:
+         · 放大會同時往右下長 → 最外圈那一格的邊就是盤子的邊 → .fc-stage 冒捲軸
+           → 下一次 fitBoard() 縮一階(1.35 / −12deg 量到的溢出是 3px)
+         · 往上位移只會超出**上緣**,而上緣那個方向捲不到 → 一個像素都不外溢
+       ★ 而「飛」偏偏一定發生在最外圈(航線格與落點都在外圈)—— 這一條不是理論。
+     ⚠ filter 不進捲動範圍,所以「高度」主要交給陰影扛。 */
+  .fc-plane.hop svg{animation:fcHop .26s cubic-bezier(.3,.7,.4,1) both}
+  @keyframes fcHop{
+    0%{transform:scale(1) translateY(0);filter:drop-shadow(0 1px 2px rgba(0,0,0,.42))}
+    45%{transform:scale(1.22) translateY(-24%);filter:drop-shadow(0 7px 5px rgba(0,0,0,.32))}
+    100%{transform:scale(1) translateY(0);filter:drop-shadow(0 1px 2px rgba(0,0,0,.42))}}
+  .fc-plane.flying{z-index:9}
+  .fc-plane.flying svg{animation:fcSoar .52s cubic-bezier(.4,.05,.4,1) both}
+  @keyframes fcSoar{
+    0%{transform:scale(1.1) rotate(-6deg) translateY(0);filter:drop-shadow(0 1px 2px rgba(0,0,0,.42))}
+    26%{transform:scale(1.35) rotate(-12deg) translateY(-26%);
+        filter:drop-shadow(0 11px 7px rgba(0,0,0,.3)) drop-shadow(0 0 6px rgba(255,255,255,.75))}
+    74%{transform:scale(1.35) rotate(-12deg) translateY(-26%);
+        filter:drop-shadow(0 11px 7px rgba(0,0,0,.3)) drop-shadow(0 0 6px rgba(255,255,255,.75))}
+    100%{transform:scale(1.12) rotate(-4deg) translateY(0);filter:drop-shadow(0 2px 3px rgba(0,0,0,.42))}}
 
   /* ---------- 被踩掉:挨打 → 彈飛 → 落地(重做)----------
      使用者:「飛機被踩掉的動畫太差了,應該做的再誇張一點,時間長一點點沒關係」。
@@ -9046,10 +9227,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        → .fc-stage(overflow:auto)冒捲軸 → fitBoard 縮一階(同 .fc-fx 那一段)。 */
   .fc-plane.eject{transition-timing-function:cubic-bezier(.3,.85,.25,1)}
   .fc-plane.eject svg{animation:fcEject .7s cubic-bezier(.3,.5,.4,1) both}
+  /* ★ 中段多一個 translateY 的**拋物線**(使用者要的「螺旋翻滾摔回機場」)——
+     位移是 place() 帶的直線,把「高度」疊在 svg 上就變成一條弧。
+     ⚠ 往上位移是安全的(上緣捲不到),放大仍然壓在 1.19(見上面那條上限)。 */
   @keyframes fcEject{
-    0%{transform:scale(1.19) rotate(5deg);filter:brightness(1.25) drop-shadow(0 0 4px #fff)}
-    35%{transform:scale(.78) rotate(280deg);filter:brightness(1.1)}
-    100%{transform:scale(.9) rotate(720deg);filter:brightness(1)}}
+    0%{transform:scale(1.19) rotate(5deg) translateY(0);filter:brightness(1.25) drop-shadow(0 0 4px #fff)}
+    35%{transform:scale(.78) rotate(280deg) translateY(-34%);
+        filter:brightness(1.1) drop-shadow(0 9px 6px rgba(0,0,0,.3))}
+    100%{transform:scale(.9) rotate(720deg) translateY(0);filter:brightness(1)}}
   /* 落地:壓扁再彈回來(回彈的 overshoot 在 svg 上,盒子沒動 → 不會撐大盤面) */
   .fc-plane.plop svg{animation:fcPlop .26s cubic-bezier(.2,1.5,.4,1) both}
   @keyframes fcPlop{
@@ -9109,6 +9294,102 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     72%{opacity:.9}
     100%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -1.75)) scaleY(1.3);opacity:0}}
 
+  /* ---------- 一次性的小特效:起飛煙 / 落地塵 / 到家煙火 / 噴射尾跡 ----------
+     ⚠⚠ 四樣全部住在 .fc-fx 裡(overflow:hidden):起飛點在外圈、機場在四個角,
+       全都貼著盤子的邊 —— 噴出去就是把 .fc-stage 的捲動範圍撐大(紅線 19,同 .fc-boom)。
+     ⚠ 尺寸一律 --fc-cell 的倍數,不可以寫死 px(格子 13px → 46px 差三倍半)。 */
+  .fc-puff,.fc-dust,.fc-cheer{position:absolute;width:0;height:0}
+  .fc-puff > i,.fc-dust > i,.fc-cheer > i{position:absolute;left:0;top:0;display:block}
+  /* 起飛出庫:六團小煙往外散(配 SFX.launch 的加速音) */
+  .fc-puff > i{width:calc(var(--fc-cell) * .34);height:calc(var(--fc-cell) * .34);
+               margin:calc(var(--fc-cell) * -.17) 0 0 calc(var(--fc-cell) * -.17);border-radius:50%;
+               background:radial-gradient(circle,rgba(255,255,255,.95) 0 38%,
+                          rgba(255,255,255,.4) 68%,rgba(255,255,255,0) 100%);
+               animation:fcPuff .6s ease-out var(--d,0ms) both}
+  @keyframes fcPuff{
+    0%{transform:rotate(var(--a,0deg)) translateY(0) scale(.4);opacity:.95}
+    100%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -.95)) scale(1.55);opacity:0}}
+  /* 摔回機場落地的那一下:兩圈往外擴的塵 */
+  .fc-dust > i{width:calc(var(--fc-cell) * .7);height:calc(var(--fc-cell) * .7);
+               margin:calc(var(--fc-cell) * -.35) 0 0 calc(var(--fc-cell) * -.35);border-radius:50%;
+               border:calc(var(--fc-cell) * .08) solid rgba(120,95,55,.45);
+               animation:fcDust .48s ease-out both}
+  .fc-dust > i + i{animation-delay:.1s}
+  @keyframes fcDust{0%{transform:scale(.3);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+  /* 到家:終點放一串四色小煙火。★ 位置是**盤面正中心**,離四個邊最遠 ——
+     所以它是這一頁唯一可以放開噴、完全不會被裁到的特效。 */
+  .fc-cheer > i{width:calc(var(--fc-cell) * .2);height:calc(var(--fc-cell) * .34);
+                margin:calc(var(--fc-cell) * -.17) 0 0 calc(var(--fc-cell) * -.1);border-radius:99px;
+                background:var(--c);box-shadow:0 0 calc(var(--fc-cell) * .16) rgba(255,255,255,.85);
+                animation:fcCheer .82s cubic-bezier(.15,.7,.3,1) var(--d,0ms) both}
+  @keyframes fcCheer{
+    0%{transform:rotate(var(--a,0deg)) translateY(0) scale(.5);opacity:0}
+    18%{opacity:1}
+    100%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * var(--r,1.4) * -1)) scale(1);opacity:0}}
+  /* ★★ 超音速直飛的噴射尾跡(飛 12 格)。
+     ⚠ 外層只負責**角度與長度**(board.js 的 jet() 算的),會動的是裡面那條 —— 兩支
+       動畫掛在同一個 transform 上就是互相蓋掉(同 .fc-plane 那條紅線)。
+     ⚠ .52s 又是 MS_FLY 的雙胞胎(尾跡要跟飛機同時到)。 */
+  .fc-jet{position:absolute;height:calc(var(--fc-cell) * .34);
+          margin-top:calc(var(--fc-cell) * -.17);transform-origin:0 50%}
+  .fc-jet > i{position:absolute;left:0;top:0;width:100%;height:100%;display:block;
+              border-radius:99px;transform-origin:0 50%;
+              background:linear-gradient(90deg,rgba(255,255,255,0) 0,var(--c) 46%,#fff 97%);
+              animation:fcJet .52s linear both}
+  @keyframes fcJet{
+    0%{transform:scaleX(0) scaleY(.45);opacity:.95}
+    70%{opacity:.75}
+    100%{transform:scaleX(1) scaleY(1);opacity:0}}
+
+  /* ---------- ★★ 落點預覽層(按住 / 滑過一架飛機)----------
+     ⚠⚠ overflow:hidden 的理由與 .fc-fx 一模一樣(紅線 19):圈與準心都比一格大,
+       而落點常常就在最外圈 —— 不裁就是捲軸 → fitBoard() 縮一階 → 自己震盪。
+     ★ z-index 10 = 壓在飛機**上面**(.fc-fx 反過來是 4,壓在飛機底下):
+       「這一格踩得到他」的準心一定要蓋在**受害者**身上才講得清楚。
+     ⚠ pointer-events:none —— 它蓋在飛機上面,不關掉就再也點不到飛機了。 */
+  .fc-pv{left:0;top:0;width:100%;height:100%;overflow:hidden;border-radius:20px;
+         pointer-events:none;z-index:10}
+  .fc-pv > *{position:absolute}
+  /* 路徑上每一格一顆小點(落點不畫點 —— 那裡有圈) */
+  .fc-pv-dot{width:calc(var(--fc-cell) * .26);height:calc(var(--fc-cell) * .26);
+             margin:calc(var(--fc-cell) * -.13) 0 0 calc(var(--fc-cell) * -.13);border-radius:50%;
+             background:var(--c);box-shadow:0 0 0 1.5px rgba(255,255,255,.9);
+             animation:fcPvIn .16s ease-out both}
+  @keyframes fcPvIn{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:.9}}
+  /* 「飛 12 格」是一條直線穿過盤面(place 的 transition 就是線性內插)——
+     ⚠ 不畫這一條的話玩家會以為是沿著外圈走過去的,而那是完全不同的 12 格。 */
+  .fc-pv-line{height:calc(var(--fc-cell) * .16);margin-top:calc(var(--fc-cell) * -.08);
+              transform-origin:0 50%;opacity:.8;border-radius:99px;
+              background:repeating-linear-gradient(90deg,var(--c) 0 42%,transparent 42% 100%);
+              background-size:calc(var(--fc-cell) * .44) 100%}
+  /* 落點的圈。★ 踩得到人 → 換成紅色準心(十字線由 ::before / ::after 畫);
+     走到終點 → 換成金色(那一架就收工了)。 */
+  .fc-pv-t{width:calc(var(--fc-cell) * .94);height:calc(var(--fc-cell) * .94);
+           margin:calc(var(--fc-cell) * -.47) 0 0 calc(var(--fc-cell) * -.47);border-radius:50%;
+           border:calc(var(--fc-cell) * .1) solid var(--c);
+           box-shadow:0 0 0 1.5px rgba(255,255,255,.85),inset 0 0 0 1.5px rgba(255,255,255,.85);
+           animation:fcPvT .9s ease-in-out infinite}
+  @keyframes fcPvT{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  .fc-pv-t.hit{width:calc(var(--fc-cell) * 1.3);height:calc(var(--fc-cell) * 1.3);
+               margin:calc(var(--fc-cell) * -.65) 0 0 calc(var(--fc-cell) * -.65);
+               border-color:#ff2d2d;
+               box-shadow:0 0 0 1.5px rgba(255,255,255,.9),
+                          0 0 calc(var(--fc-cell) * .32) rgba(255,45,45,.85);
+               animation:fcPvHit .52s ease-in-out infinite}
+  @keyframes fcPvHit{0%,100%{transform:scale(1)}50%{transform:scale(1.11)}}
+  /* 十字準線。⚠⚠ 兩條都要**以圈為中心**再往兩邊各伸出去一點:
+     `top:-37%; height:174%` 才是「上下各多出 37%」;寫成 `top:-36%; height:74%` 的話
+     線只往**一邊**長(截圖上就是一條偏在左邊的紅槓,看起來像破圖)—— 這只有看圖才發現得到。 */
+  .fc-pv-t.hit::before,.fc-pv-t.hit::after{content:"";position:absolute;background:#ff2d2d;
+               box-shadow:0 0 0 1.5px rgba(255,255,255,.75);border-radius:99px}
+  .fc-pv-t.hit::before{left:50%;top:-37%;width:calc(var(--fc-cell) * .1);height:174%;
+                       margin-left:calc(var(--fc-cell) * -.05)}
+  .fc-pv-t.hit::after{top:50%;left:-37%;height:calc(var(--fc-cell) * .1);width:174%;
+                      margin-top:calc(var(--fc-cell) * -.05)}
+  .fc-pv-t.goal{border-color:#ffb300;
+                box-shadow:0 0 0 1.5px rgba(255,255,255,.9),
+                           0 0 calc(var(--fc-cell) * .34) rgba(255,190,40,.9)}
+
   /* 盤面挨一記。
      ⚠⚠ **只准縮不准放,而且平移量必須 <(1−scale)/2**(百分比是元素自己的邊長)——
        這樣位移後的外框永遠留在原本那個框裡面,一個像素都不會外溢。
@@ -9132,32 +9413,92 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .fc-board.fc-quake{animation:none}
     .fc-spark{display:none}
     .fc-flash,.fc-ring{animation-duration:.2s}
+    /* ★ 同一條判準:滿天飛的顆粒一律關掉,**講規則的那些留著** ——
+       落點預覽(.fc-pv*)是資訊不是裝飾,關掉它等於把這一版最有用的東西關掉;
+       它本來就只有那顆圈在呼吸,而全站那條 .001s 已經把呼吸壓成靜止了。 */
+    .fc-cheer,.fc-puff,.fc-dust,.fc-jet{display:none}
+    .fc-hangar.cue{animation:none}
   }
 
   /* ---------- 骰子 ----------
      ⚠ 點數是**別人給的**(住在 moves 裡),這裡只負責演;.rolling 期間顯示的那幾面
        純粹是視覺,與規則無關(見 board.js 第六節)。 */
-  .fc-die{width:58px;height:58px;flex:none;border-radius:18px;
-          background:linear-gradient(155deg,#fffdf6,#f6e6c6);
-          border:2px solid var(--fc-line);padding:8px;
-          display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
-          gap:2px;cursor:pointer;
-          box-shadow:0 3px 8px rgba(60,40,10,.28),inset 0 1px 0 rgba(255,255,255,.9);
+  /* ★★ 立體骰子:六個面一次建好,之後**只轉角度**(見 board.js 的 setDie / DIE_SHOW)。
+     ⚠ 盒子只負責透視與外框光,**點數在六個面上** → padding / 格線 / 背景一律搬到
+       .fc-face 身上(留在盒子上的話點數會跟著透視被推歪)。
+     ⚠⚠ .fc-cube 的 transform 開頭那個 translateZ(−半個骰子) 不是裝飾:
+       perspective 的參考平面是 z=0,正面若停在 +半個骰子 就會被放大約 17%
+       → 骰子看起來比它的盒子大一圈,而 .live 的光圈與版面全部對不上。
+       ⚠ 順序是「先轉再往後推」(transform 由右往左作用)→ 骰子仍然在原地翻。
+     ⚠ 尺寸走 --fc-d 這一個變數(矮視窗那一段只要改它)——
+       面的 translateZ 是它的一半,寫死 px 的話換個尺寸就散成六張紙。
+     ⚠ .fc-die 不可以有 overflow:hidden(3D 的面會被切掉)。 */
+  .fc-die{--fc-d:58px;width:var(--fc-d);height:var(--fc-d);flex:none;position:relative;
+          border:0;background:none;padding:0;cursor:pointer;border-radius:18px;
+          perspective:calc(var(--fc-d) * 3.4);
+          filter:drop-shadow(0 3px 6px rgba(60,40,10,.34));
           transition:transform .14s,box-shadow .14s,filter .14s}
+  .fc-cube{position:absolute;inset:0;transform-style:preserve-3d;
+           transform:translateZ(calc(var(--fc-d) / -2));
+           transition:transform .13s linear}
+  .fc-face{position:absolute;inset:0;box-sizing:border-box;backface-visibility:hidden;
+           border-radius:18px;border:2px solid var(--fc-line);
+           background:linear-gradient(155deg,#fffdf6,#f6e6c6);
+           box-shadow:inset 0 1px 0 rgba(255,255,255,.9),
+                      inset 0 0 calc(var(--fc-d) * .22) rgba(150,120,60,.2);
+           padding:8px;display:grid;grid-template-columns:repeat(3,1fr);
+           grid-template-rows:repeat(3,1fr);gap:2px}
+  /* 六面的擺法。⚠ 對面兩數和 7(1-6 / 2-5 / 3-4)—— 真骰子就是這樣,轉起來才不會
+     露出馬腳。**改哪一面都要跟著改 board.js 的 DIE_SHOW**(那是這裡的反矩陣)。 */
+  .fc-face[data-f="1"]{transform:translateZ(calc(var(--fc-d) / 2))}
+  .fc-face[data-f="6"]{transform:rotateY(180deg) translateZ(calc(var(--fc-d) / 2))}
+  .fc-face[data-f="3"]{transform:rotateY(90deg) translateZ(calc(var(--fc-d) / 2))}
+  .fc-face[data-f="4"]{transform:rotateY(-90deg) translateZ(calc(var(--fc-d) / 2))}
+  .fc-face[data-f="5"]{transform:rotateX(90deg) translateZ(calc(var(--fc-d) / 2))}
+  .fc-face[data-f="2"]{transform:rotateX(-90deg) translateZ(calc(var(--fc-d) / 2))}
   .fc-pip{border-radius:50%;background:transparent}
   .fc-pip.on{background:var(--fc-ink);box-shadow:inset 0 -1px 0 rgba(255,255,255,.25)}
-  .fc-die.live{box-shadow:0 3px 10px rgba(60,40,10,.3),0 0 0 3px var(--accent),
-               inset 0 1px 0 rgba(255,255,255,.9);animation:fcDieCall 1.5s ease-in-out infinite}
-  .fc-die.idle{filter:saturate(.5) opacity(.62);cursor:default}
+  /* 還沒擲過(data-v=0)= 空白的骰子:六個面的點數一起收起來 */
+  .fc-die[data-v="0"] .fc-pip.on{background:transparent;box-shadow:none}
+  /* ★ 兩個一次性的光圈各佔一個 pseudo,**不跟 .live / .pop 搶 animation 這個屬性** ——
+     它們全掛在 .fc-die 身上的話,擲到 6 的金光會把彈跳整支蓋掉(而且很難認)。 */
+  .fc-die::before,.fc-die::after{content:"";position:absolute;inset:0;border-radius:18px;
+                                 pointer-events:none}
+  .fc-die.live{box-shadow:0 3px 10px rgba(60,40,10,.3),0 0 0 3px var(--accent);
+               animation:fcDieCall 1.5s ease-in-out infinite}
+  .fc-die.idle{filter:saturate(.5) opacity(.62) drop-shadow(0 2px 4px rgba(60,40,10,.28));cursor:default}
   .fc-die.rolling{animation:fcDieRoll .12s linear infinite}
   .fc-die.pop{animation:fcDiePop .28s ease-out}
+  /* 落定那一下的轉場曲線彈一點(是 transition 不是動畫 —— 角度是 JS 寫的) */
+  .fc-die.land .fc-cube{transition:transform .34s cubic-bezier(.2,1.5,.4,1)}
+  /* ★ 擲到 6 = 可以再擲一次:金光爆一圈(規則本身值得一個回饋,同 SFX.six 那兩音) */
+  .fc-die.six::after{animation:fcSix .9s ease-out}
+  @keyframes fcSix{
+    0%{box-shadow:0 0 0 0 rgba(255,196,60,.95),0 0 0 0 rgba(255,150,30,.75)}
+    45%{box-shadow:0 0 0 9px rgba(255,196,60,.4),0 0 24px 7px rgba(255,150,30,.5)}
+    100%{box-shadow:0 0 0 20px rgba(255,196,60,0),0 0 28px 9px rgba(255,150,30,0)}}
+  /* ★ 「輪到我了」:骰子上一圈綠光(與自家機場那一圈同時,見 board.js 的 turnCue) */
+  .fc-die.callme::before{animation:fcCall .55s ease-out 2}
+  @keyframes fcCall{
+    0%{box-shadow:0 0 0 0 var(--accent)}
+    100%{box-shadow:0 0 0 14px transparent}}
   @keyframes fcDieCall{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-  @keyframes fcDieRoll{0%{transform:rotate(-9deg) scale(1.04)}50%{transform:rotate(9deg) scale(.96)}
-                       100%{transform:rotate(-9deg) scale(1.04)}}
+  /* ⚠ 翻滾期間**不要轉盒子**(它是 perspective 的容器,轉了整個透視會跟著歪)——
+     骰子自己的翻滾在 .fc-cube 上,這裡只做一點上下的震動。 */
+  @keyframes fcDieRoll{0%{transform:translateY(0) scale(1.03)}50%{transform:translateY(-8%) scale(.98)}
+                       100%{transform:translateY(0) scale(1.03)}}
   @keyframes fcDiePop{0%{transform:scale(1.28)}60%{transform:scale(.95)}100%{transform:scale(1)}}
 
   .fc-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
            line-height:1.35;text-align:left;max-height:2.7em;overflow:hidden}
+  /* ★ 連擲 6 的計數。**這是規則的一部分**(連續三次 6 這一輪作廢),而它以前在畫面上
+     完全沒有 —— 玩家只知道「又是 6」,第三次忽然作廢就很像 bug(見 adapter.js 的 sixTag)。
+     ⚠ 它跟著提示文字走(不是絕對定位的徽章):動作列上只有骰子 / 提示 / 倒數三格,
+       硬插第四格在窄手機上會把提示擠成兩行。 */
+  .fc-fire{display:inline-block;font-size:11.5px;font-weight:800;color:#ff7a18;
+           background:rgba(255,150,30,.16);border-radius:8px;padding:1px 5px;white-space:nowrap;
+           animation:fcFire .9s ease-in-out infinite}
+  @keyframes fcFire{0%,100%{filter:brightness(1)}50%{filter:brightness(1.22)}}
 
   /* ---------- 出手倒數的環(v1.179.1)----------
      ★★ 與台灣麻將 / 21 點 / UNO / 暗棋**同一顆**:SVG 環圈 + 中間秒數,最後 3 秒轉紅脈動。
@@ -9230,7 +9571,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .fc-room{padding:6px 10px}
     .fc-room .mp-subrow,.fc-room-foot{margin-top:3px}
     .fc-acts{min-height:46px}
-    .fc-die{width:48px;height:48px;padding:6px;border-radius:15px}
+    /* ⚠ 立體骰只改 --fc-d 這一個變數(面的 translateZ 是它的一半,自己會跟著縮);
+       padding 與圓角在**面**上,不在盒子上。 */
+    .fc-die{--fc-d:48px;border-radius:15px}
+    .fc-face{padding:6px;border-radius:15px}
     .fc-cd{width:30px;height:30px}
     .fc-cdn{font-size:12.5px}
     .fc-hint{font-size:12px}

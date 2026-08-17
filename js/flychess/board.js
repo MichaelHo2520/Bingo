@@ -191,6 +191,15 @@ const FCB = (function(){
        ⚠ 圓角要跟著盤子(20px),不然四個角會切出直角的邊。 */
     h += '<div class="fc-fx" id="fcFx" aria-hidden="true"></div>';
 
+    /* ★ 落點預覽的圖層。⚠⚠ 與 .fc-fx 是**兩層**,而且方向刻意相反:
+         · .fc-fx  z-index 4 → 壓在飛機**底下**(爆炸是背景的光,不可以蓋住主角)
+         · .fc-pv  z-index 10 → 壓在飛機**上面**(「這一格踩得到他」的準心一定要
+           蓋在受害者身上,畫在他底下就等於沒畫)
+       ⚠ overflow:hidden 的理由與 .fc-fx 完全一樣(紅線 17 / 19):預覽的圈與準心
+         都比一格大,而落點常常在最外圈 —— 不裁就是捲軸 → fitBoard() 縮一階。
+       ⚠ 它是**自己建的**(不佔 flychess.html 一行,照 qr.js 的先例)。 */
+    h += '<div class="fc-pv" id="fcPv" aria-hidden="true"></div>';
+
     board.innerHTML = h;
     built = true;
   }
@@ -325,6 +334,7 @@ const FCB = (function(){
     const fx = $("fcFx");
     if(fx && fx.firstChild) fx.innerHTML = "";
     if(board) board.classList.remove("fc-quake");
+    clearPv();      // ⚠ 落點預覽也是「中途狀態」:一手開始演了就不該再留著上一個落點
   }
 
   /* 撞擊特效:白光 + 擴散的圈 + 八道火花,擺在「踩到的那一格」的正中心。
@@ -344,6 +354,137 @@ const FCB = (function(){
     el.innerHTML = h;
     fx.appendChild(el);
     setTimeout(() => el.remove(), 900);
+  }
+
+  /* ==========================================================================
+     三之二、★ 一次性的小特效(起飛煙 / 落地塵 / 到家煙火 / 噴射尾跡)
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠⚠ 全部丟進 .fc-fx(overflow:hidden),一個都不准直接掛在 .fc-board 上 ——
+         起飛點與機場都貼著盤子的邊,噴出去就是把 .fc-stage(overflow:auto)的捲動
+         範圍撐大 → 捲軸 → 下一次 fitBoard() 縮一階(紅線 19,與 boom 同一條)。
+       ⚠ 尺寸一律 --fc-cell 的倍數,不可以寫死 px(格子從 13px 到 46px 差三倍半)。
+       ⚠ 收尾用普通的 setTimeout **而不是** later():它們只刪 DOM、不出聲也不推進局面,
+         而 later() 會被 bump() 的世代記號擋掉 → 取消時反而變成刪不掉的殘骸
+         (真正的取消路徑是 clearFx() 整層清掉)。
+     ========================================================================== */
+  function mkFx(cls, x, y, inner, ms, color){
+    const fx = $("fcFx");
+    if(!fx) return null;
+    const el = document.createElement("div");
+    el.className = cls;
+    if(color != null) el.dataset.c = color;
+    el.style.left = "calc(var(--fc-cell) * " + (x + 0.5) + ")";
+    el.style.top  = "calc(var(--fc-cell) * " + (y + 0.5) + ")";
+    el.innerHTML = inner || "";
+    fx.appendChild(el);
+    setTimeout(() => el.remove(), ms);
+    return el;
+  }
+  // 起飛出庫:尾端一陣煙(配 SFX.launch 的加速音)
+  function puff(x, y, color){
+    let h = "";
+    for(let i = 0; i < 6; i++)
+      h += '<i style="--a:' + (i * 60 + 20) + 'deg;--d:' + ((i % 3) * 45) + 'ms"></i>';
+    mkFx("fc-puff", x, y, h, 760, color);
+  }
+  // 被彈回機場之後落地的塵環(第三段 plop 的那一下)
+  function dust(x, y, color){ mkFx("fc-dust", x, y, "<i></i><i></i>", 640, color); }
+  /* 到家:終點中央放一串四色小煙火。
+     ★ 位置是盤面正中心 → 不會被 .fc-fx 裁到,可以噴得比撞擊還開。 */
+  function cheer(x, y){
+    let h = "";
+    for(let i = 0; i < 14; i++)
+      h += '<i data-c="' + (i % 4) + '" style="--a:' + (i * 26 + 9) + 'deg;--r:' +
+           (1.2 + (i % 4) * 0.3).toFixed(2) + ';--d:' + ((i % 5) * 55) + 'ms"></i>';
+    mkFx("fc-cheer", x, y, h, 1200);
+  }
+  /* ★★ 直飛 12 格的噴射尾跡。
+     ★ 它不是憑空想像的一條線:飛機的位移是**一段線性的 transform**(place() 直接把
+       translate 換成落點,由 transition 內插)—— 畫面上它真的是「破空穿過盤面」的
+       一條直線,所以尾跡的角度與長度算的就是同一條線。
+     ⚠ 外層只負責旋轉與長度,**會動的是裡面那個 `<i>`** —— 兩支動畫掛在同一個
+       transform 上就是互相蓋掉(同 .fc-plane 那條紅線的道理)。 */
+  function jet(from, to, color){
+    const fx = $("fcFx");
+    if(!fx || !from || !to) return;
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if(!(len > 0.2)) return;
+    const el = document.createElement("div");
+    el.className = "fc-jet";
+    el.dataset.c = color;
+    el.style.left = "calc(var(--fc-cell) * " + (from.x + 0.5) + ")";
+    el.style.top  = "calc(var(--fc-cell) * " + (from.y + 0.5) + ")";
+    el.style.width = "calc(var(--fc-cell) * " + len.toFixed(3) + ")";
+    el.style.transform = "rotate(" + (Math.atan2(dy, dx) * 180 / Math.PI).toFixed(2) + "deg)";
+    el.innerHTML = "<i></i>";
+    fx.appendChild(el);
+    setTimeout(() => el.remove(), MS_FLY + 360);
+  }
+
+  /* ==========================================================================
+     三之三、★★ 落點預覽 —— 這一架會停在哪、踩不踩得到人
+     ──────────────────────────────────────────────────────────────────────────
+       這一頁最大的決策負擔是「玩家得自己默數格子」:走完會不會踩到人、會不會剛好
+       停在別人一擲就踩得到的格子上。而它同時是十四個裡**最多人不會玩**的一頁
+       (見 notes/22 的「玩法說明」那一節)—— 看得到落點,規則就自己講完了一半。
+
+     ★★★ 為什麼用 pointerover / pointerout 這一對:
+       桌機是「滑過去看」,手機是「按住不放看」—— 而觸控上這一對事件正好在
+       pointerdown / pointerup 時各發一次,**一份程式碼兩種裝置都成立**,
+       而且不必發明新手勢:按住 → 看落點 → 手指移開就取消 → 在原地放開才真的走
+       (click 只在「放開時還在同一架飛機上」才發得出來)。
+       ⚠ 不要改成「第一下預覽、第二下確認」—— 那是把**每一手**都變成兩次點擊。
+     ⚠ 同一架飛機的子元素之間移動(svg ↔ 座號)也會發 pointerout → 一定要看
+       relatedTarget,不然預覽會在手指底下閃爍。
+     ========================================================================== */
+  let curCans = [], curSeat = -1, curColor = 0, pvOn = -1;
+
+  function clearPv(){
+    const pv = $("fcPv");
+    if(pv && pv.firstChild) pv.innerHTML = "";
+    pvOn = -1;
+  }
+  // 預覽層的零件:一個「格子中心」的座標點(同 boom:傳進來的是左上角 → 中心要 +0.5)
+  function pvNode(tag, cls, x, y, color){
+    const el = document.createElement(tag);
+    el.className = cls;
+    if(color != null) el.dataset.c = color;
+    el.style.left = "calc(var(--fc-cell) * " + (x + 0.5) + ")";
+    el.style.top  = "calc(var(--fc-cell) * " + (y + 0.5) + ")";
+    return el;
+  }
+  function showPv(plane){
+    if(animating || pvOn === plane) return;
+    const pv = $("fcPv");
+    let m = null;
+    for(let i = 0; i < curCans.length; i++) if(curCans[i].plane === plane) m = curCans[i];
+    if(!pv || !m || !shown || curSeat < 0) return;
+    clearPv();
+    pvOn = plane;
+    const c = curColor;
+    const fromQ = (shown[curSeat] || [])[plane] || 0;
+    const steps = stepsOf(fromQ, m.hops);
+    let prev = R.posXY(c, fromQ, plane);
+    steps.forEach((s, k) => {
+      const p = R.posXY(c, s.q, plane);
+      /* 「飛」是一條**直線穿過盤面**(place 的 transition 就是線性內插)——
+         不畫這條線的話玩家會以為是沿著外圈走過去的,而那是完全不同的 12 格。 */
+      if(s.kind === "fly"){
+        const dx = p.x - prev.x, dy = p.y - prev.y;
+        const el = pvNode("div", "fc-pv-line", prev.x, prev.y, c);
+        el.style.width = "calc(var(--fc-cell) * " + Math.sqrt(dx * dx + dy * dy).toFixed(3) + ")";
+        el.style.transform = "rotate(" + (Math.atan2(dy, dx) * 180 / Math.PI).toFixed(2) + "deg)";
+        pv.appendChild(el);
+      }
+      if(k < steps.length - 1) pv.appendChild(pvNode("i", "fc-pv-dot", p.x, p.y, c));
+      prev = p;
+    });
+    /* 落點一個圈;**踩得到人就換成準心**(這是這個遊戲最爽的一件事,要用力講),
+       走到終點換成金色(那一架就收工了)。 */
+    const last = R.posXY(c, m.to, plane);
+    pv.appendChild(pvNode("i", "fc-pv-t" + (m.eat ? " hit" : "") +
+                               (m.to >= R.GOAL ? " goal" : ""), last.x, last.y, c));
   }
 
   /* 盤面挨一記。⚠⚠ **只准縮不准放、平移量必須小於縮掉的那一半**:
@@ -405,18 +546,25 @@ const FCB = (function(){
     placeAll(mid, st.colors, 0);
 
     const steps = stepsOf(fromQ, mv.hops);
-    let k = 0;
+    const myC = st.colors[seat];
+    let k = 0, lastQ = fromQ;
     (function next(){
       if(g !== animGen) return;
       if(k >= steps.length){ land(); return; }
       const s = steps[k++];
       el.classList.toggle("hop", s.kind === "jump");
       el.classList.toggle("flying", s.kind === "fly");
-      place(el, st.colors[seat], s.q, idx, msOf(s.kind), 0, 1);
+      place(el, myC, s.q, idx, msOf(s.kind), 0, 1);
+      const here = R.posXY(myC, s.q, idx);
       if(s.kind === "walk") SFX.tick();
-      else if(s.kind === "fly") SFX.fly();
+      else if(s.kind === "fly"){
+        SFX.fly();
+        // ★ 尾跡畫的就是「這一段真的走的那條直線」(見 jet 的註解)
+        jet(R.posXY(myC, lastQ, idx), here, myC);
+      }
       else if(s.kind === "jump") SFX.jump();
-      else if(s.kind === "launch") SFX.launch();
+      else if(s.kind === "launch"){ SFX.launch(); puff(here.x, here.y, myC); }
+      lastQ = s.q;
       later(g, next, msOf(s.kind));
     })();
 
@@ -429,7 +577,12 @@ const FCB = (function(){
        ⚠ 每一段的聲音都排在 later() 的世代守衛裡面(離場後不可以繼續響)。 */
     function land(){
       el.classList.remove("hop", "flying");
-      if(mv.home) SFX.home();
+      if(mv.home){
+        SFX.home();
+        /* ★ 到家的小煙火。位置是**盤面正中心**(GOAL_XY + 0.5 = 7,7)—— 那裡離四個邊
+           最遠,所以它是這一頁唯一可以放開噴、完全不會被 .fc-fx 裁到的特效。 */
+        cheer(R.GOAL_XY.x, R.GOAL_XY.y);
+      }
       if(mv.eaten && mv.eaten.length){
         const victims = mv.eaten.map(e => planeEls[e.seat] && planeEls[e.seat][e.plane]).filter(Boolean);
         // 撞擊點 = 踩人的那一架**停下來**的那一格(踩人只算停下來那一格,見規則)
@@ -447,6 +600,11 @@ const FCB = (function(){
           later(g, () => {
             victims.forEach(ee => { ee.classList.remove("eject"); ee.classList.add("plop"); });
             SFX.plop();
+            // 摔進機場的那一下:每一架各噴一圈塵(位置 = 它自己那一格機場)
+            (mv.eaten || []).forEach(e => {
+              const hp = R.hangarXY(st.colors[e.seat], e.plane);
+              dust(hp.x, hp.y, st.colors[e.seat]);
+            });
             later(g, () => {
               victims.forEach(ee => ee.classList.remove("plop"));
               finish();
@@ -476,6 +634,9 @@ const FCB = (function(){
          st,               replay 出來的局面(唯一真相)
          mySeat,           我坐哪(-1 = 觀看)
          can:[planeIdx],   現在我可以動哪幾架(空 = 不能動)
+         cans:[legalMove], ★ 同一批的完整內容({plane,to,hops})—— 落點預覽與「踩得到」
+                             那顆紅光要它;呼叫端本來就算了一次 legalMoves,整包傳過來
+                             就不必在這裡再算一次。⚠ 沒傳也不會壞(只是沒有預覽)。
          anim:{...}|null,  ★ 這一手要不要演(批次同步一律 null)
          onDone            演完的回呼
        }
@@ -487,15 +648,31 @@ const FCB = (function(){
     build();
     ensurePlanes(st);
     fitBoard();
+    /* ⚠ 手指還按在某一架飛機上時**不可以**把預覽弄掉 —— refresh / 改名字 / resize
+       都會走到這裡。先記下來,畫完再原地重畫一次(那一手已經不合法就自然消失)。 */
+    const keepPv = pvOn;
 
     // 可以動的那幾架加上提示;其餘一律拿掉(不用 disabled —— 點了要講得出原因)
     const can = view.can || [];
+    curSeat = (view.mySeat == null) ? -1 : view.mySeat;
+    curColor = (curSeat >= 0 && st.colors[curSeat] != null) ? st.colors[curSeat] : 0;
+    /* 「這一手踩得到幾架」交給規則層算(eatCount 是純函式)—— 盤面不自己判命中。 */
+    curCans = (curSeat >= 0 ? (view.cans || []) : []).map(m => ({
+      plane: m.plane, to: m.to, hops: m.hops, eat: R.eatCount(st, curSeat, m) > 0
+    }));
+    const eats = {};
+    curCans.forEach(m => { if(m.eat) eats[m.plane] = 1; });
     for(let s = 0; s < planeEls.length; s++)
       for(let i = 0; i < planeEls[s].length; i++){
         const el = planeEls[s][i];
-        el.classList.toggle("can", s === view.mySeat && can.indexOf(i) >= 0);
-        el.classList.toggle("mine", s === view.mySeat);
+        const mine = s === view.mySeat;
+        el.classList.toggle("can", mine && can.indexOf(i) >= 0);
+        el.classList.toggle("mine", mine);
         el.classList.toggle("home", st.planes[s][i] >= R.GOAL);
+        /* ★ 這一架這個點數**踩得到人** → 呼吸光換成紅金色。
+           踩人是這一局唯一「對某一個特定的人做壞事」的瞬間(notes/22 第一節),
+           漏看它就等於這一手白擲了。 */
+        el.classList.toggle("eat", mine && !!eats[i]);
       }
     // 誰的回合:那一家的機場亮起來
     [...board.querySelectorAll(".fc-hangar")].forEach(el => {
@@ -512,7 +689,26 @@ const FCB = (function(){
     placeAll(st.planes, st.colors, 0);
     shown = st.planes.map(r => r.slice());
     shownColors = st.colors.slice();
+    if(keepPv >= 0) showPv(keepPv);      // ⚠ bump() 已經把它清掉了 → 重畫一次(見上面)
     if(view.onDone) view.onDone();
+  }
+
+  /* ★ 「輪到我了」的一次性提示(Gemini 建議的「回合焦點感」)。
+     4 人局輪轉很快,現場常常是「大家在看別人對決 → 沒注意到已經輪到自己」。
+     ⚠ 只做**一次性**的東西:常駐的呼吸光已經有兩處(骰子 .live + 自家機場 .turn),
+       再加一個動不停的只是噪音。
+     ⚠ 兩樣都走 box-shadow / filter —— 它們**不進捲動範圍**,所以不必關進 .fc-fx
+       (紅線 19 管的是會撐大盒子的 transform)。 */
+  function turnCue(){
+    if(dieEl){
+      dieEl.classList.remove("callme"); void dieEl.offsetWidth; dieEl.classList.add("callme");
+      setTimeout(() => { if(dieEl) dieEl.classList.remove("callme"); }, 1100);
+    }
+    if(!board) return;
+    const hg = board.querySelector('.fc-hangar[data-c="' + curColor + '"]');
+    if(!hg) return;
+    hg.classList.remove("cue"); void hg.offsetWidth; hg.classList.add("cue");
+    setTimeout(() => hg.classList.remove("cue"), 1400);
   }
 
   /* ==========================================================================
@@ -523,18 +719,49 @@ const FCB = (function(){
          (那樣兩台會看到不一樣的點數)。
      ========================================================================== */
   const PIPS = [[], [4], [0, 8], [0, 4, 8], [0, 2, 6, 8], [0, 2, 4, 6, 8], [0, 2, 3, 5, 6, 8]];
-  function dieHTML(v){
+  function faceHTML(v){
     let h = "";
     for(let i = 0; i < 9; i++)
-      h += '<i class="fc-pip' + (PIPS[v] && PIPS[v].indexOf(i) >= 0 ? " on" : "") + '"></i>';
+      h += '<i class="fc-pip' + (PIPS[v].indexOf(i) >= 0 ? " on" : "") + '"></i>';
     return h;
   }
+  /* ==========================================================================
+     ★★ 立體骰子:六個面一次建好,之後**只轉角度**,不再重畫點數
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠ 對面兩數和是 7(1-6 / 2-5 / 3-4)—— 真的骰子就是這樣排的,轉起來才不會
+         露出馬腳(相鄰兩面同時看得到)。
+       ⚠ 面的擺法寫在 CSS(`.fc-face[data-f]`),這裡只放它的**反矩陣**:
+         面在 rotateY(90deg) → 骰子要 rotateY(-90deg) 才把那一面轉到正面。
+         ★ 兩個角度刻意**不會同時非零** → 不必管旋轉順序(rotateX 與 rotateY 誰先都一樣)。
+       ⚠⚠ 這一格是**視覺**,與規則無關:真值一律由呼叫端帶進來(點數住在 moves 裡)。
+     ========================================================================== */
+  const DIE_SHOW = { 1: [0, 0], 2: [90, 0], 3: [0, -90], 4: [0, 90], 5: [-90, 0], 6: [0, 180] };
+  function cubeHTML(){
+    let h = '<span class="fc-cube" id="fcCube">';
+    for(let v = 1; v <= 6; v++)
+      h += '<span class="fc-face" data-f="' + v + '">' + faceHTML(v) + "</span>";
+    return h + "</span>";
+  }
 
-  let dieEl = null, rollT = null, rollGen = 0, rollDone = null;
+  let dieEl = null, cubeEl = null, rollT = null, rollGen = 0, rollDone = null;
+  /* 累積的整圈數,**只增不減** → 骰子永遠往同一個方向翻:每換一面就多轉一整圈,
+     看起來才是「連續在滾」而不是「跳」到下一面。 */
+  let spinX = 0, spinY = 0;
   function setDie(v){
     if(!dieEl) return;
-    dieEl.innerHTML = dieHTML(v || 0);
-    dieEl.dataset.v = v || 0;
+    const n = v || 0;
+    dieEl.dataset.v = n;                 // ★ 真值仍然掛在 data-v(診斷 / e2e 讀這個)
+    if(!cubeEl) return;
+    const r = DIE_SHOW[n] || DIE_SHOW[1];
+    /* ⚠⚠ 開頭那個 translateZ(−半個骰子) **一定要跟著寫**:perspective 的參考平面是
+       z=0,正面若停在 +半個骰子 就會被放大 —— 量過是 **1.17 倍**(骰子看起來比它的
+       盒子大一圈,`.live` 的光圈與版面全部對不上)。
+       ⚠ CSS 的 `.fc-cube` 裡也有一份同樣的預設值,但**這一行會整個蓋掉它**(inline)
+         → 漏寫的症狀只有量才看得出來(t-fc-look 的 dieBox=192/225)。
+       ⚠ 順序是「先轉、再往後推」(transform 由右往左作用)→ 骰子仍然在原地翻。 */
+    cubeEl.style.transform = "translateZ(calc(var(--fc-d) / -2)) " +
+                             "rotateX(" + (r[0] + spinX * 360) + "deg) " +
+                             "rotateY(" + (r[1] + spinY * 360) + "deg)";
   }
   /* ==========================================================================
      擲骰的聲音 —— 一次擲 = 一顆音效(v2.x 起是真的骰子錄音)
@@ -603,14 +830,22 @@ const FCB = (function(){
       if(g !== rollGen) return;
       if(k++ >= SPINS){
         dieEl.classList.remove("rolling");
+        dieEl.classList.add("land");     // 落定那一下的轉場曲線彈一點(是 transition 不是動畫)
         setDie(v);
         dieEl.classList.remove("pop"); void dieEl.offsetWidth; dieEl.classList.add("pop");
-        // ★ 「擲到 6 可以再擲一次」是規則的回饋,疊在骰子聲之上(音域刻意差很遠)
-        if(v === 6) SFX.six();
+        setTimeout(() => { if(dieEl) dieEl.classList.remove("land"); }, 480);
+        // ★ 「擲到 6 可以再擲一次」是規則的回饋:金光 + 向上兩音(音域刻意差很遠)
+        if(v === 6){
+          SFX.six();
+          dieEl.classList.remove("six"); void dieEl.offsetWidth; dieEl.classList.add("six");
+          setTimeout(() => { if(dieEl) dieEl.classList.remove("six"); }, 1000);
+        }
         const d = rollDone; rollDone = null;
         if(d) d();
         return;
       }
+      // 翻滾:每一下多轉一整圈,兩軸交替 —— 只轉一軸看起來是「左右擺」而不是在滾
+      if(k % 2) spinX++; else spinY++;
       setDie(1 + (k * 3 + 2) % 6);
       rollT = setTimeout(spin, 55 + k * 8);
     })();
@@ -623,10 +858,11 @@ const FCB = (function(){
     if(!acts.dataset.built){
       acts.dataset.built = "1";
       acts.innerHTML =
-        '<button class="fc-die" id="fcDie" type="button" aria-label="擲骰子"></button>' +
+        '<button class="fc-die" id="fcDie" type="button" aria-label="擲骰子">' + cubeHTML() + "</button>" +
         '<div class="fc-hint" id="fcHint"></div>' +
         '<div class="fc-cdwrap" id="fcCdWrap"></div>';
       dieEl = $("fcDie");
+      cubeEl = $("fcCube");
       dieEl.addEventListener("click", () => { if(cb.onDice) cb.onDice(); });
       setDie(0);
     }
@@ -804,6 +1040,20 @@ const FCB = (function(){
       if(!el || !cb.onPlane) return;
       cb.onPlane(+el.dataset.plane, +el.dataset.seat);
     });
+    /* 落點預覽:桌機滑過去、手機按住不放 —— 同一對事件(見第三之三節的註解) */
+    board.addEventListener("pointerover", e => {
+      const el = (e.target && e.target.closest) ? e.target.closest(".fc-plane.can") : null;
+      if(el) showPv(+el.dataset.plane);
+    });
+    board.addEventListener("pointerout", e => {
+      const from = (e.target && e.target.closest) ? e.target.closest(".fc-plane") : null;
+      if(!from) return;
+      const rel = e.relatedTarget;
+      const to = (rel && rel.closest) ? rel.closest(".fc-plane") : null;
+      if(to === from) return;      // ⚠ 只是在同一架的子元素之間移動 → 不要清(會閃)
+      clearPv();
+    });
+    board.addEventListener("pointercancel", clearPv);
     let rt = null;
     window.addEventListener("resize", () => {
       if(rt) clearTimeout(rt);
@@ -820,10 +1070,13 @@ const FCB = (function(){
     rollGen++;
     if(rollT){ clearTimeout(rollT); rollT = null; }
     if(dieEl) dieEl.classList.remove("rolling");
+    // 落定 / 幸運 6 / 輪到你 那三個一次性 class 也要收(它們各自帶自己的 setTimeout)
+    if(dieEl) dieEl.classList.remove("pop", "land", "six", "callme");
     // ★ 與 bump() 同一條規矩:取消動畫也要把回呼交出去,否則呼叫端的 busy 永遠不會清
     const rd = rollDone; rollDone = null;
     if(rd) setTimeout(() => { try{ rd(); }catch(e){} }, 0);
     stopCd();
+    curCans = []; curSeat = -1;
     shown = null; shownColors = null;
     if(board){ board.dataset.pk = ""; planeEls.forEach(r => r.forEach(el => el.remove())); planeEls = []; }
     setDie(0);
@@ -831,8 +1084,11 @@ const FCB = (function(){
 
   return {
     mount, render, renderActs, fitBoard, reset, resultHTML, drama,
-    rollDie, setDie, animMs, stopCd,
+    rollDie, setDie, animMs, stopCd, turnCue,
     busy: () => animating,
-    cell: () => cell
+    cell: () => cell,
+    // 給 e2e 用:落點預覽本來只有指標事件叫得動(headless 造不出「按住不放」)
+    _pv: plane => (plane == null ? clearPv() : showPv(plane)),
+    _pvOn: () => pvOn
   };
 })();
