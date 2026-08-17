@@ -178,8 +178,14 @@
      ⚠ 一定要限定 `body.mp-on`:語音鈕在單機是 display:none(見 .tk-btn 那一段),
        不限定的話單機列會平白多讓 84px —— 症狀就是上面註解說的「晶片列莫名其妙
        離右緣一大段」。
-     ⚠ 權重刻意停在 (0,4,0) 並且**排在這裡**(靠前):後面 `body.m16-big …{padding-right:0}`
-       與橫向的還原那兩條同權重、在後面 → 它們照樣贏,大牌桌與橫向的行為一行都不變。 */
+     ⚠⚠ **權重是 (0,4,1),而它比「歸零」那幾條高** —— `:has()` 算的是括號裡最具體的
+       那一段(`> .tools-docked .tk-btn` = 兩個 class),所以這一條有 **4 個 class**,
+       比只有三個的通用歸零條多一個。凡是要把這 168px 收回去的地方,**都得寫成同樣四個
+       class 的雙胞胎**,否則排在後面也贏不了:
+         · `body.m16-big .mj-room .row:has(> .tools-docked)` —— 剛好也是 (0,4,1) ✅
+         · `body.is-big .row:has(> .tools-docked)` —— 只有 (0,3,1) ❌ **2.3.6 現場回報就是它輸掉**
+       → 檔尾那一段因此補了一條 `body.is-big .row:has(> .tools-docked .tk-btn)`。
+       ⚠ 動這條選擇器(加 / 減 class)就要回去看那兩處,不然又會有一邊靜靜地輸掉。 */
   body.mp-on .row:has(> .tools-docked .tk-btn){padding-right:168px}
   .tools.tools-docked{position:absolute;right:0;top:50%;transform:translateY(-50%);flex:none}
   /* ⚠ 這幾顆是**全站最常出現**的元件(頂列的 ⛶ / ⚙️ / 返回 / 語音),
@@ -9782,6 +9788,19 @@ body.is-big :is(.un-room-title,.b2-room-title,.bj-room-title,.dc-room-title,.gmk
    ★ `.tools-docked` 只會被 dockTools() 掛到那一條列上 → 不必列前綴。 */
 body.is-big .tools-docked{display:none}
 body.is-big .row:has(> .tools-docked){padding-right:0}
+/* ⚠⚠⚠ **歸零要兩條,而且第二條不是「順手補齊」** —— 接了即時語音的頁面在**連線**時
+   `.tools` 裡是四顆鈕(⛶ ⚙️ 🔊 🎙),讓位那條是檔案上方的
+   `body.mp-on .row:has(> .tools-docked .tk-btn){padding-right:168px}`,而 `:has()` 讓它
+   拿到 **4 個 class**(0,4,1);上面這條通用的歸零只有 3 個(0,3,1)→ **排在後面也輸**。
+   ★ 症狀(2.3.6 現場回報,飛行棋):大棋盤模式下「小」與 😀 停在離房間框右緣 **179px**
+     的地方 —— 四顆鈕早就 display:none 了,讓給它們的 168px 還留著。
+     ⚠ 走 BigMode 的十一頁**全部**中,而**單機列不會**(`body:not(.mp-on) .tk-btn` 收掉了
+       語音鈕,那條 168 也就不生效)→ 只有連線時看得到,回報時很像是單一遊戲的問題。
+     ⚠ 台灣麻將沒中:它自己那條 `body.m16-big .mj-room .row:has(> .tools-docked)`
+       剛好也是 (0,4,1)。**共用這條少一個 class 就是這次的根因。**
+   ★ 守門:tools/t-big-consist.html 的 D 條(v2.4.0 起連線那格會掛 body.mp-on,
+     而且改成拿那一列的**外緣**比 —— 舊版扣掉 padding 來比,等於自己把這個 bug 扣掉了)。 */
+body.is-big .row:has(> .tools-docked .tk-btn){padding-right:0}
 /* ⑤ 晶片縮成迷你版:收掉「你」徽章(.mp-chip.me 已經有光環,同一格不必再寫一次),
    其餘一個都不收(名字 / 分數 / 輪到誰是這一列存在的理由)。
    ★ 這三個 class 都是 JS 動態產生、只出現在晶片列裡 → 零登記。 */

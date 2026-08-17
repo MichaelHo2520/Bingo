@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 c99b5fa67257737ddcb14f52fa2756044b27d017646a45d9131f22573e256662)
+    真相在 styles.src.css(sha256 0ebf78853d60ee4b339c5e53caa413d59c11684a5cb0cc8daba25bf3aa78a140)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4391,6 +4391,7 @@ body.is-big :is(.un-room-title,.b2-room-title,.bj-room-title,.dc-room-title,.gmk
   display:none}
 body.is-big .tools-docked{display:none}
 body.is-big .row:has(> .tools-docked){padding-right:0}
+body.is-big .row:has(> .tools-docked .tk-btn){padding-right:0}
 body.is-big .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
 body.is-big .you-badge{display:none}
 body.is-big .mp-players{
