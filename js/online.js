@@ -643,6 +643,16 @@
         const alone=isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1;
         if(alone) scheduleAloneCheck(); else clearAloneCheck();   // 只剩房主 → 走專用寬限(對手按離開的話較短)
         if(iWasKicked() || hostGone()) scheduleRecheck(recheckWait()); else clearRecheck();
+        /* ★★ 大廳裡「我準備了沒」一律以 DB 為準(v2.3.7,與 mp-core 的同一段平行)。
+           鈕的字看**本地** ready、晶片的記號看 **DB** —— 兩份漂掉時:DB false / 本地 true
+           會讓「按準備」變成「取消準備」(按了更沒準備);反過來則是我以為還沒準備、
+           房主已經算我好了。players 是唯一權威來源,收到就對齊。
+           ⚠ Bingo 這半多一件事:ready 同時鎖著填號 UI → 一定要順手 setLock(ready),
+             不然會出現「鈕寫著取消準備、卡片卻還能改」。
+           ⚠ 只在大廳做;`players[meId] &&` 不可省(claimSeat 交易中途沒有我)。 */
+        if(curPhase==="lobby" && players[meId] && !!players[meId].ready!==ready){
+          ready=!!players[meId].ready; updateReadyBtn(); setLock(ready);
+        }
         renderPlayers(); updateStartBtn();
         if(isHost) updateRoomIndex();   // 人數/房主名變動 → 同步大廳輕量索引(sig 去重,線數變動不會觸發寫入)
         if(curPhase==="lobby") syncScoreRow();   // 分數變動(重設戰績/開新賽季)→ 重新評估目標勝場鎖定狀態
@@ -662,7 +672,12 @@
       roomRef.child("size").on("value",s=>{
         const n=s.val();
         if(typeof n!=="number"||n<5||n>7||isHost||n===SIZE)return;
-        if(ready){ ready=false; roomRef.child("players/"+meId).update({ready:false}); updateReadyBtn(); }
+        /* ⚠ 退回未準備要**說話**(v2.3.7,對應 mp-core 的 unreadyOnFieldChange):
+           無聲的話訪客看到的只有「我按好的準備自己跳掉了」,而原因在房主那台。 */
+        if(ready){
+          ready=false; roomRef.child("players/"+meId).update({ready:false}); updateReadyBtn();
+          showToast("房主改了盤面大小,請重新填卡並再按一次「準備好了」⚙️", 2600);
+        }
         setSize(n);
         if(curPhase==="playing"){ state.marked=Array(nCells()).fill(false); applyCalledMarks(); updateTurnUI(); refreshLines(); }
         else setLock(false);
@@ -822,6 +837,12 @@
       if(!isHost)return;
       const ids=Object.keys(players);
       if(ids.length<2 || !ids.every(id=>players[id].ready)){ showToast("需要 2 人以上且全部準備好"); return; }
+      /* ★★★ 離線就整支不動(v2.3.7,與 js/shared/mp-core.js 的 startGame 逐字平行)。
+         下面兩筆寫入以前只有第二筆有守門:①清 per-player 的 winAt/lines(無守門)
+         ②setGame(canWriteGame 擋離線)。房主那台被判定斷線時 ①照樣套用到本地快取並排隊,
+         ②靜靜 return → 房間被清了一半而這一局沒開起來。
+         ⚠ autoStarting 要放掉,否則全員準備好的狀態不變 → 回線之後也不會再自動開打。 */
+      if(!canWriteGame()){ autoStarting=false; return; }
       // 清掉上一局每位玩家的達標紀錄與線數(per-player,獨立節點;分數存 scores/,不隨開新局清除)
       const pups={}; Object.keys(players).forEach(id=>{ pups["players/"+id+"/winAt"]=null; pups["players/"+id+"/lines"]=0; });
       if(Object.keys(pups).length) roomRef.update(pups);
@@ -1270,7 +1291,15 @@
     // 揭曉結果:比較各玩家達標時的叫號數(winAt),最早者贏;若最早者不只一人 = 平手
     function showOutcome(){
       if(!winner)return;
-      if(!outcomeShown && state.mode!=="play") return;   // 我不是這局的參賽者(例如趁「再一局」大廳期間才加入的人)→ 不彈出上一局的舊結果卡
+      /* 我不是這局的參賽者(例如趁「再一局」大廳期間才加入的人)→ 不彈出上一局的舊結果卡。
+         ★★ 這一道與 js/shared/mp-core.js 的 `if(!outcomeShown && curPhase==="lobby") return;`
+            是**同一件事**(CLAUDE.md 紅線 4 的雙胞胎):`again()` 刻意把 winner 留在 DB 裡,
+            所以「大廳裡收到一份還帶著 winner 的快照」是常態(重連重推 / 新加入 / 房主改寫)。
+            少了它就會:結果卡自己彈回來、彩帶重播、而且**把使用者剛按好的 ready 抹掉**
+            —— 共用核心那半漏了這道,2026-08-17 由你畫我猜的現場回報抓出來。
+         ⚠ Bingo 這半判「我是不是參賽者」用 state.mode(backToLobby 會設成 "setup"),
+            共用層沒有 state 這包 → 用 curPhase。兩邊語意相同,不要硬統一寫法。 */
+      if(!outcomeShown && state.mode!=="play") return;
       const withAt=Object.keys(players).filter(id=>players[id]&&typeof players[id].winAt==="number");
       let finalists, at;
       if(withAt.length){

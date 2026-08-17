@@ -590,6 +590,23 @@ const MPCore = (function(){
         const alone=isHost && curPhase!=="lobby" && !winner && Object.keys(players).length<=1;
         if(alone) scheduleAloneCheck(); else clearAloneCheck();
         if(iWasKicked() || hostGone()) scheduleRecheck(recheckWait()); else clearRecheck();
+        /* ★★ 大廳裡「我準備了沒」一律以 DB 為準(v2.3.7)。
+           本地那個 `ready` 旗標與 DB 上的 `players/{我}/ready` 是兩份,而**畫面各看一份**:
+           鈕的字看本地、玩家晶片上的記號看 DB。兩邊漂掉的下場是這一頁最難自救的狀態:
+             · DB false / 本地 true → 鈕寫著「取消準備」,按下去 toggleReady 把它翻成
+               **false 再寫一次 false** = 使用者按了準備、結果更沒準備(而畫面沒有任何錯誤)
+             · DB true / 本地 false → 鈕寫著「準備好了」,但房主那邊已經把我算成準備好了,
+               隨時可能直接開打
+           漂掉的來源不必窮舉(重連沿用舊座位、房主端清零沒送出去、漏收一份快照都算)——
+           players 是唯一權威來源,收到就對齊,漂多少都會被下一份快照收斂回來。
+           ⚠ 只在**大廳**做:局間續局的遊戲(mahjong16 / 21 點)在對局相位用同一個旗標跑
+             readyUp(),那邊刻意要「本地與 DB 都說好了才擋第二次按」(v1.181.1),不要動它。
+           ⚠ 一定要 `players[meId] &&`:claimSeat 的交易中途會有「名單裡還沒有我」的快照。
+           ⚠ 自己寫入時不會誤觸:Firebase 的本地寫入是先套用快取再發事件(同一個呼叫堆疊),
+             所以走到這裡時 DB 那份已經是我剛寫的值 → 兩邊相等 → 這一段不動作。 */
+        if(curPhase==="lobby" && players[meId] && !!players[meId].ready!==ready){
+          ready=!!players[meId].ready; updateReadyBtn();
+        }
         renderPlayers(); updateStartBtn();
         /* 語音的 mesh 要跟著「房裡現在有誰」動:有人進來就拉線、有人走就拆線。
            ⚠ 一定要掛在 players 這個事件上 —— 那是唯一權威的來源(斷線的人由
@@ -733,6 +750,18 @@ const MPCore = (function(){
       if(!isHost)return;
       const ids=Object.keys(players);
       if(ids.length<MIN_PLAYERS || !ids.every(id=>players[id].ready)){ showToast("需要 "+MIN_PLAYERS+" 人並且都準備好"); return; }
+      /* ★★★ 離線就整支不動(v2.3.7)。下面有兩筆寫入,而以前**只有第二筆有守門**:
+           ① roomRef.update(pups) —— 把全房的 ready 清成 false(無守門)
+           ② setGame(…)          —— 真正開局(canWriteGame() 擋離線)
+         房主那台剛好被判定斷線時,①照樣會套用到本地快取並排隊補送、②整支靜靜 return
+         → **全房的準備被清光,而這一局沒有開起來**。從訪客看就是「最後一個人一按準備,
+         大家的準備一起消失」,而且下一輪再湊齊還會再來一次(對得上使用者說的「重複按了兩次」)。
+         ⚠ 順手把 autoStarting 放掉:不放的話 ready 沒被清 → allReady 一直成立 →
+           `if(!autoStarting)` 永遠不成立 → **房主回線之後也再也不會自動開打**(換一個死法)。
+         ⚠ 擋在 A.newGame 之前:那一支會有副作用(你畫我猜在裡面 remove 掉上一場的 ink)。
+         ⚠ canWriteGame() 自己會跳「連線中斷」的 toast,而它有 3 秒節流 →
+           緊接著的 setGame 不會再跳第二次。 */
+      if(!canWriteGame()){ autoStarting=false; return; }
       /* ★★ 順序還沒決定 → 先轉去決定(猜拳 / 房主排),決定完會再回到這裡一次。
          ⚠ random 也走這裡洗:洗在核心而不是各 adapter,九個遊戲才有同一種「隨機」。 */
       if(ORDER_PICK && !picked){
@@ -747,7 +776,8 @@ const MPCore = (function(){
       // 上一局的順序(adapter 可據此決定要輪替還是重抽)
       const prev=(order.length===ids.length && order.every(id=>players[id])) ? order.slice() : null;
       const g=A.newGame(ids, prev, picked||null);
-      if(!g) return;                                      // adapter 判定不能開打(例如題目產生失敗)
+      // adapter 判定不能開打(例如題目產生失敗)。⚠ autoStarting 要放掉,否則下一次全員準備好時開不起來
+      if(!g){ autoStarting=false; return; }
       const pups={}; ids.forEach(id=>{ pups["players/"+id+"/ready"]=false; });
       roomRef.update(pups);
       setGame(Object.assign({ status:"playing", winner:null, roundId:Date.now() }, g));
@@ -976,6 +1006,25 @@ const MPCore = (function(){
     const myPts = () => ptsFor(meId);
     function showOutcome(){
       if(!winner)return;
+      /* ★★★ 已經在大廳的人一律不理這一份 winner(v2.3.7)。
+         `again()` **刻意**把 game.winner 留在 DB 裡(清掉會把還在看結果卡的人硬拉回大廳,
+         見那一支的註解)—— 於是「大廳裡收到一份還帶著 winner 的 game 快照」是常態,
+         而 backToLobby() 又把 outcomeShown 重設成 false → 這一支會把它當成**這一局第一次
+         揭曉**再跑一遍:結果卡自己彈回來、彩帶與音效再放一次,而下面那一行還會把我剛按好的
+         `ready` 抹成 false。使用者回報的原句:「我已經按了準備好了,但準備好了又會突然跳掉,
+         感覺有點像是別人按了」(你畫我猜,非房主)。
+         大廳裡會收到 game 快照的三條路,一條都不罕見:
+           ① 斷線重連 —— resume() 結尾 `game.once("value")` 重推一次(手機鎖屏 / 切 App / Wi-Fi 抖)
+           ② 進到一間「上一場打完、還沒開下一場」的房 —— 監聽掛上就先給一次目前值
+           ③ 房主那台任何一次改寫 game
+         ⚠ 判準用 `!outcomeShown` 而不是只看相位:對局中(結果卡已經跳過)照樣要能重畫卡片
+           內容(分數同步 / 有人改名 / 別人按繼續),那條路 outcomeShown 是 true,行為不變。
+         ⚠ 這一行與 js/online.js 的 `state.mode!=="play"` 那一道**是同一件事**(CLAUDE.md 紅線 4);
+           Bingo 那半從 v1.x 就有,共用核心這半漏了 —— 兩邊改一邊記得看另一邊。
+         ★ 跳過**整支**是安全的(不是只跳過那一行):計分那兩段本來就靠 roundId 冪等
+           —— 該記的那一次早在對局相位記完了,而反向修正那條要 `myAdd===0` 且
+           `scoredRoundOf(me)===roundId`,大廳這條路兩個條件不會同時成立。 */
+      if(!outcomeShown && curPhase==="lobby") return;
       const isDraw=winner.by==="draw";
       const wids=winnerIds();
       const iWon=!isDraw && wids.indexOf(meId)>=0;
@@ -1228,9 +1277,17 @@ const MPCore = (function(){
       return true;
     }
     // 房主改了設定 → 已按準備的訪客要退回未準備(免得在不知情下用新設定開打)
+    /* ⚠⚠ **一定要說話**(v2.3.7)。退回本身是對的,但它以前是完全無聲的:
+       訪客那邊看到的就只有「我按好的準備自己跳掉了」,而房主在等人的時候手最癢
+       —— 你畫我猜大廳有五排設定(秒數 / 每人幾次 / 難度 / 共同作畫 / 自訂題目),
+       每按一顆就把全房訪客的準備清一次。使用者回報時的猜測是「感覺有點像是別人按了」,
+       那個猜測其實是對的,只是畫面上沒有任何東西告訴他。
+       ⚠ 只有**真的翻掉**才跳(本來就沒準備的人不必收到通知)。
+       ⚠ Bingo 那半的對應位置是 online.js 的 `size` 監聽(盤面大小),同樣補了一則。 */
     function unreadyOnFieldChange(){
       if(!isHost && ready && roomRef && meId){
         ready=false; roomRef.child("players/"+meId).update({ready:false}); updateReadyBtn();
+        showToast("房主改了設定,請再按一次「準備好了」⚙️", 2600);
       }
     }
 
