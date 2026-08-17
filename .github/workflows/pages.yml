@@ -1,0 +1,66 @@
+# GitHub Pages 部署 —— 純靜態上傳,不跑 Jekyll
+#
+# ★★ 為什麼從「Deploy from a branch」(legacy)換過來(2026-08-17):
+#   legacy 的 Pages build 會在 GitHub 側跑一輪 Jekyll。這個專案一個 Jekyll 功能都沒用到,
+#   卻要為它付兩個代價,而且**兩個都咬過**:
+#     ① 慢 —— 成功那幾次都要 ~117 秒(它得掃過 215 個檔,含 13MB 的 mp3)
+#     ② ⚠⚠ **失敗時只給一句 "Page build failed."**,沒有任何 log:
+#        commit 62b4a77 那次就是這樣掛掉的(`duration: 0` = 根本沒跑起來),
+#        接著 8bf3c53 卡在 `building` 十幾分鐘不動 →
+#        **線上版整整停在兩個 commit 之前,而 repo 本身完全正常**
+#        (檢查過:111 個文字檔都是合法 UTF-8、13MB 遠低於 1GB、沒有 Liquid 標記、
+#         沒有 symlink、README 沒有壞掉的 front matter)。
+#        那種「推上去了但線上沒變、也查不出為什麼」是最貴的一種壞法。
+#   → 換成 Actions 之後:不跑 Jekyll、**失敗看得到完整 log**、通常幾十秒。
+#
+# ⚠ 這個檔要配合 repo 設定一起改(缺一個都不會生效):
+#     Settings → Pages → Source = **GitHub Actions**
+#   等價的指令:gh api -X PUT repos/<owner>/<repo>/pages -f build_type=workflow
+#   ⚠ 要回退成舊做法就把 build_type 改回 legacy(那時這個 workflow 會變成空轉)。
+#
+# ⚠ 上傳的是**整個 repo 根目錄**(path: .)—— 這個專案沒有建置步驟,
+#   `styles.css` 是本機 `node tools/build-css.js` 產生後就進版控的(見 CLAUDE.md 紅線 6),
+#   所以 CI 這裡刻意**不跑任何 build**:CI 自己 build 一次就等於多了一個
+#   「線上與本機不一致」的來源,而那正是 styles.css 這種產生檔最怕的事。
+
+name: Deploy static site to Pages
+
+on:
+  push:
+    branches: [main]
+  # 手動觸發(改完設定之後不必為了部署硬推一個 commit)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 同時只跑一個部署;⚠ cancel-in-progress 刻意是 false ——
+# 取消進行中的部署可能讓站台停在半完成的狀態。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # 整個 repo 根目錄。.nojekyll 也在裡面(雙保險:artifact 端也不做 Jekyll 處理)
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
