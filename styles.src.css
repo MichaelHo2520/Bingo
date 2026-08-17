@@ -195,22 +195,38 @@
   .icon-btn:focus-visible,.btn:focus-visible,.cell:focus-visible,.mini:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
 
   /* ---------- 即時語音的兩顆鈕(js/shared/talk.js)----------
-     🔊 / 🔇 = 要不要聽 · 🎙 = 要不要講。兩顆都住在 `.tools` 裡(⛶ 旁邊)——
+     喇叭 = 要不要聽 · 麥克風 = 要不要講。兩顆都住在 `.tools` 裡(⛶ 旁邊)——
      那一整塊會被 syncTools() 在頂列被收掉時整組搬進房間框,所以鈕自己不必知道
      「大牌桌」的存在。⚠ 不要為了排版把它們挪出 .tools。
-     ⚠ 字面刻意不用 🎤:那顆是**語音留言**(錄一段送出),是另一個功能。
+     ⚠ 圖示刻意不用 🎤:那顆是**語音留言**(錄一段送出),是另一個功能。
      ★ 只在連線中出現:單機沒有講話的對象,那時留一顆按了沒反應的鈕只會讓人困惑。
        ⚠ 判斷用 body.mp-on(核心進房時掛、leave 時脫),不是 .hidden ——
          .hidden 要靠 JS 每次換畫面同步,而這件事 CSS 自己就答得出來。 */
   body:not(.mp-on) .tk-btn{display:none}
   .tk-btn{position:relative}
   .tk-btn.on{background:var(--accent);border-color:var(--accent);color:#1a1020}
-  /* 🎙 的「靜音中」= 一條斜線(v2.1.0)。
+  /* 圖示是 talk.js 塞進來的**自繪 SVG**,不是 emoji 字面(v2.2.3)。
+     ★ 為什麼:🎙(U+1F399)是 Unicode 的「預設文字呈現」字元 → 桌機 Chrome / Edge
+       會退回 Segoe UI Symbol 的線條字形,糊成一團(手機看不出來,只有桌機在醜);
+       而補 U+FE0F 換成彩色 emoji 的話,**彩色 emoji 不吃 `color`** ——
+       下面 `.on` / `.bad` 那兩條換底色的規則就白寫了。→ 完整說明在 talk.js 的 ICO_LISTEN。
+     ⚠ 尺寸用 **em 不用 px**:`.icon-btn` 的字級各頁不同(頂列 19px、房間框 16px、
+       橫向台灣麻將 14px),寫死 px 的話小尺寸的鈕會被圖示撐爆。
+     ⚠ `fill` 下在 `<svg>` 上讓兩條路徑一起繼承;音波與叉叉要**自己蓋回 fill:none**,
+       它們是描邊不是填色(漏了會變成兩坨黑塊)。 */
+  .tk-ico{width:1.2em;height:1.2em;display:block;fill:currentColor;pointer-events:none}
+  .tk-ico .tk-wave,.tk-ico .tk-x{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+  /* 「聽」的開 / 關**同一份 markup**:亮著露音波、暗著露叉叉。
+     ⚠ 這兩條只咬得到聽鈕(講鈕的 SVG 裡沒有這兩個 class),不必再限定 id。 */
+  .tk-btn .tk-wave{display:none}
+  .tk-btn.on .tk-wave{display:block}
+  .tk-btn.on .tk-x{display:none}
+  /* 麥克風的「靜音中」= 一條斜線(v2.1.0)。
      ★ 為什麼非得有它:v2.1.0 起「講」蘊含「聽」,於是麥克風關著有**兩種**意思 ——
        「聽著但閉麥」(別人講話你聽得到)與「語音整個沒開」(一片安靜)。
        兩者的鈕都是暗的,光看顏色分不出來,而後果差很多 → 前者多一條斜線。
      ⚠ 走 ::after + position:absolute,**不可以**讓它變成格子成員:.icon-btn 是
-       `display:grid;place-items:center`,多一個子項就會把 🎙 擠歪。
+       `display:grid;place-items:center`,多一個子項就會把麥克風擠歪。
      ⚠ 寬度用 % 不用 px:橫向的台灣麻將把這幾顆縮成 28px(見檔尾那段),
        寫死 26px 的話斜線會戳出鈕外面。 */
   .tk-btn.muted::after{
@@ -2926,6 +2942,45 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
    ⚠ 這裡不必 `margin` —— `.m16-draw` 本來就有 0.45 張牌的左邊距,右邊又是整排的盡頭。 */
 .m16-ht.m16-wt{position:relative;z-index:2;
   outline:2.5px solid var(--mj-jz);outline-offset:2px}
+
+/* ---------- ★★ 胡牌的慶祝光環(v2.2.4) ----------
+   使用者:「胡了也可以有些動畫,這樣會比較有感」。一局只播一次 = 情緒最高點,
+   所以預算給到 950ms(遠超過一般 UI 的 300ms 上限)—— 那個上限管的是「常常看到的東西」。
+
+   ⚠⚠ 這一整塊只准動 transform / opacity。這一頁的牌寬是「寬度算出來、再被總高度夾」的,
+     **任何讓總寬 / 總高變一點的東西都會讓整副牌換一次大小**(notes/11 的〇節)——
+     所以外框 `position:absolute;inset:0` 貼在 .mj-play 上、`pointer-events:none`,
+     它在版面上完全不存在。
+   ⚠ 節點本身是 **JS 建立的持久節點**,不在 paint() 產生的 HTML 裡:那一段每次 render
+     被 innerHTML 重建最多七次,動畫會跟著重跑(同 #m16Acts 的理由,見 board.js)。
+   ⚠ 三圈的 nth-child 延遲是 150ms 一階 —— 再密就糊成一圈、再疏就看得出是三次獨立動畫。
+   ⚠⚠ 顏色一律**寫死暖金**,不可以用 var(--mj-jz) 或 var(--accent):
+     前者是紅中的紅(第一版用了它 —— 看起來像警告不像慶祝),後者每個主題不一樣,
+     而「胡了」的金色是這件事的一部分,不該隨主題變成紫的或綠的。
+   ⚠⚠ 光環**必須在衝出牌桌邊界之前就散掉**。第一版擴到 11 倍,結果整段只看得到
+     四個角落的楔形,像破圖 —— 牌桌是長方形,圓一旦超過短邊就只剩角。
+     所以 scale 收在 3.4、而且 opacity 在 62% 就歸零(那時圓還在框內)。
+   ★ 主體是**暖光暈染**不是光環:光環是點綴,「整桌亮了一下」才是體感來源。 */
+.m16-cele{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden}
+.m16-cele i{position:absolute;left:50%;top:50%;width:132px;height:132px;margin:-66px 0 0 -66px;
+  border-radius:50%;border:3px solid rgba(255,197,84,.9);opacity:0;
+  animation:m16Ring .95s cubic-bezier(.23,1,.32,1) forwards}
+.m16-cele i:nth-child(2){animation-delay:.15s}
+.m16-cele i:nth-child(3){animation-delay:.3s}
+/* 暖光暈染:刻意用 ::after 而不是第四個節點 —— 它不是圈。
+   ⚠ 兩層漸層疊起來(中央濃、外圈淡)才有「光」的感覺,單層只是一塊半透明的黃斑。 */
+.m16-cele::after{content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 50%,rgba(255,206,110,.5) 0%,rgba(255,176,60,.22) 38%,transparent 70%);
+  opacity:0;animation:m16Glow .95s ease-out forwards}
+/* ⚠ 14% 那一格不可省:光環要「先出現、再擴散」。少了它就是從正中央長出一個
+   半透明的點,看起來像破圖而不像光環。 */
+@keyframes m16Ring{
+  0%{opacity:0;transform:scale(.35)}
+  14%{opacity:.95}
+  62%{opacity:0;transform:scale(2.6)}
+  100%{opacity:0;transform:scale(3.4)}
+}
+@keyframes m16Glow{0%{opacity:0}18%{opacity:1}62%{opacity:.72}100%{opacity:0}}
 
 /* ---------- 一局結束:牌桌上每一家都攤開(v1.75.15) ----------
    使用者:「每一局結束的時候,我希望能把全部人的牌都顯示出來,不是在勝負頁顯示,

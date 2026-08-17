@@ -974,6 +974,11 @@ const MP = MPCore.create((function(){
            吃碰槓);斷線重連時 before 是 null,sfx 自己也會擋掉。 */
       const ev = newRnd ? [] : (M16Sfx.play(before, s, mySeat()) || []);
       if(ev.indexOf("draw") >= 0) buzzTurn();
+      /* 胡牌的慶祝光環(v2.2.4)。★ 沿用同一份 diff —— 不必自己再判斷 st.over,
+         `hu`(放槍)/ `zimo`(自摸)那兩個事件已經是「這一手剛剛結束」的意思。
+         ⚠ 換局那一手 ev 是空的(上面 newRnd 就給 []),斷線重連 before 為 null 時
+           sfx 自己會回空 → 兩種「重收到一次結束快照」的情況都不會重播。 */
+      if(ev.indexOf("hu") >= 0 || ev.indexOf("zimo") >= 0) M16B.celebrate();
       /* 宣告視窗換了一輪 → 我的表態記號要清掉。
          ⚠ 兩個旗標一起清(見 sendBid 與 board.js 的 bidDone):只清 myBid 的話
            下一輪宣告的牌不會站起來(bidDone 卡在 true → claimOpts() 回空)。 */

@@ -1664,6 +1664,34 @@ const M16B = (function(){
   function pickWord(list, seed){
     return list[((seed % list.length) + list.length) % list.length];
   }
+  /* ==========================================================================
+     celebrate() —— 胡牌的慶祝光環(v2.2.4)
+     ★ 由 state diff 驅動:呼叫點是現成的那兩處(adapter.js 的 applyGame 與 solo.js
+       的 step),它們本來就在算 M16Sfx 的事件,`hu`(放槍)/ `zimo`(自摸)直接拿來用
+       → 沒有變成第三份「兩份」,也不必在動作點插呼叫(notes/11 的〇節第 3 條)。
+     ⚠⚠ 節點掛在 `.mj-play` 底下、**不進 paint() 產生的 HTML** —— 那一段每次 render
+       被 innerHTML 重建最多七次,放進去動畫就會跟著重跑。這與 `#m16Acts` 一直待在
+       `.mj-play` 底下不動是同一個理由。
+     ⚠⚠ 必須冪等:斷線重連 / 續局那一刻可能再收到一次帶 over 的快照。diff 那一層
+       已經擋掉大部分(before 為 null 或不同局就不比),但這裡自己也要擋 ——
+       重複呼叫先移除上一個,**絕不疊加**。這是飛行棋「批次同步不可以連播」的同族坑。
+     ⚠ 播完就自己移除:留著的話下一局的盤面上會有一個看不見但吃 z-index 的空層。
+     ========================================================================== */
+  let celeT = 0;
+  function celebrate(){
+    const play = host && host.parentNode;              // .mj-play
+    if(!play) return;
+    const old = play.querySelector(".m16-cele");
+    if(old) old.remove();                              // 冪等:不疊
+    if(celeT){ clearTimeout(celeT); celeT = 0; }
+    const el = document.createElement("div");
+    el.className = "m16-cele";
+    el.innerHTML = "<i></i><i></i><i></i>";            // 三圈,延遲由 CSS 的 nth-child 給
+    play.appendChild(el);
+    // 900ms 動畫 + 260ms 最後一圈的延遲,留點餘裕
+    celeT = setTimeout(()=>{ celeT = 0; if(el.parentNode) el.remove(); }, 1250);
+  }
+
   /* over = MJT state 的 st.over;me = 我的座位(單機固定 0,連線是 mySeat())。
      回傳 { word, tone } —— tone 直接就是結果卡要掛的 class(win / lose / draw)。 */
   function overWord(over, me){
@@ -1845,6 +1873,7 @@ const M16B = (function(){
            那裡沒有版面預算。 */
     discardHint(){ return oneTap() ? "滑過選牌 · 點一下打出" : "點牌兩次打出"; },
     oneTap,
+    celebrate,
     // 給測試頁與 e2e:直接問排版決策,不必去讀 DOM
     planFor(hand, hasDraw, avail){ return planHand(hand, hasDraw, avail); },
     // 給 e2e:玩家自訂的顯示順序(沒拖過 = null)

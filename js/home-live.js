@@ -605,9 +605,9 @@ const HomeLive = (function(){
     const btns=[];
     if(row.staleInfo.length) btns.push('<button class="btn ghost svs-clear" type="button" data-key="'+g.key+'">清除這 '+row.staleInfo.length+' 間已關閉</button>');
     // ★ 統計 = 場次 + 語音人次,兩個一起清(它們都是「這個遊戲的統計」,見 svClearStatsKey)
-    // ⚠ 語音那一段用 🎙 而不是「語音 N 次」:寫全的話這顆鈕在手機寬度一定折成兩行,
+    // ⚠ 語音那一段用 🎙️ 而不是「語音 N 次」:寫全的話這顆鈕在手機寬度一定折成兩行,
     //   而「次)」單獨掉到第二行很難看。完整說法在頂上那行與 confirm 裡都有。
-    if(row.n||row.talk) btns.push('<button class="btn ghost svs-clear-stats" type="button" data-key="'+g.key+'">清除統計('+row.n+' 場'+(row.talk?" · 🎙"+row.talk:"")+')</button>');
+    if(row.n||row.talk) btns.push('<button class="btn ghost svs-clear-stats" type="button" data-key="'+g.key+'">清除統計('+row.n+' 場'+(row.talk?" · 🎙️"+row.talk:"")+')</button>');
     const btnRow=btns.length ? '<div class="svs-row-actions">'+btns.join("")+'</div>' : "";
     const list=row.rooms.length
       ? '<div class="svs-stale">'+row.rooms.map(svRoomHtml).join("<br>")+
@@ -616,8 +616,8 @@ const HomeLive = (function(){
     return '<div class="svs-row" id="'+svRowId(g.key)+'">'+
       '<div class="svs-row-head"><span class="svs-name">'+g.icon+' '+esc(g.name)+'</span>'+
       '<span class="svs-nums">大廳 '+row.activeN+' 間 · 已關閉 '+row.staleInfo.length+' 間 · 累積 '+row.n+' 場'+
-      // 🎙 語音人次:0 就整段不寫(每一列都掛一個 0 只會把這行擠爆,看不出誰真的有人用)
-      (row.talk?' · <b class="svs-mic">🎙 '+row.talk+'</b>':"")+'</span></div>'+
+      // 🎙️ 語音人次:0 就整段不寫(每一列都掛一個 0 只會把這行擠爆,看不出誰真的有人用)
+      (row.talk?' · <b class="svs-mic">🎙️ '+row.talk+'</b>':"")+'</span></div>'+
       list+btnRow+'</div>';
   }
   /* 骨架列:面板一打開就先把十四列畫出來(圖示 + 名字 + 一條跑馬燈),
@@ -685,7 +685,7 @@ const HomeLive = (function(){
       const totalTalk=rows.reduce((n,r)=>n+r.talk,0);
       const talkGames=rows.filter(r=>r.talk>0).length;
       if(ping)ping.innerHTML='✅ 連線正常('+ms+' ms)<br>'+
-        '<b class="svs-mic">🎙 即時語音</b>:累計開啟 '+totalTalk+' 次'+
+        '<b class="svs-mic">🎙️ 即時語音</b>:累計開啟 '+totalTalk+' 次'+
         (totalTalk?'('+talkGames+' 個遊戲用過)':'(還沒有人用過)');
       if(clearAll){
         const total=rows.reduce((n,r)=>n+r.staleInfo.length,0);
@@ -695,7 +695,7 @@ const HomeLive = (function(){
       if(clearStatsAll){
         const totalN=rows.reduce((n,r)=>n+r.n,0);
         clearStatsAll.disabled=!totalN&&!totalTalk;
-        clearStatsAll.textContent="🧹 清除全部統計紀錄("+totalN+" 場"+(totalTalk?" · 🎙"+totalTalk:"")+")";
+        clearStatsAll.textContent="🧹 清除全部統計紀錄("+totalN+" 場"+(totalTalk?" · 🎙️"+totalTalk:"")+")";
       }
     }catch(e){
       if(ping)ping.textContent="⚠️ 讀取失敗,檢查網路或稍後再試";

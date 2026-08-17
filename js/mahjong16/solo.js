@@ -268,7 +268,12 @@ const Solo = (function(){
   function sfxTick(){
     const prev = sfxPrev;
     sfxPrev = st;
-    if(prev !== st) M16Sfx.play(prev, st, ME);
+    if(prev === st) return;
+    const ev = M16Sfx.play(prev, st, ME) || [];
+    /* 胡牌的慶祝光環(v2.2.4)—— 與連線共用同一份 diff(見 adapter.js 的同一段)。
+       ⚠ 這裡刻意**不改判成 `st.over`**:那個條件在結束後每一次 render 都成立,
+         而 diff 只在「剛剛才結束」那一次給 hu / zimo,正是我們要的一次。 */
+    if(ev.indexOf("hu") >= 0 || ev.indexOf("zimo") >= 0) M16B.celebrate();
   }
 
   /* ==========================================================================

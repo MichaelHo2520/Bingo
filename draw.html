@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v2.2.2 -->
-<meta name="version" content="2.2.2">
+<!-- 你畫我猜 · v2.2.4 -->
+<meta name="version" content="2.2.4">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -41,8 +41,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠ 兩顆鈕**必須留在 .tools 裡面** —— 那一整塊會被 syncTools() 在頂列被收掉時
              整組搬進房間框;挪出去就是「開了大模式再也關不掉麥克風」。
            ⚠ 字面不可以用 🎤:那顆是語音留言(錄一段送出),是另一個功能。 -->
-      <button class="icon-btn tk-btn" id="tkListenBtn" type="button" title="打開語音(聽別人說話)" aria-label="打開語音,聽別人說話" aria-pressed="false">🔇</button>
-      <button class="icon-btn tk-btn" id="tkSpeakBtn" type="button" title="打開麥克風(讓別人聽到你)" aria-label="打開麥克風,讓別人聽到你" aria-pressed="false">🎙</button>
+      <button class="icon-btn tk-btn" id="tkListenBtn" type="button" title="打開語音(聽別人說話)" aria-label="打開語音,聽別人說話" aria-pressed="false"></button>
+      <button class="icon-btn tk-btn" id="tkSpeakBtn" type="button" title="打開麥克風(讓別人聽到你)" aria-label="打開麥克風,讓別人聽到你" aria-pressed="false"></button>
       <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
       <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
     </div>

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 41b39313dc54f2d0ba93ee760cc249b83ab368f921366083ff7257a54a024b7f)
+    真相在 styles.src.css(sha256 9d00759bedae0100341c12b4824c14f05a62e73d2eeb13c569fb6ffabf6d05da)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -106,6 +106,11 @@
   body:not(.mp-on) .tk-btn{display:none}
   .tk-btn{position:relative}
   .tk-btn.on{background:var(--accent);border-color:var(--accent);color:#1a1020}
+  .tk-ico{width:1.2em;height:1.2em;display:block;fill:currentColor;pointer-events:none}
+  .tk-ico .tk-wave,.tk-ico .tk-x{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+  .tk-btn .tk-wave{display:none}
+  .tk-btn.on .tk-wave{display:block}
+  .tk-btn.on .tk-x{display:none}
   .tk-btn.muted::after{
     content:"";position:absolute;left:50%;top:50%;width:62%;height:2px;border-radius:2px;
     background:currentColor;opacity:.8;pointer-events:none;
@@ -1579,6 +1584,22 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
   outline:2px solid var(--mj-jz);outline-offset:1px}
 .m16-ht.m16-wt{position:relative;z-index:2;
   outline:2.5px solid var(--mj-jz);outline-offset:2px}
+.m16-cele{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden}
+.m16-cele i{position:absolute;left:50%;top:50%;width:132px;height:132px;margin:-66px 0 0 -66px;
+  border-radius:50%;border:3px solid rgba(255,197,84,.9);opacity:0;
+  animation:m16Ring .95s cubic-bezier(.23,1,.32,1) forwards}
+.m16-cele i:nth-child(2){animation-delay:.15s}
+.m16-cele i:nth-child(3){animation-delay:.3s}
+.m16-cele::after{content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at 50% 50%,rgba(255,206,110,.5) 0%,rgba(255,176,60,.22) 38%,transparent 70%);
+  opacity:0;animation:m16Glow .95s ease-out forwards}
+@keyframes m16Ring{
+  0%{opacity:0;transform:scale(.35)}
+  14%{opacity:.95}
+  62%{opacity:0;transform:scale(2.6)}
+  100%{opacity:0;transform:scale(3.4)}
+}
+@keyframes m16Glow{0%{opacity:0}18%{opacity:1}62%{opacity:.72}100%{opacity:0}}
 .m16-foe.shown{align-items:flex-start}
 .m16-foe .m16-reveal{gap:3px;justify-content:flex-start;flex:1 1 auto;min-width:0}
 .m16-foe .m16-meld.m16-hg{gap:1px;padding:3px;justify-content:flex-start}

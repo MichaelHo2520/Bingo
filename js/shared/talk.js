@@ -6,7 +6,8 @@
    ★★★ 名字叫 Talk 不叫 Voice:**`Voice` 已經被 js/audio.js 佔走了**(語音留言:
        錄 6 秒 WAV 送出去,非即時)。全專案沒有最外層 IIFE,同一頁的各檔共用全域
        詞法作用域 → 撞名就是整頁 SyntaxError。兩者是**完全不同的功能**,
-       使用者看到的字面也要分開:語音留言 = 🎤、即時語音 = 🔊 / 🎙。
+       使用者看到的圖示也要分開:語音留言 = 🎤(emoji 字面)、
+       即時語音 = 喇叭 / 麥克風(**自繪 SVG**,見下面 ICO_LISTEN 的長註解)。
 
    ── 這一支在做什麼 ────────────────────────────────────────────────────────
      房裡每兩個人之間拉一條 RTCPeerConnection(mesh),音訊 **P2P 直連**,
@@ -523,6 +524,43 @@ const Talk = (function () {
   let uiBusy = false;
   function btnL() { return document.getElementById("tkListenBtn"); }
   function btnS() { return document.getElementById("tkSpeakBtn"); }
+
+  /* --------------------------------------------------------------------------
+     兩顆鈕的圖示:**自繪 SVG**,不用 emoji 字面(v2.2.3)
+     ──────────────────────────────────────────────────────────────────────────
+     ★ 原本是 🔇 / 🔊 + 🎙,而 🎙(U+1F399)在 Unicode 裡是**預設文字呈現**的字元
+       (🔇 / 🔊 不是,它們預設就是 emoji)—— 沒有帶變體選擇符 U+FE0F 時,
+       Chrome / Edge 不會去拿 Segoe UI Emoji 的彩色字形,而是退回 **Segoe UI Symbol
+       的線條字形**:一支滿是細網格的復古立式麥克風,19px 下整個糊成一團。
+       ⚠ 手機看不出來(Android / iOS 一律當 emoji 畫)→ **只有桌機在醜**,
+         所以「我手機看起來好好的」不能當作沒問題。
+     ★ 補一個 U+FE0F 修得掉那個,但會**換一個更糟的問題**:彩色 emoji 不吃 `color`,
+       而這兩顆鈕有兩種會換底色的狀態(`.on` 是主題強調色、`.bad` 是紅色)——
+       銀色的麥克風壓在黃色 / 青色的強調色上比現在還糊(五個主題有三個會中)。
+       → 自繪 SVG 一律 `fill:currentColor`,四種狀態 × 五個主題全部自動對。
+     ★ markup 收在**這裡**、不是十四頁的 HTML 裡:那會是十四份(加 tools/ 裡二十幾份
+       測試頁就更多)會慢慢分岔的雙胞胎(CLAUDE.md 紅線 4)。
+       → HTML 那邊只留一顆**空的** `<button>`,長相由這支負責。
+     ⚠ 「開 / 關」**不換 innerHTML**:喇叭的音波與叉叉兩組路徑都在同一份 SVG 裡,
+       靠 CSS 收放(見 styles.src.css 的 `.tk-wave` / `.tk-x`)。每次 report()
+       重寫 innerHTML 會把 `.icon-btn` 的 transition 打斷,而 report() 很頻繁。
+     ⚠ `aria-hidden` 一定要留:鈕自己的 aria-label 已經把狀態講完了,
+       圖示再被讀一次只會變成雜訊。
+     -------------------------------------------------------------------------- */
+  const ICO_LISTEN =
+    '<svg class="tk-ico" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path d="M4.2 9h3.1l5.3-4.7A.9.9 0 0 1 14 5v14a.9.9 0 0 1-1.4.7L7.3 15H4.2A1.2 1.2 0 0 1 3 13.8v-3.6A1.2 1.2 0 0 1 4.2 9z"/>' +
+      '<path class="tk-wave" d="M16.9 8.8a4.6 4.6 0 0 1 0 6.4M19.9 6.1a8.6 8.6 0 0 1 0 11.8"/>' +
+      '<path class="tk-x" d="M17.2 9.6l4.6 4.8M21.8 9.6l-4.6 4.8"/>' +
+    '</svg>';
+  const ICO_SPEAK =
+    '<svg class="tk-ico" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path d="M12 14.2a3.4 3.4 0 0 0 3.4-3.4V4.6a3.4 3.4 0 1 0-6.8 0v6.2a3.4 3.4 0 0 0 3.4 3.4z"/>' +
+      '<path d="M18.2 10.6a1.05 1.05 0 0 0-2.1 0 4.1 4.1 0 0 1-8.2 0 1.05 1.05 0 0 0-2.1 0 6.15 6.15 0 0 0 5.15 6.06V19h-2.1a1.05 1.05 0 0 0 0 2.1h6.3a1.05 1.05 0 0 0 0-2.1h-2.1v-2.34a6.15 6.15 0 0 0 5.15-6.06z"/>' +
+    '</svg>';
+  /* 只在「還沒有 SVG」時寫一次 —— 這樣舊的測試頁(HTML 裡還留著 🎙 字面的那些)
+     也會被自動蓋掉,不必一份一份改。 */
+  function ico(btn, html) { if (!btn.querySelector("svg")) btn.innerHTML = html; }
   function toast(msg) {
     // 兩份都叫 showToast(game.js / ui-kit.js),但這一支可能被沒有它的頁面載入
     try { if (typeof showToast === "function") showToast(msg); } catch (e) { }
@@ -532,7 +570,9 @@ const Talk = (function () {
     const bL = btnL(), bS = btnS();
     const bad = !!(st && st.failed && st.failed.length);
     if (bL) {
-      bL.textContent = listen ? "🔊" : "🔇";
+      /* ⚠ 開 / 關**不換圖示的 markup**:音波與叉叉都在同一份 SVG 裡,
+         由 `.tk-btn.on` 決定露哪一組(見上面 ICO_LISTEN 的長註解)。 */
+      ico(bL, ICO_LISTEN);
       bL.classList.toggle("on", listen);
       /* 關「聽」會連麥克風一起關(規則 ②)—— 副作用要寫在標題裡先講,
          不要讓人按下去才發現自己被閉麥了。 */
@@ -542,7 +582,7 @@ const Talk = (function () {
       bL.setAttribute("aria-pressed", listen ? "true" : "false");
     }
     if (bS) {
-      bS.textContent = "🎙";
+      ico(bS, ICO_SPEAK);
       bS.classList.toggle("on", speak);
       /* ★ 「聽著但閉麥」與「語音整個關掉」**必須長得不一樣**:兩者的麥克風都是關的,
          光靠「暗的」分不出來,而後果差很多 —— 前者別人講話你聽得到,後者一片安靜。
