@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 acfe3cbd80fc3024de5f003bfed631f8657216ce273dec65587e8ec3ff02501c)
+    真相在 styles.src.css(sha256 d43c5cd88e20ca489c44af78b2c86c1afff6107d019828ba98be109e9932fa33)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -136,16 +136,34 @@
   }
   .subtitle{font-weight:800;font-size:15px;letter-spacing:.4px}
   .hint{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.5}
-  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:12px;padding:3px;gap:4px}
+  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:12px;padding:3px;gap:4px;position:relative}
+  .seg::before{
+    content:"";position:absolute;left:3px;top:3px;bottom:3px;border-radius:9px;
+    background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2);pointer-events:none;
+    transition:transform .28s cubic-bezier(.23,1,.32,1),width .28s cubic-bezier(.23,1,.32,1),opacity .15s;
+  }
+  .seg:has(> button:nth-child(2):last-child)::before{width:calc((100% - 10px)/2)}
+  .seg:has(> button:nth-child(3):last-child)::before{width:calc((100% - 14px)/3)}
+  .seg:has(> button:nth-child(4):last-child)::before{width:calc((100% - 18px)/4)}
+  .seg:has(> button:nth-child(5):last-child)::before{width:calc((100% - 22px)/5)}
+  .seg:has(> button:nth-child(1).on)::before{transform:translateX(0)}
+  .seg:has(> button:nth-child(2).on)::before{transform:translateX(calc(100% + 4px))}
+  .seg:has(> button:nth-child(3).on)::before{transform:translateX(calc(200% + 8px))}
+  .seg:has(> button:nth-child(4).on)::before{transform:translateX(calc(300% + 12px))}
+  .seg:has(> button:nth-child(5).on)::before{transform:translateX(calc(400% + 16px))}
+  .seg:not(:has(> button.on))::before{opacity:0}
   .seg button{
     flex:1;border:0;background:transparent;color:var(--muted);font-family:'Nunito';font-weight:800;
-    font-size:14px;padding:8px 8px;border-radius:9px;cursor:pointer;transition:.2s;white-space:nowrap;
+    font-size:14px;padding:8px 8px;border-radius:9px;cursor:pointer;white-space:nowrap;
+    position:relative;z-index:1;
+    transition:color .2s cubic-bezier(.23,1,.32,1);
   }
-  .seg button.on{background:var(--accent);color:#1c1008;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .seg button.on{color:#1c1008}
   .seg.readonly{pointer-events:none;opacity:.9}
   .seg.readonly button{cursor:default}
   .seg.readonly button:not(.on){opacity:.32}
-  .seg.readonly button.on{background:rgba(0,0,0,.16);color:var(--text);box-shadow:none}
+  .seg.readonly::before{background:rgba(0,0,0,.16);box-shadow:none}
+  .seg.readonly button.on{color:var(--text)}
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
   .field{margin-top:12px}

@@ -272,17 +272,66 @@
   .hint{color:var(--muted);font-size:13.5px;margin-top:3px;line-height:1.5}
 
   /* ---------- Segmented / options ---------- */
-  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:12px;padding:3px;gap:4px}
+  /* ==========================================================================
+     ★★★ 選擇列的滑動指示器(v2.3.2)
+     ── 為什麼 ────────────────────────────────────────────────────────────────
+       使用者:「像是選擇項目的動畫增加」。在這之前選中就是**背景瞬間換色**,
+       而且那條 transition 是 `.2s`(沒寫屬性 = `transition-property:all`,
+       animate skill 明列的 never-ship)。改成一顆會**滑過去**的藥丸 ——
+       它是這一整輪唯一「一定看得出來」的動畫,而且選擇列在十四頁的設定與
+       進場面板到處都是,曝光量最高。
+     ── 為什麼做得到(不必寫 JS)──────────────────────────────────────────────
+       `.seg button` 是 `flex:1` → **每一格等寬**。所以位移可以寫成
+       `translateX(自身寬度的倍數)`,**與選項數無關**(第 k 格 = (k-1) 格 + (k-1) 個 gap):
+       五條 transform 規則就蓋完 2~5 個選項的所有情況。
+       寬度才需要分 N:每格 = (100% - 內距 6px - (N-1)個 gap×4px) / N。
+     ⚠⚠ 實測全站 98 個 `.seg`,選項數是 2(37)/ 3(40)/ 4(15)/ 5(6)—— **上限是 5**。
+       這一節之所以能把 `.on` 的背景整個拿掉(改由滑塊提供),唯一的依據就是這個上限;
+       ⚠ **哪天有人加了 6 個選項的選擇列,那一列會變成「看不出選了哪個」** ——
+         所以守門測試會去數每一個 `.seg` 的直接子 button,超過 5 就紅。
+     ⚠ 沒有任何一格是 `.on` 時滑塊要收起來(見 :not(:has(...)) 那條)——
+       不然初始化那一瞬間會在第一格亮一顆藥丸,看起來像「預設選了第一個」。
+     ⚠ 按鈕要 `position:relative;z-index:1`:滑塊是絕對定位的,不墊高的話字會被蓋住。
+     ========================================================================== */
+  .seg{display:flex;background:rgba(0,0,0,.14);border-radius:12px;padding:3px;gap:4px;position:relative}
+  .seg::before{
+    content:"";position:absolute;left:3px;top:3px;bottom:3px;border-radius:9px;
+    background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2);pointer-events:none;
+    /* ⚠ 只過渡 transform / width,**不可以寫成 `transition:.28s`** —— 那等於 all,
+       會把 background 也一起過渡,換主題時滑塊的顏色會慢半拍地爬過去。 */
+    transition:transform .28s cubic-bezier(.23,1,.32,1),width .28s cubic-bezier(.23,1,.32,1),opacity .15s;
+  }
+  /* 寬度依選項數(N=2~5);內距 6px + (N-1) 個 4px 的 gap */
+  .seg:has(> button:nth-child(2):last-child)::before{width:calc((100% - 10px)/2)}
+  .seg:has(> button:nth-child(3):last-child)::before{width:calc((100% - 14px)/3)}
+  .seg:has(> button:nth-child(4):last-child)::before{width:calc((100% - 18px)/4)}
+  .seg:has(> button:nth-child(5):last-child)::before{width:calc((100% - 22px)/5)}
+  /* 位置只看「選中的是第幾格」,與 N 無關(100% = 滑塊自己的寬度) */
+  .seg:has(> button:nth-child(1).on)::before{transform:translateX(0)}
+  .seg:has(> button:nth-child(2).on)::before{transform:translateX(calc(100% + 4px))}
+  .seg:has(> button:nth-child(3).on)::before{transform:translateX(calc(200% + 8px))}
+  .seg:has(> button:nth-child(4).on)::before{transform:translateX(calc(300% + 12px))}
+  .seg:has(> button:nth-child(5).on)::before{transform:translateX(calc(400% + 16px))}
+  /* 一格都沒選 → 收起來(見上面的紅線) */
+  .seg:not(:has(> button.on))::before{opacity:0}
   .seg button{
     flex:1;border:0;background:transparent;color:var(--muted);font-family:'Nunito';font-weight:800;
-    font-size:14px;padding:8px 8px;border-radius:9px;cursor:pointer;transition:.2s;white-space:nowrap;
+    font-size:14px;padding:8px 8px;border-radius:9px;cursor:pointer;white-space:nowrap;
+    position:relative;z-index:1;
+    /* ⚠ 屬性要寫出來(舊版是 `transition:.2s` = all)。只留 color —— 背景現在是滑塊的事 */
+    transition:color .2s cubic-bezier(.23,1,.32,1);
   }
-  .seg button.on{background:var(--accent);color:#1c1008;box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  /* ⚠ 只換文字色,**背景交給滑塊** —— 兩邊都畫的話會看到兩顆藥丸(滑塊在移動、
+     舊的那顆同時在原地淡出)。 */
+  .seg button.on{color:#1c1008}
   /* 訪客唯讀選項(房主決定的設定):做成明顯「不能按」——整體淡化、選中項改中性灰底(拿掉亮橘按鈕感)、未選項再淡一階、游標不變手指 */
   .seg.readonly{pointer-events:none;opacity:.9}
   .seg.readonly button{cursor:default}
   .seg.readonly button:not(.on){opacity:.32}
-  .seg.readonly button.on{background:rgba(0,0,0,.16);color:var(--text);box-shadow:none}
+  /* ⚠ 唯讀版的中性灰底要下在**滑塊**上,不是 button 上(v2.3.2 起背景是滑塊畫的)——
+     還下在 button 身上的話會變成「橘色滑塊 + 底下一塊灰」兩層疊著。 */
+  .seg.readonly::before{background:rgba(0,0,0,.16);box-shadow:none}
+  .seg.readonly button.on{color:var(--text)}
 
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
