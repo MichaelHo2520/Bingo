@@ -344,7 +344,16 @@
   /* ---------- Win overlay ---------- */
   .veil{position:fixed;inset:0;display:none;place-items:center;z-index:50;
     background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:20px}
-  .veil.show{display:grid}
+  /* 背板淡入(v2.2.1)。在這之前是 display:none → grid 直接跳:.55 的黑底連同 blur(4px)
+     整片瞬間蓋上,卡片才慢慢彈進來 —— 十四頁的七種蓋板(結果卡 / 設定 / 表情 / 語音 /
+     離開 / 踢人 / 房規)全部中招,而且是每一次開蓋板都看得到。
+     ⚠ 動 opacity,不可以改成動 background 或 backdrop-filter:後兩者每一幀都要重畫
+       整片背景(blur 尤其貴),opacity 走合成器。
+     ⚠ 只有進場、沒有退場,這是**刻意的**:退場要等動畫跑完才能 display:none,
+       那是 JS 的事(十四頁 × 七處蓋板的關閉路徑),不是 CSS 一行補得起來的。
+       要做的話請整批做,不要只補一兩頁 —— 半套會變成「有些蓋板會淡出、有些直接消失」。 */
+  .veil.show{display:grid;animation:veilIn .18s cubic-bezier(.23,1,.32,1)}
+  @keyframes veilIn{from{opacity:0}to{opacity:1}}
   /* ★ max-height + overflow-y:auto 不可省(v1.58.4)。這張卡沒有捲動能力時,內容一多
      (麻將的攤牌 + 台數表 + 排行榜)就直接**超出畫面而且捲不到** —— .veil 是
      position:fixed 的,body 又是 overflow:hidden,超出的部分沒有任何地方捲得到。
@@ -354,8 +363,32 @@
   .win-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
     padding:34px 30px;text-align:center;max-width:380px;backdrop-filter:blur(14px);
     max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;
-    animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
-  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+    animation:popWin .34s cubic-bezier(.23,1,.32,1) .04s backwards}
+  /* ⚠ 起點是 .94、不是 .7(v2.2.1 改)。`.7` 配上 1.56 的 overshoot,總擺幅超過 40% ——
+     在結果卡上那叫歡慶,但同一條規則也套在**離開房間 / 認輸 / 踢人的確認框**上
+     (它們是 .win-card.confirm-card),在那裡就只是滑稽。現實世界沒有東西從無到有。
+     ⚠ `.04s backwards` 兩個都不可省:延遲是讓背板先鋪滿、卡片才進來(空間感);
+       而少了 backwards,卡片會先用**原尺寸**閃 40ms 才跳回起點才開始動 —— 那一幀
+       比原本沒有延遲還糟,而且只有錄影逐格看得出來。 */
+  @keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+  /* ⚠⚠ 結果卡是唯一保留彈跳的一張(一局只看一次 = 慶祝的預算),但彈跳**寫在 keyframe 裡**、
+     不靠 overshoot 曲線 —— 這一條是量出來才發現的,不是設計偏好:
+       **彈跳幅度跟位移範圍成正比**。舊的 .7→1 範圍 0.3,配 cubic-bezier(.34,1.56,.64,1)
+       衝出約 10% ⇒ 峰值 scale ≈ 1.03(看得見);起點一改成 .94,範圍只剩 0.06,
+       同一條曲線的峰值掉到 **1.006** —— 在 380px 的卡上是 2px,等於彈跳整個消失。
+     所以起點提高之後,**曲線換成純 ease-out、峰值改由 55% 這一格明寫**,
+     兩者不可以同時用(overshoot 曲線 × overshoot 關鍵格會相乘,彈過頭)。
+     ⚠ 要調彈跳大小改 55% 那一格的 1.025,不要回頭去動起點的 .94。 */
+  @keyframes popWin{
+    0%{transform:scale(.94);opacity:0}
+    55%{transform:scale(1.025);opacity:1}
+    100%{transform:scale(1);opacity:1}
+  }
+  /* 確認框不彈:它是「要不要離開 / 要不要認輸」的**決定**時刻,不是慶祝。
+     換成強 ease-out、砍到 200ms。⚠ 權重要寫成 .win-card.confirm-card(0,2,0),
+     不可以只寫 .confirm-card —— 那是 (0,1,0),跟上面的 .win-card 同權重,
+     贏只贏在「寫在後面」,哪天有人搬動順序就靜靜失效。 */
+  .win-card.confirm-card{animation:pop .2s cubic-bezier(.23,1,.32,1) .04s backwards}
   /* ⚠ 這個字級是給 BINGO 的「你贏了 / 你輸了」設計的(三個字、每字都是大字)。
      字數一多就爆版:麻將的「你沒胡」「本場結束」在 76px 下會撐滿整張卡、
      把下面的台數表擠出畫面。四個字以上的遊戲各自壓小,見 .mj-win / .sdk-win。 */
@@ -421,7 +454,10 @@
   .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
     padding:22px 22px 24px;max-width:360px;width:100%;backdrop-filter:blur(14px);
     max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;   /* 螢幕不夠高時卡片內部可捲動,不再被切掉 */
-    animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
+    animation:pop .2s cubic-bezier(.23,1,.32,1) .04s backwards}
+  /* ⚠ 設定 / 語音 / 房規卡也不彈(v2.2.1):彈跳是「一局結束才看一次」的預算,
+     這幾張是隨時會開的工具卡,開的次數一多,彈跳就從「有活力」變成「拖時間」。
+     表情卡開得更兇,再快一階,見 .set-card.emote-card。 */
   .set-head{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:10px;text-align:center}
   /* 設定分類:每組一個小標題(外觀 / 音效 / 背景音樂 / 語音),組與組之間留白,一眼好找 */
   .set-group{border:1px solid var(--panel-line);border-radius:16px;padding:2px 12px;margin-top:12px;
@@ -713,6 +749,10 @@
      .set-card 的 width:100% 先被 .veil 的 grid area 夾住,max-width 比它大時不會撐出橫向捲動。 */
   .emote-card{max-width:clamp(340px,44vw,460px);position:relative;overscroll-behavior:contain;touch-action:pan-y}  /* 只有卡片內部可上下捲,不外溢到背景 */
   #emoteVeil{touch-action:none}   /* 手指在卡片外(背景)滑動時,不捲動背景頁 */
+  /* 表情面板一局要開好幾十次(嘴砲是這個專案的重點功能之一)—— 這種頻率的東西只配
+     「快到幾乎察覺不到」那一階,150ms。⚠ 這裡只覆寫 duration、不重寫整條 animation:
+     曲線與 .04s backwards 都要留著,整條重寫最容易漏掉 backwards。 */
+  .set-card.emote-card{animation-duration:.15s}
   /* 右上角關閉 ✕:sticky 固定在卡片可視區右上,卡片內部捲動時也不會捲走。
      ⚠ flex-shrink:0 不可省:房規卡是 display:flex;flex-direction:column(見 .dc-rules-card 等),
        內容一長、卡片被 max-height 夾住,這顆鈕沒設的話會跟著被壓扁高度(寬不變、高被壓到剩一半),
@@ -721,7 +761,15 @@
     width:34px;height:34px;border-radius:50%;border:1px solid var(--panel-line);
     background:rgba(255,255,255,.12);color:var(--text);font-size:15px;font-weight:800;line-height:1;
     cursor:pointer;display:grid;place-items:center;transition:background .15s,transform .1s}
-  .card-x:hover{background:rgba(255,255,255,.22);transform:scale(1.06)}
+  /* ⚠ hover 一定要用 (hover:hover) and (pointer:fine) 圈起來(v2.2.1 補)。
+     觸控裝置點下去會發一次**假 hover**,而且在手指離開後**留在那個狀態** ——
+     症狀是「按了 ✕ 關掉蓋板,下次再開,那顆 ✕ 是放大又反白的」,
+     使用者會以為它壞了或是被選取了。滑鼠上的行為一個字都沒變。
+     ⚠ background 也一起圈進來:同一次假 hover 留下的,不是只有放大那一半。
+     觸控要的回饋在下面那條 :active(縮 .9),它本來就在,不受影響。 */
+  @media (hover:hover) and (pointer:fine){
+    .card-x:hover{background:rgba(255,255,255,.22);transform:scale(1.06)}
+  }
   .card-x:active{transform:scale(.9)}
 
   .emote-card .set-head{padding:0 34px}   /* 標題兩側留空,長名字不會被 ✕ 蓋到 */
@@ -7645,9 +7693,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
 
   /* ---------- 畫板 ----------
      .dw-stage 吃掉剩餘高度,畫布本身的寬高由 js/draw/board.js 的 fit() 算成整數 px。
-     ★★ v1.155.2 起畫布**把舞台吃滿、不鎖長寬比**(只留 INK_PAD 4px 讓那圈 3px 外框
-       不被 overflow:hidden 削掉)—— 所以這裡**不可以**加 aspect-ratio 之類的東西,
-       兩邊各算各的會打架。為什麼拿掉鎖:見 js/draw/board.js 的檔頭 ①。 */
+     ★★ v2.2.0 起**畫家的畫布吃滿舞台,其他人的畫布縮成畫家那個形狀**(等比,四周留白)
+       —— 所以這裡**不可以**加 aspect-ratio 之類的東西,兩邊各算各的會打架。
+       ⚠ 留白由 .dw-stage 這一行的 align-items/justify-content:center 負責置中,
+         那不是裝飾:少了它,別人那台的圖會貼在角落。
+       完整的取捨(以及它被反轉過兩次的來龍去脈):見 js/draw/board.js 的檔頭 ①。 */
   .dw-stage{flex:1 1 0;min-height:120px;width:100%;position:relative;
     display:flex;align-items:center;justify-content:center;overflow:hidden}
   /* ⚠⚠ touch-action:none 是**非做不可**的:沒有它,手指一動就變成捲整頁,

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 71bf94e34edd06397f2a07fee4e82ad928f88ee6e851da35637f8a18954a801f)
+    真相在 styles.src.css(sha256 41b39313dc54f2d0ba93ee760cc249b83ab368f921366083ff7257a54a024b7f)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -203,12 +203,19 @@
   .status .lbl{color:var(--muted);font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px}
   .veil{position:fixed;inset:0;display:none;place-items:center;z-index:50;
     background:rgba(0,0,0,.55);backdrop-filter:blur(4px);padding:20px}
-  .veil.show{display:grid}
+  .veil.show{display:grid;animation:veilIn .18s cubic-bezier(.23,1,.32,1)}
+  @keyframes veilIn{from{opacity:0}to{opacity:1}}
   .win-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
     padding:34px 30px;text-align:center;max-width:380px;backdrop-filter:blur(14px);
     max-height:calc(100dvh - 40px);overflow-y:auto;overscroll-behavior:contain;
-    animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
-  @keyframes pop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+    animation:popWin .34s cubic-bezier(.23,1,.32,1) .04s backwards}
+  @keyframes pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}
+  @keyframes popWin{
+    0%{transform:scale(.94);opacity:0}
+    55%{transform:scale(1.025);opacity:1}
+    100%{transform:scale(1);opacity:1}
+  }
+  .win-card.confirm-card{animation:pop .2s cubic-bezier(.23,1,.32,1) .04s backwards}
   .win-card .word{font-family:'Fredoka';font-weight:700;font-size:clamp(46px,15vw,76px);line-height:1;
     background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
   .win-card p{color:var(--muted);margin:10px 0 22px;font-weight:700}
@@ -253,7 +260,7 @@
   .set-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:26px;
     padding:22px 22px 24px;max-width:360px;width:100%;backdrop-filter:blur(14px);
     max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);overflow-y:auto;
-    animation:pop .3s cubic-bezier(.34,1.56,.64,1)}
+    animation:pop .2s cubic-bezier(.23,1,.32,1) .04s backwards}
   .set-head{font-family:'Fredoka';font-weight:700;font-size:23px;margin-bottom:10px;text-align:center}
   .set-group{border:1px solid var(--panel-line);border-radius:16px;padding:2px 12px;margin-top:12px;
     background:rgba(255,255,255,.04)}
@@ -475,11 +482,14 @@
   .order-item .mv button:disabled{opacity:.3;cursor:default}
   .emote-card{max-width:clamp(340px,44vw,460px);position:relative;overscroll-behavior:contain;touch-action:pan-y}
   #emoteVeil{touch-action:none}
+  .set-card.emote-card{animation-duration:.15s}
   .card-x{position:sticky;top:0;margin:-6px -4px -32px auto;z-index:4;flex-shrink:0;
     width:34px;height:34px;border-radius:50%;border:1px solid var(--panel-line);
     background:rgba(255,255,255,.12);color:var(--text);font-size:15px;font-weight:800;line-height:1;
     cursor:pointer;display:grid;place-items:center;transition:background .15s,transform .1s}
-  .card-x:hover{background:rgba(255,255,255,.22);transform:scale(1.06)}
+  @media (hover:hover) and (pointer:fine){
+    .card-x:hover{background:rgba(255,255,255,.22);transform:scale(1.06)}
+  }
   .card-x:active{transform:scale(.9)}
   .emote-card .set-head{padding:0 34px}
   .emote-to{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 14px}
