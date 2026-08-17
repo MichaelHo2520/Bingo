@@ -526,6 +526,31 @@
     55%{transform:scale(1.025);opacity:1}
     100%{transform:scale(1);opacity:1}
   }
+  /* ==========================================================================
+     ★★ 結果卡的內容分層進場(v2.3.3)
+     整張卡一起出現時,眼睛沒有閱讀順序可循 —— 大字、排名表、按鈕同時到,
+     資訊量最大的那一刻反而最難讀。改成由上而下依序進場(55ms 一階),
+     視線就被帶著走一次。★ 這是動畫裡少數「一定看得出來」的手法,而且十四頁共用。
+
+     ⚠⚠ **確認框(.confirm-card)排除在外** —— 離開 / 認輸 / 踢人是**決定**的時刻,
+       把「要不要離開房間」的按鈕延後 300ms 才浮出來只會讓人以為卡住了。
+     ⚠ 延遲從 .10s 起(卡片本身是 .04s 延遲 + .34s)—— 讓卡片先站定再放內容進來。
+     ⚠ **第 6 個以後一律用同一個延遲**:結果卡的子元素最多九個(大字 / 誰贏 / 副標 /
+       總冠軍 / 排名表 / 表情列 / 連線鈕組 / 單機鈕組 / 偷看連結),而且**被隱藏的
+       那幾個照樣佔 nth-child 的號碼** —— 不封頂的話最後那顆按鈕會延到 500ms 後才出現。
+     ⚠⚠ 位移只給 7px,而且**一定要驗過不會撐出捲軸**:這張卡是 overflow-y:auto,
+       transform 會算進可捲區域 —— 位移太大時(麻將那種內容塞滿的局)會閃一下捲軸。
+       7px 在 34px 的下內距裡面,守門那條 scrollHeight 就是在量這件事。
+     ========================================================================== */
+  .win-card:not(.confirm-card) > *{animation:winRise .34s cubic-bezier(.23,1,.32,1) backwards}
+  .win-card:not(.confirm-card) > :nth-child(1){animation-delay:.10s}
+  .win-card:not(.confirm-card) > :nth-child(2){animation-delay:.155s}
+  .win-card:not(.confirm-card) > :nth-child(3){animation-delay:.21s}
+  .win-card:not(.confirm-card) > :nth-child(4){animation-delay:.265s}
+  .win-card:not(.confirm-card) > :nth-child(5){animation-delay:.32s}
+  .win-card:not(.confirm-card) > :nth-child(n+6){animation-delay:.36s}
+  @keyframes winRise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
   /* 確認框不彈:它是「要不要離開 / 要不要認輸」的**決定**時刻,不是慶祝。
      換成強 ease-out、砍到 200ms。⚠ 權重要寫成 .win-card.confirm-card(0,2,0),
      不可以只寫 .confirm-card —— 那是 (0,1,0),跟上面的 .win-card 同權重,
@@ -2552,6 +2577,18 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
 }
 /* 摸進來那張隔開放 —— 真牌桌的慣例,也讓「打掉剛摸的」這個最常見的操作不必瞄準 */
 .m16-draw{margin-left:calc(var(--m16w,36px) * 0.45)}
+/* ★ 摸牌動畫(v2.3.3)。⚠ 一局摸十幾次 → 照頻率閘只配「幾乎察覺不到」那一階:
+   **160ms**、位移只有 0.3 張牌,而且刻意不彈 —— 這裡要的是「牌落到位」的實感,
+   不是慶祝(那是胡牌 .m16-cele 的預算)。
+   ⚠⚠ class 由 JS **一次性**掛(board.js 的 markDraw / drawFx):這一格只要牌還在
+     手上就一直是 .m16-draw,寫成無條件的話那張牌會跟著每一次重畫抽動
+     (一次 render 最多重建七次,別人打一張牌也會重畫)。
+   ⚠ 只動 transform / opacity —— 這一頁的牌寬會被總高夾,碰版面就是整副牌換一次大小。 */
+.m16-drawin{animation:m16Draw .16s cubic-bezier(.23,1,.32,1) backwards}
+@keyframes m16Draw{
+  from{opacity:0;transform:translateX(calc(var(--m16w,36px) * 0.3))}
+  to{opacity:1;transform:none}
+}
 /* 沒摸牌時佔住同一格(v1.58.3)。寬度 = 間隔 0.45 + 一張牌 1 = 1.45 ——
    要與上面那條 margin-left 加上牌寬**完全相等**,不然「摸 / 打」之間手牌會左右挪。
    ⚠ 這是版面穩定的一半,另一半在 board.js 的 planHand()(一律把這一格算進寬度)。 */

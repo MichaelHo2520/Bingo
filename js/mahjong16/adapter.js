@@ -973,7 +973,8 @@ const MP = MPCore.create((function(){
          ⚠ 換局那一手不比 —— 整包重發,逐欄位 diff 出來的東西沒有意義(會在開局瞬間響一串
            吃碰槓);斷線重連時 before 是 null,sfx 自己也會擋掉。 */
       const ev = newRnd ? [] : (M16Sfx.play(before, s, mySeat()) || []);
-      if(ev.indexOf("draw") >= 0) buzzTurn();
+      /* ⚠ markDraw() 要排在下面那句 M16B.render() **之前**(旗標由 render 消費) */
+      if(ev.indexOf("draw") >= 0){ buzzTurn(); M16B.markDraw(); }
       /* 胡牌的慶祝光環(v2.2.4)。★ 沿用同一份 diff —— 不必自己再判斷 st.over,
          `hu`(放槍)/ `zimo`(自摸)那兩個事件已經是「這一手剛剛結束」的意思。
          ⚠ 換局那一手 ev 是空的(上面 newRnd 就給 []),斷線重連 before 為 null 時

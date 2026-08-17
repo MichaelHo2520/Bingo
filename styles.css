@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 d43c5cd88e20ca489c44af78b2c86c1afff6107d019828ba98be109e9932fa33)
+    真相在 styles.src.css(sha256 079b271005835498ae78e2a7d47d9e6b40e7300ebd3d051b1f0ca0ebb3ef0779)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -263,6 +263,14 @@
     55%{transform:scale(1.025);opacity:1}
     100%{transform:scale(1);opacity:1}
   }
+  .win-card:not(.confirm-card) > *{animation:winRise .34s cubic-bezier(.23,1,.32,1) backwards}
+  .win-card:not(.confirm-card) > :nth-child(1){animation-delay:.10s}
+  .win-card:not(.confirm-card) > :nth-child(2){animation-delay:.155s}
+  .win-card:not(.confirm-card) > :nth-child(3){animation-delay:.21s}
+  .win-card:not(.confirm-card) > :nth-child(4){animation-delay:.265s}
+  .win-card:not(.confirm-card) > :nth-child(5){animation-delay:.32s}
+  .win-card:not(.confirm-card) > :nth-child(n+6){animation-delay:.36s}
+  @keyframes winRise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
   .win-card.confirm-card{animation:pop .2s cubic-bezier(.23,1,.32,1) .04s backwards}
   .win-card .word{font-family:'Fredoka';font-weight:700;font-size:clamp(46px,15vw,76px);line-height:1;
     background:linear-gradient(135deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -1457,6 +1465,11 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
                0 calc(var(--m16w,36px) * 0.10) 0 0 var(--mj-side)}
 }
 .m16-draw{margin-left:calc(var(--m16w,36px) * 0.45)}
+.m16-drawin{animation:m16Draw .16s cubic-bezier(.23,1,.32,1) backwards}
+@keyframes m16Draw{
+  from{opacity:0;transform:translateX(calc(var(--m16w,36px) * 0.3))}
+  to{opacity:1;transform:none}
+}
 .m16-slot{flex:none;width:calc(var(--m16w,36px) * 1.45)}
 .m16-hand .m16-ht{touch-action:none;-webkit-user-drag:none}
 .m16-hand .m16-ht.m16-drag{transition:none;z-index:6;cursor:grabbing;

@@ -962,6 +962,10 @@ const M16B = (function(){
     if(pool) pool.scrollTop = pool.scrollHeight;
     placeWall(pool);                                     // ★ 一定是最後一步,見那一支
     placeActs();                                         // ★ 動作列的落點,理由同上(見那一支)
+    /* ★ 摸牌動畫的旗標在這裡熄掉(v2.3.3)—— 一定要等**整段 render 跑完**:
+       上面那道牌寬夾取會重建這一段最多七次,中途熄掉的話只有第一次重建帶得到
+       class,而活到最後的是最後一次那份 → 畫面上等於沒有動畫。 */
+    drawFx = false;
   }
 
   /* ---------- 橫向:把「沒人吃得掉」的那一截高度交給牌河(v1.178.0)-------------
@@ -1252,7 +1256,12 @@ const M16B = (function(){
         }else if(hasDraw){
           /* 宣告模式下,摸進來那張也可能是「打了它就聽牌」的選項之一(通常就是摸切) */
           const tk = tt ? (tt.indexOf(st.drawn)>=0 ? " tingok" : " tingno") : "";
-          html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+tk,
+          /* ★ 摸牌動畫(v2.3.3):只在「剛摸進來的那一次 render」掛 m16-drawin。
+             ⚠⚠ 不可以無條件掛 —— 這一格只要牌還在手上就一直是 .m16-draw,
+               而這一段每次 render 被 innerHTML 重建**最多七次**、別人每打一張牌
+               也會重畫 → 無條件掛的話那張牌會一直抽動。旗標由 state diff 點亮
+               (見 markDraw),render 消費一次就熄掉。 */
+          html += tileHTML(codeOf(st.drawn), "m16-ht m16-draw"+(sel==="d"?" sel":"")+tk+(drawFx?" m16-drawin":""),
                            ' data-t="'+st.drawn+'" data-k="d"');
         }else{
           html += '<i class="m16-slot" aria-hidden="true"></i>';
@@ -1677,6 +1686,15 @@ const M16B = (function(){
        重複呼叫先移除上一個,**絕不疊加**。這是飛行棋「批次同步不可以連播」的同族坑。
      ⚠ 播完就自己移除:留著的話下一局的盤面上會有一個看不見但吃 z-index 的空層。
      ========================================================================== */
+  /* ★ 摸牌動畫的一次性旗標(v2.3.3)。
+     ⚠ 與 celebrate() 同一套思路:由 state diff 點亮(`draw` 事件),
+       **render 消費一次就熄掉** —— 這一格只要牌還在手上就一直是 .m16-draw,
+       無條件掛動畫的話它會跟著每一次重畫抽動(一次 render 最多重建七次)。
+     ⚠ markDraw() 一定要在 render() **之前**呼叫:兩個呼叫點(adapter 的 applyGame、
+       solo 的 sfxTick)本來就都排在 render 前面,不要調換。 */
+  let drawFx = false;
+  function markDraw(){ drawFx = true; }
+
   let celeT = 0;
   function celebrate(){
     const play = host && host.parentNode;              // .mj-play
@@ -1874,6 +1892,7 @@ const M16B = (function(){
     discardHint(){ return oneTap() ? "滑過選牌 · 點一下打出" : "點牌兩次打出"; },
     oneTap,
     celebrate,
+    markDraw,
     // 給測試頁與 e2e:直接問排版決策,不必去讀 DOM
     planFor(hand, hasDraw, avail){ return planHand(hand, hasDraw, avail); },
     // 給 e2e:玩家自訂的顯示順序(沒拖過 = null)

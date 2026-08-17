@@ -274,6 +274,8 @@ const Solo = (function(){
        ⚠ 這裡刻意**不改判成 `st.over`**:那個條件在結束後每一次 render 都成立,
          而 diff 只在「剛剛才結束」那一次給 hu / zimo,正是我們要的一次。 */
     if(ev.indexOf("hu") >= 0 || ev.indexOf("zimo") >= 0) M16B.celebrate();
+    /* ⚠ sfxTick() 本來就排在 render() 之前(見 render),旗標才接得上 —— 不要調換 */
+    if(ev.indexOf("draw") >= 0) M16B.markDraw();
   }
 
   /* ==========================================================================
