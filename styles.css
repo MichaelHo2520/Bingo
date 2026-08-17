@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 1d67fb0061b992b6c7d4b75107bf3b11092e24b845a5fc67fdb97a3020414651)
+    真相在 styles.src.css(sha256 493fb9a0e2926d150f65c2428015a1cdf0c34fc3f344a7b349a19983a6445447)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -125,6 +125,22 @@
   .tk-btn.bad{background:#c0392b;border-color:#e74c3c;color:#fff;animation:tk-warn 1.4s ease-in-out infinite}
   @keyframes tk-warn{0%,100%{opacity:1}50%{opacity:.55}}
   .mp-chip.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
+  .mp-chip.me.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
+  .tk-tag{position:relative;display:inline-grid;place-items:center;flex:0 0 auto;
+    width:15px;height:15px;margin-left:1px;line-height:0;color:var(--muted);opacity:.85}
+  .tk-tagico{width:100%;height:100%;display:block;fill:currentColor;pointer-events:none}
+  .tk-tag.live{color:#5bd75b;opacity:1}
+  .tk-tag.mute{color:var(--muted);opacity:.75}
+  .tk-tag.wait{color:#e8c447;opacity:1;animation:tk-warn 1.1s ease-in-out infinite}
+  .tk-tag.bad{color:#ff6b5e;opacity:1;animation:tk-warn 1.4s ease-in-out infinite}
+  .tk-tag.talking{color:#9dffb0;opacity:1;filter:drop-shadow(0 0 5px rgba(91,215,91,.95))}
+  .tk-tag.mute::after,.tk-tag.bad::after{
+    content:"";position:absolute;left:50%;top:50%;width:118%;height:2px;border-radius:2px;
+    background:currentColor;opacity:.9;pointer-events:none;
+    transform:translate(-50%,-50%) rotate(-45deg);
+  }
+  .mp-chip.turn .tk-tag.live,.mp-chip.turn .tk-tag.mute,.mp-chip.turn .tk-tag.talking{color:#1c1008}
+  .mp-chip.turn .tk-tag.wait{color:#5a3a00}
   .panel{
     width:min(92vw,520px);
     background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,0) 44%),var(--panel);

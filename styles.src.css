@@ -254,6 +254,47 @@
      ⚠ 不可以用 transform 放大 —— `.mp-chip.turn` 已經佔用了 transform(scale 1.04),
        兩個一起套的話後面那條會整個蓋掉前面那條,「輪到誰」就不見了。改用 box-shadow。 */
   .mp-chip.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
+  /* ★★★ 自己的晶片也要亮(v2.3.7)—— 使用者:「其他人講話的時候框框會變綠色的,
+     我希望自己也可以有這個功能,比較好的判斷到底現在有沒有收到聲音」。
+     ⚠⚠ 這一條**非加不可**,不是重複:`.mp-chip.me`(accent-2 光環)在這個檔案裡排在
+       **後面**(晶片那一段),兩者權重同樣是 (0,2,0) → 後面的贏 → 自己的框
+       只加 `.tk-talking` 是**不會變綠的**。所以這裡用 (0,3,0) 明確壓過它。
+     ⚠ 「自己在說話」是 talk.js 量**自己的麥克風**得到的(LOCAL_METER),與遠端那一路
+       是兩顆獨立的 AudioContext —— 它回答的是「我的麥克風有沒有在動」。
+     ⚠ `.mp-chip.turn` 的 turnpulse 動畫會蓋掉這裡的 box-shadow(動畫贏過一般宣告)——
+       **那是刻意不處理的**:輪到誰比誰在說話重要,而「誰在說話」在那種情況下
+       由下面那顆徽章的 `.talking` 負責(它不吃 turn 的動畫)。 */
+  .mp-chip.me.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
+
+  /* ---------- 晶片上的語音徽章(v2.3.7,talk.js 的 paintChips)----------
+     使用者:「如果有開啟對話的人,我希望他的人物框,可以有一點資訊顯示」。
+     四種狀態:live(麥克風開著)· mute(在聽但閉麥)· wait(正在連線)· bad(接不上)。
+     ⚠ **沒開語音的人不掛徽章**(判準在 talk.js 的 P.heard)—— 不然整排都在閃黃燈。
+     ⚠ 圖示是 talk.js 從 ICO_SPEAK 換個 class 生出來的同一份 SVG,不是第三份麥克風;
+       尺寸走 % 讓它跟著 .tk-tag 的 px 走(晶片的字級是固定的 14px,不像那兩顆鈕會變)。
+     ⚠ 斜線同 `.tk-btn.muted` 的做法:::after + absolute,寬度用 % ——
+       但這裡 `.tk-tag` 是 grid 容器,所以要自己 position:relative。 */
+  .tk-tag{position:relative;display:inline-grid;place-items:center;flex:0 0 auto;
+    width:15px;height:15px;margin-left:1px;line-height:0;color:var(--muted);opacity:.85}
+  .tk-tagico{width:100%;height:100%;display:block;fill:currentColor;pointer-events:none}
+  .tk-tag.live{color:#5bd75b;opacity:1}
+  .tk-tag.mute{color:var(--muted);opacity:.75}
+  /* 正在連線 / 連不上都用 tk-warn 那個閃爍(定義在上面那兩顆鈕那一段)——
+     ⚠ 「正在連線」故意也會動:靜態的黃點看起來像一個狀態,會動的才讀得出「還在等」。 */
+  .tk-tag.wait{color:#e8c447;opacity:1;animation:tk-warn 1.1s ease-in-out infinite}
+  .tk-tag.bad{color:#ff6b5e;opacity:1;animation:tk-warn 1.4s ease-in-out infinite}
+  /* 這一秒真的在說話:比 live 更亮 + 外發光。⚠ 它是「誰在說話」在 `.turn` 那格的替身
+     (那裡的綠光環會被 turnpulse 蓋掉),所以**不可以**只靠 .mp-chip.tk-talking。 */
+  .tk-tag.talking{color:#9dffb0;opacity:1;filter:drop-shadow(0 0 5px rgba(91,215,91,.95))}
+  .tk-tag.mute::after,.tk-tag.bad::after{
+    content:"";position:absolute;left:50%;top:50%;width:118%;height:2px;border-radius:2px;
+    background:currentColor;opacity:.9;pointer-events:none;
+    transform:translate(-50%,-50%) rotate(-45deg);
+  }
+  /* 輪到誰的時候晶片底色是 accent(亮黃 / 亮橘)—— 灰的 var(--muted) 與淺綠壓在上面
+     都看不見,一律換成晶片自己的深色字。⚠ 權重要 (0,3,0) 才壓得過上面那幾條。 */
+  .mp-chip.turn .tk-tag.live,.mp-chip.turn .tk-tag.mute,.mp-chip.turn .tk-tag.talking{color:#1c1008}
+  .mp-chip.turn .tk-tag.wait{color:#5a3a00}
 
   /* ---------- Panel ---------- */
   /* ★★ 質感(v2.2.5):同一套「光從上方來」,但投影比結果卡弱一階 ——

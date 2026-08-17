@@ -99,6 +99,42 @@ const Talk = (function () {
   const SPEAK_THRESHOLD = 0.035;   // 音量超過這個值算「正在說話」(0~1;實測底噪約 0.005~0.015)
   const SPEAK_HOLD_MS = 320;       // 低於門檻後還亮多久(不加這個會跟著音節一閃一閃)
 
+  /* ---------- 自己的音量(v2.3.7)----------
+     ★ 起點是使用者的一句話:「如果其他人講話的時候框框會變綠色的,我希望自己也可以有
+       這個功能,比較好的判斷到底現在有沒有收到聲音」。
+     ★ 做法:遠端量的是**收到的**音訊,自己這一份量的是**麥克風送出去的**音訊 ——
+       於是自己的晶片也會跟著亮綠,而且它回答的是一個更重要的問題:
+       **「我的麥克風到底有沒有在動」**(靜音的麥克風與沒人在講話,以前完全分不出來)。
+     ⚠ 門檻比遠端**高一階**:遠端那一路經過對方的 AGC 之後是壓平的,自己這一路是原始輸入,
+       用 0.035 的話呼吸聲就會讓自己的框一直閃。
+     ⚠⚠ **LOCAL_METER 是刻意留的一行開關。** 它會 `createMediaStreamSource()`,而 WebKit
+       上「remote stream 進 AudioContext 會把 <audio> 的聲音偷走」是踩過的坑(v1.182.1,
+       遠端那一路因此整段跳過 WebKit)。這裡接的是**本地麥克風**——沒有任何 `<audio>` 在播它,
+       那個坑的機制構成不了;而且刻意用**另一顆** AudioContext(`lacx`),與遠端那顆完全不共用。
+       但 **iPhone 上還沒實機驗證** → 萬一現場回報「iPhone 聽不到別人」,
+       **第一個要關掉的就是這一行**(改成 false,別的地方一個字都不必動)。 */
+  const LOCAL_METER = true;
+  const LOCAL_THRESHOLD = 0.055;
+
+  /* ---------- 對帳(v2.3.7)----------
+     ★★★ 為什麼非要不可:WebRTC 的協商有**太多會靜靜失敗**的路徑(信被刪掉、glare 撞在
+       死角、對方換了一條全新的 PC、SDP 掉一封),而它們的共同症狀是
+       **「PC 停在 connecting,永遠不會變 failed」** —— 於是
+       `onconnectionstatechange` 一次都不會來,沒有紅色、沒有 restartIce、沒有 toast,
+       使用者只會說「有人聽不到某個人」。三人局現場回報的正是這個。
+     → 逐一補完那些路徑是補不完的,一定要有一個**週期性對帳**兜底(同跳棋每 3 秒對帳)。
+     ⚠⚠ 兩條紀律:
+       ① **判準只能是「壞了多久」,不可以是「試了幾次」** —— 而且 `connected` 的線
+          一碰就是一次重新協商 + 幾秒空白,所以絕對不可以無條件重建。
+       ② **修復動作只能由這個節奏發動**,不可以寫進 onDesc 的 glare 分支:
+          「一忽略 offer 就重貼」會讓兩台互相把同一份 SDP 貼到天亮。 */
+  const REPAIR_MS = 3000;          // 對帳週期
+  const NUDGE_MS = 3000;           // 壞這麼久 → 重貼一次自己的 SDP(對方的信箱可能被清掉了)
+  const REBUILD_MS = 9000;         // 壞這麼久 → 整條 PC 重建
+  const REBUILD_MAX_MS = 60000;    // 重建的間隔上限(每次翻倍,免得一直在重建)
+  const BAD_MS = 20000;            // 壞這麼久 → 標紅(讓使用者看得見,而不是以為大家都沒在講)
+  const ORPHAN_MAX = 80;           // 「還沒有 PC 就先到」的 candidate 最多收著幾筆
+
   /* ---------- 狀態 ---------- */
   let hooks = null;            // { ref, me, players, nameOf, onState } —— 由 mp-core 掛進來
   let listen = false, speak = false;
@@ -113,6 +149,49 @@ const Talk = (function () {
   let meterTimer = null;
   let acx = null;              // 分析用的 AudioContext(與 audio.js 那幾個各自獨立)
   let statDone = false;        // 這一間房的使用統計記過了沒(見下面 bumpStat)
+
+  /* ---------- 世代(epoch)---------- */
+  /* ★★★ 每一條 PC 有一個「世代」字串,跟著 SDP 與 candidate 一起寄出去(payload 的 `g`)。
+     它解決兩件用別的方法解不掉的事:
+       ① **陳舊的 SDP 變成看得出來的**。v1.182.1 為此在 attach() 整個清掉自己的信箱,
+          而那是個競態:清的時候別人可能剛把 offer 寄到 —— 三人局(有人先開語音)必中,
+          後果是對方永遠在等一封被刪掉的信的回音(死鎖)。有了世代就不必用時機去猜,
+          **所以那個 wipe 已經拿掉了**(見 attach)。
+       ② **對方換了一條全新的 PC**(斷線重連 / 他那邊重建)時我必須跟著重建 ——
+          舊 PC 收到換過 DTLS fingerprint 的 offer 一定套不上去,而錯誤是被吞掉的。
+     ⚠⚠ **只有 offer 才依世代重建,answer 絕對不可以** —— answer 是「回應我剛送出的 offer」,
+       它帶的新世代正是對方為了回應我而重建出來的。照 answer 重建的話兩台會**無限互相重建**。
+     ⚠ 鹽(sess)每次 attach() 重抽,不可以只用遞增序號:重新整理頁面後序號會從 1 重來,
+       上一輪殘留的信會跟新的 PC 撞成同一個世代 → ① 就白做了。 */
+  let sess = "";
+  let genSeq = 0;
+  function newGen() { return sess + "." + (++genSeq); }
+
+  const orphans = Object.create(null);  // fromId -> [candidate payload]:還沒有 PC 就先到的
+  const retry = Object.create(null);    // fromId -> { at, gap }:重建的節流(要活過 dropPeer)
+  const chain = Object.create(null);    // fromId -> Promise:每條線的處理序列(見 seq)
+  let repairTimer = null;
+
+  /* 本地麥克風的音量分析。⚠ 刻意與遠端那顆 acx **分開**(見上面 LOCAL_METER 的長註解)。 */
+  let lacx = null, lsrc = null, lanalyser = null, ldata = null;
+  let localSpeaking = false, localLoud = 0;
+
+  /* 晶片上的語音狀態徽章(見下面 paintChips)。 */
+  let chipObs = null, chipBusy = false, chipSig = "";
+  let gestureArmed = false;
+
+  /* ★★★ 每條線一個處理序列。`onDesc` / `onCand` 都是 async,而 Firebase 的事件是**可以連著
+     來兩發**的(offer 後面緊跟 answer、SDP 與 candidate 同時到)—— 兩個 async 交錯執行會
+     把同一顆 PC 的狀態機推進錯的狀態,而 `setRemoteDescription` 拋出來的例外是被吞掉的
+     → 又一種靜靜地連不上。
+     ⚠ 前一筆失敗也要繼續(所以是 `.catch(()=>{})` 而不是讓它斷鏈):
+       一次失敗不該把這條線後面所有的信卡死。 */
+  function seq(id, fn) {
+    const prev = chain[id] || Promise.resolve();
+    const next = prev.then(() => fn()).catch(() => { });
+    chain[id] = next;
+    return next;
+  }
 
   function supported() {
     return !!(window.RTCPeerConnection && navigator.mediaDevices &&
@@ -192,12 +271,41 @@ const Talk = (function () {
     } finally {
       if (timer) clearTimeout(timer);
     }
+    armMicWatch();
     return localStream;
   }
+
+  /* ★★★ 麥克風被系統收走時要有人知道(v2.3.7)。
+     track 在行動裝置上**很容易** end:接電話、別的 App 搶麥、切藍牙耳機、iOS 鎖屏。
+     以前完全沒有掛 `onended`,下場是:
+       · 我這邊的講鈕**還是亮著的**、我也還聽得到別人 → 我完全不覺得有問題;
+       · 但 sender 手上那條 track 已經 ended → **全房都聽不到我了**。
+     這是唯一會造成**真正單向**失聯的洞,而且症狀跟「一條線沒接起來」長得一模一樣
+     (現場回報「有人聽不到某個人」時,這是第二個要排除的原因)。
+     ⚠ `track.stop()` 依規格**不會**觸發 ended,但還是在 closeMic 裡先拆掉 handler ——
+       不然哪天某個瀏覽器多送一發,就會在關麥的路徑上跳一則莫名的 toast。 */
+  function armMicWatch() {
+    if (!localStream) return;
+    localStream.getAudioTracks().forEach(t => { t.onended = onMicLost; });
+  }
+  function onMicLost() {
+    if (!speak) return;
+    /* track 已經 ended,沒有東西要 stop() —— 直接放掉它,不要走 closeMic
+       (那支會去 stop 一條死掉的 track,而且會把這裡要留的旗標順序弄亂)。 */
+    localStream = null;
+    speak = false;
+    stopLocalMeter();
+    duck(false);
+    audioSession("playback");
+    sync();
+    toast("麥克風被系統中斷了(可能是來電或其他 App),請再按一次「講」");
+  }
+
   function closeMic() {
     if (!localStream) return;
-    localStream.getTracks().forEach(t => { try { t.stop(); } catch (e) { } });
+    localStream.getTracks().forEach(t => { try { t.onended = null; t.stop(); } catch (e) { } });
     localStream = null;
+    stopLocalMeter();
     if (!speak) audioSession("playback");
   }
 
@@ -219,7 +327,10 @@ const Talk = (function () {
   }
 
   /* ---------- 一條連線 ---------- */
-  function peerOf(id) {
+  /* heardSeed:重建時把「我已經聽過這個人」帶過來(見下面 P.heard 的說明)。
+     ⚠ **rgen 刻意不帶過來**:新的 P 一律從空的世代開始,第一封信直接收下 ——
+       帶過來的話重建之後第一封信就會被判成「換世代」,又觸發一次重建。 */
+  function peerOf(id, heardSeed) {
     if (peers[id]) return peers[id];
 
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
@@ -239,9 +350,25 @@ const Talk = (function () {
       needPlay: false,   // iOS:play() 被擋掉了,等下一次使用者手勢補播
       analyser: null, data: null,
       speaking: false, lastLoud: 0,
-      failed: false
+      failed: false,
+      gen: newGen(),     // 我這一條 PC 的世代(寄出去的每一封信都帶著它)
+      rgen: "",          // 對方最後一次告訴我的世代
+      /* ★★★ heard = 「這個人真的在語音裡」的唯一判準,而且**只靠 signaling 推**,不寫 DB。
+         為什麼需要它:`sync()` 會對房裡**每一個人**建 PC(包含根本沒開語音的人)——
+         那些 PC 永遠停在 connecting,而「沒開語音」與「接不上」在 WebRTC 上
+         **看起來完全一樣**。少了這個旗標會出兩種錯:
+           ① 晶片上給沒開語音的人掛一顆黃色「正在連線…」(整排都在閃,而其實沒事);
+           ② 對帳每 3 秒對著這些人重貼 SDP、每 9 秒重建一次(白燒流量與 CPU)。
+         → 只有**收到過對方的 SDP** 才算「他在語音裡」;在那之前不顯示、也不對帳。
+         ⚠ 這樣不會漏修:雙方都在跑對帳,誰在等誰就會重貼,一定有一邊先動。 */
+      heard: !!heardSeed,
+      badSince: 0        // 從什麼時候開始不是 connected(0 = 沒壞);對帳只看這個
     };
     peers[id] = P;
+
+    /* 早到而先被收著的 candidate:PC 一建好就接上去(見 onCand 的長註解)。 */
+    const orp = orphans[id];
+    if (orp && orp.length) { orp.forEach(c => P.pend.push(c)); orp.length = 0; }
 
     // 我方的 audio transceiver:一開始就照現在的意願建好
     P.tx = pc.addTransceiver("audio", { direction: dirOf() });
@@ -265,8 +392,12 @@ const Talk = (function () {
     pc.onicecandidate = e => {
       if (!e.candidate || !sigRef) return;
       const c = e.candidate;
-      outRef(id).child("c").push({
-        d: c.candidate, m: c.sdpMid, i: c.sdpMLineIndex
+      const r = outRef(id); if (!r) return;
+      /* ⚠ 一定要帶世代:polite 方回滾之後 ICE 會重新收集,而**回滾前**推出去的那幾筆
+         屬於上一代 —— 對方照樣會收下並加進去,白跑一輪 ICE 檢查(不會壞,但會拖慢)。
+         帶著 `g` 就濾得掉(見 flushCand)。 */
+      r.child("c").push({
+        d: c.candidate, m: c.sdpMid, i: c.sdpMLineIndex, g: P.gen
       });
     };
 
@@ -282,18 +413,34 @@ const Talk = (function () {
 
     pc.onconnectionstatechange = () => {
       const s = pc.connectionState;
+      const now = Date.now();
+      if (s === "connected") {
+        /* 通了 → 把對帳的計時與重建的節流一起歸零(不歸零的話下一次壞掉會**立刻**
+           跳到最凶的那一階,而那多半只是網路抖了一下)。 */
+        P.badSince = 0; delete retry[id];
+        if (P.failed) { P.failed = false; }
+        report();
+        return;
+      }
       if (s === "failed") {
         /* v2.1.0 接上 TURN 之後,走到這裡的意思**變了**:以前多半是「對稱 NAT +
            沒有中繼」,現在則多半是**連 TURN 都拿不到 relay candidate** ——
            要嘛那台公共服務掛了、要嘛網路把它也擋掉了。
            ⚠ 兩者在畫面上一模一樣,別用猜的:開 `tools/t-turn-check.html` 量一次。
-           重試一次 ICE(換一組 candidate 有時就通了);還是不行就標記起來給 UI 看,
-           不要靜靜地沒聲音 —— 那會變成「我開了麥可是沒人聽得到,而且看不出為什麼」。 */
-        if (!P.failed) { P.failed = true; try { pc.restartIce(); } catch (e) { } }
+           ⚠ v2.3.7:`restartIce()` 以前被 `if (!P.failed)` 綁成**一輩子只做一次** ——
+             第二次以後的失敗完全沒有救援。現在交給對帳升級處理,這裡只做第一發
+             (那一發最有價值:換一組 candidate 常常就通了)。 */
+        P.failed = true;
+        if (!P.badSince) P.badSince = now;
+        if (!retry[id]) { retry[id] = { at: now, gap: REBUILD_MS }; try { pc.restartIce(); } catch (e) { } }
         report();
-      } else if (s === "connected") {
-        if (P.failed) { P.failed = false; report(); }
+        return;
       }
+      /* ⚠ `disconnected` 以前**完全沒有處理**。手機切 App / Wi-Fi 換 4G 很常停在這裡幾十秒,
+         而有些組合根本走不到 failed → 一次救援都不會發生。這裡只記時間,
+         真正要不要動手交給對帳(它才知道「壞多久了」)。 */
+      if (s === "disconnected" || s === "closed") { if (!P.badSince) P.badSince = now; }
+      report();
     };
 
     return P;
@@ -328,7 +475,12 @@ const Talk = (function () {
     if (!desc) return;
     const r = outRef(toId);
     if (!r) return;
-    try { r.child("d").set({ t: desc.type, s: desc.sdp }); } catch (e) { }
+    const P = peers[toId];
+    /* ⚠ 一律用 set()(不是 push):同一個信箱格子,新的蓋掉舊的。
+       ★ 順帶一個對帳要用到的性質:**重貼一模一樣的內容不會產生事件**
+         (Firebase 只在值真的變了才通知)→ 對方沒事就完全不受打擾;
+         而對方的信箱被清掉時(值變成 null)重貼就會補上 —— 這正是對帳修得掉死鎖的原因。 */
+    try { r.child("d").set({ t: desc.type, s: desc.sdp, g: (P && P.gen) || "" }); } catch (e) { }
   }
 
   async function onDesc(fromId, d) {
@@ -342,14 +494,25 @@ const Talk = (function () {
        (setRemoteDescription 在 closed 的 PC 上直接拋錯,而我們把例外吞掉 → 靜靜地連不上)。
        ⚠ keepMail=true:不可以順手清掉 DB 上的信 —— 我正在處理的就是那一封,
          後面還有屬於它的 candidate 要收。 */
+    /* ★★★ 而且(v2.3.7)**世代變了也要就地重建** —— 這是「舊 PC 死了才重建」漏掉的一半:
+       斷線重連的路徑上,對方會看到我從 players 消失 → 拆掉他那條 PC;我回來之後他建的是
+       **全新**的 PC(新的 DTLS fingerprint + 新的 ICE ufrag),而我這邊的舊 PC 此刻多半是
+       `disconnected`(還沒到 failed)→ 舊判準不重建 → 把新 offer 套到舊 PC 上,
+       fingerprint 一換就直接拋錯,而錯誤是被吞掉的 → **這一條永久靜靜地斷掉**。
+       ⚠⚠ **只認 offer**。answer 帶的新世代是對方為了回應我而重建出來的,
+         照它重建就是兩台無限互相重建(見上面 newGen 的長註解)。 */
     {
       const old = peers[fromId];
       if (old) {
         const cs = old.pc.connectionState, ss = old.pc.signalingState;
-        if (cs === "failed" || cs === "closed" || ss === "closed") dropPeer(fromId, true);
+        const newGenSeen = d.t === "offer" && !!old.rgen && !!d.g && d.g !== old.rgen;
+        if (newGenSeen || cs === "failed" || cs === "closed" || ss === "closed") dropPeer(fromId, true);
       }
     }
-    const P = peerOf(fromId), pc = P.pc;
+    const P = peerOf(fromId, true), pc = P.pc;
+    /* 收到 SDP = 「這個人真的在語音裡」的唯一證據(見 peerOf 裡 heard 的長註解)。 */
+    P.heard = true;
+    if (d.g) P.rgen = d.g;
     const desc = { type: d.t, sdp: d.s };
     try {
       /* Perfect Negotiation 的收端。衝突 = 對方送 offer 來的時候我自己也正在送。 */
@@ -370,7 +533,13 @@ const Talk = (function () {
       await pc.setRemoteDescription(desc);
       // remote 落地了 → 把早到而排隊的 candidate 補進去(見 onCand)
       await flushCand(P);
-      if (desc.type === "offer") {
+      /* ⚠ 一定要再確認一次 `have-remote-offer`(v2.3.7)。
+         上面剛建好的 PC,它的 `addTransceiver` 會**非同步地**觸發一發
+         `onnegotiationneeded` —— 那支的 `setLocalDescription()` 有可能搶在這裡之前跑完並
+         把 answer 送出去,這時狀態已經是 `stable`;沒有這道閘的話這裡的
+         `setLocalDescription()` 會在 stable 上產生一份**沒有人要的 offer**,
+         把剛接好的線重新推回協商中(症狀:接上之後又立刻斷,反覆重連)。 */
+      if (desc.type === "offer" && pc.signalingState === "have-remote-offer") {
         await pc.setLocalDescription();
         sendDesc(fromId, pc.localDescription);
       }
@@ -385,18 +554,35 @@ const Talk = (function () {
      少掉關鍵的 host / srflx candidate 就是連不上,而重開一次會重新收集、
      有時順序剛好對了就通 → 使用者看到的就是「開開關關好幾次才會通」。
      排隊之後一筆都不會掉,而且刪除時機也跟著改成「處理完才刪」。 */
+  /* ★★★ v2.3.7 補掉同一個病的最後一個出口:**連 PC 都還沒有**的時候到的 candidate。
+     舊寫法回 `false`(DB 那筆刻意不刪、留著等下一輪),但 `child_added` **不會對同一筆
+     再觸發一次** → 那筆等於永久消失,和 v1.182.1 修掉的「早到就被丟棄」是同一個病,
+     只差在早到的對象從 `remoteDescription` 換成了 `peers[id]`。
+     → 改成自己收著(orphans),`peerOf()` 建好 PC 的那一刻補進去。
+     ⚠ 要有上限:對方一直在收集而我一直沒建 PC 的話,這個陣列會無限長大。 */
+  function orphanOf(id) { return orphans[id] || (orphans[id] = []); }
   async function onCand(fromId, c) {
+    if (!c || !c.d) return;                       // 壞資料:什麼都不做(呼叫端會刪掉)
+    const item = { g: c.g || "", cand: { candidate: c.d, sdpMid: c.m, sdpMLineIndex: c.i } };
     const P = peers[fromId];
-    if (!P || !c || !c.d) return false;
-    P.pend.push({ candidate: c.d, sdpMid: c.m, sdpMLineIndex: c.i });
+    if (!P) {
+      const o = orphanOf(fromId);
+      if (o.length < ORPHAN_MAX) o.push(item);
+      return;
+    }
+    P.pend.push(item);
     if (P.pc.remoteDescription && P.pc.remoteDescription.type) await flushCand(P);
-    return true;
   }
   async function flushCand(P) {
     if (!P.pend.length) return;
     const q = P.pend.slice(); P.pend.length = 0;
     for (let i = 0; i < q.length; i++) {
-      try { await P.pc.addIceCandidate(q[i]); } catch (e) { }
+      /* 上一代的 candidate 丟掉(polite 方回滾前推出去的那幾筆)—— 加進去只是白跑
+         一輪 ICE 檢查。⚠ `P.rgen` 還空著時**不可以**濾:那表示對方的 SDP 還沒到,
+         這時每一筆都可能是有用的(整個佇列存在的理由就是它們比 SDP 先到)。 */
+      const it = q[i];
+      if (it.g && P.rgen && it.g !== P.rgen) continue;
+      try { await P.pc.addIceCandidate(it.cand); } catch (e) { }
     }
   }
 
@@ -418,16 +604,19 @@ const Talk = (function () {
       if (fromId === me() || watched[fromId]) return;
       watched[fromId] = true;
       const slot = sigRef.child(fromId);   // ⚠ 別叫 box —— 上面那個 box() 是裝 <audio> 的容器
-      slot.child("d").on("value", s => { const v = s.val(); if (v) onDesc(fromId, v); });
+      /* ⚠ 兩個監聽都走 seq():同一條線的 SDP 與 candidate 一律排隊處理,不可以交錯
+         (兩個 async 交錯會把 PC 的狀態機推進錯的狀態,而例外是被吞掉的)。 */
+      slot.child("d").on("value", s => { const v = s.val(); if (v) seq(fromId, () => onDesc(fromId, v)); });
       /* candidate:**處理完(收下或排進佇列)才刪**。
          ⚠ 舊版是「onCand 之後立刻 remove」,而 onCand 是 async —— 等於一定在處理完
            之前就刪掉了,早到的那幾筆於是永遠消失(見 onCand 的長註解)。
          刪除本身還是要做:不刪的話一間房打一整晚會累積成千上萬筆,
          而且重連的人會把上一輪的全部重放一次。 */
+      /* ★ v2.3.7 起 onCand **一律接手**(沒有 PC 就自己收著,見它的長註解)→
+         這裡就變成無條件刪:留在 DB 裡的那條路已經證明是「永久消失」而不是「等下一輪」。 */
       slot.child("c").on("child_added", s => {
-        onCand(fromId, s.val()).then(okd => {
-          if (okd) { try { s.ref.remove(); } catch (e) { } }
-        });
+        const v = s.val();
+        seq(fromId, () => onCand(fromId, v)).then(() => { try { s.ref.remove(); } catch (e) { } });
       });
     });
   }
@@ -481,24 +670,68 @@ const Talk = (function () {
     } catch (e) { }
     startMeter();
   }
+  /* ---------- 自己的麥克風音量(v2.3.7)----------
+     見檔頭 LOCAL_METER 的長註解:這一路量的是**送出去的**音訊,回答的是
+     「我的麥克風到底有沒有在動」。⚠ 用**獨立**的 AudioContext,與遠端那顆不共用。
+     ⚠ 同遠端那一路:**絕對不要 connect(destination)** —— 那會把自己的聲音播回自己的
+       喇叭,再被麥克風收回去,全房嘯叫(而回音消除擋不住這種自己造出來的路徑)。 */
+  function armLocalMeter() {
+    if (!LOCAL_METER || lanalyser) return;
+    if (!speak || !localStream) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!lacx) lacx = new AC();
+      if (lacx.state === "suspended") { try { lacx.resume(); } catch (e) { } }
+      lsrc = lacx.createMediaStreamSource(localStream);
+      const an = lacx.createAnalyser();
+      an.fftSize = 512;
+      lsrc.connect(an);
+      lanalyser = an; ldata = new Uint8Array(an.fftSize);
+    } catch (e) { lanalyser = null; }
+    startMeter();
+  }
+  function stopLocalMeter() {
+    try { if (lsrc) lsrc.disconnect(); } catch (e) { }
+    try { if (lacx) { lacx.close(); lacx = null; } } catch (e) { }
+    lsrc = null; lanalyser = null; ldata = null;
+    localSpeaking = false; localLoud = 0;
+  }
+  function peakOf(data) {
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = Math.abs(data[i] - 128) / 128;
+      if (v > peak) peak = v;
+    }
+    return peak;
+  }
+
   function startMeter() {
     if (meterTimer) return;
     meterTimer = setInterval(() => {
-      let changed = false;
+      let changed = false, any = false;
       const now = Date.now();
       for (const id in peers) {
         const P = peers[id];
         if (!P.analyser) continue;
+        any = true;
         P.analyser.getByteTimeDomainData(P.data);
-        let peak = 0;
-        for (let i = 0; i < P.data.length; i++) {
-          const v = Math.abs(P.data[i] - 128) / 128;
-          if (v > peak) peak = v;
-        }
+        const peak = peakOf(P.data);
         if (peak >= SPEAK_THRESHOLD) P.lastLoud = now;
         const sp = (now - P.lastLoud) < SPEAK_HOLD_MS;
         if (sp !== P.speaking) { P.speaking = sp; changed = true; }
       }
+      /* 自己那一份。⚠ 門檻比遠端高(LOCAL_THRESHOLD):這一路沒有經過對方的 AGC,
+         用遠端那個值的話呼吸聲就會讓自己的框一直閃。 */
+      if (lanalyser && speak) {
+        any = true;
+        lanalyser.getByteTimeDomainData(ldata);
+        if (peakOf(ldata) >= LOCAL_THRESHOLD) localLoud = now;
+        const sp = (now - localLoud) < SPEAK_HOLD_MS;
+        if (sp !== localSpeaking) { localSpeaking = sp; changed = true; }
+      } else if (localSpeaking) { localSpeaking = false; changed = true; }
+      // 沒有東西要量了就自己收掉(WebKit 上遠端整段跳過 → 關麥之後這裡就空了)
+      if (!any) { stopMeter(); }
       if (changed) report();
     }, 120);
   }
@@ -558,6 +791,11 @@ const Talk = (function () {
       '<path d="M12 14.2a3.4 3.4 0 0 0 3.4-3.4V4.6a3.4 3.4 0 1 0-6.8 0v6.2a3.4 3.4 0 0 0 3.4 3.4z"/>' +
       '<path d="M18.2 10.6a1.05 1.05 0 0 0-2.1 0 4.1 4.1 0 0 1-8.2 0 1.05 1.05 0 0 0-2.1 0 6.15 6.15 0 0 0 5.15 6.06V19h-2.1a1.05 1.05 0 0 0 0 2.1h6.3a1.05 1.05 0 0 0 0-2.1h-2.1v-2.34a6.15 6.15 0 0 0 5.15-6.06z"/>' +
     '</svg>';
+  /* 晶片上那顆小徽章的圖示 —— **從 ICO_SPEAK 換個 class 生出來的**,不是再畫一份。
+     ⚠ 不可以自己抄一份路徑:那就是第三份會慢慢分岔的麥克風(CLAUDE.md 紅線 4)。
+     ⚠ 同樣不用 emoji(紅線 8 / 紅線 13):19px 的鈕都糊了,15px 的徽章只會更糟。 */
+  const ICO_TAG = ICO_SPEAK.replace('class="tk-ico"', 'class="tk-tagico"');
+
   /* 只在「還沒有 SVG」時寫一次 —— 這樣舊的測試頁(HTML 裡還留著 🎙 字面的那些)
      也會被自動蓋掉,不必一份一份改。 */
   function ico(btn, html) { if (!btn.querySelector("svg")) btn.innerHTML = html; }
@@ -566,17 +804,31 @@ const Talk = (function () {
     try { if (typeof showToast === "function") showToast(msg); } catch (e) { }
   }
 
+  /* 現在有沒有人連不上。⚠ 與 report() 同一道 heard 閘(沒開語音的人不算連不上)。 */
+  function anyBad() {
+    for (const id in peers) if (peers[id].failed && peers[id].heard) return true;
+    return false;
+  }
   function paintBtns(st) {
     const bL = btnL(), bS = btnS();
-    const bad = !!(st && st.failed && st.failed.length);
+    /* ⚠ 沒帶 st 的時候要**自己算**,不可以當成「沒事」(v2.3.7)。
+       bindUi 的兩個 click handler 最後都會 `paintBtns()`(不帶參數),而那一下排在
+       report() 之後 → 舊寫法會把剛亮起來的紅色**清掉**,而下一次 report() 可能要等
+       3 秒(對帳)、甚至永遠不來(狀態沒再變)→ 使用者按一下鈕,警示就不見了。 */
+    const bad = st ? !!(st.failed && st.failed.length) : anyBad();
     if (bL) {
       /* ⚠ 開 / 關**不換圖示的 markup**:音波與叉叉都在同一份 SVG 裡,
          由 `.tk-btn.on` 決定露哪一組(見上面 ICO_LISTEN 的長註解)。 */
       ico(bL, ICO_LISTEN);
       bL.classList.toggle("on", listen);
+      /* ★ 連不上也要在**聽鈕**上看得見(v2.3.7)。原本紅色只掛在講鈕、而且只有 speak 為真
+         才掛 —— 於是 v2.1.0 特別保留的「閉麥在聽」那個狀態,連線失敗時
+         **畫面上一個提示都沒有**,使用者只會覺得「大家今天都不講話」。 */
+      bL.classList.toggle("bad", listen && bad);
       /* 關「聽」會連麥克風一起關(規則 ②)—— 副作用要寫在標題裡先講,
          不要讓人按下去才發現自己被閉麥了。 */
-      bL.title = listen ? (speak ? "關掉語音(麥克風也會一起關)" : "關掉語音(不再聽到別人)")
+      bL.title = (listen && bad) ? "語音連不上(你聽不到某些人)"
+               : listen ? (speak ? "關掉語音(麥克風也會一起關)" : "關掉語音(不再聽到別人)")
                         : "打開語音(聽別人說話)";
       bL.setAttribute("aria-label", bL.title);
       bL.setAttribute("aria-pressed", listen ? "true" : "false");
@@ -599,18 +851,130 @@ const Talk = (function () {
     }
   }
 
+  /* ==========================================================================
+     玩家晶片上的語音徽章(v2.3.7)
+     ──────────────────────────────────────────────────────────────────────────
+     ★ 起點是使用者的一句話:「如果有開啟對話的人,我希望他的人物框,可以有一點資訊顯示」。
+     ★ 它回答的是**綠光環回答不了的那一半**:綠光環只有「這一秒有沒有在講」,
+       而現場真正想知道的是「他到底有沒有在語音裡 / 他是不是閉著麥 / 是不是連不上」。
+       ⚠ 這也是上一次現場回報最缺的東西:以前使用者只能說「有人聽不到」,
+         有了它就能直接說「B 那格一直是黃的」—— 同 `t-turn-check.html` 存在的理由。
+
+     ★★★ **四種狀態,而且全部是本地推出來的、一個位元都不寫 DB**(紅線 7):
+       · live —— 連上了,而且對方在送音訊(他開著麥)
+       · mute —— 連上了,但對方沒在送(他聽著、閉著麥)
+       · wait —— 還沒連上(正在接)
+       · bad  —— 接不上
+       怎麼推「對方有沒有開麥」:看**我方** transceiver 的 `currentDirection` ——
+       我在收(`sendrecv` / `recvonly`)就等於對方在送。SDP 已經把這件事講完了,
+       不必再開一個 DB 節點去問(那會是每人每次開關好幾筆寫入)。
+     ⚠⚠ **沒開語音的人不掛徽章** —— 判準是 `P.heard`(見 peerOf)。
+       `sync()` 對房裡每一個人都建 PC,那些人的 PC 永遠停在 connecting,
+       而「沒開語音」與「接不上」在 WebRTC 上看起來一模一樣 → 少了這道閘,
+       整排晶片都會掛著黃色的「正在連線…」在閃,而其實一切正常。
+
+     ★★★ 為什麼用 MutationObserver 而不是改 `renderPlayers()`:
+       晶片列是 `mp-core.js` / `online.js` **各一份**畫的(而且 `box.innerHTML=""`
+       整列重建),要在那裡加東西就是**又一組雙胞胎**(紅線 4)。
+       照 `qr.js` 的先例(紅線 4 的 ★★:鈕與蓋板都自己建、十四頁零登記)——
+       這一支自己盯著那個容器,重建完就把徽章補回去。**十四頁一行都不必改。**
+     ⚠ observe 一定要 `{ childList: true }` **而且不加 subtree**:
+       我們自己是往晶片**裡面**塞節點的,加了 subtree 就會自己觸發自己 → 無限迴圈。
+       (`chipBusy` 是第二道保險,不要因為有它就把 subtree 加回來。)
+     ========================================================================== */
+  const TAG_TXT = {
+    live: "語音:麥克風開著",
+    mute: "語音:在聽,但閉著麥克風",
+    wait: "語音:正在連線…",
+    bad: "語音:連不上(你們聽不到彼此)"
+  };
+  const TAG_TXT_ME = {
+    live: "你的麥克風開著(有聲音時你的框會變綠)",
+    mute: "你在聽,但閉著麥克風"
+  };
+  function voiceOf(P) {
+    if (P.failed) return "bad";
+    const cs = P.pc.connectionState;
+    if (cs === "failed" || cs === "closed") return "bad";
+    if (cs !== "connected") return "wait";
+    const dir = (P.tx && P.tx.currentDirection) || "";
+    return (dir === "sendrecv" || dir === "recvonly") ? "live" : "mute";
+  }
+  /* pid -> 狀態。⚠ 只收「我聽過的人」+ 自己。 */
+  function voiceMap() {
+    const m = Object.create(null);
+    for (const id in peers) { const P = peers[id]; if (P.heard) m[id] = voiceOf(P); }
+    const my = me();
+    if (my && on()) m[my] = speak ? "live" : "mute";
+    return m;
+  }
+  function chipsBox() { return document.getElementById("mpPlayers"); }
+  function armChipObs() {
+    if (chipObs || !window.MutationObserver) return;
+    const box = chipsBox(); if (!box) return;
+    chipObs = new MutationObserver(() => { if (!chipBusy) paintChips(true); });
+    chipObs.observe(box, { childList: true });   // ⚠ 不加 subtree,見上面
+  }
+  function stopChipObs() {
+    if (chipObs) { try { chipObs.disconnect(); } catch (e) { } chipObs = null; }
+    chipSig = "";
+    const box = chipsBox(); if (!box) return;
+    try { box.querySelectorAll(".tk-tag").forEach(t => t.remove()); } catch (e) { }
+  }
+  function paintChips(force) {
+    const box = chipsBox(); if (!box) return;
+    const vs = voiceMap();
+    const talking = Object.create(null);
+    for (const id in peers) if (peers[id].speaking) talking[id] = true;
+    const my = me();
+    if (my && localSpeaking && speak) talking[my] = true;
+    /* ⚠ 只有真的變了才動 DOM:report() 在有人講話時每 120ms 就來一次,
+       無條件重寫會在「每次換畫面」的路徑上白燒(CLAUDE.md 紅線 7 的最後一條)。 */
+    const sig = Object.keys(vs).sort().map(id => id + ":" + vs[id] + (talking[id] ? "!" : "")).join("|");
+    if (!force && sig === chipSig) return;
+    chipSig = sig;
+    chipBusy = true;
+    try {
+      box.querySelectorAll(".mp-chip").forEach(chip => {
+        const id = chip.dataset && chip.dataset.id;
+        const st = id ? vs[id] : null;
+        let tag = chip.querySelector(".tk-tag");
+        if (!st) { if (tag) tag.remove(); return; }
+        if (!tag) {
+          tag = document.createElement("span");
+          tag.innerHTML = ICO_TAG;
+          /* ⚠ 插在移出鈕 ✕ **之前**:那顆是晶片的最後一格(房主大廳限定),
+             徽章掉到它後面會變成「名字 ✕ 麥克風」,讀起來像是麥克風可以被關掉。 */
+          const kick = chip.querySelector(".mp-kick");
+          if (kick) chip.insertBefore(tag, kick); else chip.appendChild(tag);
+        }
+        tag.className = "tk-tag " + st + (talking[id] ? " talking" : "");
+        tag.title = (id === my && TAG_TXT_ME[st]) ? TAG_TXT_ME[st] : (TAG_TXT[st] || "");
+      });
+    } finally { chipBusy = false; }
+  }
+
   /* ---------- 對外狀態 ---------- */
   function report() {
     const spk = [], bad = [];
     for (const id in peers) {
       if (peers[id].speaking) spk.push(id);
-      if (peers[id].failed) bad.push(id);
+      /* ⚠ 要 `&& heard`:沒開語音的人那條 PC 本來就永遠接不起來(見 peerOf 的 heard),
+         不加這道閘的話「房裡有人沒開語音」會被報成「連不上」→ 鈕紅著閃給沒事的人看。 */
+      if (peers[id].failed && peers[id].heard) bad.push(id);
     }
-    const st = { listen, speak, speaking: spk, failed: bad, peers: Object.keys(peers).length };
+    /* ★ 自己也進 speaking(v2.3.7)—— 晶片列那邊 `talkingIds.indexOf(id)>=0` 就會給
+       自己的晶片掛上 `.tk-talking`,**十四頁與兩份 renderPlayers 一行都不必改**。
+       ⚠ 一定要 `speak &&`:閉著麥的時候框不可以亮(那會變成「我以為我在講話」)。 */
+    if (speak && localSpeaking) { const my = me(); if (my) spk.push(my); }
+    const st = { listen, speak, speaking: spk, failed: bad, peers: Object.keys(peers).length, voice: voiceMap() };
     /* ⚠ 鈕一律重畫,**不可以**因為 hooks 還沒掛上就跳過 —— 沒進房時 hooks 是 null,
        而那時使用者照樣按得到鈕(大廳畫面);跳過的話會變成「按了沒反應」。 */
     paintBtns(st);
     if (hooks && hooks.onState) { try { hooks.onState(st); } catch (e) { } }
+    /* ⚠ 徽章要排在 onState **後面**:那支會把整條晶片列重建掉(renderPlayers),
+       排在前面的話剛掛上的徽章會被立刻沖掉,要等 observer 補第二趟才看得到(會閃一下)。 */
+    paintChips();
   }
 
   /* ==========================================================================
@@ -650,6 +1014,98 @@ const Talk = (function () {
     try { r.root.child("game_stats/talk_" + k + "/n").transaction(n => (n || 0) + 1); } catch (e) { }
   }
 
+  /* ==========================================================================
+     對帳 —— 「接不上就自己修好」(v2.3.7)
+     ──────────────────────────────────────────────────────────────────────────
+     ★★★ 為什麼這一段比任何單一 bug 的修正都重要:
+       WebRTC 的協商有**太多會靜靜失敗**的路徑,而它們的共同下場是
+       **PC 停在 `connecting`,永遠不會變 `failed`** →
+       `onconnectionstatechange` 一次都不會來 → 沒有紅色、沒有 restartIce、沒有 toast。
+       三人局現場回報的「有一個人每次都聽得到全部,其他人各缺一個」就是這樣長出來的:
+       壞掉的是**一條** pairwise 連線,而沒被牽連的第三個人自然聽得到全部。
+       ⚠ 而且它是**決定性**的(禮讓方由 pid 字典序決定,pid 存在 localStorage)——
+         「每次都同一個人」正是這種結構性錯誤的指紋,不是網路抖動。
+     → 逐一補完那些路徑補不完,所以這裡不猜原因,只問一件事:**這條線壞多久了。**
+
+     三階升級(全部以「壞了多久」為判準,見檔頭的常數):
+       ≥ 3s  · **重貼一次自己的 SDP** —— 對方的信箱可能被清掉了 / 那封信掉了。
+               ★ 重貼相同內容不會產生事件(Firebase 只在值變了才通知)→ 沒事的人完全
+                 不受打擾;而值被刪成 null 的那一邊就會補上,死鎖當場解開。
+       ≥ 9s  · **整條 PC 重建**(間隔每次翻倍,上限 60s)—— 狀態機卡死 / 對方換了新的 PC。
+       ≥ 20s · **標紅** —— 修不好也要讓使用者看得見,不要讓他以為大家都沒在講話。
+
+     ⚠⚠ 三條紀律,少一條就會變成新的災難:
+       ① **只對「真的在語音裡的人」動手**(`P.heard`)。房裡沒開語音的人那條 PC 本來就
+          接不起來,對他們對帳 = 每 3 秒白寫一筆 SDP、每 9 秒重建一次。
+       ② **`connected` 的線一個字都不要碰。** 碰一下就是一次重新協商 + 幾秒空白。
+       ③ **修復只能由這個節奏發動。** 寫進 onDesc 的 glare 分支(「一忽略 offer 就重貼」)
+          會讓兩台互相把同一份 SDP 貼到天亮。
+     ========================================================================== */
+  function startRepair() {
+    if (repairTimer) return;
+    repairTimer = setInterval(repairTick, REPAIR_MS);
+  }
+  function stopRepair() {
+    if (repairTimer) { clearInterval(repairTimer); repairTimer = null; }
+  }
+  function repairTick() {
+    if (!hooks || !on()) return;
+    const now = Date.now();
+    let changed = false;
+    /* ⚠ 一定要先把 key 拍下來:下面的重建會 delete + 重新塞同一個 key,
+       直接 for-in 邊走邊改是未定義行為。 */
+    Object.keys(peers).forEach(id => {
+      const P = peers[id];
+      if (!P) return;
+      if (!P.heard) return;                      // 紀律 ①
+      if (P.pc.connectionState === "connected") { // 紀律 ②
+        if (P.badSince || P.failed) { P.badSince = 0; P.failed = false; delete retry[id]; changed = true; }
+        return;
+      }
+      if (!P.badSince) { P.badSince = now; return; }   // 這一輪才發現壞,下一輪才動手
+      const bad = now - P.badSince;
+
+      if (bad >= REBUILD_MS) {
+        const r = retry[id] || (retry[id] = { at: 0, gap: REBUILD_MS });
+        if (now - r.at >= r.gap) {
+          r.at = now;
+          r.gap = Math.min(r.gap * 2, REBUILD_MAX_MS);
+          /* ⚠ keepMail=true:DB 上對方寄來的信不可以動 —— 重建的目的就是要收下它。 */
+          dropPeer(id, true);
+          peerOf(id, true);          // heard 帶過去,不然新的 P 會被紀律 ① 排除掉
+          changed = true;
+          return;                    // 這一輪就到這裡,新的 PC 讓它自己去協商
+        }
+      }
+      if (bad >= NUDGE_MS) sendDesc(id, P.pc.localDescription);
+      if (bad >= BAD_MS && !P.failed) { P.failed = true; changed = true; }
+    });
+    if (changed) report();
+  }
+
+  /* ★★★ 「連上了卻沒聲音」的補播,從兩顆鈕擴大到**整個畫面的任何一次點按**(v2.3.7)。
+     `ontrack` 是**對方接上的那一刻**觸發的,常常在我按完鈕很久之後 —— 那一次 `play()`
+     被 iOS 的自動播放政策擋掉的話,以前**只有再去按那兩顆語音鈕**才救得回來,
+     而使用者這時的直覺是「他壞了」,不是「我再按一次麥克風」。
+     玩遊戲的人每幾秒就在點畫面,而那是貨真價實的使用者手勢 → 幾乎零成本就補掉了。
+     ⚠ 沒有東西要補時**什麼都不做**:這支掛在 document 上、每一次點按都會經過。
+     ⚠ pointerdown 與 touchend 都掛:iOS 對「哪一種事件算使用者啟動」歷來比較挑,
+       而 kickPlay() 本身是冪等的,多跑一次沒有代價。 */
+  function armGesture() {
+    if (gestureArmed) return;
+    gestureArmed = true;
+    const h = () => {
+      if (!on()) return;
+      let need = false;
+      for (const id in peers) if (peers[id].needPlay) { need = true; break; }
+      if (need || (acx && acx.state === "suspended")) kickPlay();
+    };
+    try {
+      document.addEventListener("pointerdown", h, true);
+      document.addEventListener("touchend", h, true);
+    } catch (e) { }
+  }
+
   /* ---------- 依「現在房裡有誰」+「兩個開關」重算所有連線 ---------- */
   function sync() {
     if (!hooks) return;
@@ -658,6 +1114,10 @@ const Talk = (function () {
        兩支對外 API 最後都會經過 sync(),而且上面那道 on() 的閘已經把「沒開」濾掉了。 */
     bumpStat();
     watch();
+    startRepair();      // 接不上就自己修好(見上面那一整段)
+    armGesture();       // iOS:任何一次點按都補播被擋掉的遠端音訊
+    armChipObs();       // 晶片上的語音徽章(自己盯著晶片列,十四頁零登記)
+    armLocalMeter();    // 自己的麥克風音量 → 自己的框也會變綠
 
     const ps = hooks.players() || {};
     const live = Object.keys(ps).filter(id => id !== me());
@@ -686,11 +1146,19 @@ const Talk = (function () {
   }
 
   function teardown() {
+    stopRepair();
     Object.keys(peers).forEach(dropPeer);
     unwatch();
     stopMeter();
+    stopLocalMeter();
     closeMic();
     duck(false);
+    /* 這一輪的暫存全部歸零:留著的話下一次開語音會把上一輪的 candidate / 重建節流
+       帶進去(而那些都是對著已經不存在的 PC 的)。 */
+    Object.keys(orphans).forEach(k => { delete orphans[k]; });
+    Object.keys(retry).forEach(k => { delete retry[k]; });
+    Object.keys(chain).forEach(k => { delete chain[k]; });
+    stopChipObs();
     report();
   }
 
@@ -778,18 +1246,32 @@ const Talk = (function () {
          ref(path)  → roomRef.child(path)(沒進房時回 null)
          me()       → 我的 pid ·  players() → 現在房裡的人(物件)
          onState(s) → 狀態變了要重畫 UI */
-    /* ⚠ 進房那一刻**先把自己的信箱清乾淨**(v1.182.1)。
-       `d` 是 set() 寫的,而 `.on("value")` 一掛上就會立刻回一次現值 —— 上一輪殘留的
-       offer 會被當成新的收下來,然後對著一條早就不存在的連線協商(回一個沒有人要的
-       answer,還把自己的 PC 推進錯的 signalingState)。
-       ⚠ 房主開房時 create() 的 wipe 已經清過 rtc,但**訪客加入既有房間時不會** →
-         這裡是那條路徑唯一的清理點。
-       ⚠⚠ 一定要在這裡清、不可以搬到 watch() 裡:理由見 watch() 的長註解
-         (會刪掉別人剛送來的邀請 → 兩邊互相等)。 */
+    /* ★★★ v2.3.7:**這裡原本會把自己的信箱整個 remove() 掉,已經拿掉了。**
+       ── 原本為什麼要清(v1.182.1)──
+         `d` 是 set() 寫的,而 `.on("value")` 一掛上就會立刻回一次現值 → 上一輪殘留的
+         offer 會被當成新的收下來,對著一條早就不存在的連線協商。
+       ── 為什麼它是錯的 ──
+         `attach()` 的時機是 `claimSeat` 交易提交**之後**(核心的 enterLobby → listen),
+         而別人看到我入座、算出 offer、寫回 DB 也是兩趟 —— **這是一個競態**,
+         而 `adoptScore()` 要接回舊成績時還會多一次交易,那種情況清得**一定比較晚**。
+         清掉之後對方停在 `have-local-offer` 等一封已經不存在的信的回音,
+         而他若剛好是 impolite,還會把我後來送的 offer 當成 glare 直接丟掉
+         → **兩邊互相等,永久死鎖**。三人局「有人先開語音、第三個人才加入」必中,
+         而且因為禮讓方由 pid 字典序決定,**每次壞的都是同一條線**。
+       ── 現在怎麼處理陳舊的 SDP ──
+         改用**世代**(payload 的 `g`,見 newGen):殘留的信帶的是舊世代,對方真正的 offer
+         一到就對不上 → 就地重建。**從「靠時機清掉」變成「看得出來」** —— 這才是這一類
+         問題的正解,而且順手修掉「對方換了一條全新 PC」那條路(斷線重連)。
+       ⚠ 殘留不會累積:candidate 收完就刪、`d` 會被下一封 set() 蓋掉,
+         而 `stop()` / 房主關房 / create() 的 wipe 都會把整個 `rtc` 清乾淨。
+       ⚠⚠ **不要「順手」把 remove() 加回來。** 加回來就是把上面那個死鎖一起加回來。 */
     attach(h) {
       hooks = h;
       statDone = false;   // 使用統計是「一間房記一次」→ 進新房要重新起算(比照核心的 armPlayCount)
-      try { const r = hooks && hooks.ref && hooks.ref("rtc/" + hooks.me()); if (r) r.remove(); } catch (e) { }
+      /* 世代的鹽:每次進房重抽。⚠ 不可以只靠遞增序號 —— 重新整理頁面後序號會從 1 重來,
+         上一輪殘留的信就會跟新的 PC 撞成同一個世代,上面那套判斷整個失效。 */
+      genSeq = 0;
+      sess = Math.random().toString(36).slice(2, 8) + (Date.now() % 46656).toString(36);
     },
     listening() { return listen; },
     speaking() { return speak; },
@@ -809,6 +1291,23 @@ const Talk = (function () {
       teardown();
       hooks = null;
       statDone = false;
+      sess = ""; genSeq = 0;
+    },
+    /* 診斷用(產品碼不呼叫,同 iceServers() 的先例):每條線現在到什麼地步。
+       ★ 存在的理由與 `t-turn-check.html` 一樣 —— 「有人聽不到某個人」這種回報
+         如果只能靠猜,就會一直靠猜。這一支讓它在 console 裡一行就問得出來:
+         `Talk.diag()`(晶片上那顆徽章是它的簡化版,給現場的人看的)。 */
+    diag() {
+      return Object.keys(peers).map(id => {
+        const P = peers[id];
+        return {
+          id, heard: P.heard, polite: P.polite, state: P.pc.connectionState,
+          ice: P.pc.iceConnectionState, sig: P.pc.signalingState,
+          dir: (P.tx && P.tx.currentDirection) || "", voice: voiceOf(P),
+          badMs: P.badSince ? (Date.now() - P.badSince) : 0,
+          gen: P.gen, rgen: P.rgen, pend: P.pend.length, needPlay: !!P.needPlay
+        };
+      });
     }
   };
 })();
