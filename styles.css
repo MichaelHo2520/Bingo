@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 493fb9a0e2926d150f65c2428015a1cdf0c34fc3f344a7b349a19983a6445447)
+    真相在 styles.src.css(sha256 c99b5fa67257737ddcb14f52fa2756044b27d017646a45d9131f22573e256662)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -126,6 +126,8 @@
   @keyframes tk-warn{0%,100%{opacity:1}50%{opacity:.55}}
   .mp-chip.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
   .mp-chip.me.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
+  .mp-chip.turn.tk-talking{border-color:#5bd75b;animation:tk-turntalk 1.2s ease-in-out infinite}
+  @keyframes tk-turntalk{0%,100%{box-shadow:0 0 0 2px #5bd75b}50%{box-shadow:0 0 0 2px #5bd75b,0 0 16px #5bd75b}}
   .tk-tag{position:relative;display:inline-grid;place-items:center;flex:0 0 auto;
     width:15px;height:15px;margin-left:1px;line-height:0;color:var(--muted);opacity:.85}
   .tk-tagico{width:100%;height:100%;display:block;fill:currentColor;pointer-events:none}

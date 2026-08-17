@@ -98,6 +98,10 @@ const Talk = (function () {
   ];
   const SPEAK_THRESHOLD = 0.035;   // 音量超過這個值算「正在說話」(0~1;實測底噪約 0.005~0.015)
   const SPEAK_HOLD_MS = 320;       // 低於門檻後還亮多久(不加這個會跟著音節一閃一閃)
+  /* 徽章那一顆用的是**另一段**保持時間(v2.3.8)。
+     ⚠ 不可以共用 SPEAK_HOLD_MS:320ms 是給綠光環用的(要跟得上音節),
+       拿它當「他的麥克風是不是開著」的判準,**字與字之間的空隙就會讓斜線閃出來**。 */
+  const LIVE_HOLD_MS = 2500;
 
   /* ---------- 自己的音量(v2.3.7)----------
      ★ 起點是使用者的一句話:「如果其他人講話的時候框框會變綠色的,我希望自己也可以有
@@ -892,12 +896,54 @@ const Talk = (function () {
     live: "你的麥克風開著(有聲音時你的框會變綠)",
     mute: "你在聽,但閉著麥克風"
   };
+  /* ---------- 「我這邊真的在收他的音訊嗎」(v2.3.8)----------
+     ★★★ 為什麼不可以只信 `P.tx.currentDirection`:那是**協商出來的意圖**,不是事實。
+       現場回報的正是它與事實對不上的那一刻:「別人在講話的時候,他的語音圖案還是
+       畫著禁用、只是變成綠色」—— 那就是 `mute` 的斜線(::after)與 `.talking` 的綠
+       疊在同一顆徽章上,一個自相矛盾的畫面。
+       只要 `P.tx` 這一顆 transceiver 沒有跟著最後一次協商走,推論就是舊的而音訊照樣在流:
+         · 對方重建了 PC,新的 m-line 對到**另一顆** transceiver → `P.tx.currentDirection`
+           停在 null(而 null 在舊寫法裡就是 mute → 斜線);
+         · 對方「開麥」那一次的重新協商被 glare 吃掉 / 信掉了 → 方向還是舊的。
+     → 改成問**所有** receiver 的 track:`live` 且 `muted === false` = 現在真的有東西進來。
+     ⚠ 遠端 track 的 `muted` 依規格就是「沒有資料進來」(對方 replaceTrack(null)、
+       方向不再送,都會讓它變 true)。而這一路**在 WebKit 上格外重要**:
+       那邊的音量分析整段跳過(見 armMeter),徽章以前只剩 currentDirection 一條路。
+     ⚠ 拿不到 getReceivers(假 PC 模型 / 很舊的瀏覽器)就回 **null**(不是 false)——
+       呼叫端要分得出「問不到」與「問到了、沒在收」。 */
+  function recvLive(P) {
+    let rs = null;
+    try { rs = (P.pc && P.pc.getReceivers) ? P.pc.getReceivers() : null; } catch (e) { rs = null; }
+    if (!rs || !rs.length) return null;
+    let seen = false;
+    for (let i = 0; i < rs.length; i++) {
+      const t = rs[i] && rs[i].track;
+      if (!t || t.kind !== "audio") continue;
+      seen = true;
+      if (t.readyState !== "ended" && t.muted === false) return true;
+    }
+    return seen ? false : null;
+  }
+  /* 「我剛剛真的聽到他的聲音」—— 這是耳朵,不是推論(v2.3.8)。見 LIVE_HOLD_MS。 */
+  function heardRecently(P) {
+    if (P.speaking) return true;
+    return !!P.lastLoud && (Date.now() - P.lastLoud) < LIVE_HOLD_MS;
+  }
   function voiceOf(P) {
+    /* ★★★ 最高權威是耳朵(v2.3.8):量到過他的聲音 → 一定是 live。
+       ⚠ 這一條要排在 failed / connectionState **前面** —— 聽得到他就表示這條線是通的,
+         那些旗標若還沒被對帳清掉,那也一定是它們錯,不是耳朵錯。 */
+    if (heardRecently(P)) return "live";
     if (P.failed) return "bad";
     const cs = P.pc.connectionState;
     if (cs === "failed" || cs === "closed") return "bad";
     if (cs !== "connected") return "wait";
+    /* 他沒在講話的那些秒:兩個訊號問一遍 —— 現在有沒有東西進來(事實)+ 協商方向(意圖)。
+       ⚠⚠ **只要有一個說在收就算 live**,這個偏向是刻意的:
+         誤判成 live 的代價只是「他其實沒在講」(下一秒就看得出來),
+         而誤判成 mute 的代價是**畫一個禁用符號給正在講話的人** —— 那正是現場回報的事。 */
     const dir = (P.tx && P.tx.currentDirection) || "";
+    if (recvLive(P) === true) return "live";
     return (dir === "sendrecv" || dir === "recvonly") ? "live" : "mute";
   }
   /* pid -> 狀態。⚠ 只收「我聽過的人」+ 自己。 */
@@ -1304,6 +1350,10 @@ const Talk = (function () {
           id, heard: P.heard, polite: P.polite, state: P.pc.connectionState,
           ice: P.pc.iceConnectionState, sig: P.pc.signalingState,
           dir: (P.tx && P.tx.currentDirection) || "", voice: voiceOf(P),
+          /* v2.3.8:徽章 / 綠框說謊的時候,要一行就問得出**哪一層**壞了 ——
+             `recv` 是事實(receiver 真的在收嗎)、`dir` 是意圖(協商出來的方向),
+             `an` / `spk` 是音量分析那一路(它死掉的話綠框會停,但聲音照樣聽得到)。 */
+          recv: recvLive(P), spk: !!P.speaking, an: !!P.analyser,
           badMs: P.badSince ? (Date.now() - P.badSince) : 0,
           gen: P.gen, rgen: P.rgen, pend: P.pend.length, needPlay: !!P.needPlay
         };

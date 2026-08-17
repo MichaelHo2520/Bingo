@@ -261,10 +261,23 @@
        只加 `.tk-talking` 是**不會變綠的**。所以這裡用 (0,3,0) 明確壓過它。
      ⚠ 「自己在說話」是 talk.js 量**自己的麥克風**得到的(LOCAL_METER),與遠端那一路
        是兩顆獨立的 AudioContext —— 它回答的是「我的麥克風有沒有在動」。
-     ⚠ `.mp-chip.turn` 的 turnpulse 動畫會蓋掉這裡的 box-shadow(動畫贏過一般宣告)——
-       **那是刻意不處理的**:輪到誰比誰在說話重要,而「誰在說話」在那種情況下
-       由下面那顆徽章的 `.talking` 負責(它不吃 turn 的動畫)。 */
+     ⚠ `.mp-chip.turn` 的 turnpulse 動畫會蓋掉這裡的 box-shadow(動畫贏過一般宣告)
+       → **下面那一條專門處理它**(v2.3.8 補;在那之前是刻意不處理的)。 */
   .mp-chip.me.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
+  /* ★★★ 「輪到誰」那一格也要看得出他在說話(v2.3.8)—— 上面原本寫「刻意不處理」,
+     現場回報把它否決了:「剛開始別人說話框框會變綠色,過一陣子之後就沒有了,
+     可是他還可以繼續說話」。那個「過一陣子」就是**開局** —— 大廳沒有 `.turn`,
+     一進對局,輪到誰那一格的綠框就整個消失(而派對場合大家正是輪到自己時話最多)。
+     ⚠⚠ 為什麼非得寫成一條**動畫**:`.mp-chip.turn` 的 turnpulse 會蓋掉任何一般的
+       box-shadow 宣告(動畫的優先級比一般宣告高,權重加到 (0,9,0) 也贏不了)——
+       只有同樣是動畫的東西壓得住它,而 (0,3,0) > (0,2,0) → 這一條贏。
+     ⚠ 節奏刻意與 turnpulse 一模一樣(1.2s ease-in-out),**只換顏色**:
+       「輪到誰」還是靠放大 + accent 底色 + 字級在講,不會因為變綠就讀不出來。
+     ⚠ 「自己 + 輪到自己 + 在講話」三個一起中的時候也走這一條:上一條
+       `.mp-chip.me.tk-talking` 的綠是**同一個色碼**,而動畫一律贏過一般的 box-shadow
+       宣告 → **順序在這裡不影響結果**;放在它後面純粹是為了讀起來是一組。 */
+  .mp-chip.turn.tk-talking{border-color:#5bd75b;animation:tk-turntalk 1.2s ease-in-out infinite}
+  @keyframes tk-turntalk{0%,100%{box-shadow:0 0 0 2px #5bd75b}50%{box-shadow:0 0 0 2px #5bd75b,0 0 16px #5bd75b}}
 
   /* ---------- 晶片上的語音徽章(v2.3.7,talk.js 的 paintChips)----------
      使用者:「如果有開啟對話的人,我希望他的人物框,可以有一點資訊顯示」。
@@ -283,8 +296,13 @@
      ⚠ 「正在連線」故意也會動:靜態的黃點看起來像一個狀態,會動的才讀得出「還在等」。 */
   .tk-tag.wait{color:#e8c447;opacity:1;animation:tk-warn 1.1s ease-in-out infinite}
   .tk-tag.bad{color:#ff6b5e;opacity:1;animation:tk-warn 1.4s ease-in-out infinite}
-  /* 這一秒真的在說話:比 live 更亮 + 外發光。⚠ 它是「誰在說話」在 `.turn` 那格的替身
-     (那裡的綠光環會被 turnpulse 蓋掉),所以**不可以**只靠 .mp-chip.tk-talking。 */
+  /* 這一秒真的在說話:比 live 更亮 + 外發光。
+     ⚠ 「輪到誰」那一格的綠光環在 v2.3.8 之前是**沒有的**(被 turnpulse 蓋掉),
+       那時這顆徽章是唯一的替身;現在兩個都在,但**兩條都要留** ——
+       徽章不吃 turn 的動畫,綠框不吃「晶片被捲出可視範圍」。
+     ⚠⚠ 而 `.talking` 只會跟 `.live` 一起出現(判準在 talk.js 的 voiceOf:
+       量到聲音一律回 live)—— **不可以**讓它跟 `.mute` / `.bad` 疊起來,
+       那就會變成「禁用的斜線 + 綠色」,v2.3.8 的現場回報就是這個。 */
   .tk-tag.talking{color:#9dffb0;opacity:1;filter:drop-shadow(0 0 5px rgba(91,215,91,.95))}
   .tk-tag.mute::after,.tk-tag.bad::after{
     content:"";position:absolute;left:50%;top:50%;width:118%;height:2px;border-radius:2px;
