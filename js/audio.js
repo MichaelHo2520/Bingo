@@ -76,11 +76,24 @@
         .catch(()=>{ sfxLoading[key]=false; sfxFailed[key]=true; });   // 取不到/解不了(離線、file://)→ 交給 HTMLAudio 或合成音後備
     }
     function preload(){ loadSfx("win"); loadSfx("lose"); }
-    // 播已解碼的音檔(走總音量節點);成功回 true,失敗(muted / 無 ctx / 尚未載好)回 false
-    function playBuf(buf){
+    /* 播已解碼的音檔(走總音量節點);成功回 true,失敗(muted / 無 ctx / 尚未載好)回 false。
+       g / off 是**音效槽專用的兩個修正**(v2.x,見 def 的 opts.gain / opts.offset):
+         g   = 這一格自己的音量(1 = 原樣)
+         off = 從音檔的第幾秒開始播(跳過開頭的靜音)
+       ⚠ 兩個都省略時行為與原本**逐位元相同**(勝/敗音檔就是這樣呼叫的)。 */
+    function playBuf(buf,g,off){
       if(muted)return false;
       const c=ac(); if(!c||!buf)return false;
-      try{ if(c.state==="suspended")c.resume(); const s=c.createBufferSource(); s.buffer=buf; s.connect(masterNode(c)); s.start(); return true; }catch(e){ return false; }
+      try{
+        if(c.state==="suspended")c.resume();
+        const s=c.createBufferSource(); s.buffer=buf;
+        let out=s;
+        if(g!=null&&g!==1){ const gn=c.createGain(); gn.gain.value=g; s.connect(gn); out=gn; }
+        out.connect(masterNode(c));
+        // ⚠ offset 超過長度的話 start() 會直接沒聲音 → 夾住
+        s.start(0, Math.max(0, Math.min(+off||0, Math.max(0, buf.duration-0.01))));
+        return true;
+      }catch(e){ return false; }
     }
     // HTMLAudio 後備(Web Audio 解不了時用);桌機/Android 可套音量,iOS 音量可能無效
     function playEl(key){
@@ -132,8 +145,9 @@
           cl.el=new Audio(src); cl.elSrc=src;
           cl.el.addEventListener("error",()=>{ cl.elIdx++; cl.el=null; },{ once:true });
         }
-        cl.el.volume=Math.max(0,Math.min(1,vol));
-        cl.el.currentTime=0;
+        // ⚠ 這一層也要吃 gain / offset,不然「file:// 開網頁」時會比 http 大聲、還多 0.14 秒的靜音
+        cl.el.volume=Math.max(0,Math.min(1,vol*(cl.gain==null?1:cl.gain)));
+        cl.el.currentTime=cl.offset||0;
         const p=cl.el.play(); if(p&&p.catch)p.catch(()=>{});
         return true;
       }catch(e){ return false; }
@@ -163,8 +177,21 @@
       // 平手不走這裡(平手用 win);lose 只在自己輸時播
       lose(){ if(muted)return; if(playBuf(loseBuf))return; if(!sfxReady.lose&&!sfxFailed.lose)loadSfx("lose"); if(sfxFailed.lose&&playEl("lose"))return; synthLose(); },
       // 註冊一格音效槽:files 可以是單一路徑或候選陣列(依序試),synth 是取不到音檔時的合成音後備
-      /* 註冊一格音效槽。opts.el = 允許 HTMLAudio 後備(只給「檔案一定隨程式發佈」的槽,見 playClipEl) */
+      /* 註冊一格音效槽。
+         opts.el     = 允許 HTMLAudio 後備(只給「檔案一定隨程式發佈」的槽,見 playClipEl)
+         opts.gain   = 這一格自己的音量倍率(預設 1)
+         opts.offset = 從音檔的第幾秒開始播(預設 0)
+
+         ★★ gain / offset 是給「**網路上抓來的音效檔**」用的(v2.x,飛行棋的骰子是第一個)。
+           自己錄 / 自己產生的檔可以在產生時就把音量與頭尾修好(大老二的 pass 就是這樣做的),
+           但抓來的檔改不動 —— 而抓來的檔幾乎一定有這兩個毛病:
+             ① **峰值被正規化到 1.0** → 比整個遊戲其他聲音大好幾倍(飛行棋那顆量到 5.94 倍)
+             ② **開頭有一小段靜音** → 按下去到出聲差了 0.1~0.2 秒,感覺像沒反應
+           ⚠ 在此之前這裡**沒有 per-slot 音量**,唯一壓得下來的位置是音檔本身
+             (js/big2/board.js 的 pass 那一段還留著這句註解)—— 現在不必再那樣繞。
+         ⚠ 兩個都不給時,這一格的行為與加這個功能之前**逐位元相同**。 */
       def(key,files,synth,opts){ clips[key]={ files:[].concat(files||[]), synth:synth||null, useEl:!!(opts&&opts.el),
+                                              gain:(opts&&opts.gain!=null)?+opts.gain:1, offset:(opts&&opts.offset)?+opts.offset:0,
                                               buf:null, ready:false, failed:false, loading:false, i:0, el:null, elSrc:"", elIdx:0 }; },
       /* 先載好但不播。給「沒有合成音後備」的音效槽用(台灣麻將的喊牌語音):
          懶載入的話**第一次觸發不會有聲音**(音檔還在飛),而那一格沒有東西可以墊。
@@ -174,7 +201,7 @@
       sfx(key){
         if(muted)return;
         const cl=clips[key]; if(!cl)return;
-        if(cl.ready&&playBuf(cl.buf))return;
+        if(cl.ready&&playBuf(cl.buf,cl.gain,cl.offset))return;
         loadClip(key);
         // fetch 取不到(離線 / file://)→ HTMLAudio(只有 el:true 的槽);再不行才用合成音墊
         if(cl.failed&&cl.useEl&&playClipEl(cl))return;

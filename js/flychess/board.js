@@ -89,16 +89,19 @@ const FCB = (function(){
              T(1200, { type: "triangle", dur: 0.38, vol: 0.10, delay: 0.05, slideTo: 420 }); },
     plop(){ T(900,  { type: "triangle", dur: 0.10, vol: 0.20, slideTo: 420 });  // 掉回機場
             T(1400, { type: "sine", dur: 0.14, vol: 0.16, delay: 0.04, slideTo: 700 }); },
-    /* 骰子:**轉的那 0.6 秒本來完全沒有聲音** —— 使用者:「骰子應該要有點音效」。
+    /* 骰子的**後備**合成音(v2.x 起正式的聲音是 mp3/fc/dice.mp3,見下面的音效槽)。
        ⚠⚠ 第一版加了 rattle,使用者**還是說沒聽到** —— 不是沒響,是放在 150~260Hz
-         聽不到(見上面那條 600Hz 的規矩)。現在整趟擲骰是舊版的 16 倍能量。
-       ⚠ rattle 一次擲會響七下 → 單響控在「輪到你」的 5~6%(約走格 tick 的七倍),
-         夠清楚又不會變連珠炮;音高每下不同,一樣的話聽起來像卡帶而不像骰子在滾。 */
-    rattle(k){ const f = 1500 + (k % 3) * 260;
-               T(f, { type: "square", dur: 0.042, vol: 0.15, slideTo: f * 0.5 }); },
-    dice(){ T(1050, { type: "square", dur: 0.075, vol: 0.30, slideTo: 420 });   // 落桌那一記
-            T(620,  { type: "triangle", dur: 0.16, vol: 0.22, delay: 0.01, slideTo: 380 }); // 木頭的厚度
-            T(1900, { type: "triangle", dur: 0.11, vol: 0.22, delay: 0.03, slideTo: 2500 }); },
+         聽不到(見上面那條 600Hz 的規矩)。
+       ⚠ rattle 一次擲會響八下 → 單響控在「輪到你」的 5~6%(約走格 tick 的七倍),
+         夠清楚又不會變連珠炮;音高每下不同,一樣的話聽起來像卡帶而不像骰子在滾。
+       ⚠ `at` 是**在 AudioContext 時間軸上的延遲**(秒),不是 setTimeout ——
+         整趟是一次排完的(見 rollSynth),背景頁籤被節流時整句才不會散掉。 */
+    rattle(k, at){ const f = 1500 + (k % 3) * 260;
+                   T(f, { type: "square", dur: 0.042, vol: 0.15, delay: at || 0, slideTo: f * 0.5 }); },
+    dice(at){ const t = at || 0;
+              T(1050, { type: "square", dur: 0.075, vol: 0.30, delay: t, slideTo: 420 });          // 落桌那一記
+              T(620,  { type: "triangle", dur: 0.16, vol: 0.22, delay: t + 0.01, slideTo: 380 });  // 木頭的厚度
+              T(1900, { type: "triangle", dur: 0.11, vol: 0.22, delay: t + 0.03, slideTo: 2500 }); },
     // 擲到 6 = 「可以再擲一次」,給它一個聽得出來的向上兩音(規則本身的回饋)
     six(){ [988, 1319].forEach((f, i) => T(f, { type: "sine", dur: 0.13, vol: 0.20, delay: 0.09 + i * 0.08 })); },
     home(){ [659, 880, 1175].forEach((f, i) => T(f, { type: "sine", dur: 0.18, vol: 0.20, delay: i * 0.07 })); },
@@ -533,12 +536,57 @@ const FCB = (function(){
     dieEl.innerHTML = dieHTML(v || 0);
     dieEl.dataset.v = v || 0;
   }
+  /* ==========================================================================
+     擲骰的聲音 —— 一次擲 = 一顆音效(v2.x 起是真的骰子錄音)
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 使用者自己找了一個骰子音效丟進來。真實的骰子聲本來就是「一段滾動 + 落定」,
+         所以**不再是「每亂跳一面配一聲」** —— 那是沒有音檔時才需要的湊法,
+         疊在真的錄音上只會糊成一片。
+       ⚠⚠ 抓來的音檔有兩個一定要修的毛病,兩個都在 def() 的 opts 修(不動原始檔,
+         換一個檔進來程式照樣能用):
+           gain 0.62   原檔峰值正規化到 1.0 → 量到是全遊戲最大聲那顆(輪到你)的
+                       **5.94 倍**,直接放會蓋掉其他所有聲音。0.62² ≈ 0.38 → 收到 2.3 倍。
+           offset 0.12 原檔開頭有 0.14 秒**靜音** → 不跳過的話「按下去 → 停半拍 → 才出聲」,
+                       感覺像沒按到。留 20ms 不切,免得吃掉起音。
+       ★ 沒有音檔時(檔案被刪 / 離線第一次還沒載到)退回 rollSynth,節奏與音檔對齊,
+         聽起來是同一件事 —— 音效槽的設計本來就是「有檔就播檔」。
+       ⚠ 動 mp3 的路徑要**兩處一起改**:這裡的 DICE_FILES 與 sw.js 的 CORE
+         (CLAUDE.md 的紅線;這一頁沒有 sfx.js,也沒有會碰到音檔的產生器)。
+     ========================================================================== */
+  /* 亂跳幾面。★ 8 面 = 728ms,而音檔跳掉開頭靜音之後**剛好在 ~740ms 衰乾淨** ——
+     骰子停下來的那一刻,聲音也正好收掉。改任何一邊都要重新對(量法見 notes/22 第 12.1)。 */
+  const SPINS = 8;
+  const DICE_FILES = ["mp3/fc/dice.mp3"];
+  let diceDefed = false, dicePrimed = false;
+  /* 後備:整趟自己排完(rattle × SPINS + 落定),時間點與上面那串亂跳一模一樣。
+     ⚠ 用 tone() 的 delay 排在 AudioContext 的時間軸上,**不要用 setTimeout** ——
+       背景頁籤被節流時整句會散掉(同大老二那條)。 */
+  function rollSynth(){
+    let t = 0;
+    for(let k = 1; k <= SPINS; k++){ SFX.rattle(k, t); t += (55 + k * 8) / 1000; }
+    SFX.dice(t);
+  }
+  function ensureDiceDef(){
+    if(diceDefed || typeof Sound === "undefined" || !Sound.def) return;
+    diceDefed = true;
+    Sound.def("fcDice", DICE_FILES, rollSynth, { el: true, gain: 0.62, offset: 0.12 });
+  }
+  /* 先載好但不播。⚠ 不先載的話**這一局的第一次擲骰**一定是後備合成音(懶載入,
+     音檔還在飛)—— 而那一顆聽起來與其他次不一樣,像是「有時候有音效有時候沒有」。
+     ★ 掛在 renderActs():它只在對局中被叫,那時一定已經有過使用者手勢。 */
+  function primeDice(){
+    if(dicePrimed || typeof Sound === "undefined" || !Sound.prime) return;
+    dicePrimed = true;
+    ensureDiceDef();
+    Sound.prime("fcDice");
+  }
+
   /* 擲骰動畫:亂跳幾面之後停在真值。done 在停下來的那一刻叫。
      ⚠ 亂跳的那幾面只是**視覺**,與規則無關(真值是參數帶進來的)。
-     ★ 每一面都配一聲 rattle:在此之前**只有停下來那一刻響一聲**,
-       中間 0.6 秒的翻滾是靜音的 —— 骰子是這一頁唯一的操作,按下去要立刻有回應。
-     ⚠⚠ 聲音一律排在**世代記號的守衛後面**:排在前面的話,離開棋局之後骰子雖然
-       不轉了,聲音還是會自己響完(t-fc-solo-e2e 的 F 節就是在量這件事)。 */
+     ⚠⚠ 聲音是**一顆一次性的音效,在最前面就放掉**(不像動畫有世代記號可以攔)——
+       擲到一半離開棋局的話,那 0.7 秒會自己播完。這與紅線 9 不衝突:紅線 9 擋的是
+       「人都回到選單了,骰子還繼續轉、**轉完再叫一聲**」那種**計時器鏈**;
+       這裡離場之後不會再有任何**新的**聲音發出來(t-fc-solo-e2e 的 F 節量的就是這個)。 */
   function rollDie(v, done){
     // ★ 同 runMove:接手新的一段之前,先把上一段沒交出去的回呼交出去
     const prevDone = rollDone; rollDone = null;
@@ -548,21 +596,22 @@ const FCB = (function(){
     if(!dieEl){ if(done) done(); return; }
     rollDone = done || null;
     dieEl.classList.add("rolling");
+    ensureDiceDef();
+    if(typeof Sound !== "undefined" && Sound.sfx) Sound.sfx("fcDice"); else rollSynth();
     let k = 0;
     (function spin(){
       if(g !== rollGen) return;
-      if(k++ >= 7){
+      if(k++ >= SPINS){
         dieEl.classList.remove("rolling");
         setDie(v);
         dieEl.classList.remove("pop"); void dieEl.offsetWidth; dieEl.classList.add("pop");
-        SFX.dice();
+        // ★ 「擲到 6 可以再擲一次」是規則的回饋,疊在骰子聲之上(音域刻意差很遠)
         if(v === 6) SFX.six();
         const d = rollDone; rollDone = null;
         if(d) d();
         return;
       }
       setDie(1 + (k * 3 + 2) % 6);
-      SFX.rattle(k);
       rollT = setTimeout(spin, 55 + k * 8);
     })();
   }
@@ -570,6 +619,7 @@ const FCB = (function(){
   /* 動作列:骰子鈕 + 一句話 + 倒數環 */
   function renderActs(o){
     if(!acts) return;
+    primeDice();                     // ★ 對局中才會走到這裡 = 一定已經有過使用者手勢
     if(!acts.dataset.built){
       acts.dataset.built = "1";
       acts.innerHTML =
