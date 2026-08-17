@@ -6,19 +6,30 @@
 
    ★★★ 四件「不知道就會做錯」的事(完整版在 notes/21 的〇節):
 
-   ① **座標一律正規化成 0~999 / 0~749 送出,畫布本身則是「有多少吃多少」(v1.155.2)。**
-      也就是說:**每個人看到的畫按各自的畫布比例拉伸**,不是同一個形狀。
-      ⚠⚠ 這是 v1.155.2 **刻意反轉**的決定,不是漏做 —— v1.154.0~v1.155.1 是把畫布
-        鎖成 4:3(寧可留白也不變形),而使用者實測後說:
-        「畫板一定要大一點,別人那邊的顯示可以依狀況進行大小的比例來縮放。」
-        直向手機上那個鎖的代價是**畫布只有可用高度的 58%**(331×248,而舞台有 429)。
-      ★ 取捨講白:直向手機之間長寬比很接近(0.7~0.8),差異看不太出來;
-        真正會歪的是「手機畫的圖在桌機橫向視窗上看」。受眾是親友聚會、全部是手機
-        → 換到大一倍的畫布划算得多。
-      ★ 線上格式**一個字都不必改**:送出端本來就是拿自己的 rect 正規化
-        (`(e.clientX-r.left)/r.width*LW`),接收端本來就是 `x*boxW/LW` ——
-        拿掉 4:3 之後這兩行的語意自然從「固定邏輯空間」變成「各自比例縮放」。
-        新舊版本同房也不會壞(只是看到的形狀不一樣)。
+   ① **座標一律正規化成 0~999 / 0~749 送出,而「這張圖是什麼形狀」由畫家那一台決定
+      (v2.2.0)。**
+      畫家的畫布照舊把舞台吃滿(只夾在 AR_MIN~AR_MAX 之間),並且把自己的長寬比當成
+      **第五種記錄** `"a<w>,<h>"` 推上去;其他每一台把自己的畫布**縮成同一個形狀**
+      (等比 contain,四周留白)→ 每個人看到的是**同一張圖**,不是各自拉伸的版本。
+      ⚠⚠⚠ 這一條被反轉過**兩次**,而且**兩次都是使用者親自裁示的** ——
+        看到「留白很浪費」或「不如各自吃滿」就順手改回去,等於把踩過的坑再踩一遍:
+        · v1.154.0~v1.155.1:**鎖 4:3**(寧可留白也不變形)→ 直向手機上畫布只有
+          可用高度的 58%(331×248,而舞台有 429)。使用者:「畫板一定要大一點,
+          別人那邊的顯示可以依狀況進行大小的比例來縮放。」
+        · v1.155.2~v2.1.0:**誰都不鎖、各自吃滿**(每個人照自己的畫布拉伸)→
+          畫家在寬視窗(2.13)、猜的人在直向手機(0.58)時**縱向被拉長 3.7 倍**,
+          蠟燭變成一根柱子。使用者(2026-08-17,附同一局的兩張截圖):
+          「你有發現比例變了嗎?我不喜歡是這樣的縮放。」
+        · v2.2.0(現在):**畫家那一台照樣吃滿**(v1.155.2 那條裁示一個字都沒退),
+          只有**看的人**改成等比縮放 —— 使用者當初講的「別人那邊的顯示可以依狀況
+          進行大小的比例來縮放」本來就是這個意思,v1.155.2 做成了「拉伸」才是誤讀。
+      ★ 線上格式**向下相容**:`a` 與擦布 `e` / 撤銷 `u` 同一種手法 —— 舊版第一行就把
+        不是 s/e 的整筆忽略 → 舊版看到的就是 v2.1.0 的樣子(各自拉伸),不會壞;
+        而新版收不到 `a`(畫家是舊版)也自動退回「吃滿自己的舞台」= 舊行為。
+      ⚠⚠ **幫畫的人(共同作畫)也要跟著畫家的形狀**,他不是形狀的來源 ——
+        照自己的形狀畫的話,送出去的邏輯座標在畫家那台會落在**別的位置**。
+      ⚠ 畫家那一台的長寬比要夾(AR_MIN~AR_MAX):不夾的話桌機那種 2.13 的寬視窗
+        會逼得每支手機只用得到 27% 的紙(細細一條),對猜的人比拉伸還糟。
 
    ② **紙一律是淺色的,不吃主題變數。**
       墨水是深色的;紙如果跟著 midnight / arcade 變深,深墨水就整個看不見了 ——
@@ -98,6 +109,12 @@ const DWB = (function () {
   let cb = {};                           // { onStroke, onClear, onGuess, onPick, onPickOwn, onGiveUp, onFin }
   let cv = null, ctx = null, dpr = 1;
   let boxW = 0, boxH = 0;                // 畫布的 CSS 尺寸(px)
+  /* ---------- 形狀的來源(v2.2.0,見檔頭 ①)----------
+     iArtist:我是不是這一回合的畫家(= 形狀的來源)。adapter 每一份 game 快照設一次。
+     srcAR  :畫家那台的長寬比。**0 = 還不知道**(畫家是舊版 / 那筆記錄還沒到)→
+              退回「吃滿自己的舞台」,也就是 v2.1.0 的行為。
+     arSent :我上次推出去的比例,只是為了不要每一次 fit() 都推一筆(見 maybeSendAR)。 */
+  let iArtist = false, srcAR = 0, arSent = 0;
   let strokes = [], byId = {};           // 這一回合畫了什麼(重畫 / 重連歸位的來源)
   let enabled = false;                   // 我現在能不能畫
   let drawing = null;                    // 正在畫的那一筆 { sid, c, w, p:[] }
@@ -138,6 +155,14 @@ const DWB = (function () {
   /* 畫布四周留這麼多(v1.155.2):`.dw-stage` 是 overflow:hidden,而紙有一圈 3px 的外框
      (`.dw-ink` 的第一段 box-shadow)—— 貼死就會被削掉,看起來像沒有邊。 */
   const INK_PAD = 4;
+  /* ---------- 畫家那一台的形狀夾在這個區間(v2.2.0,見檔頭 ①)----------
+     ★ 存在的理由只有一個:**別人要照這個形狀縮**。桌機橫向視窗量到的長寬比是 2.13,
+       直向手機照著縮之後紙上只剩一條 353×166 的細帶(高度只用得到 27%)——
+       對「猜的人」來說那比拉伸還糟,而猜的人永遠比畫的人多。
+     ⚠ 下限刻意放到 0.45 而不是 0.5:直向手機在放大模式下量到 0.50~0.56,
+       **一支手機都不可以被夾到**(夾到就是白白損失畫布,而那正是 v1.155.2 修掉的事)。
+       這個區間夾的對象是桌機 / 橫向那種寬視窗,不是手機。 */
+  const AR_MIN = 0.45, AR_MAX = 1.4;
 
   /* ---------- 兩指縮放的檢視狀態(v2.1.0,見檔頭 ⑥)----------
      ★ 這三個數字是**這一台自己看畫布的窗**,不上線、不進 strokes、不進分享圖:
@@ -219,18 +244,27 @@ const DWB = (function () {
          不會把另一邊帶著縮,畫面比例會被壓歪(成語接龍 v1.135.0 踩過)。
        ⚠ dpr 夾在 2:手機常見 3,那是 2.25 倍的像素量,而畫的是純線條,看不出差別。
 
-       ★★★ **畫布把舞台吃滿,不鎖長寬比**(v1.155.2,見檔頭 ①)。
-          在此之前是鎖 4:3,代價在直向手機上很嚇人:實測舞台 429 高,而畫布只有 248 ——
-          **58%**,剩下的 181px 是純空白(v1.155.1 那一版把它讓給猜題列,於是變成
-          「畫板一樣小、下面多一塊很大的猜題板」,使用者兩件都不滿意)。
-       ⚠ 只留 INK_PAD 的邊,其餘全吃 —— 這裡**不可以**再出現任何長寬比運算。
+       ★★★ **畫家把舞台吃滿(只夾長寬比區間),其他人縮成畫家的形狀**(v2.2.0,見檔頭 ①)。
+          · 畫家:留 INK_PAD 的邊、其餘全吃 —— v1.155.2 那條裁示原封不動
+            (鎖 4:3 的代價在直向手機上很嚇人:舞台 429 高而畫布只有 248 = **58%**)。
+          · 其他人(含幫畫的):等比縮成 srcAR 那個形狀,放不下的那一邊留白。
+       ⚠⚠ **這裡是唯一算形狀的地方** —— `.dw-stage` / `.dw-ink` 上都不可以再出現
+         aspect-ratio 之類的東西,兩邊各算各的會打架(成語接龍 v1.135.0 踩過)。
      ========================================================================== */
   function fit() {
     const stage = $("dwStage");
     if (!cv || !stage) return;
     const r = stage.getBoundingClientRect();
-    const w = Math.max(80, Math.floor(r.width)  - INK_PAD * 2);
-    const h = Math.max(60, Math.floor(r.height) - INK_PAD * 2);
+    const availW = Math.max(80, Math.floor(r.width)  - INK_PAD * 2);
+    const availH = Math.max(60, Math.floor(r.height) - INK_PAD * 2);
+    /* ★★ 先把「應該多大」算出來,再拿它去比對(v2.2.0)。
+       ⚠⚠ 這道守衛**不可以只比舞台尺寸**:收到 "a" 的那一刻舞台一個 px 都沒動,
+         要變的是**形狀** —— 比舞台的話那筆記錄會被這道 return 靜靜吃掉,
+         而畫面上看起來完全正常(圖照舊是拉伸的,沒有任何線索)。 */
+    const ar = shapeAR(availW, availH);
+    let w = availW, h = availH;
+    if (w / h > ar) w = Math.max(40, Math.round(h * ar));
+    else            h = Math.max(30, Math.round(w / ar));
     if (w === boxW && h === boxH && cv.width) return;   // 沒變就別重畫(重畫會閃)
     boxW = w; boxH = h;
     dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -246,6 +280,39 @@ const DWB = (function () {
        不夾一次的話,轉向 / 按放大鈕 / 手機鍵盤收起來都可能讓紙的邊緣露出背景。 */
     clampView();
     repaint();
+    maybeSendAR();     // ★ 我是畫家的話,形狀變了要讓每個人跟著變(v2.2.0)
+  }
+
+  /* ---------- 形狀:算 / 送 / 收(v2.2.0,見檔頭 ①)---------- */
+  function clampAR(ar) { return Math.max(AR_MIN, Math.min(AR_MAX, ar || 1)); }
+  /* 我這塊畫布要長成什麼形狀。
+     ⚠ **幫畫的人走的是下面那條「其他人」**(iArtist 只有這一回合的畫家是 true)——
+       形狀不一致的話,他畫的線送出去之後在畫家那台會落在別的位置。 */
+  function shapeAR(availW, availH) {
+    if (!iArtist && srcAR > 0) return srcAR;
+    return clampAR(availW / availH);
+  }
+  /* ★★★ 畫家把自己的形狀推上去 —— 線上的第五種記錄。
+     ⚠⚠ 一定要等 `enabled` 才送:adapter 的 ink() 只在 draw 相位寫得進去(DWR.mayInk),
+       pick 相位送出去的會被靜靜丟掉 —— 而那正是最需要它的時候(別人要在畫家下第一筆
+       之前就把畫布縮好)。所以 setEnabled() 那裡也叫一次,不能只靠 fit()。
+     ⚠ 2% 的門檻是為了不要每一次 fit() 都推一筆:網址列收合、鍵盤、ResizeObserver
+       都會叫 fit(),而每一筆都是一次 push。 */
+  function maybeSendAR() {
+    if (!iArtist || !enabled || !boxW || !boxH) return;
+    const ar = boxW / boxH;
+    if (arSent && Math.abs(ar / arSent - 1) < 0.02) return;
+    arSent = ar;
+    cb.onStroke && cb.onStroke("a" + boxW + "," + boxH);
+  }
+  /* 這一回合我是不是畫家(= 形狀的來源)。由 adapter 每一份 game 快照設一次。
+     ⚠ 換角色就要把來源歸零:上一回合我是猜的人,srcAR 停在上一位畫家的形狀,
+       留著的話輪到我畫時自己的畫布會被別人的形狀夾住。 */
+  function setArtist(on) {
+    const v = !!on;
+    if (v === iArtist) return;
+    iArtist = v; srcAR = 0; arSent = 0;
+    fit();
   }
 
   /* 邏輯座標 → 畫布的裝置像素。★ 中間那兩個 vk / vx 就是兩指縮放(見檔頭 ⑥),
@@ -319,6 +386,8 @@ const DWB = (function () {
          "e<sid>,<c>,<w>,<x>,<y>,…"           一段**擦除**(v1.157.0;格式與 s 完全同形,c 不用)
          "u<sid>"                              **撤銷**那一筆(v1.163.0;見下面 applyRec 那段)
          "x"                                   清空
+         "a<w>,<h>"                            **畫家那台的畫布尺寸**(v2.2.0;只有比值有意義,
+                                               見檔頭 ①)—— 別人照這個形狀縮自己的畫布
        ★ **直線不是新的一種記錄** —— 它就是「只有兩個點的 s」,所以線上格式一個字
          都不必改,舊版本收到照樣畫得出來(見檔頭 ⑤)。
        ★ 每一批都**自帶 c / w** → 每一筆推送是自足的,不依賴前面收到過什麼;
@@ -361,6 +430,23 @@ const DWB = (function () {
       t.un = true;
       repaint();
       syncTool();                      // 可撤的筆變少了 → 復原鈕可能要鎖起來
+      return;
+    }
+    /* ★★★ 畫家那台的畫布形狀(v2.2.0,見檔頭 ①)。**第五種記錄,理由同擦布 / 撤銷**:
+       舊版第一行就把不是 s / e 的整筆忽略 → 舊版只是照舊各自拉伸,不會壞。
+       ⚠⚠ 畫家自己一定要擋掉(這是自己的回音):套下去的話他的畫布會被自己的形狀
+         再夾一次、夾完 fit() 又推一筆,兩者互相追著縮。
+       ⚠ 壞資料一律整筆丟掉(同這一支的每一條路)—— 形狀是全域的,一筆爛資料
+         會把整張圖擠成一條線,比少畫一筆嚴重得多。 */
+    if (kind === "a") {
+      if (iArtist) return;
+      const b = rec.slice(1).split(",");
+      const aw = +b[0], ah = +b[1];
+      if (!isFinite(aw) || !isFinite(ah) || aw <= 0 || ah <= 0) return;
+      const ar = clampAR(aw / ah);
+      if (srcAR && Math.abs(ar / srcAR - 1) < 0.01) return;
+      srcAR = ar;
+      fit();                          // ⚠ 形狀變了 → 重新量(fit() 自己會 repaint)
       return;
     }
     if (kind !== "s" && kind !== "e") return;
@@ -429,8 +515,15 @@ const DWB = (function () {
     ptrs.clear(); pinch = null; pinchLock = false;
     syncTool();
     mySids.clear();                       // ⚠ 一定要跟著清:重連重放整包時它必須是空的
+    /* ★★ 形狀的來源也要歸零(v2.2.0,見檔頭 ①):下一回合換人畫,形狀要重新收一次
+       (那筆 "a" 會在畫家下第一筆之前送到,重連的人則靠 attachRound 的重放拿到)。
+       ⚠⚠ arSent 一定要一起清 —— 每一回合是**新的 ink 節點**,上一回合推的那一筆
+         不在裡面。不清的話「連續兩回合形狀沒變」的畫家就再也不會推,
+         而症狀是**只有某些回合會歪**(第一回合正常,之後每一回合都退回舊行為)。 */
+    srcAR = 0; arSent = 0;
     if (flushT) { clearTimeout(flushT); flushT = null; }
     clearCanvas();
+    fit();                                // ⚠ 形狀的來源沒了 → 要縮回自己的舞台
   }
 
   /* ==========================================================================
@@ -711,6 +804,11 @@ const DWB = (function () {
        相位已經換了,adapter 的 ink() 也寫不進去,留著只會在畫布上掛一條預覽線。 */
     if (!enabled && lineFrom) { lineFrom = null; lineTo = null; repaint(); }
     if (cv) cv.classList.toggle("live", enabled);
+    /* ★★ 可以下筆的那一刻就把自己的形狀推出去(v2.2.0)——
+       ⚠ 不可以只靠 fit() 那條:畫家的畫布通常從 pick 相位到 draw 相位一個 px 都沒動,
+         fit() 會在第一道守衛就 return,那筆 "a" 永遠不會送 → 每個人都退回舊行為
+         (症狀:「偶爾會歪、偶爾不會」,而歪不歪其實只看畫家中途有沒有轉向)。 */
+    if (enabled) maybeSendAR();
   }
   // 清空:本地立刻生效,同時請 adapter 推一筆 "x"(讓別人也清)
   function clearInk() {
@@ -1293,23 +1391,35 @@ const DWB = (function () {
   }
   /* 合成整張圖 → dataURL。★★ 全程**同步**:iOS 要求 navigator.share() 在使用者手勢裡呼叫,
      中間 await 一下(例如用非同步的 toBlob)手勢授權就過期了,分享會靜靜失敗。 */
+  /* 分享圖那塊紙要多高 —— 跟著**這張圖真正的形狀**走(v2.2.0)。
+     ⚠ 在此之前固定 1000×750,而畫布從 v1.155.2 起就不是 4:3 了 → 分享出去的那一張
+       **一直是被壓過的**(直向手機上壓得最凶,而受眾全是手機)。沒有人回報是因為
+       按分享的人自己也沒看過那張圖長什麼樣 —— 它是直接送進系統分享匣的。
+     ★ v2.2.0 起每一台的 boxW/boxH 已經是同一個形狀(見檔頭 ①)→ 誰按分享都輸出同一張。
+     ⚠ 寬度固定 1000:字幕的字級、留白、浮水印位置全部是照它訂的。
+     ⚠ 上下限是防呆(極端視窗),不是設計值。 */
+  function shotH() {
+    const ar = (boxW > 0 && boxH > 0) ? (boxW / boxH) : (LW / LH);
+    return Math.max(560, Math.min(2000, Math.round(LW / ar)));
+  }
   function shotDataUrl() {
     const lines = shotLines();
     const capH = SHOT_PAD * 2 + lines.length * SHOT_LINE;
+    const H = shotH();
     // ① 透明層:墨水與擦布(見上面 ⚠⚠⚠)
     const ink = document.createElement("canvas");
-    ink.width = LW; ink.height = LH;
-    paintTo(ink.getContext("2d"), LW, LH);
+    ink.width = LW; ink.height = H;
+    paintTo(ink.getContext("2d"), LW, H);
     // ② 紙 + 貼上 ① + 字幕
     const out = document.createElement("canvas");
-    out.width = LW; out.height = LH + capH;
+    out.width = LW; out.height = H + capH;
     const g = out.getContext("2d");
     g.fillStyle = paperColor();
     g.fillRect(0, 0, out.width, out.height);
     g.drawImage(ink, 0, 0);
     g.strokeStyle = "rgba(0,0,0,.12)"; g.lineWidth = 2;
-    g.beginPath(); g.moveTo(SHOT_PAD, LH); g.lineTo(LW - SHOT_PAD, LH); g.stroke();
-    let y = LH + SHOT_PAD + 30;
+    g.beginPath(); g.moveTo(SHOT_PAD, H); g.lineTo(LW - SHOT_PAD, H); g.stroke();
+    let y = H + SHOT_PAD + 30;
     lines.forEach(l => {
       g.fillStyle = l.head ? "#20242c" : (l.ok ? "#2f7de0" : "rgba(32,36,44,.72)");
       g.font = (l.head ? "800 34px " : "700 30px ") + "'Nunito','Noto Sans TC',sans-serif";
@@ -1319,7 +1429,7 @@ const DWB = (function () {
     g.fillStyle = "rgba(32,36,44,.34)";
     g.font = "700 24px 'Nunito','Noto Sans TC',sans-serif";
     const mark = "你畫我猜 🎨";
-    g.fillText(mark, LW - SHOT_PAD - g.measureText(mark).width, LH + capH - SHOT_PAD + 6);
+    g.fillText(mark, LW - SHOT_PAD - g.measureText(mark).width, H + capH - SHOT_PAD + 6);
     return out.toDataURL("image/png");
   }
   // dataURL → File(同步;見 shotDataUrl 上面那段為什麼不可以用 toBlob)
@@ -1355,6 +1465,8 @@ const DWB = (function () {
 
   return {
     init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush, setSeat,
+    /* v2.2.0:這一回合我是不是畫家(= 畫布形狀的來源,見檔頭 ①)。 */
+    setArtist,
     pickColor, toggleEraser, toggleLine, undo, syncTool,
     /* 兩指縮放(v2.1.0)。zoomAt 匯出只給診斷 / e2e 用 —— 真人走的是手勢與那顆晶片。 */
     resetView, zoomAt,
@@ -1379,7 +1491,10 @@ const DWB = (function () {
                k: vk, vx: vx, vy: vy,
                /* v1.170.0:共同作畫的守門要量得到「我的筆有沒有帶座位命名空間」
                   與「復原鈕會不會去動別人的筆」。 */
-               base: sidBase, mine: strokes.filter(s => !s.un && isMySid(s.sid)).length };
+               base: sidBase, mine: strokes.filter(s => !s.un && isMySid(s.sid)).length,
+               /* v2.2.0:畫布形狀。守門要量得到「我有沒有照畫家的比例縮」——
+                  art 是「我是不是形狀的來源」,src 是收到的來源比例(0 = 還沒收到)。 */
+               art: iArtist, src: srcAR, ar: boxH ? boxW / boxH : 0 };
     }
   };
 })();
