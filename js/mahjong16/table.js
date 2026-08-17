@@ -229,18 +229,60 @@ const MJT = (function(){
   }
   /* 結算宣告視窗。優先權:胡 > 槓 > 碰 > 吃;同級由下家起算(離出牌者近的先) */
   const PRI = { win:4, kong:3, pong:2, chow:1 };
-  function resolveClaim(st){
-    if(!st.claim || st.over) return null;
+  /* 離出牌者多近(下家 = 1,最近) */
+  function distOf(st, seat, from){ return ((seat - from) % st.seats + st.seats) % st.seats; }
+  /* 目前的最佳出價 = 現在結算的話會選中誰;沒有人要 → null。
+     ★ 抽出來是因為 claimDecided() 要拿**同一把尺**量「還沒表態的人有沒有機會壓過去」——
+       兩處各寫一份優先權比較的話,規則一改就會分岔,而分岔的症狀是「有時候會提早結算、
+       有時候不會」,現場根本重現不出來。 */
+  function bestBidOf(st){
     const cl = st.claim;
     let best = null;
     Object.keys(cl.bids).forEach(k=>{
       const seat = +k, b = cl.bids[k];
       if(b.type==="pass") return;
       const p = PRI[b.type] || 0;
-      // 同級比「離出牌者多近」(下家最近)
-      const dist = ((seat - cl.from) % st.seats + st.seats) % st.seats;
+      const dist = distOf(st, seat, cl.from);
       if(!best || p>best.p || (p===best.p && dist<best.dist)) best = { seat, b, p, dist };
     });
+    return best;
+  }
+  /* ★★ 這個宣告視窗的結果**已經定了嗎**(v2.3.4)——「還沒表態的那些人,有沒有可能翻盤」。
+     ──────────────────────────────────────────────────────────────────────────
+     使用者:「我在想要不要吃的時候,如果有人按碰或是槓或是胡了,目前是需要等到我決定
+     要不要吃之後才會有反應,但這樣不好玩」。真牌桌上有人喊「碰」,你手上那副吃當場就
+     沒了 —— 不會有人站在那裡等你想完。所以判準不是「全員表態了沒」而是「結果還會不會變」。
+
+     ★ 只看**還沒表態**的人能拿出的最高優先權:壓不過現在的最佳出價 → 他表不表態都一樣,
+       視窗可以當場收掉;壓得過(例如他能胡而現在最好的只是碰)→ 一定要等他。
+       所以「我可能胡」的人永遠不會被切掉 —— 這是這一支的安全性核心。
+     ★ allBidsIn() 是它的特例(沒有人待表態 → 一定已定),兩支刻意都留著:
+       純函式測試要能分別驗「全員表態」與「提早收掉」兩件事。
+     ⚠ 這**不會**多洩漏牌情(notes/11 第二節那六條管道):提早收掉的那一刻,收掉的原因
+       (碰 / 槓 / 胡)本身就同時攤在桌上,是公開資訊。反過來它還**堵掉**一條 ——
+       舊行為下「碰得慢」等於在告訴全桌「還有別人也吃得下這張」。
+     ⚠ 不做的事:**不切掉「已經沒機會但視窗還沒定」的那個人的面板**(例:最佳是碰、
+       我是吃、另一家還可能胡)。那會反過來變成新的管道 —— 我會提早知道「有人宣告了
+       比吃大的東西」。他照樣按得下去,只是結算時輸掉,無害。 */
+  function claimDecided(st){
+    if(!st || !st.claim || st.over) return false;
+    const cl = st.claim;
+    const best = bestBidOf(st);
+    return Object.keys(cl.elig).every(k=>{
+      const seat = +k;
+      if(cl.bids[seat]) return true;                       // 已經表態,不會再變
+      let p = 0;
+      (cl.elig[seat] || []).forEach(t=>{ p = Math.max(p, PRI[t] || 0); });
+      if(!p) return true;                                  // 沒有任何叫得出口的東西
+      if(!best) return false;                              // 目前沒有人要 → 誰都拿得走
+      const dist = distOf(st, seat, cl.from);
+      return !(p>best.p || (p===best.p && dist<best.dist));
+    });
+  }
+  function resolveClaim(st){
+    if(!st.claim || st.over) return null;
+    const cl = st.claim;
+    const best = bestBidOf(st);
     if(!best){
       /* ★ 搶槓視窗沒人胡 → 那個槓成立,**槓的人補一張繼續打**,不是輪到下一家。
          寫成 passTurn 的話,加槓完會被憑空跳過一輪(規則錯,但畫面上很難看出來)。 */
@@ -484,6 +526,20 @@ const MJT = (function(){
     out.akong = st.melds[seat].filter(m=>m.k==="pung" && all.indexOf(m.t)>=0).map(m=>m.t);
     return out;
   }
+  /* ★ 「剛剛是誰把牌吃 / 碰 / 明槓走了」(v2.3.4)—— 比較前後兩份 state 的明牌區,
+     回 { seat, kind:"chow"|"pung"|"kong" } 或 null。兩份輪次驅動共用它來報一句「○○ 碰!」。
+     ⚠ 只認**明牌組數變多**那一種:加槓(pung 就地變 kong)與搶槓退回(kong 變回 pung)
+       組數都不變 —— 那兩件事各有自己的報法,混進來會變成憑空多喊一次槓。
+     ⚠ 呼叫端要自己擋掉「換局」與暗槓(組數同樣會多一組):這裡只做 diff,不猜情境。 */
+  function meldTakenAt(before, after){
+    if(!before || !after || !before.melds || !after.melds) return null;
+    for(let s=0;s<after.seats;s++){
+      const b = before.melds[s] || [], a = after.melds[s] || [];
+      if(a.length <= b.length) continue;
+      return { seat:s, kind:a[a.length-1].k };
+    }
+    return null;
+  }
   /* 打掉某張之後會聽什麼(給「聽牌提示」用) */
   function tenpaiAfter(st, seat, tile){
     if(!toPlay(st, seat)) return [];
@@ -604,11 +660,11 @@ const MJT = (function(){
   }
 
   return {
-    newRound, autoDraw, discard, bid, allBidsIn, resolveClaim,
+    newRound, autoDraw, discard, bid, allBidsIn, claimDecided, resolveClaim,
     concealedKong, addKong, selfDrawWin, settleWin,
     // 宣告聽牌(v1.67.0)
     declareTing, canDeclareTing, tingTiles, tingTypeOf, tingOf, DI_TING_MAX,
-    ownActions, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft, drawsLeft, nextDealerOf,
+    ownActions, meldTakenAt, tenpaiAfter, tenpaiNow, eligibleFor, wallLeft, drawsLeft, nextDealerOf,
     roundsOf, windOfRounds, WINDS,
     seatWind, leftOf, nextOf, needOf, toPlay, holding, allTiles, enc, dec
   };

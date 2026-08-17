@@ -350,7 +350,10 @@ const Solo = (function(){
         const nx = (d ? MJT.bid(st, seat, d.type, d.tiles) : null) || MJT.bid(st, seat, "pass", null);
         if(nx) st = nx;
       });
-      if(MJT.allBidsIn(st)) resolveClaim();
+      /* ★ v2.3.4:判準是「結果定了沒」不是「全員表態了沒」(MJT.claimDecided)——
+         電腦按了碰 / 槓 / 胡,玩家手上那副吃就當場沒了,不必等他想完。
+         ⚠ 玩家能胡的時候壓不掉,claimDecided 會回 false → 照樣等他(見那支的註解)。 */
+      if(MJT.claimDecided(st)) resolveClaim();
       else render();                               // 還在等玩家:只重畫,不要再排一次
     }, MJ16AI.thinkMs(lv, "claimThink"));
   }
@@ -369,14 +372,11 @@ const Solo = (function(){
      所以不違反「不可以洩漏誰在考慮」那條。 */
   function announceClaim(before, after){
     if(after.over) return;
-    for(let s=0;s<after.seats;s++){
-      const b = before.melds[s].length, a = after.melds[s].length;
-      if(a <= b) continue;
-      const m = after.melds[s][a-1];
-      const w = m.k === "chow" ? "吃" : (m.k === "kong" ? "槓" : "碰");
-      showToast(seatName(s) + " " + w + "!", 1200);
-      return;                                      // 聲音由 sfxTick() 出(吃 / 碰 / 槓 各有各的音)
-    }
+    /* ⚠ diff 走 MJT.meldTakenAt()(v2.3.4 抽出去)—— 連線那份也報同一句,兩邊只能有一把尺。 */
+    const tk = MJT.meldTakenAt(before, after);
+    if(!tk) return;
+    showToast(seatName(tk.seat) + " " + M16B.meldWord(tk.kind) + "!", 1200);
+    // 聲音由 sfxTick() 出(吃 / 碰 / 槓 各有各的音)
   }
 
   /* ==========================================================================
@@ -416,7 +416,7 @@ const Solo = (function(){
     if(!nx) return;
     st = nx;
     M16B.clearSel();
-    if(MJT.allBidsIn(st)) resolveClaim();
+    if(MJT.claimDecided(st)) resolveClaim();
     else render();                                 // 電腦還沒表態完,等它們的 timer
   }
 

@@ -641,6 +641,12 @@ const M16B = (function(){
 
   function panelOf(box){ return box ? box.querySelector(".m16-claim") : null; }
 
+  /* ★ 明牌那一組的中文字面(v2.3.4)—— 單機與連線都要報「○○ 碰!」,而那句話是
+     **同一句**,所以字面只放這一份(兩份輪次驅動刻意分家,字面沒有理由跟著分)。
+     ⚠ 鍵是明牌的 `k`(碰是 **pung**),不是宣告類型的 `pong` —— 兩套詞彙,見 claimPanel。 */
+  const MELD_WORD = { chow:"吃", pung:"碰", kong:"槓" };
+  function meldWord(k){ return MELD_WORD[k] || k; }
+
   /* 收掉面板。★ 冪等 —— 已經關著就什麼都不做(否則每次 renderActs 都會重播進場動畫)。 */
   function hideClaim(box){
     if(box) box.classList.remove("m16-hush");
@@ -763,6 +769,8 @@ const M16B = (function(){
       const opts = document.createElement("div");
       opts.className = "m16-crow m16-copts";
       co.forEach((o, i) => {
+        /* ⚠ 這裡的鍵是**宣告類型**(pong),與明牌的 k(pung)是兩套詞彙 —— 別跟
+           meldWord() 併成一張表,併了就會有一邊查不到而印出英文。 */
         const lbl = { chow:"吃", pong:"碰", kong:"槓" }[o.type] || o.type;
         mk(opts, "✔ " + lbl + tilesHTML(o.tiles, lblTw),
            "take" + (o === cur ? " on" : ""),
@@ -1825,7 +1833,7 @@ const M16B = (function(){
     /* 宣告面板(v1.111.0,單機與連線共用一份)—— 呼叫規矩見那一節的四條紅線。
        ⚠ 清動作列時要用 isClaim() 跳過它(同倒數環):它是持久節點,
          每次重建就是每次重播進場動畫。兩邊的 clearActs / paintActs 各一行。 */
-    claimPanel, hideClaim,
+    claimPanel, hideClaim, meldWord,
     /* 動作列那一格的落點 + 明牌帶要讓多寬(v1.177.1,見 placeActs / actsReserve)。
        ★★ **兩份 renderActs 畫完動作列之後都要叫一次**(adapter.js / solo.js 各一行,
          grep m16Acts 找得到)。理由:呼叫順序是 `M16B.render()` → `renderActs()`,

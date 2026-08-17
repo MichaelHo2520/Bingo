@@ -551,8 +551,13 @@ const MP = MPCore.create((function(){
       const s1 = MJT.bid(s0, me, type, tiles);
       if(!s1) return false;
       Object.assign(g, MJT.enc(s1));
-      // 全員都表態了就順手結算,省一次來回
-      if(MJT.allBidsIn(s1)){
+      /* 結果已經定了就順手結算,省一次來回。
+         ★ v2.3.4:判準從 allBidsIn(全員表態)放寬成 claimDecided(**結果不會再變**)——
+           我按了碰,還在考慮要不要吃的那家已經翻不了盤,不必等他;而他能胡的時候
+           claimDecided 就會回 false,照樣等(見 table.js 那支的註解)。
+         ⚠ 這一筆交易一送出,別台的宣告面板會當場消失 —— 那是刻意的,收掉的原因
+           (碰 / 槓 / 胡)同一刻就攤在桌上,不多洩漏任何牌情。 */
+      if(MJT.claimDecided(s1)){
         const s2 = MJT.resolveClaim(s1);
         if(s2){ Object.assign(g, MJT.enc(s2)); if(s2.over) finishInto(g, s2); }
       }
@@ -980,6 +985,21 @@ const MP = MPCore.create((function(){
          ⚠ 換局那一手 ev 是空的(上面 newRnd 就給 []),斷線重連 before 為 null 時
            sfx 自己會回空 → 兩種「重收到一次結束快照」的情況都不會重播。 */
       if(ev.indexOf("hu") >= 0 || ev.indexOf("zimo") >= 0) M16B.celebrate();
+      /* ★ 有人把牌吃 / 碰 / 明槓走了 → 報一句(v2.3.4)。與單機的 announceClaim() 同一句、
+         同一支 diff(MJT.meldTakenAt)—— 那邊從 v1.60.0 就有,連線這一半一直缺。
+         ★★ v2.3.4 之後它更要緊:結果一定就提早收掉宣告視窗,**還在考慮吃的那家會看到
+           面板忽然消失** —— 沒有這一句就只剩「聲音 + 對手列多一組明牌」,像是自己按錯了。
+         ⚠ 條件刻意是「上一份有宣告視窗、這一份沒有」而不是「明牌多一組」:暗槓的組數
+           也會多一組,而那是自己回合的動作、不走宣告視窗(單機那邊也是分開報的)。
+         ⚠ 這一句給全房看,**不洩漏牌情**:吃 / 碰 / 槓 成立的那一刻牌就攤在桌上了
+           (與第二節那六條管道無關 —— 那些堵的是「還在考慮」)。 */
+      if(before && before.claim && !s.claim && !s.over){
+        const tk = MJT.meldTakenAt(before, s);
+        /* ⚠ 自己那一筆說「你」(同 turnText 的慣例,也同單機的 seatName);
+           ⚠ showToast 走 textContent → **不可以** esc(),esc 過的字會原樣顯示成 &amp;。 */
+        if(tk) showToast((tk.seat===mySeat() ? "你" : nameOfSeat(tk.seat)) +
+                         " " + M16B.meldWord(tk.kind) + "!", 1300);
+      }
       /* 宣告視窗換了一輪 → 我的表態記號要清掉。
          ⚠ 兩個旗標一起清(見 sendBid 與 board.js 的 bidDone):只清 myBid 的話
            下一輪宣告的牌不會站起來(bidDone 卡在 true → claimOpts() 回空)。 */
