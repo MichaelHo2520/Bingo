@@ -20,9 +20,13 @@
       ⚠ 那些子節點的監聽**核心收不掉**(leave() 只 off() 得到 roomRef.child("rtc")),
         所以 stop() 一定要自己拆 —— 漏掉就是「離開房間之後還在收上一間的 SDP」。
 
-   ② **「聽」與「講」是兩個獨立開關,不可以合成一顆。**
-      只想聽的人**不該被要求麥克風權限** —— 所以 getUserMedia 只在開「講」時才叫。
-      這也是為什麼 direction 要算出四種狀態而不是開 / 關兩種(見 dirOf)。
+   ② **「聽」與「講」是兩顆鈕,不可以合成一顆** —— 但它們**不是互相獨立的**。
+      · 只想聽的人**不該被要求麥克風權限** → getUserMedia 只在開「講」時才叫,
+        這也是為什麼 direction 要算出四種狀態而不是開 / 關兩種(見 dirOf)。
+      · 而「講」**蘊含**「聽」(v2.1.0):開講會順手開聽、關聽會順手關講,
+        只有「聽著但閉麥」是留下來的中間狀態(暫停說話)。
+        規則與理由見下面 doListen / doSpeak 的長註解 —— ⚠ 那三條規則要寫在
+        **狀態層**,寫進 click handler 的話從對外 API 進來就繞過去了。
 
    ③ **關「講」要真的把 track 停掉,不可以只設 enabled=false。**
       enabled=false 的話系統的麥克風指示燈**還亮著** —— 對「親友聚會」這種
@@ -51,13 +55,45 @@
 
 const Talk = (function () {
 
-  /* ---------- 對外設定 ---------- */
-  /* 只有公共 STUN;TURN 之後要接的話補在這個陣列裡就好(例如 Cloudflare 的免費額度)。
-     ⚠ 沒有 TURN 的代價:對稱 NAT 的組合(估 10~20%)會連不起來 —— 那時 UI 會顯示
-       「連不上」而不是靜靜沒聲音(見 pc.oniceconnectionstatechange)。 */
+  /* ---------- 對外設定:ICE 伺服器 ---------- */
+  /* STUN 只做一件事:告訴你「你在公網上長什麼樣」,連線本身還是 P2P 直連。
+     **連不上的時候負責救援的是 TURN**(把音訊中繼過去)。沒有 TURN 的話,雙方都在
+     對稱 NAT(symmetric NAT)後面的組合會直接失敗 —— 一般估 10~20%,而台灣的行動網路
+     普遍是 CGNAT,實際會更高。
+     ⚠ 症狀是「我開了麥、畫面上一切正常,可是沒有人聽得到我」,最難自己發現的一種壞掉
+       (所以 onconnectionstatechange 失敗時會把講鈕轉成紅色閃爍 —— `.tk-btn.bad`)。
+
+   ★★★ 為什麼用 Open Relay 這組**公共**服務,而不是自己去申請 Cloudflare / Metered 的金鑰:
+       **這個 repo 是公開的**(見 CLAUDE.md 的上傳策略:`.git` 會 push 上 GitHub)。
+       自己申請的金鑰不管靜態或動態,寫進這一支就等於公開發佈 → 任何人都能刷掉你的額度,
+       而且撤換要重新部署。Open Relay 的帳密**本來就設計成公開的**(帳號密碼都是
+       `openrelayproject`),放進公開 repo 沒有任何問題 —— 這是選它的**主要**理由,
+       不是因為它比較好。
+   ⚠⚠ 代價:免費公共服務,**沒有任何可用性保證**,哪天它停掉我們這邊不會有半點徵兆 ——
+       **壞掉的 TURN 與沒有 TURN 在畫面上完全一樣**(都是 relay candidate 拿不到)。
+       → 所以有 `tools/t-turn-check.html`:它會真的去要一輪 candidate,一台一台告訴你
+         拿不拿得到 relay。**懷疑語音連不上就先開那一頁**,不要用症狀猜。
+   ⚠ 要換成自己的金鑰(要穩定 / 流量大)就改這個陣列,**別的地方一個字都不必動** ——
+     十四頁共用這一份。步驟見 notes/24-即時語音.md 第八節。
+
+   ★ 隱私:走 TURN 時音訊會經過中繼伺服器,但 **WebRTC 的媒體一律是 DTLS-SRTP
+     端對端加密**,TURN 只搬得動加密後的位元組,解不開內容(它看得到的是
+     「誰跟誰在通話、用掉多少流量」)。
+
+   ⚠ `turn:` 少了 username / credential 會被**靜靜忽略**(不報錯,只是永遠沒有 relay
+     candidate)—— t-talk-e2e 的 J 節就是在守這一條。 */
+  const TURN_USER = "openrelayproject";
+  const TURN_PASS = "openrelayproject";
   const ICE_SERVERS = [
     { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" }
+    { urls: "stun:stun1.l.google.com:19302" },
+    /* 80 與 443 是刻意的:公司 / 公共 Wi-Fi 常常只放行這兩個 port,而 TURN 的預設
+       3478 是最先被擋掉的那一個。最後那條 `turns`(TLS over TCP:443)是最後手段 ——
+       最慢,但因為長得跟 HTTPS 一樣,幾乎穿得過所有防火牆。
+       ⚠ 三條都留著不會變慢:ICE 是同時去問全部的,誰先回來就先用誰。 */
+    { urls: "turn:openrelay.metered.ca:80", username: TURN_USER, credential: TURN_PASS },
+    { urls: "turn:openrelay.metered.ca:443", username: TURN_USER, credential: TURN_PASS },
+    { urls: "turns:openrelay.metered.ca:443?transport=tcp", username: TURN_USER, credential: TURN_PASS }
   ];
   const SPEAK_THRESHOLD = 0.035;   // 音量超過這個值算「正在說話」(0~1;實測底噪約 0.005~0.015)
   const SPEAK_HOLD_MS = 320;       // 低於門檻後還亮多久(不加這個會跟著音節一閃一閃)
@@ -75,6 +111,7 @@ const Talk = (function () {
   let audioBox = null;         // 裝所有 <audio> 的隱藏容器
   let meterTimer = null;
   let acx = null;              // 分析用的 AudioContext(與 audio.js 那幾個各自獨立)
+  let statDone = false;        // 這一間房的使用統計記過了沒(見下面 bumpStat)
 
   function supported() {
     return !!(window.RTCPeerConnection && navigator.mediaDevices &&
@@ -107,10 +144,13 @@ const Talk = (function () {
   /* ---------- direction:兩個開關 → 四種狀態 ----------
      ⚠ 一定要走 transceiver 的 direction,不可以用「有沒有 addTrack」來表達:
        只聽的人沒有 track 可以 add,但他**必須**在 SDP 裡說明自己要收 —— 否則
-       對方不會送。inactive 只在「兩個都關」時出現,而那時我們根本不建 PC。 */
+       對方不會送。inactive 只在「兩個都關」時出現,而那時我們根本不建 PC。
+     ⚠ v2.1.0 起 speak ⇒ listen(見下面 doSpeak / doListen 的長註解)→
+       **"sendonly" 已經不可能出現**。留著它是防禦性的:哪天不變式被破掉,
+       這裡回對的 direction 至少還聽得到人講話,不會整條線變成 inactive。 */
   function dirOf() {
     if (speak && listen) return "sendrecv";
-    if (speak) return "sendonly";
+    if (speak) return "sendonly";   // 見上:目前到不了
     if (listen) return "recvonly";
     return "inactive";
   }
@@ -242,7 +282,10 @@ const Talk = (function () {
     pc.onconnectionstatechange = () => {
       const s = pc.connectionState;
       if (s === "failed") {
-        /* 走到這裡多半是**兩邊都在對稱 NAT 後面而我們沒有 TURN**。
+        /* v2.1.0 接上 TURN 之後,走到這裡的意思**變了**:以前多半是「對稱 NAT +
+           沒有中繼」,現在則多半是**連 TURN 都拿不到 relay candidate** ——
+           要嘛那台公共服務掛了、要嘛網路把它也擋掉了。
+           ⚠ 兩者在畫面上一模一樣,別用猜的:開 `tools/t-turn-check.html` 量一次。
            重試一次 ICE(換一組 candidate 有時就通了);還是不行就標記起來給 UI 看,
            不要靜靜地沒聲音 —— 那會變成「我開了麥可是沒人聽得到,而且看不出為什麼」。 */
         if (!P.failed) { P.failed = true; try { pc.restartIce(); } catch (e) { } }
@@ -491,18 +534,26 @@ const Talk = (function () {
     if (bL) {
       bL.textContent = listen ? "🔊" : "🔇";
       bL.classList.toggle("on", listen);
-      bL.title = listen ? "關掉語音(不再聽到別人)" : "打開語音(聽別人說話)";
+      /* 關「聽」會連麥克風一起關(規則 ②)—— 副作用要寫在標題裡先講,
+         不要讓人按下去才發現自己被閉麥了。 */
+      bL.title = listen ? (speak ? "關掉語音(麥克風也會一起關)" : "關掉語音(不再聽到別人)")
+                        : "打開語音(聽別人說話)";
       bL.setAttribute("aria-label", bL.title);
       bL.setAttribute("aria-pressed", listen ? "true" : "false");
     }
     if (bS) {
       bS.textContent = "🎙";
       bS.classList.toggle("on", speak);
-      /* 連不上要**看得見**:沒有 TURN 的話對稱 NAT 的組合會失敗,而那時使用者
+      /* ★ 「聽著但閉麥」與「語音整個關掉」**必須長得不一樣**:兩者的麥克風都是關的,
+         光靠「暗的」分不出來,而後果差很多 —— 前者別人講話你聽得到,後者一片安靜。
+         → 前者多一條斜線(通用的靜音符號,見 styles.src.css 的 .tk-btn.muted)。 */
+      bS.classList.toggle("muted", listen && !speak);
+      /* 連不上要**看得見**:TURN 也拿不到 relay 的組合會失敗,而那時使用者
          以為自己在講話、其實沒有人聽得到 —— 最難自己發現的一種壞掉。 */
       bS.classList.toggle("bad", speak && bad);
-      bS.title = speak ? (bad ? "有人連不上你的語音" : "關掉麥克風(別人聽不到你)")
-                       : "打開麥克風(讓別人聽到你)";
+      bS.title = speak ? (bad ? "有人連不上你的語音" : "暫停說話(靜音,但還聽得到別人)")
+               : listen ? "開始說話(讓別人聽到你)"
+                        : "開始說話(會一起打開語音)";
       bS.setAttribute("aria-label", bS.title);
       bS.setAttribute("aria-pressed", speak ? "true" : "false");
     }
@@ -522,10 +573,50 @@ const Talk = (function () {
     if (hooks && hooks.onState) { try { hooks.onState(st); } catch (e) { } }
   }
 
+  /* ==========================================================================
+     使用統計 —— 給首頁那個隱藏的「伺服器狀態」面板回答「語音到底有沒有人在用」
+     ──────────────────────────────────────────────────────────────────────────
+     ★ 記的是**人次**:每個人在每一間房記一次(開了又關再開不重複算),
+       一場四個人都開 = 4 次。比「幾間房用過」更能回答「有多少人真的在用」。
+     ★ 節點刻意寄生在既有的 game_stats 底下、叫 **talk_<遊戲 key>**:
+       資料庫規則本來就是 `game_stats/$game/n` 的萬用字元(見 notes/firebase-rules.json),
+       $game 換成 talk_gomoku 一樣過得去 → **一行規則都不必改、不必重新部署**
+       (同一顆 game_stats 請求就把十四個遊戲的語音次數一起讀回來,面板不必多跑一趟)。
+       ⚠ 反過來說 `talk_` 變成保留前綴:將來新增遊戲的 key 不可以用它開頭。
+       ⚠ 首頁熱門度排序查的是 stats[遊戲 key],完全不會撈到這幾筆。
+     ★ 遊戲 key 從 roomRef 自己反推(roomRef.parent.key = "<key>_rooms",Bingo 是 "rooms")
+       —— **刻意不新增 hook**:attach() 的呼叫端有兩份(mp-core.js 與 online.js),
+       加一個參數就是再養一組會慢慢分岔的雙胞胎(CLAUDE.md 紅線 4)。
+       反推不出來就安靜地不記(統計壞掉絕不可以影響通話本身)。
+     ========================================================================== */
+  function statKey() {
+    try {
+      const r = hooks && hooks.ref && hooks.ref("rtc");
+      const nd = r && r.parent && r.parent.parent;   // rtc → 房間 → <key>_rooms 這一層
+      const k = nd && nd.key;
+      if (!k) return "";
+      if (k === "rooms") return "bingo";             // Bingo 的房間節點就叫 rooms
+      return /_rooms$/.test(k) ? k.replace(/_rooms$/, "") : "";
+    } catch (e) { return ""; }
+  }
+  function bumpStat() {
+    if (statDone || !hooks) return;
+    const k = statKey(); if (!k) return;
+    const r = hooks.ref && hooks.ref("rtc");
+    if (!r || !r.root) return;
+    /* 旗標先立起來:送失敗也不重試 —— 這是統計,不值得為它再排一輪交易,
+       更不可以變成「每次 sync() 都重送」(有人講話時 sync 會被叫很多次)。 */
+    statDone = true;
+    try { r.root.child("game_stats/talk_" + k + "/n").transaction(n => (n || 0) + 1); } catch (e) { }
+  }
+
   /* ---------- 依「現在房裡有誰」+「兩個開關」重算所有連線 ---------- */
   function sync() {
     if (!hooks) return;
     if (!on()) { teardown(); return; }
+    /* ★ 這一行是「語音真的被打開了」唯一的匯流點:兩顆鈕、setListen / setSpeak
+       兩支對外 API 最後都會經過 sync(),而且上面那道 on() 的閘已經把「沒開」濾掉了。 */
+    bumpStat();
     watch();
 
     const ps = hooks.players() || {};
@@ -563,20 +654,42 @@ const Talk = (function () {
     report();
   }
 
-  /* ---------- 兩個開關(命名函式:bindUi 的 click handler 也要用到) ---------- */
+  /* ==========================================================================
+     兩個開關(命名函式:bindUi 的 click handler 也要用到)
+     ──────────────────────────────────────────────────────────────────────────
+     ★★★ **「講」蘊含「聽」**(v2.1.0)—— 兩顆鈕不再是完全獨立的。
+         使用者:「你都要說話了,怎麼可能不要聽呢」。這也是連線遊戲的通例
+         (Discord 的 mute / deafen 就是這個模型)。三條規則:
+
+           ① 開「講」 → 「聽」自動跟著開
+           ② 關「聽」 → 「講」跟著關(①的逆否命題;不然會冒出「聽不到卻在講」)
+           ③ **「聽著但閉麥」一定要留著** —— 使用者明確要保留的「暫停說話」
+
+     → 於是 (listen=false, speak=true) 這個組合**再也不會出現**。
+     ⚠ 規則寫在**這一層**,不是寫在 bindUi 的 click handler 裡:
+       setListen / setSpeak 是對外 API,只擋 UI 的話從 API 進來照樣能把不變式破掉。
+     ⚠ 規則 ① 的副作用是「聽」會**無聲無息地被打開」,那沒問題(多聽到東西不會嚇到人);
+       規則 ② 反過來會**把麥克風關掉**,那是會嚇到人的 → bindUi 那邊要出一則 toast。
+     ========================================================================== */
   async function doListen(v) {
     listen = !!v;
+    // 規則 ②:關「聽」= 整個語音關掉,麥克風不可以自己留著開著
+    if (!listen && speak) { speak = false; closeMic(); duck(false); }
     kickPlay();      // 這一下是使用者手勢:把 iOS 擋掉的遠端音訊補播回來
     sync();
     return true;
   }
   /* ⚠ 回傳 false = 使用者不給權限 / 裝置沒有麥克風 —— 呼叫端要把鈕彈回去,
-     不可以自顧自地顯示「已開麥」(那是「我以為我在講話」最糟的一種)。 */
+     不可以自顧自地顯示「已開麥」(那是「我以為我在講話」最糟的一種)。
+     ⚠ 失敗時**刻意不動 listen**:使用者按的是麥克風,結果卻變成「開始聽得到別人」
+       是另一種驚嚇,而且 toast 已經把失敗講清楚了。 */
   async function doSpeak(v) {
     kickPlay();      // 同 doListen:這一下是手勢,順手補播
     if (v) {
       try { await openMic(); } catch (e) { speak = false; sync(); return false; }
-      speak = true; duck(true);
+      speak = true;
+      listen = true;   // 規則 ①:要說話就一定要聽得到
+      duck(true);
     } else {
       speak = false; closeMic(); duck(false);
     }
@@ -600,7 +713,12 @@ const Talk = (function () {
       }
       if (bL) bL.addEventListener("click", async () => {
         if (uiBusy) return; uiBusy = true;
+        /* 規則 ②:關「聽」的時候麥克風會被一起關掉 —— 那是**會嚇到人的**副作用
+           (「我只是不想聽,怎麼連我的麥也沒了」),一定要講出來。
+           ⚠ 要先記住按之前的狀態:doListen 回來之後 speak 已經被改掉了。 */
+        const wasSpeak = speak;
         try { await doListen(!listen); } finally { uiBusy = false; }
+        if (wasSpeak && !speak) toast("已關閉語音,麥克風也一起關掉了");
         paintBtns();
       });
       if (bS) bS.addEventListener("click", async () => {
@@ -630,10 +748,17 @@ const Talk = (function () {
          (會刪掉別人剛送來的邀請 → 兩邊互相等)。 */
     attach(h) {
       hooks = h;
+      statDone = false;   // 使用統計是「一間房記一次」→ 進新房要重新起算(比照核心的 armPlayCount)
       try { const r = hooks && hooks.ref && hooks.ref("rtc/" + hooks.me()); if (r) r.remove(); } catch (e) { }
     },
     listening() { return listen; },
     speaking() { return speak; },
+    /* 診斷用:把 ICE 設定攤出來給 tools/t-turn-check.html 與 t-talk-e2e 的 J 節。
+       ⚠ 一定要回**複本**:診斷頁拿到的是同一個陣列的話,它隨手改一下就會改到正式連線
+         用的設定(而那種錯誤只在特定網路環境下才看得出來)。
+       ★ 產品碼**不會**呼叫這一支 —— 它存在的唯一理由是「壞掉的 TURN 與沒有 TURN
+         在畫面上一模一樣」,總要有個地方量得到。 */
+    iceServers() { return ICE_SERVERS.map(s => Object.assign({}, s)); },
     setListen: doListen,
     setSpeak: doSpeak,
     // 房裡的人變了(有人進來 / 離開)→ 核心叫這一支
@@ -643,6 +768,7 @@ const Talk = (function () {
       listen = false; speak = false;
       teardown();
       hooks = null;
+      statDone = false;
     }
   };
 })();

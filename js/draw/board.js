@@ -42,6 +42,20 @@
         所以撤銷只是掛一個 `un` 旗標,repaint() 跳過它。
       · **直線**是「只有兩個點的一筆」—— **線上格式一個字都不必改**(舊版也看得懂),
         這是它 CP 值最高的地方。手指在手機上畫不出直線,而房子 / 車窗 / 桌子全是直線。
+
+   ⑥ **兩指縮放(v2.1.0)—— 純粹是「看的人這一台的事」,一個位元組都不上線。**
+      使用者:「畫板我希望能夠支援兩指的縮放,這樣可以畫的比較細一點」。
+      ★★★ 做法是**畫布內部的檢視變換**(vk / vx / vy 走 sx() / sy()),
+        **不是**對 `<canvas>` 下 CSS transform ——
+        CSS 縮放放大的是既有的點陣,3 倍就是 3 倍的馬賽克;內部變換是**照新的比例重畫**,
+        線條在任何倍率都是銳利的,而這一頁放大的唯一目的就是「畫得更細」。
+      ★ 座標系一個字都沒動:送出去的照樣是 0~999 / 0~749(pos() 把檢視變換**反解**回去),
+        所以別人那台看到的位置與縮放前完全一樣,新舊版本同房也不受影響。
+      ⚠ 筆寬 / 擦布寬**一定要跟著 vk 放大**(penStyle 那兩行):不跟著放大的話,
+        放大時畫出來的線在縮回去之後會變成細如髮絲的一條 —— 使用者以為自己畫粗了。
+      ⚠ 每一回合要歸位(resetInk):換人畫的時候不該繼承上一位的縮放與位移。
+      ⚠ 兩指下去的那一刻**一定要把第一根手指剛剛起的那一筆退掉**(abortStroke)——
+        不然每次縮放都會在紙上留一個點。
    ========================================================================== */
 
 const DWB = (function () {
@@ -125,6 +139,45 @@ const DWB = (function () {
      (`.dw-ink` 的第一段 box-shadow)—— 貼死就會被削掉,看起來像沒有邊。 */
   const INK_PAD = 4;
 
+  /* ---------- 兩指縮放的檢視狀態(v2.1.0,見檔頭 ⑥)----------
+     ★ 這三個數字是**這一台自己看畫布的窗**,不上線、不進 strokes、不進分享圖:
+         畫布 CSS px = 邏輯座標 × (boxW/LW) × vk + vx
+       所以 vk=1 / vx=vy=0 時每一條算式都退化回 v2.0.0 的樣子(這是刻意的:
+       沒有人縮放時,這個功能等於不存在)。
+     ⚠ vx / vy 一律 ≤ 0 而且不小於 boxW*(1-vk) —— 紙永遠鋪滿畫布,不可以露出背景。
+     ⚠ MAX_K 取 4:再大也沒有用(邏輯座標只有 1000×750,4 倍時一個邏輯單位已經 3~4 px),
+       而倍率愈大、手指移動一點點就飛出畫面外,反而更難畫。 */
+  const MIN_K = 1, MAX_K = 4;
+  let vk = 1, vx = 0, vy = 0;
+  function clampK(k) { return Math.max(MIN_K, Math.min(MAX_K, k || 1)); }
+  function clampView() {
+    vk = clampK(vk);
+    vx = Math.max(boxW * (1 - vk), Math.min(0, vx));
+    vy = Math.max(boxH * (1 - vk), Math.min(0, vy));
+  }
+  /* ⚠⚠ 縮放的重畫**刻意是同步的**,不可以「聰明地」合到 requestAnimationFrame 裡:
+       ① 直線預覽(previewLine)本來就是每一個 pointermove 整張 repaint —— 這一頁的
+          筆劃量(一回合幾十筆)重畫一次是微不足道的成本,兩指一幀畫兩遍也一樣
+       ② ⚠ **rAF 在 headless e2e 一次都不派**(紅線 3-B 踩過:用它等會整支測試當場掛住)
+          → 走 rAF 的話這個功能就變成「只能靠眼睛看」的那一類,守不住。
+     ⚠ 以畫布上某一點為錨縮放(兩指的中心 / 滑鼠游標)——
+     ⚠ 錨點的「邏輯位置」縮放前後必須不動,不然畫面會朝角落跑掉。 */
+  function zoomAt(k, cx, cy) {
+    k = clampK(k);
+    const ux = (cx - vx) / vk, uy = (cy - vy) / vk;
+    vk = k; vx = cx - k * ux; vy = cy - k * uy;
+    clampView();
+    repaint();
+    syncZoomChip();
+  }
+  function resetView(toast) {
+    if (vk === 1 && !vx && !vy) return;
+    vk = 1; vx = 0; vy = 0;
+    repaint();
+    syncZoomChip();
+    if (toast) modeToast("🔍 回到原本大小");
+  }
+
   /* ---------- 初始化 ---------- */
   function init(o) {
     cb = o || {};
@@ -137,6 +190,9 @@ const DWB = (function () {
     bindGiveUp();   // 放棄這一題(v1.168.0;兩段式在 bindGiveUp 裡)
     bindFin();      // 畫家的「畫完了」(v1.168.0)
     bindPick();
+    /* 縮放倍率晶片:按一下回到原本大小(見 syncZoomChip)。 */
+    const pz = $("dwPinch");
+    if (pz) pz.addEventListener("click", () => resetView(true));
     addEventListener("resize", fit);
     /* ★★ 舞台自己變高變矮時也要重量(v1.156.0)。這一頁原本只掛 resize,而
        **切 body 的 class 不會發 resize** —— 於是「先看看畫板 👀」(共用的 peekBoard()
@@ -186,11 +242,18 @@ const DWB = (function () {
        少了這兩行,蓋板會跟著 .dw-stage 的尺寸把畫布外面那一圈也蓋黑(見 draw.html 那段註解)。 */
     const wrap = $("dwWrap");
     if (wrap) { wrap.style.width = w + "px"; wrap.style.height = h + "px"; }
+    /* ⚠ 舞台變大變小之後位移的合法範圍跟著變(vx 的下限是 boxW*(1-vk))——
+       不夾一次的話,轉向 / 按放大鈕 / 手機鍵盤收起來都可能讓紙的邊緣露出背景。 */
+    clampView();
     repaint();
   }
 
-  function sx(x) { return x * boxW / LW * dpr; }
-  function sy(y) { return y * boxH / LH * dpr; }
+  /* 邏輯座標 → 畫布的裝置像素。★ 中間那兩個 vk / vx 就是兩指縮放(見檔頭 ⑥),
+     沒縮放時 vk=1、vx=0 → 與 v2.0.0 逐字相同。
+     ⚠ 畫的每一條路徑都只准走這兩支(strokePath / drawTail / applyRec 的續段 / previewLine),
+       自己另外算一份的地方就是「縮放之後只有那一種筆畫錯位」的來源。 */
+  function sx(x) { return (x * boxW / LW * vk + vx) * dpr; }
+  function sy(y) { return (y * boxH / LH * vk + vy) * dpr; }
 
   function clearCanvas() {
     if (!ctx) return;
@@ -204,14 +267,17 @@ const DWB = (function () {
        所以四個畫的地方(strokePath / drawTail / applyRec 的續段 / repaint)一律走 penStyle + penEnd。 */
   function penStyle(s) {
     ctx.lineCap = "round"; ctx.lineJoin = "round";
+    /* ⚠⚠ 筆寬與擦布寬**一定要乘上 vk**(兩指縮放,見檔頭 ⑥):
+       粗細的真相是邏輯單位,放大就是「同一條線看起來比較粗」。
+       漏乘的症狀很陰:放大時看起來畫得剛剛好,縮回去卻細如髮絲(而別人那台一直是細的)。 */
     if (s.er) {
       ctx.globalCompositeOperation = "destination-out";
       ctx.strokeStyle = "rgba(0,0,0,1)";                  // 擦除只看 alpha,顏色無關
-      ctx.lineWidth = Math.max(1, ER_W * boxW / LW * dpr);
+      ctx.lineWidth = Math.max(1, ER_W * boxW / LW * vk * dpr);
     } else {
       ctx.globalCompositeOperation = "source-over";
       ctx.strokeStyle = COLORS[s.c] || COLORS[0];
-      ctx.lineWidth = Math.max(1, (WIDTHS[s.w] || WIDTHS[DEF_W]) * boxW / LW * dpr);
+      ctx.lineWidth = Math.max(1, (WIDTHS[s.w] || WIDTHS[DEF_W]) * boxW / LW * vk * dpr);
     }
   }
   function penEnd() { ctx.globalCompositeOperation = "source-over"; }
@@ -356,6 +422,11 @@ const DWB = (function () {
     /* ★ 每一回合把筆歸零:換人畫的時候不該繼承上一位畫家挑的顏色 / 還拿著擦布 / 還在直線模式。 */
     curC = DEF_C; curW = DEF_W; curEr = false;
     curLine = false; lineFrom = null; lineTo = null;
+    /* ★ 縮放也要歸位(v2.1.0):上一位畫家放大到某個角落去畫細節,
+       下一回合換人時畫面不該還停在那個角落 —— 而且新的一張是空的,停在那裡看起來像壞掉。
+       ⚠ 手指狀態一起清:換回合時可能正按著(相位是別人推的,不會有 pointerup 收尾)。 */
+    resetView();
+    ptrs.clear(); pinch = null; pinchLock = false;
     syncTool();
     mySids.clear();                       // ⚠ 一定要跟著清:重連重放整包時它必須是空的
     if (flushT) { clearTimeout(flushT); flushT = null; }
@@ -365,10 +436,17 @@ const DWB = (function () {
   /* ==========================================================================
      三、本地作畫(只有畫家會走到)
      ========================================================================== */
+  /* 螢幕座標 → 邏輯座標(0~999 / 0~749)。
+     ★★ 兩指縮放(檔頭 ⑥)唯一的另一半就在這裡:**把檢視變換反解回去** ——
+       送出去的一律是邏輯座標,所以別人那台看到的位置與我有沒有放大完全無關。
+     ⚠ 先把「畫布 CSS px」算出來(cvx / cvy)再反解,不可以拿 r.width 直接除 ——
+       r.width 是**沒有**檢視變換的外框尺寸(縮放不改 DOM 幾何,只改畫布內容)。 */
   function pos(e) {
     const r = cv.getBoundingClientRect();
-    const x = Math.round((e.clientX - r.left) / r.width * LW);
-    const y = Math.round((e.clientY - r.top) / r.height * LH);
+    const cvx = (e.clientX - r.left) * (boxW / (r.width  || boxW));
+    const cvy = (e.clientY - r.top)  * (boxH / (r.height || boxH));
+    const x = Math.round((cvx - vx) / vk / boxW * LW);
+    const y = Math.round((cvy - vy) / vk / boxH * LH);
     return [Math.max(0, Math.min(LW - 1, x)), Math.max(0, Math.min(LH - 1, y))];
   }
   function flush() {
@@ -376,6 +454,9 @@ const DWB = (function () {
     if (!pend.length || pendSid < 0) { pend = []; return; }
     const rec = encode(pendSid, curC, curW, pend, pendEr);
     pend = [];
+    /* ★ 記下「這一筆已經送出去過」(v2.1.0):兩指縮放要把剛起頭的那一筆收掉,
+       而**送過的只能撤銷、沒送過的才可以直接拿掉**(見 abortStroke)。 */
+    if (byId[pendSid]) byId[pendSid].tx = true;
     cb.onStroke && cb.onStroke(rec);
   }
   function armFlush() {
@@ -414,8 +495,92 @@ const DWB = (function () {
     cb.onStroke && cb.onStroke(encode(sid, curC, curW, s.p, curEr));
     syncTool();
   }
+  /* ==========================================================================
+     ★★★ 兩指縮放 / 平移(v2.1.0,見檔頭 ⑥)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「畫板我希望能夠支援兩指的縮放,這樣可以畫的比較細一點」。
+       · 一根手指 = 畫(與 v2.0.0 完全相同)
+       · 兩根手指 = 撐開縮放 + 一起拖曳平移(同一個手勢,錨在兩指中心)
+       · 滑鼠滾輪 = 以游標為錨縮放(桌機與測試用;手機上不存在)
+     ⚠⚠ **不能畫的人也要能縮放**:猜的人放大來看細節是自然的,而且它純粹是本地檢視 ——
+       所以指標記錄 / 兩指判定一律排在 `enabled` 那道守衛**前面**。
+     ⚠ `pinchLock`:兩指之後先放開一根,剩下那一根**不可以**接著畫
+       (手一定會抖 → 每次縮放完都在紙上留一道)。要全部放開才解鎖。
+     ⚠ 換手指(第三根加入 / 原本兩根之一離開)一律**重新取基準**,不然畫面會瞬間跳一大格。
+     ========================================================================== */
+  const ptrs = new Map();       // pointerId → 目前的 client 座標(順序 = 按下去的順序)
+  let pinch = null;             // { d0, cx0, cy0, k0, x0, y0 } —— 這一次手勢的基準
+  let pinchLock = false;        // 兩指結束後還有手指按著 → 那一根不准畫
+  function ptrPair() {
+    const a = [];
+    ptrs.forEach(v => { if (a.length < 2) a.push(v); });
+    return a.length === 2 ? a : null;
+  }
+  /* 兩指的距離與中心(中心換算成**畫布 CSS px**,與 vx / vy 同一個座標系) */
+  function pinchGeo(a) {
+    const r = cv.getBoundingClientRect();
+    const kx = boxW / (r.width || boxW), ky = boxH / (r.height || boxH);
+    const dx = a[1].x - a[0].x, dy = a[1].y - a[0].y;
+    return { d: Math.max(1, Math.hypot(dx, dy)),
+             cx: ((a[0].x + a[1].x) / 2 - r.left) * kx,
+             cy: ((a[0].y + a[1].y) / 2 - r.top)  * ky };
+  }
+  function startPinch() {
+    const a = ptrPair(); if (!a) return;
+    abortStroke();                       // ⚠ 第一根手指剛起的那一筆要退掉(見檔頭 ⑥)
+    const g = pinchGeo(a);
+    pinch = { d0: g.d, cx0: g.cx, cy0: g.cy, k0: vk, x0: vx, y0: vy };
+  }
+  function movePinch() {
+    const a = ptrPair(); if (!a || !pinch) return;
+    const g = pinchGeo(a);
+    const k = clampK(pinch.k0 * g.d / pinch.d0);
+    /* 起手時中心底下的那一點(未縮放座標)要**跟著手指走**:
+       撐開 = 縮放,兩指一起移動 = 平移,兩件事同一條算式就做完了。 */
+    const ux = (pinch.cx0 - pinch.x0) / pinch.k0, uy = (pinch.cy0 - pinch.y0) / pinch.k0;
+    vk = k; vx = g.cx - k * ux; vy = g.cy - k * uy;
+    clampView();
+    repaint();
+    syncZoomChip();
+  }
+  /* 兩指下去時把剛起頭的那一筆收掉。
+     ★ 分兩條路,差別在**它送出去了沒**:
+       · 還沒送(pend 裡那幾個點都還在本地)→ 直接從 strokes 拿掉,一個位元組都不上線
+       · 已經送過至少一批 → 只能走既有的撤銷記錄 "u<sid>"(絕不可以從 strokes 裡刪,
+         那是紅線 19:這一頁的真相是照順序 replay,抽掉中間一筆會讓後面的擦布擦錯東西)
+     ⚠ 沒送過的那一條**一定要把 pend 清掉**,不然下一次 flush 會把這幾個點接到別的筆上。 */
+  function abortStroke() {
+    if (lineFrom) { lineFrom = null; lineTo = null; repaint(); }
+    const s = drawing;
+    if (!s) return;
+    drawing = null;
+    if (flushT) { clearTimeout(flushT); flushT = null; }
+    pend = []; pendSid = -1;
+    if (s.tx) { s.un = true; cb.onStroke && cb.onStroke("u" + s.sid); }
+    else {
+      const i = strokes.indexOf(s);
+      if (i >= 0) strokes.splice(i, 1);
+      delete byId[s.sid];
+    }
+    repaint();
+    syncTool();
+  }
+  /* 滑鼠滾輪縮放(桌機)。⚠ 一定要 preventDefault + { passive:false },
+     不然瀏覽器會拿去捲頁面 —— 而畫布常常是滿版的。 */
+  function onWheel(e) {
+    if (!e.deltaY) return;
+    e.preventDefault();
+    const r = cv.getBoundingClientRect();
+    const cx = (e.clientX - r.left) * (boxW / (r.width  || boxW));
+    const cy = (e.clientY - r.top)  * (boxH / (r.height || boxH));
+    zoomAt(vk * Math.exp(-e.deltaY * 0.0015), cx, cy);
+  }
   function onDown(e) {
-    if (!enabled || e.button > 0) return;
+    if (e.button > 0) return;
+    /* ⚠ 這三行排在 enabled 前面:猜的人也要能兩指放大來看細節(見上面那段) */
+    ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.size >= 2) { e.preventDefault(); startPinch(); return; }
+    if (pinchLock || !enabled) return;
     e.preventDefault();
     try { cv.setPointerCapture(e.pointerId); } catch (_) {}
     const p = pos(e);
@@ -437,6 +602,9 @@ const DWB = (function () {
     syncTool();
   }
   function onMove(e) {
+    /* ⚠ 縮放這一段排在 enabled 前面(不能畫的人也要能放大來看) */
+    if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch) { e.preventDefault(); movePinch(); return; }
     if (!enabled) return;
     // ★ 直線:拖到哪就預覽到哪(⚠ 這一段一定要排在 drawing 那道守衛前面)
     if (lineFrom) {
@@ -460,6 +628,16 @@ const DWB = (function () {
     if (pend.length >= MAX_PTS * 2) flush(); else armFlush();
   }
   function onUp(e) {
+    ptrs.delete(e.pointerId);
+    /* ★ 縮放中放開手指:還有兩根就重新取基準(不然畫面會跳),
+       不足兩根就結束手勢 —— 而**剩下那一根不准接著畫**(見 pinchLock)。 */
+    if (pinch) {
+      try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
+      if (ptrPair()) startPinch();
+      else { pinch = null; pinchLock = ptrs.size > 0; }
+      return;
+    }
+    if (!ptrs.size) pinchLock = false;
     // ★ 直線:放手才成一筆(⚠ 排在 drawing 那道守衛前面 —— 直線期間 drawing 一直是 null)
     if (lineFrom) {
       try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
@@ -500,9 +678,34 @@ const DWB = (function () {
     cv.addEventListener("pointercancel", onUp);
     // ⚠ 直線也要收(lineFrom):手指滑出畫布時那一筆得結掉,不然它會一直預覽著
     cv.addEventListener("pointerleave", e => { if (drawing || lineFrom) onUp(e); });
+    /* 滾輪縮放(桌機)。⚠ passive:false 不可省 —— 少了它 preventDefault() 無效,
+       捲的會是整頁,而不是縮放畫布。 */
+    cv.addEventListener("wheel", onWheel, { passive: false });
   }
+  /* ---------- 縮放倍率晶片(v2.1.0)----------
+     ★ 它同時是**唯一的出口**:放大之後要回到原本大小,除了把兩指捏回去就只有它。
+       (⚠ 刻意**不放進 `#dwTools`** —— 那一列在 360px 上已經是「題目 + 五色 + 四顆鈕」
+        剛好塞滿,再加一顆就把題目擠成省略號,而題目是畫家唯一要讀的字,見紅線 3-D。)
+     ⚠ 只在放大時出現(vk > 1)—— 沒縮放時它是純粹的雜訊,而且會擋住紙的一角。
+     ⚠ 它住在 `.dw-wrap` 裡、**排在 `#dwOver` 前面**:選題 / 公布答案的蓋板要蓋得住它。 */
+  function syncZoomChip() {
+    const b = $("dwPinch"); if (!b) return;
+    const on = vk > 1.005;
+    b.classList.toggle("hidden", !on);
+    if (on) b.textContent = "🔍 " + (Math.round(vk * 10) / 10).toFixed(1) + "× ✕";
+  }
+  /* 兩指縮放的提示只講**一次**(v2.1.0)。★ 新功能沒人講就等於沒做:
+     手勢是看不見的,而這一頁的畫布上沒有任何地方寫得下這句話。
+     ⚠ 一次是「一次載入一次」,不是每回合 —— 每次輪到自己畫都跳一則就是刷版。
+     ⚠ 挑在「可以下筆的那一刻」講(蓋板剛關掉、手正要碰畫布),不在開頁時講。 */
+  let saidPinch = false;
   function setEnabled(on) {
+    const was = enabled;
     enabled = !!on;
+    if (enabled && !was && !saidPinch) {
+      saidPinch = true;
+      try { showToast("🔍 兩指撐開可以放大畫板,細節更好畫", 2400); } catch (e) {}
+    }
     if (!enabled && drawing) { drawing = null; flush(); }
     /* ⚠ 時間到的那一刻可能正拖著一條還沒放手的直線 —— 丟掉(不是 commit):
        相位已經換了,adapter 的 ink() 也寫不進去,留著只會在畫布上掛一條預覽線。 */
@@ -1153,6 +1356,8 @@ const DWB = (function () {
   return {
     init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush, setSeat,
     pickColor, toggleEraser, toggleLine, undo, syncTool,
+    /* 兩指縮放(v2.1.0)。zoomAt 匯出只給診斷 / e2e 用 —— 真人走的是手勢與那顆晶片。 */
+    resetView, zoomAt,
     setShotInfo, shareShot, shotLines, shotDataUrl,
     setCd, stopCd, setRoundInfo, setLen, setZoom,
     setFinBtn, gvArmed, gvDisarm, setMini,
@@ -1169,6 +1374,9 @@ const DWB = (function () {
                un: strokes.length - live.length,         // 幾筆被撤銷了(v1.163.0)
                c: curC, tool: curEr ? "er" : (curLine ? "line" : "pen"),
                line: curLine, w: boxW, h: boxH,
+               /* v2.1.0:兩指縮放的檢視狀態(倍率 + 位移)。守門要量得到
+                  「放大之後送出去的座標有沒有跟著歪掉」。 */
+               k: vk, vx: vx, vy: vy,
                /* v1.170.0:共同作畫的守門要量得到「我的筆有沒有帶座位命名空間」
                   與「復原鈕會不會去動別人的筆」。 */
                base: sidBase, mine: strokes.filter(s => !s.un && isMySid(s.sid)).length };

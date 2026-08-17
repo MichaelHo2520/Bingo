@@ -412,11 +412,35 @@ const HomeLive = (function(){
   function svBase(){
     return (typeof FIREBASE_CONFIG!=="undefined" && FIREBASE_CONFIG && FIREBASE_CONFIG.databaseURL) || "";
   }
+
+  /* ---------- REST 併發閘(v2.1.0)----------
+     ★ 這個面板原本**整串序列 await**:game_stats → 十四個遊戲一個接一個 → 每個遊戲裡再
+       一間房一間房地讀 createdAt / 整包房間資料。十四個遊戲 × 最多 60 間 = 幾百趟往返
+       排成一直線,行動網路一趟 150~300ms → 開一次面板要等好幾十秒,而且那期間
+       svBody 完全空白(只有一行「連線中…」)—— 使用者的回報就是「以為死掉了」。
+     ★ 這裡讓**所有** REST 讀寫排同一條有上限的隊,呼叫端該平行的地方直接 Promise.all。
+     ⚠ 一定要有上限,不可以無腦全部一起噴:瀏覽器對同一個 host 本來就會自己排隊,
+       而且會把首頁看板 / 語音那些請求一起卡住,反而更慢;有上限「還剩幾筆」也才有意義。
+     ⚠ svRun 要**原樣轉發失敗**(不吞):refreshStatusPanel 靠 catch 分辨「讀不到」
+       跟「真的是空的」,吞掉的話連線掛了也會畫成一片正常的空清單。 */
+  const SV_CONC=12;
+  const svQ=[]; let svActive=0;
+  function svPump(){
+    while(svActive<SV_CONC && svQ.length){ svActive++; svQ.shift()().then(svDone,svDone); }
+  }
+  function svDone(){ svActive--; svPump(); }
+  function svRun(fn){
+    return new Promise((res,rej)=>{ svQ.push(()=>fn().then(res,rej)); svPump(); });
+  }
   function svGet(path,qs){
-    return fetch(svBase()+"/"+path+".json"+(qs?("?"+qs):"")).then(r=>r.json());
+    return svRun(()=>fetch(svBase()+"/"+path+".json"+(qs?("?"+qs):"")).then(r=>r.json()));
+  }
+  // 讀不到就當預設值(單一房間的欄位讀失敗不該讓整個遊戲那一列跟著消失)
+  function svTry(path,qs,dflt){
+    return svGet(path,qs).then(v=>(v==null?dflt:v),()=>dflt);
   }
   function svDelete(path){
-    return fetch(svBase()+"/"+path+".json",{method:"DELETE"});
+    return svRun(()=>fetch(svBase()+"/"+path+".json",{method:"DELETE"}));
   }
   function svAgo(ms){
     if(!ms) return "時間不明";
@@ -483,30 +507,40 @@ const HomeLive = (function(){
      ⚠ 上限仍然是各 30 間 —— 而且**要在畫面上講清楚被截掉幾間**
        (CLAUDE.md 紅線 17:靜靜截斷會讀成「就這些」)。 */
   const SV_MAX=30;
-  async function svLoadGame(g,statsN){
-    let idx={},rms={};
-    try{ idx=(await svGet(g.index))||{}; }catch(e){}
-    try{ rms=(await svGet(g.rooms,"shallow=true"))||{}; }catch(e){}
+  /* ⚠ 全部走 Promise.all(排隊上限交給 svRun)—— 這一支原本是三層巢狀的循序 await,
+       那是「開面板要等好幾十秒」的主因(見上面 SV_CONC 那段)。
+     ⚠ 已關閉的房間仍然是**整包**讀:那一包含 deal + moves(你畫我猜還有筆劃),
+       單間可能到數十 KB。REST 沒有「只取某幾個欄位」的查詢,拆成 7 個子路徑反而是
+       7 倍的往返 → 這裡選擇維持整包、改用併發把等待時間攤平。 */
+  async function svLoadGame(g,statsN,talkN){
+    const [idx,rms]=await Promise.all([
+      svTry(g.index,"",{}),
+      svTry(g.rooms,"shallow=true",{})
+    ]);
     const idxKeys=Object.keys(idx), rmKeys=Object.keys(rms);
-    const rooms=[];
-    for(const code of idxKeys.slice(0,SV_MAX)){
-      const r=idx[code]||{};
-      let at=0; try{ at=(await svGet(g.rooms+"/"+code+"/createdAt"))||0; }catch(e){}
-      rooms.push({ code, live:true, name:r.name||("房間 "+code), host:r.host||"",
-                   who:r.count||0, status:r.status||"", at:at });
-    }
+    const liveCodes=idxKeys.slice(0,SV_MAX);
     const staleCodes=rmKeys.filter(c=>idxKeys.indexOf(c)<0);
-    const staleInfo=[];
-    for(const code of staleCodes.slice(0,SV_MAX)){
-      let d=null; try{ d=await svGet(g.rooms+"/"+code); }catch(e){}
-      const it={ code, live:false, name:(d&&d.roomName)||("房間 "+code), host:svHost(d),
-                 who:svWho(d), at:(d&&d.createdAt)||0, closed:(d&&d.closedAt)||0 };
-      staleInfo.push(it); rooms.push(it);
-    }
+    const staleTop=staleCodes.slice(0,SV_MAX);
+    const [ats,ds]=await Promise.all([
+      Promise.all(liveCodes.map(c=>svTry(g.rooms+"/"+c+"/createdAt","",0))),
+      Promise.all(staleTop.map(c=>svTry(g.rooms+"/"+c,"",null)))
+    ]);
+    const rooms=[];
+    liveCodes.forEach((code,i)=>{
+      const r=idx[code]||{};
+      rooms.push({ code, live:true, name:r.name||("房間 "+code), host:r.host||"",
+                   who:r.count||0, status:r.status||"", at:ats[i]||0 });
+    });
+    const staleInfo=staleTop.map((code,i)=>{
+      const d=ds[i];
+      return { code, live:false, name:(d&&d.roomName)||("房間 "+code), host:svHost(d),
+               who:svWho(d), at:(d&&d.createdAt)||0, closed:(d&&d.closedAt)||0 };
+    });
+    staleInfo.forEach(it=>rooms.push(it));
     // 新開的排前面(時間不明的排最後)
     rooms.sort((a,b)=>(b.at||0)-(a.at||0));
     const cut=Math.max(0,idxKeys.length-SV_MAX)+Math.max(0,staleCodes.length-SV_MAX);
-    return { g, activeN:idxKeys.length, rooms, staleInfo, cut, n:statsN||0 };
+    return { g, activeN:idxKeys.length, rooms, staleInfo, cut, n:statsN||0, talk:talkN||0 };
   }
 
   /* 一間房一行:狀態點 + 房名 + 誰開的 + 幾個人 + 建立時間。
@@ -520,41 +554,96 @@ const HomeLive = (function(){
       ' · '+svTime(r.at)+
       (r.live && r.status==="playing" ? " · 對戰中" : "");
   }
+  /* ⚠ 這一列一律帶 id="svRow-<key>" —— 漸進渲染是拿骨架的 outerHTML 換掉,
+       換上來的那一份也要留著同一個 id,不然「重新整理」第二次就找不到位置了。 */
+  function svRowId(key){ return "svRow-"+key; }
   function svRowHtml(row){
     const g=row.g;
     const btns=[];
     if(row.staleInfo.length) btns.push('<button class="btn ghost svs-clear" type="button" data-key="'+g.key+'">清除這 '+row.staleInfo.length+' 間已關閉</button>');
-    if(row.n) btns.push('<button class="btn ghost svs-clear-stats" type="button" data-key="'+g.key+'">清除統計('+row.n+' 場)</button>');
+    // ★ 統計 = 場次 + 語音人次,兩個一起清(它們都是「這個遊戲的統計」,見 svClearStatsKey)
+    // ⚠ 語音那一段用 🎙 而不是「語音 N 次」:寫全的話這顆鈕在手機寬度一定折成兩行,
+    //   而「次)」單獨掉到第二行很難看。完整說法在頂上那行與 confirm 裡都有。
+    if(row.n||row.talk) btns.push('<button class="btn ghost svs-clear-stats" type="button" data-key="'+g.key+'">清除統計('+row.n+' 場'+(row.talk?" · 🎙"+row.talk:"")+')</button>');
     const btnRow=btns.length ? '<div class="svs-row-actions">'+btns.join("")+'</div>' : "";
     const list=row.rooms.length
       ? '<div class="svs-stale">'+row.rooms.map(svRoomHtml).join("<br>")+
         (row.cut ? '<br><i>…還有 '+row.cut+' 間沒列出來(一次最多 '+SV_MAX+' 間)</i>' : "")+'</div>'
       : "";
-    return '<div class="svs-row">'+
+    return '<div class="svs-row" id="'+svRowId(g.key)+'">'+
       '<div class="svs-row-head"><span class="svs-name">'+g.icon+' '+esc(g.name)+'</span>'+
-      '<span class="svs-nums">大廳 '+row.activeN+' 間 · 已關閉 '+row.staleInfo.length+' 間 · 累積 '+row.n+' 場</span></div>'+
+      '<span class="svs-nums">大廳 '+row.activeN+' 間 · 已關閉 '+row.staleInfo.length+' 間 · 累積 '+row.n+' 場'+
+      // 🎙 語音人次:0 就整段不寫(每一列都掛一個 0 只會把這行擠爆,看不出誰真的有人用)
+      (row.talk?' · <b class="svs-mic">🎙 '+row.talk+'</b>':"")+'</span></div>'+
       list+btnRow+'</div>';
   }
+  /* 骨架列:面板一打開就先把十四列畫出來(圖示 + 名字 + 一條跑馬燈),
+     哪個遊戲讀完就換掉哪一列 —— 使用者第一秒就看得到「它在動」。 */
+  function svSkelHtml(g){
+    return '<div class="svs-row svs-skel" id="'+svRowId(g.key)+'">'+
+      '<div class="svs-row-head"><span class="svs-name">'+g.icon+' '+esc(g.name)+'</span>'+
+      '<span class="svs-nums">讀取中…</span></div>'+
+      '<div class="svs-bar"><i></i></div></div>';
+  }
 
-  // 排序權重 = 大廳現役 + 已關閉的房 + 累積場次,三個「有資料」的來源不分輕重全部算進去。
+  // 排序權重 = 大廳現役 + 已關閉的房 + 累積場次 + 語音人次,「有資料」的來源不分輕重全部算進去。
   // 同分照 GAMES 的原順序(比照 rankRows 的做法,不依賴 sort 的穩定性)。
-  function svWeight(r){ return r.activeN+r.staleInfo.length+r.n; }
-  // 打開面板時抓一次快照就好(比照 fetchRank 的一次性讀取),不掛常駐監聽 —— 這是給自己排查用,不必即時
+  function svWeight(r){ return r.activeN+r.staleInfo.length+r.n+r.talk; }
+
+  /* 即時語音的累計人次:寫入端在 js/shared/talk.js 的 bumpStat(),節點寄生在
+     game_stats 底下的 `talk_<遊戲 key>/n`(那邊有整段說明:為的是一行資料庫規則
+     都不必改,而且跟場次共用同一顆 game_stats 請求)。⚠ 這裡是唯一的讀取端。
+     ⚠ 註解裡不可以把那個路徑寫成 星號星號斜線 的樣子 —— 那三個字元會把整段註解
+       就地切斷,後面的程式碼靜靜地變成註解(CLAUDE.md 紅線 9)。 */
+  function svTalkN(stats,key){
+    const d=stats&&stats["talk_"+key];
+    return (d&&typeof d.n==="number"&&d.n>0)?d.n:0;
+  }
+
+  /* 打開面板時抓一次快照就好(比照 fetchRank 的一次性讀取),不掛常駐監聽 —— 這是給自己排查用,不必即時。
+     ★★ v2.1.0 漸進渲染:一拿到 game_stats 就先把十四列骨架畫出來,十四個遊戲**同時**去讀,
+       誰先回來誰先就地換成正式那一列,頂上那行同步報「讀取中 5 / 14」。
+       原本是全部讀完才一次 innerHTML → 中間那幾十秒畫面完全空白,使用者的回報是「以為死掉了」。
+     ⚠ 排序(有資料的排前面)得等全部讀完才知道,所以骨架照 GAMES 原順序、**最後才重排一次**。
+       不可以每讀完一個就重排:列會一路跳動,比不動更難用。 */
   async function refreshStatusPanel(){
     if(svBusy)return;
     svBusy=true;
     const ping=$("svPing"), body=$("svBody"), clearAll=$("svClearAll"), clearStatsAll=$("svClearStatsAll");
-    if(ping)ping.textContent="連線中…";
+    // 讀取中先把兩顆清除鈕鎖起來:資料還沒到位,那時的數字是上一輪的
+    if(clearAll)clearAll.disabled=true;
+    if(clearStatsAll)clearStatsAll.disabled=true;
+    if(ping)ping.innerHTML='<span class="svs-spin"></span>連線中…';
+    /* ⚠ 骨架要**在第一顆請求之前**就畫上去,不可以等 game_stats 回來才畫:
+       那一趟本身就可能等一兩秒,而「按下去到畫面有反應」的空窗正是要修掉的東西。
+       順帶把上一輪的舊清單換掉 —— 舊數字擺在那裡看起來像是「重新整理沒生效」。 */
+    if(body)body.innerHTML=GAMES.map(svSkelHtml).join("");
     const t0=Date.now();
     try{
       const stats=await svGet("game_stats");
-      if(ping)ping.textContent="✅ 連線正常("+(Date.now()-t0)+" ms)";
-      const rows=[];
-      for(const g of GAMES) rows.push(await svLoadGame(g,stats&&stats[g.key]&&stats[g.key].n));
-      // 有資料(現役房 / 已關閉的房 / 累積場次)的排前面,方便一眼看出要處理誰
+      const ms=Date.now()-t0;
+      let doneN=0;
+      const progress=()=>{
+        if(ping)ping.innerHTML='<span class="svs-spin"></span>✅ 連線正常('+ms+' ms)· 讀取房間資料 '+doneN+' / '+GAMES.length;
+      };
+      progress();
+      const rows=await Promise.all(GAMES.map(g=>
+        svLoadGame(g,stats&&stats[g.key]&&stats[g.key].n,svTalkN(stats,g.key)).then(row=>{
+          doneN++; progress();
+          // 就地換掉骨架(面板中途被關掉 / 又按了重新整理 → 找不到就安靜跳過)
+          const el=$(svRowId(g.key)); if(el) el.outerHTML=svRowHtml(row);
+          return row;
+        })
+      ));
+      // 有資料(現役房 / 已關閉的房 / 累積場次 / 語音人次)的排前面,方便一眼看出要處理誰
       rows.sort((a,b)=>svWeight(b)-svWeight(a)||GAMES.indexOf(a.g)-GAMES.indexOf(b.g));
       svRows=rows;
       if(body)body.innerHTML=rows.map(svRowHtml).join("");
+      const totalTalk=rows.reduce((n,r)=>n+r.talk,0);
+      const talkGames=rows.filter(r=>r.talk>0).length;
+      if(ping)ping.innerHTML='✅ 連線正常('+ms+' ms)<br>'+
+        '<b class="svs-mic">🎙 即時語音</b>:累計開啟 '+totalTalk+' 次'+
+        (totalTalk?'('+talkGames+' 個遊戲用過)':'(還沒有人用過)');
       if(clearAll){
         const total=rows.reduce((n,r)=>n+r.staleInfo.length,0);
         clearAll.disabled=!total;
@@ -562,11 +651,12 @@ const HomeLive = (function(){
       }
       if(clearStatsAll){
         const totalN=rows.reduce((n,r)=>n+r.n,0);
-        clearStatsAll.disabled=!totalN;
-        clearStatsAll.textContent="🧹 清除全部統計紀錄("+totalN+" 場)";
+        clearStatsAll.disabled=!totalN&&!totalTalk;
+        clearStatsAll.textContent="🧹 清除全部統計紀錄("+totalN+" 場"+(totalTalk?" · 🎙"+totalTalk:"")+")";
       }
     }catch(e){
       if(ping)ping.textContent="⚠️ 讀取失敗,檢查網路或稍後再試";
+      if(body)body.innerHTML="";
     }
     svBusy=false;
   }
@@ -580,7 +670,7 @@ const HomeLive = (function(){
     /* ⚠ 話要講清楚「清掉的是什麼」:v1.147.0 起這些節點就是「誰開過哪一間、什麼時候」的
        唯一紀錄(房主離開不再自動刪),按下去等於把那份歷史丟掉。 */
     if(!confirm("確定要清除「"+row.g.name+"」的 "+row.staleInfo.length+" 間已關閉的房間嗎?那是「誰開過哪一間、什麼時候」的紀錄,清掉就查不到了,而且無法復原。"))return;
-    for(const s of row.staleInfo){ try{ await svDelete(row.g.rooms+"/"+s.code); }catch(e){} }
+    await svBusyWhile("清除中…",()=>svAll(row.staleInfo.map(s=>svDelete(row.g.rooms+"/"+s.code))));
     showToast("已清除「"+row.g.name+"」已關閉的房間 🗑");
     refreshStatusPanel();
   }
@@ -588,24 +678,45 @@ const HomeLive = (function(){
     const total=svRows.reduce((n,r)=>n+r.staleInfo.length,0);
     if(!total)return;
     if(!confirm("確定要清除全部遊戲、共 "+total+" 間已關閉的房間嗎?那是「誰開過哪一間、什麼時候」的紀錄,清掉就查不到了,而且無法復原。"))return;
-    for(const row of svRows) for(const s of row.staleInfo){ try{ await svDelete(row.g.rooms+"/"+s.code); }catch(e){} }
+    const jobs=[];
+    for(const row of svRows) for(const s of row.staleInfo) jobs.push(svDelete(row.g.rooms+"/"+s.code));
+    await svBusyWhile("清除中…("+total+" 間)",()=>svAll(jobs));
     showToast("已清除全部已關閉的房間 🗑");
     refreshStatusPanel();
   }
+  /* ⚠ 場次與語音人次是**同一個遊戲的統計**,一起清:留一半下來只會讓下次打開時
+     以為「清除沒生效」。兩個都寄生在 game_stats 底下(見 svTalkN 那段)。 */
   async function svClearStatsKey(key){
-    const row=svRows.find(r=>r.g.key===key); if(!row||!row.n)return;
-    if(!confirm("確定要清除「"+row.g.name+"」的統計紀錄("+row.n+" 場)嗎?此動作無法復原,首頁熱門度排序會受影響。"))return;
-    try{ await svDelete("game_stats/"+key+"/n"); }catch(e){}
+    const row=svRows.find(r=>r.g.key===key); if(!row||(!row.n&&!row.talk))return;
+    if(!confirm("確定要清除「"+row.g.name+"」的統計紀錄("+row.n+" 場"+(row.talk?"、語音 "+row.talk+" 次":"")+")嗎?此動作無法復原,首頁熱門度排序會受影響。"))return;
+    await svBusyWhile("清除中…",()=>svAll([svDelete("game_stats/"+key+"/n"),svDelete("game_stats/talk_"+key+"/n")]));
     showToast("已清除「"+row.g.name+"」的統計紀錄 🧹");
     refreshStatusPanel();
   }
   async function svClearAllStats(){
     const total=svRows.reduce((n,r)=>n+r.n,0);
-    if(!total)return;
-    if(!confirm("確定要清除全部遊戲、共 "+total+" 場的統計紀錄嗎?此動作無法復原,首頁熱門度排序會歸零重來。"))return;
-    try{ await svDelete("game_stats"); }catch(e){}
+    const totalTalk=svRows.reduce((n,r)=>n+r.talk,0);
+    if(!total&&!totalTalk)return;
+    if(!confirm("確定要清除全部遊戲、共 "+total+" 場"+(totalTalk?" 與 "+totalTalk+" 次語音":"")+"的統計紀錄嗎?此動作無法復原,首頁熱門度排序會歸零重來。"))return;
+    /* ⚠ 先整包刪 game_stats,再逐一刪各遊戲的 n / talk_n 當保險:
+       資料庫規則授權的是 `game_stats/$game/n`(見 notes/firebase-rules.json)——
+       整包刪要的是 game_stats 這一層的寫入權,那**不一定**授權得到,
+       而 REST 被擋是靜靜回 401、fetch 不會 reject → 只做整包刪會變成「按了沒反應」。 */
+    const jobs=[svDelete("game_stats")];
+    for(const g of GAMES){ jobs.push(svDelete("game_stats/"+g.key+"/n")); jobs.push(svDelete("game_stats/talk_"+g.key+"/n")); }
+    await svBusyWhile("清除中…",()=>svAll(jobs));
     showToast("已清除全部統計紀錄 🧹");
     refreshStatusPanel();
+  }
+  // 一批刪除:全部平行送(排隊上限交給 svRun),個別失敗不影響其他筆
+  function svAll(jobs){ return Promise.all(jobs.map(p=>p.then(null,()=>null))); }
+  /* 清除也可能要跑好幾秒(一次幾百間房)—— 同樣不可以讓畫面呆在原地什麼都不說。
+     ⚠ 期間把兩顆全域清除鈕鎖住:連按第二下等於再送一整批同樣的 DELETE。 */
+  async function svBusyWhile(msg,fn){
+    const ping=$("svPing"), a=$("svClearAll"), b=$("svClearStatsAll");
+    if(ping)ping.innerHTML='<span class="svs-spin"></span>'+esc(msg);
+    if(a)a.disabled=true; if(b)b.disabled=true;
+    try{ await fn(); }catch(e){}
   }
 
   // 事件綁定自己管(比照上面 visibilitychange 監聽的自包含風格),元素早就在 DOM 裡(這支 <script> 排在 body 尾端)

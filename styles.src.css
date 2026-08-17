@@ -203,7 +203,21 @@
        ⚠ 判斷用 body.mp-on(核心進房時掛、leave 時脫),不是 .hidden ——
          .hidden 要靠 JS 每次換畫面同步,而這件事 CSS 自己就答得出來。 */
   body:not(.mp-on) .tk-btn{display:none}
+  .tk-btn{position:relative}
   .tk-btn.on{background:var(--accent);border-color:var(--accent);color:#1a1020}
+  /* 🎙 的「靜音中」= 一條斜線(v2.1.0)。
+     ★ 為什麼非得有它:v2.1.0 起「講」蘊含「聽」,於是麥克風關著有**兩種**意思 ——
+       「聽著但閉麥」(別人講話你聽得到)與「語音整個沒開」(一片安靜)。
+       兩者的鈕都是暗的,光看顏色分不出來,而後果差很多 → 前者多一條斜線。
+     ⚠ 走 ::after + position:absolute,**不可以**讓它變成格子成員:.icon-btn 是
+       `display:grid;place-items:center`,多一個子項就會把 🎙 擠歪。
+     ⚠ 寬度用 % 不用 px:橫向的台灣麻將把這幾顆縮成 28px(見檔尾那段),
+       寫死 26px 的話斜線會戳出鈕外面。 */
+  .tk-btn.muted::after{
+    content:"";position:absolute;left:50%;top:50%;width:62%;height:2px;border-radius:2px;
+    background:currentColor;opacity:.8;pointer-events:none;
+    transform:translate(-50%,-50%) rotate(-45deg);
+  }
   /* 連不上(沒有 TURN 時對稱 NAT 會失敗)—— 一定要看得見:那時使用者以為自己在講話,
      其實沒有人聽得到,是最難自己發現的一種壞掉。 */
   .tk-btn.bad{background:#c0392b;border-color:#e74c3c;color:#fff;animation:tk-warn 1.4s ease-in-out infinite}
@@ -915,7 +929,10 @@
      沿用 .veil / .set-card / .card-x 既有元件樣式,這裡只補特有的幾條。
      ========================================================================== */
   .svs-card{max-width:420px}
-  .svs-ping{text-align:center;font-size:12.5px;color:var(--muted);margin:-6px 0 12px}
+  .svs-ping{text-align:center;font-size:12.5px;color:var(--muted);margin:-6px 0 12px;line-height:1.75}
+  /* 🎙 語音那幾個數字比周圍亮一階 —— 它是這張卡裡唯一「新功能有沒有人用」的訊號,
+     混在一排灰字裡會直接被略過(統計寫入端在 js/shared/talk.js 的 bumpStat)。 */
+  .svs-mic{color:var(--text);opacity:.85;font-weight:800}
   .svs-actions{display:flex;gap:8px;margin-bottom:14px}
   .svs-actions .btn{width:auto;flex:1;margin-top:0;padding:11px 8px;font-size:13.5px}
   .svs-actions .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
@@ -936,6 +953,32 @@
   .svs-stale i{opacity:.7;font-style:normal}
   .svs-row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .svs-row .btn.ghost{width:auto;margin-top:0;padding:7px 12px;font-size:13px}
+
+  /* ---------- 讀取中的樣子(v2.1.0)----------
+     這個面板要跑十四個遊戲 × 每間房各一趟 REST,慢的時候好幾秒;原本那幾秒
+     整塊是空白的,使用者的回報是「以為死掉了」。兩個零成本的「還活著」訊號:
+       ① .svs-spin —— 頂上那行的轉圈(純 CSS border 轉,不必圖檔)
+       ② .svs-skel + .svs-bar —— 十四列骨架各一條左右跑的光條,讀完就地換成正式那列
+     ⚠ 兩個動畫都放在**已經開著的蓋板**裡,不在任何「每次換畫面」的路徑上
+       (CLAUDE.md 紅線 7 的那條:載入路徑上多做事會把 t-topbar-fit 推過門檻)。
+     ⚠ prefers-reduced-motion 要一起關掉:這是裝飾性動畫,不是資訊本身
+       (數字「5 / 14」才是,那一份不受影響)。 */
+  .svs-spin{
+    display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px;
+    border:2px solid rgba(128,128,128,.3);border-top-color:var(--text);border-radius:50%;
+    animation:svsSpin .7s linear infinite;
+  }
+  @keyframes svsSpin{ to{ transform:rotate(360deg) } }
+  .svs-skel .svs-nums{opacity:.6}
+  .svs-bar{margin-top:8px;height:6px;border-radius:999px;background:rgba(128,128,128,.16);overflow:hidden}
+  .svs-bar i{display:block;width:38%;height:100%;border-radius:999px;
+    background:linear-gradient(90deg,transparent,rgba(128,128,128,.55),transparent);
+    animation:svsSlide 1.15s ease-in-out infinite}
+  /* 從左邊外面滑到右邊外面(-100% ~ 340%:38% 寬的光條剛好完全離開兩側) */
+  @keyframes svsSlide{ 0%{transform:translateX(-100%)} 100%{transform:translateX(340%)} }
+  @media (prefers-reduced-motion:reduce){
+    .svs-spin,.svs-bar i{animation:none}
+  }
 
   /* ==========================================================================
      五子棋(gomoku.html 專用) — v1.37.0
@@ -7622,6 +7665,23 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     box-shadow:0 0 0 3px var(--dw-edge),0 10px 30px rgba(0,0,0,.22);
     touch-action:none;-webkit-user-select:none;user-select:none}
   .dw-ink.live{cursor:crosshair}
+
+  /* ★★ 兩指縮放的倍率晶片(v2.1.0)—— 只在放大時出現(js/draw/board.js 的 syncZoomChip
+     切 .hidden),按一下回到原本大小。使用者:「畫板我希望能夠支援兩指的縮放,
+     這樣可以畫的比較細一點」。
+     ⚠ 貼**左上角**:這一頁的重點常畫在中下方(見上面那條 66px 的坑),
+       而右上角在公布答案那一層是分享鈕(.dw-shbtn)的位置。
+     ⚠⚠ 顏色**不可以吃 --text / --panel**:它疊在紙上,而紙是固定的淺色、不跟主題走
+       (紅線 11)—— 吃主題變數的話 midnight / arcade 會變成白紙上的白字。
+       這裡用的 --dw-ink 就是紙那一組自己的變數,五個主題都是同一個值。
+     ⚠ 它是畫布的兄弟、蓋住的那一小塊真的點不到紙 —— 那是刻意的取捨:
+       那一角在放大時是「取消放大」的出口,而畫布本身可以先捏回去再畫。 */
+  .dw-pinch{position:absolute;top:8px;left:8px;padding:6px 11px;border-radius:999px;
+    border:1px solid rgba(0,0,0,.14);background:rgba(255,255,255,.88);color:var(--dw-ink);
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;line-height:1;
+    cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.20)}
+  .dw-pinch:active{transform:scale(.94)}
+  .dw-pinch.hidden{display:none}
 
   /* ---------- 蓋板:選題目 / 公布答案 ---------- */
   /* 遮罩與卡片一律照既有的 .veil + .win-card 配方(那一組五個主題都驗過)——

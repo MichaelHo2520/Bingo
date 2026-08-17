@@ -15,8 +15,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
-<!-- 你畫我猜 · v2.0.0 -->
-<meta name="version" content="2.0.0">
+<!-- 你畫我猜 · v2.1.0 -->
+<meta name="version" content="2.1.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -272,6 +272,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            .dw-wrap 的寬高由 js/draw/board.js 的 fit() 設成與畫布逐像素相同。 -->
       <div class="dw-wrap" id="dwWrap">
         <canvas class="dw-ink" id="dwInk"></canvas>
+        <!-- ★★ 兩指縮放的倍率晶片(v2.1.0)。使用者:「畫板我希望能夠支援兩指的縮放,
+             這樣可以畫的比較細一點」。按一下 = 回到原本大小(除了把兩指捏回去,這是唯一的出口)。
+             ⚠ 只在放大時出現(js/draw/board.js 的 syncZoomChip 切 .hidden)。
+             ⚠⚠ 位置一定要**排在 #dwOver 前面**:選題 / 公布答案的蓋板是同一層的絕對定位,
+                排在後面的話它會浮在蓋板上面(而那時根本不能畫,留著只是擋字)。
+             ⚠ 刻意不放進 #dwTools —— 那一列在 360px 上已經剛好塞滿(見紅線 3-D)。 -->
+        <button class="dw-pinch hidden" id="dwPinch" type="button" title="回到原本大小" aria-label="回到原本大小"></button>
         <div class="dw-over hidden" id="dwOver"></div>
       </div>
     </div>

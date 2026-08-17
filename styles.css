@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 6faa27a141669dd86caefd38ef7fbbf4091159e8ed2ada339b5c107a14ef37e5)
+    真相在 styles.src.css(sha256 71bf94e34edd06397f2a07fee4e82ad928f88ee6e851da35637f8a18954a801f)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -104,7 +104,13 @@
   .icon-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
   .icon-btn:focus-visible,.btn:focus-visible,.cell:focus-visible,.mini:focus-visible{outline:3px solid var(--accent-2);outline-offset:2px}
   body:not(.mp-on) .tk-btn{display:none}
+  .tk-btn{position:relative}
   .tk-btn.on{background:var(--accent);border-color:var(--accent);color:#1a1020}
+  .tk-btn.muted::after{
+    content:"";position:absolute;left:50%;top:50%;width:62%;height:2px;border-radius:2px;
+    background:currentColor;opacity:.8;pointer-events:none;
+    transform:translate(-50%,-50%) rotate(-45deg);
+  }
   .tk-btn.bad{background:#c0392b;border-color:#e74c3c;color:#fff;animation:tk-warn 1.4s ease-in-out infinite}
   @keyframes tk-warn{0%,100%{opacity:1}50%{opacity:.55}}
   .mp-chip.tk-talking{border-color:#5bd75b;box-shadow:0 0 0 2px #5bd75b,0 0 12px rgba(91,215,91,.55)}
@@ -605,7 +611,8 @@
     .status .big{font-size:17px}
   }
   .svs-card{max-width:420px}
-  .svs-ping{text-align:center;font-size:12.5px;color:var(--muted);margin:-6px 0 12px}
+  .svs-ping{text-align:center;font-size:12.5px;color:var(--muted);margin:-6px 0 12px;line-height:1.75}
+  .svs-mic{color:var(--text);opacity:.85;font-weight:800}
   .svs-actions{display:flex;gap:8px;margin-bottom:14px}
   .svs-actions .btn{width:auto;flex:1;margin-top:0;padding:11px 8px;font-size:13.5px}
   .svs-actions .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
@@ -621,6 +628,21 @@
   .svs-stale i{opacity:.7;font-style:normal}
   .svs-row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   .svs-row .btn.ghost{width:auto;margin-top:0;padding:7px 12px;font-size:13px}
+  .svs-spin{
+    display:inline-block;width:11px;height:11px;margin-right:6px;vertical-align:-1px;
+    border:2px solid rgba(128,128,128,.3);border-top-color:var(--text);border-radius:50%;
+    animation:svsSpin .7s linear infinite;
+  }
+  @keyframes svsSpin{ to{ transform:rotate(360deg) } }
+  .svs-skel .svs-nums{opacity:.6}
+  .svs-bar{margin-top:8px;height:6px;border-radius:999px;background:rgba(128,128,128,.16);overflow:hidden}
+  .svs-bar i{display:block;width:38%;height:100%;border-radius:999px;
+    background:linear-gradient(90deg,transparent,rgba(128,128,128,.55),transparent);
+    animation:svsSlide 1.15s ease-in-out infinite}
+  @keyframes svsSlide{ 0%{transform:translateX(-100%)} 100%{transform:translateX(340%)} }
+  @media (prefers-reduced-motion:reduce){
+    .svs-spin,.svs-bar i{animation:none}
+  }
   :root{ --gmk-wood:#e9c98d; --gmk-line:rgba(66,40,12,.55); --gmk-star:rgba(66,40,12,.75); --gmk-edge:rgba(66,40,12,.28); --gmk-frame:#8a5a24; }
   :root[data-theme="midnight"]{ --gmk-wood:#141c31; --gmk-line:rgba(140,190,255,.34); --gmk-star:rgba(140,190,255,.6); --gmk-edge:rgba(140,190,255,.2); --gmk-frame:#39527f; }
   :root[data-theme="bubblegum"]{ --gmk-wood:#fff0f8; --gmk-line:rgba(150,70,130,.4); --gmk-star:rgba(150,70,130,.65); --gmk-edge:rgba(150,70,130,.22); --gmk-frame:#c07aa8; }
@@ -3448,6 +3470,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     box-shadow:0 0 0 3px var(--dw-edge),0 10px 30px rgba(0,0,0,.22);
     touch-action:none;-webkit-user-select:none;user-select:none}
   .dw-ink.live{cursor:crosshair}
+  .dw-pinch{position:absolute;top:8px;left:8px;padding:6px 11px;border-radius:999px;
+    border:1px solid rgba(0,0,0,.14);background:rgba(255,255,255,.88);color:var(--dw-ink);
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:12px;line-height:1;
+    cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.20)}
+  .dw-pinch:active{transform:scale(.94)}
+  .dw-pinch.hidden{display:none}
   .dw-over{position:absolute;inset:0;display:grid;place-items:center;padding:10px;
     background:rgba(0,0,0,.55);backdrop-filter:blur(4px);border-radius:14px}
   .dw-ov-card{background:var(--panel);border:1px solid var(--panel-line);border-radius:16px;
