@@ -246,6 +246,12 @@ const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettin
                       那條註解逐字相同 —— 房主開局前看一眼房規、按返回想關掉,跳出來的是
                       「離開房間?」;而同型的 21 點 / UNO / 暗棋三頁一直都是對的。 */
                    ["b2RulesVeil",()=>closeRules()],
+                   /* ★ 房間分享的 QR 蓋板(js/shared/qr.js 自己建的,十四頁都有)。
+                      ⚠ 一定要排在 leaveVeil **前面**:兩者都可能開著,而先關的應該是
+                        比較輕的那一層 —— 反過來的話「看著 QR 按返回」會直接跳離開確認。
+                      ★ 只有載入 qr.js 的頁面才有這個 id,沒有的頁面自動跳過;
+                        而元素存在就代表 RoomShare 一定在,可以直接叫。 */
+                   ["qrVeil",()=>RoomShare.close()],
                    ["resignVeil",()=>MP.cancelResign()],["leaveVeil",()=>MP.cancelLeave()]];
 function dismissTopLayer(){
   for(let i=0;i<BACK_LAYERS.length;i++){
@@ -1312,6 +1318,10 @@ function bindCommonUI(){
      (又一組紅線 4 的雙胞胎)。沒有那兩顆鈕的頁面 bindUi() 自己 return,可以無腦叫。
      ⚠ 一定要 typeof 判斷:talk.js 是選配的,沒載入的頁面直接寫 Talk 會是 ReferenceError。 */
   if (typeof Talk !== "undefined" && Talk) Talk.bindUi();
+  /* 房間分享(QR + Web Share)。同 talk.js:邏輯與 UI 都在 js/shared/qr.js 自己身上,
+     十四頁(含 Bingo)共用同一份 —— 這裡只有這一行,鈕與蓋板都是它自己建的。
+     ⚠ 同樣要 typeof 判斷:qr.js 是選配的。 */
+  if (typeof RoomShare !== "undefined" && RoomShare) RoomShare.bindUi();
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));
   $("bgmTrackSel").addEventListener("change",e=>setBgmTrack(e.target.value));

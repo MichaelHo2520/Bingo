@@ -9420,6 +9420,53 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   }
 
   /* ==========================================================================
+     房間分享(QR + Web Share)—— 前綴 `qr-`,十四頁共用
+     ──────────────────────────────────────────────────────────────────────────
+     ★ DOM 全部由 js/shared/qr.js 自己建(十四頁的 HTML 一個字都沒動),
+       所以這一段是這個功能唯一的樣式來源,不必擔心與某一頁的 markup 走散。
+     ★ 蓋板沿用既有的 .veil / .set-card / .card-x / .set-head —— 那是全站七種蓋板
+       共用的殼,重用它等於自動吃到「背板淡入」「卡片可捲」「質感三件套」那幾件事。
+     ⚠ 前綴 `qr-` 是新的(紅線 6),與既有十五個前綴都不撞;掃過 `.qr` 開頭沒有別的。
+     ========================================================================== */
+
+  /* 觸發鈕:住在房間橫幅的狀態列 .mp-subrow 裡(那一列是 flex,.mp-status 佔 flex:1
+     並且自己會 ellipsis)—— 所以這顆鈕一律 flex:none,擠不到狀態文字。
+     ⚠ 不放進 .mp-actions:那一列在窄機上已經有「大 / 🎤 / 😀」三顆,
+       第四顆會把房間框推爆(紅線 7 的 t-topbar-fit / t-zfold-fit 會紅)。 */
+  .qr-open{flex:none;display:inline-flex;align-items:center;gap:5px;
+    padding:3px 9px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.06);
+    color:var(--text);font-family:inherit;font-size:12px;line-height:1.5;
+    transition:background .15s,transform .1s}
+  .qr-open:active{transform:scale(.94)}
+  .qr-open:hover{background:rgba(255,255,255,.12)}
+  /* 圖示是**自繪 SVG**,不用 emoji 字面(同 talk.js 那兩顆鈕的理由):
+     QR 相關的 emoji 沒有一個是「預設 emoji 呈現」的,桌機會退回線條字形。
+     ⚠ 三個定位方框走 stroke、其餘小點走 fill,兩者都吃 currentColor. */
+  .qr-ico{width:14px;height:14px;flex:none}
+  .qr-ico-ring{fill:none;stroke:currentColor;stroke-width:2.2}
+  .qr-ico-dot{fill:currentColor}
+  /* 「大 / 小」BigMode 會把房間框壓成一行、狀態列縮到 6em ——
+     那時只留圖示。⚠ 掛共用旗標 body.is-big(零登記,紅線 7),
+     不要為十四頁各寫一條各自的前綴 class。 */
+  body.is-big .qr-open-t{display:none}
+  body.is-big .qr-open{padding:3px 7px}
+
+  /* 蓋板內容 */
+  .qr-card{max-width:330px}
+  .qr-room{text-align:center;font-size:13px;opacity:.78;margin-bottom:12px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ⚠ QR 一律白底黑碼、**不吃主題色**:五個主題有三個的強調色對比度不足以掃。
+     這裡的 padding 是規格要求的靜空區(quiet zone)在視覺上的延伸 ——
+     canvas 內部已經畫了 4 格,外面這一圈是為了讓深色卡片不要貼著碼區。 */
+  .qr-canvas{display:block;margin:0 auto;background:#fff;
+    padding:8px;border-radius:12px;image-rendering:pixelated;
+    box-shadow:0 6px 18px -8px rgba(0,0,0,.55)}
+  .qr-tip{text-align:center;font-size:12px;opacity:.7;margin-top:12px;line-height:1.6}
+  .qr-acts{display:flex;gap:10px;margin-top:16px}
+  .qr-btn{flex:1;min-width:0}
+
+  /* ==========================================================================
      大螢幕 / 摺疊機展開(Galaxy Z Fold 7)—— 第一段:版面放寬
      ──────────────────────────────────────────────────────────────────────────
        使用者:「想要增加支援 z fold 7 折疊機展開螢幕的解析度…打開變大螢幕的時候,

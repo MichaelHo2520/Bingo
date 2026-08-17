@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 0941f216b5ae947b7eae48f7a708dcdfdba33dd4f97d07eb0b1afd7a431c89ea)
+    真相在 styles.src.css(sha256 1d67fb0061b992b6c7d4b75107bf3b11092e24b845a5fc67fdb97a3020414651)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4293,6 +4293,27 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
              justify-content:center;gap:10px}
     .tq-hint{flex:none;text-align:center;font-size:12px;max-height:none}
   }
+  .qr-open{flex:none;display:inline-flex;align-items:center;gap:5px;
+    padding:3px 9px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.06);
+    color:var(--text);font-family:inherit;font-size:12px;line-height:1.5;
+    transition:background .15s,transform .1s}
+  .qr-open:active{transform:scale(.94)}
+  .qr-open:hover{background:rgba(255,255,255,.12)}
+  .qr-ico{width:14px;height:14px;flex:none}
+  .qr-ico-ring{fill:none;stroke:currentColor;stroke-width:2.2}
+  .qr-ico-dot{fill:currentColor}
+  body.is-big .qr-open-t{display:none}
+  body.is-big .qr-open{padding:3px 7px}
+  .qr-card{max-width:330px}
+  .qr-room{text-align:center;font-size:13px;opacity:.78;margin-bottom:12px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qr-canvas{display:block;margin:0 auto;background:#fff;
+    padding:8px;border-radius:12px;image-rendering:pixelated;
+    box-shadow:0 6px 18px -8px rgba(0,0,0,.55)}
+  .qr-tip{text-align:center;font-size:12px;opacity:.7;margin-top:12px;line-height:1.6}
+  .qr-acts{display:flex;gap:10px;margin-top:16px}
+  .qr-btn{flex:1;min-width:0}
   @media (min-width:700px) and (min-height:640px){
     .scroll-area,.panel,.mp-panel,.board-wrap,.actions,.status,
     .room-tabs,.primary-bar,.solo-head{width:min(92vw,680px)}

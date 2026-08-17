@@ -417,6 +417,10 @@
         只有這一行 + online.js 的幾個掛載點。
      ⚠ 一定要 typeof 判斷:talk.js 是選配的,直接寫 Talk 會是 ReferenceError。 */
   if (typeof Talk !== "undefined" && Talk) Talk.bindUi();
+  /* 房間分享(QR + Web Share)。同 talk.js:UI 住在 js/shared/qr.js 自己身上,
+     所以 Bingo 這一頁也只有這一行 + online.js 的兩個掛載點,沒有雙胞胎。
+     ⚠ 一定要 typeof 判斷:qr.js 是選配的。 */
+  if (typeof RoomShare !== "undefined" && RoomShare) RoomShare.bindUi();
   HomeLive.boot();        // 首頁「現在有人在玩」看板:idle 後才載 Firebase SDK,首屏不等它
   // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
   setTimeout(maybeShowInstallTip,1500);

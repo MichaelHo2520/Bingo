@@ -20,6 +20,9 @@ const CORE = [
   "./js/shared/mp-order.js",
   "./js/shared/mp-core.js",
   "./js/shared/talk.js",       // 即時語音 WebRTC(v1.183.0 起十四頁全部載入,含 Bingo)
+  "./js/shared/qr.js",         // 房間分享:QR 編碼器 + 邀請蓋板(十四頁全部載入,含 Bingo)
+                               // ★ QR 編碼器刻意自己實作、不吃 CDN —— 外部資源這支 SW 不攔截,
+                               //   離線就抓不到,而離線正是現場最需要它在的時候
   "./js/shared/mj-faces.js",   // 麻將牌面自繪(消消樂與台灣 16 張共用)
   "./js/shared/pk-faces.js",   // 撲克牌面自繪(排七與大老二共用,v1.76.0 抽出)
   // 台灣 16 張麻將(第五個遊戲,v1.58.0)
@@ -280,12 +283,76 @@ self.addEventListener("activate", e => {
   })());
 });
 
+/* ============================================================================
+   媒體(音檔 / 圖檔)走 cache-first —— 其餘一律維持 network-first
+   ──────────────────────────────────────────────────────────────────────────
+   ★ 為什麼要分層:network-first 的代價是**每一個檔每一次都要等一趟網路**,
+     而 mp3/ 與 img/ 是這個站最大的一塊(約 4.5MB / 19 個音檔 + 14 張圖示),
+     內容又幾乎不變 —— 版本一發、CORE 一灌,之後每一次載入都在重新驗證同一批
+     不會變的東西。現場的網路正好是最爛的時候(一群人擠同一個熱點)。
+   ★ 而程式碼那一層(HTML / JS / CSS)**維持 network-first 不動**:那正是
+     「改完上傳卻吃到舊快取、更新出不來」要防的東西,規則與版號一定要最新。
+     → 換句話說,分層之後兩邊各自拿到自己要的:碼求新,媒體求快。
+
+   ⚠⚠ **帶 Range 的請求刻意不走快取**,照舊走 network-first。
+     理由不是省事:HTMLMediaElement 一律送 Range,而 iOS Safari 對 <audio> 的
+     Range 請求**要求回 206**,拿 200 回它會播不出來。快取裡存的一定是 200
+     (CORE 是 SW 自己用普通 fetch 灌的),照 cache-first 回過去就等於在
+     iPhone 上把那些音效弄啞 —— 而桌機測不出來。
+     ★ 好消息是**主路徑不帶 Range**:js/audio.js 的 BGM 與所有音效走的是
+       `fetch → decodeAudioData`(普通請求),圖檔的 <img> 也不帶 Range。
+       所以「不碰 Range」幾乎不減損效益,只是把 HTMLAudio 那條後備留在原路上。
+
+   ⚠ 這一層換來的代價(講清楚,不是 bug):cache-first **不重新驗證** ——
+     開發時把一個 mp3 / png **換成新檔但檔名不變**,瀏覽器會繼續放舊的那一份,
+     直到版號改掉(CACHE 名帶版號 → activate 清舊快取)或按設定頁的「強制更新」。
+     發版時本來就會進版號,所以只有「同一版之內反覆換素材」會遇到。
+   ============================================================================ */
+const MEDIA_RE = /\.(mp3|wav|m4a|ogg|opus|png|jpe?g|webp|gif|svg)$/i;
+
+/* 206 的回應進不了快取(規格對 Cache.put 明訂要以 TypeError reject),
+   所以另外發一次**不帶 Range** 的請求把整個檔收進來,下一次就有得命中。
+   ⚠ 這一段補的正是下面那條長註解說的「network-first 會順手收快取」對
+     HTMLAudio **不成立**的洞 —— 而 CORE 裡那條「使用者自己放的 mp3 刻意不列」
+     一直靠著那個不成立的假設。
+   ⚠ 要去重:同一個檔在播放期間會連發好幾個 Range 請求,不擋的話會平行抓好幾份。 */
+const warming = new Set();
+function warmFull(url) {
+  if (warming.has(url)) return;
+  warming.add(url);
+  fetch(url)
+    .then(r => (r && r.status === 200) ? caches.open(CACHE).then(c => c.put(url, r)) : null)
+    .catch(() => { })
+    .then(() => warming.delete(url), () => warming.delete(url));
+}
+
+function mediaFirst(req) {
+  return caches.match(req).then(hit => {
+    if (hit) return hit;
+    return fetch(req).then(res => {
+      if (res && res.status === 200) {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => { });
+      } else if (res && res.status === 206) {
+        warmFull(req.url);
+      }
+      return res;
+    }).catch(() => Response.error());   // 沒命中又沒網路:這個檔本來就沒有
+  });
+}
+
 self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   let url;
   try { url = new URL(req.url); } catch (_) { return; }
   if (url.origin !== self.location.origin) return;   // 外部(Firebase / 字型)不攔,直接走網路
+
+  // 媒體且不帶 Range → cache-first(見上面那一大段)
+  if (MEDIA_RE.test(url.pathname) && !req.headers.get("range")) {
+    e.respondWith(mediaFirst(req));
+    return;
+  }
 
   // network-first:先網路(順手更新快取),失敗才回退快取;導覽請求離線時退回外殼 app.html
   e.respondWith(
@@ -301,7 +368,10 @@ self.addEventListener("fetch", e => {
               會被埋掉,而那是「離線整個不能玩」的唯一線索
            ② 這些媒體回應永遠進不了 runtime cache —— 也就是說「network-first 會順手把
               播過的檔收進來」這個假設**對所有走 HTMLAudio 的音檔都不成立**,
-              而下面第 138 行那條「使用者自己放的 mp3 刻意不列進 CORE」正是靠這個假設。
+              而上面 CORE 那條「使用者自己放的 mp3 刻意不列進 CORE」正是靠這個假設。
+              ★ ②那個洞已經補掉了:媒體改走上面的 mediaFirst,遇到 206 會用
+                warmFull() 另外抓一份完整的收進來。這裡留著是因為**非媒體**的請求
+                (以及帶 Range 的媒體)還是走這一條,①的理由照樣成立。
          ⚠ 就算條件收成 200,`.catch()` 還是要留:同一段的兄弟 c.addAll(CORE).catch(()=>{})
            一直都有,這裡少了純粹是漏的(配額滿、私密瀏覽都會 reject)。 */
       if (res && res.status === 200) {

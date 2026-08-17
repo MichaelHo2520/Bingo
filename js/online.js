@@ -431,6 +431,9 @@
       $("setupActions").classList.remove("hidden");
       $("mpBar").classList.remove("hidden");
       $("mpRoomTitle").textContent=roomName||("房間 "+code);   // 橫幅只顯示房名(不再帶內部號碼,避免手機上被截斷)
+      /* 房間分享(QR + Web Share)。⚠ 一律 typeof 檢查 —— qr.js 是選配的(同 Talk 的規矩)。
+         ⚠ 十三頁的 js/shared/mp-core.js 另有一份平行實作,改一邊記得改另一邊。 */
+      if(typeof RoomShare!=="undefined" && RoomShare) RoomShare.setRoom(code, roomName);
       $("startBtn").classList.add("hidden");
       $("onlineBtn").classList.add("hidden");
       $("mpReadyBtn").classList.remove("hidden");
@@ -1471,6 +1474,7 @@
       closeLeaveAsk(); closeKick();   // 離開/被踢/房主關房都可能在確認卡開著時發生 → 一併收掉,不留孤兒蓋板
       disarmBackGuard();   // 已經不在房裡:守衛連同它墊的那一筆歷史一起收掉(不然返回鍵要多按一次)
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();   // 離線:重置快速語音鈕狀態
+      if(typeof RoomShare!=="undefined" && RoomShare) RoomShare.setRoom(null);   // 收掉邀請鈕與 QR 蓋板
       closeWin();
       $("mpBar").classList.add("hidden");
       hidePhasePanels();

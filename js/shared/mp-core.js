@@ -491,6 +491,10 @@ const MPCore = (function(){
       $("primaryBar").classList.remove("hidden");
       $("mpReadyBtn").classList.remove("hidden");
       $("mpRoomTitle").textContent=roomName||("房間 "+code);
+      /* 房間分享(QR + Web Share)。⚠ 一律 typeof 檢查 —— qr.js 是選配的,
+         將來某頁不載入它就會是 ReferenceError(同 Talk 的規矩)。
+         ⚠ 這一頁的 online.js 另有一份平行實作,改一邊記得改另一邊。 */
+      if(typeof RoomShare!=="undefined" && RoomShare) RoomShare.setRoom(code, roomName);
       A.enterLobby && A.enterLobby();
       syncSubrow(); syncSetup(); updateReadyBtn(); updateGoal();
       listen(); watchConn();
@@ -1460,6 +1464,7 @@ const MPCore = (function(){
       closeLeaveAsk(); closeKick(); closeResign(); closeEmote(); closeWin();
       disarmBackGuard();   // 已經不在房裡:守衛連同它墊的那一筆歷史一起收掉(不然返回鍵要多按一次)
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();
+      if(typeof RoomShare!=="undefined" && RoomShare) RoomShare.setRoom(null);   // 收掉邀請鈕與 QR 蓋板
       A.onLeave && A.onLeave();
       setActionHint("");
       openConnect();   // 回到連線畫面,可以再建房 / 加入
