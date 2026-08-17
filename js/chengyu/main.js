@@ -58,6 +58,16 @@ addEventListener("keydown", e => {
   if (e.target && /^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;   // 別吃掉暱稱/聊天輸入
   CYB.onKey(e);
 });
+/* ★ 盤面鎖住時的那一下點擊(v2.3.6)——「按不動」是這一頁最沒有線索的一種回報,
+   因為 .cy-play:has(.cy-stage.locked) .cy-pad 是 pointer-events:none:字卡連事件都收不到,
+   而 CYB.pick()/press() 在 !enabled 時也是靜靜 return。兩者的點擊都會冒到 #cyPlay,
+   在這裡接住轉給連線層 —— 對局中就當場對帳一次並解開,順便講一句話。
+   ⚠ 單機的鎖(暫停 / 已完成)有自己的蓋板,不歸這裡管。 */
+$("cyPlay").addEventListener("click", () => {
+  if (Solo.running()) return;
+  const st = $("cyStage");
+  if (st && st.classList.contains("locked")) MP.lockedTap();
+});
 
 /* ---------- 進場選單 ---------- */
 $("cyHomeDiffSeg").addEventListener("click", e => {

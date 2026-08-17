@@ -101,6 +101,16 @@ const MP = MPCore.create((function () {
     if (CYB.frozen()) return;                          // press() 已經先講過「冷靜 N 秒」了
     if (CYB.isBlock(i) || CYB.isGiven(i)) { showToast("這格是題目給的,不能改"); return; }
     if (CYB.valueAt(i)) { showToast("這格已經被填走了"); return; }
+    /* ★ 這一頁**最後一條完全無聲**的路(v2.3.6):畫面說這格是空的、真相說早就有人填走了。
+       底下那支交易會在 for 迴圈裡 return false —— 一個字都不會寫出去,而且**連 toast 都沒有**
+       (交易中止是靜的)。使用者的體驗就是「點格子、點字卡,什麼都沒發生」,而且重試幾次都一樣
+       —— 正是回報上來的那句「沒辦法選字」。畫面與真相對不上有很多種進法(漏收快照 / 樂觀寫入
+       被回退 / applyGame 丟過例外),這裡不問是哪一種,先講話再把畫面拉回真相。 */
+    if (takenAt(lastG, i)) {
+      showToast("這格剛剛被別人搶走了,畫面幫你更新一下 🔄", 1600);
+      if (lastG && charList.length) repaintFrom(lastG);
+      return;
+    }
     const seat = mySeat(); if (seat < 0) { showToast("座位還在同步,等一下再試 ⏳", 1400); return; }
     const v = charIdx(ch); if (v < 0) { showToast("這個字不在這一盤裡", 1400); return; }
     const right = (CYB.solAt(i) === ch);
@@ -137,18 +147,66 @@ const MP = MPCore.create((function () {
     (Array.isArray(g.fills) ? g.fills : []).forEach(c => { if (decFill(c).ok) k++; });
     return k;
   }
+  function takenAt(g, i) {
+    return (Array.isArray(g && g.fills) ? g.fills : []).some(c => { const f = decFill(c); return f.ok && f.i === i; });
+  }
+  /* 新的一局(或對帳發現這一台根本沒套用上)→ 重建盤面 + 重算規範字元清單。
+     ⚠ puzKey 一定要**等 setPuzzle 真的做完**才寫進去:先寫的話,setPuzzle 丟例外的那一台
+       從此 g.puzzle === puzKey,這一局再也進不來 —— 盤面停在上一盤、charList 也是舊的,
+       而且沒有任何錯誤訊息。(v2.3.6 起心跳每 3 秒會發現並重試,不再是永久出局。) */
+  function applyPuzzle(g) {
+    CYB.setPuzzle({ rows: g.rows, cols: g.cols, puzzle: g.puzzle, sol: g.sol });
+    puzKey = g.puzzle;
+    charList = buildCharList(g.puzzle, g.sol);
+    holes = CYB.remaining();
+    fills = []; tally = [];
+    CYB.setSel(CYB.firstEmpty());
+  }
+  /* ⚠ 一定要先 clearFills():CYB.fill() 只會加不會減,不清就沒有任何管道能把
+     「被伺服器回退掉的樂觀寫入」從畫面上洗掉 —— 那一格會永遠停在我的顏色上,
+     filledCount() 也就永遠對不上 okCount(),心跳每 3 秒重畫一次卻永遠修不好。 */
   function repaintFrom(g) {
     const next = Array.isArray(g.fills) ? g.fills : [];
+    const keep = CYB.sel();
     tally = [];
+    CYB.clearFills();
     next.forEach(c => { const f = decFill(c); if (f.ok) CYB.fill(f.i, charList[f.v], colorOf(f.seat)); bump(tally, f.seat, f.ok); });
     fills = next.slice();
+    keepSel(keep);
     renderHud();
   }
+  /* 重建盤面之後把選格放回去 —— 只有「原本就沒選 / 那一格已經不能填了」才跳到 firstEmpty。
+     ★★ 舊寫法是**無條件** setSel(firstEmpty())(v2.3.6 修)。三人以上同時搶格時,我的樂觀
+       寫入常被伺服器重排 → 本地 fills 不再是真相的前綴 → 每一次都走重建這一條:
+       使用者剛點好的格子會在他點字卡**之前**被偷偷換掉 → 字填到別的格子 → 多半是錯的
+       → 凍結 3 秒。連中幾次,那一台看起來就是「一直按不動」。 */
+  function keepSel(keep) {
+    if (keep < 0 || CYB.isBlock(keep) || CYB.isGiven(keep) || CYB.valueAt(keep)) CYB.setSel(CYB.firstEmpty());
+    else CYB.setSel(keep);
+  }
   function reconcile() {
-    if (ctx.phase() !== "playing" || !lastG || !puzKey) return;
+    if (ctx.phase() !== "playing" || !lastG) return;
+    /* ① 題目根本沒套用上(setPuzzle 丟過例外 / 漏收重建那一拍)—— 這一台會停在上一盤的盤面上,
+       charList 也是舊的,而且**永遠鎖著**。舊版把 !puzKey 當成 early-out,等於這種進法
+       連心跳都救不到。⚠ 包 try:它丟例外也不可以把後面的對帳一起帶走。 */
+    if (lastG.puzzle && lastG.puzzle !== puzKey) {
+      try { applyPuzzle(lastG); } catch (e) { console.error("cy applyPuzzle", e); }
+    }
+    if (!puzKey) return;
     if (!ctx.winner() && !CYB.isEnabled()) CYB.setEnabled(true);
     if (CYB.filledCount() !== okCount(lastG)) repaintFrom(lastG);
     if (holes > 0 && CYB.isComplete() && !ctx.winner()) settleGrab();
+  }
+  /* 盤面鎖著的時候 .cy-pad 是 pointer-events:none —— 使用者點下去**連事件都收不到**,
+     於是回報上來永遠只有「沒辦法按」五個字。main.js 把冒到 #cyPlay 的那一下轉進這裡:
+     把使用者的手指當成一次額外的對帳訊號,不必等下一次心跳,也一定要講一句話。 */
+  function lockedTap() {
+    if (ctx.phase() !== "playing") return;      // 大廳 / 單機 —— 不是這一支的事
+    if (ctx.winner()) { showToast("這一盤結束了,等下一盤開始 👀", 1400); return; }
+    const wasLocked = !CYB.isEnabled();
+    reconcile();
+    if (!CYB.isEnabled()) CYB.setEnabled(true);
+    if (wasLocked) showToast("盤面剛剛卡住了,已經幫你解開 🔄", 1600);
   }
   function startSync() { stopSync(); syncT = setInterval(reconcile, SYNC_MS); }
   function stopSync() { if (syncT) { clearInterval(syncT); syncT = null; } }
@@ -266,18 +324,8 @@ const MP = MPCore.create((function () {
       if (!playing) return;
       gDiff = CYGen.LEVELS[g.diff] ? g.diff : "std";
       lastG = g;                                    // 對帳心跳要用(見 reconcile)
-      // 題目換了(新的一局)→ 重建盤面 + 重算規範字元清單
-      if (g.puzzle && g.puzzle !== puzKey) {
-        /* ⚠ puzKey 一定要**等 setPuzzle 真的做完**才寫進去:先寫的話,setPuzzle 丟例外的
-           那一台從此 g.puzzle === puzKey,這一局再也進不來這個分支 —— 盤面停在上一盤、
-           charList 也是舊的,而且沒有任何錯誤訊息。 */
-        CYB.setPuzzle({ rows: g.rows, cols: g.cols, puzzle: g.puzzle, sol: g.sol });
-        puzKey = g.puzzle;
-        charList = buildCharList(g.puzzle, g.sol);
-        holes = CYB.remaining();
-        fills = []; tally = [];
-        CYB.setSel(CYB.firstEmpty());
-      }
+      // 題目換了(新的一局)→ 重建盤面 + 重算規範字元清單(對帳心跳也走同一支)
+      if (g.puzzle && g.puzzle !== puzKey) applyPuzzle(g);
       /* ★★★ 解鎖**不綁在「題目換了」那個分支裡**(v1.181.1)。
          舊寫法只有重建盤面那一拍會 setEnabled(true) —— 那一拍沒跑到的話這一台就整局鎖著:
          盤面看得到、字卡淡掉、點下去完全沒反應,而且再也沒有第二次機會。
@@ -287,11 +335,13 @@ const MP = MPCore.create((function () {
       const pops = [];
       // 能延續就只補新的幾筆,否則整盤重建(重連 / 中途歸位)
       const extend = next.length >= fills.length && fills.every((v, k) => next[k] === v);
+      /* ★★ 整盤重建走 repaintFrom():它會先 clearFills()(把回退掉的樂觀寫入洗乾淨)
+         並且**保住選格**。這一條不是罕見路徑 —— 三人以上同時搶格時,自己的樂觀寫入
+         幾乎每次都會被伺服器重排到別人後面,於是每填一格就走一次這裡。
+         ⚠ 舊寫法在這裡無條件 setSel(firstEmpty()):使用者點好格子、還沒點字卡,選格就被
+           換掉 → 字填到別的格子 → 填錯 → 凍結 3 秒。詳見 repaintFrom / keepSel 的註解。 */
       if (!extend) {
-        tally = [];
-        next.forEach(c => { const f = decFill(c); if (f.ok) CYB.fill(f.i, charList[f.v], colorOf(f.seat)); bump(tally, f.seat, f.ok); });
-        fills = next.slice();
-        CYB.setSel(CYB.firstEmpty());
+        repaintFrom(g);
       } else {
         const added = next.slice(fills.length);
         fills = next.slice();
@@ -418,7 +468,7 @@ const MP = MPCore.create((function () {
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
-      play, erase, seeDone,
+      play, erase, seeDone, lockedTap,
       diff: () => diff, gameDiff: () => gDiff,
       setDiff(v) {
         if (!CYGen.LEVELS[v]) return;

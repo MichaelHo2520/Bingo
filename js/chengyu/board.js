@@ -159,6 +159,18 @@ const CYB = (function () {
     if (i < 0 || i >= rows * cols || block[i] || given[i]) return;
     vals[i] = ""; owners[i] = null; repaint();
   }
+  /* ★ 把「填上去的」全部清掉,給定字與裝飾格不動(選格刻意保留)。
+     連線搶字整盤重建時一定要先走這一支:fill() 只會**加**,不會減 ——
+     漏了的話,被伺服器回退掉的樂觀寫入會在畫面上留成一格永遠洗不掉的幽靈,
+     而那一格從此點下去只會得到「這格已經被填走了」,連 remaining() 都少算一格
+     (isComplete() 因此可能提早為真 → 整局被提早結算)。 */
+  function clearFills() {
+    for (let i = 0; i < rows * cols; i++) {
+      if (block[i] || given[i]) continue;
+      vals[i] = ""; owners[i] = null;
+    }
+    repaint();
+  }
 
   /* ---------- 畫面 ---------- */
   function repaint() {
@@ -235,7 +247,7 @@ const CYB = (function () {
   }
 
   return {
-    init, setPuzzle, fill, clear, flashWrong, flashTaken, markDone,
+    init, setPuzzle, fill, clear, clearFills, flashWrong, flashTaken, markDone,
     freeze, unfreeze, frozen, onKey, press,
     setEnabled(v) { enabled = !!v; if (wrap) wrap.classList.toggle("locked", !enabled); },
     /* ★ 連線的對帳心跳要問「現在到底能不能按」(v1.181.1)——「按不動」在畫面上只有
