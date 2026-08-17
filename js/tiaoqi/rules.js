@@ -187,6 +187,40 @@ const TQ = (function(){
   }
   function homeHoles(c, count){ return CORNER_HOLES[c].slice(0, count); }
 
+  /* ---------- ★★ 視角旋轉 —— 「自己永遠在畫面下方」 ----------
+     六角星有 **60° 旋轉對稱** → 整盤轉 60° 的倍數之後,121 個洞會一個不差地
+     落回原本那 121 個洞的位置上(外接框、木框、格線、洞的集合**全都不變**)。
+     所以「換視角」不必旋轉任何 DOM,只要把洞的 id 重新映射:
+       要畫 id → 改去問 rot(id, k) 那個洞的 posXY()。
+     ★ 好處是棋子上的座號與頭飾**不會跟著歪**(轉 DOM 就會),而且盤面寬高不變
+       → fitBoard() / 縮放 / 大小模式全部不受影響。
+     ⚠⚠ 這一層**純粹是顯示**:座位 → 角、moves、勝負一個位元都不動 ——
+       六個人看到六個角度,但看的是同一局。真的去改 cornerOfSeat() 的話,
+       同一份 moves 會在別人那台 replay 出完全不同的盤面。
+     ★ 立方座標轉 60°(角 c → 角 c+1):(x, y, z) → (−z, −x, −y)。
+     ⚠ 不要自己推第二個公式:轉錯方向的症狀很難看出來 ——
+       **自己那一家仍然乖乖在下方**,只有其他人的方位左右相反。 */
+  const ROT = [];                        // ROT[k][id] = 這個洞轉 k 步之後是哪一個洞
+  for(let k = 0; k < NCORNER; k++){
+    const row = [];
+    for(let id = 0; id < N_HOLES; id++){
+      let h = HOLES[id];
+      for(let t = 0; t < k; t++) h = { x: -h.z, y: -h.x, z: -h.y };
+      const j = idAt(h.x, h.z);
+      row.push(j >= 0 ? j : id);         // 保險:對稱成立時走不到這一支
+    }
+    ROT.push(row);
+  }
+  function rotId(id, k){
+    const row = ROT[((k % NCORNER) + NCORNER) % NCORNER];
+    return (row && row[id] != null) ? row[id] : id;
+  }
+  // 我坐 c 這個角時,整盤要轉幾步才會讓 c 落到「下」(角 3)
+  function viewRot(c){
+    if(!(c >= 0 && c < NCORNER)) return 0;
+    return ((3 - c) % NCORNER + NCORNER) % NCORNER;
+  }
+
   /* ==========================================================================
      三、房規
      ──────────────────────────────────────────────────────────────────────────
@@ -500,6 +534,8 @@ const TQ = (function(){
     // 幾何(純資料,board.js 查表用)
     HOLES, NB, JP, DIRS, CORNER_HOLES, posXY, dist, idAt,
     cornerOf, tipOf, homeHoles, OPPOSITE, cornerOfSeat, seatsOk, lopsided,
+    // 視角(純顯示,見上面那一段的 ⚠⚠)
+    rotId, viewRot,
     // 房規
     normRules,
     // 走法

@@ -75,6 +75,12 @@ const TQB = (function(){
   let shownKey = "";                   // 上一次畫的「幾家幾顆」(換局才重建棋子)
   let lastPaint = null;                // 上一次畫出來的 pieces(給 e2e 對帳用)
 
+  /* ★★ 視角:整盤轉幾步(60° 一步),讓「我」那一角落在畫面下方。
+     旋轉不轉 DOM,只換洞的 id → 位置的對應(理由與公式在 rules.js 的 ROT 那一段)。
+     ⚠ 於是這一支只有「問洞在哪」的地方要改走 vXY(),真相層完全不知道有這件事。 */
+  let rotK = 0;
+  function vXY(id){ return R.posXY(R.rotId(id, rotK)); }
+
   /* 飛行中的那一顆。★ 它**只影響畫面**:真相位置已經在 render() 裡落定了。 */
   let flight = null;                   // { el, path, startAt, dur, seg }
   let rafId = 0;
@@ -121,6 +127,9 @@ const TQB = (function(){
           → 星形是格線自己長出來的,不是裁出來的。
        ⚠ 這正是紅線「不要用 clip-path 去切一個星」的正解:那樣切會讓尖角的洞貼在裁切邊上。
 
+     ★★ 視角旋轉(rotK)刻意**只碰兩樣**:六個角的三角面板 + 121 個洞。
+       星的輪廓、六邊形木框、三角格線在 60° 旋轉下是**自己映到自己**
+       (頂點集合、邊集合都不變)→ 走 posXY() 而不是 vXY() 是對的,不是漏改。
      ★ 凹槽用「fill + stroke + stroke-linejoin:round」而不是再算一次外擴多邊形 ——
        同一條路徑加一圈 PAN_W/2 格的圓角描邊,等距外擴而且六個尖角自動變圓。
      ⚠ 顏色一律走 CSS(class + var),這裡只產生形狀:改配色不必動 JS。
@@ -200,10 +209,10 @@ const TQB = (function(){
     for(let c = 0; c < 6; c++){
       const list = R.CORNER_HOLES[c];
       if(!list || list.length < 10) continue;
-      const row = list.slice(6, 10).map(id => R.posXY(id));
+      const row = list.slice(6, 10).map(id => vXY(id));
       let a = row[0], b = row[0];
       row.forEach(p => { if(p.x < a.x) a = p; if(p.x > b.x) b = p; });
-      const t = R.posXY(list[0]);
+      const t = vXY(list[0]);
       h += '<polygon class="tq-tray-home" data-c="' + c + '" points="' +
            [t, a, b].map(p => f3(p.x + OX) + "," + f3(p.y + OY)).join(" ") + '"/>';
     }
@@ -231,7 +240,7 @@ const TQB = (function(){
        排到後面就會把 121 個洞整個蓋掉(而且它 pointer-events:none,看起來像點不到)。 */
     let h = trayHTML();
     for(let id = 0; id < R.N_HOLES; id++){
-      const p = R.posXY(id), c = R.cornerOf(id);
+      const p = vXY(id), c = R.cornerOf(id);
       h += '<button type="button" class="tq-hole" data-id="' + id + '"' +
            (c >= 0 ? ' data-c="' + c + '"' : "") + " " + at(p.x, p.y, HOLE_R) + "></button>";
     }
@@ -453,7 +462,7 @@ const TQB = (function(){
                                    "calc(var(--tq-cell) * " + (cy + OY - PC_R) + "))";
   }
   function setHole(el, id){
-    const p = R.posXY(id);
+    const p = vXY(id);
     setPos(el, p.x, p.y);
   }
 
@@ -533,7 +542,7 @@ const TQB = (function(){
     const u = (t / f.dur) * segs;             // 走到第幾段的幾成
     const k = Math.min(segs - 1, Math.floor(u));
     const frac = u - k;
-    const a = R.posXY(f.path[k]), b = R.posXY(f.path[k + 1]);
+    const a = vXY(f.path[k]), b = vXY(f.path[k + 1]);
     /* 每一段拉一條小拋物線 —— 跳棋是「跳」過去的,直線平移看起來像滑行。
        ⚠ 幅度跟著段長走,單步(只有一段)幾乎不拱。 */
     const lift = (segs === 1 ? 0.12 : 0.30) * Math.sin(Math.PI * frac);
@@ -557,10 +566,27 @@ const TQB = (function(){
          pending        送出中、還沒被伺服器確認的那一顆(畫成半透明;-1 = 無)
        }
      ========================================================================== */
+  /* ★★ 視角:讓「我」那一角落在畫面下方(六個人各看各的角度,局是同一局)。
+     ⚠ 判斷刻意放在**每一次 render**,不是進場算一次 —— 連線時座位可能比第一次
+       render 晚才知道(先觀看、後入座),而觀看中(mySeat < 0)不轉。
+     ⚠⚠ 轉了就得**重建托盤與 121 個洞**(它們的座標是寫死在 HTML 裡的),
+       所以這裡要把 built / shownKey 一起清掉,並收掉正在飛的那一顆
+       (它抓著的 el 馬上就會被 innerHTML 清走)。 */
+  function setView(mySeat, st){
+    const c = (mySeat >= 0 && mySeat < st.n && st.corners) ? st.corners[mySeat] : -1;
+    const k = R.viewRot(c);
+    if(k === rotK) return;
+    rotK = k;
+    stopFlight();
+    built = false; shownKey = "";
+    holeEls = []; pieceEls = []; lastPaint = null;
+  }
+
   function render(view){
     if(!board) return;
     const st = view.st;
     if(!st) return;
+    setView(view.mySeat, st);
     build();
     ensurePieces(st);
     fitBoard();
