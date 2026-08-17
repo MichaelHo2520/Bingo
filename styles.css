@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 a1f61335a8759db8db69b8a0a60c648c3c447a3801fda1d15c47a74854cc830e)
+    真相在 styles.src.css(sha256 df639e065b8eafb930c5c9ed5f17fa97ce6ce5dd2a1c13aa753f93198952eae9)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -57,6 +57,7 @@
     overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   .topbar,#mpBar,#soloHead,#roomTabs,.primary-bar{flex:none}
   #home,#gmkHome,#sdkHome,#mjHome,#m16Home,#svHome,#b2Home,#bjHome,#unHome,#dcHome,#cyHome,
+  #fcHome,#tqHome,
   #mpConnect{flex:0 1 auto;min-height:0;
     overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   body.room-tab-fill .scroll-area{flex:1 1 0}

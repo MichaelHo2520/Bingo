@@ -94,8 +94,18 @@
      #unHome 386 字、#dcHome 321 字、#b2Home 302 字與當年出事的 #bjHome(396 字)同一個等級,
      而被裁掉的正好是各頁「不講就會被當成 bug」那一條(UNO 剩一張要按 UNO!、暗棋炮的三條、
      大老二同牌型才能互壓)—— 那三處的 HTML 註解都自稱自己是那條規則唯一的說明。
-     ★ 守門在 tools/test-pages.js:掃每頁 class="panel" 的 *Home id,一律要出現在這一行。 */
+     ★ 守門在 tools/test-pages.js:掃每頁 class="panel" 的 *Home id,一律要出現在這一行。
+     ⚠⚠ v1.182.2 補上 #fcHome / #tqHome —— 飛行棋(v1.179.0)與跳棋(v1.180.0)上線時
+     都漏了,而**守門整整兩個中碼沒有發現**:test-pages.js 的 PAGES 那張表也漏了同樣這兩頁,
+     於是「掃每頁」實際上只掃了十二頁 —— 登記表與它的守門一起漏同一個遊戲,兩層防線同時失效。
+     ⚠ 那兩頁的進場面板 class 是 `panel fc-home` / `panel tq-home` 而不是純 `panel`,
+       所以就算 PAGES 沒漏,舊的 regex 也抓不到它們(v1.182.2 一併放寬)。
+     ★ 跳棋這一頁尤其貴:進場說明是走 / 跳 / 連跳的完整教學,而 main.js 的 paintSoloHint()
+       還特地寫「按左上角 ‹ 回上一層,那裡有完整的玩法說明」—— 指過去卻是看不完也滑不動的一頁。
+     ★ v1.182.2 起真正的守門是 tools/test-registry.js(以 js/<game>/ 目錄為單一真相,
+       反查每一張清單),它**不會跟著登記表一起漏**。 */
   #home,#gmkHome,#sdkHome,#mjHome,#m16Home,#svHome,#b2Home,#bjHome,#unHome,#dcHome,#cyHome,
+  #fcHome,#tqHome,
   #mpConnect{flex:0 1 auto;min-height:0;
     overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   /* 填號分頁:改回 flex:1 撐滿(內容本來就有整片號碼格,不會空太多),讓準備列固定在最底,右下浮動鈕才有穩定的落點、不會壓到準備鈕 */
