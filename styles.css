@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 0fd9e5f1d81fb3b3fa190181747e2b88b7eba112127349e923785d41d2495b1e)
+    真相在 styles.src.css(sha256 acfe3cbd80fc3024de5f003bfed631f8657216ce273dec65587e8ec3ff02501c)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3863,18 +3863,21 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .fc-plane.flying svg{transform:scale(1.35) rotate(-12deg)}
   @keyframes fcPulse{0%,100%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}
                      50%{filter:drop-shadow(0 0 6px rgba(255,255,255,.95))}}
-  .fc-plane.eaten,.fc-plane.eject,.fc-plane.plop{z-index:11}
+  .fc-plane.eaten{z-index:12}
+  .fc-plane.eject,.fc-plane.plop{z-index:11}
   .fc-plane.eaten svg{animation:fcHit .3s cubic-bezier(.2,.9,.3,1) both}
   @keyframes fcHit{
     0%{transform:scale(1) rotate(0);filter:brightness(1)}
-    16%{transform:scale(1.6) rotate(-18deg);filter:brightness(3.4) drop-shadow(0 0 8px #fff)}
-    40%{transform:scale(1.15) rotate(15deg);filter:brightness(2.4) drop-shadow(0 0 5px #fff)}
-    68%{transform:scale(1.36) rotate(-10deg);filter:brightness(1.7)}
-    100%{transform:scale(1.2) rotate(6deg);filter:brightness(1.35)}}
+    14%{transform:scale(1.46) rotate(-16deg);
+        filter:brightness(1.9) drop-shadow(0 0 9px #fff) drop-shadow(0 0 16px rgba(255,214,107,.9))}
+    38%{transform:scale(1.17) rotate(13deg);
+        filter:brightness(1.6) drop-shadow(0 0 6px #fff) drop-shadow(0 0 12px rgba(255,214,107,.7))}
+    66%{transform:scale(1.3) rotate(-8deg);filter:brightness(1.4) drop-shadow(0 0 5px #fff)}
+    100%{transform:scale(1.19) rotate(5deg);filter:brightness(1.25) drop-shadow(0 0 4px #fff)}}
   .fc-plane.eject{transition-timing-function:cubic-bezier(.3,.85,.25,1)}
   .fc-plane.eject svg{animation:fcEject .7s cubic-bezier(.3,.5,.4,1) both}
   @keyframes fcEject{
-    0%{transform:scale(1.2) rotate(6deg);filter:brightness(1.35)}
+    0%{transform:scale(1.19) rotate(5deg);filter:brightness(1.25) drop-shadow(0 0 4px #fff)}
     35%{transform:scale(.78) rotate(280deg);filter:brightness(1.1)}
     100%{transform:scale(.9) rotate(720deg);filter:brightness(1)}}
   .fc-plane.plop svg{animation:fcPlop .26s cubic-bezier(.2,1.5,.4,1) both}
@@ -3883,7 +3886,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     40%{transform:scale(1.3,.74)}
     72%{transform:scale(.93,1.08)}
     100%{transform:scale(1)}}
-  .fc-plane.stomp{z-index:12}
+  .fc-plane.stomp{z-index:11}
   .fc-plane.stomp svg{animation:fcStomp .3s cubic-bezier(.2,1.3,.4,1) both}
   @keyframes fcStomp{
     0%{transform:scale(1)}
@@ -3894,24 +3897,27 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          pointer-events:none;z-index:4}
   .fc-boom{position:absolute;width:0;height:0}
   .fc-boom > i{position:absolute;left:0;top:0;display:block}
-  .fc-flash{width:calc(var(--fc-cell) * 2.4);height:calc(var(--fc-cell) * 2.4);
-            margin:calc(var(--fc-cell) * -1.2) 0 0 calc(var(--fc-cell) * -1.2);border-radius:50%;
-            background:radial-gradient(circle,rgba(255,255,255,.95) 0 32%,rgba(255,214,107,.55) 55%,rgba(255,214,107,0) 72%);
-            animation:fcFlash .34s ease-out both}
-  @keyframes fcFlash{0%{transform:scale(.28);opacity:1}100%{transform:scale(1);opacity:0}}
+  .fc-flash{width:calc(var(--fc-cell) * 3.2);height:calc(var(--fc-cell) * 3.2);
+            margin:calc(var(--fc-cell) * -1.6) 0 0 calc(var(--fc-cell) * -1.6);border-radius:50%;
+            background:radial-gradient(circle,rgba(255,255,255,.98) 0 26%,rgba(255,201,71,.72) 46%,
+                                       rgba(255,140,40,.34) 62%,rgba(255,140,40,0) 76%);
+            animation:fcFlash .4s ease-out both}
+  @keyframes fcFlash{0%{transform:scale(.22);opacity:1}55%{opacity:.85}100%{transform:scale(1);opacity:0}}
   .fc-ring{width:var(--fc-cell);height:var(--fc-cell);
            margin:calc(var(--fc-cell) * -.5) 0 0 calc(var(--fc-cell) * -.5);border-radius:50%;
-           border:calc(var(--fc-cell) * .14) solid rgba(255,255,255,.95);
-           animation:fcRing .52s cubic-bezier(.14,.7,.3,1) both}
-  @keyframes fcRing{0%{transform:scale(.25);opacity:1}100%{transform:scale(2.6);opacity:0}}
-  .fc-spark{width:calc(var(--fc-cell) * .15);height:calc(var(--fc-cell) * .4);
-            margin:calc(var(--fc-cell) * -.2) 0 0 calc(var(--fc-cell) * -.075);border-radius:99px;
-            background:linear-gradient(#fff,#ff9f1c);
-            animation:fcSpark .5s cubic-bezier(.16,.72,.3,1) both}
+           border:calc(var(--fc-cell) * .2) solid rgba(255,255,255,.98);
+           box-shadow:0 0 calc(var(--fc-cell) * .22) rgba(255,170,40,.9);
+           animation:fcRing .55s cubic-bezier(.12,.72,.28,1) both}
+  @keyframes fcRing{0%{transform:scale(.2);opacity:1}70%{opacity:.7}100%{transform:scale(3.4);opacity:0}}
+  .fc-spark{width:calc(var(--fc-cell) * .17);height:calc(var(--fc-cell) * .62);
+            margin:calc(var(--fc-cell) * -.31) 0 0 calc(var(--fc-cell) * -.085);border-radius:99px;
+            background:linear-gradient(#fff 18%,#ffb020 62%,rgba(255,120,20,0));
+            animation:fcSpark .55s cubic-bezier(.14,.74,.28,1) both}
   @keyframes fcSpark{
-    0%{transform:rotate(var(--a,0deg)) translateY(0) scaleY(.4);opacity:0}
-    14%{opacity:1}
-    100%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -1.05)) scaleY(1.15);opacity:0}}
+    0%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -.15)) scaleY(.35);opacity:0}
+    12%{opacity:1}
+    72%{opacity:.9}
+    100%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -1.75)) scaleY(1.3);opacity:0}}
   .fc-board.fc-quake{animation:fcQuake .42s cubic-bezier(.2,.7,.3,1)}
   @keyframes fcQuake{
     0%{transform:translate(0,0) scale(1)}

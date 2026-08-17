@@ -31,7 +31,23 @@ const FCB = (function(){
   const CELL_MAX = 46;
 
   /* 一格走多久。★ 走格是一格一段 —— 玩家會跟著數,一次滑過去就看不出走了幾格 */
-  const MS_WALK = 105, MS_JUMP = 260, MS_FLY = 520, MS_LAUNCH = 300, MS_EAT = 420;
+  const MS_WALK = 105, MS_JUMP = 260, MS_FLY = 520, MS_LAUNCH = 300;
+
+  /* 被踩掉的三段。使用者:「飛機被踩掉的動畫太差了,應該做的再誇張一點,
+     時間長一點點沒關係」。
+     ★ 一般 UI 的 300ms 上限管的是「常常看到的東西」,而踩人是這一局裡**唯一
+       對某一個特定的人做壞事**的瞬間(見第七節)——一整局只發生幾次,預算給得起。
+     ★ 三段各自對著畫面上的三件事,合起來才讀得出因果:
+         ① MS_HIT   挨打(定格被打歪 + 撞擊特效 + 盤面一震)
+         ② MS_EJECT 被彈回機場(一路翻滾)
+         ③ MS_PLOP  落地彈一下
+     ⚠ 總長 1260ms 必須留在 adapter 的 busy 看門狗(5000ms)底下:最長的一手
+       (走 6 格 + 飛 + 跳 ≈ 1410ms)加上這一段也只有 2.7 秒,還有一倍的餘裕。
+     ⚠ 拉長它就等於拉長 busy —— 不要拉到接近看門狗,那顆是最後一道保險不是預算。
+     ⚠⚠ **這三個數字是雙胞胎**:`styles.src.css` 的 fcHit / fcEject / fcPlop 各有一份
+       duration。對不上的症狀很難認 —— 這邊短了就是「動畫演到一半被收掉」,
+       這邊長了就是「演完之後畫面乾等一段才換人」,兩種都不會報錯。 */
+  const MS_HIT = 300, MS_EJECT = 700, MS_PLOP = 260;
 
   let board = null, stage = null, acts = null;
   let cb = { onDice: null, onPlane: null };
@@ -52,10 +68,23 @@ const FCB = (function(){
     jump(){ T(660, { type: "triangle", dur: 0.11, vol: 0.16, slideTo: 1180 }); },
     fly(){ T(300, { type: "sawtooth", dur: 0.38, vol: 0.10, slideTo: 1500 });
            T(760, { type: "sine", dur: 0.22, vol: 0.10, delay: 0.16, slideTo: 1320 }); },
-    eat(){ T(420, { type: "square", dur: 0.16, vol: 0.20, slideTo: 110 });
-           T(150, { type: "triangle", dur: 0.22, vol: 0.16, delay: 0.06 }); },
-    dice(){ T(300, { type: "square", dur: 0.05, vol: 0.13 });
-            T(560, { type: "triangle", dur: 0.10, vol: 0.15, delay: 0.05, slideTo: 820 }); },
+    /* 踩人的三聲,與畫面的三段一一對上(由一聲擴成三聲)——
+       只有一聲「咚」的話,後面 1 秒的翻滾與落地在聽覺上是靜音的。 */
+    eat(){ T(520, { type: "square", dur: 0.05, vol: 0.24, slideTo: 90 });      // 撞上去
+           T(95,  { type: "triangle", dur: 0.30, vol: 0.26, delay: 0.01 });    // 低頻的實心感
+           T(260, { type: "sawtooth", dur: 0.20, vol: 0.11, delay: 0.02, slideTo: 62 }); },
+    eject(){ T(1500, { type: "sine", dur: 0.46, vol: 0.13, slideTo: 240 });    // 被彈飛的呼嘯
+             T(700,  { type: "triangle", dur: 0.38, vol: 0.08, delay: 0.05, slideTo: 170 }); },
+    plop(){ T(300, { type: "triangle", dur: 0.09, vol: 0.15, slideTo: 150 });  // 掉回機場
+            T(160, { type: "sine", dur: 0.15, vol: 0.13, delay: 0.04 }); },
+    /* 骰子:**轉的那 0.6 秒本來完全沒有聲音** —— 使用者:「骰子應該要有點音效」。
+       ⚠ rattle 一次擲會響七下,音量必須壓得比 tick 還克制(同一條「連珠炮」的規矩);
+         音高刻意每下不一樣,一樣的話聽起來像卡帶而不像骰子在杯子裡滾。 */
+    rattle(k){ T(150 + (k % 3) * 55, { type: "square", dur: 0.026, vol: 0.075 }); },
+    dice(){ T(240, { type: "square", dur: 0.07, vol: 0.20, slideTo: 95 });     // 落桌
+            T(900, { type: "triangle", dur: 0.10, vol: 0.15, delay: 0.02, slideTo: 1400 }); },
+    // 擲到 6 = 「可以再擲一次」,給它一個聽得出來的向上兩音(規則本身的回饋)
+    six(){ [988, 1319].forEach((f, i) => T(f, { type: "sine", dur: 0.13, vol: 0.16, delay: 0.09 + i * 0.08 })); },
     home(){ [659, 880, 1175].forEach((f, i) => T(f, { type: "sine", dur: 0.18, vol: 0.20, delay: i * 0.07 })); },
     launch(){ T(360, { type: "triangle", dur: 0.20, vol: 0.18, slideTo: 900 }); }
   };
@@ -134,6 +163,14 @@ const FCB = (function(){
          寫 −1 等於整顆往左上偏了半格 —— 而盤面正中心就是四條跑道的交會點,
          偏了半格一眼就看得出來(四條跑道會有兩條對不上)。 */
     h += '<div class="fc-goal" ' + at(R.GOAL_XY.x - 0.5, R.GOAL_XY.y - 0.5, 2, 2) + '><span>🏁</span></div>';
+
+    /* 撞擊特效的圖層。⚠⚠ **它存在的理由就是 overflow:hidden 那一行**:
+       火花會噴出格子一格多,而踩人常常發生在**最外圈**(貼著盤子的邊)——
+       噴出去的部分會把 `.fc-stage`(overflow:auto)的捲動範圍撐大 → 冒出捲軸,
+       而 fitBoard() 量的正是 stage 的可用空間 → 縮一階、捲軸消失、又放大(跳棋踩過的同一個震盪)。
+       把特效關在自己的盒子裡,盤面上其他東西(飛機的光暈 / 飛行時放大的機身)一個都不必動。
+       ⚠ 圓角要跟著盤子(20px),不然四個角會切出直角的邊。 */
+    h += '<div class="fc-fx" id="fcFx" aria-hidden="true"></div>';
 
     board.innerHTML = h;
     built = true;
@@ -252,10 +289,55 @@ const FCB = (function(){
   function bump(){
     animGen++;
     animating = false;
+    clearFx();
     const d = pendingDone; pendingDone = null;
     if(d) setTimeout(() => { try{ d(); }catch(e){} }, 0);
   }
   function later(g, fn, ms){ setTimeout(() => { if(g === animGen) fn(); }, ms); }
+
+  /* ★★ 被踩的那三個 class 是**動畫中途的狀態**,一定要有人負責收。
+     它們都帶 `both` 的填充模式(翻滾停在 720 度、落地停在壓扁)——
+     動畫被 bump() 半路取消時沒收掉的話,那架飛機就**永遠**歪在那裡:
+     不會報錯、位置還是對的,只有看起來不對(而斷言量不到「看起來」)。
+     ⚠ 特效層也一起清:換局 / 離場時不可以留下半個爆炸。 */
+  const FX_CLASS = ["eaten", "eject", "plop", "stomp"];
+  function clearFx(){
+    planeEls.forEach(row => row.forEach(el => el.classList.remove(...FX_CLASS)));
+    const fx = $("fcFx");
+    if(fx && fx.firstChild) fx.innerHTML = "";
+    if(board) board.classList.remove("fc-quake");
+  }
+
+  /* 撞擊特效:白光 + 擴散的圈 + 八道火花,擺在「踩到的那一格」的正中心。
+     ⚠ 傳進來的 (x,y) 是**一架飛機的左上角**(posXY 全部都是這個約定)→ 中心要 +0.5。
+     ⚠ 收尾用普通的 setTimeout **而不是** later():它只刪 DOM、不出聲也不推進局面,
+       而 later() 會被 bump() 的世代記號擋掉 → 取消時反而變成刪不掉的殘骸
+       (真正的取消路徑是 clearFx() 整層清掉)。 */
+  function boom(x, y){
+    const fx = $("fcFx");
+    if(!fx) return;
+    const el = document.createElement("div");
+    el.className = "fc-boom";
+    el.style.left = "calc(var(--fc-cell) * " + (x + 0.5) + ")";
+    el.style.top  = "calc(var(--fc-cell) * " + (y + 0.5) + ")";
+    let h = '<i class="fc-flash"></i><i class="fc-ring"></i>';
+    for(let i = 0; i < 8; i++) h += '<i class="fc-spark" style="--a:' + (i * 45 + 12) + 'deg"></i>';
+    el.innerHTML = h;
+    fx.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  /* 盤面挨一記。⚠⚠ **只准縮不准放、平移量必須小於縮掉的那一半**:
+     盤子在舞台裡是量好的(fitBoard 讓它剛好放得下),往外長一個像素就會讓
+     `.fc-stage` 冒出捲軸 → 再量一次就縮一階(同 .fc-fx 那一段的震盪)。
+     scale ≤ 1 且 |translate| ≤ (1−scale)/2 的組合,外框永遠留在原本的框裡面。 */
+  function quake(){
+    if(!board) return;
+    board.classList.remove("fc-quake");
+    void board.offsetWidth;
+    board.classList.add("fc-quake");
+    setTimeout(() => { if(board) board.classList.remove("fc-quake"); }, 460);
+  }
 
   // hops → 一步一步的清單(走格是一格一段,跳 / 飛各一段)
   function stepsOf(fromQ, hops){
@@ -285,6 +367,8 @@ const FCB = (function(){
     const prevDone = pendingDone; pendingDone = null;
     if(prevDone) setTimeout(() => { try{ prevDone(); }catch(e){} }, 0);
     const g = ++animGen;
+    // ⚠ 這裡不走 bump(),所以上一手留下的特效 class 要自己收(見 clearFx 的註解)
+    clearFx();
     animating = true;
     pendingDone = done || null;
     const seat = mv.seat, idx = mv.plane;
@@ -317,26 +401,39 @@ const FCB = (function(){
       later(g, next, msOf(s.kind));
     })();
 
+    /* ★★ 踩人的三段(重做)。原本只有「閃一下白 + 滑回機場」,
+       使用者:「飛機被踩掉的動畫太差了…應該做的再誇張一點」。
+       ① 挨打:被踩的那幾架**留在原地**被打歪 + 撞擊特效 + 盤面一震
+          —— 同時飛回去的話看不出誰踩了誰(這一條從第一版就是對的,保留)
+       ② 彈飛:一路翻滾兩圈回機場
+       ③ 落地:壓扁再彈回來
+       ⚠ 每一段的聲音都排在 later() 的世代守衛裡面(離場後不可以繼續響)。 */
     function land(){
       el.classList.remove("hop", "flying");
       if(mv.home) SFX.home();
       if(mv.eaten && mv.eaten.length){
-        // ★ 被踩的飛機在「踩到」之後才飛回機場 —— 同時發生的話看不出誰踩了誰
+        const victims = mv.eaten.map(e => planeEls[e.seat] && planeEls[e.seat][e.plane]).filter(Boolean);
+        // 撞擊點 = 踩人的那一架**停下來**的那一格(踩人只算停下來那一格,見規則)
+        const hit = R.posXY(st.colors[seat], st.planes[seat][idx], idx);
         SFX.eat();
-        mv.eaten.forEach(e => {
-          const ee = planeEls[e.seat] && planeEls[e.seat][e.plane];
-          if(ee) ee.classList.add("eaten");
-        });
+        boom(hit.x, hit.y);
+        quake();
+        el.classList.add("stomp");                       // 踩的人自己也踏一下(看得出是誰幹的)
+        victims.forEach(ee => ee.classList.add("eaten"));
         later(g, () => {
-          placeAll(st.planes, st.colors, MS_EAT);
+          el.classList.remove("stomp");
+          victims.forEach(ee => { ee.classList.remove("eaten"); ee.classList.add("eject"); });
+          SFX.eject();
+          placeAll(st.planes, st.colors, MS_EJECT);
           later(g, () => {
-            (mv.eaten || []).forEach(e => {
-              const ee = planeEls[e.seat] && planeEls[e.seat][e.plane];
-              if(ee) ee.classList.remove("eaten");
-            });
-            finish();
-          }, MS_EAT);
-        }, 120);
+            victims.forEach(ee => { ee.classList.remove("eject"); ee.classList.add("plop"); });
+            SFX.plop();
+            later(g, () => {
+              victims.forEach(ee => ee.classList.remove("plop"));
+              finish();
+            }, MS_PLOP);
+          }, MS_EJECT);
+        }, MS_HIT);
         return;
       }
       placeAll(st.planes, st.colors, 0);
@@ -421,7 +518,11 @@ const FCB = (function(){
     dieEl.dataset.v = v || 0;
   }
   /* 擲骰動畫:亂跳幾面之後停在真值。done 在停下來的那一刻叫。
-     ⚠ 亂跳的那幾面只是**視覺**,與規則無關(真值是參數帶進來的)。 */
+     ⚠ 亂跳的那幾面只是**視覺**,與規則無關(真值是參數帶進來的)。
+     ★ 每一面都配一聲 rattle:在此之前**只有停下來那一刻響一聲**,
+       中間 0.6 秒的翻滾是靜音的 —— 骰子是這一頁唯一的操作,按下去要立刻有回應。
+     ⚠⚠ 聲音一律排在**世代記號的守衛後面**:排在前面的話,離開棋局之後骰子雖然
+       不轉了,聲音還是會自己響完(t-fc-solo-e2e 的 F 節就是在量這件事)。 */
   function rollDie(v, done){
     // ★ 同 runMove:接手新的一段之前,先把上一段沒交出去的回呼交出去
     const prevDone = rollDone; rollDone = null;
@@ -439,11 +540,13 @@ const FCB = (function(){
         setDie(v);
         dieEl.classList.remove("pop"); void dieEl.offsetWidth; dieEl.classList.add("pop");
         SFX.dice();
+        if(v === 6) SFX.six();
         const d = rollDone; rollDone = null;
         if(d) d();
         return;
       }
       setDie(1 + (k * 3 + 2) % 6);
+      SFX.rattle(k);
       rollT = setTimeout(spin, 55 + k * 8);
     })();
   }
@@ -588,8 +691,10 @@ const FCB = (function(){
                                     o.byId || o.byName, "emoji"));
     }
   }
+  /* ★ 震動的節奏刻意對著畫面的三段:短一下(挨打)→ 停 → 長一下(摔回機場)。
+     ⚠ 原本是 [18,40,18](兩下一樣短),在手上只讀得到「抖了一下」,分不出被踩還是別的通知。 */
   function buzz(){
-    try{ if(typeof vibrateOn !== "undefined" && vibrateOn && navigator.vibrate) navigator.vibrate([18, 40, 18]); }catch(e){}
+    try{ if(typeof vibrateOn !== "undefined" && vibrateOn && navigator.vibrate) navigator.vibrate([30, 45, 85]); }catch(e){}
   }
 
   /* ==========================================================================

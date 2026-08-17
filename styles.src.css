@@ -8545,32 +8545,53 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @keyframes fcPulse{0%,100%{filter:drop-shadow(0 0 0 rgba(255,255,255,0))}
                      50%{filter:drop-shadow(0 0 6px rgba(255,255,255,.95))}}
 
-  /* ---------- 被踩掉:挨打 → 彈飛 → 落地(v2.2.6 重做)----------
+  /* ---------- 被踩掉:挨打 → 彈飛 → 落地(重做)----------
      使用者:「飛機被踩掉的動畫太差了,應該做的再誇張一點,時間長一點點沒關係」。
      ⚠⚠⚠ **會動的一律是裡面那個 <svg>,不可以動 .fc-plane 自己的 transform** ——
        飛機的**位置**就住在 .fc-plane 的 transform 上(board.js 的 place() 每一步都在寫它),
        在同一個屬性上再掛一支動畫 = 兩邊互相蓋掉:症狀是飛機瞬間跳到盤面左上角
        (動畫贏的時候)或整段動畫像沒發生過(transition 贏的時候)。
-       ⚠ v2.2.6 之前那支 fcHit 只動 filter,正是為了閃開這一條 —— 現在改成「大動作
+       ⚠ 重做之前那支 fcHit 只動 filter,正是為了閃開這一條 —— 現在改成「大動作
          全部放進 svg,位移仍然只由 place() 負責」,兩者永遠不會碰到同一個屬性。
      ★ 三段接得起來的關鍵是**首尾對齊**:上一段的 100% 就是下一段的 0%
        (挨打停在 scale(1.2) rotate(6deg) → 彈飛從那裡開始)。對不齊就會有一格閃跳。
      ★ 翻滾停在 720deg = 剛好兩整圈,所以落地那一段從 rotate(0) 起算看起來是連續的。 */
-  .fc-plane.eaten,.fc-plane.eject,.fc-plane.plop{z-index:11}
+  /* ⚠⚠ **被踩的那幾架要壓在踩人的那一架上面(12 > 11)。** 它們停在同一格,
+     而這一段的主角是**受害者** —— 反過來排的話畫面上只看得到攻擊者,
+     被踩的完全被蓋住,整段動畫等於白做(第一版就是這樣,截圖才看出來)。
+   ⚠⚠ **不可以靠 brightness 打亮**:第一版 brightness(3.4) 把飛機打成純白,
+     而底下的格子本來就是接近白的 → 飛機**直接消失**。要「被打到」的感覺一律用
+     放大 + 轉角度 + 白色外光暈(drop-shadow),機身的顏色一定要留著 ——
+     顏色在這一頁是規則本體(誰的飛機),看不出顏色就看不出是誰被踩。 */
+  .fc-plane.eaten{z-index:12}
+  .fc-plane.eject,.fc-plane.plop{z-index:11}
+  /* ⚠⚠⚠ **放大與轉角度是有上限的,而且上限是量出來的,不是抓感覺。**
+     飛機是 `.fc-board` 的直接子元素(不在 .fc-fx 的裁切框裡)—— 停在**最外圈**時
+     它的格子邊就是盤子的邊,放大 / 轉動撐出去的部分會落到 `.fc-stage`(overflow:auto)
+     的捲動範圍裡 → **右緣 / 下緣**冒出捲軸(左緣 / 上緣不會,那個方向捲不到)
+     → 捲軸吃掉 clientHeight → 下一次 fitBoard() 就縮一階。
+     ⚠ 轉角度比放大更兇:方框轉 θ 度,外框放大 (cosθ+sinθ) 倍 —— 26 度就多 34%。
+     ★ 判準:**不可以比這一頁本來就在用的 `.fc-plane.flying`(scale 1.35 rotate −12deg)
+       更會撐**。在 900×430(格子 28px、盤面貼齊舞台)量到 flying 溢出 3px,
+       而 scale 1.8/−26 溢出 13px、1.55/−20 是 5px、**1.46/−16 是 3px** → 取這一組。
+     ★ 所以「誇張」的份量主要由**撞擊特效**扛(它在 .fc-fx 裡,怎麼噴都被裁乾淨),
+       飛機自己只負責「被打歪 + 發亮」。 */
   .fc-plane.eaten svg{animation:fcHit .3s cubic-bezier(.2,.9,.3,1) both}
   @keyframes fcHit{
     0%{transform:scale(1) rotate(0);filter:brightness(1)}
-    16%{transform:scale(1.6) rotate(-18deg);filter:brightness(3.4) drop-shadow(0 0 8px #fff)}
-    40%{transform:scale(1.15) rotate(15deg);filter:brightness(2.4) drop-shadow(0 0 5px #fff)}
-    68%{transform:scale(1.36) rotate(-10deg);filter:brightness(1.7)}
-    100%{transform:scale(1.2) rotate(6deg);filter:brightness(1.35)}}
+    14%{transform:scale(1.46) rotate(-16deg);
+        filter:brightness(1.9) drop-shadow(0 0 9px #fff) drop-shadow(0 0 16px rgba(255,214,107,.9))}
+    38%{transform:scale(1.17) rotate(13deg);
+        filter:brightness(1.6) drop-shadow(0 0 6px #fff) drop-shadow(0 0 12px rgba(255,214,107,.7))}
+    66%{transform:scale(1.3) rotate(-8deg);filter:brightness(1.4) drop-shadow(0 0 5px #fff)}
+    100%{transform:scale(1.19) rotate(5deg);filter:brightness(1.25) drop-shadow(0 0 4px #fff)}}
   /* 彈飛:位移由 place() 用 MS_EJECT 的 transition 帶,這裡只負責「一路翻滾兩圈 + 縮小」。
      ⚠ 位移的曲線刻意**不做尾端過衝**:終點是角落的機場,衝過頭就是飛出盤子邊界
        → .fc-stage(overflow:auto)冒捲軸 → fitBoard 縮一階(同 .fc-fx 那一段)。 */
   .fc-plane.eject{transition-timing-function:cubic-bezier(.3,.85,.25,1)}
   .fc-plane.eject svg{animation:fcEject .7s cubic-bezier(.3,.5,.4,1) both}
   @keyframes fcEject{
-    0%{transform:scale(1.2) rotate(6deg);filter:brightness(1.35)}
+    0%{transform:scale(1.19) rotate(5deg);filter:brightness(1.25) drop-shadow(0 0 4px #fff)}
     35%{transform:scale(.78) rotate(280deg);filter:brightness(1.1)}
     100%{transform:scale(.9) rotate(720deg);filter:brightness(1)}}
   /* 落地:壓扁再彈回來(回彈的 overshoot 在 svg 上,盒子沒動 → 不會撐大盤面) */
@@ -8580,8 +8601,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     40%{transform:scale(1.3,.74)}
     72%{transform:scale(.93,1.08)}
     100%{transform:scale(1)}}
-  /* 踩人的那一架自己也踏一下 —— 看得出「是誰幹的」,而不是受害者莫名其妙飛走 */
-  .fc-plane.stomp{z-index:12}
+  /* 踩人的那一架自己也踏一下 —— 看得出「是誰幹的」,而不是受害者莫名其妙飛走。
+     ⚠ z 比 .eaten 低一階(見上面):踩人的那一架在**下面**,被踩的才是主角。 */
+  .fc-plane.stomp{z-index:11}
   .fc-plane.stomp svg{animation:fcStomp .3s cubic-bezier(.2,1.3,.4,1) both}
   @keyframes fcStomp{
     0%{transform:scale(1)}
@@ -8589,7 +8611,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     55%{transform:scale(.94,1.12)}
     100%{transform:scale(1)}}
 
-  /* ---------- 撞擊特效層(v2.2.6)----------
+  /* ---------- 撞擊特效層 ----------
      ⚠⚠ **overflow:hidden 是這一層存在的理由,不是順手加的。** 火花會噴出一格多,
        而踩人常常發生在最外圈(貼著盤子的邊)—— 噴出去的部分會撐大 .fc-stage
        (overflow:auto)的捲動範圍 → 冒出捲軸,而 fitBoard() 量的就是 stage 的可用空間
@@ -8602,25 +8624,34 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 爆點本身是個沒有大小的座標(左上角 + 半格 = 格子中心),底下三種零件各自以它為圓心 */
   .fc-boom{position:absolute;width:0;height:0}
   .fc-boom > i{position:absolute;left:0;top:0;display:block}
-  .fc-flash{width:calc(var(--fc-cell) * 2.4);height:calc(var(--fc-cell) * 2.4);
-            margin:calc(var(--fc-cell) * -1.2) 0 0 calc(var(--fc-cell) * -1.2);border-radius:50%;
-            background:radial-gradient(circle,rgba(255,255,255,.95) 0 32%,rgba(255,214,107,.55) 55%,rgba(255,214,107,0) 72%);
-            animation:fcFlash .34s ease-out both}
-  @keyframes fcFlash{0%{transform:scale(.28);opacity:1}100%{transform:scale(1);opacity:0}}
+  /* ⚠ 尺寸全部用 --fc-cell 的倍數,不可以寫死 px:格子從 13px(小手機)到 46px(大棋盤)
+     差三倍半,寫死的話不是看不見就是蓋掉半個盤面。
+     ⚠ 這三樣的大小是**一路放大改出來的**:第一版全部收在一格以內,截圖看起來只是
+       「閃了一下小星星」,完全不像被撞。撞擊要跨到三格才讀得出是一件大事。 */
+  .fc-flash{width:calc(var(--fc-cell) * 3.2);height:calc(var(--fc-cell) * 3.2);
+            margin:calc(var(--fc-cell) * -1.6) 0 0 calc(var(--fc-cell) * -1.6);border-radius:50%;
+            background:radial-gradient(circle,rgba(255,255,255,.98) 0 26%,rgba(255,201,71,.72) 46%,
+                                       rgba(255,140,40,.34) 62%,rgba(255,140,40,0) 76%);
+            animation:fcFlash .4s ease-out both}
+  @keyframes fcFlash{0%{transform:scale(.22);opacity:1}55%{opacity:.85}100%{transform:scale(1);opacity:0}}
   .fc-ring{width:var(--fc-cell);height:var(--fc-cell);
            margin:calc(var(--fc-cell) * -.5) 0 0 calc(var(--fc-cell) * -.5);border-radius:50%;
-           border:calc(var(--fc-cell) * .14) solid rgba(255,255,255,.95);
-           animation:fcRing .52s cubic-bezier(.14,.7,.3,1) both}
-  @keyframes fcRing{0%{transform:scale(.25);opacity:1}100%{transform:scale(2.6);opacity:0}}
-  /* 八道火花。--a 由 board.js 逐個掛上去(角度是靜態值,所以 transform 內插得動) */
-  .fc-spark{width:calc(var(--fc-cell) * .15);height:calc(var(--fc-cell) * .4);
-            margin:calc(var(--fc-cell) * -.2) 0 0 calc(var(--fc-cell) * -.075);border-radius:99px;
-            background:linear-gradient(#fff,#ff9f1c);
-            animation:fcSpark .5s cubic-bezier(.16,.72,.3,1) both}
+           border:calc(var(--fc-cell) * .2) solid rgba(255,255,255,.98);
+           box-shadow:0 0 calc(var(--fc-cell) * .22) rgba(255,170,40,.9);
+           animation:fcRing .55s cubic-bezier(.12,.72,.28,1) both}
+  @keyframes fcRing{0%{transform:scale(.2);opacity:1}70%{opacity:.7}100%{transform:scale(3.4);opacity:0}}
+  /* 八道火花。--a 由 board.js 逐個掛上去(角度是靜態值,所以 transform 內插得動)。
+     ⚠ 貼著盤子邊的那一格被踩時會有一半的火花被 .fc-fx 切掉 —— 那是**刻意的**,
+       它是「爆炸發生在盤面上」的一部分,不是破圖(不切就是捲軸,見 .fc-fx)。 */
+  .fc-spark{width:calc(var(--fc-cell) * .17);height:calc(var(--fc-cell) * .62);
+            margin:calc(var(--fc-cell) * -.31) 0 0 calc(var(--fc-cell) * -.085);border-radius:99px;
+            background:linear-gradient(#fff 18%,#ffb020 62%,rgba(255,120,20,0));
+            animation:fcSpark .55s cubic-bezier(.14,.74,.28,1) both}
   @keyframes fcSpark{
-    0%{transform:rotate(var(--a,0deg)) translateY(0) scaleY(.4);opacity:0}
-    14%{opacity:1}
-    100%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -1.05)) scaleY(1.15);opacity:0}}
+    0%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -.15)) scaleY(.35);opacity:0}
+    12%{opacity:1}
+    72%{opacity:.9}
+    100%{transform:rotate(var(--a,0deg)) translateY(calc(var(--fc-cell) * -1.75)) scaleY(1.3);opacity:0}}
 
   /* 盤面挨一記。
      ⚠⚠ **只准縮不准放,而且平移量必須 <(1−scale)/2**(百分比是元素自己的邊長)——
