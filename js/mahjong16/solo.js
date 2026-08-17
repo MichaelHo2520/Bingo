@@ -662,8 +662,10 @@ const Solo = (function(){
       /* ★★ 台數逐項展開 + 總台數滾動(v2.4.0)—— **與連線共用 M16Fx.taiHTML**
          (那邊是 adapter.js 的 outcome,兩份的算式措辭本來就一模一樣)。
          ⚠ fallback 留著舊的那一行:混合快取下拿不到 fx.js 的話,結果卡不可以少掉台數。 */
+      /* ⚠ 第三個參數(v2.4.1)= 「這一局是我贏的嗎」→ 蓋朱紅印章(只有贏家蓋,
+         理由與胡牌特寫同一條)。連線那一份傳的是核心給的 iWon,這裡是自己算的同一件事。 */
       const line = (typeof M16Fx !== "undefined")
-        ? M16Fx.taiHTML(head, o)
+        ? M16Fx.taiHTML(head, o, !!iWon)
         : head + " · 底 " + o.base + " + 台 " + o.tai + " = <b>" + o.total + "</b> 台(" +
           (o.list.map(function(x){ return esc(x.name)+" "+x.tai; }).join("、") || "無台") + ")";
       /* ★ 最後一局仍然是「本場結束」(單機 e2e 在斷言這句):那一張卡的主角是總結算。 */

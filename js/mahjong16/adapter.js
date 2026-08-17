@@ -1216,8 +1216,10 @@ const MP = MPCore.create((function(){
            算式的措辭在兩邊本來就一模一樣,分家就會慢慢漂。
          ⚠ fallback 保留舊的那一行(混合快取拿不到 fx.js 時仍然看得到台數,見上面那條
            `typeof` 守衛的理由;這裡壞掉的話結果卡會少掉最關鍵的資訊)。 */
+      /* ⚠ 第三個參數(v2.4.1)= 「這一局是我贏的嗎」→ 蓋朱紅印章。**只有贏家蓋**,
+         理由與胡牌特寫同一條(不要在剛放槍的人的結果卡上放煙火)。 */
       const line = (typeof M16Fx !== "undefined")
-        ? M16Fx.taiHTML(head, o)
+        ? M16Fx.taiHTML(head, o, !!iWon)
         : head + " · 底 "+o.base+" + 台 "+o.tai+" = <b>"+o.total+"</b> 台(" +
           (o.list.map(x=>esc(x.name)+" "+x.tai).join("、") || "無台") + ")";
       /* ⚠ 滾動要在共用層把這段字串寫進 `#winMsg` **之後**才抓得到節點 →

@@ -3,8 +3,10 @@
 /* ============================================================================
    台灣 16 張麻將 —— 動效層(M16Fx)
 
-   碰 / 槓 / 吃 / 聽牌的漢字爆發、胡牌的全螢幕特寫、補花的花瓣、流局的薄霧。
+   碰 / 槓 / 吃 / 聽牌的漢字爆發、吃碰槓的**飛牌流光**、胡牌的全螢幕特寫 +
+   **放槍連線**、補花的花瓣、流局的薄霧、結果卡的台數展開 + **朱紅印章**。
    一句話:**這一支只畫「情緒」,一個 px 的版面都不碰。**
+   (唯一的例外是結果卡上那顆印章 —— 它住在蓋板裡,不在牌桌上,見 ⑨。)
 
    ── ★ 為什麼是獨立一支,不塞進 board.js ────────────────────────────────────
      board.js 的 render() 在**一次呼叫裡**會把 host.innerHTML 重建**最多七次**
@@ -165,19 +167,24 @@ const M16Fx = (function(){
        別人胡的時候該講的話結果卡第一行已經寫得很清楚了(誰胡誰放槍 · 幾台),
        而且**不遮結果卡**本身就是對輸家比較好的處理。
        ⚠ 既有的 `celebrate()` 光環仍然全桌都播(v2.2.4 的行為原封不動)。
+       ★ v2.4.1 起「誰放槍給誰」那條線**全桌都看得到**(見下面 ⑨),但輸家那一份
+         只有線、沒有暗場 / 巨字 / 金幣 —— 那是**資訊**不是慶祝,上面那條理由沒有變。
      ── ★ 為什麼掛 body 而不是 `.mj-play` ───────────────────────────────────
        見檔頭那條:結果卡 `#veil` 是 z-index:50 的全螢幕蓋板,而且**立刻**蓋上來。
      ========================================================================== */
-  function finisher(tsumo){
+  function finisher(tsumo, ron){
     const el = document.createElement("div");
     el.className = "m16-fx m16-fxfin" + (tsumo ? " tsumo" : "");
     /* 三層:暗場(把畫面壓下去,字才亮得起來)→ 放射光芒 → 燙金字 + 金幣。
        ⚠ 暗場一定要**由濃轉無**,而且在字消失之前就要退乾淨:留在畫面上等於
-         把剛淡入的結果卡壓成灰的(第一版就是這樣,看起來像沒載完)。 */
+         把剛淡入的結果卡壓成灰的(第一版就是這樣,看起來像沒載完)。
+       ⚠ 放槍連線接在巨字**下面**(所以 .m16-fxfin 是 flex column,見 CSS)——
+         疊在字上會把兩件事都變得看不清,而它本來就是巨字的註腳。 */
     el.innerHTML =
       '<div class="m16-fxdim"></div>' +
       '<div class="m16-fxrays"></div>' +
       '<div class="m16-fxbig"><b>' + (tsumo ? "自摸!" : "胡!") + '</b></div>' +
+      (ron ? ronHTML(ron) : "") +
       dust(14, "m16-fxcoin");
     /* 1.15s 主體 + 粒子延遲。⚠ 刻意**不再長**:它蓋在結果卡上面,而結果卡是
        「下一局」在的地方 —— 特寫再久就會從獎賞變成擋路(按得下去但看不見)。 */
@@ -223,7 +230,118 @@ const M16Fx = (function(){
   }
 
   /* ==========================================================================
-     ⑥ 誰做的 —— 兩段自己的 diff
+     ⑥ 吃 / 碰 / 明槓的飛牌流光(v2.4.1)—— 那張牌從牌河飛進明牌區
+     ── ★★ 為什麼這一頁做得起 FLIP,而且**不必記上一幀的座標** ───────────────
+       一般的 FLIP 要在重畫**之前**把起點 rect 存下來,而這一頁的 render() 一次呼叫
+       會把 host.innerHTML 重建最多七次 —— 存起來的節點早就不存在了。
+       ★ 這裡兩端都在**新的** DOM 上量得到,一次 rAF 就夠:
+         · 起點 = `.m16-pslot` —— 牌被拿走時 board.js 一律在原位留一個**同寬同高**的
+           透明佔位(v1.73.2,為的是那一排的行高不要跳)。它的 rect **逐 px 等於**
+           那張牌剛才在的地方,等於免費的起點。
+         · 終點 = 那一家明牌列裡**最後一組** `.m16-meld`(剛攤出來的就是它)。
+       ⚠⚠ 所以這一支與 v1.73.2 那個佔位是**綁在一起的**:哪天有人把 `.m16-pslot`
+         拿掉(或改成不預留),這裡會安靜地不播 —— 不會壞,但也不會有動畫。
+     ── ⚠ 呼叫點在 render() **之前**(on() 在兩個 diff 呼叫點都排在 render 前)──────
+       所以一定要 rAF:同步量到的是**上一幀**的盤面(明牌還沒畫出來)。
+       render() 整段是同步的(七次重建、fillPool、placeWall 都在同一個 task 裡),
+       rAF 的 callback 保證排在它後面。
+     ── ⚠ 哪些情況不播(全部靠「量不到」自然擋掉,不必各寫一個 if)──────────────
+       暗槓 / 加槓的牌來自手上,`st.taken` 是 false → 沒有 `.m16-pslot` → 直接 return。
+       (加槓連 `MJT.meldTakenAt()` 都回 null:組數沒變。)
+     ========================================================================== */
+  function meldNodeOf(root, seat, me){
+    /* ⚠ 花牌(`.m16-flg`)與那個等高的空佔位(`.m16-fslot`)也都是 `.m16-meld` ——
+       不排掉的話「補過花的那一家」會把流光射到花牌上。 */
+    const box = (seat === me)
+      ? root.querySelector(".m16-mymelds")
+      : root.querySelector('.m16-foe[data-seat="' + seat + '"] .m16-fmelds');
+    if(!box) return null;
+    const ms = box.querySelectorAll(".m16-meld:not(.m16-flg):not(.m16-fslot)");
+    return ms.length ? ms[ms.length - 1] : null;
+  }
+
+  /* 真正畫的那一支(座標一律是**視窗座標** → 這一層是 fixed)。
+     三個節點各做一件事,少一個就不成立:
+       ray  從起點射向終點的那道金光(「流光」本體,它才是 Gemini 說的那個效果)
+       bolt 那張牌本身:一路縮到明牌的尺寸(牌河那張比明牌大,縮進去就是「歸位」)
+       lock 終點那一組的一圈閃光(「發出清脆碰撞微光」),延遲到牌到位才亮 */
+  function flyFx(a, b, tw, th){
+    const ax = a.left + a.width / 2,  ay = a.top + a.height / 2;
+    const bx = b.left + b.width / 2,  by = b.top + b.height / 2;
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    /* 起終點幾乎重疊時不播:那時畫出來只是原地一團光,看起來像破圖。
+       (橫向分欄下自己碰牌時最接近,實測仍有 60px 以上。) */
+    if(len < 14) return;
+    const ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    const rh  = Math.max(5, Math.round(a.width * 0.46));      // 流光的粗細
+    const px  = function(v){ return Math.round(v) + "px"; };
+    const el  = document.createElement("div");
+    el.className = "m16-fx m16-fxfly";
+    el.innerHTML =
+      '<i class="m16-fxray" style="left:' + px(ax) + ';top:' + px(ay - rh / 2) +
+        ';width:' + px(len) + ';height:' + px(rh) + ';--ang:' + ang.toFixed(1) + 'deg"></i>' +
+      '<i class="m16-fxbolt" style="left:' + px(a.left) + ';top:' + px(a.top) +
+        ';width:' + px(a.width) + ';height:' + px(a.height) +
+        ';--dx:' + px(dx) + ';--dy:' + px(dy) +
+        ';--sx:' + (tw / a.width).toFixed(3) + ';--sy:' + (th / a.height).toFixed(3) + '"></i>' +
+      '<i class="m16-fxlock" style="left:' + px(b.left) + ';top:' + px(b.top) +
+        ';width:' + px(b.width) + ';height:' + px(b.height) + '"></i>';
+    /* 340ms 飛 + 300ms 延遲的那一閃 —— 一局要吃碰十幾次,再長就會覺得牌桌黏黏的
+       (同 `.m16-dropin` 那條 200ms 的頻率閘)。 */
+    show("fly", el, 760, true);
+  }
+
+  function flyMeld(seat, me){
+    requestAnimationFrame(function(){
+      const root = stage();
+      if(!root) return;
+      const src = root.querySelector(".m16-pslot");
+      const dst = meldNodeOf(root, seat, me);
+      if(!src || !dst) return;
+      const a = src.getBoundingClientRect(), b = dst.getBoundingClientRect();
+      /* 終點的**尺寸**要拿那一組裡的一張牌(明牌一組有三四張,拿整組的寬會過頭) */
+      const tl = dst.querySelector(".m16-mt");
+      const t  = tl ? tl.getBoundingClientRect() : null;
+      if(!a.width || !b.width || !t || !t.width) return;
+      flyFx(a, b, t.width, t.height);
+    });
+  }
+
+  /* ==========================================================================
+     ⑦ 放槍連線(v2.4.1)—— 「誰放槍給誰」
+     ── ⚠⚠ 為什麼**不是**「從牌河那張畫一條光束到贏家手牌」(建議書原本的形狀)────
+       胡的那一刻 `#veil`(結果卡)**立刻**蓋上來,而且盤面同時在重畫(全桌攤牌 →
+       每一家的高度暴增、版面整個換一次)。真的照著兩端的 DOM 座標畫,結果是
+       **一條指著看不見的東西的光束**,而且橫向 / 直向 / 攤牌前後各歪一個樣子。
+     ★ 所以改成「**自帶兩端**」:兩個名字 + 中間一道光束,整組住在覆蓋層裡,
+       與盤面座標完全無關 → 任何版面、任何時機都對得準,而它要回答的問題
+       (誰放槍給誰)一個字都沒少。
+     ── ★ 全桌都看得到,但輸家那一份只有線 ──────────────────────────────────
+       贏家:接在特寫的巨字下面(finisher 自己組)。
+       其他人(含放槍的那位):只有這條線,沒有暗場 / 巨字 / 金幣 ——
+       ②那條「不要在剛放槍的人臉上放煙火」仍然成立,這裡給的是**資訊**。
+     ⚠ 自摸沒有這條線(沒有人放槍)。
+     ========================================================================== */
+  function ronHTML(r){
+    /* ⚠ 名字是玩家自己輸入的 → esc()(同 word 那條) */
+    return '<div class="m16-fxron">' +
+      '<span class="m16-fxrn from"><b>' + esc(r.from) + '</b><i>放槍</i></span>' +
+      /* ⚠ 光束要**兩層**:外層是 flex 軌道(箭頭掛在它的 ::after),裡面那條才做
+         scaleX —— 直接縮外層會把箭頭一起壓扁成一條線。 */
+      '<span class="m16-fxrbeam"><i></i></span>' +
+      '<span class="m16-fxrn to"><b>' + esc(r.to) + '</b><i>胡</i></span>' +
+    '</div>';
+  }
+  function ronOnly(r){
+    const el = document.createElement("div");
+    el.className = "m16-fx m16-fxronly";
+    el.innerHTML = ronHTML(r);
+    show("ron", el, 1250, true);
+  }
+
+  /* ==========================================================================
+     ⑧ 誰做的 —— 兩段自己的 diff
      ── 吃 / 碰 / 槓:直接用現成的 `MJT.meldTakenAt()` ──────────────────────
        它回 `{ seat, kind }`,adapter 的「報一句」本來就在用 → 零重複。
        ⚠ 它認的是「明牌組數變多」,所以**加槓**(pung → kong,組數沒變)回 null。
@@ -261,7 +379,14 @@ const M16Fx = (function(){
          zimo / hu 講的是**這一局怎麼結束**,不是「我贏了」。 */
     if(has("hu") || has("zimo")){
       const o = after && after.over;
-      if(o && o.type === "win" && o.seat === me) finisher(o.from == null);
+      if(!o || o.type !== "win") return;
+      /* 放槍連線的兩端(v2.4.1)。★ 講到自己一律用「你」——
+         畫面上寫著自己的暱稱、旁邊還標著「放槍」,讀起來像在講別人。 */
+      const side = function(s){ return (s === me) ? "你" : nm(s); };
+      const ron = (o.from != null && o.from !== undefined)
+                  ? { from:side(o.from), to:side(o.seat) } : null;
+      if(o.seat === me) finisher(o.from == null, ron);   // 贏家:特寫(連線接在巨字下面)
+      else if(ron) ronOnly(ron);                          // 其他人(含放槍那位):只有線
       return;
     }
     if(has("washout")){ mist(); return; }
@@ -293,12 +418,15 @@ const M16Fx = (function(){
       const tk = (typeof MJT !== "undefined" && MJT.meldTakenAt)
                  ? MJT.meldTakenAt(before, after) : null;
       if(tk && tk.seat !== me) who = nm(tk.seat);
+      /* ★ 飛牌流光(v2.4.1)—— 與上面那個字**同一份 diff、同一個 tk**,不必再算一次。
+         ⚠ 它自己會 rAF 到 render 之後才量;量不到起點(暗槓 / 加槓)就安靜不播。 */
+      if(tk) flyMeld(tk.seat, me);
     }
     word(kind, who);
   }
 
   /* ==========================================================================
-     ⑦ 結果卡:台數逐項展開 + 總台數滾動 + 印章
+     ⑨ 結果卡:台數逐項展開 + 總台數滾動 + 朱紅印章
      ── ★ 資料是現成的 ────────────────────────────────────────────────────────
        `st.over.list` 本來就帶著每一項番種(`{ name, tai }`,由 scoring.js 算),
        在這一版之前被印成一行頓號串「自摸 1、門清 1、清一色 8」。所以這裡
@@ -326,19 +454,32 @@ const M16Fx = (function(){
      solo.js 的 paintResult 只差「名字怎麼來」,算式本身一模一樣)。
        head  「小明 胡 阿弟 打的牌」那一段(呼叫端自己組好、自己 esc 好)
        o     st.over
+       mine  這一局**是我贏的**嗎 → 蓋朱紅印章(見下面那條)
      ⚠ 回傳字串會被塞進 `#winMsg` 的 innerHTML,所以 head 一定要是**已經 esc 過**的。 */
-  function taiHTML(head, o){
+  function taiHTML(head, o, mine){
     const total = o.total | 0;
+    const n = (o.list ? o.list.length : 0);
     return '<span class="m16-fxhow">' + head + '</span>' +
       '<span class="m16-fxtai">' +
         taiItems(o.list) +
         /* 底台與總和:底是固定的,台是上面那些加起來的 → 分兩格才看得出因果。
            ⚠ 總和那一格要留 `data-tai`,滾動靠它認(見 armTai)。 */
-        '<span class="m16-fxsum" style="--i:' + ((o.list ? o.list.length : 0)) + '">' +
+        '<span class="m16-fxsum" style="--i:' + n + '">' +
           '底 ' + (o.base | 0) + ' + 台 ' + (o.tai | 0) + ' = ' +
           '<b class="m16-fxroll" data-tai="' + total + '">' + total + '</b> 台' +
         '</span>' +
-      '</span>';
+      '</span>' +
+      /* ★★ 朱紅印章(v2.4.1)—— 建議書的「最後重重蓋上大贏家朱紅印章」。
+         ★ **只有我贏才蓋**:它是給贏家的那一下,蓋在輸家的結果卡上就變成在嘲笑他
+           (同 ② 那條「不要在放槍的人臉上放煙火」)。
+         ★ 延遲接在總台數**後面**(--i 用同一個 n)—— 順序是「番種一項一項 → 總台數
+           滾完 → 印章落下」,那正是建議書要的那個節奏;三件事同時發生就只是一團。
+         ⚠ 它**參與流**(display:block + margin),與這一整支別的東西都不同 ——
+           可以這樣做的唯一理由:這一段住在結果卡(蓋板)裡,不在牌桌上,
+           長高就自己捲,碰不到「牌寬被總高度夾」那條紅線。
+         ⚠ 傾斜走 transform(不影響版面);印章是裝飾,資訊在上面那一行,
+           所以 aria-hidden。 */
+      (mine ? '<span class="m16-fxstamp" style="--i:' + n + '" aria-hidden="true">大贏家</span>' : '');
   }
   /* 總台數從 0 滾上去。★ 只在**呼叫端寫完 innerHTML 之後**才有節點可以抓,所以
      兩份都在自己那邊叫一次(adapter 的 outcome / solo 的 paintResult)。
@@ -385,10 +526,26 @@ const M16Fx = (function(){
          (notes/11 第 3 條紅線)。 */
     demo(kind, opts){
       const o = opts || {};
-      if(kind === "fin") return finisher(!!o.tsumo);
+      const ron = { from:(o.who || "阿弟"), to:(o.to || "你") };
+      if(kind === "fin") return finisher(!!o.tsumo, o.ron ? ron : null);
+      if(kind === "ron") return ronOnly(ron);
       if(kind === "mist") return mist();
       if(kind === "petal") return petals();
       if(kind === "ting") return tingGlow();
+      /* 飛牌流光:試看頁沒有真的牌河 / 明牌列 → 用舞台的比例造一組座標。
+         ⚠ 產品碼**永遠**走 flyMeld()(它量的是 `.m16-pslot` 與剛攤出來那一組),
+           這裡造假只是為了「不必真的打一局就看得到」。 */
+      if(kind === "fly"){
+        const root = stage();
+        if(!root) return;
+        const r = root.getBoundingClientRect();
+        const w = Math.max(20, Math.round(Math.min(r.width, r.height) * 0.09));
+        const a = o.a || { left:r.left + r.width * 0.20, top:r.top + r.height * 0.24,
+                           width:w, height:Math.round(w * 1.32) };
+        const b = o.b || { left:r.left + r.width * 0.58, top:r.top + r.height * 0.68,
+                           width:Math.round(w * 2.3), height:Math.round(w * 1.05) };
+        return flyFx(a, b, Math.round(w * 0.72), Math.round(w * 0.95));
+      }
       return word(kind, o.who || "");
     }
   };

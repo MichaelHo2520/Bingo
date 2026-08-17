@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 97154ae914848d4cc9e9bfef8d848c1c8aafb30f3d3bbe737e258af1e5354f38)
+    真相在 styles.src.css(sha256 81f543e59afe11c5ade826731cf56c150375bd045aae91a24d56dbb1cdea85a2)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1728,7 +1728,7 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
   100%{opacity:0;transform:rotate(var(--a,0deg)) translateY(calc(var(--d,60px) * -1)) scale(var(--s,1))}
 }
 .m16-fxfin{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:61;
-  display:flex;align-items:center;justify-content:center}
+  display:flex;flex-direction:column;align-items:center;justify-content:center}
 .m16-fxdim{position:absolute;inset:0;opacity:0;
   background:radial-gradient(circle at 50% 46%,transparent 0%,rgba(0,0,0,.28) 38%,rgba(0,0,0,.62) 100%);
   animation:m16FxDim 1.15s ease-out forwards}
@@ -1833,6 +1833,92 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
   0%{opacity:0;transform:translateY(7px) scale(.9)}
   100%{opacity:1;transform:none}
 }
+.m16-fxfly{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:40}
+.m16-fxray{position:absolute;transform-origin:0 50%;border-radius:99px;opacity:0;
+  background:linear-gradient(90deg,rgba(255,214,120,0),rgba(255,206,90,.5) 52%,rgba(255,244,200,.95));
+  filter:blur(1.5px);
+  animation:m16FxRay .34s cubic-bezier(.4,0,.3,1) forwards}
+@keyframes m16FxRay{
+  0%{opacity:0;transform:rotate(var(--ang,0deg)) scaleX(0)}
+  20%{opacity:.95}
+  60%{opacity:.8;transform:rotate(var(--ang,0deg)) scaleX(1)}
+  100%{opacity:0;transform:rotate(var(--ang,0deg)) scaleX(1)}
+}
+.m16-fxbolt{position:absolute;border-radius:14%;opacity:0;
+  background:linear-gradient(145deg,#fff8dd,#ffd473 46%,#e9a326);
+  box-shadow:0 0 10px 2px rgba(255,196,74,.7),0 0 26px 8px rgba(255,168,40,.32);
+  animation:m16FxBolt .34s cubic-bezier(.45,0,.3,1) forwards}
+@keyframes m16FxBolt{
+  0%{opacity:0;transform:translate(0,0) scale(1)}
+  14%{opacity:1}
+  78%{opacity:1}
+  100%{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(var(--sx,1),var(--sy,1))}
+}
+.m16-fxlock{position:absolute;border-radius:12%;opacity:0;
+  box-shadow:0 0 0 2px rgba(255,222,140,.95),0 0 20px 6px rgba(255,190,60,.45);
+  animation:m16FxLock .32s ease-out .28s forwards}
+@keyframes m16FxLock{
+  0%{opacity:0;transform:scale(.88)}
+  34%{opacity:1;transform:scale(1.08)}
+  100%{opacity:0;transform:scale(1)}
+}
+.m16-fxronly{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:61;
+  display:flex;align-items:center;justify-content:center}
+.m16-fxron{display:flex;align-items:center;justify-content:center;gap:9px;
+  width:min(92vw,440px);padding:0 8px}
+.m16-fxfin .m16-fxron{margin-top:10px}
+.m16-fxrn{display:flex;flex-direction:column;align-items:center;gap:3px;flex:0 0 auto;
+  min-width:0;max-width:38%;opacity:0;
+  animation:m16FxRn .46s cubic-bezier(.23,1,.32,1) forwards}
+.m16-fxrn.to{animation-delay:.16s}
+.m16-fxrn b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font:900 17px/1.25 'Nunito',sans-serif;color:#fff0bd;
+  text-shadow:0 2px 8px rgba(0,0,0,.8)}
+.m16-fxrn i{flex:none;font:800 10.5px/1 'Nunito',sans-serif;font-style:normal;
+  letter-spacing:.1em;text-indent:.1em;padding:3px 8px;border-radius:99px}
+.m16-fxrn.from b{color:#ffd6cf}
+.m16-fxrn.from i{color:#ffdad4;background:rgba(198,52,40,.72);
+  box-shadow:inset 0 0 0 1px rgba(255,130,110,.45)}
+.m16-fxrn.to i{color:#3b2a06;background:linear-gradient(180deg,#ffdf95,#efb23a)}
+.m16-fxrbeam{position:relative;flex:1 1 auto;min-width:26px;height:5px;align-self:center}
+.m16-fxrbeam i{position:absolute;inset:0;border-radius:99px;
+  transform-origin:0 50%;transform:scaleX(0);
+  background:linear-gradient(90deg,rgba(214,58,45,.95),rgba(255,196,74,.98));
+  box-shadow:0 0 12px 2px rgba(255,170,60,.45);
+  animation:m16FxBeam .5s cubic-bezier(.5,0,.25,1) .12s forwards}
+.m16-fxrbeam::after{content:"";position:absolute;right:-3px;top:50%;margin-top:-7px;
+  border:7px solid transparent;border-left-color:#ffcc5e;opacity:0;
+  animation:m16FxTip .28s ease-out .5s forwards}
+@keyframes m16FxRn{0%{opacity:0;transform:translateY(9px) scale(.9)}100%{opacity:1;transform:none}}
+@keyframes m16FxBeam{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}
+@keyframes m16FxTip{0%{opacity:0;transform:translateX(-7px)}100%{opacity:1;transform:none}}
+.m16-fxstamp{display:block;width:max-content;margin:11px auto 2px;
+  font:900 15px/1 'Nunito',sans-serif;letter-spacing:.24em;text-indent:.24em;
+  color:#ff6154;padding:8px 13px;border-radius:7px;
+  border:2.5px solid #dd3a2c;
+  box-shadow:inset 0 0 0 1px rgba(221,58,44,.45),0 0 16px rgba(221,58,44,.22);
+  text-shadow:0 0 9px rgba(255,97,84,.45);
+  opacity:0;transform:rotate(-11deg);
+  animation:m16FxStamp .5s cubic-bezier(.2,1.5,.4,1) forwards;
+  animation-delay:calc(var(--i,0) * 90ms + 430ms)}
+@keyframes m16FxStamp{
+  0%{opacity:0;transform:rotate(-32deg) scale(2.9)}
+  55%{opacity:1;transform:rotate(-9deg) scale(.94)}
+  74%{transform:rotate(-11.5deg) scale(1.05)}
+  100%{opacity:.96;transform:rotate(-11deg) scale(1)}
+}
+.m16-stage{border-radius:12px;
+  background:
+    repeating-linear-gradient(48deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(-48deg,rgba(0,0,0,.05) 0 1px,transparent 1px 3px),
+    radial-gradient(118% 86% at 50% 38%,rgba(38,94,68,.34),rgba(16,46,35,.46) 58%,rgba(8,26,20,.56));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),
+             inset 0 12px 26px -14px rgba(0,0,0,.6),
+             inset 0 -14px 28px -16px rgba(0,0,0,.55)}
+.m16-hand .m16-row:last-child{
+  box-shadow:0 3px 0 2px rgba(122,84,45,.92),
+             0 6px 0 4px rgba(56,35,17,.9),
+             0 9px 10px -3px rgba(0,0,0,.5)}
 .m16-foe.shown{align-items:flex-start}
 .m16-foe .m16-reveal{gap:3px;justify-content:flex-start;flex:1 1 auto;min-width:0}
 .m16-foe .m16-meld.m16-hg{gap:1px;padding:3px;justify-content:flex-start}

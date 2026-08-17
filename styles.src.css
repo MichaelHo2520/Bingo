@@ -2753,6 +2753,10 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
        這一列滿寬之後自然成立(原本置中,兩三組明牌時看起來就像浮在手牌中間)。
      ⚠ 橫向不受影響:那邊 `.m16-mine{display:contents}`,這一列是 grid item 本來就滿寬
        (而且刻意維持 justify-content:center,見橫向那一段)。 */
+/* ⚠ `position:relative` 是給「一鍵理牌」那顆鈕當定位基準的(v2.4.0,見 .m16-sortbtn)。
+   ★ 它**不改變任何佈局**(這一列本來就是 flex item),而且鈕是絕對定位 → 不參與流、
+     量不到高度 —— 這一列是動作列的錨點(placeActs 量它),讓它長高就是整副牌縮一次。
+   ⚠ 只影響「這一列內部」的絕對定位子元素;`#m16Acts` 住在 `.mj-play` 底下,不在這裡面。 */
 .m16-mymelds{position:relative;width:100%;min-height:34px;padding-right:var(--m16aw,0px)}
 .m16-meld{display:inline-flex;align-items:flex-end;gap:1px;
   padding:3px;border-radius:8px;background:rgba(255,255,255,.10)}
@@ -3238,6 +3242,7 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
   100%{opacity:0;transform:scale(3.4)}
 }
 @keyframes m16Glow{0%{opacity:0}18%{opacity:1}62%{opacity:.72}100%{opacity:0}}
+
 /* ==========================================================================
    ★★ 動效層 M16Fx(v2.4.0)—— 碰 / 槓 / 吃 / 聽牌的漢字、胡牌特寫、花瓣、薄霧
    邏輯在 js/mahjong16/fx.js,那支檔頭寫著全部的「為什麼」。這裡只記 CSS 這一半
@@ -3325,8 +3330,10 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
 /* ---------- ② 胡 / 自摸的全螢幕特寫 ----------
    ⚠⚠ pointer-events:none 在這裡是**正確性不是禮貌**:它蓋在結果卡上面,
      少了它那 1.4 秒「下一局」按不下去,而使用者只會覺得卡住了。 */
+/* ⚠ flex-direction:column 是 v2.4.1 改的:放槍連線(⑪)要接在巨字**下面**。
+   暗場 / 光芒 / 金幣三層都是 absolute,不受方向影響 —— 進流的只有巨字與那條線。 */
 .m16-fxfin{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:61;
-  display:flex;align-items:center;justify-content:center}
+  display:flex;flex-direction:column;align-items:center;justify-content:center}
 /* 中央透明的聚光暗場(見檔頭那條:整片壓黑會把 confetti 的金片一起壓暗)。
    ⚠ 一定要**由濃轉無**、而且在字消失之前退乾淨 —— 留著就是把剛淡入的結果卡
      壓成灰的(第一版如此,看起來像沒載完)。 */
@@ -3515,6 +3522,157 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
    ⚠ 所以想加動畫降級請走那顆開關,不要再開 media query。
      真的要做的話唯一可接受的形狀是「跟隨系統 / 開 / 關」三態的 UI,
      而那是另一個決定(要多一列設定),不是順手加一段 CSS。 */
+
+/* ---------- ⑩ 吃 / 碰 / 明槓的飛牌流光(v2.4.1)----------
+   ★ 座標一律**視窗座標**(fx.js 量 getBoundingClientRect 直接寫成 inline style)
+     → 這一層是 `fixed`,而且**不可以**改成 absolute:牌河與明牌列在直向 / 橫向
+     分屬不同的排版容器,只有視窗座標同時說得準兩種版面。
+   ⚠ z-index:40 是**夾在中間**選的:要壓過牌桌(`.m16-stage` 是 z-index:0 的
+     stacking context),但要在結果卡 `.veil`(50)之下 —— 這個特效發生在對局中,
+     不該有機會蓋到任何蓋板。
+   ⚠ 三個節點各做一件事,少一個就不成立:
+     ray  射向終點的那道金光(建議書要的「化為一道金色流光」本體)
+     bolt 那張牌本身(牌河那張比明牌大 → 一路縮到明牌尺寸 = 「歸位」)
+     lock 終點那一組的一圈閃光(「發出清脆碰撞微光」),延遲到牌到位才亮 */
+.m16-fxfly{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:40}
+/* transform-origin:0 50% + fx.js 把 left/top 設在**起點的中心** → rotate 之後
+   這條光就從起點指向終點,scaleX 從 0 長到 1 就是「射出去」。 */
+.m16-fxray{position:absolute;transform-origin:0 50%;border-radius:99px;opacity:0;
+  background:linear-gradient(90deg,rgba(255,214,120,0),rgba(255,206,90,.5) 52%,rgba(255,244,200,.95));
+  filter:blur(1.5px);
+  animation:m16FxRay .34s cubic-bezier(.4,0,.3,1) forwards}
+@keyframes m16FxRay{
+  0%{opacity:0;transform:rotate(var(--ang,0deg)) scaleX(0)}
+  20%{opacity:.95}
+  60%{opacity:.8;transform:rotate(var(--ang,0deg)) scaleX(1)}
+  100%{opacity:0;transform:rotate(var(--ang,0deg)) scaleX(1)}
+}
+/* ⚠ `translate() scale()` 的順序不可以對調:矩陣是 T×S,點先被縮放(繞自己的中心)
+   再平移 —— 所以 --dx/--dy 就是**中心到中心**的位移,fx.js 那邊也是這樣算的。
+   寫成 `scale() translate()` 的話位移會被縮放倍率乘過去,終點整個跑掉。 */
+.m16-fxbolt{position:absolute;border-radius:14%;opacity:0;
+  background:linear-gradient(145deg,#fff8dd,#ffd473 46%,#e9a326);
+  box-shadow:0 0 10px 2px rgba(255,196,74,.7),0 0 26px 8px rgba(255,168,40,.32);
+  animation:m16FxBolt .34s cubic-bezier(.45,0,.3,1) forwards}
+@keyframes m16FxBolt{
+  0%{opacity:0;transform:translate(0,0) scale(1)}
+  14%{opacity:1}
+  78%{opacity:1}
+  100%{opacity:0;transform:translate(var(--dx,0),var(--dy,0)) scale(var(--sx,1),var(--sy,1))}
+}
+/* 延遲 .28s = 牌快到了才亮(飛行本體 .34s)—— 同時亮的話看起來像兩個不相干的閃光。 */
+.m16-fxlock{position:absolute;border-radius:12%;opacity:0;
+  box-shadow:0 0 0 2px rgba(255,222,140,.95),0 0 20px 6px rgba(255,190,60,.45);
+  animation:m16FxLock .32s ease-out .28s forwards}
+@keyframes m16FxLock{
+  0%{opacity:0;transform:scale(.88)}
+  34%{opacity:1;transform:scale(1.08)}
+  100%{opacity:0;transform:scale(1)}
+}
+
+/* ---------- ⑪ 放槍連線:誰放槍給誰(v2.4.1)----------
+   ⚠⚠ 它**自帶兩端**(兩個名字 + 中間一道光束),不去指盤面上的節點 ——
+     理由寫在 fx.js 的 ⑦:胡的那一刻結果卡立刻蓋上來、盤面同時在攤牌重畫,
+     真的照 DOM 座標畫會得到「一條指著看不見的東西的光束」,而且每種版面歪法都不同。
+   ★ 贏家那一份接在特寫的巨字下面(`.m16-fxfin .m16-fxron`);
+     其他人(含放槍的那位)只有這條線,沒有暗場 / 巨字 / 金幣。 */
+.m16-fxronly{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:61;
+  display:flex;align-items:center;justify-content:center}
+.m16-fxron{display:flex;align-items:center;justify-content:center;gap:9px;
+  width:min(92vw,440px);padding:0 8px}
+.m16-fxfin .m16-fxron{margin-top:10px}
+.m16-fxrn{display:flex;flex-direction:column;align-items:center;gap:3px;flex:0 0 auto;
+  min-width:0;max-width:38%;opacity:0;
+  animation:m16FxRn .46s cubic-bezier(.23,1,.32,1) forwards}
+.m16-fxrn.to{animation-delay:.16s}
+/* ⚠ 名字是使用者輸入的 → 一定要能截斷(有人會取很長的名字,而這一層是 fixed:
+   撐爆的話兩端會被推出畫面外,而不是換行)。 */
+.m16-fxrn b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font:900 17px/1.25 'Nunito',sans-serif;color:#fff0bd;
+  text-shadow:0 2px 8px rgba(0,0,0,.8)}
+.m16-fxrn i{flex:none;font:800 10.5px/1 'Nunito',sans-serif;font-style:normal;
+  letter-spacing:.1em;text-indent:.1em;padding:3px 8px;border-radius:99px}
+/* 放槍那一端是**紅的**、胡那一端是金的 —— 顏色本身就說完了方向,
+   不必再讀那兩個小標(而小標在最小的手機上只有 10.5px)。 */
+.m16-fxrn.from b{color:#ffd6cf}
+.m16-fxrn.from i{color:#ffdad4;background:rgba(198,52,40,.72);
+  box-shadow:inset 0 0 0 1px rgba(255,130,110,.45)}
+.m16-fxrn.to i{color:#3b2a06;background:linear-gradient(180deg,#ffdf95,#efb23a)}
+/* 光束:外層是 flex 軌道(要放箭頭),真正動的是裡面那條 —— 直接對外層 scaleX
+   會把箭頭一起壓扁成一條線。 */
+.m16-fxrbeam{position:relative;flex:1 1 auto;min-width:26px;height:5px;align-self:center}
+.m16-fxrbeam i{position:absolute;inset:0;border-radius:99px;
+  transform-origin:0 50%;transform:scaleX(0);
+  background:linear-gradient(90deg,rgba(214,58,45,.95),rgba(255,196,74,.98));
+  box-shadow:0 0 12px 2px rgba(255,170,60,.45);
+  animation:m16FxBeam .5s cubic-bezier(.5,0,.25,1) .12s forwards}
+.m16-fxrbeam::after{content:"";position:absolute;right:-3px;top:50%;margin-top:-7px;
+  border:7px solid transparent;border-left-color:#ffcc5e;opacity:0;
+  animation:m16FxTip .28s ease-out .5s forwards}
+@keyframes m16FxRn{0%{opacity:0;transform:translateY(9px) scale(.9)}100%{opacity:1;transform:none}}
+@keyframes m16FxBeam{0%{transform:scaleX(0)}100%{transform:scaleX(1)}}
+@keyframes m16FxTip{0%{opacity:0;transform:translateX(-7px)}100%{opacity:1;transform:none}}
+
+/* ---------- ⑫ 結果卡的朱紅印章(v2.4.1)----------
+   ★ 建議書:「最後重重蓋上『大贏家』朱紅印章(Stamp Drop Effect)」。
+   ⚠ 它是這一整支裡**唯一參與版面流**的東西(display:block + margin)——
+     可以這樣做的唯一理由是它住在**結果卡(蓋板)**裡,不在牌桌上,
+     所以碰不到「牌寬被總高度夾」那條紅線(⑧那一段的最後一句)。
+   ⚠ 延遲接在總台數後面(--i 與 .m16-fxsum 同一個值)—— 順序是
+     「番種一項一項 → 總台數滾完 → 印章落下」;三件事同時發生就只是一團。
+   ⚠ 傾斜走 transform:它不影響版面,所以旋轉之後的四個角不會把卡片撐寬。
+   ⚠ letter-spacing 會在**最後一個字後面**也留一格 → 補 text-indent 把整塊推回置中。 */
+.m16-fxstamp{display:block;width:max-content;margin:11px auto 2px;
+  font:900 15px/1 'Nunito',sans-serif;letter-spacing:.24em;text-indent:.24em;
+  color:#ff6154;padding:8px 13px;border-radius:7px;
+  border:2.5px solid #dd3a2c;
+  box-shadow:inset 0 0 0 1px rgba(221,58,44,.45),0 0 16px rgba(221,58,44,.22);
+  text-shadow:0 0 9px rgba(255,97,84,.45);
+  opacity:0;transform:rotate(-11deg);
+  animation:m16FxStamp .5s cubic-bezier(.2,1.5,.4,1) forwards;
+  animation-delay:calc(var(--i,0) * 90ms + 430ms)}
+/* 「重重蓋上」= 從很大很歪的地方砸下來,過衝一點再回正 —— 少了 55% 那一格
+   它只是淡入,完全沒有「蓋章」的重量。 */
+@keyframes m16FxStamp{
+  0%{opacity:0;transform:rotate(-32deg) scale(2.9)}
+  55%{opacity:1;transform:rotate(-9deg) scale(.94)}
+  74%{transform:rotate(-11.5deg) scale(1.05)}
+  100%{opacity:.96;transform:rotate(-11deg) scale(1)}
+}
+
+/* ---------- ⑬ 牌桌質感:絨布桌面 + 木質牌托(v2.4.1)----------
+   建議書 3.2.1 / 3.2.3。⚠⚠ 這兩樣都是**只用背景與 box-shadow 畫的**,
+   一個 px 的版面都沒有動 —— 這不是潔癖,是這一頁唯一做得起質感的方式:
+     牌寬 = 寬度算出來、再被 `host.scrollHeight` 夾(board.js 的 render())
+     → 任何佔得到高度的裝飾都會讓整副牌**小一級,而且只縮不放**。
+   ★ 所以牌托刻意**沒有自己的高度**:它是 `.m16-row` 的 box-shadow,
+     而 box-shadow **不進 scrollHeight**(同 `.m16-tile` 那道畫側面厚度的陰影)。
+     代價是它只有 4~5px 高、外加左右各探出 4px —— 換來的是牌一個 px 都沒縮。
+     ⚠ 想把它做粗一點的人請先讀這一段:給 `.m16-hand` 加 padding-bottom 是行的,
+       但 6px 的高度在手機上大約換掉 2px 的牌寬,而使用者為了牌變小回報過三次。 */
+/* 絨布:三層疊起來才有布的感覺 —— 兩道相反方向的細斜紋(織)+ 中央微亮的暈(光)。
+   ⚠ 斜紋的透明度只有 .018 / .05,單看幾乎不存在;拉高就會變成「畫面有雜訊」。
+   ⚠ 顏色**寫死深綠**不吃主題變數:綠檯呢是麻將桌這件事的一部分(同 `.m16-cele`
+     那條「胡了的金色不可以隨主題變成紫的」)。
+   ⚠ 圓角 12px:`.m16-stage` 是 overflow-y:auto,圓角會**裁掉**四個角的內容 ——
+     它的內距有 6px/8px,12px 只吃到角落的空白;再大就會削到對手那一列的晶片。 */
+.m16-stage{border-radius:12px;
+  background:
+    repeating-linear-gradient(48deg,rgba(255,255,255,.018) 0 1px,transparent 1px 3px),
+    repeating-linear-gradient(-48deg,rgba(0,0,0,.05) 0 1px,transparent 1px 3px),
+    radial-gradient(118% 86% at 50% 38%,rgba(38,94,68,.34),rgba(16,46,35,.46) 58%,rgba(8,26,20,.56));
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),
+             inset 0 12px 26px -14px rgba(0,0,0,.6),
+             inset 0 -14px 28px -16px rgba(0,0,0,.55)}
+/* 木質牌托:掛在**最後一排**手牌上(兩排時只有下面那排該有托)。
+   ⚠ 三道陰影的順序 = 由上往下疊:第一道(淺木)蓋在第二道(深木)上面,
+     所以看到的是「淺 3px → 深 3px → 柔和落影」= 一道有厚度的木邊。
+   ⚠ 正的 spread 會讓陰影往四周長,但外陰影**不會畫進元素自己的盒子裡**
+     → 上緣那一截自動被牌蓋掉,左右各探出 2/4px 就是牌托的兩端。 */
+.m16-hand .m16-row:last-child{
+  box-shadow:0 3px 0 2px rgba(122,84,45,.92),
+             0 6px 0 4px rgba(56,35,17,.9),
+             0 9px 10px -3px rgba(0,0,0,.5)}
 
 /* ---------- 一局結束:牌桌上每一家都攤開(v1.75.15) ----------
    使用者:「每一局結束的時候,我希望能把全部人的牌都顯示出來,不是在勝負頁顯示,
