@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 079b271005835498ae78e2a7d47d9e6b40e7300ebd3d051b1f0ca0ebb3ef0779)
+    真相在 styles.src.css(sha256 0941f216b5ae947b7eae48f7a708dcdfdba33dd4f97d07eb0b1afd7a431c89ea)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3222,16 +3222,18 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @keyframes dcFlipIn{ from{transform:rotateY(0)} to{transform:rotateY(180deg)} }
   .dc-p.dc-sliding{z-index:5}
   .dc-reveal{position:absolute;display:flex;align-items:center;justify-content:center;
-    pointer-events:none;z-index:8;
-    animation:dcRevealToCenter .38s cubic-bezier(.24,.44,.32,1) both}
-  @keyframes dcRevealToCenter{
-    0%{transform:translate(0,0) scale(1)}
-    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.6)}
-  }
-  .dc-reveal.dc-reveal-gone{animation:dcRevealFade .28s ease-in forwards}
-  @keyframes dcRevealFade{
-    0%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.6);opacity:1}
-    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.15);opacity:0}
+    pointer-events:none;z-index:8;will-change:transform;
+    animation:dcRevealLift var(--rv-dur,1400ms) linear both}
+  .dc-reveal .dc-flip3d{animation-duration:calc(var(--rv-dur,1400ms) * .21);
+    animation-delay:calc(var(--rv-dur,1400ms) * .19)}
+  @keyframes dcRevealLift{
+    0%  {transform:translate(0,0) scale(var(--rv-s0,.625));opacity:1}
+    40% {transform:translate(0,0) scale(var(--rv-s0,.625));opacity:1;
+         animation-timing-function:cubic-bezier(.32,.72,.28,1)}
+    62% {transform:translate(var(--fx,0),var(--fy,0)) scale(1);opacity:1}
+    83% {transform:translate(var(--fx,0),var(--fy,0)) scale(1);opacity:1;
+         animation-timing-function:ease-in}
+    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(.94);opacity:0}
   }
   .dc-acts{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:5px;
     padding:6px 10px;border-radius:14px;background:var(--panel);

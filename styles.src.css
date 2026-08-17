@@ -7329,27 +7329,55 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        改成:被吃的子一邊翻開一邊飛到棋盤正中央、放大到看得清清楚楚,停留一下,
        再淡出消失。★ 這次「飛」跟 v1.137.3 的「飛去吃子欄」不一樣 ——
        方向、目的地、放大縮小的意圖都不同,不是走回頭路。
-     ⚠⚠⚠ .dc-reveal 掛在 **`.dc-board` 底下**(不是掛在某一格的 `.dc-sq` 裡)——
-       它要飛越好幾格的距離到棋盤中央,若掛在原本那一格,會被那一格所在的
-       stacking context 卡住(疊不到隔壁格上面)。board.js 用 `getBoundingClientRect()`
-       算出「原本那一格」相對 `.dc-board` 的 left/top,先讓它疊在正確的起點,
-       再用 `--fx`/`--fy` 給位移量。
-     ⚠ 裡面包的 .dc-flip3d(翻開的那一下)沿用翻牌動畫那一份,轉的是它自己的
-       rotateY,跟外層 .dc-reveal 的位移+放大是兩個獨立的 transform,互不干擾。
+     ⚠⚠⚠ .dc-reveal 掛在 **`.dc-stage` 底下**(不是掛在某一格的 `.dc-sq` 裡,
+       也不是 `.dc-board`)—— 兩個理由各擋一件事:離開 `.dc-sq` 是因為它要飛越
+       好幾格到棋盤中央,留在原本那一格會被那一格的 stacking context 卡住;
+       再往上搬到 `.dc-stage` 是因為 paint() 每一手都 `board.innerHTML = …` 整段
+       重建,掛在 board 裡的浮層會被連根拔掉(症狀是**時有時無**,見 board.js)。
+       board.js 用 `getBoundingClientRect()` 算出「原本那一格」相對 stage 的
+       left/top,先讓它疊在正確的起點,再用 `--fx`/`--fy` 給位移量
+       (⚠ 位移的終點以**棋盤**的中心為準,不是 stage 的中心)。
      ⚠⚠⚠ 要不要套這一段**不是看 kind**(炮打暗子跟炮打明棋都是 `"jump"`,分不出
        來)——是看 board.js 的 `wasHiddenAtTo`(這一步的目標,在這一步之前是不是
-       還蓋著),所以「炮打到暗子」跟「翻攻吃得動」用的是同一段動畫,不必各寫一次。 */
+       還蓋著),所以「炮打到暗子」跟「翻攻吃得動」用的是同一段動畫,不必各寫一次。
+     ★★ v2.3.5:整段改成**一支**動畫的時間軸,而且「翻」與「飛」錯開播 ——
+       使用者回報連吃吃到暗子時「那個動畫沒有很順」。CSS 這一半修三件事
+       (JS 那一半是「不要延遲 220ms 才掛浮層」與「連吃要去重」,見 board.js):
+       ① 「翻」與「飛」原本**同時**播:翻是內層 .dc-flip3d 的 rotateY(preserve-3d
+          子樹)、飛是這一層的 translate+scale —— 3D 子樹在一個正在縮放的祖先底下
+          **每一幀都要重新光柵化**,而 .dc-p 的底是六層漸層 + 九道 box-shadow
+          (見上面 .dc-p 那一段),重畫一次不便宜。錯開之後任何一刻都只有一個
+          transform 在動,而且視覺上也更像「先翻起來看,再拿到中間放大」。
+       ② 原本是 scale(1)→scale(1.6):貼圖照起點的尺寸畫一次再撐大 → 飛的過程是
+          **糊的**,停下來才忽然變清晰。改成由 board.js 把盒子直接開成放大後的尺寸
+          (--dc-cell 一起放大),這裡從 scale(--rv-s0 = 1/1.6) 縮回 1 → 全程清晰。
+       ③ 原本是「dcRevealToCenter 播完 → 掛 .dc-reveal-gone 換成 dcRevealFade」:
+          換動畫就是一個接縫,兩份關鍵影格的起點只要有一格對不上就是一次跳動。
+          一支時間軸從頭走到尾沒有接縫,也少一個 timer。
+       ⚠ 五段的比例在下面的關鍵影格,總長是 board.js 的 RV_ALL(寫成 inline 的
+         --rv-dur)—— 兩邊各管一半,改總長不必動這裡。
+       ⚠⚠ .dc-flip3d 那兩個係數(delay / duration)必須與關鍵影格的 19% / 40%
+         對齊,不然「翻完才飛」會變成「翻到一半就飛」——①白修。 */
   .dc-reveal{position:absolute;display:flex;align-items:center;justify-content:center;
-    pointer-events:none;z-index:8;
-    animation:dcRevealToCenter .38s cubic-bezier(.24,.44,.32,1) both}
-  @keyframes dcRevealToCenter{
-    0%{transform:translate(0,0) scale(1)}
-    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.6)}
-  }
-  .dc-reveal.dc-reveal-gone{animation:dcRevealFade .28s ease-in forwards}
-  @keyframes dcRevealFade{
-    0%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.6);opacity:1}
-    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(1.15);opacity:0}
+    pointer-events:none;z-index:8;will-change:transform;
+    animation:dcRevealLift var(--rv-dur,1400ms) linear both}
+  /* 翻開的那一下:沿用翻牌動畫那一份 keyframes(dcFlipIn),只把長度與**起跑時間**
+     改成總長的比例 —— 第一段「牌背停在原格等攻擊方滑進來」結束之後才翻。 */
+  .dc-reveal .dc-flip3d{animation-duration:calc(var(--rv-dur,1400ms) * .21);
+    animation-delay:calc(var(--rv-dur,1400ms) * .19)}
+  @keyframes dcRevealLift{
+    /* ① 0~19% 牌背停在原格(攻擊方正滑過來,slidePiece 是 .26s ≈ 總長的 19%)
+       ② 19~40% 就地翻開 —— 這兩段都**不位移、不縮放** */
+    0%  {transform:translate(0,0) scale(var(--rv-s0,.625));opacity:1}
+    40% {transform:translate(0,0) scale(var(--rv-s0,.625));opacity:1;
+         animation-timing-function:cubic-bezier(.32,.72,.28,1)}
+    /* ③ 40~62% 飛到棋盤正中央、放回盒子的原尺寸(= 一格的 1.6 倍) */
+    62% {transform:translate(var(--fx,0),var(--fy,0)) scale(1);opacity:1}
+    /* ④ 62~83% 停留讓人看清楚 */
+    83% {transform:translate(var(--fx,0),var(--fy,0)) scale(1);opacity:1;
+         animation-timing-function:ease-in}
+    /* ⑤ 83~100% 就地淡出(只收一點點 —— 收太多會變成「掉回去」) */
+    100%{transform:translate(var(--fx,0),var(--fy,0)) scale(.94);opacity:0}
   }
 
   /* ---------- 動作列 ----------

@@ -266,7 +266,18 @@ const DCB = (function(){
          ⑦「移動過去後,如果是可以吃的,那隻就變成用動畫翻到中正中央」——⑥的
            「就地淡出」看得清楚但不夠**顯眼**(棋盤格子本來就小)。改成:被吃的子
            一邊翻開一邊飛到棋盤正中央、放大,停留讓人看清楚,再淡出消失
-           (revealAtCenter(),見下方 CSS 的 dcRevealToCenter)。
+           (revealAtCenter(),見下方 CSS 的 dcRevealLift)。
+         ⑧「連吃如果是吃到還沒翻開的棋子並且有成功的吃掉,會有一個棋子跑到中間的
+           動畫,那個動畫沒有很順」——⑦的**畫法**沒改,是把四個不順的地方一起修
+           (細節見 revealAtCenter() 與 CSS 那一段,這裡只列結論):
+           - 浮層原本是 `setTimeout(220)` 才掛上去,而 paint() 早就把落點畫成攻擊方
+             的子了 → 那顆暗子**先消失 0.22 秒再冒出來**。改成一開始就掛,第一段
+             停在原格當牌背(等的時間由 CSS 時間軸自己走)。
+           - 「翻」與「飛」原本**同時**播 → 3D 子樹在會縮放的祖先底下每一幀重新
+             光柵化(而 .dc-p 的底是六層漸層 + 九道 box-shadow)。改成錯開。
+           - 原本 scale(1)→scale(1.6),貼圖照起點畫一次再撐大 → 飛的過程是糊的。
+             改成盒子直接開成放大後的尺寸、從 scale(1/1.6) 縮回 1。
+           - **連吃沒有去重**:上一顆還在飛下一顆就吃下去了,兩顆疊在棋盤正中央。
        「明棋吃明棋」(被吃的子在這一步之前就已經翻開,玩家早就知道是誰:`eat`、
        `rush`、以及打到明棋的 `jump`)不套翻開動畫 —— slidePiece() 滑過去、被吃的子
        瞬間被攻擊方蓋掉就講完了,不需要再翻一次給他看。
@@ -306,9 +317,9 @@ const DCB = (function(){
     }, 300);
   }
 
-  /* 「這一步吃 / 翻攻的目標,之前玩家看不看得到」→ 才需要播:一邊翻開一邊飛到棋盤
-     正中央放大、停留讓人看清楚,再淡出消失(使用者:「移動過去後,如果是可以吃的,
-     那隻就變成用動畫翻到中正中央」)。
+  /* 「這一步吃 / 翻攻的目標,之前玩家看不看得到」→ 才需要播:牌背停在原格等攻擊方
+     滑進來、就地翻開、飛到棋盤正中央放大、停留讓人看清楚,再淡出消失
+     (使用者:「移動過去後,如果是可以吃的,那隻就變成用動畫翻到中正中央」)。
      ⚠ z-index 比攻擊方的子高(見 CSS 的 .dc-reveal),攻擊方雖然已經滑到位,
        但視覺上被這一層蓋著,直到淡出消失那一刻才「露出」攻擊方安穩落地的畫面。
      ⚠⚠ 明棋吃明棋(打之前就翻開過)不叫這一支 —— 玩家早就知道是誰,滑過去就講完了。
@@ -316,11 +327,26 @@ const DCB = (function(){
        掛在原本那一格會被那一格的 stacking context 卡住,疊不到別格上面。用
        getBoundingClientRect() 量出「原本那一格」相對 `.dc-board` 的 left/top,
        先讓它疊在正確的起點(元素本身用 inline left/top/width/height 定住),
-       再用 --fx/--fy(位移到板子中心的量)交給 CSS 的 dcRevealToCenter 動畫。 */
-  const DARK_REVEAL_MS = 380, DARK_HOLD_MS = 420, DARK_VANISH_MS = 280;
+       再用 --fx/--fy(位移到板子中心的量)交給 CSS 的 dcRevealLift 動畫。
+
+     ── ★★ 整段只有**一支** CSS 動畫(dcRevealLift),五段一次走完 ───────────────
+       ⚠ 五段的**比例**寫在 CSS 的關鍵影格,**總長**寫在這裡(inline 的 --rv-dur)——
+         JS 只需要這一個數字來排「播完把節點拿掉」那個 timer。
+       ⚠⚠ 舊版是「dcRevealToCenter 播完 → 掛 .dc-reveal-gone 換成 dcRevealFade」,
+         換動畫就是一個接縫:兩份關鍵影格的起點只要有一格對不上就是一次跳動,
+         而且要多一個 timer 去撥那個 class。一支時間軸從頭走到尾沒有接縫。
+       ⚠⚠⚠ 第②段(翻)與第③段(飛)**刻意不重疊**,這是「不順」的主因:
+         翻是 .dc-flip3d 的 rotateY(preserve-3d 子樹)、飛是外層的 translate+scale,
+         兩個 transform 同時動的時候瀏覽器沒辦法只合成一次 —— 3D 子樹在一個正在
+         縮放的祖先底下每一幀都要重新光柵化,而 .dc-p 的底是**六層漸層 + 九道
+         box-shadow**(見 styles.src.css 的 .dc-p),重畫一次不便宜。錯開之後
+         任何一刻都只有一個 transform 在動。 */
+  const RV_ALL = 1400;      // 整段總長(ms);五段的比例見 CSS 的 @keyframes dcRevealLift
+  const RV_UP  = 1.6;       // 飛到中央之後放多大(= 一格的幾倍)
   function revealAtCenter(toIdx, got){
     const sq = sqEl(toIdx);
     if(!sq || got == null || !board || !stage) return;
+    cutReveals();                       // ⚠ 連吃:上一顆還在飛就先收掉,見那一支
     /* ⚠⚠⚠ 掛在 **stage** 不是 board:`paint()` 每一手都會 `board.innerHTML = …`
        整段重建,掛在 board 裡的浮層會被**連根拔掉**。單機對電腦時這是必然發生的 ——
        玩家吃完暗子後 `aiTurn()` 最快 320ms(AI_MIN_MS)就走一手 → paint() →
@@ -333,28 +359,59 @@ const DCB = (function(){
     const sRect = sq.getBoundingClientRect();
     const bRect = board.getBoundingClientRect();
     const gRect = stage.getBoundingClientRect();
+    /* ★★ 盒子直接開成**放大後**的尺寸,再用 scale(1/RV_UP) 縮回一格大小當起點 ——
+       **不是**開成一格大再放大到 1.6 倍。差別在光柵化:瀏覽器是照這段動畫會用到的
+       比例把貼圖畫出來,起點小終點大的話那張貼圖在放大的過程中是**糊的**,直到停下來
+       才重畫成清晰的(看起來就是「飛到中間才忽然變清楚」)。反過來排,全程都清晰。
+       ⚠ 因此 --dc-cell 也要跟著開成放大後的值(棋子的字級 / 厚度都是它的百分比)。
+       ⚠⚠⚠ 而且它一定要**自己補一份**:--dc-cell 是 fitBoard() 寫在 `.dc-board`
+         身上的,這顆浮層掛在 stage(board 的父層)—— 繼承不到。拿不到就會退回
+         `.dc-ch` / `--dc-th` 宣告裡的後備值 44px,症狀是**飛到中央那顆放大的子,
+         裡面的字明顯小一號、比例整個怪掉**(使用者回報過),棋子的厚度也會變薄。
+         守門是 tools/gen-dc-shot.js 的 mode=reveal(量「字 / 棋子」的比例)。 */
+    const big = Math.round(sRect.width * RV_UP);
     const el = document.createElement("span");
     el.className = "dc-reveal";
-    el.style.left = (sRect.left - gRect.left) + "px";
-    el.style.top  = (sRect.top  - gRect.top)  + "px";
-    el.style.width  = sRect.width  + "px";
-    el.style.height = sRect.height + "px";
-    /* ⚠⚠⚠ --dc-cell 一定要自己補一份:它是 fitBoard() 寫在 **`.dc-board`** 身上的,
-       而這顆浮層掛在 **stage**(board 的父層,見上面那段 ⚠⚠⚠)—— 繼承不到。
-       拿不到就會退回 `.dc-ch` / `--dc-th` 宣告裡的後備值 44px,症狀是
-       **飛到中央那顆放大的子,裡面的字明顯小一號、比例整個怪掉**(使用者回報),
-       而且棋子的厚度也會跟著變薄。⚠ 用量到的格寬(= fitBoard 寫的整數 px)最保險,
-       不必再去讀 board 的 computed style。 */
-    el.style.setProperty("--dc-cell", Math.round(sRect.width) + "px");
+    // 盒子比格子大,要往回退半圈才對得準原本那一格(縮放是繞著中心)
+    el.style.left = (sRect.left - gRect.left - (big - sRect.width)  / 2).toFixed(1) + "px";
+    el.style.top  = (sRect.top  - gRect.top  - (big - sRect.height) / 2).toFixed(1) + "px";
+    el.style.width  = big + "px";
+    el.style.height = big + "px";
+    el.style.setProperty("--dc-cell", big + "px");
+    el.style.setProperty("--rv-dur", RV_ALL + "ms");
+    el.style.setProperty("--rv-s0", (sRect.width / big).toFixed(4));
+    /* 位移量量的是「這一格的中心 → 棋盤的中心」。
+       ⚠ transform 寫成 `translate(…) scale(…)`,translate 走的是**父層**的座標系
+         (排在 scale 前面 → 不受自己的縮放影響),所以這裡不必再除以比例。 */
+    el.style.setProperty("--fx", ((bRect.left - sRect.left) + (bRect.width  - sRect.width)  / 2).toFixed(1) + "px");
+    el.style.setProperty("--fy", ((bRect.top  - sRect.top)  + (bRect.height - sRect.height) / 2).toFixed(1) + "px");
     el.innerHTML = flipWrapHTML(pieceFaceHTML(got));
     stage.appendChild(el);
-    const dx = (bRect.left - sRect.left) + bRect.width  / 2 - sRect.width  / 2;
-    const dy = (bRect.top  - sRect.top)  + bRect.height / 2 - sRect.height / 2;
-    el.style.setProperty("--fx", dx.toFixed(1) + "px");
-    el.style.setProperty("--fy", dy.toFixed(1) + "px");
-    setTimeout(() => { el.classList.add("dc-reveal-gone"); }, DARK_REVEAL_MS + DARK_HOLD_MS);
-    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); },
-               DARK_REVEAL_MS + DARK_HOLD_MS + DARK_VANISH_MS);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, RV_ALL + 60);
+  }
+  /* 連吃:上一顆還在飛,下一顆就吃下去了 —— 整段 1.4 秒,而連吃兩手之間常常不到一秒。
+     不收掉的話兩顆會疊在棋盤正中央(一顆正在淡出、一顆正飛進來),那個「亂」比動畫
+     本身順不順更明顯,而且那正是使用者回報的情境(連吃 + 吃到暗子)。
+     ⚠ 收法不是直接 removeChild(畫面上會 pop 一下),是**凍結在當下再快速淡掉**;
+       而「凍結」一定要先把 animation 拿掉 —— CSS 動畫的優先級高過 inline style,
+       animation 還掛著的話寫進去的 transform / opacity 一個字都不會生效。
+     ⚠⚠ 用 data-cut 標記已經在收的那些,重入時跳過(不然每來一顆就把它們的淡出重跑
+       一次,反而永遠淡不完)。 */
+  const RV_CUT = 140;
+  function cutReveals(){
+    if(!stage) return;
+    stage.querySelectorAll(".dc-reveal:not([data-cut])").forEach(el => {
+      const cs = getComputedStyle(el);
+      const tf = cs.transform, op = cs.opacity;
+      el.dataset.cut = "1";
+      el.style.animation = "none";
+      if(tf && tf !== "none") el.style.transform = tf;
+      el.style.opacity = op;
+      void el.offsetWidth;                       // 強制 reflow,下面的 transition 才生效
+      el.style.transition = "opacity " + RV_CUT + "ms linear";
+      el.style.opacity = "0";
+      setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, RV_CUT + 40);
+    });
   }
   // 離場 / 換局時把還在飛的浮層清掉(它掛在 stage 上,不會被 board.innerHTML 帶走)
   function clearReveals(){
@@ -364,10 +421,12 @@ const DCB = (function(){
 
   function playMoveFx(L, wasHiddenAtTo){
     if(SLIDE_KINDS[L.kind]) slidePiece(L.from, L.to);
-    if(EAT_KINDS[L.kind] && wasHiddenAtTo){
-      // 對齊滑入抵達的時間點:攻擊方的子先滑過去,「放上去」那一刻被吃的子才起飛翻開
-      setTimeout(() => { revealAtCenter(L.to, L.got); }, 220);
-    }
+    /* ⚠⚠ 這一支要**立刻**掛,不可以再 setTimeout 等攻擊方滑到位(舊版等 220ms):
+       paint() 已經把落點畫成攻擊方的子、被吃的那顆從 DOM 上消失了,晚 220ms 才掛的
+       下場是「暗子瞬間不見 → 空了 0.22 秒 → 又冒出來 → 才翻開」,那個「不見又冒
+       出來」就是使用者說的不順。改成一開始就掛,第一段停在原格當牌背(等攻擊方滑
+       進來的那段時間由 CSS 時間軸自己走)—— 那顆暗子從頭到尾沒有離開過畫面。 */
+    if(EAT_KINDS[L.kind] && wasHiddenAtTo) revealAtCenter(L.to, L.got);
     // 明棋吃明棋(wasHiddenAtTo 是 false):滑過去本身就講完了,不疊加任何效果。
     // darkSelf / jumpSelf / darkMiss:翻牌動畫本身已經講完了,不疊加任何效果。
   }
