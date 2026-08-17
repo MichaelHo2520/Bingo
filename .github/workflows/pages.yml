@@ -1,5 +1,11 @@
 # GitHub Pages 部署 —— 純靜態上傳,不跑 Jekyll
 #
+# ⚠⚠⚠ **目前這個 workflow 是「備用」,沒有在跑**(2026-08-17)。
+#   repo 設定回到 `build_type=legacy`,線上版由 GitHub 內建的
+#   `pages-build-deployment` 部署。原因與怎麼切回來,見檔尾「現在為什麼是備用」。
+#   ★ 所以 `on:` 底下**刻意只留 workflow_dispatch** —— 掛著 `push` 的話每次推都會
+#     多一個失敗的紅 X(它現在一定失敗),而那種常態性的紅會讓人以後看不出真的壞掉。
+#
 # ★★ 為什麼從「Deploy from a branch」(legacy)換過來(2026-08-17):
 #   legacy 的 Pages build 會在 GitHub 側跑一輪 Jekyll。這個專案一個 Jekyll 功能都沒用到,
 #   卻要為它付兩個代價,而且**兩個都咬過**:
@@ -26,9 +32,10 @@
 name: Deploy static site to Pages
 
 on:
-  push:
-    branches: [main]
-  # 手動觸發(改完設定之後不必為了部署硬推一個 commit)
+  # ⚠ 只有手動 —— 見檔頭那條(現在是備用,掛 push 會每次留一個紅 X)。
+  #   要正式接管部署時,把下面兩行的註解拿掉、並把 build_type 改成 workflow。
+  # push:
+  #   branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -64,3 +71,34 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+# ============================================================================
+# 現在為什麼是備用(2026-08-17 的實測紀錄,免得下一個人重走一遍)
+# ----------------------------------------------------------------------------
+# 那天線上版停在兩個 commit 之前,而 repo 完全正常。查到最後**根因在 GitHub 側**:
+#
+#   legacy build(62b4a77 / 8bf3c53 兩次都掛):
+#     ##[error]Failed to download action 'actions/jekyll-build-pages'
+#     Error: 503 (Service Unavailable) → 429 (Too Many Requests) ×3 attempts
+#
+#   換成這個 workflow 之後**一樣掛**,只是換一個 action 的名字:
+#     Failed to download archive 'actions/configure-pages' after 3 attempts  (429)
+#     Failed to download archive 'actions/deploy-pages' after 3 attempts     (429)
+#
+# 也就是說那段時間 codeload.github.com 對這個 repo 在限流,**兩種管線都會中** ——
+# 不是 Jekyll 的錯,也不是 `styles.css` 的錯(當時很容易誤判成後者:
+# 失敗的兩次剛好都改了 styles.css,沒改的那次成功,而 legacy 的錯誤訊息只有
+# 一句 "Page build failed."、`duration: 0`)。
+#
+# ★ 最後可用的組合(實測):**legacy + `.nojekyll`** —— 那次成功只花 **48 秒**
+#   (加 `.nojekyll` 之前是 117 秒),因為 Jekyll 那一段整個跳過了。
+#   所以 `.nojekyll` 留著是淨賺:build 快一倍 = 撞上限流的窗口小一半。
+#
+# ── 什麼時候把這個 workflow 接回來 ──────────────────────────────────────────
+#   ① 手動跑一次(Actions 頁面 → 這個 workflow → Run workflow),確認不再 429;
+#   ② 成功之後:把上面 `on:` 的 push 兩行解註解;
+#   ③ `gh api -X PUT repos/<owner>/<repo>/pages -f build_type=workflow`。
+#   ⚠ ②③ 少一個都不會生效:只改設定 → 推 code 不會觸發部署;只解註解 → 跑得起來
+#     但 deploy-pages 那一步會因為 Pages 還是 legacy 而失敗。
+#   ⚠ 回退:`build_type=legacy` + 把 push 兩行改回註解。
+# ============================================================================
