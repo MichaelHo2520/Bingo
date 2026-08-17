@@ -155,7 +155,14 @@ const Solo = (function(){
   function tick(){
     if(!active || over || !st) return;
     if(st.over){ finish(); return; }
-    if(st.turn === ME){ thinking = false; paint(); return; }   // 等玩家點
+    if(st.turn === ME){
+      thinking = false;
+      /* ★ 「輪到你」——大老二 / UNO / 排七的單機都有,這一頁在 v2.3.3 之前沒有。
+         六人局要等五個 AI 依序想完才回到自己,中間只有走子的細響。
+         ⚠ `moves.length` 是為了不要與開局的 Sound.start() 撞在一起(第 0 手就是我時)。 */
+      if(moves.length) try{ Sound.turn(); }catch(e){}
+      paint(); return;                                          // 等玩家點
+    }
     thinking = true;
     paint();
     later(aiMove, TQAI.thinkMs(level));
@@ -171,14 +178,10 @@ const Solo = (function(){
     const mv = st.last;
     const idx = st.pieces[seat].indexOf(to);
     /* ★★ 現場效果走 TQB.drama()(單機與連線同一支,見 board.js 第七節)。
-       ⚠ 它自己包了 try/catch —— 裝飾壞掉不可以連帶把棋局卡住。 */
-    if(mv.borrowed > 0 && mv.jumps >= 2){
-      TQB.drama({ kind: "borrow", byName: seatName(seat), toName: "別人", byId: "s" + seat });
-    }else if(mv.jumps >= 4){
-      TQB.drama({ kind: "chain", byName: seatName(seat), jumps: mv.jumps, byId: "s" + seat });
-    }else if(mv.home){
-      TQB.drama({ kind: "home", byName: seatName(seat), byId: "s" + seat });
-    }else{
+       ⚠ 它自己包了 try/catch —— 裝飾壞掉不可以連帶把棋局卡住。
+       ★ v2.3.4 起「哪一種效果 / 疊哪幾顆聲音」全部在那一支裡決定(在此之前這裡與
+         adapter 各有一份門檻,而且已經不一樣了);這裡只把那一手交過去。 */
+    if(!TQB.drama({ mv: mv, byName: seatName(seat), toName: "別人", byId: "s" + seat })){
       const t = TQ.moveText(mv);
       if(t && seat !== ME) showToast(esc(seatName(seat)) + " " + t, 1200);
     }
@@ -210,8 +213,9 @@ const Solo = (function(){
   function selectPiece(id){
     sel = id;
     spots = TQ.movesFrom(st, id);
-    TQB.SFX.pick();
-    if(!spots.length) showToast("這一顆四面都被擋住了 —— 換一顆");
+    // ⚠ 有路 / 死路不同的聲音(與 adapter 同一個道理,見那一份的註解)
+    if(spots.length) TQB.SFX.pick();
+    else { TQB.SFX.blocked(); showToast("這一顆四面都被擋住了 —— 換一顆"); }
     paint();
   }
   function ok2play(){

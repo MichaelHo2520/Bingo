@@ -126,7 +126,10 @@ const MP = MPCore.create((function(){
       hint: hintText(),
       // 倒數給全桌看(誰還剩幾秒是公開資訊,大家才知道在等什麼)
       cdMs: secOn() ? turnSec * 1000 : 0,
-      cdEnd: secOn() ? turnAt + turnSec * 1000 : 0
+      cdEnd: secOn() ? turnAt + turnSec * 1000 : 0,
+      /* ⚠ 但「剩 3 秒那一聲」只能響在自己的回合 —— 環給全桌看,聲音不行
+         (六人局每家都嗶就是一局嗶上百次)。 */
+      cdMine: isMyTurn()
     });
     ctx.renderPlayers();
   }
@@ -165,6 +168,11 @@ const MP = MPCore.create((function(){
          chk => chk.turn === me && !!TQ.moveOf(chk, me, from, to));
     // ★ 純視覺的「送出中」。⚠ 它不擋任何操作,只是讓玩家知道點到了
     markPending(from);
+    /* ★★★ 加上「聽得到的」送出回饋(v2.3.4)。這一頁刻意不樂觀(檔頭①):送出之後
+       本地一格都不動,要等 100~300ms 的往返 —— 在此之前那段空窗**完全沒有聲音**,
+       而第 3.2 節那張表明明寫著「回饋可以樂觀、狀態不可以」。
+       ⚠ 它是裝飾:自己包起來,絕不可以把例外丟進送出這條路(飛行棋 v1.179.6 的教訓)。 */
+    try{ TQB.SFX.send(); }catch(e){ console.error("tq sfx:send", e); }
   }
 
   function markPending(id){
@@ -206,8 +214,10 @@ const MP = MPCore.create((function(){
   function selectPiece(id){
     sel = id;
     spots = TQ.movesFrom(st, id);
-    TQB.SFX.pick();
-    if(!spots.length) showToast("這一顆四面都被擋住了 —— 換一顆");
+    /* ⚠ 有路 / 死路要**不同的聲音**:在此之前兩者都是 pick(),
+       等於聲音先說「選到了」、字才說「但走不了」。 */
+    if(spots.length) TQB.SFX.pick();
+    else { TQB.SFX.blocked(); showToast("這一顆四面都被擋住了 —— 換一顆"); }
     paint();
   }
   function doMove(from, to, path){
@@ -251,6 +261,11 @@ const MP = MPCore.create((function(){
   function autoPlay(seat, step){
     turnT = null;
     if(!st || st.over || st.turn !== seat || !playing()) return;
+    /* ★ 逾時的那個人要知道「那一手不是我下的」—— 在此之前畫面與聲音都跟自己走的一模一樣。
+       ⚠ 只響在自己這一台的自己那一座:armTurnT() 每台都替**當下那一家**排計時器,
+         不加這道守衛就會替別人逾時而在自己這裡響。
+       ⚠⚠ 語氣要中性(像時鐘),**不可以做成錯誤音** —— 代打是幫他。 */
+    if(seat === mySeat()){ try{ TQB.SFX.auto(); }catch(e){ console.error("tq sfx:auto", e); } }
     // ★ 替人代打一律用「普通」,不套任何人的難度 —— 幫人打不該幫他打得特別好
     push(step, chk => TQAI.autoMove(chk, seat), chk => chk.turn === seat);
     /* ★★ 沒寫成就自己補排一次(飛行棋 v1.179.6 的教訓):交易有可能整個沒寫成,
@@ -326,22 +341,18 @@ const MP = MPCore.create((function(){
        ⚠ 借道 / 長鏈 / 到家都是 replay 算得出來的公開事實 →
          **完全在本地做,一個 DB 寫入都沒有**(走 sendEmote 會變成 N 台各送一次)。
      ========================================================================== */
+  /* ★★ v2.3.4 起「哪一種效果 / 疊哪幾顆聲音」一律由 TQB.drama() 決定,這裡只把那一手
+     交過去(單機那一份也是同一支)—— 在此之前門檻是雙胞胎而且已經走鐘了
+     (這邊 `borrowed > 0`、solo 那邊 `borrowed > 0 && jumps >= 2`)。
+     ⚠ 它回「有沒有做出表情」;沒有才補那句 toast。 */
   function drama(mv){
     if(!mv) return;
-    const me = mySeat();
     try{
-      if(mv.borrowed > 0){
-        // 被借的是誰:借道那一段的中點屬於誰 —— 規則層已經算過,這裡只講「有借」
-        TQB.drama({ kind: "borrow", byName: nameOfSeat(mv.seat), toName: "別人",
-                    byId: ctx.order()[mv.seat], victim: false });
-      }else if(mv.jumps >= 4){
-        TQB.drama({ kind: "chain", byName: nameOfSeat(mv.seat), jumps: mv.jumps,
-                    byId: ctx.order()[mv.seat] });
-      }else if(mv.home){
-        TQB.drama({ kind: "home", byName: nameOfSeat(mv.seat), byId: ctx.order()[mv.seat] });
-      }else{
+      const shown = TQB.drama({ mv: mv, byName: nameOfSeat(mv.seat), toName: "別人",
+                                byId: ctx.order()[mv.seat], victim: false });
+      if(!shown && mv.seat !== mySeat()){
         const t = TQ.moveText(mv);
-        if(t && mv.seat !== me) showToast(esc(nameOfSeat(mv.seat)) + " " + t, 1300);
+        if(t) showToast(esc(nameOfSeat(mv.seat)) + " " + t, 1300);
       }
     }catch(e){ console.error("tq drama", e); }
   }

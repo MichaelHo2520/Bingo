@@ -63,8 +63,16 @@ const TQB = (function(){
   const OX = TRAY_W / 2 - R.BOARD_W / 2;   // 洞座標要往右下平移多少(格)
   const OY = TRAY_H / 2 - R.BOARD_H / 2;
 
-  const MS_HOP = 150;                  // 一段跳多久
-  const MS_STEP = 210;                 // 單步多久(只有一段,慢一點才看得到)
+  /* 動畫節奏(v2.3.4 放慢,使用者:「沒有在玩跳棋的感覺」)。
+     ★ 快不是優點 —— 150ms 一段的連跳看起來是「滑過去」而不是「一顆一顆跳」。
+     ⚠⚠ 但**不可以線性放大**:8 段連跳 × 250ms = 2 秒,而
+       ① animMs() 同時是單機的節拍器(solo.js 每一手等 animMs + 140)→ 6 人局會拖到不想玩;
+       ② 對帳心跳每 3 秒一拍,遇到 _flying() 會讓一拍 → 動畫越長,對帳被推得越晚。
+       → 所以整趟有上限 MS_CHAIN_MAX,超過就把每段壓縮(段數多的那幾手本來就該快起來,
+         那正好是「連跳有加速度」的手感)。 */
+  const MS_HOP = 250;                  // 一段跳多久(上限之內)
+  const MS_STEP = 340;                 // 單步多久(只有一段,慢一點才看得到)
+  const MS_CHAIN_MAX = 1500;           // ★ 連跳整趟的天花板(6 段就到頂)
 
   let board = null, stage = null, acts = null;
   let cb = { onHole: null, onPiece: null };
@@ -85,14 +93,93 @@ const TQB = (function(){
   let flight = null;                   // { el, path, startAt, dur, seg }
   let rafId = 0;
 
-  /* 這一頁的音效。★ 走 Sound.tone()(audio.js 開給各遊戲寫自己樂句的入口)。
-     ⚠ 連跳一段一聲,而且**音高隨段數往上爬** —— 跳得越長越爽,那是這個遊戲的核心快感。 */
+  /* ==========================================================================
+     這一頁的音效(v2.3.4 整組重做)。★ 走 Sound.tone()(audio.js 開給各遊戲寫自己
+     樂句的入口)—— 吃靜音開關與總音量,不必自己管。
+
+     ⚠⚠⚠ **量,不要聽**(notes/22 第 12.1.1 節那條血淚):「有沒有響」與「聽不聽得到」
+       是兩件事。量法是照 tone() 的包絡離線渲染 → 過兩級 500Hz 高通(≈ 小喇叭的低頻
+       滾降)→ 比總能量,以「輪到你」那顆當 1.00。**那條「使用者說沒聽到」的線 = 0.088。**
+
+     ⚠⚠ v2.3.3 之前這一整組都在線以下,而**最嚴重的是核心快感**:
+       整趟四段連跳量到 **0.087** —— 剛好就是那條線。CLAUDE.md 給這一頁的一句話介紹
+       是「連跳一口氣飛過半個盤面」,而那個賣點在手機喇叭上幾乎是靜音的。
+       病因不是飛行棋那個「基頻壓太低」(520Hz 以上是合格的),而是
+       **triangle 波(諧波按 1/n² 掉)+ dur 0.085 + vol 0.13 三個一起小**。
+
+     ★★ 修法不是整體調大(一局 83~179 手,每手最多 9 響 → 會變連珠炮),
+       而是**把動態範圍拉開**:輕的維持輕,重的真的重。
+       改完量到(vs 輪到你):
+
+         pick 0.014 · blocked 0.054 · step 0.135 · warn 0.159 · send 0.200
+         hop 0.035(第一段)→ 0.385(第九段)　←★ 舊版只有 0.014 → 0.041
+         land 0.164~0.266 · auto 0.248 · borrow 0.323 · home 0.749
+         **整趟連跳 + 落地:2 段 0.255 / 4 段 0.592 / 6 段 1.033 / 8 段 1.709**
+                              ↑ 舊版四段是 0.087,現在是 6.8 倍
+
+       對照(飛行棋改完、使用者確認聽得到的):plop 0.247 · six 0.429 · eat 0.595。
+     ⚠ **改任何一顆之前先照那個方法量一次**,而且要量「整趟」不是只量單響。
+     ⚠ 基頻一律待在 600Hz 以上,要「厚」靠往下滑(slideTo)—— 同飛行棋那條紅線。
+     ========================================================================== */
   const SFX = {
-    hop(k){ T(520 + Math.min(k, 9) * 62, { type: "triangle", dur: 0.085, vol: 0.13 }); },
-    step(){ T(430, { type: "sine", dur: 0.10, vol: 0.11 }); },
+    /* ★★★ 連跳一段一聲:音高、時長、份量**三個都隨段數往上爬**。
+       ⚠ v2.3.3 之前只有音高在爬,而音高在能量上幾乎聽不出差別(0.014 → 0.041)——
+         「跳得越長越爽」這件事聽覺上其實沒有兌現。 */
+    hop(k){
+      const n = Math.min(k, 9), f = 660 + n * 74, g = Math.min(2.1, 1 + n * 0.17);
+      T(f, { type: "triangle", dur: 0.075 + n * 0.006, vol: 0.15 * g, slideTo: f * 1.55 });
+      // 第三段起補一層厚度(靠往下滑,不靠低基頻)
+      if(n >= 2) T(f * 0.62, { type: "square", dur: 0.05, vol: 0.055 * g, delay: 0.008, slideTo: f * 0.9 });
+    },
+    /* ★★ 連跳的落地。⚠ v2.3.3 之前這一支是**死碼**(見 frame() 的呼叫點註解)。 */
+    land(segs){
+      const w = Math.min(1, 0.55 + (segs || 2) * 0.11);
+      T(980, { type: "triangle", dur: 0.10, vol: 0.22 * w, slideTo: 520 });
+      T(1560, { type: "sine", dur: 0.13, vol: 0.16 * w, delay: 0.02, slideTo: 780 });
+    },
+    /* ★★ 單步走一格。⚠⚠ **不可以照抄飛行棋的走格 tick**(那顆刻意做到 0.009):
+       飛行棋一手走六格所以要輕,而這一頁的單步**就是一整手**,是那一手唯一的回饋。 */
+    step(){
+      T(760, { type: "triangle", dur: 0.13, vol: 0.20, slideTo: 620 });
+      T(1500, { type: "sine", dur: 0.06, vol: 0.10, delay: 0.02 });
+    },
     pick(){ T(760, { type: "sine", dur: 0.05, vol: 0.09 }); },
-    land(){ T(880, { type: "sine", dur: 0.14, vol: 0.13, slideTo: 1180 }); },
-    home(){ [659, 880, 1175].forEach((f, i) => T(f, { type: "sine", dur: 0.18, vol: 0.20, delay: i * 0.07 })); }
+    /* ★ 選到一顆四面都被擋住的棋 —— 往下的短音。
+       ⚠ 在此之前它與 pick() 是同一個聲音:聲音先講「選到了」,toast 才講「但走不了」。 */
+    blocked(){ T(720, { type: "triangle", dur: 0.12, vol: 0.16, slideTo: 400 }); },
+    /* ★★★ 送出中(只有連線會用)。這一頁刻意**不樂觀**(紅線 1):送出之後本地一格
+       都不動,等 100~300ms 的往返。notes/23 第 3.2 節那張表寫著「**回饋**可以樂觀,
+       **狀態**不可以」—— 而在此之前那一格回饋只有視覺(半透明脈動),是啞的。
+       ★ 這一顆同時是 notes/23 第十節那條「只有真人測得出來的 {local:false} 體感」
+         最便宜的解法:不必動同步模型,就把「鈍」的感覺抵銷掉。
+       ⚠ 一定要與 pick()(0.014)聽得出不同 —— 一個是「選中」,一個是「送出去了」。 */
+    send(){
+      T(880, { type: "triangle", dur: 0.07, vol: 0.22, slideTo: 1320 });
+      T(1320, { type: "sine", dur: 0.10, vol: 0.16, delay: 0.05 });
+    },
+    /* ★★ 借道 —— 這一頁**唯一的人際瞬間**(notes/23 第六節),在此之前是啞的
+       (只有 🪜 表情 + 震動,而震動只有被借的那個人感覺得到)。
+       ⚠ 要與 hop() 明顯不同,才聽得出「這一段是踩在別人身上」。
+       ★ 方向刻意與飛行棋的踩人相反:那一顆是「對某個人做壞事」(下滑、碎裂),
+         這一顆是「借用」→ **上揚、不刺**。 */
+    borrow(){
+      T(1046, { type: "sine", dur: 0.12, vol: 0.20, slideTo: 1568 });
+      T(1568, { type: "triangle", dur: 0.16, vol: 0.16, delay: 0.07 });
+    },
+    /* ⚠ at = 往後錯開幾秒。借道 + 到家會**同時發生**(越過目標區裡對手的棋跳進自己家),
+       兩顆撞在同一個 30ms 裡會糊掉 → 呼叫端錯開它(見 drama())。 */
+    home(at){
+      const t = at || 0;
+      [659, 880, 1175].forEach((f, i) => T(f, { type: "sine", dur: 0.18, vol: 0.20, delay: t + i * 0.07 }));
+    },
+    /* ★ 倒數剩 3 秒。⚠ **只響一次、而且只在自己的回合**(見 tickCd)——
+       這是親友聚會,不做成三聲逼人。 */
+    warn(){ T(1175, { type: "triangle", dur: 0.12, vol: 0.22, slideTo: 880 }); },
+    /* ★ 系統代打。⚠ **不可以做成錯誤音** —— 代打是幫他,不是罰他。中性的兩音(像時鐘)。 */
+    auto(){
+      T(1320, { type: "sine", dur: 0.09, vol: 0.16 });
+      T(990, { type: "sine", dur: 0.14, vol: 0.16, delay: 0.09 });
+    }
   };
   function T(f, o){ if(typeof Sound !== "undefined" && Sound.tone) Sound.tone(f, o); }
 
@@ -486,7 +573,7 @@ const TQB = (function(){
   function animMs(path){
     if(!path || path.length < 2) return 0;
     const segs = path.length - 1;
-    return segs === 1 ? MS_STEP : segs * MS_HOP;
+    return segs === 1 ? MS_STEP : Math.min(segs * MS_HOP, MS_CHAIN_MAX);
   }
 
   function stopFlight(){
@@ -535,7 +622,14 @@ const TQB = (function(){
          ⚠ 這裡**不叫任何回呼**(見檔頭):呼叫端要接續就自己算 animMs()。 */
       f.el.classList.remove("fly");
       setHole(f.el, f.path[f.path.length - 1]);
+      const segsDone = f.path.length - 1;
       flight = null;
+      /* ★★ 落地音(v2.3.4)。在此之前 SFX.land() 是**死碼** —— 定義了、export 了、
+         一個呼叫點都沒有 → 飛了 5 段、一段一段拱過去,最後是靜音的。
+         ⚠ 只給連跳:單步的 step() 已經是那一手的收尾了,再補一聲會變成兩下。
+         ⚠⚠ 只在「大致準時演完」時才響:分頁被丟到背景再回來時 rAF 會遲很久才觸發,
+           那時候補一聲「咚」是憑空冒出來的。⚠ 離場不必擔心 —— reset() 會 stopFlight()。 */
+      if(segsDone >= 2 && t < f.dur + FLIGHT_SLACK) SFX.land(segsDone);
       return;
     }
     const segs = f.path.length - 1;
@@ -545,8 +639,14 @@ const TQB = (function(){
     const a = vXY(f.path[k]), b = vXY(f.path[k + 1]);
     /* 每一段拉一條小拋物線 —— 跳棋是「跳」過去的,直線平移看起來像滑行。
        ⚠ 幅度跟著段長走,單步(只有一段)幾乎不拱。 */
-    const lift = (segs === 1 ? 0.12 : 0.30) * Math.sin(Math.PI * frac);
-    setPos(f.el, a.x + (b.x - a.x) * frac, a.y + (b.y - a.y) * frac - lift);
+    const lift = (segs === 1 ? 0.18 : 0.38) * Math.sin(Math.PI * frac);
+    /* ★★ 每一段各自 ease-in-out(v2.3.4)。在此之前段內是**等速直線** ——
+       連跳看起來是一條等速的鋸齒折線(= 滑行),而不是「一顆一顆跳」。
+       兩端速度歸零 = 每一段都有起跳與落定,那正是使用者說少掉的「玩跳棋的感覺」。
+       ★ 它仍然是**純 t 的函式**(紅線 2),被打斷、rAF 不觸發都不影響正確性。
+       ⚠ 拋物線用 frac(牆上時間)而不是 e:用 e 的話棋子會「先浮起來才開始飛」。 */
+    const e = 0.5 - 0.5 * Math.cos(Math.PI * frac);
+    setPos(f.el, a.x + (b.x - a.x) * e, a.y + (b.y - a.y) * e - lift);
     if(k !== f.seg){
       f.seg = k;
       if(segs === 1) SFX.step(); else SFX.hop(k);
@@ -640,6 +740,11 @@ const TQB = (function(){
             而那段空窗裡只要再叫一次 renderActs()(resize 就會)環就會彈回滿格。
      ========================================================================== */
   let cdT = null, cdKey = "", cdEnd = 0;
+  /* ★ 倒數提示音的兩個狀態(v2.3.4)。
+     ⚠ `cdMine` 是必要的:倒數環**給全桌看**(誰還剩幾秒是公開資訊),但提示音
+       只能響在**自己**那一回合 —— 不然六人局每一家倒數都嗶一聲,一局嗶上百次。
+     ⚠ `cdWarned` 綁在 cdKey 上(= 這一手的倒數),換手就重置 → 一手只響一次。 */
+  let cdMine = false, cdWarned = false;
   const CD_HOT = 3000;
 
   function renderActs(o){
@@ -651,10 +756,10 @@ const TQB = (function(){
     acts.classList.remove("hidden");
     const hint = $("tqHint");
     if(hint) hint.innerHTML = o.hint || "";
-    syncCd(o.cdMs, o.cdEnd);
+    syncCd(o.cdMs, o.cdEnd, o.cdMine);
   }
 
-  function syncCd(cdMs, endAt){
+  function syncCd(cdMs, endAt, mine){
     const box = $("tqCdWrap");
     if(!box) return;
     if(!cdMs || !endAt){ stopCd(); return; }
@@ -662,6 +767,7 @@ const TQB = (function(){
     if(left <= 0){ stopCd(); return; }
     const key = cdMs + ":" + endAt;
     cdEnd = endAt;
+    cdMine = !!mine;
     box.innerHTML =
       '<span class="tq-cd' + (left <= CD_HOT ? " tq-hot" : "") + '" id="tqCd" aria-hidden="true"' +
         ' style="--cd-dur:' + (cdMs / 1000) + 's;--cd-delay:' + (-(cdMs - left) / 1000) + 's">' +
@@ -671,6 +777,7 @@ const TQB = (function(){
       "</span>";
     if(key === cdKey && cdT) return;
     cdKey = key;
+    cdWarned = false;              // ★ 換一手 = 重新給一次提示音的額度
     if(cdT) clearInterval(cdT);
     cdT = setInterval(tickCd, 200);
   }
@@ -685,11 +792,19 @@ const TQB = (function(){
       n.classList.remove("tq-beat"); void n.offsetWidth; n.classList.add("tq-beat");
     }
     el.classList.toggle("tq-hot", left <= CD_HOT);
+    /* ★ 進入「剩 3 秒」時嗶一聲。在此之前 CD_HOT 只換 CSS 的 .tq-hot,是純視覺 ——
+       而這一頁的倒數刻意比飛行棋長(40 vs 30 秒,因為「跳棋要想的比較久」),
+       想得越久就越可能盯著盤面算連跳路線、沒在看自己的倒數環。
+       ⚠ 只在自己的回合、一手只響一次(見 cdMine / cdWarned)。 */
+    if(!cdWarned && cdMine && left <= CD_HOT && left > 0){
+      cdWarned = true;
+      try{ SFX.warn(); }catch(e){}
+    }
     if(left <= 0){ clearInterval(cdT); cdT = null; }
   }
   function stopCd(){
     if(cdT){ clearInterval(cdT); cdT = null; }
-    cdKey = ""; cdEnd = 0;
+    cdKey = ""; cdEnd = 0; cdMine = false; cdWarned = false;
     const box = $("tqCdWrap");
     if(box) box.innerHTML = "";
   }
@@ -716,19 +831,44 @@ const TQB = (function(){
      ========================================================================== */
   function safe(what, fn){ try{ fn(); }catch(e){ console.error("tq drama:" + what, e); } }
 
+  /* ★★ v2.3.4 起「哪一種效果」由這一支決定,呼叫端只把那一手交過來。
+     兩個理由:
+       ① **在此之前門檻是雙胞胎而且已經走鐘了** —— adapter 用 `borrowed > 0`、
+          solo 用 `borrowed > 0 && jumps >= 2`,同一件事在兩邊的頻率不一樣。
+       ② adapter 的 drama() 有 900 字元的原始碼斷言(gen-tq-e2e.js)→
+          疊聲音的邏輯放在那邊會把它擠爆。
+     ⚠ 舊的 { kind:"chain", jumps:5 } 呼叫法**照樣有效**(讀 o.mv || o)——
+       gen-tq-e2e.js 有一條就是那樣叫的。
+
+     ★★★ **表情挑一個,聲音可以疊。**
+       表情飛三顆會糊成一團;但「借道 + 到家」是**同一手**會同時成立的
+       (越過目標區裡對手的棋跳進自己家,而那正是最常見的到家方式之一)——
+       在此之前那是 if / else-if 鏈,🏁 的三音會被借道**整個吞掉**,
+       也就是**最該有聲音的那一手反而什麼聲音都沒有**。
+     ⚠ 回傳「有沒有做出表情」:沒有的話呼叫端才去補那句 toast。 */
   function drama(o){
-    if(!o) return;
-    if(o.kind === "borrow"){
-      safe("emote", () => showEmote("🪜", esc(o.byName) + " 借了 " + esc(o.toName) + " 的棋當跳板",
-                                    o.byId || o.byName, "emoji"));
+    if(!o) return false;
+    const mv = o.mv || o, j = mv.jumps || 0, b = mv.borrowed || 0;
+    const who = o.byId || o.byName;
+    let shown = false;
+    /* ⚠ 借道的門檻是 `jumps >= 2` 而不是 `borrowed > 0`(取兩份雙胞胎裡較保守的那一個):
+       中盤過後單段跳過別人一顆是家常便飯,每次都飛 🪜 就變成洗版。 */
+    if(b > 0 && j >= 2){
+      safe("emote", () => showEmote("🪜", esc(o.byName) + " 借了 " + esc(o.toName || "別人") + " 的棋當跳板",
+                                    who, "emoji"));
+      safe("sfx", SFX.borrow);
       if(o.victim) safe("buzz", buzz);
-    }else if(o.kind === "chain"){
-      safe("emote", () => showEmote("🔥", esc(o.byName) + " 一口氣跳了 " + o.jumps + " 段",
-                                    o.byId || o.byName, "emoji"));
-    }else if(o.kind === "home"){
-      safe("emote", () => showEmote("🏁", esc(o.byName) + " 有一顆到家了", o.byId || o.byName, "emoji"));
-      safe("sfx", SFX.home);
+      shown = true;
+    }else if(j >= 4){
+      safe("emote", () => showEmote("🔥", esc(o.byName) + " 一口氣跳了 " + j + " 段", who, "emoji"));
+      shown = true;
+    }else if(mv.home){
+      safe("emote", () => showEmote("🏁", esc(o.byName) + " 有一顆到家了", who, "emoji"));
+      shown = true;
     }
+    // ★ 到家的三音不再被上面任何一支吞掉;疊在借道後面要錯開,不然兩顆糊在一起。
+    if(mv.home) safe("sfx", () => SFX.home(shown && b > 0 ? 0.22 : 0));
+    return shown;
   }
   function buzz(){
     try{ if(typeof vibrateOn !== "undefined" && vibrateOn && navigator.vibrate) navigator.vibrate([16, 34, 16]); }catch(e){}
