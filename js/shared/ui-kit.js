@@ -1308,6 +1308,17 @@ const BigMode = (function(){
     if(!cfg) return;
     document.body.classList.toggle(cfg.cls, want && live());
     const on = document.body.classList.contains(cfg.cls);
+    /* ★★ 通用旗標(v1.182.3):版面規則一律掛在 `body.is-big` 上,**不必逐遊戲列前綴**。
+       在此之前 styles.src.css 檔尾是十一組群組選擇器、每組為每個遊戲寫一行
+       (11 組 × 11 行 = 121 行,承載的實際宣告只有 11 條)——
+       而新增遊戲時漏補任何一組都是靜默的版面錯位,全部漏補就是「按下去完全沒反應」。
+       ⚠⚠ 飛行棋(v1.179.0)與跳棋(v1.180.0)**連續兩個新遊戲都踩了**,而且都是
+         使用者回報才發現的(e2e 一支都不會紅)。加這一行之後那張登記表就不存在了。
+       ★ 各頁自己的 `XX-big` 仍然保留:那十一頁各自還有幾條專屬規則掛在它上面,
+         而且 tools/t-big-consist.html 是靠點鈕之後看 body class 來判斷狀態的。
+       ⚠ 台灣麻將與你畫我猜**刻意不走這一支**(各有自己的大模式實作)→ 它們不會拿到
+         is-big,規則照舊掛在 body.m16-big / body.dw-big 上,不受這一行影響。 */
+    document.body.classList.toggle("is-big", on);
     /* ★★ 只有**狀態真的變了**才往下做重算(v1.178.5)。sync() 每次換畫面都會被叫到,
        而換畫面十次裡有九次這個狀態沒動 —— 每次都補一發 resize + after() 是白工,
        而且**量得到**:t-topbar-fit / t-zfold-fit 那兩支在「補 body class 之後等 60ms 再量」

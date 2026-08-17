@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 df639e065b8eafb930c5c9ed5f17fa97ce6ce5dd2a1c13aa753f93198952eae9)
+    真相在 styles.src.css(sha256 6faa27a141669dd86caefd38ef7fbbf4091159e8ed2ada339b5c107a14ef37e5)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4142,150 +4142,24 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .gc-art{width:58px;height:58px}
     .gc-name{font-size:17px}
   }
-body.un-big .topbar,
-body.b2-big .topbar,
-body.bj-big .topbar,
-body.dc-big .topbar,
-body.gmk-big .topbar,
-body.sdk-big .topbar,
-body.mj-big .topbar,
-body.sv-big .topbar,
-body.fc-big .topbar,
-body.tq-big .topbar,
-body.cy-big .topbar{display:none}
-body.un-big .un-room,
-body.b2-big .b2-room,
-body.bj-big .bj-room,
-body.dc-big .dc-room,
-body.gmk-big .gmk-room,
-body.sdk-big .sdk-room,
-body.mj-big .mj-room,
-body.sv-big .sv-room,
-body.fc-big .fc-room,
-body.tq-big .tq-room,
-body.cy-big .cy-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
-body.un-big .un-room > .row,
-body.b2-big .b2-room > .row,
-body.bj-big .bj-room > .row,
-body.dc-big .dc-room > .row,
-body.gmk-big .gmk-room > .row,
-body.sdk-big .sdk-room > .row,
-body.mj-big .mj-room > .row,
-body.sv-big .sv-room > .row,
-body.fc-big .fc-room > .row,
-body.tq-big .tq-room > .row,
-body.cy-big .cy-room > .row{flex:none;order:3;margin-top:0}
-body.un-big .un-room > .mp-subrow,
-body.b2-big .b2-room > .mp-subrow,
-body.bj-big .bj-room > .mp-subrow,
-body.dc-big .dc-room > .mp-subrow,
-body.gmk-big .gmk-room > .mp-subrow,
-body.sdk-big .sdk-room > .mp-subrow,
-body.mj-big .mj-room > .mp-subrow,
-body.sv-big .sv-room > .mp-subrow,
-body.fc-big .fc-room > .mp-subrow,
-body.tq-big .tq-room > .mp-subrow,
-body.cy-big .cy-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
+body.is-big .topbar{display:none}
+body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room){
+  display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
+body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room) > .row{
+  flex:none;order:3;margin-top:0}
+body.is-big .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-body.un-big .un-room-foot,
-body.b2-big .b2-room-foot,
-body.bj-big .bj-room-foot,
-body.dc-big .dc-room-foot,
-body.gmk-big .gmk-room-foot,
-body.sdk-big .sdk-room-foot,
-body.mj-big .mj-room-foot,
-body.sv-big .sv-room-foot,
-body.fc-big .fc-room-foot,
-body.tq-big .tq-room-foot,
-body.cy-big .cy-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
-body.un-big .un-room .mp-leave-btn,
-body.b2-big .b2-room .mp-leave-btn,
-body.bj-big .bj-room .mp-leave-btn,
-body.dc-big .dc-room .mp-leave-btn,
-body.gmk-big .gmk-room .mp-leave-btn,
-body.sdk-big .sdk-room .mp-leave-btn,
-body.mj-big .mj-room .mp-leave-btn,
-body.sv-big .sv-room .mp-leave-btn,
-body.fc-big .fc-room .mp-leave-btn,
-body.tq-big .tq-room .mp-leave-btn,
-body.cy-big .cy-room .mp-leave-btn{display:none}
-body.un-big .un-room .mp-goal,
-body.b2-big .b2-room .mp-goal,
-body.bj-big .bj-room .mp-goal,
-body.dc-big .dc-room .mp-goal,
-body.gmk-big .gmk-room .mp-goal,
-body.sdk-big .sdk-room .mp-goal,
-body.mj-big .mj-room .mp-goal,
-body.sv-big .sv-room .mp-goal,
-body.fc-big .fc-room .mp-goal,
-body.tq-big .tq-room .mp-goal,
-body.cy-big .cy-room .mp-goal{display:none}
-body.un-big .un-room-title,
-body.b2-big .b2-room-title,
-body.bj-big .bj-room-title,
-body.dc-big .dc-room-title,
-body.gmk-big .gmk-room-title,
-body.sdk-big .sdk-room-title,
-body.mj-big .mj-room-title,
-body.sv-big .sv-room-title,
-body.fc-big .fc-room-title,
-body.tq-big .tq-room-title,
-body.cy-big .cy-room-title{display:none}
-body.un-big .un-room .tools-docked,
-body.b2-big .b2-room .tools-docked,
-body.bj-big .bj-room .tools-docked,
-body.dc-big .dc-room .tools-docked,
-body.gmk-big .gmk-room .tools-docked,
-body.sdk-big .sdk-room .tools-docked,
-body.mj-big .mj-room .tools-docked,
-body.sv-big .sv-room .tools-docked,
-body.fc-big .fc-room .tools-docked,
-body.tq-big .tq-room .tools-docked,
-body.cy-big .cy-room .tools-docked{display:none}
-body.un-big .un-room .row:has(> .tools-docked),
-body.b2-big .b2-room .row:has(> .tools-docked),
-body.bj-big .bj-room .row:has(> .tools-docked),
-body.dc-big .dc-room .row:has(> .tools-docked),
-body.gmk-big .gmk-room .row:has(> .tools-docked),
-body.sdk-big .sdk-room .row:has(> .tools-docked),
-body.mj-big .mj-room .row:has(> .tools-docked),
-body.sv-big .sv-room .row:has(> .tools-docked),
-body.fc-big .fc-room .row:has(> .tools-docked),
-body.tq-big .tq-room .row:has(> .tools-docked),
-body.cy-big .cy-room .row:has(> .tools-docked){padding-right:0}
-body.un-big .un-room .mp-chip,
-body.b2-big .b2-room .mp-chip,
-body.bj-big .bj-room .mp-chip,
-body.dc-big .dc-room .mp-chip,
-body.gmk-big .gmk-room .mp-chip,
-body.sdk-big .sdk-room .mp-chip,
-body.mj-big .mj-room .mp-chip,
-body.sv-big .sv-room .mp-chip,
-body.fc-big .fc-room .mp-chip,
-body.tq-big .tq-room .mp-chip,
-body.cy-big .cy-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
-body.un-big .un-room .you-badge,
-body.b2-big .b2-room .you-badge,
-body.bj-big .bj-room .you-badge,
-body.dc-big .dc-room .you-badge,
-body.gmk-big .gmk-room .you-badge,
-body.sdk-big .sdk-room .you-badge,
-body.mj-big .mj-room .you-badge,
-body.sv-big .sv-room .you-badge,
-body.fc-big .fc-room .you-badge,
-body.tq-big .tq-room .you-badge,
-body.cy-big .cy-room .you-badge{display:none}
-body.un-big .un-room-foot .mp-players,
-body.b2-big .b2-room-foot .mp-players,
-body.bj-big .bj-room-foot .mp-players,
-body.dc-big .dc-room-foot .mp-players,
-body.gmk-big .gmk-room-foot .mp-players,
-body.sdk-big .sdk-room-foot .mp-players,
-body.mj-big .mj-room-foot .mp-players,
-body.sv-big .sv-room-foot .mp-players,
-body.fc-big .fc-room-foot .mp-players,
-body.tq-big .tq-room-foot .mp-players,
-body.cy-big .cy-room-foot .mp-players{
+body.is-big :is(.un-room-foot,.b2-room-foot,.bj-room-foot,.dc-room-foot,.gmk-room-foot,.sdk-room-foot,.mj-room-foot,.sv-room-foot,.fc-room-foot,.tq-room-foot,.cy-room-foot){
+  order:1;flex:1 1 0;min-width:0;margin-top:0}
+body.is-big .mp-leave-btn{display:none}
+body.is-big .mp-goal{display:none}
+body.is-big :is(.un-room-title,.b2-room-title,.bj-room-title,.dc-room-title,.gmk-room-title,.sdk-room-title,.mj-room-title,.sv-room-title,.fc-room-title,.tq-room-title,.cy-room-title){
+  display:none}
+body.is-big .tools-docked{display:none}
+body.is-big .row:has(> .tools-docked){padding-right:0}
+body.is-big .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
+body.is-big .you-badge{display:none}
+body.is-big .mp-players{
   -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
   mask-image:linear-gradient(to right,#000 90%,transparent)}
 .gmk-bigbtn,.sdk-bigbtn,.mj-bigbtn,.sv-bigbtn,.cy-bigbtn,
@@ -4293,23 +4167,9 @@ body.cy-big .cy-room-foot .mp-players{
 .gmk-bigbtn.on,.sdk-bigbtn.on,.mj-bigbtn.on,.sv-bigbtn.on,.cy-bigbtn.on,
 .un-bigbtn.on,.b2-bigbtn.on,.bj-bigbtn.on,.dc-bigbtn.on,.fc-bigbtn.on,.tq-bigbtn.on{
   border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
-body.gmk-big .gmk-solobar,
-body.sdk-big .sdk-solobar,
-body.mj-big .mj-solobar,
-body.cy-big .cy-solobar{padding-top:6px;padding-bottom:6px}
-body.gmk-big .gmk-lvtag,
-body.sdk-big .sdk-lvtag,
-body.mj-big .mj-lvtag,
-body.cy-big .cy-lvtag{display:none}
-body.gmk-big .gmk-solobar .tools-docked,
-body.sdk-big .sdk-solobar .tools-docked,
-body.mj-big .mj-solobar .tools-docked,
-body.cy-big .cy-solobar .tools-docked{display:none}
-body.gmk-big .gmk-solobar .row:has(> .tools-docked),
-body.sdk-big .sdk-solobar .row:has(> .tools-docked),
-body.mj-big .mj-solobar .row:has(> .tools-docked),
-body.cy-big .cy-solobar .row:has(> .tools-docked){padding-right:0}
-body.gmk-big .gmk-solobar .gmk-rec,
-body.sdk-big .sdk-solobar .sdk-timer,
-body.mj-big .mj-solobar .mj-timer,
-body.cy-big .cy-solobar .cy-timer{margin-left:auto}
+body.is-big :is(.gmk-solobar,.sdk-solobar,.mj-solobar,.cy-solobar){padding-top:6px;padding-bottom:6px}
+body.is-big :is(.gmk-lvtag,.sdk-lvtag,.mj-lvtag,.cy-lvtag){display:none}
+body.is-big .gmk-rec,
+body.is-big .sdk-timer,
+body.is-big .mj-timer,
+body.is-big .cy-timer{margin-left:auto}

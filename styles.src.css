@@ -9101,167 +9101,72 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      要按設定或全螢幕就先按「小」出來。
    ⚠ 晶片列**保持橫捲**(.mp-players.oneline 本來就是),右緣用 mask 淡出 ——
      人多時排不下是常態,切一半的字用漸層收掉比硬切好看。
-   ⚠ 四頁的規則一字不差,所以併成群組選擇器;⚠ 照紅線 6,群組裡**只有 class 沒有 #id**
-     (混一個 id 進來會讓同組每一個 class 都拿到 id 權重)。
+   ⚠ 照紅線 6,群組裡**只有 class 沒有 #id**(混一個 id 進來會讓同組每一個 class
+     都拿到 id 權重)。
 
    ── ⚠ 暗棋(dc)只有一處刻意不同:🏳 **投降不收** ──────────────────────────
      那一列的其他東西(返回 / 房名 / 局數)都是「離開這一局才會用」,收掉沒差;
      **投降是對局中的動作**,而且暗棋只有兩個人 → 晶片只佔兩格,那一顆留得下。
      ⚠ 所以這一段裡**沒有** `.dc-resign{display:none}` —— 不要「順手補齊」。
+
+   ── ★★★ v1.182.3:改掛共用旗標 `body.is-big`,這一段從 121 行降到 24 行 ──────
+     在此之前每一條規則都是**十一行群組選擇器**(每個遊戲一行),十一組加起來 121 行,
+     而承載的實際宣告只有 11 條。加新遊戲要在十一組裡各補一行,漏補任何一組都是
+     靜默的版面錯位,**全部漏補就是「按下去完全沒反應」**。
+     ⚠⚠ 飛行棋(v1.179.0)與跳棋(v1.180.0)**連續兩個新遊戲都踩了**,而且都是
+       使用者回報才發現的 —— e2e 一支都不會紅。
+     ★ `is-big` 由 js/shared/ui-kit.js 的 BigMode.apply() 與 `XX-big` 同時切,
+       所以「有沒有登記」這件事不存在了(JS 一定會切)。
+     ★ 權重刻意維持不變:`body.is-big .x` 與原本的 `body.un-big .x` 都是 (0,2,1),
+       而且位置一樣在檔尾 → 與各頁 `body.XX-mp .XX-room` 那類同權重規則的勝負關係不變。
+     ⚠ 底下**只剩四組還需要列前綴**(它們選的是各頁專屬 class:`.XX-room` /
+       `.XX-room-top` 的 `> .row` / `.XX-room-foot` / `.XX-room-title`)——
+       那四組用 `:is()` 各壓成一行,加新遊戲補**四處**而不是十一處。
+       其餘各組選的都是本來就共用的 class(`.topbar` / `.mp-leave-btn` / `.mp-goal` /
+       `.mp-subrow` / `.mp-chip` / `.you-badge` / `.mp-players` / `.tools-docked`)→ **零登記**。
+     ⚠ 台灣麻將與你畫我猜刻意不走 BigMode(各有自己的實作)→ 它們拿不到 is-big,
+       規則照舊在各自的 `body.m16-big` / `body.dw-big` 段落裡,不受這一段影響。
+     ★ 守門:tools/test-registry.js(那四組 `:is()` 清單要蓋滿走 BigMode 的十一頁)。
    ========================================================================== */
-body.un-big .topbar,
-body.b2-big .topbar,
-body.bj-big .topbar,
-body.dc-big .topbar,
-body.gmk-big .topbar,
-body.sdk-big .topbar,
-body.mj-big .topbar,
-body.sv-big .topbar,
-body.fc-big .topbar,
-body.tq-big .topbar,
-body.cy-big .topbar{display:none}
+body.is-big .topbar{display:none}
 /* ① 三層並排成一行。⚠ 上下內距 6px 不是 4px:34px 的鈕是這一列唯一貼到框邊的東西
    (晶片只有 22px 高),4px 看起來就是黏著框(台灣麻將 v1.178.1 的上手回報)。 */
-body.un-big .un-room,
-body.b2-big .b2-room,
-body.bj-big .bj-room,
-body.dc-big .dc-room,
-body.gmk-big .gmk-room,
-body.sdk-big .sdk-room,
-body.mj-big .mj-room,
-body.sv-big .sv-room,
-body.fc-big .fc-room,
-body.tq-big .tq-room,
-body.cy-big .cy-room{display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
+/* ⚠⚠ 需要列前綴的第 1 / 4 組:`.XX-room`(連線列與單機列**共用同一個 class**,
+   所以一次到位)。加新遊戲要補這裡 —— 守門 tools/test-registry.js。 */
+body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room){
+  display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 /* ② order:晶片列(foot)在 DOM 裡是最後一個,拉到最左邊;鈕那一列(.row)推到最右。
-   ⚠ 連線與單機共用同一組 class(兩條列都是 .XX-room),所以一次到位。 */
-body.un-big .un-room > .row,
-body.b2-big .b2-room > .row,
-body.bj-big .bj-room > .row,
-body.dc-big .dc-room > .row,
-body.gmk-big .gmk-room > .row,
-body.sdk-big .sdk-room > .row,
-body.mj-big .mj-room > .row,
-body.sv-big .sv-room > .row,
-body.fc-big .fc-room > .row,
-body.tq-big .tq-room > .row,
-body.cy-big .cy-room > .row{flex:none;order:3;margin-top:0}
-body.un-big .un-room > .mp-subrow,
-body.b2-big .b2-room > .mp-subrow,
-body.bj-big .bj-room > .mp-subrow,
-body.dc-big .dc-room > .mp-subrow,
-body.gmk-big .gmk-room > .mp-subrow,
-body.sdk-big .sdk-room > .mp-subrow,
-body.mj-big .mj-room > .mp-subrow,
-body.sv-big .sv-room > .mp-subrow,
-body.fc-big .fc-room > .mp-subrow,
-body.tq-big .tq-room > .mp-subrow,
-body.cy-big .cy-room > .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
+   ⚠⚠ 需要列前綴的第 2 / 4 組(同一份清單,但這裡要限定**直接子代**的 .row ——
+     不限定的話 `body.is-big .row` 會打到那一列以外的每一條 row)。 */
+body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room) > .row{
+  flex:none;order:3;margin-top:0}
+/* .mp-subrow 是共用 class 而且每頁只有一處(就在房間框裡)→ 不必列前綴。
+   ⚠ 原本寫成 `.XX-room > .mp-subrow`,拿掉直接子代限制是安全的(整頁就這麼一個)。 */
+body.is-big .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-body.un-big .un-room-foot,
-body.b2-big .b2-room-foot,
-body.bj-big .bj-room-foot,
-body.dc-big .dc-room-foot,
-body.gmk-big .gmk-room-foot,
-body.sdk-big .sdk-room-foot,
-body.mj-big .mj-room-foot,
-body.sv-big .sv-room-foot,
-body.fc-big .fc-room-foot,
-body.tq-big .tq-room-foot,
-body.cy-big .cy-room-foot{order:1;flex:1 1 0;min-width:0;margin-top:0}
+/* ⚠⚠ 需要列前綴的第 3 / 4 組:`.XX-room-foot`。加新遊戲要補這裡。 */
+body.is-big :is(.un-room-foot,.b2-room-foot,.bj-room-foot,.dc-room-foot,.gmk-room-foot,.sdk-room-foot,.mj-room-foot,.sv-room-foot,.fc-room-foot,.tq-room-foot,.cy-room-foot){
+  order:1;flex:1 1 0;min-width:0;margin-top:0}
 /* ③ 返回鍵 / 房名 / 局數三個一起收 —— 收掉它們讓出來的寬度就是給晶片的。
-   ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」,手機實體返回鍵也不受影響。 */
-body.un-big .un-room .mp-leave-btn,
-body.b2-big .b2-room .mp-leave-btn,
-body.bj-big .bj-room .mp-leave-btn,
-body.dc-big .dc-room .mp-leave-btn,
-body.gmk-big .gmk-room .mp-leave-btn,
-body.sdk-big .sdk-room .mp-leave-btn,
-body.mj-big .mj-room .mp-leave-btn,
-body.sv-big .sv-room .mp-leave-btn,
-body.fc-big .fc-room .mp-leave-btn,
-body.tq-big .tq-room .mp-leave-btn,
-body.cy-big .cy-room .mp-leave-btn{display:none}
-body.un-big .un-room .mp-goal,
-body.b2-big .b2-room .mp-goal,
-body.bj-big .bj-room .mp-goal,
-body.dc-big .dc-room .mp-goal,
-body.gmk-big .gmk-room .mp-goal,
-body.sdk-big .sdk-room .mp-goal,
-body.mj-big .mj-room .mp-goal,
-body.sv-big .sv-room .mp-goal,
-body.fc-big .fc-room .mp-goal,
-body.tq-big .tq-room .mp-goal,
-body.cy-big .cy-room .mp-goal{display:none}
-body.un-big .un-room-title,
-body.b2-big .b2-room-title,
-body.bj-big .bj-room-title,
-body.dc-big .dc-room-title,
-body.gmk-big .gmk-room-title,
-body.sdk-big .sdk-room-title,
-body.mj-big .mj-room-title,
-body.sv-big .sv-room-title,
-body.fc-big .fc-room-title,
-body.tq-big .tq-room-title,
-body.cy-big .cy-room-title{display:none}
-/* ④ ⛶ / ⚙️ 跟著頂列一起消失(兩條是同一件事的兩半,見檔頭) */
-body.un-big .un-room .tools-docked,
-body.b2-big .b2-room .tools-docked,
-body.bj-big .bj-room .tools-docked,
-body.dc-big .dc-room .tools-docked,
-body.gmk-big .gmk-room .tools-docked,
-body.sdk-big .sdk-room .tools-docked,
-body.mj-big .mj-room .tools-docked,
-body.sv-big .sv-room .tools-docked,
-body.fc-big .fc-room .tools-docked,
-body.tq-big .tq-room .tools-docked,
-body.cy-big .cy-room .tools-docked{display:none}
-body.un-big .un-room .row:has(> .tools-docked),
-body.b2-big .b2-room .row:has(> .tools-docked),
-body.bj-big .bj-room .row:has(> .tools-docked),
-body.dc-big .dc-room .row:has(> .tools-docked),
-body.gmk-big .gmk-room .row:has(> .tools-docked),
-body.sdk-big .sdk-room .row:has(> .tools-docked),
-body.mj-big .mj-room .row:has(> .tools-docked),
-body.sv-big .sv-room .row:has(> .tools-docked),
-body.fc-big .fc-room .row:has(> .tools-docked),
-body.tq-big .tq-room .row:has(> .tools-docked),
-body.cy-big .cy-room .row:has(> .tools-docked){padding-right:0}
+   ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」,手機實體返回鍵也不受影響。
+   ★ `.mp-leave-btn` / `.mp-goal` 是共用 class 而且只住在那兩條列裡 → 零登記。
+   ⚠ 那四頁的**單機列**(.XX-solobar)本來就沒有 .mp-leave-btn(它的返回是別的鈕),
+     所以「單機列的返回鍵不收」那條刻意的例外不受影響 —— 見檔尾 solobar 那一段。 */
+body.is-big .mp-leave-btn{display:none}
+body.is-big .mp-goal{display:none}
+/* ⚠⚠ 需要列前綴的第 4 / 4 組:`.XX-room-title`。加新遊戲要補這裡。 */
+body.is-big :is(.un-room-title,.b2-room-title,.bj-room-title,.dc-room-title,.gmk-room-title,.sdk-room-title,.mj-room-title,.sv-room-title,.fc-room-title,.tq-room-title,.cy-room-title){
+  display:none}
+/* ④ ⛶ / ⚙️ 跟著頂列一起消失(兩條是同一件事的兩半,見檔頭)。
+   ★ `.tools-docked` 只會被 dockTools() 掛到那一條列上 → 不必列前綴。 */
+body.is-big .tools-docked{display:none}
+body.is-big .row:has(> .tools-docked){padding-right:0}
 /* ⑤ 晶片縮成迷你版:收掉「你」徽章(.mp-chip.me 已經有光環,同一格不必再寫一次),
-   其餘一個都不收(名字 / 分數 / 輪到誰是這一列存在的理由)。 */
-body.un-big .un-room .mp-chip,
-body.b2-big .b2-room .mp-chip,
-body.bj-big .bj-room .mp-chip,
-body.dc-big .dc-room .mp-chip,
-body.gmk-big .gmk-room .mp-chip,
-body.sdk-big .sdk-room .mp-chip,
-body.mj-big .mj-room .mp-chip,
-body.sv-big .sv-room .mp-chip,
-body.fc-big .fc-room .mp-chip,
-body.tq-big .tq-room .mp-chip,
-body.cy-big .cy-room .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
-body.un-big .un-room .you-badge,
-body.b2-big .b2-room .you-badge,
-body.bj-big .bj-room .you-badge,
-body.dc-big .dc-room .you-badge,
-body.gmk-big .gmk-room .you-badge,
-body.sdk-big .sdk-room .you-badge,
-body.mj-big .mj-room .you-badge,
-body.sv-big .sv-room .you-badge,
-body.fc-big .fc-room .you-badge,
-body.tq-big .tq-room .you-badge,
-body.cy-big .cy-room .you-badge{display:none}
-body.un-big .un-room-foot .mp-players,
-body.b2-big .b2-room-foot .mp-players,
-body.bj-big .bj-room-foot .mp-players,
-body.dc-big .dc-room-foot .mp-players,
-body.gmk-big .gmk-room-foot .mp-players,
-body.sdk-big .sdk-room-foot .mp-players,
-body.mj-big .mj-room-foot .mp-players,
-body.sv-big .sv-room-foot .mp-players,
-body.fc-big .fc-room-foot .mp-players,
-body.tq-big .tq-room-foot .mp-players,
-body.cy-big .cy-room-foot .mp-players{
+   其餘一個都不收(名字 / 分數 / 輪到誰是這一列存在的理由)。
+   ★ 這三個 class 都是 JS 動態產生、只出現在晶片列裡 → 零登記。 */
+body.is-big .mp-chip{padding:2px 6px;gap:4px;font-size:11px}
+body.is-big .you-badge{display:none}
+body.is-big .mp-players{
   -webkit-mask-image:linear-gradient(to right,#000 90%,transparent);
   mask-image:linear-gradient(to right,#000 90%,transparent)}
 
@@ -9287,34 +9192,28 @@ body.cy-big .cy-room-foot .mp-players{
      「按了大之後這局不能提示也不能悔棋」。同理**返回鍵也不收** ——
      單機沒有別的出口(連線那一側按「小」還看得到房間框的返回鍵)。
    ⚠ 計時 / 失誤 / ⏸ 一律留著:那是這四頁唯一的局勢資訊(頂列已經收掉了)。 */
-body.gmk-big .gmk-solobar,
-body.sdk-big .sdk-solobar,
-body.mj-big .mj-solobar,
-body.cy-big .cy-solobar{padding-top:6px;padding-bottom:6px}
-body.gmk-big .gmk-lvtag,
-body.sdk-big .sdk-lvtag,
-body.mj-big .mj-lvtag,
-body.cy-big .cy-lvtag{display:none}
+body.is-big :is(.gmk-solobar,.sdk-solobar,.mj-solobar,.cy-solobar){padding-top:6px;padding-bottom:6px}
+body.is-big :is(.gmk-lvtag,.sdk-lvtag,.mj-lvtag,.cy-lvtag){display:none}
 
 /* ---------- ⚠ 單機列(.XX-solobar)也要照全站規則(v1.178.6 補)----------
    使用者:「變成大棋盤或是牌桌模式,全螢幕跟設定按鈕就隱藏掉,然後那個小的按鈕是在右邊,
    我希望全部的遊戲都是一致的」。
-   v1.178.5 漏掉這四頁的**單機列**:上面那組收 ⛶ / ⚙️ 的選擇器寫的是 `.XX-room`,
+   v1.178.5 漏掉這四頁的**單機列**:當時那組收 ⛶ / ⚙️ 的選擇器寫的是 `.XX-room`,
    而五子棋 / 數獨 / 消消樂 / 成語接龍的單機列 class 是 `.XX-solobar`(不是 room)——
    於是大模式收了頂列、dockTools() 把那兩顆搬進單機列,然後**沒有人把它們藏起來**。
-   ⚠⚠ 兩條要一起寫,少一條就是白留一格(同 .XX-room 那組:讓位的 84px 要跟著歸零)。
-   ★ 第三條是「小」要靠右:那條列本來靠 `.XX-lvtag`(flex:1)把後面的東西推到右緣,
+
+   ★★ v1.182.3:收 ⛶ / ⚙️ 的那兩條(`.tools-docked` 與讓位的 84px 歸零)**已經刪掉** ——
+     它們現在由上面通用的 `body.is-big .tools-docked` / `body.is-big .row:has(> .tools-docked)`
+     一起管,而那兩條不掛任何遊戲前綴。這正是這次改動要的效果:v1.178.6 那個
+     「room 系寫了、solobar 系漏了」的分岔**在結構上不可能再發生**,因為只剩一份。
+   ⚠ 單機的返回鍵仍然不收:那四頁的單機列本來就沒有 `.mp-leave-btn`(它的返回是別的鈕),
+     所以通用的 `body.is-big .mp-leave-btn{display:none}` 碰不到它 —— 行為與改動前一致。
+
+   ★ 剩下這一條是「小」要靠右:那條列本來靠 `.XX-lvtag`(flex:1)把後面的東西推到右緣,
      而大模式把標籤收掉了 → 不補一個 auto,整組會塌到左邊(看起來像卡在中間)。
-     ⚠ 補在**標籤後面第一個還看得見的元素**上:五子棋是戰績,其餘三頁是計時。 */
-body.gmk-big .gmk-solobar .tools-docked,
-body.sdk-big .sdk-solobar .tools-docked,
-body.mj-big .mj-solobar .tools-docked,
-body.cy-big .cy-solobar .tools-docked{display:none}
-body.gmk-big .gmk-solobar .row:has(> .tools-docked),
-body.sdk-big .sdk-solobar .row:has(> .tools-docked),
-body.mj-big .mj-solobar .row:has(> .tools-docked),
-body.cy-big .cy-solobar .row:has(> .tools-docked){padding-right:0}
-body.gmk-big .gmk-solobar .gmk-rec,
-body.sdk-big .sdk-solobar .sdk-timer,
-body.mj-big .mj-solobar .mj-timer,
-body.cy-big .cy-solobar .cy-timer{margin-left:auto}
+     ⚠ 補在**標籤後面第一個還看得見的元素**上:五子棋是戰績,其餘三頁是計時 ——
+       四頁各不相同,所以這一條**不能**併成 :is(),必須逐頁寫。 */
+body.is-big .gmk-rec,
+body.is-big .sdk-timer,
+body.is-big .mj-timer,
+body.is-big .cy-timer{margin-left:auto}
