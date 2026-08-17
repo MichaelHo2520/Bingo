@@ -2753,7 +2753,7 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
        這一列滿寬之後自然成立(原本置中,兩三組明牌時看起來就像浮在手牌中間)。
      ⚠ 橫向不受影響:那邊 `.m16-mine{display:contents}`,這一列是 grid item 本來就滿寬
        (而且刻意維持 justify-content:center,見橫向那一段)。 */
-.m16-mymelds{width:100%;min-height:34px;padding-right:var(--m16aw,0px)}
+.m16-mymelds{position:relative;width:100%;min-height:34px;padding-right:var(--m16aw,0px)}
 .m16-meld{display:inline-flex;align-items:flex-end;gap:1px;
   padding:3px;border-radius:8px;background:rgba(255,255,255,.10)}
 /* 暗槓底色不同:它在算台時是暗刻,和攤出來的碰不是同一回事 */
@@ -3238,6 +3238,283 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
   100%{opacity:0;transform:scale(3.4)}
 }
 @keyframes m16Glow{0%{opacity:0}18%{opacity:1}62%{opacity:.72}100%{opacity:0}}
+/* ==========================================================================
+   ★★ 動效層 M16Fx(v2.4.0)—— 碰 / 槓 / 吃 / 聽牌的漢字、胡牌特寫、花瓣、薄霧
+   邏輯在 js/mahjong16/fx.js,那支檔頭寫著全部的「為什麼」。這裡只記 CSS 這一半
+   不知道就會做錯的事:
+
+   ⚠⚠ 這一整塊只准動 transform / opacity / box-shadow / background。
+     這一頁的牌寬是「寬度算出來、再被總高度夾」的,**任何讓總寬 / 總高變一點的
+     東西都會讓整副牌換一次大小**(notes/11 的〇節)。所以每一層都是
+     absolute|fixed + inset:0 + pointer-events:none —— 在版面上完全不存在。
+   ⚠⚠ 高潮特效(胡 / 流局)一定要壓在結果卡**之上**:`.veil` 是 z-index:50 的
+     全螢幕蓋板,而且胡的那一刻**立刻**蓋上來 —— 掛在牌桌那一層(z-index:6)
+     等於做了看不到。所以那兩個是 fixed + z-index:61 且掛 body。
+   ⚠ 暗場刻意是**中央透明的 radial**(不是整片黑):共用的金片 canvas.confetti
+     是 z-index:60、剛好在它底下 —— 整片壓黑會把金片一起壓暗,而中央留亮
+     正好就是「背景微暗聚光」想要的效果。
+   ⚠ 大漢字**不可以加 line-height:1**:字面是中日韓字,而 font-family 第一順位的
+     Fredoka / Nunito 沒有中日韓字形 → 行框壓到 font-size 時基線由「第一個可用
+     字型」決定,墨跡會浮上去(「大 / 小」那顆鈕踩過,DOM 完全量不出來)。
+     這裡一律用 flex 置中 + line-height:1.15,不靠行框。
+   ========================================================================== */
+.m16-fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:7}
+
+/* ---------- ① 漢字爆發:碰! / 槓! / 吃! / 聽牌 ----------
+   ★ 位置**偏上**,不是正中央 —— 正中央住著宣告面板 .m16-claim。v2.3.4 之後
+     「結果一定就提早收掉宣告視窗」,所以「別人碰了」那一刻我的面板可能正開著,
+     而這個字要**解釋**那件事,不可以蓋住它。
+   ⚠⚠ 往上推一定要用 `transform:translateY(-%)`,**不可以用 `padding-top:%`**
+     (第一版用了,截圖才看出來):padding 的百分比一律相對 containing block 的
+     **寬度**,而這個舞台的長寬比差很多 —— 直向 390×500 的 26% 是 101px(高度的 20%,
+     看起來剛好),橫向 800×300 的 26% 卻是 208px = **高度的 69%**,字會直接砸在手牌上。
+     transform 的百分比相對**自己的高度**(這一層是 inset:0,等於舞台高)→ 兩種版面
+     都是同一個比例。
+   ⚠ 另一半理由:金粉的原點是 `left:50%;top:50%`(相對這一層)—— 用 padding 只推字、
+     粒子留在舞台中心,兩者會脫開;推整層才是同心的。 */
+.m16-fxw{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transform:translateY(-16%)}
+.m16-fxwho{font:800 13px/1.2 'Nunito',sans-serif;color:#ffe6a0;letter-spacing:.04em;
+  text-shadow:0 1px 3px rgba(0,0,0,.7);opacity:0;
+  animation:m16FxWho .9s cubic-bezier(.23,1,.32,1) forwards}
+/* 立體燙金:三層 offset 疊出厚度 + 一圈外光。⚠ 不用 background-clip:text ——
+   那條在部分 WebKit 上與 text-shadow 併用會把陰影一起裁掉,字就變扁的。 */
+.m16-fxw b{font:900 clamp(46px,14vw,88px)/1.15 'Fredoka','Nunito',sans-serif;
+  color:#ffe9ab;letter-spacing:.06em;
+  text-shadow:0 2px 0 #b8781a,0 4px 0 #7d4e0c,0 7px 16px rgba(0,0,0,.55),
+              0 0 26px rgba(255,193,74,.72);
+  opacity:0;animation:m16FxWord .9s cubic-bezier(.18,1.5,.4,1) forwards}
+/* 吃是三種宣告裡最輕的一件事(拿兩張、不封任何人的門)→ 字小一號、光淡一點。
+   槓最重 → 大一號。⚠ 只改 font-size 與外光,厚度那三層一律不動:
+   那是「同一組字」的識別,一改就變成兩套視覺語彙。 */
+.m16-fxw-chow b{font-size:clamp(38px,11vw,70px);text-shadow:0 2px 0 #b8781a,0 4px 0 #7d4e0c,
+  0 7px 16px rgba(0,0,0,.55),0 0 18px rgba(255,193,74,.5)}
+.m16-fxw-kong b{font-size:clamp(52px,16vw,98px)}
+/* 聽牌是**冷色**的:它不是「我拿到牌了」而是「我進入最後直線」——
+   與碰槓吃同色的話,一眼看過去會以為又有人吃了誰的牌。 */
+.m16-fxw-ready b{color:#cfe8ff;
+  text-shadow:0 2px 0 #2a6ea8,0 4px 0 #17456b,0 7px 16px rgba(0,0,0,.55),
+              0 0 26px rgba(120,196,255,.7)}
+.m16-fxw-ready .m16-fxwho{color:#cfe8ff}
+@keyframes m16FxWord{
+  0%{opacity:0;transform:scale(.42) rotate(-7deg)}
+  26%{opacity:1;transform:scale(1.1) rotate(1.5deg)}
+  40%{transform:scale(1) rotate(0)}
+  72%{opacity:1;transform:scale(1) rotate(0)}
+  100%{opacity:0;transform:scale(1.04) translateY(-10px)}
+}
+@keyframes m16FxWho{
+  0%{opacity:0;transform:translateY(6px)}
+  30%{opacity:.95;transform:none}
+  74%{opacity:.95}
+  100%{opacity:0;transform:translateY(-6px)}
+}
+/* 金粉:從中心往 --a 的方向飛 --d 遠。★ rotate 之後才 translateY(負) ——
+   順序反過來就變成「先平移再繞著自己轉」,全部飛同一個方向。 */
+.m16-fxdust,.m16-fxcoin,.m16-fxleaf{position:absolute;left:50%;top:50%;width:7px;height:7px;
+  margin:-3.5px 0 0 -3.5px;border-radius:50%;opacity:0;
+  background:radial-gradient(circle at 35% 32%,#fff5d0,#ffc44e 58%,#d9901c);
+  animation:m16FxDust .72s cubic-bezier(.23,1,.32,1) forwards}
+.m16-fxw-ready .m16-fxdust{background:radial-gradient(circle at 35% 32%,#eaf6ff,#8fccff 58%,#3d86c4)}
+@keyframes m16FxDust{
+  0%{opacity:0;transform:rotate(var(--a,0deg)) translateY(0) scale(.3)}
+  22%{opacity:1}
+  100%{opacity:0;transform:rotate(var(--a,0deg)) translateY(calc(var(--d,60px) * -1)) scale(var(--s,1))}
+}
+
+/* ---------- ② 胡 / 自摸的全螢幕特寫 ----------
+   ⚠⚠ pointer-events:none 在這裡是**正確性不是禮貌**:它蓋在結果卡上面,
+     少了它那 1.4 秒「下一局」按不下去,而使用者只會覺得卡住了。 */
+.m16-fxfin{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:61;
+  display:flex;align-items:center;justify-content:center}
+/* 中央透明的聚光暗場(見檔頭那條:整片壓黑會把 confetti 的金片一起壓暗)。
+   ⚠ 一定要**由濃轉無**、而且在字消失之前退乾淨 —— 留著就是把剛淡入的結果卡
+     壓成灰的(第一版如此,看起來像沒載完)。 */
+/* ⚠ 退場要**快**:這一層壓在結果卡上面,晚退就是把剛淡入的結果卡壓成灰的
+   (第一版 62% 還留著 .8,截圖看起來像沒載完)。 */
+.m16-fxdim{position:absolute;inset:0;opacity:0;
+  background:radial-gradient(circle at 50% 46%,transparent 0%,rgba(0,0,0,.28) 38%,rgba(0,0,0,.62) 100%);
+  animation:m16FxDim 1.15s ease-out forwards}
+@keyframes m16FxDim{0%{opacity:0}12%{opacity:1}44%{opacity:.55}100%{opacity:0}}
+/* 放射光芒:一圈細楔形轉一點角度就夠 —— 轉整圈會變成在看風扇。
+   ⚠ repeating-conic-gradient 在舊 WebKit 沒有的話整個 background 失效(不會炸),
+     那時就只剩暗場 + 字,仍然成立。
+   ⚠⚠ **一定要用 mask 讓邊緣淡出、而且峰值不可以拉太高**(第一版 .9 + 無 mask,
+     截圖出來是「整個畫面變成一把黃色風扇」,連頂列與結果卡都被染黃)——
+     這一頁的使用者對特效的兩次否決都是同一個詞:**太亂**(notes/19)。
+     要的是「光從中央爆出來」,不是「畫面換底色」。 */
+.m16-fxrays{position:absolute;width:min(150vw,150vh);height:min(150vw,150vh);opacity:0;
+  background:repeating-conic-gradient(from 0deg,rgba(255,214,120,.26) 0deg 5deg,transparent 5deg 16deg);
+  -webkit-mask-image:radial-gradient(circle at 50% 50%,#000 0%,rgba(0,0,0,.5) 32%,transparent 64%);
+  mask-image:radial-gradient(circle at 50% 50%,#000 0%,rgba(0,0,0,.5) 32%,transparent 64%);
+  animation:m16FxRays 1.15s cubic-bezier(.23,1,.32,1) forwards}
+@keyframes m16FxRays{
+  0%{opacity:0;transform:scale(.4) rotate(-14deg)}
+  22%{opacity:.5}
+  100%{opacity:0;transform:scale(1.15) rotate(12deg)}
+}
+.m16-fxbig{position:relative;display:flex;align-items:center;justify-content:center;padding:0 16px}
+.m16-fxbig b{font:900 clamp(64px,21vw,150px)/1.15 'Fredoka','Nunito',sans-serif;
+  color:#fff0bd;letter-spacing:.05em;
+  text-shadow:0 3px 0 #c07f18,0 6px 0 #8a5406,0 10px 26px rgba(0,0,0,.6),
+              0 0 46px rgba(255,196,74,.9),0 0 90px rgba(255,158,40,.5);
+  opacity:0;animation:m16FxBig 1.3s cubic-bezier(.16,1.6,.36,1) forwards}
+/* 自摸比胡別人的牌盛大(三家付)—— 同 sfx 把兩者做成不同音效的理由。 */
+.m16-fxfin.tsumo .m16-fxbig b{font-size:clamp(56px,18vw,132px)}
+@keyframes m16FxBig{
+  0%{opacity:0;transform:scale(2.2) rotate(-6deg)}
+  20%{opacity:1;transform:scale(.94) rotate(1deg)}
+  32%{transform:scale(1.04) rotate(0)}
+  40%{transform:scale(1)}
+  70%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.12)}
+}
+/* 金幣:比金粉大、飛得遠、而且會轉 —— 「四射」的體感來自旋轉不是速度。 */
+.m16-fxcoin{width:13px;height:13px;margin:-6.5px 0 0 -6.5px;
+  background:linear-gradient(145deg,#fff3ca,#ffc247 46%,#c9840f);
+  box-shadow:0 1px 3px rgba(0,0,0,.4);
+  animation:m16FxCoin 1.15s cubic-bezier(.23,1,.32,1) forwards}
+@keyframes m16FxCoin{
+  0%{opacity:0;transform:rotate(var(--a,0deg)) translateY(0) scale(.3)}
+  18%{opacity:1}
+  100%{opacity:0;
+    transform:rotate(var(--a,0deg)) translateY(calc(var(--d,60px) * -3.4)) scale(var(--s,1)) rotate(300deg)}
+}
+
+/* ---------- ③ 流局的薄霧 ----------
+   ⚠ 只做「掠過」不做「停留」:停留就是把結果卡糊掉(它有 backdrop-filter,
+     兩層疊起來會變成一片奶白)。 */
+.m16-fxmist{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:55}
+.m16-fxmist i{position:absolute;left:-40%;width:180%;height:26%;opacity:0;
+  background:linear-gradient(90deg,transparent,rgba(214,226,236,.5) 40%,rgba(230,238,246,.62) 55%,transparent);
+  filter:blur(12px);animation:m16FxMist 1.35s ease-in-out forwards}
+.m16-fxmist i:nth-child(1){top:16%}
+.m16-fxmist i:nth-child(2){top:44%;animation-delay:.1s}
+.m16-fxmist i:nth-child(3){top:70%;animation-delay:.2s}
+@keyframes m16FxMist{
+  0%{opacity:0;transform:translateX(-22%)}
+  30%{opacity:.9}
+  70%{opacity:.7}
+  100%{opacity:0;transform:translateX(20%)}
+}
+
+/* ---------- ④ 補花的花瓣(只有自己補花才播,見 fx.js)----------
+   ⚠ 起點在**下緣**不是正中央:花牌攤在「我的明牌列」上,而那一列貼著手牌上方。 */
+.m16-fxpetal{display:block}
+.m16-fxleaf{top:auto;bottom:20%;width:9px;height:9px;margin:0 0 0 -4.5px;
+  border-radius:60% 12% 60% 12%;
+  background:linear-gradient(150deg,#ffd9e6,#ff9dc0 55%,#e2648f);
+  animation:m16FxLeaf 1.15s ease-out forwards}
+@keyframes m16FxLeaf{
+  0%{opacity:0;transform:rotate(var(--a,0deg)) translateY(0) scale(.4)}
+  20%{opacity:1}
+  100%{opacity:0;
+    transform:rotate(var(--a,0deg)) translateY(calc(var(--d,60px) * -.8)) scale(var(--s,1)) rotate(180deg)}
+}
+
+/* ---------- ⑤ 我宣告聽牌:手牌邊緣一圈藍光 ----------
+   ⚠ 貼在盤面**下緣**(手牌在那裡),而且只有 background —— 不可以用 border /
+     outline 之類會參與盒模型的東西(這一頁量的是 scrollHeight)。 */
+.m16-fxting{display:block}
+.m16-fxting::after{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
+  background:linear-gradient(0deg,rgba(96,180,255,.42),rgba(96,180,255,.12) 46%,transparent);
+  opacity:0;animation:m16FxTing 1.5s ease-out forwards}
+@keyframes m16FxTing{0%{opacity:0}16%{opacity:1}52%{opacity:.72}100%{opacity:0}}
+
+/* ---------- ⑥ 出牌落桌:牌河最新那張亮一下 ----------
+   ★★ 刻意**不做無限呼吸光**,兩個理由都很硬:
+     ① `.m16-pt.last` 那圈紅框是「常駐不脈動」的設計語彙(五子棋 .gmk-stone.last /
+        暗棋 .dc-lastto 同一組;暗棋那段註解就寫著「棋盤本身的動畫已經夠多,
+        再疊一個持續脈動只是雜訊」)。
+     ② 這一格**每次 render 都被 innerHTML 重建**(一次 render 最多七次),
+        無限動畫會跟著重跑 → 別人一表態、倒數環一動,那張牌就從頭閃一次。
+   → 所以改成「落桌那一下」的一次性動畫:class 由 JS 一次性掛(board.js 的
+     markDrop / dropFx,同 v2.3.3 摸牌那一套),常駐紅框原封不動。
+   ⚠ 200ms 是頻率閘:一局要打三十幾張,再長就會覺得牌桌黏黏的。 */
+.m16-dropin{animation:m16Drop .2s cubic-bezier(.34,1.56,.64,1) backwards}
+@keyframes m16Drop{
+  0%{transform:translateY(-42%) scale(1.14);filter:brightness(1.5)}
+  62%{transform:translateY(4%) scale(.97);filter:brightness(1.12)}
+  100%{transform:none;filter:none}
+}
+
+/* ---------- ⑦ 一鍵理牌(只在玩家拖過之後才存在,見 board.js 的 sortBtnHTML)----------
+   ★ 為什麼是「拖過才出現」:這一頁的動作列那一格**字數就是版面預算**
+     (discardHint 多五個字,牌寬從 27 掉到 25)—— 一顆常駐的鈕同樣要吃空間。
+     而理牌只有「我剛剛把手牌拖亂了」才需要 → 沒拖過就完全不存在,零成本。
+   ⚠ 它是 .m16-fx 家族裡**唯一吃點擊的東西**,所以 pointer-events 要自己開回來。
+   ⚠ 絕對定位貼在明牌列左端上方:那一列一律畫出來(它是動作列的錨點),
+     而明牌是從左往右長 —— 疊在它上面才不會在攤牌之後被推走。 */
+.m16-sortbtn{position:absolute;left:0;top:-2px;z-index:8;
+  pointer-events:auto;-webkit-tap-highlight-color:transparent;
+  appearance:none;border:1px solid rgba(255,255,255,.22);
+  background:rgba(24,30,40,.72);color:#dbe6f2;
+  font:700 11px/1 'Nunito',sans-serif;padding:4px 7px;border-radius:8px;cursor:pointer;
+  box-shadow:0 2px 6px rgba(0,0,0,.35);opacity:.9}
+.m16-sortbtn:hover{opacity:1;background:rgba(34,44,58,.86)}
+.m16-sortbtn:active{transform:scale(.94)}
+/* ★ 這一列**已經有東西**(花牌 / 明牌從左緣開始長)→ 挪到列外上方,不要壓在花牌上。
+   由 board.js 在 paint() 依 shown.length 掛(見那裡的註解)。
+   ⚠ 這個位置在盤面塞滿時會碰到牌河下緣一點 —— 那是**刻意選的較小代價**:
+     蓋住花牌(算台資訊)更糟,而且按下去這顆鈕就自己消失了。 */
+.m16-sortbtn.up{top:-23px}
+
+/* ---------- ⑧ 結果卡:台數逐項展開 + 總台數滾動 ----------
+   ★ 資料是現成的(`st.over.list` 一直都帶著每一項番種),這一版只是換一種出場方式
+     —— 規則層一行都沒改。
+   ★ 逐項展開走 animation-delay 而不是 JS 排程:節點一插進 DOM 就開始跑,
+     所以不必知道結果卡什麼時候顯示,也就踩不到「showOutcome 會被重複觸發」那個坑。
+   ⚠ 這一段住在 #winMsg 裡(結果卡內),**不受牌桌那條幾何紅線管** ——
+     結果卡是蓋板,長高就自己捲。 */
+.m16-fxhow{display:block;margin-bottom:7px}
+.m16-fxtai{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;align-items:center}
+.m16-fxti{display:inline-flex;align-items:center;gap:4px;
+  font:700 12px/1 'Nunito',sans-serif;color:#e8eef6;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;padding:4px 9px;
+  opacity:0;animation:m16FxTi .34s cubic-bezier(.23,1,.32,1) forwards;
+  animation-delay:calc(var(--i,0) * 90ms)}
+.m16-fxti b{font:800 12px/1 'Fredoka','Nunito',sans-serif;color:#ffd479}
+.m16-fxti.none{color:var(--muted);background:none;border-style:dashed}
+/* 總和那一格:與番種藥丸**刻意長得不一樣**(它不是番種,是結論)。 */
+.m16-fxsum{display:inline-flex;align-items:center;gap:4px;
+  font:700 12.5px/1 'Nunito',sans-serif;color:#f2f6fb;
+  opacity:0;animation:m16FxTi .34s cubic-bezier(.23,1,.32,1) forwards;
+  animation-delay:calc(var(--i,0) * 90ms + 120ms)}
+.m16-fxsum b{font:900 17px/1 'Fredoka','Nunito',sans-serif;color:#ffd479;
+  min-width:1.6em;text-align:center;
+  text-shadow:0 0 14px rgba(255,196,74,.5)}
+@keyframes m16FxTi{
+  0%{opacity:0;transform:translateY(7px) scale(.9)}
+  100%{opacity:1;transform:none}
+}
+
+/* ---------- ⑨ ★★ 為什麼這裡**刻意沒有** prefers-reduced-motion 降級 ----------
+   ⚠⚠ 這一段是「不要再加回來」的紀錄 —— v2.4.0 加過一次,而且**當場出事**。
+
+   加了什麼:整組把位移 / 縮放 / 旋轉換成淡入淡出,粒子在 fx.js 裡整組不建,
+   落桌回彈直接 `animation:none`。看起來很正確。
+   出了什麼事:使用者的回報是「實際在單機對戰,**沒感覺到有什麼變化**」,
+   而程式與 CSS 其實都是好的 —— 只是整組被降級成 0.9 秒的淡入淡出、而且一顆粒子都沒有。
+   ⚠ 查下來連「他的系統到底有沒有開減少動態」都不成立:Windows 的
+     `UserPreferencesMask` 顯示 ClientAreaAnimation = True(動畫效果開著)——
+     `reduce: true` 是**自動化 Chrome 自己的預設**,不是那台機器的設定。
+     也就是說我為了一個不存在的情境,把真正的功能弱化掉了。
+
+   為什麼決定整段拿掉(三個理由,少一個都不足):
+     ① **與這個專案的其他十三個遊戲一致** —— 既有的胡牌光環 `.m16-cele`、摸牌
+        `.m16-drawin`、共用的金片 `burst()` 一律不看系統偏好。只有新特效降級,
+        就是「同一頁裡兩套標準」。
+     ② **這一頁有自己的開關**(設定面板的「動畫特效」,`#m16SwFx`)——
+        它比系統設定更容易發現、也更具體:不想要就在遊戲裡關掉,當場生效。
+     ③ 想同時保留兩者的話只有兩條路,兩條都更糟:
+        「開關開著就無視系統」= 這一段變成永遠不生效的死碼;
+        「開關開著仍然降級」= 使用者明明打開了卻只看到很弱的效果,
+        而**那正是這次踩到的坑**(它已經騙過一次)。
+
+   ⚠ 所以想加動畫降級請走那顆開關,不要再開 media query。
+     真的要做的話唯一可接受的形狀是「跟隨系統 / 開 / 關」三態的 UI,
+     而那是另一個決定(要多一列設定),不是順手加一段 CSS。 */
 
 /* ---------- 一局結束:牌桌上每一家都攤開(v1.75.15) ----------
    使用者:「每一局結束的時候,我希望能把全部人的牌都顯示出來,不是在勝負頁顯示,

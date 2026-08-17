@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
 <!-- 台灣 16 張麻將 · v2.3.6 -->
-<meta name="version" content="2.3.6">
+<meta name="version" content="2.3.6+3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -405,6 +405,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
               <button data-tv="all">全部牌</button>
             </div>
           </div>
+          <!-- 動畫特效(v2.4.0,js/mahjong16/fx.js)。★ 為什麼要有這顆開關:同一位使用者在
+               暗棋否決過兩次同類的東西(「一點都不像是正式發行的遊戲」/「看起來太亂了」,
+               notes/19)—— 喊牌大字是麻將這個牌類的主流語彙所以預設開,但現場覺得吵要
+               **當場關得掉**,這比事後回頭拆程式便宜太多。
+               ⚠ 它只管慶祝那一層;摸牌滑入與落桌回彈是操作手感,不受它管(見 fx.js 檔頭)。 -->
+          <div class="set-row">
+            <span class="set-lbl">動畫特效<span class="set-sub">(碰 / 胡 / 聽牌的大字)</span></span>
+            <button class="switch" id="m16SwFx" role="switch" aria-checked="true" aria-label="動畫特效"><span class="knob"></span></button>
+          </div>
         </div>
 
         <!-- 個人偏好,同時給單機與連線用(v1.119.0)。⚠ 不是「玩法輔助」那兩顆算牌開關 ——
@@ -550,6 +559,12 @@ const FIREBASE_CONFIG = {
 <script src="js/mahjong16/ai.js"></script>
 <script src="js/mahjong16/sfx.js"></script>
 <script src="js/mahjong16/board.js"></script>
+<!-- 動效層(v2.4.0):碰 / 槓 / 吃 / 聽牌的漢字、胡牌特寫、花瓣、薄霧。
+     ★ 排在 board.js 之後、adapter / solo 之前 —— 那兩支是它的呼叫端(各一行 diff)。
+     ⚠ 引用一律 `typeof M16Fx !== "undefined"`(同 talk.js 的規矩):sw.js 是
+       network-first,裝置有可能拿到新的 adapter.js 卻還吃著沒有這一行的舊頁面,
+       而呼叫點在 applyGame / sfxTick 上 —— ReferenceError 會讓整個盤面停止重畫。 -->
+<script src="js/mahjong16/fx.js"></script>
 <script src="js/mahjong16/solo.js"></script>
 <script src="js/mahjong16/adapter.js"></script>
 <script src="js/mahjong16/main.js"></script>

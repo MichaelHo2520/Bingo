@@ -176,6 +176,8 @@ const Solo = (function(){
     M16B.clearSel();
     M16B.resetFit();                              // 換局才重新量牌寬(v1.70.1,見 board.js 檔頭⑤)
     M16B.resetOrder();                            // 換局才丟掉玩家拖出來的手牌順序(v1.82.0)
+    // 還在飛的特效跟著換局收掉(v2.4.0):上一局的「胡!」不該疊在新局的牌桌上
+    if(typeof M16Fx !== "undefined") M16Fx.clear();
     closeWin();
     st = MJT.newRound({
       rs: "p" + seats,
@@ -197,6 +199,7 @@ const Solo = (function(){
     M16B.clearSel();
     M16B.resetFit();                              // 離開牌桌:下次進來從頭量
     M16B.resetOrder();                            // 離開牌桌:下次進來回到照牌序(v1.82.0)
+    if(typeof M16Fx !== "undefined") M16Fx.clear();   // 同上(v2.4.0)
     closeWin();
     /* ⚠ m16-hush 要跟著拿掉(v1.111.0):留著的話下次進來那顆倒數環(連線那邊)
        會用上一場的 --m16cb 飄在盤面中央 —— 兩種模式共用同一條動作列。 */
@@ -276,6 +279,13 @@ const Solo = (function(){
     if(ev.indexOf("hu") >= 0 || ev.indexOf("zimo") >= 0) M16B.celebrate();
     /* ⚠ sfxTick() 本來就排在 render() 之前(見 render),旗標才接得上 —— 不要調換 */
     if(ev.indexOf("draw") >= 0) M16B.markDraw();
+    /* ★ 出牌落桌的回彈(v2.4.0):同一套一次性旗標,同一個位置(render 之前)。 */
+    if(ev.indexOf("discard") >= 0) M16B.markDrop();
+    /* ★★ 動效層(v2.4.0,js/mahjong16/fx.js)—— 與連線共用同一份 diff、同一支 fx
+       (adapter.js 的 applyGame 那一行是它的雙胞胎,改一邊一定要改另一邊)。
+       ⚠⚠ `typeof` 守衛的理由見那邊:這一支從 render 的路上叫,ReferenceError
+         會讓**整個盤面停止重畫**。 */
+    if(typeof M16Fx !== "undefined") M16Fx.on(ev, prev, st, ME, seatName);
   }
 
   /* ==========================================================================
@@ -645,18 +655,27 @@ const Solo = (function(){
       // ★ 「誰奪冠」接在大字下面第一行(v1.75.15,理由與連線那份同一條)
       msg = (last ? seasonMsg() + "<br>" : "") + "牌山見底,這一局不收付";
     }else{
-      const tags = o.list.map(function(x){ return esc(x.name)+" "+x.tai; }).join("、");
       const how = (o.from === null) ? "自摸" : ("胡 " + esc(seatName(o.from)) + " 打的牌");
       /* ★ v1.75.14 併成**一行**(原本「誰怎麼胡」與「底台算式」各一行)——
          誰胡誰放槍下面那張排名表已經逐列寫著,理由與連線那份同一條(adapter.js outcome)。 */
-      const line = (iWon ? how : (esc(seatName(o.seat)) + " " + how)) +
-                   " · 底 " + o.base + " + 台 " + o.tai + " = <b>" + o.total + "</b> 台(" + (tags||"無台") + ")";
+      const head = iWon ? how : (esc(seatName(o.seat)) + " " + how);
+      /* ★★ 台數逐項展開 + 總台數滾動(v2.4.0)—— **與連線共用 M16Fx.taiHTML**
+         (那邊是 adapter.js 的 outcome,兩份的算式措辭本來就一模一樣)。
+         ⚠ fallback 留著舊的那一行:混合快取下拿不到 fx.js 的話,結果卡不可以少掉台數。 */
+      const line = (typeof M16Fx !== "undefined")
+        ? M16Fx.taiHTML(head, o)
+        : head + " · 底 " + o.base + " + 台 " + o.tai + " = <b>" + o.total + "</b> 台(" +
+          (o.list.map(function(x){ return esc(x.name)+" "+x.tai; }).join("、") || "無台") + ")";
       /* ★ 最後一局仍然是「本場結束」(單機 e2e 在斷言這句):那一張卡的主角是總結算。 */
       word = last ? "本場結束" : ow.word;
       msg = (last ? seasonMsg() + "<br>" : "") + line;
     }
     $("winWord").textContent = word;
     $("winMsg").innerHTML = msg;
+    /* ★ 總台數從 0 滾上去(v2.4.0)。⚠ 一定要排在寫入 `#winMsg` **之後** ——
+       它要抓的節點就在那段 HTML 裡(連線那一份是 hook,由共用層寫入,所以那邊
+       靠 armTai 自己的 rAF 重試接上)。⚠ 它是冪等的:結果卡被重畫也不會從 0 再滾一次。 */
+    if(typeof M16Fx !== "undefined") M16Fx.armTai();
 
     const again = $("m16SoloAgain");
     if(again) again.textContent = last ? "🔄 再來一場" : "下一局";

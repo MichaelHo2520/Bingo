@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 81832fa002ac3432b1256497f646dc6d289c57751e79b08f3dc160cc63c27b26)
+    真相在 styles.src.css(sha256 df92704f67fa51f1a20a3cc284954737522aeb1ecdb7afa564006b90926a6437)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1502,7 +1502,7 @@ body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:
   min-height:3px;border-radius:2px 2px 0 0;background:var(--mj-jf);
   box-shadow:0 0 0 1px rgba(0,0,0,.30)}
 .m16-mymelds,.m16-fmelds{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
-.m16-mymelds{width:100%;min-height:34px;padding-right:var(--m16aw,0px)}
+.m16-mymelds{position:relative;width:100%;min-height:34px;padding-right:var(--m16aw,0px)}
 .m16-meld{display:inline-flex;align-items:flex-end;gap:1px;
   padding:3px;border-radius:8px;background:rgba(255,255,255,.10)}
 .m16-meld.cc{background:rgba(0,0,0,.22)}
@@ -1686,6 +1686,153 @@ body.m16-mp .mj-room.playing .mj-room-foot{display:flex}
   100%{opacity:0;transform:scale(3.4)}
 }
 @keyframes m16Glow{0%{opacity:0}18%{opacity:1}62%{opacity:.72}100%{opacity:0}}
+.m16-fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:7}
+.m16-fxw{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transform:translateY(-16%)}
+.m16-fxwho{font:800 13px/1.2 'Nunito',sans-serif;color:#ffe6a0;letter-spacing:.04em;
+  text-shadow:0 1px 3px rgba(0,0,0,.7);opacity:0;
+  animation:m16FxWho .9s cubic-bezier(.23,1,.32,1) forwards}
+.m16-fxw b{font:900 clamp(46px,14vw,88px)/1.15 'Fredoka','Nunito',sans-serif;
+  color:#ffe9ab;letter-spacing:.06em;
+  text-shadow:0 2px 0 #b8781a,0 4px 0 #7d4e0c,0 7px 16px rgba(0,0,0,.55),
+              0 0 26px rgba(255,193,74,.72);
+  opacity:0;animation:m16FxWord .9s cubic-bezier(.18,1.5,.4,1) forwards}
+.m16-fxw-chow b{font-size:clamp(38px,11vw,70px);text-shadow:0 2px 0 #b8781a,0 4px 0 #7d4e0c,
+  0 7px 16px rgba(0,0,0,.55),0 0 18px rgba(255,193,74,.5)}
+.m16-fxw-kong b{font-size:clamp(52px,16vw,98px)}
+.m16-fxw-ready b{color:#cfe8ff;
+  text-shadow:0 2px 0 #2a6ea8,0 4px 0 #17456b,0 7px 16px rgba(0,0,0,.55),
+              0 0 26px rgba(120,196,255,.7)}
+.m16-fxw-ready .m16-fxwho{color:#cfe8ff}
+@keyframes m16FxWord{
+  0%{opacity:0;transform:scale(.42) rotate(-7deg)}
+  26%{opacity:1;transform:scale(1.1) rotate(1.5deg)}
+  40%{transform:scale(1) rotate(0)}
+  72%{opacity:1;transform:scale(1) rotate(0)}
+  100%{opacity:0;transform:scale(1.04) translateY(-10px)}
+}
+@keyframes m16FxWho{
+  0%{opacity:0;transform:translateY(6px)}
+  30%{opacity:.95;transform:none}
+  74%{opacity:.95}
+  100%{opacity:0;transform:translateY(-6px)}
+}
+.m16-fxdust,.m16-fxcoin,.m16-fxleaf{position:absolute;left:50%;top:50%;width:7px;height:7px;
+  margin:-3.5px 0 0 -3.5px;border-radius:50%;opacity:0;
+  background:radial-gradient(circle at 35% 32%,#fff5d0,#ffc44e 58%,#d9901c);
+  animation:m16FxDust .72s cubic-bezier(.23,1,.32,1) forwards}
+.m16-fxw-ready .m16-fxdust{background:radial-gradient(circle at 35% 32%,#eaf6ff,#8fccff 58%,#3d86c4)}
+@keyframes m16FxDust{
+  0%{opacity:0;transform:rotate(var(--a,0deg)) translateY(0) scale(.3)}
+  22%{opacity:1}
+  100%{opacity:0;transform:rotate(var(--a,0deg)) translateY(calc(var(--d,60px) * -1)) scale(var(--s,1))}
+}
+.m16-fxfin{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:61;
+  display:flex;align-items:center;justify-content:center}
+.m16-fxdim{position:absolute;inset:0;opacity:0;
+  background:radial-gradient(circle at 50% 46%,transparent 0%,rgba(0,0,0,.28) 38%,rgba(0,0,0,.62) 100%);
+  animation:m16FxDim 1.15s ease-out forwards}
+@keyframes m16FxDim{0%{opacity:0}12%{opacity:1}44%{opacity:.55}100%{opacity:0}}
+.m16-fxrays{position:absolute;width:min(150vw,150vh);height:min(150vw,150vh);opacity:0;
+  background:repeating-conic-gradient(from 0deg,rgba(255,214,120,.26) 0deg 5deg,transparent 5deg 16deg);
+  -webkit-mask-image:radial-gradient(circle at 50% 50%,#000 0%,rgba(0,0,0,.5) 32%,transparent 64%);
+  mask-image:radial-gradient(circle at 50% 50%,#000 0%,rgba(0,0,0,.5) 32%,transparent 64%);
+  animation:m16FxRays 1.15s cubic-bezier(.23,1,.32,1) forwards}
+@keyframes m16FxRays{
+  0%{opacity:0;transform:scale(.4) rotate(-14deg)}
+  22%{opacity:.5}
+  100%{opacity:0;transform:scale(1.15) rotate(12deg)}
+}
+.m16-fxbig{position:relative;display:flex;align-items:center;justify-content:center;padding:0 16px}
+.m16-fxbig b{font:900 clamp(64px,21vw,150px)/1.15 'Fredoka','Nunito',sans-serif;
+  color:#fff0bd;letter-spacing:.05em;
+  text-shadow:0 3px 0 #c07f18,0 6px 0 #8a5406,0 10px 26px rgba(0,0,0,.6),
+              0 0 46px rgba(255,196,74,.9),0 0 90px rgba(255,158,40,.5);
+  opacity:0;animation:m16FxBig 1.3s cubic-bezier(.16,1.6,.36,1) forwards}
+.m16-fxfin.tsumo .m16-fxbig b{font-size:clamp(56px,18vw,132px)}
+@keyframes m16FxBig{
+  0%{opacity:0;transform:scale(2.2) rotate(-6deg)}
+  20%{opacity:1;transform:scale(.94) rotate(1deg)}
+  32%{transform:scale(1.04) rotate(0)}
+  40%{transform:scale(1)}
+  70%{opacity:1;transform:scale(1)}
+  100%{opacity:0;transform:scale(1.12)}
+}
+.m16-fxcoin{width:13px;height:13px;margin:-6.5px 0 0 -6.5px;
+  background:linear-gradient(145deg,#fff3ca,#ffc247 46%,#c9840f);
+  box-shadow:0 1px 3px rgba(0,0,0,.4);
+  animation:m16FxCoin 1.15s cubic-bezier(.23,1,.32,1) forwards}
+@keyframes m16FxCoin{
+  0%{opacity:0;transform:rotate(var(--a,0deg)) translateY(0) scale(.3)}
+  18%{opacity:1}
+  100%{opacity:0;
+    transform:rotate(var(--a,0deg)) translateY(calc(var(--d,60px) * -3.4)) scale(var(--s,1)) rotate(300deg)}
+}
+.m16-fxmist{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:55}
+.m16-fxmist i{position:absolute;left:-40%;width:180%;height:26%;opacity:0;
+  background:linear-gradient(90deg,transparent,rgba(214,226,236,.5) 40%,rgba(230,238,246,.62) 55%,transparent);
+  filter:blur(12px);animation:m16FxMist 1.35s ease-in-out forwards}
+.m16-fxmist i:nth-child(1){top:16%}
+.m16-fxmist i:nth-child(2){top:44%;animation-delay:.1s}
+.m16-fxmist i:nth-child(3){top:70%;animation-delay:.2s}
+@keyframes m16FxMist{
+  0%{opacity:0;transform:translateX(-22%)}
+  30%{opacity:.9}
+  70%{opacity:.7}
+  100%{opacity:0;transform:translateX(20%)}
+}
+.m16-fxpetal{display:block}
+.m16-fxleaf{top:auto;bottom:20%;width:9px;height:9px;margin:0 0 0 -4.5px;
+  border-radius:60% 12% 60% 12%;
+  background:linear-gradient(150deg,#ffd9e6,#ff9dc0 55%,#e2648f);
+  animation:m16FxLeaf 1.15s ease-out forwards}
+@keyframes m16FxLeaf{
+  0%{opacity:0;transform:rotate(var(--a,0deg)) translateY(0) scale(.4)}
+  20%{opacity:1}
+  100%{opacity:0;
+    transform:rotate(var(--a,0deg)) translateY(calc(var(--d,60px) * -.8)) scale(var(--s,1)) rotate(180deg)}
+}
+.m16-fxting{display:block}
+.m16-fxting::after{content:"";position:absolute;left:0;right:0;bottom:0;height:46%;
+  background:linear-gradient(0deg,rgba(96,180,255,.42),rgba(96,180,255,.12) 46%,transparent);
+  opacity:0;animation:m16FxTing 1.5s ease-out forwards}
+@keyframes m16FxTing{0%{opacity:0}16%{opacity:1}52%{opacity:.72}100%{opacity:0}}
+.m16-dropin{animation:m16Drop .2s cubic-bezier(.34,1.56,.64,1) backwards}
+@keyframes m16Drop{
+  0%{transform:translateY(-42%) scale(1.14);filter:brightness(1.5)}
+  62%{transform:translateY(4%) scale(.97);filter:brightness(1.12)}
+  100%{transform:none;filter:none}
+}
+.m16-sortbtn{position:absolute;left:0;top:-2px;z-index:8;
+  pointer-events:auto;-webkit-tap-highlight-color:transparent;
+  appearance:none;border:1px solid rgba(255,255,255,.22);
+  background:rgba(24,30,40,.72);color:#dbe6f2;
+  font:700 11px/1 'Nunito',sans-serif;padding:4px 7px;border-radius:8px;cursor:pointer;
+  box-shadow:0 2px 6px rgba(0,0,0,.35);opacity:.9}
+.m16-sortbtn:hover{opacity:1;background:rgba(34,44,58,.86)}
+.m16-sortbtn:active{transform:scale(.94)}
+.m16-sortbtn.up{top:-23px}
+.m16-fxhow{display:block;margin-bottom:7px}
+.m16-fxtai{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;align-items:center}
+.m16-fxti{display:inline-flex;align-items:center;gap:4px;
+  font:700 12px/1 'Nunito',sans-serif;color:#e8eef6;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);
+  border-radius:999px;padding:4px 9px;
+  opacity:0;animation:m16FxTi .34s cubic-bezier(.23,1,.32,1) forwards;
+  animation-delay:calc(var(--i,0) * 90ms)}
+.m16-fxti b{font:800 12px/1 'Fredoka','Nunito',sans-serif;color:#ffd479}
+.m16-fxti.none{color:var(--muted);background:none;border-style:dashed}
+.m16-fxsum{display:inline-flex;align-items:center;gap:4px;
+  font:700 12.5px/1 'Nunito',sans-serif;color:#f2f6fb;
+  opacity:0;animation:m16FxTi .34s cubic-bezier(.23,1,.32,1) forwards;
+  animation-delay:calc(var(--i,0) * 90ms + 120ms)}
+.m16-fxsum b{font:900 17px/1 'Fredoka','Nunito',sans-serif;color:#ffd479;
+  min-width:1.6em;text-align:center;
+  text-shadow:0 0 14px rgba(255,196,74,.5)}
+@keyframes m16FxTi{
+  0%{opacity:0;transform:translateY(7px) scale(.9)}
+  100%{opacity:1;transform:none}
+}
 .m16-foe.shown{align-items:flex-start}
 .m16-foe .m16-reveal{gap:3px;justify-content:flex-start;flex:1 1 auto;min-width:0}
 .m16-foe .m16-meld.m16-hg{gap:1px;padding:3px;justify-content:flex-start}

@@ -204,6 +204,43 @@ $("m16TileSeg").addEventListener("click", e=>{
   showToast(m==="off" ? "報牌名:關" : (m==="all" ? "報牌名:全部牌" : "報牌名:只有字牌"), 1200);
 });
 
+/* ---------- 設定:動畫特效(v2.4.0,js/mahjong16/fx.js)----------
+   碰 / 槓 / 吃 / 聽牌的漢字、胡牌的全螢幕特寫、補花花瓣、流局薄霧。
+   ★ 為什麼這一頁需要一顆開關(另外十三頁的動效都沒有):**同一位使用者在暗棋
+     否決過兩次同類的做法** —— 浮出「吃掉 + 棋子名字」→「一點都不像是正式發行的
+     遊戲」;改成震波 + 火花 + 亂飛 →「現在這樣也很糟,看起來太亂了」(notes/19)。
+     喊牌大字是麻將這個牌類的主流語彙(雀魂 / 明星三缺一都有),所以預設開;
+     但現場覺得吵要**當場關得掉**,不必等下一版。
+   ⚠ 它只管慶祝那一層。摸牌滑入(v2.3.3)與落桌回彈是**操作手感**,不受它管 ——
+     那兩個是「牌到位了」的訊號,關掉只會讓牌桌變得沒有回饋。
+   ⚠ typeof 守衛同 adapter / solo 那兩處:混合快取下 fx.js 可能還沒到,
+     而這一段在啟動路徑上。 */
+function syncM16Fx(){
+  const b = $("m16SwFx"); if(!b) return;
+  const on = (typeof M16Fx !== "undefined") ? M16Fx.fxOn() : true;
+  b.setAttribute("aria-checked", on ? "true" : "false");
+}
+/* ⚠⚠ 這一顆**一定要先問在不在**,不可以照抄上面 `$("m16SwVoice").addEventListener(…)`
+   那種寫法(那些元素從第一版就在,而這一列是 v2.4.0 才加的):
+   e2e 跑的是 mahjong16.html 的 **DOM 快照**(tools/t-mj16-*-dom.html,產生檔)——
+   快照還沒重新產生時這裡就是 null,而 `null.addEventListener` 會**在啟動路徑上炸掉**
+   → 後面的 `showScreen` / `bootReady` 全部不跑,症狀是「整頁的按鈕永遠灰著」,
+   而且 e2e 會紅在一堆看起來毫不相關的地方(實測紅了 10 條,其中三條在「離開牌桌
+   要把大牌桌脫掉」)。同一個道理:少一顆開關是小事,整頁起不來是大事。 */
+const m16FxBtn = $("m16SwFx");
+if(m16FxBtn) m16FxBtn.addEventListener("click",()=>{
+  if(typeof M16Fx === "undefined") return;
+  M16Fx.setFx(!M16Fx.fxOn());
+  savePrefs(); syncM16Fx();
+  const on = M16Fx.fxOn();
+  /* ★ 順手示範一次(同喊牌語音那兩顆「改完就試聽」的理由):這種設定看不出效果,
+     不當場演一次的話使用者要真的打到那一手才知道有沒有生效。
+     ⚠ 只在**開**的時候演,而且用最輕的那一個(吃)—— 在設定頁跳一個「胡!」
+       全螢幕特寫會嚇到人,而且它是 fixed 的、會蓋住設定面板本身。 */
+  if(on) M16Fx.demo("chow");
+  showToast(on ? "動畫特效:開" : "動畫特效:關", 1200);
+});
+
 /* ---------- 設定:聽牌後自動摸切(v1.119.0) ----------
    個人偏好,單機與連線共用一顆旗標(M16B.autoTingOn(),見 board.js 檔頭那段註解)。
    ⚠ 這裡只負責存偏好與同步開關樣子 —— 真正「輪到我、已宣告聽牌、沒得選就自動打」
@@ -280,6 +317,7 @@ Solo.loadOwn();
 syncSettingsUI();
 syncM16Voice();      // ⚠ loadPrefs() 之後才同步(偏好裡的喊牌語音開關要先讀進來)
 syncM16AutoTing();   // 同上,聽牌後自動摸切的開關樣子也要等偏好讀進來才同步
+syncM16Fx();         // 同上(v2.4.0):動畫特效那顆開關
 syncSoloSeg();
 showScreen("home");
 autoJoinFromQuery(MP);

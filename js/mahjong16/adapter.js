@@ -957,7 +957,9 @@ const MP = MPCore.create((function(){
          那會讓整副牌在一局裡忽大忽小(理由見 board.js 檔頭⑤)。
          ⚠ resetOrder()(玩家拖出來的手牌順序,v1.82.0)吃**同一格**、同一個理由:
            其他路徑清掉的話,每碰一次手牌就被打散一次。 */
-      if(newRnd){ curRound = rid; myBid = false; M16B.clearSel(); M16B.resetFit(); M16B.resetOrder(); }
+      if(newRnd){ curRound = rid; myBid = false; M16B.clearSel(); M16B.resetFit(); M16B.resetOrder();
+                  /* 還在飛的特效跟著換局收掉(v2.4.0):上一局的「胡!」不該疊在新局的牌桌上 */
+                  if(typeof M16Fx !== "undefined") M16Fx.clear(); }
 
       const before = st;
       st = s;
@@ -980,6 +982,16 @@ const MP = MPCore.create((function(){
       const ev = newRnd ? [] : (M16Sfx.play(before, s, mySeat()) || []);
       /* ⚠ markDraw() 要排在下面那句 M16B.render() **之前**(旗標由 render 消費) */
       if(ev.indexOf("draw") >= 0){ buzzTurn(); M16B.markDraw(); }
+      /* ★ 出牌落桌的回彈(v2.4.0):同一套一次性旗標,同樣要排在 render() 之前。 */
+      if(ev.indexOf("discard") >= 0) M16B.markDrop();
+      /* ★★ 動效層(v2.4.0,js/mahjong16/fx.js):碰 / 槓 / 吃 / 聽牌的漢字、胡牌特寫、
+         花瓣、薄霧。**沿用同一份 diff** —— 與音效、celebrate 一樣不必自己判斷發生了什麼,
+         也不必在動作點插呼叫(notes/11 第 3 條紅線)。
+         ⚠⚠ `typeof` 守衛不是形式:sw.js 是 network-first,裝置有可能拿到新的
+           adapter.js 卻還吃著**沒有 fx.js 的舊頁面** → ReferenceError,而這一支是從
+           applyGame() 裡叫的,一路炸上去等於**整個盤面停止重畫**。
+           特效不見是小事,牌桌壞掉是大事(同 sfx.js 的 ready() 那段註解)。 */
+      if(typeof M16Fx !== "undefined") M16Fx.on(ev, before, s, mySeat(), nameOfSeat);
       /* 胡牌的慶祝光環(v2.2.4)。★ 沿用同一份 diff —— 不必自己再判斷 st.over,
          `hu`(放槍)/ `zimo`(自摸)那兩個事件已經是「這一手剛剛結束」的意思。
          ⚠ 換局那一手 ev 是空的(上面 newRnd 就給 []),斷線重連 before 為 null 時
@@ -1190,15 +1202,27 @@ const MP = MPCore.create((function(){
                  msg: (last ? seasonMsg()+"<br>" : "") + "牌山見底,這一局不收付" };
 
       const o = st.over;
-      const tag = o.list.map(x=>esc(x.name)+" "+x.tai).join("、");
       const how = (o.from===null) ? "自摸" : ("胡 "+esc(nameOfSeat(o.from))+" 打的牌");
       /* ★ v1.75.14 併成**一行**(原本是「誰怎麼胡」+「底台算式」兩行)。
          「誰胡了誰放槍」下面那張排名表已經逐列寫著(這局 · 自摸 / 放槍 −6),
          再用兩行散文講一次正是使用者說的「要再想一會」——同一件事講三次最難讀
          (排七 v1.75.3 的同一條結論)。留下來的是表上沒有的那一半:台數怎麼來的。
          ⚠ msg 這一半仍然是兩份(solo.js 的 paintResult),改一邊一定要改另一邊。 */
-      const line = (iWon ? how : (esc(w.name||"對手")+" "+how)) +
-                   " · 底 "+o.base+" + 台 "+o.tai+" = <b>"+o.total+"</b> 台("+(tag||"無台")+")";
+      const head = iWon ? how : (esc(w.name||"對手")+" "+how);
+      /* ★★ 台數逐項展開 + 總台數滾動(v2.4.0,js/mahjong16/fx.js 的 taiHTML / armTai)——
+         **同一份資料換一種出場方式**:`o.list` 一直都帶著每一項番種,只是以前被印成
+         一行頓號串。規則層一個字都沒改。
+         ⚠ 兩份都要改(solo.js 的 paintResult),而且**共用 M16Fx 那一支** ——
+           算式的措辭在兩邊本來就一模一樣,分家就會慢慢漂。
+         ⚠ fallback 保留舊的那一行(混合快取拿不到 fx.js 時仍然看得到台數,見上面那條
+           `typeof` 守衛的理由;這裡壞掉的話結果卡會少掉最關鍵的資訊)。 */
+      const line = (typeof M16Fx !== "undefined")
+        ? M16Fx.taiHTML(head, o)
+        : head + " · 底 "+o.base+" + 台 "+o.tai+" = <b>"+o.total+"</b> 台(" +
+          (o.list.map(x=>esc(x.name)+" "+x.tai).join("、") || "無台") + ")";
+      /* ⚠ 滾動要在共用層把這段字串寫進 `#winMsg` **之後**才抓得到節點 →
+         armTai 內部用 rAF(+ 一次重試),所以這裡照順序呼叫就好,不要自己排 setTimeout。 */
+      if(typeof M16Fx !== "undefined") M16Fx.armTai();
       /* ★ 最後一局仍是「本場結束」(與單機同步):那張卡的主角是總結算,
          所以「誰奪冠」排在這一手的細節**前面**(見上面那條)。 */
       return { word: last?"本場結束":ow.word, msg: (last?seasonMsg()+"<br>":"")+line };
@@ -1206,7 +1230,10 @@ const MP = MPCore.create((function(){
 
     ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, baseTai:baseTai,
                          voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode(),
-                         autoTing:M16B.autoTingOn(), big:M16B.bigOn() }; },
+                         autoTing:M16B.autoTingOn(), big:M16B.bigOn(),
+                         /* 動畫特效(v2.4.0)。⚠ typeof 守衛同前:混合快取下 fx.js 可能不存在,
+                            而這一支是開頁就會跑的(存偏好),炸掉就進不了牌桌。 */
+                         fx:(typeof M16Fx !== "undefined") ? M16Fx.fxOn() : true }; },
     usePrefs(o){
       if(goalOK(+o.handsGoal)) handsGoal = +o.handsGoal;
       /* ⚠ 這裡要 snapSec():v1.103.0 換掉整組秒數之後,舊玩家偏好裡的 8 / 12 / 20
@@ -1237,6 +1264,13 @@ const MP = MPCore.create((function(){
            「只在牌桌畫面生效」的守衛就是為了這一行(見 js/mahjong16/board.js 的 applyBig)。
            這裡照樣呼叫是對的:它會把**狀態**記下來,等 showScreen("play"/"solo") 再套上去。 */
       M16B.setBig(!!o.big);
+      /* 動畫特效(v2.4.0):碰 / 槓 / 吃 / 聽牌的漢字、胡牌特寫、花瓣、薄霧。
+         ⚠ 預設**開**(舊偏好沒有這一欄 → undefined → 要當成開)。寫成 `=== true`
+           的話所有老玩家升上來都是關的,而他們翻設定只會看到開關是關的、
+           不知道有這個東西 —— 同上面「喊牌語音」那條的教訓。
+         ⚠ 這裡刻意**不看系統的 prefers-reduced-motion**(v2.4.0 試過、當場出事:
+           回報是「沒感覺到有什麼變化」)—— 理由見 styles.src.css 的 ⑨ 那一段。 */
+      if(typeof M16Fx !== "undefined") M16Fx.setFx(o.fx !== false);
     },
 
     api:{

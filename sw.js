@@ -33,6 +33,7 @@ const CORE = [
   "./js/mahjong16/ai.js",
   "./js/mahjong16/sfx.js",     // 摸打吃碰槓胡的音效(v1.61.0)
   "./js/mahjong16/board.js",
+  "./js/mahjong16/fx.js",      // 碰 / 槓 / 吃 / 聽牌的漢字、胡牌特寫、花瓣、薄霧(v2.4.0)
   "./js/mahjong16/solo.js",
   "./js/mahjong16/adapter.js",
   "./js/mahjong16/main.js",

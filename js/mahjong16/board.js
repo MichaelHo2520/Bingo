@@ -972,8 +972,10 @@ const M16B = (function(){
     placeActs();                                         // ★ 動作列的落點,理由同上(見那一支)
     /* ★ 摸牌動畫的旗標在這裡熄掉(v2.3.3)—— 一定要等**整段 render 跑完**:
        上面那道牌寬夾取會重建這一段最多七次,中途熄掉的話只有第一次重建帶得到
-       class,而活到最後的是最後一次那份 → 畫面上等於沒有動畫。 */
+       class,而活到最後的是最後一次那份 → 畫面上等於沒有動畫。
+       ⚠ 落桌那一顆(v2.4.0)同一個理由、同一個位置,兩顆一起熄。 */
     drawFx = false;
+    dropFx = false;
   }
 
   /* ---------- 橫向:把「沒人吃得掉」的那一截高度交給牌河(v1.178.0)-------------
@@ -1193,7 +1195,8 @@ const M16B = (function(){
       ? '<div class="m16-pslot" style="--m16w:'+pwL+'px" aria-hidden="true"></div>' : '';
     html += '<div class="m16-pool" id="m16Pool" style="--m16w:'+pw+'px;--m16ph:'+poolH+'px">'+
       st.discards.map((d,i)=>tileHTML(codeOf(d.t),
-        "m16-pt"+(i===last?" last":""),
+        /* ★ 落桌回彈只掛在最新那張、而且只有剛打出來的那一次(見 markDrop) */
+        "m16-pt"+(i===last?" last"+(dropFx?" m16-dropin":""):""),
         ' data-seat="'+d.seat+'"'+(i===last?' style="--m16w:'+pwL+'px"':''))).join("")+
       pslot+
       '</div>';
@@ -1219,7 +1222,24 @@ const M16B = (function(){
          與下面的 placeActs())。量不到它,那一列會掉回 top:0 蓋在對手列上。
          ⚠ 所以這個條件**不可以再加回任何 if** —— 「有明牌才畫」等於「沒碰過牌的時候
            倒數環會跑到畫面最上面」,而那只有真的開一局才看得出來。 */
-    html += '<div class="m16-mymelds" style="--m16w:'+mtw+'px">'+shown.join("")+'</div>';
+    /* ★ 一鍵理牌(v2.4.0)—— **只在玩家真的拖過之後才存在**(`ord` 非 null)。
+       ★★ 「拖過才出現」不是省事,是版面預算:這一頁動作列那一格的**字數就是預算**
+         (discardHint 多五個字,750×485 下牌寬從 27 掉到 25),一顆常駐的鈕同樣要
+         吃掉空間 —— 而理牌只有「我剛剛把手牌拖亂了」這一種情況需要。
+         沒拖過就完全不存在 = 零成本;拖過了它才冒出來,剛好也是最容易被發現的時機。
+       ⚠ 它是絕對定位、疊在這一列左端(CSS 的 .m16-sortbtn),**不參與流** ——
+         這一列是動作列的錨點(placeActs 量它),讓它長高就是整副牌縮一次。
+       ⚠ 一局結束就不畫:那時手牌已經攤開給全桌看,重排沒有意義(而且會蓋到攤開的牌)。 */
+    /* ⚠⚠ 位置要**看這一列有沒有東西**(截圖才發現的):這一列左端在開局時是空的
+       (那正是最常整理手牌的時機)→ 疊在列內零遮擋;但補了花 / 碰過牌之後,花牌與明牌
+       就是從左緣開始長的 → 鈕會壓在**第一張花牌**上,而花牌是算台資訊。
+       → 有東西就往列外上方挪(CSS 的 .m16-sortbtn.up)。
+       ★ 那個位置在盤面**塞滿**時會疊到牌河下緣一點,那是刻意選的較小代價:
+         蓋住花牌 / 明牌更糟,而且**按下去這顆鈕就自己消失了**(ord 回 null)——
+         遮擋只活在「拖亂了還沒按理牌」這段時間裡。 */
+    const sortBtn = (ord && !st.over)
+      ? '<button type="button" class="m16-sortbtn' + (shown.length ? " up" : "") + '">理牌</button>' : '';
+    html += '<div class="m16-mymelds" style="--m16w:'+mtw+'px">'+sortBtn+shown.join("")+'</div>';
 
     /* --- 我的手牌 --- */
     const inClaim = co.length>0;
@@ -1415,6 +1435,15 @@ const M16B = (function(){
     host = document.getElementById(o.hostId || "m16Stage");
     if(!host) return;
     host.addEventListener("click", e=>{
+      /* ★ 一鍵理牌(v2.4.0):把玩家拖出來的顯示順序丟掉,回到照牌序(萬 / 條 / 筒 / 字)。
+         ⚠ 走的是現成的 resetOrder() —— 它本來就是「換局 / 離開牌桌」在用的那一支,
+           所以這裡**沒有新的狀態**:順序一直是純本地的顯示,不進 DB / 不進 st。
+         ⚠ 一定要 render() 一次:sel 與宣告選項的 idx 都是**格位鍵**,順序一換就位移
+           (同 endDrag 那條 ▲④)。這裡順手清掉 sel,免得清掉順序之後那個選取指到別張牌。 */
+      if(e.target.closest(".m16-sortbtn")){
+        resetOrder(); sel = ""; opts = null; render();
+        return;
+      }
       const el = e.target.closest(".m16-ht");
       if(el && el.dataset.t!==undefined){
         /* ★ 剛剛那一下是拖曳(而且真的換到別的位置)→ 這一下不算點擊。
@@ -1703,6 +1732,18 @@ const M16B = (function(){
   let drawFx = false;
   function markDraw(){ drawFx = true; }
 
+  /* ★ 出牌落桌的一次性旗標(v2.4.0)—— 與 markDraw 完全同一套,理由也同一條:
+       牌河最新那張(`.m16-pt.last`)**每次 render 都被 innerHTML 重建**,
+       無條件掛動畫的話別人一表態、倒數環一動,那張牌就從頭彈一次。
+     ★★ 刻意做成「落桌那一下」而不是無限呼吸光:`.m16-pt.last` 那圈紅框是
+       **常駐不脈動**的設計語彙(五子棋 `.gmk-stone.last` / 暗棋 `.dc-lastto` 同一組,
+       暗棋那段註解就寫著「盤面本身的動畫已經夠多,再疊一個持續脈動只是雜訊」)。
+     ⚠ 呼叫端要排在 render() **之前**(旗標由 render 消費),與 markDraw 同兩個位置。
+     ⚠ 被吃 / 碰走的那一手沒有 last(`st.taken` 時 last = -1)→ 沒有節點可掛,
+       自然不播,那是對的:那張牌已經不在牌河上了。 */
+  let dropFx = false;
+  function markDrop(){ dropFx = true; }
+
   let celeT = 0;
   function celebrate(){
     const play = host && host.parentNode;              // .mj-play
@@ -1901,6 +1942,9 @@ const M16B = (function(){
     oneTap,
     celebrate,
     markDraw,
+    /* 出牌落桌的一次性旗標(v2.4.0)。★ 呼叫端與 markDraw 同兩處
+       (adapter 的 applyGame / solo 的 sfxTick),而且同樣要排在 render() **之前**。 */
+    markDrop,
     // 給測試頁與 e2e:直接問排版決策,不必去讀 DOM
     planFor(hand, hasDraw, avail){ return planHand(hand, hasDraw, avail); },
     // 給 e2e:玩家自訂的顯示順序(沒拖過 = null)
