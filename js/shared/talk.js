@@ -120,7 +120,7 @@ const Talk = (function () {
      它在兩種情況下會「永遠不 resolve、也不 reject」:
        ① 使用者把權限提示晾在那裡不點(很常見 —— 提示跳出來的時候人正在看牌);
        ② headless / 沒有音訊裝置的環境(這就是 t-talk-e2e 一開始整支卡死的原因)。
-     而呼叫端(ui-kit 的 bindTalkUi)為了擋連點有一個 `talkBusy` 旗標,
+     而呼叫端(下面 bindUi 的 click handler)為了擋連點有一個 `uiBusy` 旗標,
      它是在 finally 裡才放掉的 → 永遠不回 = **旗標永遠卡著 = 那兩顆鈕從此按不動**,
      而且畫面上完全看不出為什麼。20 秒足夠讓人回應提示,又不會真的鎖死。
      ⚠ 超時之後才回來的 stream 要自己收掉,否則麥克風開著沒有人管
@@ -463,15 +463,63 @@ const Talk = (function () {
     try { if (acx) { acx.close(); acx = null; } } catch (e) { }
   }
 
-  /* ---------- 對外狀態(UI 用) ---------- */
+  /* ==========================================================================
+     UI:那兩顆鈕(v1.183.0 從 ui-kit.js **收進來**)
+     ──────────────────────────────────────────────────────────────────────────
+     ★★★ 為什麼收進來:UI 那一半原本住在 `js/shared/ui-kit.js`,而 **Bingo 不載入
+       `js/shared/`**(紅線 2 的物理隔離)—— 照那個結構,Bingo 要接語音就得**複製
+       第二份**,於是又多一組 CLAUDE.md 紅線 4 說的雙胞胎(「改一邊記得改另一邊」),
+       而那正是這個專案已經有好幾組、每組都出過事的東西。
+     ★ 而且分層上本來就沒有理由分開:talk.js **自己就在碰 DOM**(它要建 <audio>),
+       所以「talk.js 零 DOM」這個約束從第一版起就不存在,拆出去只是徒增一組雙胞胎。
+     → 收進來之後,一頁要接語音只剩兩件事:載入這支 + 呼叫一次 Talk.bindUi()。
+     ⚠ 這裡**不可以**自己宣告 `$` 或 `showToast`:那兩個在 game.js(Bingo)與
+       ui-kit.js(十三頁)各有一份全域定義,重複宣告 const 會整頁 SyntaxError。
+       要用就 typeof 檢查後直接用。
+     ========================================================================== */
+  let uiBusy = false;
+  function btnL() { return document.getElementById("tkListenBtn"); }
+  function btnS() { return document.getElementById("tkSpeakBtn"); }
+  function toast(msg) {
+    // 兩份都叫 showToast(game.js / ui-kit.js),但這一支可能被沒有它的頁面載入
+    try { if (typeof showToast === "function") showToast(msg); } catch (e) { }
+  }
+
+  function paintBtns(st) {
+    const bL = btnL(), bS = btnS();
+    const bad = !!(st && st.failed && st.failed.length);
+    if (bL) {
+      bL.textContent = listen ? "🔊" : "🔇";
+      bL.classList.toggle("on", listen);
+      bL.title = listen ? "關掉語音(不再聽到別人)" : "打開語音(聽別人說話)";
+      bL.setAttribute("aria-label", bL.title);
+      bL.setAttribute("aria-pressed", listen ? "true" : "false");
+    }
+    if (bS) {
+      bS.textContent = "🎙";
+      bS.classList.toggle("on", speak);
+      /* 連不上要**看得見**:沒有 TURN 的話對稱 NAT 的組合會失敗,而那時使用者
+         以為自己在講話、其實沒有人聽得到 —— 最難自己發現的一種壞掉。 */
+      bS.classList.toggle("bad", speak && bad);
+      bS.title = speak ? (bad ? "有人連不上你的語音" : "關掉麥克風(別人聽不到你)")
+                       : "打開麥克風(讓別人聽到你)";
+      bS.setAttribute("aria-label", bS.title);
+      bS.setAttribute("aria-pressed", speak ? "true" : "false");
+    }
+  }
+
+  /* ---------- 對外狀態 ---------- */
   function report() {
-    if (!hooks || !hooks.onState) return;
     const spk = [], bad = [];
     for (const id in peers) {
       if (peers[id].speaking) spk.push(id);
       if (peers[id].failed) bad.push(id);
     }
-    try { hooks.onState({ listen, speak, speaking: spk, failed: bad, peers: Object.keys(peers).length }); } catch (e) { }
+    const st = { listen, speak, speaking: spk, failed: bad, peers: Object.keys(peers).length };
+    /* ⚠ 鈕一律重畫,**不可以**因為 hooks 還沒掛上就跳過 —— 沒進房時 hooks 是 null,
+       而那時使用者照樣按得到鈕(大廳畫面);跳過的話會變成「按了沒反應」。 */
+    paintBtns(st);
+    if (hooks && hooks.onState) { try { hooks.onState(st); } catch (e) { } }
   }
 
   /* ---------- 依「現在房裡有誰」+「兩個開關」重算所有連線 ---------- */
@@ -515,9 +563,59 @@ const Talk = (function () {
     report();
   }
 
+  /* ---------- 兩個開關(命名函式:bindUi 的 click handler 也要用到) ---------- */
+  async function doListen(v) {
+    listen = !!v;
+    kickPlay();      // 這一下是使用者手勢:把 iOS 擋掉的遠端音訊補播回來
+    sync();
+    return true;
+  }
+  /* ⚠ 回傳 false = 使用者不給權限 / 裝置沒有麥克風 —— 呼叫端要把鈕彈回去,
+     不可以自顧自地顯示「已開麥」(那是「我以為我在講話」最糟的一種)。 */
+  async function doSpeak(v) {
+    kickPlay();      // 同 doListen:這一下是手勢,順手補播
+    if (v) {
+      try { await openMic(); } catch (e) { speak = false; sync(); return false; }
+      speak = true; duck(true);
+    } else {
+      speak = false; closeMic(); duck(false);
+    }
+    sync();
+    return true;
+  }
+
   /* ---------- 對外 API ---------- */
   return {
     supported,
+    /* ★ 綁那兩顆鈕。十三頁由 ui-kit 的 bindCommonUI() 代叫;**Bingo 自己在 main.js 叫一次**
+       (它不載入 js/shared/ui-kit.js)。沒有那兩顆鈕的頁面直接 return,所以可以無腦呼叫。 */
+    bindUi() {
+      const bL = btnL(), bS = btnS();
+      if (!bL && !bS) return;                    // 這一頁沒接語音
+      if (!supported()) {                        // 瀏覽器不支援(或走 http 不是 https)
+        // 留一顆按了沒反應的鈕比沒有更糟 —— 直接收起來
+        if (bL) bL.classList.add("hidden");
+        if (bS) bS.classList.add("hidden");
+        return;
+      }
+      if (bL) bL.addEventListener("click", async () => {
+        if (uiBusy) return; uiBusy = true;
+        try { await doListen(!listen); } finally { uiBusy = false; }
+        paintBtns();
+      });
+      if (bS) bS.addEventListener("click", async () => {
+        if (uiBusy) return; uiBusy = true;
+        try {
+          const want = !speak;
+          const ok = await doSpeak(want);
+          /* ⚠ 被拒絕(沒給權限 / 沒有麥克風)一定要講出來並讓鈕彈回去 ——
+             自顧自地顯示「已開麥」是「我以為我在講話」那一類最糟的錯誤。 */
+          if (want && !ok) toast("沒辦法開啟麥克風,請檢查瀏覽器的權限設定");
+        } finally { uiBusy = false; }
+        paintBtns();
+      });
+      paintBtns();
+    },
     /* 由 mp-core 在進房後掛上。hooks:
          ref(path)  → roomRef.child(path)(沒進房時回 null)
          me()       → 我的 pid ·  players() → 現在房裡的人(物件)
@@ -536,26 +634,8 @@ const Talk = (function () {
     },
     listening() { return listen; },
     speaking() { return speak; },
-
-    async setListen(v) {
-      listen = !!v;
-      kickPlay();      // 這一下是使用者手勢:把 iOS 擋掉的遠端音訊補播回來
-      sync();
-      return true;
-    },
-    /* ⚠ 回傳 false = 使用者不給權限 / 裝置沒有麥克風 —— 呼叫端要把鈕彈回去,
-       不可以自顧自地顯示「已開麥」(那是「我以為我在講話」最糟的一種)。 */
-    async setSpeak(v) {
-      kickPlay();      // 同 setListen:這一下是手勢,順手補播
-      if (v) {
-        try { await openMic(); } catch (e) { speak = false; sync(); return false; }
-        speak = true; duck(true);
-      } else {
-        speak = false; closeMic(); duck(false);
-      }
-      sync();
-      return true;
-    },
+    setListen: doListen,
+    setSpeak: doSpeak,
     // 房裡的人變了(有人進來 / 離開)→ 核心叫這一支
     refresh() { sync(); },
     // 離開房間:全部拆乾淨(核心的 leave() 收不到子節點的監聽,見檔頭紅線 ①)

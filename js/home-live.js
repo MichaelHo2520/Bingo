@@ -45,10 +45,13 @@ const HomeLive = (function(){
     '</svg>';
   }
 
-  // max = 可加入的人數上限(要與各遊戲 adapter.js 的 maxPlayers 一致;Bingo 沒有上限 → 0)
+  /* max = 可加入的人數上限(要與各遊戲 adapter.js 的 maxPlayers 一致)。
+     ⚠ Bingo 沒有 adapter —— 它的那一份在 `js/online.js` 的 **MAX_PLAYERS**,兩邊要一致。
+       v1.183.0 之前 Bingo 是 0(= 沒有上限);改成 6 的動機是即時語音:
+       mesh 的連線數是 N(N−1)/2,6 人 15 條,再多手機撐不住(10 人就 45 條)。 */
   // href = 別頁的遊戲;沒有 href 的就是本頁(Bingo)
   const GAMES=[
-    { key:"bingo",   index:"rooms_index",   rooms:"rooms",         name:"BINGO",  icon:"🎲", badge:"hlBadgeBingo",   max:0 },
+    { key:"bingo",   index:"rooms_index",   rooms:"rooms",         name:"BINGO",  icon:"🎲", badge:"hlBadgeBingo",   max:6 },
     { key:"gomoku",  index:"gomoku_index",  rooms:"gomoku_rooms",  name:"五子棋", icon:"⚫", badge:"hlBadgeGomoku",  max:2, href:"gomoku.html" },
     { key:"sudoku",  index:"sudoku_index",  rooms:"sudoku_rooms",  name:"數獨",   icon:"🔢", badge:"hlBadgeSudoku",  max:6, href:"sudoku.html" },
     { key:"mahjong", index:"mahjong_index", rooms:"mahjong_rooms", name:"麻將",   icon:"🀄", badge:"hlBadgeMahjong", max:6, href:"mahjong.html" },

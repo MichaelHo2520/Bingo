@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.182.3 -->
-<meta name="version" content="1.182.3">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v1.183.0 -->
+<meta name="version" content="1.183.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -54,6 +54,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="topver" id="topVer" aria-label="版本"></span>
     </div>
     <div class="tools">
+      <!-- 即時語音(v1.183.0)。⚠ Bingo **不載入 js/shared/ui-kit.js**,所以 UI 那一半
+           是由 talk.js 自己提供的(Talk.bindUi(),在 js/main.js 叫一次)——
+           這樣就不必再多一組紅線 4 的雙胞胎。完整說明見 notes/24 的〇節。
+           ⚠ 字面不可以用 🎤:那顆是語音留言(錄一段送出),是另一個功能。 -->
+      <button class="icon-btn tk-btn" id="tkListenBtn" type="button" title="打開語音(聽別人說話)" aria-label="打開語音,聽別人說話" aria-pressed="false">🔇</button>
+      <button class="icon-btn tk-btn" id="tkSpeakBtn" type="button" title="打開麥克風(讓別人聽到你)" aria-label="打開麥克風,讓別人聽到你" aria-pressed="false">🎙</button>
       <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
       <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
     </div>
@@ -704,6 +710,8 @@ const FIREBASE_CONFIG = {
 
 <script src="js/audio.js"></script>
 <script src="js/game.js"></script>
+<!-- 即時語音(WebRTC mesh)。⚠ 要排在 js/online.js **之前**(它一進房就 Talk.attach()) -->
+<script src="js/shared/talk.js"></script>
 <script src="js/online.js"></script>
 <script src="js/home-live.js"></script>
 <script src="js/main.js"></script>

@@ -1201,81 +1201,6 @@ function syncTools(){
 addEventListener("resize", syncTools);
 
 /* ==========================================================================
-   即時語音的兩顆鈕(js/shared/talk.js 的 UI 這一半)
-   ──────────────────────────────────────────────────────────────────────────
-   ★★★ 為什麼是**兩顆**而不是一顆:「要不要聽」與「要不要講」是兩件獨立的事
-     —— 只想聽的人不該被要求麥克風權限,而想講的人不一定想被別人的聲音吵。
-     這是現在的網路遊戲(Discord / 各家手遊)的通用做法,使用者指定照這個來。
-
-   ★★ 為什麼住在 `.tools` 裡(⛶ 旁邊):那一整塊會被 syncTools() 在頂列被收掉時
-     **整組搬進房間框**。鈕自己不必知道「大牌桌」的存在,也絕對不會發生
-     「開了大牌桌就再也關不掉麥克風」——那正是 gomoku.html 那條註解警告過的坑
-     (「鈕住在頂列裡就再也按不回來」)。⚠ 不要為了省事把它們挪出 .tools。
-
-   ⚠ 字面不可以用 🎤 —— 那顆是**語音留言**(錄一段送出),兩個功能完全不同,
-     共用同一個圖示會讓使用者以為按錯。這裡用 🔊 / 🔇(聽)與 🎙(講)。
-   ========================================================================== */
-let talkBusy = false;
-function talkBtns(){ return { L:$("tkListenBtn"), S:$("tkSpeakBtn") }; }
-
-/* 由 talk.js 透過 mp-core 的 onState 回呼進來(狀態變了就重畫)。
-   ⚠ 這一支**必須容忍 talk.js 不存在**:沒接語音的頁面根本沒有這兩顆鈕。 */
-function renderTalkUi(st){
-  const b = talkBtns();
-  const T = (typeof Talk !== "undefined" && Talk) ? Talk : null;
-  const listening = st ? st.listen : !!(T && T.listening());
-  const speaking  = st ? st.speak  : !!(T && T.speaking());
-  const failed    = st && st.failed && st.failed.length;
-  if(b.L){
-    b.L.textContent = listening ? "🔊" : "🔇";
-    b.L.classList.toggle("on", listening);
-    b.L.title = listening ? "關掉語音(不再聽到別人)" : "打開語音(聽別人說話)";
-    b.L.setAttribute("aria-label", b.L.title);
-    b.L.setAttribute("aria-pressed", listening ? "true" : "false");
-  }
-  if(b.S){
-    b.S.textContent = "🎙";
-    b.S.classList.toggle("on", speaking);
-    /* 連不上要**看得見**:沒有 TURN 的話對稱 NAT 的組合會失敗,而那時使用者
-       以為自己在講話、其實沒有人聽得到。這是最難自己發現的一種壞掉。 */
-    b.S.classList.toggle("bad", !!(speaking && failed));
-    b.S.title = speaking ? (failed ? "有人連不上你的語音" : "關掉麥克風(別人聽不到你)")
-                         : "打開麥克風(讓別人聽到你)";
-    b.S.setAttribute("aria-label", b.S.title);
-    b.S.setAttribute("aria-pressed", speaking ? "true" : "false");
-  }
-}
-
-function bindTalkUi(){
-  const b = talkBtns();
-  if(!b.L && !b.S) return;                       // 這一頁沒接語音
-  const T = (typeof Talk !== "undefined" && Talk) ? Talk : null;
-  if(!T || !T.supported()){
-    // 瀏覽器不支援(或走 http 而不是 https)→ 直接把鈕收起來,不要留一顆按了沒反應的
-    if(b.L) b.L.classList.add("hidden");
-    if(b.S) b.S.classList.add("hidden");
-    return;
-  }
-  if(b.L) b.L.addEventListener("click", async ()=>{
-    if(talkBusy) return; talkBusy = true;
-    try{ await Talk.setListen(!Talk.listening()); }finally{ talkBusy = false; }
-    renderTalkUi(null);
-  });
-  if(b.S) b.S.addEventListener("click", async ()=>{
-    if(talkBusy) return; talkBusy = true;
-    try{
-      const want = !Talk.speaking();
-      const ok = await Talk.setSpeak(want);
-      /* ⚠ 被拒絕(沒給權限 / 沒有麥克風)一定要講出來並讓鈕彈回去 ——
-         自顧自地顯示「已開麥」是「我以為我在講話」那一類最糟的錯誤。 */
-      if(want && !ok) showToast("沒辦法開啟麥克風,請檢查瀏覽器的權限設定");
-    }finally{ talkBusy = false; }
-    renderTalkUi(null);
-  });
-  renderTalkUi(null);
-}
-
-/* ==========================================================================
    大 / 小 —— 收掉周邊 UI,把畫面全部讓給盤面(v1.178.3,十一頁共用)
    ──────────────────────────────────────────────────────────────────────────
      使用者:「你畫我猜那個大小畫板蠻不錯的,其他遊戲也可以加入,但不能直接叫大小」
@@ -1382,8 +1307,11 @@ function bindCommonUI(){
   $("setClose").addEventListener("click",closeSettings);
   $("setVeil").addEventListener("click",e=>{ if(e.target===$("setVeil"))closeSettings(); });
   $("fsBtn").addEventListener("click",toggleFull);
-  // 即時語音的兩顆鈕(只有接了語音的頁面有;沒有的話這一支自己 return)
-  bindTalkUi();
+  /* 即時語音的兩顆鈕。UI 那一半**住在 js/shared/talk.js 自己身上**(v1.183.0 收過去的)——
+     不放這裡的理由:Bingo 不載入 js/shared/,放這裡就等於逼它複製第二份
+     (又一組紅線 4 的雙胞胎)。沒有那兩顆鈕的頁面 bindUi() 自己 return,可以無腦叫。
+     ⚠ 一定要 typeof 判斷:talk.js 是選配的,沒載入的頁面直接寫 Talk 會是 ReferenceError。 */
+  if (typeof Talk !== "undefined" && Talk) Talk.bindUi();
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));
   $("bgmTrackSel").addEventListener("change",e=>setBgmTrack(e.target.value));

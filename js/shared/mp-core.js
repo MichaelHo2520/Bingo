@@ -563,7 +563,7 @@ const MPCore = (function(){
              ⚠ 只有真的變了才重畫:這個回呼在有人講話時每 120ms 就可能來一次,
                無條件 renderPlayers() 會把整條晶片列每秒重建八次。 */
           onState:(st)=>{
-            renderTalkUi(st);
+            // ⚠ 鈕的重畫由 talk.js 自己負責(v1.183.0)—— 這裡只管晶片列
             const sig=(st&&st.speaking||[]).slice().sort().join(",");
             if(sig!==talkingSig){ talkingSig=sig; talkingIds=(st&&st.speaking)||[]; renderPlayers(); }
           }

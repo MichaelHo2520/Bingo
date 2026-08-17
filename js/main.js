@@ -411,6 +411,12 @@
   hardRefreshLanded();   // 上一輪是按「強制更新」重載進來的話:抹掉 ?fresh= 並回報有沒有真的換到版
   initUpdateCheck();
   initFullscreenKeep();   // 全螢幕跨頁保持:從五子棋/數獨回來後,第一個手勢自動接回全螢幕
+  /* 即時語音的兩顆鈕(v1.183.0)。★ Bingo **不載入 js/shared/ui-kit.js**,
+     那邊是由 bindCommonUI() 代叫的,這裡自己叫一次。
+     ★★ UI 那一半住在 talk.js 自己身上 → 這一頁**不必**再抄一份紅線 4 的雙胞胎,
+        只有這一行 + online.js 的幾個掛載點。
+     ⚠ 一定要 typeof 判斷:talk.js 是選配的,直接寫 Talk 會是 ReferenceError。 */
+  if (typeof Talk !== "undefined" && Talk) Talk.bindUi();
   HomeLive.boot();        // 首頁「現在有人在玩」看板:idle 後才載 Firebase SDK,首屏不等它
   // iOS 的「加入主畫面」引導。延遲一下再彈:讓畫面先畫完,一進站就跳太突兀
   setTimeout(maybeShowInstallTip,1500);

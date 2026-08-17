@@ -33,7 +33,12 @@
     let resyncing=false, resyncTimer=null;   // 剛從背景/斷線恢復的寬限旗標與計時器(期間不把舊名單快照當成被踢)
     let graceTimer=null, graceAt=0;          // 「暫時有人不見」的寬限計時器:逾時仍不見才真的離開/回大廳
     let aloneTimer=null, aloneTick=null, aloneWaitMs=0;   // 遊戲中只剩房主自己的專用計時器 + 秒數倒數 interval
-    let byeIds={};                           // 「自己按了離開房間」的人(bye/{pid});見下面四個寬限期
+    /* 即時語音:現在有誰正在說話(talk.js 本地量出來的,不進 DB)。
+       talkingSig 是上一次畫過的簽章 —— 只在真的變了才重畫晶片列(見 listen 的 onState)。
+       ⚠ renderPlayers() 會讀 talkingIds,少了這一行是**執行期** ReferenceError,
+         而 `node --check` 只驗語法、抓不到它。 */
+    let talkingIds=[], talkingSig="";
+    let byeIds={};                        // 「自己按了離開房間」的人(bye/{pid});見下面四個寬限期
     /* ---------- 四個寬限期(v1.166.0 拆成兩組:「斷線」給滿一分鐘,「按下離開」照舊很快) ----------
        使用者:「離開視窗後再回來…改成 1 分鐘內回來都沒問題」。切去 LINE 回訊息、接個電話,
        手機馬上凍結分頁 → WebSocket 斷 → 伺服器依 onDisconnect 把 players/{我} 移掉,
@@ -274,7 +279,7 @@
              ⚠ v1.156.0 更正:共用層那一份原本寫的理由是「set() 在二次撞號時會擦掉還在打的
                那一局」,而這一包 payload 本身就會 —— 真正擋住二次撞號的是 pickFreeCode 的迴圈。
            ⚠ 這一段與 js/shared/mp-core.js 的 create() 是雙胞胎(CLAUDE.md 紅線 5)。 */
-        return roomRef.update({ players:null, scores:null, hostName:null, closedAt:null, bye:null,
+        return roomRef.update({ players:null, scores:null, hostName:null, closedAt:null, bye:null, rtc:null,
           host:meId, roomName:roomName, target:state.target, size:SIZE, orderMethod:"random",
           scoreMode:scoreMode, winGoal:winGoal,   // 用記住的計分偏好當建房預設
           emotes:null, createdAt:Date.now(),
@@ -294,9 +299,13 @@
         const r=snap.val();
         if(!r||!r.host){ setMsg("這個房間已經關閉了,請重新選擇。"); return; }
         roomName=inName||r.roomName||("房間 "+code);   // 以房主設定的房名為準
-        joinNode();
-        // ★ 誤按離開的救援(v1.97.0):進大廳之前先把同名的舊成績接回來,免得排行榜先閃一次 0
-        adoptScore(r,enterLobby);
+        /* ★ 誤按離開的救援(v1.97.0):進大廳之前先把同名的舊成績接回來,免得排行榜先閃一次 0。
+           ⚠ v1.183.0 起要**等搶到位子才往下走** —— 搶輸(房間滿了)的話不可以進大廳,
+             否則畫面上看起來在房裡、DB 上卻沒有你那一格。 */
+        joinNode(
+          ()=>{ adoptScore(r,enterLobby); },
+          ()=>{ roomRef=null; setMsg("這個房間人滿了(上限 "+MAX_PLAYERS+" 人),請選別間。"); }
+        );
       }).catch(e=>setMsg("加入失敗:"+e.message));
     }
     // 從主選單的「現在有人在玩」直接加入:先切到連線畫面,SDK 就緒後才 join。
@@ -306,8 +315,34 @@
       openConnect();
       ensureFirebase().then(()=>join(inCode,$("mpName").value,inName)).catch(()=>{});
     }
-    function joinNode(){
-      armPresence({ name:meName, lines:0, ready:false });
+    /* ★★★ 入座人數上限(v1.183.0)。Bingo 在此之前是**完全沒有上限**的
+       (`js/home-live.js` 的 GAMES 裡它是 `max:0`)。
+       使用者:「Bingo 遊戲人數上限設定為 6 個」—— 動機是即時語音:mesh 的連線數是
+       N(N−1)/2,6 人是 15 條,再多手機就撐不住(10 人就 45 條)。
+       ⚠ 一定要用 **transaction** 搶位,不可以「先 once 讀人數再 update」——
+         那擋不住「兩個人同時按加入」的競態(mp-core 的 claimSeat 也是為了這個)。
+       ⚠ 這一版**刻意只擋新入座,不擋 resume()**:斷線重連走 armPresence,
+         那時自己本來就有位子;硬要在那裡也檢查的話,「斷線超過寬限期 + 房間剛好滿了」
+         會變成**回來就被踢出去**,而那個體驗比偶爾多一個人糟得多。
+       ⚠ 房主自己也走這一支(create 的 .then)—— 開房時 players 是空的,一定搶得到。 */
+    const MAX_PLAYERS = 6;
+    function joinNode(done, full){
+      if(!roomRef||!meId){ done&&done(); return; }
+      roomRef.child("players").transaction(p=>{
+        p = p || {};
+        if(p[meId]) return p;                                   // 已經在座位上(重連 / 重複呼叫)
+        if(Object.keys(p).length >= MAX_PLAYERS) return;        // 滿了 → 中止交易
+        p[meId] = { name:meName, lines:0, ready:false };
+        return p;
+      }, (err, committed)=>{
+        if(err || !committed){ full && full(); return; }
+        // 搶到位子才掛 onDisconnect(順序不能反:先掛的話搶輸時會留一條孤兒)
+        roomRef.child("players/"+meId).onDisconnect().remove();
+        /* ⚠ 回到座位就要把自己的 bye 記號清掉(同 armPresence 的理由):留著的話
+           「上次是按離開走的」會一直算數,下次真的斷線時房主會用短寬限把這局作廢。 */
+        roomRef.child("bye/"+meId).remove();
+        done && done();
+      });
       // 註:不再於房主斷線時「整房刪除」——短暫切背景改由寬限期+重連歸位處理(見 watchConn/resume);
       //     房主真的離開時 leave() 會把 host 清掉關房(v1.147.0 起**房間資料本身留著**,
       //     給首頁的伺服器狀態面板列「誰開過哪一間」),而沒有 host 的房間大廳清單也不會顯示。
@@ -383,7 +418,7 @@
     function bailFromRps(){ if(isHost) resetRoomToLobby(); else askLeave(); }
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
-      byeIds={}; aloneWaitMs=0;   // 上一間房「誰按了離開」不可以帶進新房(同 gameRev,見四個寬限期)
+      byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";   // 上一間房「誰按了離開」不可以帶進新房(同 gameRev,見四個寬限期)
       gameRev=0;   // ★ 進新房必歸零:MP 為常駐 IIFE,不重設會把上一間房累積的高 rev 帶進來,害新房快照被 onGame 的「rev<gameRev」全部誤丟 → 加入者卡在大廳、整房卡死
       clearPlayCount(); statDone=false;   // 熱門度計數:一間房記一次 → 進新房要重新起算
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();   // 連線中:顯示快速語音浮動鈕
@@ -556,7 +591,32 @@
       roomRef.child("scores/"+id).remove();   // 連同分數一起清,避免殘留(踢人才清;斷線絕不清)
       showToast("已移出 "+nm);
     }
+    /* ---------- 即時語音(js/shared/talk.js)----------
+       ★★ 這是 CLAUDE.md 紅線 4 的**例外**:UI 與邏輯都住在 talk.js 自己身上,
+         所以 Bingo 這邊**不必**再抄一份 —— 只要這幾個掛載點。
+         (v1.183.0 把 UI 從 ui-kit.js 收進 talk.js 就是為了這件事。)
+       ⚠ 一定要 feature-detect:talk.js 是選配的,直接寫 Talk 在沒載入它的頁面
+         會是 ReferenceError,而那會把整個 listen() / leave() 打斷。
+       ⚠ 這一段與 js/shared/mp-core.js 的 talkOn() 是**同構的兩份**(紅線 4)——
+         改行為要兩邊一起看;但兩邊都只是轉接,真正的邏輯只有 talk.js 一份。 */
+    function talkOn(){
+      try{ return (typeof Talk !== "undefined" && Talk && Talk.supported()) ? Talk : null; }
+      catch(e){ return null; }
+    }
+
     function listen(){
+      { const T=talkOn(); if(T) T.attach({
+          ref:(path)=>roomRef?roomRef.child(path):null,
+          me:()=>meId,
+          players:()=>players,
+          nameOf:(id)=>dispName(id),
+          /* ⚠ 鈕的重畫由 talk.js 自己做;這裡只管晶片列的「說話中」。
+             ⚠ 只有真的變了才重畫 —— 這個回呼在有人講話時每 120ms 就可能來一次。 */
+          onState:(st)=>{
+            const sig=(st&&st.speaking||[]).slice().sort().join(",");
+            if(sig!==talkingSig){ talkingSig=sig; talkingIds=(st&&st.speaking)||[]; renderPlayers(); }
+          }
+        }); }
       roomRef.child("host").on("value",s=>{
         hostId=s.val()||null; if(hostId)sawHost=true;
         if(hostGone()) scheduleRecheck(recheckWait());   // 房主暫時不見 → 進寬限期,期間房主重連歸位就恢復
@@ -570,6 +630,8 @@
         { const ids=Object.keys(players);
           if(prevIds!==null && curPhase==="lobby" && ids.some(id=>id!==meId && prevIds.indexOf(id)<0)) Sound.join();
           prevIds=ids; }
+        // 語音的 mesh 要跟著「房裡現在有誰」動(players 是唯一權威來源:斷線由 onDisconnect 從這裡移掉)
+        { const T=talkOn(); if(T) T.refresh(); }
         if(Object.keys(players).length) sawPlayers=true;
         if(players[meId]) sawMe=true;
         // 我一直穩定連著卻從名單消失 → 房主真的把我踢了,立即離開;其餘情況一律交給寬限期
@@ -633,7 +695,9 @@
         const p=players[id]||{};
         const isTurn=status==="playing"&&order.length>0&&order[turnIndex]===id;
         const chip=document.createElement("div");
-        chip.className="mp-chip clickable"+(p.ready?" ready":"")+(id===meId?" me":"")+(isTurn?" turn":"");
+        // tk-talking:那個人正在說話(即時語音);沒開語音時 talkingIds 永遠是空的
+        chip.className="mp-chip clickable"+(p.ready?" ready":"")+(id===meId?" me":"")+(isTurn?" turn":"")
+                      +(talkingIds.indexOf(id)>=0?" tk-talking":"");
         chip.dataset.id=id;                                  // 供表情動畫定位到該玩家晶片
         chip.title=id===meId?"點一下傳送互動表情給全部人":"點一下傳送互動表情";
         chip.addEventListener("click",()=>openEmote(id===meId?"all":id));   // 點對象 → 開表情面板
@@ -1346,9 +1410,14 @@
       setLock(false); updateReadyBtn(); render(); applyFillUI();
     }
     function leave(){
+      /* ★★★ 語音要**第一個**拆,而且一定要在 roomRef 還在的時候:talk.js 的 stop()
+         要自己 off 掉 rtc/{我}/{每個人} 底下的子節點監聽並把信箱 remove 掉 ——
+         下面那一圈 off() 只收得到 roomRef.child("rtc") 本身,收不到子節點。
+         漏掉 = 離開房間後還在收上一間的 SDP,而且麥克風不會關(錄音指示燈一直亮)。 */
+      { const T=talkOn(); if(T) T.stop(); }
       try{
         if(roomRef){
-          ["host","players","game","target","size","orderMethod","scoreMode","winGoal","scores","emotes","bye"].forEach(k=>roomRef.child(k).off());
+          ["host","players","game","target","size","orderMethod","scoreMode","winGoal","scores","emotes","bye","rtc"].forEach(k=>roomRef.child(k).off());
           if(isHost){
             if(meId) roomRef.child("players/"+meId).onDisconnect().cancel();
             roomRef.onDisconnect().cancel();
@@ -1365,7 +1434,7 @@
                  台灣麻將的 tai、你畫我猜的 ink/say)—— Bingo **沒有** extraNodes 這個概念
                  (它的房內節點就是上面那幾個固定欄位),所以這一份刻意不加。
                  這是那一對雙胞胎目前唯一該有的差異,不是漏改。 */
-            roomRef.update({ host:null, players:null, game:null, bye:null,
+            roomRef.update({ host:null, players:null, game:null, bye:null, rtc:null,
                              hostName:meName||"", closedAt:Date.now() });
           }else if(meId){
             const pr=roomRef.child("players/"+meId);
@@ -1393,7 +1462,7 @@
       }catch(e){}
       stopConn(); clearRecheck(); clearAloneCheck(); clearPlayCount();   // 卸載連線監聽、清掉寬限計時器
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
-      sawPlayers=false; sawMe=false; sawHost=false; hostId=null; byeIds={}; aloneWaitMs=0;
+      sawPlayers=false; sawMe=false; sawHost=false; hostId=null; byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; scores={}; calledList=[];
       order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false; wasMyTurn=false; lastIndexSig=null; gameRev=0;
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
