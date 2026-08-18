@@ -182,10 +182,11 @@ const UNB = (function(){
   function moveSfx(mv, n){
     if(UN.isDraw(mv)){ sfx.draw(); return; }
     if(UN.isPass(mv)) return;
-    if(UN.isCatch(mv)){ sfx.caught(); return; }
+    if(UN.isCatch(mv)){ sfx.caught(); cutCatch(); return; }
     const id = UN.moveCard(mv);
     if(id < 0) return;
     const k = UN.kindOf(id);
+    cutIn(id);                                  // ★ 動作牌的特寫(v2.4.5,見二之二)
     if(k === UN.K_SKIP) sfx.skip();
     else if(k === UN.K_REV) sfx.rev();
     else if(k === UN.K_D2) sfx.pen(2);
@@ -194,6 +195,76 @@ const UNB = (function(){
     else sfx.play();
     if(UN.moveDeclared(mv)) sfx.uno();
     voiceKeysOf(mv).forEach(key => say(key, 200));
+  }
+
+  /* ==========================================================================
+     二之二、動效層 UNFx(v2.4.5)—— 動作牌的特寫 · 罰抽能量球 · 宣告光柱
+     ──────────────────────────────────────────────────────────────────────────
+       ★★ 掛點只有一個:`moveSfx(mv, n)`。它已經是這一頁「一手 = 一次」的唯一入口
+         (兩個呼叫端都擋掉了換局與批次同步 —— 見 adapter.js 那段 diff 的註解),
+         所以特效**不必再自己做一次去重**,而且單機 / 連線 / AI / 對手四條路徑
+         天生都會經過它。⚠ 不要為了「動畫想早一點出來」另外找地方插呼叫。
+
+       ⚠ 特效節點掛在**獨立的 fixed 圖層** `.un-fx`,不掛 `#unStage`:
+         `render()` 每次整份覆寫 stage 的 innerHTML,放裡面會被下一次重畫吃掉。
+         z-index 40 —— 結果卡 `.veil` 是 50,特寫不可以蓋在它上面。
+       ⚠ 位置是**當下量 `.un-table` 的 rect**:桌子的高度在直立 / 橫置差很多,
+         寫死尺寸的那一版在橫置手機上會整個跑到桌子外面。
+     ========================================================================== */
+  function fxLayer(){
+    let el = document.querySelector(".un-fx");
+    if(!el){
+      el = document.createElement("div");
+      el.className = "un-fx";
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function fxSpawn(cls, ms, inner){
+    const t = document.querySelector(".un-table");
+    if(!t) return null;
+    const b = t.getBoundingClientRect();
+    if(!b.width) return null;                 // 桌子還沒有版面(hidden)→ 什麼都不放
+    const el = document.createElement("div");
+    el.className = cls;
+    el.setAttribute("style", "left:" + b.left + "px;top:" + b.top + "px;" +
+      "width:" + b.width + "px;height:" + b.height + "px");
+    el.innerHTML = inner || "";
+    fxLayer().appendChild(el);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, ms);
+    return el;
+  }
+
+  /* 動作牌的特寫。★ 一張牌只講**一件事**,而那件事就是它對別人做了什麼 ——
+     所以文案一律是動詞 / 數字,不是牌名(「+2」不是「紅色 +2」)。
+     ⚠ 顏色分兩派:有顏色的動作牌(跳過 / 迴轉 / +2)吃**那張牌自己的顏色**,
+       黑牌(Wild / +4)一律燙金 —— 黑字壓在深綠桌布上看不見。 */
+  const CUT = {};
+  CUT[UN.K_SKIP] = { t: "跳過", c: "skip" };
+  CUT[UN.K_REV]  = { t: "迴轉", c: "rev" };
+  CUT[UN.K_D2]   = { t: "+2",   c: "pen" };
+  CUT[UN.K_W4]   = { t: "+4",   c: "pen w" };
+  CUT[UN.K_WILD] = { t: "變色", c: "wild w" };
+
+  function cutIn(id){
+    const k = UN.kindOf(id);
+    const o = CUT[k];
+    if(!o) return;
+    /* ⚠ 底光用的是專用的 `un-cc-*`，**不重用牌面那組 `un-c-*`** ——
+       那一組是 `background:` 的純色填滿，鋪滿整張桌子會把牌整個蓋掉。 */
+    const col = UN.isWild(id) ? "" : " un-cc-" + UN.COL_KEY[UN.colOf(id)];
+    fxSpawn("un-cut " + o.c + col, 900,
+      (o.c.indexOf("rev") === 0 ? '<span class="un-ring" aria-hidden="true"></span>' : "") +
+      '<span class="un-cutw">' + o.t + '</span>');
+  }
+  /* 抓到漏喊 UNO:整張桌子閃一下紅 + 「抓到了!」——
+     這是這一頁最歡樂的一刻,不放特寫就只剩一聲音效。 */
+  function cutCatch(){
+    fxSpawn("un-cut caught", 950, '<span class="un-cutw">抓到了!</span>');
+  }
+  /* 有人剩一張:金色光柱(公告那一支叫它,見第七節) */
+  function cutUno(){
+    fxSpawn("un-cut unocall", 1000, '<span class="un-cutw">UNO!</span>');
   }
 
   /* ==========================================================================
@@ -222,19 +293,44 @@ const UNB = (function(){
        ★★ **2 人局不畫方向**(v1.109.0):兩個人的桌上「順向」與「逆向」是同一件事,
           而迴轉現在一律換對手出(見 rules.js 的 K_REV)—— 那顆膠囊翻來翻去卻什麼都沒
           改變,正是使用者說的「很像工程用的東西」。 */
+    /* ★ 方向換了的那一次讓膠囊自己翻一圈(v2.4.5)—— 「迴轉」最常見的抱怨是
+       「我沒看清楚現在輪誰」,而那顆膠囊靜靜換兩個字是看不到的。 */
+    const dflip = (o.dir !== dirPrev) ? " flip" : "";
+    dirPrev = o.dir;
     const dir = (o.n === 2) ? "" :
-      '<span class="un-dir">' + (o.dir > 0 ? "順向" : "逆向") + '</span>';
+      '<span class="un-dir' + dflip + '">' + (o.dir > 0 ? "順向" : "逆向") + '</span>';
     /* ★ 短到一眼看完 —— 「疊得上就疊,不然只能抽」那半句改成點牌時才講(whyNot)。
        ★★ 罰抽是**釘在左上角**的(對稱右上角的牌堆),不是桌子裡的一列 ——
           它一出現就不可以把桌上的牌與「現在顏色」那一列推開。
           v1.108.0 只在橫置矮視窗釘住,直立那段仍然是流內元素:實測沿著一整局取樣,
           桌上那張牌在 pend 有無之間**上下跳 16px**(桌子 justify-content:center,
           多一列就整組往上挪半列)—— 那正是使用者說的「介面一直跳來跳去」。 */
-    const pen = o.pend > 0 ? '<div class="un-pen">罰抽 <b>' + o.pend + '</b> 張</div>' : "";
+    /* ★★ 罰抽膠囊升級成**能量球**(v2.4.5):數字越大顏色越燙,而且**只有變多的
+       那一次**會撞一下(`.grow`)。
+       ⚠ 「有沒有變多」一定要用模組狀態比 —— `render()` 一手裡會被叫很多次
+         (別人出牌、抓鈕出現、ResizeObserver),每次都放動畫就變成一直在抖。
+       ⚠ 換局(o.key 換了)只記不放:整包重來,diff 沒有意義(同 announce 那條)。 */
+    let penCls = "";
+    if(fxKey !== String(o.key == null ? "" : o.key)){
+      fxKey = String(o.key == null ? "" : o.key);
+      penPrev = o.pend; dirPrev = o.dir;
+    }else{
+      if(o.pend > penPrev) penCls = " grow";
+      penPrev = o.pend;
+    }
+    const lv = o.pend >= 10 ? " lv4" : o.pend >= 8 ? " lv3" : o.pend >= 4 ? " lv2" : " lv1";
+    const pen = o.pend > 0
+      ? '<div class="un-pen' + lv + penCls + '">罰抽 <b>' + o.pend + '</b> 張</div>' : "";
     /* ★★ 牌堆那顆鈕(#unDraw)v1.110.0 **搬到手牌右邊**了(見 drawPadHTML)——
        所以桌上只剩「牌河最上面那張 + 現在顏色」兩件事。 */
+    /* ★ 牌河看起來要像**一疊**,不是一張浮在桌上的牌(v2.4.5)——
+       底下墊的是**上一張**(牌河是公開資訊,照實畫),歪 6 度露出一角。
+       ⚠ 只墊一張:墊多了那一角會蓋到「現在顏色」那一列,而且它只是質感,不是資訊。
+       ⚠ `aria-hidden` + 不給 data-c —— 它不可以被點擊委派當成一張牌讀去。 */
+    const under = (underTop >= 0 && underTop !== o.top)
+      ? '<span class="un-under" aria-hidden="true">' + cardHTML(underTop, "big") + '</span>' : "";
     return '<div class="un-table">' +
-             '<div class="un-top">' + (o.top >= 0 ? cardHTML(o.top, "big") : "") + '</div>' +
+             '<div class="un-top">' + under + (o.top >= 0 ? cardHTML(o.top, "big") : "") + '</div>' +
              '<div class="un-now">' +
                '<span class="un-swatch ' + colCls + '" aria-hidden="true"></span>' +
                '<span class="un-nowtxt">現在顏色 <b>' + colTxt + '</b></span>' +
@@ -253,11 +349,16 @@ const UNB = (function(){
        ★ hot 由呼叫端算好傳進來(UN.playable)—— 盤面不自己算規則。
      ========================================================================== */
   let stage = null;
+  /* 動效用的 diff 狀態(見 tableHTML 與二之二)。⚠ 全部只影響畫面,一個都不進真相。 */
+  let fxKey = null, penPrev = 0, dirPrev = 0, underTop = -1, topPrev = -1;
   function el(){ return stage || (stage = $("unStage")); }
 
   function render(o){
     const box = el();
     if(!box) return;
+    /* 牌河的「上一張」:top 換了才推進(render 一手裡會被叫很多次)。
+       ⚠ 一定要在 tableHTML() **之前**算,它讀的是算完的 underTop。 */
+    if(o.top !== topPrev){ underTop = topPrev; topPrev = o.top; }
     const hot = o.hot || [];
     const hand = UN.sortHand(o.hand || []);
     const cards = hand.map(id => {
@@ -784,12 +885,15 @@ const UNB = (function(){
            ⚠ 因此漏喊被抓的人也會被唸到 —— 那是對的:桌上就是「有人剩一張」了,
              而 sfx.uno() 那一聲本來也是這樣響的(語音只是把它講成話)。 */
         say("uno", 120);
+        cutUno();                              // ★ 金色光柱(v2.4.5)
         if(window.showToast) showToast((seat === o.me ? "你" : nm) + " 剩一張牌!", 1500);
       });
       unoPrev = now;
     }
   }
-  function resetAnnounce(){ unoPrev = null; unoKey = null; }
+  /* ⚠ 動效的 diff 狀態也要一起清 —— 不清的話換局第一次畫會拿上一局的 top 當「上一張」
+     墊在牌河底下(看起來像新局一開就已經出過牌了)。 */
+  function resetAnnounce(){ unoPrev = null; unoKey = null; underTop = -1; topPrev = -1; fxKey = null; }
 
   /* ==========================================================================
      八、結果表
