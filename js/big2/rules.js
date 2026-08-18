@@ -253,19 +253,55 @@ const B2 = (function(){
      ========================================================================== */
   const STR_HI = "hi", STR_LO = "lo";
   const STR_OPTS = [STR_HI, STR_LO];
+  /* ==========================================================================
+     ★★★ v2.4.5:第二項房規「結束方式」(end)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「我想要加一個規則選項,第一個贏了就是就結算」
+         · last (預設) = 舊行為:出完的人退出、牌局繼續,打到只剩一家
+         · first       = 有人出完那一瞬間整局就結算
+       ★ 它跟 str 一樣是**真相的一部分**(決定 replay() 算出來的局面停在哪一手)
+         → 同樣凍進 st.rules、同樣在開局那一刻凍結、交易裡一律用 g.rules。
+       ★ **score() 一行都不必改**:它本來就是「先比出完的先後,都沒出完就比剩幾張」
+         —— first 那一派只有一個人 fin=0,其餘自然照剩牌排 2/3/4 名。
+       ⚠ 舊房間 / 舊 localStorage 沒有這一格 → 白名單退回 last = 逐字回到舊行為。
+       ⚠⚠ 它**不影響任何一手的合法性**(那是 str 的事)→ AI 不必改:
+         viewOf() 傳的是整份 rules,而 AI 的目標函數本來就是「盡快出完 + 名次分」。
+     ========================================================================== */
+  const END_LAST = "last", END_FIRST = "first";
+  const END_OPTS = [END_LAST, END_FIRST];
   /* ⚠ 用**白名單**守門而不是信任呼叫端:值有一部分來自 DB / localStorage
      (舊房間沒有這個欄位、也可能被手改)。認不出來一律回預設。 */
   function normRules(r){
     const o = (r && typeof r === "object") ? r : {};
-    return { str: STR_OPTS.indexOf(o.str) >= 0 ? o.str : STR_HI };
+    return {
+      str: STR_OPTS.indexOf(o.str) >= 0 ? o.str : STR_HI,
+      end: END_OPTS.indexOf(o.end) >= 0 ? o.end : END_LAST
+    };
   }
   function defRules(){ return normRules(null); }
+  /* ★ 房規的欄位名單 —— sameRules() 靠它逐項比。
+     ⚠⚠ adapter 那邊「沒改就不寫 DB」的守衛以前是寫死的 `next.str === rules.str`,
+       加第二項房規時那一行正好是陷阱:**只改 end 會被它默默擋住**
+       (面板上點了沒反應,而且那一行有兩份)。新增房規項目只要把 key 加進這張表。 */
+  const RULE_KEYS = ["str", "end"];
+  function sameRules(a, b){
+    const x = normRules(a), y = normRules(b);
+    return RULE_KEYS.every(k => x[k] === y[k]);
+  }
   /* 從「呼叫端手上的東西」問出 str:st(有 .rules)· rules 物件 · 字串 · 什麼都沒有。 */
   function strOf(x){
     if(!x) return STR_HI;
     if(typeof x === "string") return x === STR_LO ? STR_LO : STR_HI;
     if(x.rules) return strOf(x.rules);
     return normRules(x).str;
+  }
+  /* 同上的 end。⚠ **刻意不收裸字串** —— strOf 收字串是 v1.100.0 的歷史包裹
+     (那時只有一項房規,「字串就是那一項的值」還讀得通);兩項之後一個裸字串到底是
+     哪一項的值已經說不清 → 只收 st / rules 物件,其餘一律預設。 */
+  function endOf(x){
+    if(!x || typeof x !== "object") return END_LAST;
+    if(x.rules) return endOf(x.rules);
+    return normRules(x).end;
   }
 
   /* ---------- 順子的等級 ----------
@@ -455,8 +491,17 @@ const B2 = (function(){
       if(!hand.length && st.finished.indexOf(seat) < 0) st.finished.push(seat);
     }
 
-    // 只剩一家還有牌 → 這局結束(使用者選的「打到只剩一人」)
-    if(activeCount(st) <= 1){ st.over = true; st.turn = -1; return true; }
+    /* ★★ 這局結束了沒 —— **兩條路都是房規**(v2.4.5 加了第二條):
+         · 只剩一家還有牌   → 永遠結束(last 那一派就只靠這條)
+         · end === "first"  → **有人出完那一瞬間**就結束
+       ⚠ 一律問 endOf(st)(= st.rules,開局那一刻凍結的那一份)。拿本地那一份
+         房規來判的症狀是「重連的人算出來的牌局跟現場不一樣」,而且不會報錯。
+       ⚠ finished 只在上面那一支「出牌」的路徑被 push → Pass 那一支不可能觸發
+         first;這裡不分支是因為「結束條件只能有一份」比省一行重要。 */
+    if(activeCount(st) <= 1 ||
+       (endOf(st) === END_FIRST && st.finished.length > 0)){
+      st.over = true; st.turn = -1; return true;
+    }
 
     if(trickDone(st)){
       const from = st.cur.seat;
@@ -852,8 +897,10 @@ const B2 = (function(){
     shuffled, newDeal, handsOf, dealCounts,
     // 牌型
     isBomb, bombLv, straightOf, classify, beats,
-    // ★★★ 房規(v1.100.0):順子大小。normRules 是白名單守門,STR_* 是那兩個值
-    normRules, defRules, strOf, STR_HI, STR_LO, STR_OPTS,
+    // ★★★ 房規:順子大小(str,v1.100.0)+ 結束方式(end,v2.4.5)。
+    // normRules 是白名單守門;RULE_KEYS / sameRules 是「改了沒改」唯一的問法
+    normRules, defRules, strOf, endOf, sameRules, RULE_KEYS,
+    STR_HI, STR_LO, STR_OPTS, END_LAST, END_FIRST, END_OPTS,
     // 一局
     blank, step, replay, startSeat, nextActive, activeCount, trickDone,
     // 結算

@@ -431,6 +431,33 @@
   .seg.readonly::before{background:rgba(0,0,0,.16);box-shadow:none}
   .seg.readonly button.on{color:var(--text)}
 
+  /* ==========================================================================
+     ★★★ 直排的選擇列(`.seg.col`)不用滑塊(v2.4.5,現場回報的另一半)
+     ───────────────────────────────────────────────────────────
+       ★ 症狀(量到的):大者二房規的順子那一列 seg = 402×68、兩顆鈕各 396×29,
+         而滑塊是 **196×61.75** —— 一塊「半個寬、跨滿兩列」的橘色。
+         選第二顆時它 translateX 到右半邊,**照樣跨兩列** →
+         「到底選了哪一個」完全看不出來;而被它蓋到的半段字是深字壓在亮橘上、
+         另外半段留在卡面上 —— 這就是使用者說的「看不太到裡面選項的内容」
+         裡面,跟透明度無關的那一半。
+       ── 為何會這樣 ────────────────────────────────────────
+         上面那一整組滑塊是為**橫排**算的:寬 = (100% - 内距 - gap)/N、
+         位移 = translateX(自身寬度的倍數)。`.seg.col` 把 flex 轉成直排之後,
+         那兩條算式就各自對錯了維度。
+       ── 為何不改成「直排版的滑塊」(滿寬 + translateY)──────────────
+         滑塊那一套的前提是**每一格等寬 / 等高**;而直排的鈕是
+         `white-space:normal`(整句話塞不進一行,窄機一定會摺)→
+         兩格高度不一定相等,translateY(自身高度的倍數) 一摺行就對不上。
+         → 直排一律**回到「.on 自己畫底」**(v2.3.2 之前全站的做法)。
+       ⚠ 寫在這裡而不是大者二那一節:這是「滑塊只算得出橫排」的**通則**,
+         放在滑塊旁邊下一個人才看得到;而全站目前只有大者二房規那兩列是
+         `.seg.col`(另外 98 個都是橫排,一條都不受影響)。
+       ⚠ 唐讀(訪客)那一份要跟著搬:中性的灰底原本下在**滑塊**上
+         (見上面 `.seg.readonly::before`),滑塊一藏就要下在鈕身上。 */
+  .seg.col::before{display:none}
+  .seg.col button.on{background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .seg.col.readonly button.on{background:rgba(0,0,0,.16);box-shadow:none}
+
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
 
@@ -887,6 +914,56 @@
      只作用在設定卡(#setVeil),不動到共用 .set-card 樣式的表情卡 */
   #setVeil .set-card{display:flex;flex-direction:column;overflow:hidden}
   #setVeil .set-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+
+  /* ---------- ★★★ 房規卡:不透明底(v2.4.5,現場回報)----------
+     使用者:「遊戲如果可以設定房規,在那個界面裡現在因為是透明化,
+              下面的顏色會導致其實看不太到裡面選項的內容」
+
+     ── 壞在哪 ────────────────────────────────────────────────────────────────
+       共用的 .set-card 只有 `var(--panel)`(五個主題 .05 ~ .35 的半透明)+
+       backdrop-filter:blur(14px) —— 卡片本身**沒有任何不透明的底**。蓋板底下是
+       進場選單 / 大廳 / 牌桌,於是那些**大面積的彩色塊**(橘色的「開始對局」、
+       綠色的難度鈕、綠呢桌布)整片透上來,而房規卡是全站文字最密的一張
+       (九項設定 + 一整段玩法說明,`.set-sub` 還只有 opacity:.55)。
+       ⚠ bubblegum 最慘:它的 --text 是深紫 #6a1f57,而 .veil 的黑色聚光燈又把
+         底下壓暗 → 深字壓在被壓暗的淺底上,那一整段玩法說明幾乎看不見。
+     ── 為什麼補 --bg1/--bg2 而不是寫死一個顏色 ──────────────────────────────
+       五個主題有兩種明暗(bubblegum 淺底深字,其餘深底淺字)—— 寫死顏色一定有主題
+       走鐘。用**這一頁自己的背景色**當底,`--text` / `--muted` / `--accent` 本來就是
+       配著它調的,對比自動成立;而蓋板的黑色聚光燈只壓在卡片**外面**,
+       所以卡片反而變成畫面上最亮的一塊 = 被打光的那張卡(.veil 那條聚光燈的原意)。
+     ── ⚠⚠⚠ 為什麼寫 longhand 而不是照抄 .set-card 的 background 簡寫 ─────────
+       施工第一版寫成
+         `background:<高光漸層>, var(--panel), linear-gradient(var(--bg1),var(--bg2))`
+       —— **顏色(var(--panel))落在中間層**,而簡寫裡顏色只能放最後一層。
+       .win-card v2.2.6 記過這個坑,但**帶 var() 的下場更糟**:
+       那不是「解析時整條被丟掉、退回上一條 .set-card」,而是
+       **invalid at computed-value time** → 這條 background 直接 computed 成
+       **initial**(`background-image:none` + `background-color:transparent`)。
+       症狀:房規卡**連共用的那層底都一起沒了**,只剩邊框 + 陰影 + backdrop 的模糊,
+       在 bubblegum 上看起來比修之前**更暗更看不清**(截圖驗第一輪真的截到了)。
+       ★ 抓法照 v2.2.6 那條:`getComputedStyle(el).backgroundImage === "none"`
+         —— 值明明寫了卻是 none。
+       ★ 所以這一節一律用 longhand:**不透明的那一層走 `background-color`**
+         (它永遠畫在所有 background-image 底下,不必跟「顏色排第幾層」搏鬥),
+         `--panel` 那層改用「同色兩個端點的漸層」當 image 疊上去。
+     ⚠ background-color 與最後那層 bg1→bg2 漸層**刻意重複**:漸層是為了讓卡面有方向,
+       而 background-color 是保底 —— 哪一天 --bg2 被誰改成半透明,底照樣是不透明的。
+     ⚠ backdrop-filter 刻意留著不動:它現在看不到了(底是不透明的),但拿掉會少一個
+       stacking context,而卡片裡有 position:sticky 的 ✕ —— 省那一次模糊不值得賭。
+     ⚠⚠ **四頁一條**(大老二 / 21點 / UNO / 暗棋)—— 第五個遊戲加房規面板時
+       **要把它的 class 補進這一組**,漏了不會報錯、只是那一頁還是透的。
+       ⚠ 選擇器一律用「`.set-card` + 前綴 class」:寫 `#xxRulesVeil .set-card` 會
+         波及十四頁共用的設定卡(CLAUDE.md 紅線 6),而只寫前綴 class 則贏不了
+         `.set-card` 本身那條 background(同樣是 (0,1,0),但它排在前面)。 */
+  .set-card.b2-rules-card,
+  .set-card.bj-rules-card,
+  .set-card.un-rules-card,
+  .set-card.dc-rules-card{
+    background-color:var(--bg1);
+    background-image:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,0) 48%),
+                     linear-gradient(0deg,var(--panel),var(--panel)),
+                     linear-gradient(180deg,var(--bg1),var(--bg2))}
   /* 背景音樂曲目下拉 */
   .set-select{font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;color:var(--text);
     background:rgba(255,255,255,.12);border:1px solid var(--panel-line);border-radius:12px;

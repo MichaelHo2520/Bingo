@@ -89,15 +89,28 @@ function paintSoloHint(){
        CLAUDE.md 的紅線是「不用 disabled 讓點擊靜默消失」,訪客按下去要看得到
        「只有房主能改規則」(擋在 MP.setRule / Solo 那一側,不是擋在 CSS)。
    ========================================================================== */
-/* 這一版只有一項房規,而它的值是**字串** —— ⚠ dataset 永遠是字串,所以這裡不做轉型
+/* 兩項房規的值都是**字串** —— ⚠ dataset 永遠是字串,所以這裡不做轉型
    (21點那邊要 BJ_BOOLS / BJ_STRS 兩張表就是因為它混了布林與數字)。 */
 function b2RuleVal(raw){ return String(raw); }
-/* 一句話講「現在是什麼規則」——★ 面板底部與大廳摘要**共用這一支**(兩份會走鐘)。 */
-function b2RulesText(r){
-  const rr = B2.normRules(r);
+/* 「順子誰大」那一句 */
+function b2StrText(rr){
   return rr.str === B2.STR_LO
     ? "順子:2-3-4-5-6 最大,A-2-3-4-5 最小(A 當 1)"
     : "順子:2-3-4-5-6 最大,接著 A-2-3-4-5,再來 10-J-Q-K-A";
+}
+/* 「什麼時候結算」那一句(v2.4.5)*/
+function b2EndText(rr){
+  return rr.end === B2.END_FIRST
+    ? "結算:第一個出完就結束(其他人照剩牌排名次)"
+    : "結算:打到只剩一家有牌";
+}
+/* 一句話講「現在是什麼規則」——★ 面板底部 / 大廳摘要 / adapter 的 ruleHint()
+   **三處共用這一支**(多一份就會走鐘 —— v1.100.0 立的規矩)。
+   ⚠ v2.4.5 起它是**兩句**:新增房規項目時要把那一項也接進來,
+     不然面板改得動、摘要卻永遠只講順子。 */
+function b2RulesText(r){
+  const rr = B2.normRules(r);
+  return b2StrText(rr) + " · " + b2EndText(rr);
 }
 function syncRules(rules, editable){
   const r = B2.normRules(rules);

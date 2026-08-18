@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>大老二 ｜ 單機對電腦 + 2~4 人連線</title>
 <!-- 大老二 · v2.4.4 -->
-<meta name="version" content="2.4.4+1">
+<meta name="version" content="2.4.4+2">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -326,6 +326,21 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           </div>
         </div>
 
+        <!-- ★★★ 結束方式(v2.4.5)—— 使用者:「我想要加一個規則選項,第一個贏了就是就結算」
+             ⚠ 它**是**房規物件的一員(rules.end):它決定 replay() 算出來的局面停在哪一手
+               → 開局那一刻凍結,對戰中不能改(同 str)。
+             ⚠ 兩顆鈕照上面順子那一組用 .seg.col(整句話塞不進橫排的膠囊)。 -->
+        <div class="set-group">
+          <div class="set-group-title">結束方式</div>
+          <div class="set-row col">
+            <span class="set-lbl">什麼時候結算<span class="set-sub">名次分兩種都一樣:5 / 3 / 1,最後一名 0</span></span>
+            <div class="seg col" id="b2EndSeg" aria-label="結束方式">
+              <button data-rk="end" data-rv="last"><b>打到只剩一家</b> —— 出完的人退出、牌局繼續</button>
+              <button data-rk="end" data-rv="first"><b>第一個出完就結算</b> —— 其他人照手上剩幾張排名次</button>
+            </div>
+          </div>
+        </div>
+
         <!-- ★ 出牌倒數:**連線專屬**(單機沒有倒數 —— 卡多久是自己的節奏)。
              ⚠ 它不進房規物件:那個欄位(turnSec)早就在用,而且它不影響任何判定。 -->
         <div class="set-group hidden" id="b2SecGroup">
@@ -351,7 +366,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <li><b>鐵支與同花順壓得過任何牌型</b>,而同花順又比鐵支大。</li>
             <li>單張 / 對子的大小:<b>2 最大</b>,接著 A、K…3;同點數比花色 ♠︎&gt;♥︎&gt;♦︎&gt;♣︎。</li>
             <li>壓不過就 <b>Pass</b>;一輪只剩一個人沒 Pass → 他重新領出。</li>
-            <li>出完的人退出、牌局繼續,打到只剩一家。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。</li>
+            <!-- ⚠ v2.4.5:「打到只剩一家」變成房規(結束方式)→ 這一行**不可以再寫死**,
+                 現在是哪一種一律看面板底部那一句(b2RulesText,三處共用同一支)。 -->
+            <li>出完的人退出;整局什麼時候結束看上面的<b>結束方式</b>。名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。</li>
             <li>誰<b>剩最後一手</b>(不管幾張)系統會自動報一聲「<b>拉</b>」。</li>
           </ul>
         </div>

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 8600bf4063734834b0fec0fa9b1fd866be7e231f85dfdce7ca65aecf534d4785)
+    真相在 styles.src.css(sha256 e9bfeb5512213c6144eac2f6403472dbdbfa468cbd8973d0892b8aca2fb8a0a2)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -188,6 +188,9 @@
   .seg.readonly button:not(.on){opacity:.32}
   .seg.readonly::before{background:rgba(0,0,0,.16);box-shadow:none}
   .seg.readonly button.on{color:var(--text)}
+  .seg.col::before{display:none}
+  .seg.col button.on{background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .seg.col.readonly button.on{background:rgba(0,0,0,.16);box-shadow:none}
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
   .field{margin-top:12px}
@@ -436,6 +439,14 @@
   .set-card .btn{width:100%;margin-top:18px}
   #setVeil .set-card{display:flex;flex-direction:column;overflow:hidden}
   #setVeil .set-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  .set-card.b2-rules-card,
+  .set-card.bj-rules-card,
+  .set-card.un-rules-card,
+  .set-card.dc-rules-card{
+    background-color:var(--bg1);
+    background-image:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,0) 48%),
+                     linear-gradient(0deg,var(--panel),var(--panel)),
+                     linear-gradient(180deg,var(--bg1),var(--bg2))}
   .set-select{font-family:'Nunito',sans-serif;font-weight:700;font-size:14px;color:var(--text);
     background:rgba(255,255,255,.12);border:1px solid var(--panel-line);border-radius:12px;
     padding:8px 12px;cursor:pointer;max-width:62%}
