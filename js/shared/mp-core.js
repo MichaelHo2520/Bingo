@@ -480,7 +480,7 @@ const MPCore = (function(){
     function enterLobby(){
       online=true; ready=false; curPhase="lobby";
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
-      gameRev=0; playedRound=null;   // ★ 進新房必歸零(見檔頭 #1)
+      gameRev=0; playedRound=null; clearRevHeal();   // ★ 進新房必歸零(見檔頭 #1);對帳表同理
       byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";      // 同上:上一間房「誰按了離開」不可以帶進新房(見四個寬限期)
       clearPlayCount(); statDone=false;   // 熱門度計數:一間房記一次 → 進新房要重新起算
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();
@@ -684,6 +684,41 @@ const MPCore = (function(){
         return g;
       }, undefined, !(opts && opts.local===false));
     }
+    /* ★★★ 第四道:被丟掉的快照要有人回頭對帳(v2.4.1)。
+       前三道(canWriteGame 不寫 / rev 變小也收 / 重連重推快照)守的都是同一個形狀:
+       **斷線 → SDK 察覺到 → 重連**。中間還有一段沒人守:
+         傳輸已經斷了、而 `.info/connected` 還沒察覺(真 Firebase 要幾十秒),
+         那段時間 `canWriteGame()` 照樣放行 → 樂觀寫入把 `gameRev` 墊高;
+         **而如果網路在 SDK 察覺之前就回來了**,`resume()` 一次都不會跑、
+         `resyncing` 永遠是 false → 那份 rev 較小的真值被丟掉之後
+         **再也沒有第二次機會** → 幻影盤面永久留著(這正是手機進電梯 / 隧道
+         十幾秒的那種短斷線,也是它比真斷線更常見的原因)。
+       修法很笨但兜得住:丟掉一份快照就排一顆表,期間只要收到任何 rev 追上來的
+       快照就取消;真的過了 HEAL_MS 都沒人推進,就強制拿快取裡的真值套一次。
+       ⚠ `once("value")` 在有監聽的路徑上拿的是**本地快取** —— 而交易被退回之後
+         快取裡裝的就是伺服器真值,所以這一招成立;但也因此**必須繞過 rev 守衛**
+         (healing 旗標)—— 否則拿回來的真值會被同一道守衛再丟一次,等於沒做。
+       ⚠ HEAL_MS 要遠大於一次正常往返:它唯一該在的場合是「已經卡死了」。
+       ⚠ 要跟 `gameRev` 歸零的兩處(enterLobby / leave)一起收掉。 */
+    const HEAL_MS=6000;
+    let healT=null, healing=false;
+    function clearRevHeal(){ if(healT){ clearTimeout(healT); healT=null; } }
+    function armRevHeal(){
+      if(healT||!roomRef)return;
+      healT=setTimeout(()=>{
+        healT=null;
+        if(!roomRef)return;
+        roomRef.child("game").once("value",s=>{
+          const g=s.val()||{}, rev=(typeof g.rev==="number")?g.rev:0;
+          if(rev>=gameRev)return;                 // 期間已經追上來了 → 什麼都不必做
+          healing=true;
+          try{ onGame(g); }finally{ healing=false; }
+          /* 要說一聲(紅線 6:不靈默吃掉)—— 自己剛剛那一手會從畫面上消失,
+             沒有話的話使用者看到的是「我明明出了牌它自己飛回來」。 */
+          showToast("與伺服器重新對過了",1800);
+        });
+      },HEAL_MS);
+    }
     function onGame(g){
       g=g||{};
       const rev=(typeof g.rev==="number")?g.rev:0;
@@ -691,8 +726,10 @@ const MPCore = (function(){
          伺服器把離線期間的樂觀交易退回來時,退回來的那一份 rev 一定**比本地小**,
          照丟的話畫面就永遠停在幻影盤面(見上面 canWriteGame 的註解)。
          ⚠ 這一條是那個死結的**第二道**保險:第一道(不寫)擋不住「.info/connected
-           還沒察覺斷線」的那幾十秒,那段時間照樣墊得高,只有這裡收得回來。 */
-      if(rev<gameRev && !resyncing)return;
+           還沒察覺斷線」的那幾十秒,那段時間照樣墊得高,只有這裡收得回來。
+         ⚠ 而連重連都沒發生過的那種短斷線只有第四道接得住(見上面 armRevHeal)。 */
+      if(rev<gameRev && !resyncing && !healing){ armRevHeal(); return; }
+      clearRevHeal();
       gameRev=rev;
       order=g.order||[]; roundId=g.roundId||null;
       rps=g.rps||null; revealData=g.reveal||null;
@@ -1513,7 +1550,7 @@ const MPCore = (function(){
       players={}; scores={}; order=[]; winner=null; status="lobby"; curPhase="lobby";
       byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
-      gameRev=0; lastIndexSig=null; outcomeShown=false; abandoned=false;
+      gameRev=0; clearRevHeal(); lastIndexSig=null; outcomeShown=false; abandoned=false;
       scoredThisRound=false; myRoundWin=false; autoStarting=false; emotesReady=false;
       playedRound=null;    // 進新房要歸零(同 gameRev):不然新房第一局剛好同號就不會 enterPlaying
       clearOrderT(); rps=null; revealData=null; orderAnnounced=false;

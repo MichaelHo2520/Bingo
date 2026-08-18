@@ -419,7 +419,7 @@
     function enterLobby(){
       state.online=true; ready=false; curPhase="lobby"; sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";   // 上一間房「誰按了離開」不可以帶進新房(同 gameRev,見四個寬限期)
-      gameRev=0;   // ★ 進新房必歸零:MP 為常駐 IIFE,不重設會把上一間房累積的高 rev 帶進來,害新房快照被 onGame 的「rev<gameRev」全部誤丟 → 加入者卡在大廳、整房卡死
+      gameRev=0; clearRevHeal();   // ★ 進新房必歸零:MP 為常駐 IIFE,不重設會把上一間房累積的高 rev 帶進來,害新房快照被 onGame 的「rev<gameRev」全部誤丟 → 加入者卡在大廳、整房卡死
       clearPlayCount(); statDone=false;   // 熱門度計數:一間房記一次 → 進新房要重新起算
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();   // 連線中:顯示快速語音浮動鈕
       stopRoomWatch();                                  // 已進房,卸載大廳的房間偵測監聽
@@ -896,14 +896,40 @@
     // 收到 game 快照:rev 更舊 → 過期,丟棄;否則套用整包狀態並派發到對應相位。
     // 取代舊的 8 個 child 監聽,所有欄位一次到齊,不再有「跨欄位事件到達順序」問題;
     // 同 rev 的中途更新(如猜拳逐一出拳、平手重猜)rev 不變,仍會套用(判斷用 < 而非 <=)。
+    /* ★★★ 第四道:被丟掉的快照要有人回頭對帳(v2.4.1,與 mp-core.js 那份逐字平行)。
+       前三道守的都是「斷線 → SDK 察覺到 → 重連」;中間還有一段沒人守 ——
+       傳輸已經斷了而 `.info/connected` 還沒察覺(真 Firebase 要幾十秒)的那段:
+       `canWriteGame()` 照樣放行 → 樂觀寫入把 gameRev 墊高;**而如果網路在 SDK
+       察覺之前就回來了**,resume() 一次都不會跑 → rev 較小的真值被丟掉之後
+       再也沒有第二次機會 → 幻影盤面永久留著。
+       ⚠ healing 旗標不可少:拿回來的真值 rev 本來就比本地小,不繞過守衛就會被再丟一次。
+       ⚠ 要跟 gameRev 歸零的兩處(joinRoom / leave)一起收掉。 */
+    const HEAL_MS=6000;
+    let healT=null, healing=false;
+    function clearRevHeal(){ if(healT){ clearTimeout(healT); healT=null; } }
+    function armRevHeal(){
+      if(healT||!roomRef)return;
+      healT=setTimeout(()=>{
+        healT=null;
+        if(!roomRef)return;
+        roomRef.child("game").once("value",s=>{
+          const g=s.val()||{}, rev=(typeof g.rev==="number")?g.rev:0;
+          if(rev>=gameRev)return;                 // 期間已經追上來了 → 什麼都不必做
+          healing=true;
+          try{ onGame(g); }finally{ healing=false; }
+          showToast("與伺服器重新對過了",1800);   // 不靈默吃掉:自己剛剛那一手會從畫面上消失
+        });
+      },HEAL_MS);
+    }
     function onGame(g){
       g=g||{};
       const rev=(typeof g.rev==="number")?g.rev:0;
       /* 過期快照丟棄 —— **但重連歸位的那一段窗口(resyncing)例外**:伺服器把離線期間的
          樂觀交易退回來時,退回來的那一份 rev 一定**比本地小**,照丟就永遠停在幻影狀態
          (見上面 canWriteGame)。第一道保險(離線不寫)擋不住「.info/connected 還沒察覺
-         斷線」的那幾十秒,只有這裡收得回來。 */
-      if(rev<gameRev && !resyncing)return;
+         斷線」的那幾十秒,只有這裡收得回來;而連重連都沒發生過的短斷線只有第四道接得住。 */
+      if(rev<gameRev && !resyncing && !healing){ armRevHeal(); return; }
+      clearRevHeal();
       gameRev=rev;
       order=g.order||[]; turnIndex=g.turnIndex||0; calledList=g.calledList||[];
       rps=g.rps||null; revealData=g.reveal||null; roundId=g.roundId||null;
@@ -1496,7 +1522,7 @@
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";
       roomRef=null; code=null; state.online=false; ready=false; winner=null; status="lobby"; players={}; scores={}; calledList=[];
-      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false; wasMyTurn=false; lastIndexSig=null; gameRev=0;
+      order=[]; turnIndex=0; rps=null; curPhase="lobby"; myWinAt=null; outcomeShown=false; abandoned=false; scoredThisRound=false; myRoundWin=false; wasMyTurn=false; lastIndexSig=null; gameRev=0; clearRevHeal();
       revealData=null; revealSig=""; if(revealTimer){ clearTimeout(revealTimer); revealTimer=null; }
       tieSig=""; if(tieTimer){ clearTimeout(tieTimer); tieTimer=null; }
       emotesReady=false; closeEmote();
