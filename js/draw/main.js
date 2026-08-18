@@ -52,11 +52,16 @@ DWB.init({
        · onGiveUp —— 誤觸的防線是**兩段式**,而它整段留在 board.js(第一次按只是武裝)
        · onFin —— 純提示,adapter 只寫 game.dw.fin,不碰相位也不鎖畫布 */
   onGiveUp() { MP.giveUp(); },
-  onFin(on) { MP.setFin(on); }
+  onFin(on) { MP.setFin(on); },
+  /* ★ v2.4.1:公布答案那張卡上的三顆點讚鈕。送的是**既有的表情**,不是新的同步通道 */
+  onReact(emoji) { MP.react(emoji); }
 });
 
 /* ---------- 對局:畫家工具列 ---------- */
-$("dwClear").addEventListener("click", () => DWB.clearInk());
+/* ⚠ 這一顆走的是 **clearAsk()**(兩段式,v2.4.1),不是 clearInk() ——
+   誤觸清空的代價是整場最高的一種(60 秒的圖,而復原只退得回一筆)。
+   `clearInk()` 照舊公開,但那是給 e2e / 診斷頁「直接動手」用的。 */
+$("dwClear").addEventListener("click", () => DWB.clearAsk());
 
 /* 放大畫板:吃掉猜題列與頂列(見 styles.css 的 body.dw-big)。
    ⚠ 沒有獨立的比分列要接 —— v1.155.0 起比分就畫在房間框的玩家晶片列上,

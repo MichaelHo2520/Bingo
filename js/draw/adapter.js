@@ -300,6 +300,11 @@ const MP = MPCore.create((function () {
     /* 猜錯 → 凍結 3 秒 + 把內容 push 到 say(全房看得到,這是笑點)。
        ★★ v1.167.0:冷卻**不累積、不限次數、不會失格** —— 冷完就可以再猜(見 DWR.coolMs)。
        ⚠ `d.miss` 照樣要 +1:它是娛樂統計「亂槍打鳥」的來源,只是不再影響能不能猜。 */
+    /* ★★★ 「🔥 好接近了」(v2.4.1)。⚠⚠ **只在我自己這一台跳,絕對不廣播** ——
+       猜錯的內容本來就進 say(全房看得到),再廣播「他很接近」等於昭告全房
+       「答案離這個字只差一個」,把第一名的推理成果送給所有人(理由完整版在 DWR.near)。
+       ⚠ 一定要在下面那筆交易**之前**算:`w` 是這一刻的題目,而交易是非同步的。 */
+    const isNear = !!w && DWR.near(text, w);
     coolEnd = Date.now() + DWR.coolMs();
     const seq = dw.seq;
     ctx.txGame(g => {
@@ -313,6 +318,20 @@ const MP = MPCore.create((function () {
     if (ref) ref.push().set({ f: me, t: String(text).slice(0, 16) });
     try { Sound.lose(); } catch (e) {}
     paintGuessRow();
+    /* ⚠ 排在 paintGuessRow() **後面**:那一支會重設輸入列(套上冷卻的 placeholder),
+       順序反了的話燒起來的那個 class 會在同一個 tick 內被蓋掉 —— 而且只有在
+       「這一次剛好接近」時才看得出來,平常測十次都遇不到。 */
+    if (isNear) DWB.nearHint(DWR.coolMs());
+  }
+
+  /* ★ 公布答案那張卡上的一鍵點讚(v2.4.1)。
+     ⚠⚠ 它**只是把既有的表情送出去** —— 核心的 sendEmote 負責寫 DB、飛出動畫與音效,
+       這一頁一行新的同步邏輯都沒有(所以也不必動資料庫規則)。
+     ⚠ 一律送給 "all":這一刻要的是「全場一起笑」,而挑對象要多一步(那張卡只活 5 秒)。
+     ⚠ 只在 show 相位放行:別的相位那三顆鈕根本不在畫面上,這是寫入端的第二道門。 */
+  function react(emoji) {
+    if (!dw || dw.ph !== "show" || !emoji) return;
+    try { ctx.sendEmote("all", String(emoji).slice(0, 8), "emoji"); } catch (e) {}
   }
 
   /* ★★ 放棄這一題(v1.168.0)。使用者:「如果真的猜不到,我想多一個放棄的功能,
@@ -534,7 +553,16 @@ const MP = MPCore.create((function () {
       const h = dw.hits[id] || {};
       // ⚠ 第四個參數是**秒數**,只給分享圖用(內容一個字都不傳,見 board.js 的 addHit)
       DWB.addHit(ctx.dispName(id), Math.max(0, seatOf(id)), h.o, Math.max(0, h.t | 0) / 1000);
-      if (id !== ctx.me()) { try { Sound.place(); } catch (e) {} }
+      /* ★★ 彩色彈幕(v2.4.1,Gemini 建議書 2.2)。猜題列那一則在 74px 的框裡很容易
+         被忽略(尤其手正在打字時),而「有人搶先了」正是這個遊戲最該讓人抬頭的一刻。
+         ⚠ 內容照舊只有「誰 + 第幾個」——**猜的字一個都不進來**(同 addHit 的理由)。
+         ⚠ 自己猜中時**不跳**:那一刻已經有 toast「猜中了 🎉」+ Sound.win(),
+           兩個一起上是自己蓋自己。 */
+      if (id !== ctx.me()) {
+        DWB.hitBanner(ctx.dispName(id), h.o);
+        /* 第一個猜中的人值得一段像樣的音效(其餘維持既有的短音,不然一回合會叮個沒完) */
+        try { (h.o | 0) === 0 ? Sound.line() : Sound.place(); } catch (e) {}
+      }
     });
   }
   /* 新放棄的人 → 播報一次(v1.168.0)。★ 這一則是**資訊**不只是笑點:
@@ -674,6 +702,11 @@ const MP = MPCore.create((function () {
       // 換相位 → 蓋板、畫布鎖、音效
       if (dw.ph !== curPh) {
         curPh = dw.ph;
+        /* ★★ 拍立得的快門閃光(v2.4.1)—— 公布答案那一刻「咔嚓」一下把這張畫拍下來。
+           ⚠⚠ 一定要判「這一段**剛剛**才開始」:`curPh` 開頁 / 重連時是空字串,
+             不判的話中途重連的人會在一張已經公布了三秒的卡上莫名閃一下白。
+             1500ms 的窗口足夠涵蓋一趟 RTT,而正常推進一定落在裡面。 */
+        if (dw.ph === "show" && Math.abs(Date.now() - (dw.at || 0)) < 1500) DWB.snapFlash();
         if (dw.ph === "draw") {
           try { Sound.start(); } catch (e) {}
           /* ★ 字數在猜題列也報一次(v1.161.0)——「幾個字」是猜題者唯一的提示,而眼睛
@@ -851,7 +884,7 @@ const MP = MPCore.create((function () {
 
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
-      pick, pickOwn, ink, inkClear, guess, giveUp, setFin,
+      pick, pickOwn, ink, inkClear, guess, giveUp, setFin, react,
       zoom: () => zoom,
       toggleZoom() { zoom = !zoom; DWB.setZoom(zoom); savePrefs(); },
       rules: () => DWR.normRules(rules),

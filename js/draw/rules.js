@@ -22,14 +22,23 @@
 const DWR = (function () {
 
   /* ---------- 相位時長(毫秒)----------
-     ★ 只有 draw 吃房規(45 / 60 / 90 秒);pick 與 show 是固定值。
-     ⚠ pick 從 v1.171.1 起是 **20 秒**(原本 15 秒)。使用者:「選題秒數改為 20 秒」——
-       15 秒是「三選一不必想太久」那一版的數字,而 v1.171.0 之後那一頁多了
-       「自己出題」那一格:要想一個題目 + 用注音打完 4 個字,15 秒是真的會被逼到超時。
-     ⚠ 畫家發呆時全房都在等他,所以這個數字不該再往上加;到期由 adapter 幫他選第一個。 */
-  const PICK_MS = 20000;
+     ★ 只有 draw 吃房規(60 / 90 / 120 秒);pick 與 show 是固定值。
+     ⚠ pick 從 v2.4.1 起是 **30 秒**(15 → 20 → 30)。使用者:「我想把選題時間拉長到 30 秒」。
+       每一次加長的理由都一樣:那一格要做的事變多了 —— v1.171.0 加了「自己出題」
+       (想一個題目 + 用注音打完 4 個字),v2.4.1 又加了三張卡片翻牌的入場動畫。
+     ⚠ 畫家發呆時全房都在等他,所以這個數字**不該再往上加**;到期由 adapter 幫他選第一個。
+     ⚠⚠ 改任何一個相位時長之後 e2e 若紅在**最後幾節的版面斷言**(畫布卡在 80×60 的下限、
+       放大了卻沒變高),先去把 `tools/run-e2e.ps1` 的 `--virtual-time-budget` 調大 ——
+       症狀與 `.dw-ov-card` 那條 CSS 紅線一模一樣,但真因是預算用完之後版面停止更新
+       (完整經過在 notes/21 的 v1.171.1 那一節)。 */
+  const PICK_MS = 30000;
   const SHOW_MS = 5000;
-  const SECS = [45, 60, 90];          // 作畫秒數的選項;預設值也寫在 draw.html 的 .on
+  /* ★ 作畫秒數的選項,v2.4.1 起是 60 / 90 / 120(原本 45 / 60 / 90)。
+     使用者:「作畫時間改成 60,90,120 秒選項」。
+     ⚠ 預設值**留在 60**(它照樣是選項之一)→ 舊房間存的 45 會被 normRules 退回 60,
+       也就是「只變長、不變短」,沒有人會因為這次改動少畫。
+     ⚠ 預設值同時寫在 draw.html 的 `.on`,兩邊要一致。 */
+  const SECS = [60, 90, 120];
   const ROUNDS = [1, 2, 3];           // 每人當幾次畫家
   const DIFFS = ["easy", "std", "hard"];
   /* ★★ 共同作畫(v1.170.0):0 = 關(經典玩法)、1 = 開。
@@ -116,6 +125,68 @@ const DWR = (function () {
     if (g === norm(word.w)) return true;
     const alt = word.a || [];
     for (let i = 0; i < alt.length; i++) if (g === norm(alt[i])) return true;
+    return false;
+  }
+
+  /* ---------- ★★★ 「🔥 好接近了」(v2.4.1)----------
+     Gemini 建議書:「當玩家輸入的答案與正解僅差一個字時,跳出燃燒提示(但不洩漏具體字)」。
+     ★ 它補的是這一頁最悶的一種挫折:猜「熱狗」時打「香腸」與打「熱狗堡」,
+       在此之前得到的回饋**一模一樣**(猜錯 + 凍 3 秒),而後者其實已經想對了。
+
+     ⚠⚠⚠ **這一則只給猜的那個人自己看,絕對不可以廣播。**
+       猜錯的內容本來就會進 `say`(全房看得到,那是笑點來源)—— 再廣播「他很接近」
+       等於昭告全房「答案離『香腸』只差一個字」,把第一名的推理成果送給所有人。
+       那與紅線 5(猜中的內容不進 say)是同一型的洩漏 → adapter 只在**本地**跳提示。
+     ⚠ 判定純本地算得出來:題目在每一台的記憶體裡本來就有(紅線 6 說 DB 是明碼、
+       而且刻意不修)—— 這一支沒有讓任何原本拿不到的人多拿到東西。
+
+     判準兩條(對正解與**每一個同義詞**各算一次,任一條成立就算接近):
+       ① 編輯距離 ≤ 1 —— 差一個字 / 多一個字 / 少一個字
+       ② 一方是另一方的連續子字串,而且長度差 ≤ 2(「狗」對「熱狗」、「車」對「腳踏車」)
+     ⚠⚠ **正解只有 1 個字時一律回 false**:那時候「編輯距離 ≤ 1」= 任何單字都成立,
+       提示會每猜必亮 —— 既沒有資訊量,又等於白送「答案是一個字」以外的線索。
+       題庫裡 1 個字的題有 29 條(見 notes/21b),不是罕見情況。
+     ⚠ 長度上限 24:猜題框 maxlength 是 16,但同義詞與 `dw.cw` 是別人寫進 DB 的,
+       不設上限的話一個超長字串會讓這一支算到卡住。 */
+  const NEAR_MAX = 24;
+  /* 「編輯距離是不是 ≤ 1」。★ 只要答案是 yes/no 就不必跑整張 DP 表:
+     長度差 > 1 直接否定,其餘對齊前綴、跳過一個字之後逐字比對尾巴。
+     ⚠ 吃的是**字元陣列**不是字串:補充平面的字在字串上是兩個 UTF-16 單元,
+       按字串算會把一個 emoji 當成「差兩個字」(同 DWGen.lenAt 用 Array.from 的理由)。 */
+  function tailSame(a, ai, b, bi) {
+    if (a.length - ai !== b.length - bi) return false;
+    while (ai < a.length) { if (a[ai++] !== b[bi++]) return false; }
+    return true;
+  }
+  function within1(a, b) {
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > 1) return false;
+    let i = 0;
+    while (i < la && i < lb && a[i] === b[i]) i++;
+    // 換掉一個字:兩邊各跳過那一個之後,尾巴要一樣
+    if (la === lb) return tailSame(a, i + 1, b, i + 1);
+    // 多 / 少一個字:長的那一邊跳過一個字之後,要與短的那一邊剩下的相同
+    const lng = la > lb ? a : b, sht = la > lb ? b : a;
+    return tailSame(lng, i + 1, sht, i);
+  }
+  function nearOne(g, c) {
+    if (!g || !c || g === c) return false;
+    if (g.length > NEAR_MAX || c.length > NEAR_MAX) return false;
+    const gc = Array.from(g), cc = Array.from(c);
+    if (cc.length < 2) return false;                 // ⚠ 見上面那條:1 個字的正解一律不提示
+    if (within1(gc, cc)) return true;                // ① 差一個字
+    // ② 一方是另一方的連續子字串,而且長度差 ≤ 2
+    return (c.indexOf(g) >= 0 || g.indexOf(c) >= 0) && Math.abs(gc.length - cc.length) <= 2;
+  }
+  /* 對外的那一支。word = 題庫的一筆 {w, a}。
+     ★ 猜中(hit)時一律回 false —— 那時候該跳的是「猜中了 🎉」,兩則同時跳會互相蓋掉。 */
+  function near(guess, word) {
+    const g = norm(guess);
+    if (!g || !word) return false;
+    if (hit(guess, word)) return false;
+    if (nearOne(g, norm(word.w))) return true;
+    const alt = word.a || [];
+    for (let i = 0; i < alt.length; i++) if (nearOne(g, norm(alt[i]))) return true;
     return false;
   }
 
@@ -395,7 +466,7 @@ const DWR = (function () {
   return {
     PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, COS, CUS,
     DEF_SEC, DEF_ROUNDS, DEF_DIFF, DEF_CO, DEF_CU,
-    normRules, sameRules, mayInk, mayOwnWord, norm, hit, cleanCustom, CUSTOM_MAX, COOL_MS, coolMs,
+    normRules, sameRules, mayInk, mayOwnWord, norm, hit, near, cleanCustom, CUSTOM_MAX, COOL_MS, coolMs,
     drawerAt, totalOf, plan, nextLive,
     guessPts, drawerPts, settle, roundDone,
     blankSt, tally, awards,

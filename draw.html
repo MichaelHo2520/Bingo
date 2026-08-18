@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
 <!-- 你畫我猜 · v2.4.0 -->
-<meta name="version" content="2.4.0">
+<meta name="version" content="2.4.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -156,9 +156,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="field">
         <span class="field-label" id="dwSecLabel">作畫秒數</span>
         <div class="seg" id="dwSecSeg" aria-label="一回合幾秒">
-          <button data-v="45">45 秒</button>
           <button class="on" data-v="60">60 秒</button>
           <button data-v="90">90 秒</button>
+          <button data-v="120">120 秒</button>
         </div>
       </div>
 
@@ -260,7 +260,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <button class="dw-zoombtn" id="dwZoom" type="button" title="放大畫板" aria-label="放大畫板">大</button>
       <span class="dw-cd hidden" id="dwCd" aria-label="剩餘秒數"></span>
     </div>
+    <!-- ★★ 猜中彩色彈幕(v2.4.1,Gemini 建議書 4.2/B3)。
+         ⚠⚠ 它是 .dw-stage 的孩子、**.dw-wrap 的兄弟**,而且 position:absolute ——
+            fit() 量的是 .dw-stage 的 getBoundingClientRect 與 .dw-wrap 的尺寸,
+            絕對定位不進流,所以這一條橫幅**一個 px 都不會動到畫布**。
+         ⚠ pointer-events:none 不可省:它橫過整張紙,吃得到點擊就是「畫到一半忽然畫不動」。 -->
     <div class="dw-stage" id="dwStage">
+      <div class="dw-banner hidden" id="dwBanner" aria-live="polite"></div>
       <!-- ⚠⚠ 蓋板一定要包在 .dw-wrap 裡面、而**不是**直接掛在 .dw-stage 上:
            .dw-stage 比畫布大一圈(v1.155.2 起是 INK_PAD 的 4px,在此之前 4:3 的鎖
            常常讓它高出一大截)—— 蓋板 inset:0 掛在 stage 上的話,那半透明的黑會連
@@ -276,7 +282,32 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
                 排在後面的話它會浮在蓋板上面(而那時根本不能畫,留著只是擋字)。
              ⚠ 刻意不放進 #dwTools —— 那一列在 360px 上已經剛好塞滿(見紅線 3-D)。 -->
         <button class="dw-pinch hidden" id="dwPinch" type="button" title="回到原本大小" aria-label="回到原本大小"></button>
+        <!-- ★★ 形狀選擇條(v2.4.1)。使用者要的是「畫大面積很費時」的解方,而 Gemini 建議書
+             的第一順位是油漆桶 —— 那一條**做不得**(理由寫在 js/draw/board.js 的檔頭 ⑦),
+             改成把既有的「直線」升級成三種形狀:直線 / 矩形 / 圓形。
+             ★ 它們全部是**只有幾個點的一筆 s**,線上格式一個字都沒改(同直線 v1.163.0)。
+             ⚠⚠ 刻意**不放進 #dwTools** —— 那一列在 360px 上已經剛好塞滿(紅線 3-D),
+                而且形狀是「進了直線模式才需要選」的東西,平常放在那裡是純雜訊。
+                跟 .dw-pinch 同一套:浮在紙上、只在需要時出現。
+             ⚠ 貼**右上角**(.dw-pinch 佔了左上)。公布答案那一層的分享鈕也在右上,
+                但兩者相位互斥(這一條只在 draw 相位、而且只有拿著直線工具時才在)。
+             ⚠⚠ 它一定要排在 #dwOver **前面** —— 排後面會浮在選題 / 公布答案的蓋板上。 -->
+        <span class="dw-shapes hidden" id="dwShapes" role="group" aria-label="形狀">
+          <button class="dw-shp on" id="dwShpLine" type="button" data-s="line" aria-label="直線" title="直線">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M5 19L19 5"/></svg>
+          </button>
+          <button class="dw-shp" id="dwShpRect" type="button" data-s="rect" aria-label="矩形" title="矩形">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="6.5" width="15" height="11" rx="1"/></svg>
+          </button>
+          <button class="dw-shp" id="dwShpOval" type="button" data-s="oval" aria-label="圓形" title="圓形">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><ellipse cx="12" cy="12" rx="8" ry="7"/></svg>
+          </button>
+        </span>
         <div class="dw-over hidden" id="dwOver"></div>
+        <!-- ★ 拍立得快門閃光(v2.4.1,Gemini 建議書 4.2/C1)。排在 #dwOver **後面** ——
+             閃光要蓋過剛冒出來的公布答案蓋板,那才像「咔嚓一聲把這張畫拍下來」。
+             ⚠ pointer-events:none 是硬需求:它蓋滿整張紙,吃得到點擊就會擋住分享鈕。 -->
+        <div class="dw-flash hidden" id="dwFlash" aria-hidden="true"></div>
       </div>
     </div>
     <!-- ★★ 畫家的工具列(v1.157.0 加了四色 + 擦布)。
@@ -317,7 +348,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- ★★ 復原(v1.163.0)。在此之前畫壞了只能整張清空 —— 那是手機上最大的挫折來源。
            ⚠ 沒東西可撤時是真的 disabled(見 board.js 的 syncTool):按了沒反應比灰著更像壞掉。 -->
       <button class="dw-tool dw-un" id="dwUndo" type="button" aria-label="復原" title="復原(退掉最後一筆)" disabled>↩️</button>
-      <button class="dw-tool" id="dwClear" type="button" title="整張清空">🗑<span class="dw-clr-t"> 清空</span></button>
+      <!-- ★★ 清空是**兩段式**(v2.4.1,Gemini 建議書 2.1/A2「防誤觸清空」)。
+           第一次按只是武裝 3 秒(整顆變警告色 + 換字「確定?」),3 秒內再按一次才真的清。
+           ⚠ 照抄「放棄這一題」那一套(v1.168.0),**不可以**改成開一層確認蓋板:
+              那要列進 ui-kit.js 的 BACK_LAYERS,而那個陣列是雙胞胎(CLAUDE.md 紅線 7)。
+           ⚠ 武裝一定要會自己到期 —— 停在武裝狀態的話,下一次隨手一按就整張清光了。 -->
+      <button class="dw-tool" id="dwClear" type="button" title="整張清空(按兩次)">🗑<span class="dw-clr-t" id="dwClrT"> 清空</span></button>
     </div>
     <div class="dw-say" id="dwSay" aria-live="polite"></div>
     <div class="dw-input hidden" id="dwInputRow">

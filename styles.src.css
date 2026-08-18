@@ -8645,7 +8645,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        (CLAUDE.md 紅線 7 講的是「放寬了才要一起放寬」)。
      ========================================================================== */
 
-  :root{ --dw-paper:#fffdf7; --dw-ink:#20242c; --dw-edge:rgba(74,43,31,.55); }
+  /* ⚠ 這四個都是**固定值、不吃主題**(紅線 11):紙是淺的、墨是深的、畫框是木色的。
+     跟著 midnight / arcade 走的話深墨水會在深紙上整個消失,而那是「切到某個主題才壞」
+     的坑,平常只看一個主題根本測不到。
+     ★ v2.4.1:--dw-edge 從半透明棕換成兩層實心木色(木質畫架邊框,見 .dw-ink)。 */
+  :root{ --dw-paper:#fffdf7; --dw-ink:#20242c; --dw-edge:#a9764a; --dw-edge2:#6f4526; }
 
   .dw-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));
@@ -8787,8 +8791,17 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        ⚠ 那條原本是為了消掉 inline 元素底下的基線空隙,但 `.dw-ink` 本來就是
          `display:block` → 那個空隙根本不存在,這條從頭到尾都是多餘的。 */
   .dw-wrap{position:relative;flex:none}
+  /* ★★ 木質畫架邊框(v2.4.1,Gemini 建議書 3.1)。
+     ⚠⚠ 它**一個 px 的版面都不佔** —— 全部做在既有那一圈 box-shadow 上(擴散半徑
+       3 → 5px,而 .dw-stage 早就留了 INK_PAD 4px 給它)。加真的 border / padding 的話
+       fit() 算出來的畫布會縮水,那正是紅線 17 翻過四次的那件事。
+     ⚠ 顏色是**固定的木色**,不吃主題變數 —— 同紙那條(紅線 11):畫框跟著 midnight
+       變深的話,深色主題下畫布與背景之間就沒有邊界了。
+     ⚠ 內側那一圈半透明白是「畫布微微凸起」的高光,不是裝飾:少了它木框看起來是貼上去的。 */
   .dw-ink{display:block;border-radius:14px;background:var(--dw-paper);
-    box-shadow:0 0 0 3px var(--dw-edge),0 10px 30px rgba(0,0,0,.22);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),
+               0 0 0 3px var(--dw-edge),0 0 0 5px var(--dw-edge2),
+               0 10px 30px rgba(0,0,0,.28);
     touch-action:none;-webkit-user-select:none;user-select:none}
   .dw-ink.live{cursor:crosshair}
 
@@ -8972,6 +8985,220 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     white-space:nowrap;-webkit-tap-highlight-color:transparent}
   .dw-gv.armed{background:var(--daub);border-color:var(--daub);color:#fff}
   .dw-gv:active{transform:scale(.94)}
+
+  /* ==========================================================================
+     ★★ v2.4.1 — 體驗與動效升級(Gemini 建議書)
+     ──────────────────────────────────────────────────────────────────────────
+       這一整段只「追加」,而且遵守這一頁最貴的那條版面紅線:
+       ★★★ **多出來的空間永遠是畫布的**(紅線 17,那一格翻過四次)——
+         所以底下每一個新元素都是 `position:absolute` + `pointer-events:none`
+         (可按的除外),**沒有任何一個進得了版面流**。fit() 量的是 .dw-stage 的
+         getBoundingClientRect 與 .dw-wrap 的尺寸,絕對定位不進流 = 畫布一個 px 都不動。
+       ⚠ 另一條:**畫紙那一族的顏色一律固定值**(紅線 11)。凡是疊在紙上、或疊在
+         拍立得白卡上的字,顏色都不可以吃 --text / --panel —— midnight 與 arcade 的
+         --text 是淺色的,疊在白紙上就是白紙白字(而那是只有切主題才看得到的坑)。
+     ========================================================================== */
+
+  /* ---------- ① 猜中的彩色彈幕(建議書 2.2)----------
+     猜題列那一則在 74px 的框裡很容易被忽略(尤其手正在打字時),而「有人搶先了」
+     正是這個遊戲最該讓人抬頭的一刻。
+     ⚠ 它是 .dw-stage 的孩子、.dw-wrap 的兄弟 → 被 .dw-stage 的 overflow:hidden 切齊,
+       兩端進出畫面剛剛好,不必自己做遮罩。
+     ⚠⚠ pointer-events:none 不可省:它橫過整張紙,吃得到點擊就是「畫到一半忽然畫不動」。
+     ⚠⚠ top 是 **46px 不是 16px** —— 紙的左上角有倍率晶片 .dw-pinch、右上角有形狀條
+       .dw-shapes,16px 會**正好橫過那兩顆**。它只是被蓋住兩秒鐘(z-index 比較高),
+       但那兩秒剛好是畫家最可能想換形狀的時候。往下讓開一整列就沒事了。 */
+  .dw-banner{position:absolute;left:0;right:0;top:46px;z-index:3;pointer-events:none;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:8px 14px;opacity:0;
+    background:linear-gradient(90deg,rgba(255,138,61,0),rgba(255,138,61,.96) 18%,
+               rgba(233,64,120,.96) 82%,rgba(233,64,120,0));
+    box-shadow:0 6px 22px rgba(0,0,0,.35)}
+  .dw-banner.hidden{display:none}
+  .dw-banner.go{animation:dw-bn 2.4s cubic-bezier(.16,1,.3,1) forwards}
+  .dw-bn-i{font-size:19px;line-height:1;flex:none}
+  .dw-bn-n{font-family:'Fredoka',sans-serif;font-weight:700;font-size:17px;color:#fff;
+    max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dw-bn-r{font-family:'Nunito',sans-serif;font-weight:800;font-size:13px;color:rgba(255,255,255,.92);
+    white-space:nowrap}
+  /* 滑進來 → 停一下 → 滑出去。⚠ 一路只動 transform / opacity(不動 left / width):
+     這一條橫幅蓋在畫布上面,觸發 layout 的話整張圖每一幀都要重排。 */
+  @keyframes dw-bn{
+    0%{opacity:0;transform:translateX(-14%) scale(.96)}
+    12%{opacity:1;transform:translateX(0) scale(1)}
+    78%{opacity:1;transform:translateX(0) scale(1)}
+    100%{opacity:0;transform:translateX(14%) scale(.96)}
+  }
+
+  /* ---------- ② 拍立得的快門閃光(建議書 4.2)----------
+     ⚠ 它排在 #dwOver **後面** → 蓋過剛冒出來的公布答案卡,才像「一聲快門把這張畫拍下來」。
+     ⚠⚠ pointer-events:none 是硬需求:它蓋滿整張紙,吃得到點擊就會擋住分享鈕與點讚鈕。 */
+  .dw-flash{position:absolute;inset:0;z-index:4;pointer-events:none;border-radius:14px;
+    background:#fff;opacity:0}
+  .dw-flash.hidden{display:none}
+  .dw-flash.go{animation:dw-flash .76s ease-out forwards}
+  @keyframes dw-flash{0%{opacity:0}8%{opacity:.92}100%{opacity:0}}
+
+  /* ---------- ③ 形狀條:直線 / 矩形 / 圓形(建議書 2.1 的「幾何輔助形狀」)----------
+     ⚠⚠ 刻意**不放進 #dwTools** —— 那一列在 360px 上已經剛好塞滿(紅線 3-D),
+       而且形狀是「進了直線模式才需要選」的東西,平常擺在那裡是純雜訊。
+       跟 .dw-pinch 同一套:浮在紙上、只在需要時出現、蓋住的那一小角是刻意的取捨。
+     ⚠ 貼**右上角**(.dw-pinch 佔了左上)。公布答案那一層的分享鈕也在右上,
+       但兩者相位互斥(這一條只在 draw 相位、而且只有拿著直線工具時才在)。
+     ⚠ 顏色不可以吃 --text / --panel:它疊在紙上,而紙不跟主題走(紅線 11)。
+     ⚠⚠⚠ **不可以給它 z-index。** 它與 #dwOver 同一個堆疊脈絡(都住在 .dw-wrap 裡),
+       而 #dwOver 沒有 z-index —— 給了 z-index:2 就會**浮在選題 / 公布答案的蓋板上面**,
+       那時根本不能畫,留著只是擋字。.dw-pinch 從 v2.1.0 起就是靠「排在 #dwOver 前面
+       且不設 z-index」壓在下面的,這一條照抄它。 */
+  .dw-shapes{position:absolute;top:8px;right:8px;display:flex;gap:4px;
+    padding:3px;border-radius:999px;border:1px solid rgba(0,0,0,.14);
+    background:rgba(255,255,255,.88);box-shadow:0 2px 8px rgba(0,0,0,.20)}
+  .dw-shapes.hidden{display:none}
+  .dw-shp{width:28px;height:28px;padding:0;border:none;border-radius:50%;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;
+    background:transparent;color:var(--dw-ink);transition:background .12s,color .12s}
+  .dw-shp:active{transform:scale(.9)}
+  /* ⚠ 亮起來一律**整顆填色**(紅線 24):只換邊框在 28px 上根本看不出來 */
+  .dw-shp.on{background:var(--dw-ink);color:var(--dw-paper)}
+  /* 工具列那顆鈕的圖示會跟著形狀換(js/draw/board.js 的 syncTool 從形狀條抄過來)——
+     ⚠ 抄來的 SVG 帶著 15px 的寬高屬性,尺寸統一由這一條接手。 */
+  .dw-ln svg{width:17px;height:17px}
+
+  /* ---------- ④ 清空的兩段式:武裝中要一眼看得出來(建議書 2.1)----------
+     ⚠ 窄畫面(≤430px)那一段把 .dw-clr-t 藏起來 → 那時候「確定?」三個字是看不到的,
+       **只剩顏色與脈動在講話** → 所以一定要整顆填成警告色 + 會動,不可以只換邊框。
+     ⚠ 沿用「放棄這一題」那一顆的 --daub(同一種「再按一次就回不去了」的語意,
+       兩處長得一樣才學得會)。 */
+  .dw-tool.armed{background:var(--daub);border-color:var(--daub);color:#fff;
+    animation:dw-arm .9s ease-in-out infinite}
+  .dw-tool.armed:hover{background:var(--daub)}
+  @keyframes dw-arm{0%,100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}50%{box-shadow:0 0 0 4px rgba(255,255,255,.22)}}
+
+  /* ---------- ⑤ 「好接近了」的燃燒提示(建議書 2.2)----------
+     ⚠⚠ 這一則**只有猜的那個人自己看得到**(判定與理由在 js/draw/rules.js 的 near())。
+     ⚠ 燒的是**輸入列自己**,不另開一格:那一列是 flex:none,多一格就是從畫布身上
+       拿高度(紅線 17)。文字走既有的 toast。
+     ⚠ 位置:.dw-input 本來沒有 position → 這裡補 relative,那顆火苗晶片才浮得起來。
+       它是 ::before(絕對定位)→ **不是 flex item**,一個 px 的版面都不佔。 */
+  .dw-input{position:relative}
+  .dw-input.near .dw-guess{border-color:#ff8a3d;
+    box-shadow:0 0 0 2px rgba(255,138,61,.35),0 0 18px rgba(255,90,40,.45);
+    animation:dw-near 1.1s ease-in-out infinite}
+  .dw-input.near::before{content:"🔥 好接近了";position:absolute;left:10px;top:-9px;z-index:2;
+    padding:2px 9px;border-radius:999px;pointer-events:none;
+    background:linear-gradient(135deg,#ff8a3d,#e0413a);color:#fff;
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:11px;line-height:1.5;
+    box-shadow:0 3px 10px rgba(224,65,58,.45);
+    animation:dw-nearpop .32s cubic-bezier(.16,1,.3,1)}
+  @keyframes dw-near{
+    0%,100%{box-shadow:0 0 0 2px rgba(255,138,61,.30),0 0 14px rgba(255,90,40,.32)}
+    50%{box-shadow:0 0 0 2px rgba(255,138,61,.48),0 0 24px rgba(255,90,40,.60)}
+  }
+  @keyframes dw-nearpop{0%{opacity:0;transform:translateY(5px) scale(.86)}100%{opacity:1;transform:none}}
+
+  /* ---------- ⑥ 最後 10 秒:炸彈 + 舞台警示光(建議書 4.1)----------
+     ⚠⚠ `.bomb` 是**疊在既有的 `.hot` 上面的第二個 class**,不是把 `.hot` 換掉 ——
+       `.hot` 在每一個相位的最後 10 秒都會亮(選題也會),那是既有行為。
+       `.bomb` 只在**作畫相位**掛(js/draw/board.js 的 tickCd)。
+     ⚠ 舞台那一圈紅光走 ::after,`inset:0` + pointer-events:none → 畫布尺寸完全不受影響。
+     ⚠ class 名字帶前綴(.dw-hot):元素身上光禿禿一個 `hot` / `alert` 會被任何全域規則
+       吃到(CLAUDE.md 紅線 6 的第一類撞名)。 */
+  .dw-cd.bomb{animation:dw-bomb .9s ease-in-out infinite}
+  .dw-cd.bomb::after{content:"";position:absolute;top:-3px;right:-1px;width:6px;height:6px;
+    border-radius:50%;background:#ffd54a;box-shadow:0 0 8px 3px rgba(255,180,40,.85);
+    animation:dw-fuse .38s linear infinite}
+  .dw-stage.dw-hot::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+    border-radius:14px;box-shadow:inset 0 0 34px 10px rgba(224,65,58,.50);
+    animation:dw-alert 1.05s ease-in-out infinite}
+  @keyframes dw-bomb{0%,100%{transform:scale(1)}50%{transform:scale(1.13)}}
+  @keyframes dw-fuse{0%{opacity:.55;transform:scale(.75)}50%{opacity:1;transform:scale(1.25)}100%{opacity:.55;transform:scale(.75)}}
+  @keyframes dw-alert{0%,100%{opacity:.45}50%{opacity:1}}
+
+  /* ---------- ⑦ 選題:三張卡翻開 + 「已鎖定」鈐印(建議書 4.1)----------
+     ⚠ 動畫掛在 `.dw-over.pick` 底下 → 公布答案那一層不會跟著翻。
+     ⚠⚠ 它**不會每一份快照重跑一次**:paintPick 有 dataset.pk 重畫守衛(那是自訂題目
+       輸入框的救命稻草)—— 少了那道守衛,別人送一個表情這三張卡就會重新翻一次。
+     ⚠ backwards 不可省:少了它三張卡在延遲期間是「已經在位置上」的,
+       第三張會先出現再翻,順序整個反過來。 */
+  .dw-picks{perspective:640px}
+  .dw-over.pick .dw-pickbtn{position:relative;animation:dw-flip .52s cubic-bezier(.16,1,.3,1) backwards}
+  .dw-over.pick .dw-pickbtn:nth-child(2){animation-delay:.09s}
+  .dw-over.pick .dw-pickbtn:nth-child(3){animation-delay:.18s}
+  @keyframes dw-flip{
+    0%{opacity:0;transform:rotateY(-82deg) translateZ(-30px)}
+    100%{opacity:1;transform:none}
+  }
+  /* 鈐印:選中的那一張蓋一枚朱紅大印。⚠ 它是 ::after、絕對定位 → **不撐高那張卡**
+     (而那張卡在矮視窗上本來就會溢出蓋板 14px,見紅線 23)。 */
+  .dw-over.pick .dw-pickbtn.on::after{content:"已鎖定";position:absolute;right:-6px;top:-9px;
+    padding:3px 9px;border-radius:7px;pointer-events:none;
+    border:2px solid rgba(200,32,32,.85);color:#c82020;background:rgba(255,255,255,.92);
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:11.5px;line-height:1.2;
+    transform:rotate(-11deg);animation:dw-stamp .34s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes dw-stamp{0%{opacity:0;transform:rotate(-11deg) scale(2.1)}100%{opacity:1;transform:rotate(-11deg) scale(1)}}
+  /* 等別人選題的那一張:輕輕呼吸,讓人看得出畫面沒有卡住 */
+  .dw-over.wait .dw-ov-card{animation:dw-breath 2.1s ease-in-out infinite}
+  @keyframes dw-breath{0%,100%{transform:scale(1)}50%{transform:scale(1.028)}}
+
+  /* ---------- ⑧ 公布答案 = 一張拍立得(建議書 4.2)----------
+     ⚠⚠⚠ **一列都不可以多加**:這張卡在矮視窗上本來就會超出蓋板約 14px 而被
+       .dw-stage 裁掉,而「讓它自己捲」會把 fit() 卡在 80×60 的下限回不來(紅線 23)。
+       → 畫家的署名**併進既有那一行**(「阿華 畫的答案是」),高度一個 px 都沒動;
+         拍立得純粹是換皮 + 一個入場動畫。
+     ⚠⚠ 白卡上的字色全部是**固定值** —— 吃 --text 的話 midnight / arcade 會白紙白字。
+     ⚠ padding-bottom 比 top 厚是拍立得的相紙比例(下緣那一條是寫字的地方),
+       不是留白失手。 */
+  .dw-over.show .dw-ov-card{background:#fffdf7;border-color:rgba(0,0,0,.10);
+    padding:14px 16px 20px;transform:rotate(-1.1deg);
+    box-shadow:0 14px 34px rgba(0,0,0,.42);
+    animation:dw-polaroid .46s cubic-bezier(.16,1,.3,1)}
+  .dw-over.show .dw-ov-s{color:#7a6650}
+  .dw-over.show .dw-ov-w{color:#20242c;-webkit-text-fill-color:#20242c}
+  .dw-over.show .dw-sh-row{color:#7a6650}
+  .dw-over.show .dw-sh-row.me{color:#20242c}
+  .dw-over.show .dw-sh-p{color:#c2410c}
+  @keyframes dw-polaroid{
+    0%{opacity:0;transform:rotate(-1.1deg) scale(1.14) translateY(-6px)}
+    100%{opacity:1;transform:rotate(-1.1deg) scale(1)}
+  }
+  /* ★ 一鍵點讚(建議書 4.2)。送的是**既有的表情**(核心的 sendEmote),不是新通道。
+     ⚠⚠ 位置與分享鈕對稱(它在右上、這一排在左上)——
+       **絕對不可以放進 .dw-ov-card 裡**(理由同上面那條紅線 23)。
+     ⚠ class 叫 .dw-luv 不叫 .dw-react:這一頁已經有一整組 `.dw-react-row`
+       (結果卡的賽後表情列),同族名字混在一起遲早會改到彼此(同 .dw-shbtn 的理由)。 */
+  .dw-luvs{position:absolute;top:8px;left:8px;z-index:2;display:flex;gap:5px}
+  .dw-luv{width:36px;height:36px;display:grid;place-items:center;border-radius:50%;
+    cursor:pointer;font-size:17px;border:1px solid var(--panel-line);
+    background:rgba(255,255,255,.16);color:var(--text);transition:.15s;
+    animation:dw-luvin .34s cubic-bezier(.2,1.5,.4,1) backwards}
+  .dw-luv:nth-child(2){animation-delay:.06s}
+  .dw-luv:nth-child(3){animation-delay:.12s}
+  .dw-luv:hover{background:rgba(255,255,255,.30)}
+  .dw-luv:active{transform:scale(.88)}
+  @keyframes dw-luvin{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:none}}
+
+  /* ---------- ⑨ 猜題列:氣泡卡片流(建議書 3.1)----------
+     ⚠ 動畫只動 opacity / transform:這一列是 overflow-y:auto 的捲動容器,
+       會改變高度的入場動畫等於每有人猜一次就把整列抖一下。
+     ⚠ 猜中那一則加金色底 —— 它是這一列裡唯一「有結果」的訊息,而在 74px 的框裡
+       純換字色分量不夠(而它照舊**一個字的內容都不播**,紅線 5)。 */
+  .dw-say-row{animation:dw-sayin .26s ease-out}
+  @keyframes dw-sayin{0%{opacity:0;transform:translateX(-7px)}100%{opacity:1;transform:none}}
+  .dw-say-hit{padding:1px 7px;border-radius:999px;
+    background:linear-gradient(135deg,rgba(95,224,138,.20),rgba(95,224,138,.06));
+    box-shadow:inset 0 0 0 1px rgba(95,224,138,.35)}
+
+  /* ---------- ⑩ 會暈車的人(以及省電模式)----------
+     ⚠ 這一段只關掉**裝飾性**的循環動畫與入場動畫,不關「狀態看得出來」的那一半:
+       .dw-tool.armed 的底色、.dw-shp.on 的填色、.dw-input.near 的火苗晶片全部留著 ——
+       那些是資訊,不是特效(關掉的話兩段式確認就變成「按了沒反應」)。 */
+  @media (prefers-reduced-motion:reduce){
+    .dw-banner.go,.dw-flash.go,.dw-cd.bomb,.dw-cd.bomb::after,.dw-stage.dw-hot::after,
+    .dw-over.pick .dw-pickbtn,.dw-over.pick .dw-pickbtn.on::after,.dw-over.wait .dw-ov-card,
+    .dw-over.show .dw-ov-card,.dw-luv,.dw-say-row,.dw-tool.armed,
+    .dw-input.near .dw-guess,.dw-input.near::before{animation:none}
+    .dw-banner.go{opacity:1}
+  }
 
   /* ---------- 結果卡 ---------- */
   .dw-win{padding:30px 22px}

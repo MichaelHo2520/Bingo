@@ -67,6 +67,28 @@
       ⚠ 每一回合要歸位(resetInk):換人畫的時候不該繼承上一位的縮放與位移。
       ⚠ 兩指下去的那一刻**一定要把第一根手指剛剛起的那一筆退掉**(abortStroke)——
         不然每次縮放都會在紙上留一個點。
+
+   ⑦ **形狀工具(v2.4.1)—— 而「油漆桶」刻意不做,那不是漏做。**
+      Gemini 建議書把「填色油漆桶(Flood Fill)」列在第一順位,理由是「倒數計時下手動
+      塗滿大面積色塊非常耗時」。那個痛點是真的,但 **flood fill 與這一頁的架構相衝**,
+      三條都是結構性的、不是實作難度:
+        ★★★ **① 每一台的畫布解析度不同 → 填出來的結果會不一樣。**
+          v2.2.0 之後每台的**長寬比**一致,但像素尺寸差好幾倍(手機 330 寬、桌機 760)。
+          手畫的「封閉」圖形幾乎都有髮絲級的縫:低解析度那台被抗鋸齒補起來 → 填在圈內;
+          高解析度那台縫還在 → **整張紙都變色**。同一個房間裡兩個人看到的圖完全不同,
+          而且誰會漏色**事前算不出來**。這比「畫得慢」嚴重一個量級。
+        ★★★ **② 真相是 replay,所以每次 repaint() 都要把每一次填色重跑一遍。**
+          `repaint()` 在直線 / 形狀預覽時是**每個 pointermove 跑一次**(見 previewShape),
+          兩指縮放同理。一次 flood fill = getImageData + BFS + putImageData ≈ 800×600 的
+          48 萬像素;填個五次之後,拖一條直線就會變成幻燈片。
+        ★★ **③ 紙是 CSS 背景、canvas 是透明的**(擦布靠 destination-out 露出紙,見 3-C)——
+          於是「可以填的地方」與「被擦掉的地方」在像素上**完全一樣**,填色會直接跨過
+          擦布的痕跡漫出去。要繞開就得改成「canvas 自己填紙色」,而那會讓擦布失效。
+      → 改成把既有的「直線」升級成**三種形狀:直線 / 矩形 / 圓形**。
+      ★★ 它們全部是「只有幾個點的一筆 `s`」—— **線上格式一個字都沒改**,舊版收到照樣
+        畫得出來(同 v1.163.0 直線那條的 CP 值來源)。矩形是 5 個點、圓形是 49 個點。
+      ⚠ 「填滿」這件事沒有被解決,那是已知的取捨:要填滿只能靠粗筆刷(WIDTHS 的 UI
+        還沒做,而 #dwTools 在 360px 上塞不下第五顆鈕 —— 見 notes/21 第六節)。
    ========================================================================== */
 
 const DWB = (function () {
@@ -106,7 +128,7 @@ const DWB = (function () {
   const MAX_PTS = 24;                    // 一批最多幾個點(超過就立刻送)
   const MIN_D = 4;                       // 與上一個取樣點的距離小於這麼多(邏輯單位)就丟掉
 
-  let cb = {};                           // { onStroke, onClear, onGuess, onPick, onPickOwn, onGiveUp, onFin }
+  let cb = {};                           // { onStroke, onClear, onGuess, onPick, onPickOwn, onGiveUp, onFin, onReact }
   let cv = null, ctx = null, dpr = 1;
   let boxW = 0, boxH = 0;                // 畫布的 CSS 尺寸(px)
   /* ---------- 形狀的來源(v2.2.0,見檔頭 ①)----------
@@ -149,8 +171,17 @@ const DWB = (function () {
   let curEr = false;                      // 現在拿的是擦布嗎(只影響自己這一端要送 s 還是 e)
   /* ★ 直線模式(v1.163.0):按下去記起點、放開才成一筆。中間那段只是**預覽**,
      不進 strokes、也不送出去 —— 一條直線最後只推送一次(兩個點)。
-     ⚠ 直線走的是完全獨立的路徑,不碰 drawing / pend / flush(那三個是徒手畫的節流機制)。 */
+     ⚠ 直線走的是完全獨立的路徑,不碰 drawing / pend / flush(那三個是徒手畫的節流機制)。
+     ★★ v2.4.1 起這個模式底下有**三種形狀**(見檔頭 ⑦):直線 / 矩形 / 圓形。
+     ⚠⚠ `curLine` 的語意刻意沒變 —— 它照舊是「三選一模式裡的那一格」(紅線 24),
+       所以 `stats().tool` 照樣回 "line"、`#dwLine` 照樣是**切換鈕**(按一下回到一般筆)。
+       形狀是它底下的第二層,住在浮在紙上的 `.dw-shapes`(不佔工具列的寬度)。
+     ⚠ 形狀**不必每回合歸零**?—— 要。resetInk() 一起清:上一位畫家挑的形狀
+       與顏色 / 擦布同一族,換人就該回到最單純的狀態。 */
   let curLine = false;
+  const SHAPES = ["line", "rect", "oval"];
+  const SHAPE_IDS = { line: "dwShpLine", rect: "dwShpRect", oval: "dwShpOval" };
+  let curShape = "line";
   let lineFrom = null, lineTo = null;
   /* 畫布四周留這麼多(v1.155.2):`.dw-stage` 是 overflow:hidden,而紙有一圈 3px 的外框
      (`.dw-ink` 的第一段 box-shadow)—— 貼死就會被削掉,看起來像沒有邊。 */
@@ -181,7 +212,7 @@ const DWB = (function () {
     vy = Math.max(boxH * (1 - vk), Math.min(0, vy));
   }
   /* ⚠⚠ 縮放的重畫**刻意是同步的**,不可以「聰明地」合到 requestAnimationFrame 裡:
-       ① 直線預覽(previewLine)本來就是每一個 pointermove 整張 repaint —— 這一頁的
+       ① 直線 / 形狀預覽(previewShape)本來就是每一個 pointermove 整張 repaint —— 這一頁的
           筆劃量(一回合幾十筆)重畫一次是微不足道的成本,兩指一幀畫兩遍也一樣
        ② ⚠ **rAF 在 headless e2e 一次都不派**(紅線 3-B 踩過:用它等會整支測試當場掛住)
           → 走 rAF 的話這個功能就變成「只能靠眼睛看」的那一類,守不住。
@@ -317,7 +348,7 @@ const DWB = (function () {
 
   /* 邏輯座標 → 畫布的裝置像素。★ 中間那兩個 vk / vx 就是兩指縮放(見檔頭 ⑥),
      沒縮放時 vk=1、vx=0 → 與 v2.0.0 逐字相同。
-     ⚠ 畫的每一條路徑都只准走這兩支(strokePath / drawTail / applyRec 的續段 / previewLine),
+     ⚠ 畫的每一條路徑都只准走這兩支(strokePath / drawTail / applyRec 的續段 / previewShape),
        自己另外算一份的地方就是「縮放之後只有那一種筆畫錯位」的來源。 */
   function sx(x) { return (x * boxW / LW * vk + vx) * dpr; }
   function sy(y) { return (y * boxH / LH * vk + vy) * dpr; }
@@ -507,7 +538,7 @@ const DWB = (function () {
     pend = []; pendSid = -1; pendEr = false; nextSid = 1;
     /* ★ 每一回合把筆歸零:換人畫的時候不該繼承上一位畫家挑的顏色 / 還拿著擦布 / 還在直線模式。 */
     curC = DEF_C; curW = DEF_W; curEr = false;
-    curLine = false; lineFrom = null; lineTo = null;
+    curLine = false; curShape = "line"; lineFrom = null; lineTo = null;
     /* ★ 縮放也要歸位(v2.1.0):上一位畫家放大到某個角落去畫細節,
        下一回合換人時畫面不該還停在那個角落 —— 而且新的一張是空的,停在那裡看起來像壞掉。
        ⚠ 手指狀態一起清:換回合時可能正按著(相位是別人推的,不會有 pointerup 收尾)。 */
@@ -561,13 +592,43 @@ const DWB = (function () {
        漏還原的症狀是「之後畫的每一筆都是半透明的」,而且 DOM / 記錄全部正常。
        這裡用 try 之外的方式保證:設完立刻在同一支函式裡還原(不要跨函式)。
      ⚠ 預覽**不進 strokes、不送出去**:它每次 pointermove 都會被 repaint() 蓋掉重畫。 */
-  function previewLine() {
+  /* ★★ 形狀 → 邏輯座標點陣(v2.4.1,見檔頭 ⑦)。**回傳的就是一筆 `s` 的 p 陣列** ——
+     直線 2 個點、矩形 5 個點(收尾回到起點)、圓形 49 個點。
+     ⚠ 一律 Math.round + 夾在座標系內:編碼直接 join(","),浮點數會讓每一筆胖三倍
+       (而且 `applyRec` 那邊 isFinite 通過、畫出來一樣,沒有任何斷言會紅)。
+     ⚠ 圓形取 48 段:再少會看得出是多邊形(在放大到 4 倍的畫布上尤其明顯),
+       再多只是白白加位元組 —— 48 段 ≈ 400 bytes,與徒手畫一小段差不多。
+     ⚠⚠ 圓形是**內接在拖曳出來的方框裡**(不是「以起點為圓心」):使用者拖的是一個框,
+       而框的直覺就是外接矩形;以起點為圓心的話手指一定在圓的正中央 → 看不見自己在畫什麼。 */
+  const OVAL_SEG = 48;
+  function shapePts(a, b, shape) {
+    const clamp = (v, hi) => Math.max(0, Math.min(hi, Math.round(v)));
+    if (shape === "rect") {
+      const x0 = a[0], y0 = a[1], x1 = b[0], y1 = b[1];
+      return [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0];
+    }
+    if (shape === "oval") {
+      const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2;
+      const rx = Math.abs(b[0] - a[0]) / 2, ry = Math.abs(b[1] - a[1]) / 2;
+      const out = [];
+      for (let i = 0; i <= OVAL_SEG; i++) {
+        const t = i / OVAL_SEG * Math.PI * 2;
+        out.push(clamp(cx + rx * Math.cos(t), LW - 1), clamp(cy + ry * Math.sin(t), LH - 1));
+      }
+      return out;
+    }
+    return [a[0], a[1], b[0], b[1]];
+  }
+  /* 拖曳中的預覽。⚠ 這一支**每個 pointermove 都會跑一次整張 repaint()**(見 onMove)——
+     檔頭 ⑦ 講的「油漆桶會讓這裡變幻燈片」指的就是它。 */
+  function previewShape() {
     if (!ctx || !lineFrom || !lineTo) return;
+    const pts = shapePts(lineFrom, lineTo, curShape);
     penStyle({ c: curC, w: curW, er: curEr });
     if (!curEr) ctx.globalAlpha = 0.55;                 // 擦布不透明化(destination-out 看不出深淺)
     ctx.beginPath();
-    ctx.moveTo(sx(lineFrom[0]), sy(lineFrom[1]));
-    ctx.lineTo(sx(lineTo[0]), sy(lineTo[1]));
+    ctx.moveTo(sx(pts[0]), sy(pts[1]));
+    for (let i = 2; i < pts.length; i += 2) ctx.lineTo(sx(pts[i]), sy(pts[i + 1]));
     ctx.stroke();
     ctx.globalAlpha = 1;
     penEnd();
@@ -575,13 +636,13 @@ const DWB = (function () {
   /* 直線放手 → 成一筆(兩個點)並**一次推送完畢**。
      ⚠ 不走 pend / flush:那套節流是給徒手畫的連續取樣用的,一條直線只有兩個點。
      ⚠ 但要先 flush() —— 上一筆徒手畫可能還有沒送出去的點,順序反了對方會看到接錯。 */
-  function commitLine() {
+  function commitShape() {
     const a = lineFrom, b = lineTo || lineFrom;
     lineFrom = null; lineTo = null;
     if (!a) return;
     flush();
     const sid = sidBase + nextSid++;       // ★ 帶座位命名空間(見 SID_SPAN 那段)
-    const s = { sid: sid, c: curC, w: curW, p: [a[0], a[1], b[0], b[1]], er: curEr };
+    const s = { sid: sid, c: curC, w: curW, p: shapePts(a, b, curShape), er: curEr };
     byId[sid] = s; strokes.push(s);
     mySids.add(sid);                      // 這一筆的回音要擋掉(見 applyRec)
     repaint();                            // ⚠ 一定要整張重畫:預覽那條半透明的線還在畫布上
@@ -706,7 +767,7 @@ const DWB = (function () {
       const ddx = q[0] - lineTo[0], ddy = q[1] - lineTo[1];
       if (ddx * ddx + ddy * ddy < MIN_D * MIN_D) return;        // 動太小就別重畫(整張 repaint 有成本)
       lineTo = q;
-      repaint(); previewLine();
+      repaint(); previewShape();
       return;
     }
     if (!drawing) return;
@@ -734,7 +795,7 @@ const DWB = (function () {
     // ★ 直線:放手才成一筆(⚠ 排在 drawing 那道守衛前面 —— 直線期間 drawing 一直是 null)
     if (lineFrom) {
       try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
-      commitLine();
+      commitShape();
       return;
     }
     if (!drawing) return;
@@ -760,6 +821,25 @@ const DWB = (function () {
       const m = /^dwSw(\d)$/.exec(b.id || "");
       if (m) pickColor(+m[1]);
     });
+    bindShapes();
+    syncTool();
+  }
+  /* ★★ 形狀條(v2.4.1,見檔頭 ⑦)。它**不住在 #dwTools 裡**(浮在紙上),所以另外綁一次。
+     ⚠ 按了形狀一律順手把直線模式打開 —— 這一條是「按了沒反應」的唯一防線:
+       形狀條只在直線模式下看得見,理論上按不到它時模式一定是開的;
+       但畫布鎖住 / 相位剛換的那一瞬間 class 可能還沒同步,補這一道零成本。 */
+  function bindShapes() {
+    const box = $("dwShapes"); if (!box) return;
+    box.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      pickShape(b.dataset.s);
+    });
+  }
+  function pickShape(s) {
+    if (SHAPES.indexOf(s) < 0) return;
+    curShape = s;
+    if (!curLine) curLine = true;
+    modeToast(s === "rect" ? "▭ 矩形:拖出一個框" : s === "oval" ? "◯ 圓形:拖出一個框" : "📐 直線:按住拉一條直的");
     syncTool();
   }
   function bindDraw() {
@@ -803,6 +883,10 @@ const DWB = (function () {
     /* ⚠ 時間到的那一刻可能正拖著一條還沒放手的直線 —— 丟掉(不是 commit):
        相位已經換了,adapter 的 ink() 也寫不進去,留著只會在畫布上掛一條預覽線。 */
     if (!enabled && lineFrom) { lineFrom = null; lineTo = null; repaint(); }
+    if (!enabled) clrDisarm();        // ⚠ 相位換掉時武裝要收:下一回合第一次按不該直接清光
+    /* ⚠ 形狀條的顯示條件含 enabled(見 syncTool)→ 這裡改了它就一定要重畫一次,
+       不然相位換掉之後那一條會留在紙上(而且只有「上一回合拿著直線」時才看得到)。 */
+    if (enabled !== was) syncTool();
     if (cv) cv.classList.toggle("live", enabled);
     /* ★★ 可以下筆的那一刻就把自己的形狀推出去(v2.2.0)——
        ⚠ 不可以只靠 fit() 那條:畫家的畫布通常從 pick 相位到 draw 相位一個 px 都沒動,
@@ -810,8 +894,40 @@ const DWB = (function () {
          (症狀:「偶爾會歪、偶爾不會」,而歪不歪其實只看畫家中途有沒有轉向)。 */
     if (enabled) maybeSendAR();
   }
+  /* ---------- ★★ 清空的兩段式確認(v2.4.1)----------
+     Gemini 建議書 2.1:「點擊清空時若手滑容易整張報廢」。60 秒畫完的一張圖,誤觸的代價
+     是整場最高的一種 —— 而復原鈕只退得回**一筆**,清空之後那一張是真的回不來。
+     ⚠⚠ 照抄「放棄這一題」那一套(紅線 28):第一次按只是**武裝 3 秒**(整顆變警告色 +
+       換字「確定?」),3 秒內再按一次才真的清。**不可以**改成開一層確認蓋板 ——
+       那要列進 ui-kit.js 的 BACK_LAYERS,而那個陣列是雙胞胎(CLAUDE.md 紅線 7)。
+     ⚠ 武裝一定要會自己到期:停在武裝狀態的話,下一次隨手一按就直接清光了。
+     ⚠⚠ 真正動手的那一支照舊叫 `clearInk()`,而且**維持公開** —— e2e / 診斷頁走的是它
+       (那些地方要驗的是「清空之後畫布與復原鈕的狀態」,不是那顆鈕按幾下)。
+       畫面上那顆 🗑 從 v2.4.1 起走的是 `clearAsk()`(js/draw/main.js 綁的那一行)。 */
+  const CLR_ARM_MS = 3000;
+  let clrArmT = null;
+  function clrArmed() { const b = $("dwClear"); return !!b && b.classList.contains("armed"); }
+  function clrDisarm() {
+    if (clrArmT) { clearTimeout(clrArmT); clrArmT = null; }
+    const b = $("dwClear"), t = $("dwClrT");
+    if (b) { b.classList.remove("armed"); b.title = "整張清空(按兩次)"; }
+    if (t) t.textContent = " 清空";
+  }
+  function clearAsk() {
+    if (!enabled) return;
+    const b = $("dwClear"); if (!b) return;
+    if (clrArmed()) { clrDisarm(); clearInk(); return; }
+    b.classList.add("armed");
+    b.title = "再按一次就整張清空(退不回來)";
+    const t = $("dwClrT"); if (t) t.textContent = " 確定?";
+    try { showToast("再按一次就整張清空 🗑(想退一筆的話用 ↩️)", 2600); } catch (e) {}
+    if (clrArmT) clearTimeout(clrArmT);
+    clrArmT = setTimeout(clrDisarm, CLR_ARM_MS);
+  }
+
   // 清空:本地立刻生效,同時請 adapter 推一筆 "x"(讓別人也清)
   function clearInk() {
+    clrDisarm();                      // ⚠ 直接呼叫這一支的路徑(e2e / 診斷頁)也要把武裝收掉
     if (!enabled) return;
     drawing = null; pend = []; pendSid = -1;
     lineFrom = null; lineTo = null;   // 拖到一半的直線也一起丟掉
@@ -878,6 +994,34 @@ const DWB = (function () {
     if (er) { er.classList.toggle("on", curEr); er.setAttribute("aria-pressed", curEr ? "true" : "false"); }
     const ln = $("dwLine");
     if (ln) { ln.classList.toggle("on", curLine); ln.setAttribute("aria-pressed", curLine ? "true" : "false"); }
+    /* ★★ 形狀條:直線模式 **而且畫得動**才出現(v2.4.1)。
+       ⚠⚠ `enabled` 那一半不可省 —— 它住在 `.dw-wrap` 裡,**不在 `#dwTools` 那一列**,
+         所以 `paintTools()` 把工具列收起來時它**不會跟著消失**:相位換到 pick / show
+         之後,上一回合留下來的 `curLine` 會讓它繼續浮在選題卡與拍立得上面。
+         (另一半是 CSS:它不可以有 z-index,不然連蓋板都蓋不住它。) */
+    const shBox = $("dwShapes");
+    if (shBox) shBox.classList.toggle("hidden", !(curLine && enabled));
+    let curBtn = null;
+    for (let i = 0; i < SHAPES.length; i++) {
+      const b = $(SHAPE_IDS[SHAPES[i]]);
+      if (!b) continue;
+      const on = SHAPES[i] === curShape;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      if (on) curBtn = b;
+    }
+    /* ★★★ 工具列那顆鈕的圖示要跟著形狀換(紅線 24:「哪一顆亮著」是使用者判斷
+       現在能做什麼的唯一線索 —— 亮著一顆斜線卻在畫矩形就是在騙人)。
+       ⚠⚠ 圖示**從形狀條那三顆鈕身上抄過來**,不在 JS 裡另寫一份 SVG:
+         兩份 SVG 漂移的症狀是「工具列的圖示與形狀條對不起來」,而那沒有任何斷言會紅
+         (同色塊的顏色只准有 COLORS 一份的理由)。尺寸差異交給 CSS 的 .dw-ln svg。 */
+    if (ln && curBtn && ln.dataset.shape !== curShape) {
+      ln.dataset.shape = curShape;
+      ln.innerHTML = curBtn.innerHTML;
+      const nm = curShape === "rect" ? "矩形" : curShape === "oval" ? "圓形" : "直線";
+      ln.setAttribute("aria-label", nm);
+      ln.title = nm + "(按住拉一個" + (curShape === "line" ? "條" : "框") + ";再按一次回到一般筆)";
+    }
     /* ⚠ 復原鈕沒東西可撤時要**真的鎖住**(disabled),不是只調透明度 ——
        按了沒反應比灰著更讓人以為壞了。 */
     const un = $("dwUndo");
@@ -915,7 +1059,9 @@ const DWB = (function () {
     curLine = (on === undefined) ? !curLine : !!on;
     if (curLine && curEr) curEr = false;                                          // 互斥
     if (!curLine && lineFrom) { lineFrom = null; lineTo = null; repaint(); }
-    modeToast(curLine ? "📐 直線:按住拉一條直的" : "✏️ 一般筆");
+    modeToast(!curLine ? "✏️ 一般筆"
+              : curShape === "rect" ? "▭ 矩形:拖出一個框"
+              : curShape === "oval" ? "◯ 圓形:拖出一個框" : "📐 直線:按住拉一條直的");
     syncTool();
   }
 
@@ -926,8 +1072,27 @@ const DWB = (function () {
          每 200ms 用時間差重算,分頁被凍結過(手機切 App)也不會走鐘。
        ⚠ 用 key 去重:同一段倒數重畫畫面時不要重跑動畫(比照大老二 / 暗棋的 syncCd)。
      ========================================================================== */
-  let cdKey = "", cdT = null, cdEnd = 0, cdTotal = 0;
-  function stopCd() { if (cdT) { clearInterval(cdT); cdT = null; } cdKey = ""; }
+  /* ★★ 最後 10 秒的「引線炸彈」(v2.4.1,Gemini 建議書 4.1)。
+     ⚠⚠ 它是**疊在既有的 `.hot` 上面的第二個 class(`.bomb`),不是把 `.hot` 換掉** ——
+       `.hot` 從 v1.154.0 起在**每一個相位**的最後 10 秒都會亮(選題也會),
+       改成只在作畫相位亮的話等於**默默拿掉選題那一段的緊張感**,而那是既有行為。
+       → `.hot` 一個字都沒動,`.bomb` 另外只在 `draw` 相位掛。
+     ⚠ 舞台邊緣的紅色呼吸光也掛在同一個判定上(`.dw-stage.dw-hot`)。
+       class 名字要帶前綴:`.dw-stage.alert` 那種寫法,元素身上那個 `alert` 會被任何
+       全域的 `.alert` 規則吃到(CLAUDE.md 紅線 6 的第一類撞名)。
+     ⚠ 心跳只在剩 3 / 2 / 1 秒各響一聲(每秒一次要靠 cdLastSec 去重 —— tick 是 200ms 一次)。
+       ★ 刻意**不做**每秒都響的「心跳加速」:六個人的手機一起滴滴叫是噪音不是氣氛。 */
+  let cdKey = "", cdT = null, cdEnd = 0, cdTotal = 0, cdDraw = false, cdLastSec = -1;
+  function cdAlert(on) {
+    const stg = $("dwStage");
+    if (stg) stg.classList.toggle("dw-hot", !!on);
+  }
+  function stopCd() {
+    if (cdT) { clearInterval(cdT); cdT = null; }
+    cdKey = ""; cdLastSec = -1;
+    const el = $("dwCd"); if (el) el.classList.remove("bomb");
+    cdAlert(false);
+  }
   function tickCd() {
     const el = $("dwCd"); if (!el) return;
     const left = Math.max(0, cdEnd - Date.now());
@@ -936,6 +1101,13 @@ const DWB = (function () {
     el.style.setProperty("--dw-p", pct.toFixed(1) + "%");
     el.textContent = sec;
     el.classList.toggle("hot", left <= 10000);
+    const bomb = cdDraw && left <= 10000 && left > 0;
+    el.classList.toggle("bomb", bomb);
+    cdAlert(bomb);
+    if (bomb && sec !== cdLastSec) {
+      cdLastSec = sec;
+      if (sec <= 3) { try { Sound.unmark(); } catch (e) {} }
+    }
     if (left <= 0) stopCd();
   }
   function setCd(endAt, totalMs, key) {
@@ -944,6 +1116,10 @@ const DWB = (function () {
     el.classList.remove("hidden");
     if (key === cdKey && cdT) { cdEnd = endAt; cdTotal = totalMs; return; }
     cdKey = key || String(endAt);
+    /* ⚠ 相位是從 key 讀的(adapter 傳的是 `ph + "#" + seq`)—— 刻意不多開一個參數:
+       這一支有三個呼叫端,多一個參數就多三處可以漏。 */
+    cdDraw = cdKey.indexOf("draw#") === 0;
+    cdLastSec = -1;
     cdEnd = endAt; cdTotal = totalMs;
     if (cdT) clearInterval(cdT);
     tickCd();
@@ -1087,6 +1263,8 @@ const DWB = (function () {
       /* 分享鈕與題目鈕共用這一個委派(蓋板每換一次相位就整段重畫,綁在 paintShow 裡
          會每重畫一次多疊一個監聽 → 按一下送出好幾次)。 */
       if (e.target.closest(".dw-shbtn")) { shareShot(); return; }
+      const rb = e.target.closest(".dw-luv");
+      if (rb) { cb.onReact && cb.onReact(rb.dataset.e); return; }
       if (e.target.closest(".dw-own-b")) { ownSubmit(); return; }
       const b = e.target.closest(".dw-pickbtn"); if (!b) return;
       const k = +b.dataset.k;
@@ -1121,8 +1299,30 @@ const DWB = (function () {
          矮視窗(舞台 213px)上把卡片撐高 39px 直接被 .dw-stage 裁掉;
          改成卡片自己捲之後又變成「要捲一下才找得到」,而這張卡只活 5 秒。
          貼在角落就與卡片多高完全無關,永遠在同一個位置。 */
-    showOver('<button class="dw-shbtn" type="button" title="分享這張畫" aria-label="分享這張畫">📤</button>' +
-             '<div class="dw-ov-card"><div class="dw-ov-s">答案是</div>' +
+    /* ★★ 拍立得(v2.4.1,Gemini 建議書 4.2)。⚠⚠ **一列都不可以多加** ——
+       這張卡在矮視窗上本來就會溢出蓋板約 14px(紅線 23 那條「不可以讓它自己捲」),
+       多一列署名就會把溢出加倍。→ 畫家的名字**併進既有的那一行**「🎨 阿華 畫的答案是」,
+       高度一個 px 都沒動;拍立得的樣子純粹是 `.dw-over.show` 那一段 CSS 換的皮。
+       ⚠ 名字從 rows 裡撈(那一列本來就標著 drawer),不另外多傳一個參數。 */
+    const dr = (rows || []).filter(r => r.drawer)[0];
+    const cap = dr ? ("🎨 " + esc(dr.name) + " 畫的答案是") : "答案是";
+    /* ★★ 即時點讚(v2.4.1,Gemini 建議書 4.2 的「靈魂畫作即時點讚」)。
+       ⚠ 它**不是新的同步通道** —— 三顆鈕送的就是既有的表情(核心的 sendEmote),
+         飛出來的動畫、音效、誰送給誰全部沿用 ui-kit 那一套,一行新的 DB 邏輯都沒有。
+       ★ 存在的理由是「這張卡只活 5 秒」:要在 5 秒內開表情面板 → 挑一個 → 送出,
+         實際上沒有人來得及,所以那一刻的反應永遠是零。一鍵就補上了。
+       ⚠⚠ 位置與分享鈕對稱(它在右上、這一排在左上)——
+         **絕對不可以放進 .dw-ov-card 裡**:那張卡在矮視窗上本來就會溢出 14px,
+         而讓它自己捲會把 fit() 卡在 80×60 的下限回不來(紅線 23)。 */
+    const RE = [["🎨", "神作"], ["🤣", "靈魂畫手"], ["💖", "天才"]];
+    /* ⚠ class 刻意叫 .dw-luv 而不是 .dw-react —— 這一頁已經有一整組 `.dw-react-row`
+       (結果卡的賽後表情列)。同族名字混在一起遲早會改到彼此,同 .dw-shbtn 那條的理由。 */
+    const reacts = '<span class="dw-luvs">' + RE.map(r =>
+      '<button class="dw-luv" type="button" data-e="' + r[0] + '" title="' + r[1] + '" aria-label="' + r[1] + '">' + r[0] + '</button>'
+    ).join("") + '</span>';
+    showOver(reacts +
+             '<button class="dw-shbtn" type="button" title="分享這張畫" aria-label="分享這張畫">📤</button>' +
+             '<div class="dw-ov-card"><div class="dw-ov-s">' + cap + '</div>' +
              '<div class="dw-ov-w display">' + esc(word || "?") + '</div>' +
              '<div class="dw-sh-list">' + list + '</div></div>', "show");
   }
@@ -1165,6 +1365,70 @@ const DWB = (function () {
             (rank >= 0 ? '(第 ' + (rank + 1) + ' 個)' : '') + '</span>');
   }
   function sysSay(txt) { pushSay('<span class="dw-say-sys">' + esc(txt) + '</span>'); }
+
+  /* ==========================================================================
+     ★★ 三支純畫面的特效(v2.4.1,Gemini 建議書 2.2 / 4.1 / 4.2)
+     ──────────────────────────────────────────────────────────────────────────
+       共同的規矩,三支都適用:
+       ① **一個位元組都不上線** —— 全部由收到的狀態在本地推出來。
+       ② **絕對定位、pointer-events:none** —— 這一頁的畫布尺寸是 fit() 量出來的,
+          任何進得了版面流的新元素都會把畫布縮小(而那是紅線 17 翻過四次的那件事)。
+       ③ 重播動畫一律「先拿掉 class → 讀一次 offsetWidth → 再加回去」:
+          ⚠ 少了中間那一行,同一個 class 連著加兩次**不會重跑動畫**
+          (症狀:第二個人猜中時橫幅不動,而第一個人那次完全正常)。
+     ========================================================================== */
+  /* ★ 猜中的彩色彈幕。⚠ 內容只有「誰 + 第幾個」——**猜的內容一個字都不進來**,
+     同 addHit 的理由(紅線 5):它可能是同義詞,播出去等於多送一條線索。 */
+  let banT = null;
+  function hitBanner(name, rank) {
+    const el = $("dwBanner"); if (!el) return;
+    el.innerHTML = '<span class="dw-bn-i">🎉</span>' +
+                   '<span class="dw-bn-n">' + esc(name || "") + '</span>' +
+                   '<span class="dw-bn-r">' + (rank >= 0 ? "第 " + (rank + 1) + " 個猜中!" : "猜中了!") + '</span>';
+    el.classList.remove("hidden", "go");
+    void el.offsetWidth;                              // ⚠ 見上面 ③
+    el.classList.add("go");
+    if (banT) clearTimeout(banT);
+    banT = setTimeout(() => {
+      const b = $("dwBanner");
+      if (b) { b.classList.add("hidden"); b.classList.remove("go"); b.innerHTML = ""; }
+      banT = null;
+    }, 2400);
+  }
+  /* ★ 拍立得的快門閃光(公布答案那一刻)。⚠ 它蓋在 #dwOver **上面** —— 先閃白再露出
+     那張卡,才像「咔嚓一聲把這張畫拍下來」;蓋在下面的話只會被蓋板的半透明黑吃掉。 */
+  let snapT = null;
+  function snapFlash() {
+    const el = $("dwFlash"); if (!el) return;
+    el.classList.remove("hidden", "go");
+    void el.offsetWidth;                              // ⚠ 見上面 ③
+    el.classList.add("go");
+    try { Sound.mark(); } catch (e) {}
+    if (snapT) clearTimeout(snapT);
+    snapT = setTimeout(() => {
+      const f = $("dwFlash");
+      if (f) { f.classList.add("hidden"); f.classList.remove("go"); }
+      snapT = null;
+    }, 760);
+  }
+  /* ★★★ 「🔥 好接近了」。ms = 亮多久(adapter 傳 DWR.coolMs(),讓它與冷卻同時結束 ——
+     這裡不去問規則層,不然凍結時間就有兩個真相了)。
+     ⚠⚠ 這一支只在**猜的那個人自己那一台**被呼叫,絕對不可以變成廣播(理由在 DWR.near)。
+     ⚠ 提示是**輸入列自己在燒**,不是新開一格:那一列是 flex:none,多一格就是從畫布
+       身上拿高度(紅線 17)。文字走既有的 toast。 */
+  let nearT = null;
+  function nearHint(ms) {
+    const row = $("dwInputRow"); if (!row) return;
+    row.classList.remove("near");
+    void row.offsetWidth;                             // ⚠ 見上面 ③
+    row.classList.add("near");
+    if (nearT) clearTimeout(nearT);
+    nearT = setTimeout(() => {
+      const r = $("dwInputRow"); if (r) r.classList.remove("near");
+      nearT = null;
+    }, Math.max(600, ms | 0) );
+    try { showToast("🔥 好接近了!就差一點點", 1900); } catch (e) {}
+  }
   function clearSay() {
     const box = sayBox(); if (box) box.innerHTML = "";
     sayLog = []; hitLog = [];      // ⚠ 兩份一起清:換回合時分享圖不可以帶著上一題的猜測
@@ -1473,6 +1737,10 @@ const DWB = (function () {
     setShotInfo, shareShot, shotLines, shotDataUrl,
     setCd, stopCd, setRoundInfo, setLen, setZoom,
     setFinBtn, gvArmed, gvDisarm, setMini,
+    /* v2.4.1:清空的兩段式(畫面上那顆 🗑 走這一支;clearInk 是真的動手的那一支) */
+    clearAsk, clrArmed, clrDisarm,
+    /* v2.4.1:三支純畫面的特效(見上面第六節尾巴) */
+    hitBanner, snapFlash, nearHint,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
     LW, LH, COLORS, WIDTHS,
@@ -1485,7 +1753,7 @@ const DWB = (function () {
                er: live.filter(s => s.er).length,        // 幾筆是擦除(v1.157.0)
                un: strokes.length - live.length,         // 幾筆被撤銷了(v1.163.0)
                c: curC, tool: curEr ? "er" : (curLine ? "line" : "pen"),
-               line: curLine, w: boxW, h: boxH,
+               line: curLine, shape: curShape, w: boxW, h: boxH,
                /* v2.1.0:兩指縮放的檢視狀態(倍率 + 位移)。守門要量得到
                   「放大之後送出去的座標有沒有跟著歪掉」。 */
                k: vk, vx: vx, vy: vy,
