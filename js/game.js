@@ -974,7 +974,6 @@
     bindEmoteDrag();
     buildEmoteRecipients(); buildEmoteGrid(); buildEmotePhrases(); buildVoiceClips(); buildMyClips();
     const inp=$("emoteText"); if(inp)inp.value="";
-    resetVoiceBtn(); const vh=$("voiceHint"); if(vh)vh.textContent="";
     Sound.wake();
     $("emoteVeil").classList.add("show");
   }
@@ -983,31 +982,22 @@
   // 播放」共用同一個 BGM.duck,任一在進行就停,兩者都結束才恢復(避免其一提早 duck(false) 蓋掉另一個)。
   let voiceRecording=false;
   function refreshBgmDuck(){ try{ BGM.duck(voiceRecording || voiceBusy); }catch(e){} }
-  function closeEmote(){ const v=$("emoteVeil"); if(v)v.classList.remove("show"); Voice.cancel(); voiceRecording=false; refreshBgmDuck(); resetVoiceBtn(); }
-  /* ---- 語音留言:錄音鈕狀態機(閒置 → 錄音倒數 → 送出) ---- */
-  let voiceTick=null;
-  function resetVoiceBtn(){
-    const b=$("voiceBtn"); if(voiceTick){ clearInterval(voiceTick); voiceTick=null; }
-    if(!b)return; b.classList.remove("rec"); b.disabled=false; b.textContent="🎤 錄音留言";
-  }
-  /* ★★ v1.156.0 刪掉 toggleVoice()(29 行)—— 全專案唯一一支真死碼。
-     它是「表情面板裡的錄音鈕」那一版的狀態機,而 v1.27.0 把錄音改成浮動的快速語音鈕之後
-     `#voiceBtn` / `#voiceHint` / `.emote-voice` 三個東西就都刪掉了(index.html 與 styles.css
-     現在一個字都找不到)—— 也就是說它從那時起就永遠停在第一行的 `if(!b)return`。
-     ⚠ 當年 notes/02 記的是「暫留,等它復活」,但那個前提已經不成立:元素都沒了,
-       復活不可能只是把函式接回去。距今 128 個中碼版本。
-     ⚠ 真正在用的是下面的 toggleQuickVoice() —— 兩支幾乎一模一樣(同一套 Voice.start +
-       refreshBgmDuck + 倒數),留著死的那一份最大的風險是**改語音行為時改錯那一支**。
-     ⚠ 刻意**不動** voiceRecording / refreshBgmDuck() / closeEmote() 裡的 Voice.cancel():
-       那些是快速語音鈕在用的,也是 v1.15.1「Android 錄音時 BGM 變難聽」的修正本體。
-     ⚠ resetVoiceBtn() 也刻意留著(它現在是 no-op,但 openEmote/closeEmote 各叫一次,
-       而 closeEmote 是雙胞胎的 DIFFER 例外之一 —— 拔掉它會讓兩份變成一樣,
-       連帶要改 tools/test-twins.js 的例外表,換不到任何東西)。 */
-  /* ---- 快速語音留言:浮動鈕直接錄音、送給全部人(沿用面板同一套 Voice) ---- */
-  // 快速語音鈕可能同時存在兩顆(房間框固定那顆 + 猜拳蓋板那顆),用 class 一起掃描,
-  // 讓「準備中/錄音倒數/⏹」等狀態兩邊同步顯示,不會因為只更新其中一顆而顯示不一致。
+  /* ⚠⚠ **關面板 = 取消錄音**(v2.4.0 起錄音鈕就住在這張卡片裡)。
+     `Voice.cancel()` 只收掉錄音本身,鈕的 UI 狀態(紅底脈動 + `qvTick` 倒數計時器)
+     是這一支自己管的 —— 少了 resetQuickVoiceBtn() 的症狀是「下次打開面板,
+     那顆鈕還寫著 3s、還在閃」,而且那個 interval 會一直跑下去。
+     ★ v2.4.0 起這一支與 ui-kit.js 那份**逐字相同**(原本 Bingo 多一句 resetVoiceBtn(),
+       那是 v1.27.0 遺留的 no-op,已隨這一版一起刪掉)→ 不再列進 test-twins 的 DIFFER。 */
+  function closeEmote(){ const v=$("emoteVeil"); if(v)v.classList.remove("show"); Voice.cancel(); voiceRecording=false; refreshBgmDuck(); resetQuickVoiceBtn(); }
+  /* ---- 語音留言:錄一段話送出(v2.4.0 起鈕在表情面板裡,`.emote-rec`)----
+     ★★ 這一段的沿革繞了一圈:v1.27.0 把「表情面板裡的錄音鈕」改成房間框常駐的圓形 🎤
+       (少按一次);v1.156.0 刪掉那時留下的死碼 toggleVoice();v2.4.0 因為即時語音上線、
+       房間框右半塞了七顆鈕(其中兩顆都是麥克風),又把它搬回面板裡 ——
+       這一次是 `#quickVoiceBtn` 整顆搬過去,不是再長一支新的狀態機。
+     ⚠ 函式名沿用 `*QuickVoice*`:呼叫端在 online.js(進 / 離線各一次),改名換不到東西。
+     ⚠ 選擇器是 `.emote-rec`:房間框那顆 `.quick-voice` 連同 CSS 一起在 v2.4.0 刪掉了。 */
   let qvTick=null;
-  function eachQuickVoice(fn){ const list=document.querySelectorAll(".quick-voice"); for(let i=0;i<list.length;i++)fn(list[i]); }
+  function eachQuickVoice(fn){ const list=document.querySelectorAll(".emote-rec"); for(let i=0;i<list.length;i++)fn(list[i]); }
   function setQuickVoiceUI(o){
     eachQuickVoice(b=>{
       if(o.disabled!=null) b.disabled=o.disabled;
@@ -1019,16 +1009,25 @@
   }
   function resetQuickVoiceBtn(){
     if(qvTick){ clearInterval(qvTick); qvTick=null; }
-    setQuickVoiceUI({ rec:false, disabled:false, ico:"🎤", lab:"語音" });
+    /* ⚠ 閒置字樣的秒數要問 Voice.MAX_MS,不可以寫死「6 秒」——
+       那個上限改了而鈕上還寫 6,是使用者唯一看得到的說明,錯了不會有任何東西紅。 */
+    const sec=Math.round((Voice.MAX_MS||6000)/1000);
+    setQuickVoiceUI({ rec:false, disabled:false, ico:"🎤", lab:"錄一段話送出("+sec+" 秒)" });
+  }
+  /* 這一則要傳給誰。⚠ 一定要在**送出那一刻**再算,而且要對一次名單:
+     錄音那 6 秒裡對方可能已經離開房間 —— 送給不存在的人 = 這則語音誰都收不到,
+     而畫面上會照常跳「已送出」。對不到就退回全部人。 */
+  function qvTarget(){
+    if(emoteTarget==="all")return "all";
+    return MP.roster().some(p=>p.id===emoteTarget) ? emoteTarget : "all";
   }
   function toggleQuickVoice(){
     if(!state.online)return;
     if(!Voice.supported()){ showToast("此裝置/瀏覽器不支援錄音"); return; }
     if(Voice.recording()){ setQuickVoiceUI({ disabled:true, lab:"處理中…" }); Voice.stop(); return; }  // 停止 → 交給 onBlob 收尾
-    markAudioArmed(); Sound.wake();   // 按麥克風=手勢,順手解鎖播放音訊(這也是「按著麥克風時收到的語音就會自動播」的原因)
-    kickVoiceQueue();                 // 若正好有語音在膠囊裡等,趁這個手勢一起補播
+    markAudioArmed(); Sound.wake(); kickVoiceQueue();   // 按下去=手勢:順手解鎖播放音訊,並補播卡在膠囊裡的語音
     setQuickVoiceUI({ disabled:true, lab:"準備中…" });
-    voiceRecording=true; refreshBgmDuck();   // 先停背景音樂,再開麥克風(避免 Android 通話路徑把音樂弄難聽)
+    voiceRecording=true; refreshBgmDuck();   // 先停背景音樂,再開麥克風(Android 通話路徑會把音樂弄難聽)
     Voice.start((wav)=>{
       voiceRecording=false; refreshBgmDuck();  // 錄音結束:恢復背景音樂(若還有收到的語音在播,duck 會維持到播完)
       resetQuickVoiceBtn();
@@ -1036,14 +1035,21 @@
       try{
         const url=Voice.toDataURL(wav);
         if(url.length>200000){ showToast("語音太長,請再短一點"); return; }   // RTDB 友善上限
-        MP.sendEmote("all","🎤","voice",url);
-        showToast("已送出語音給全部人 🎤");
+        const to=qvTarget();
+        MP.sendEmote(to,"🎤","voice",url);
+        /* 送出後把面板收掉 —— 與 emoji / 一句話 / 語音短訊四條路一致(它們都 closeEmote())。
+           ⚠ 順序不可以顛倒:closeEmote() 會 Voice.cancel(),要在 sendEmote 之後才叫。 */
+        closeEmote();
+        const who=(MP.roster().find(p=>p.id===to)||{}).name;
+        showToast(to==="all" ? "已送出語音 🎤" : "已送給 "+who+" 🎤");
       }catch(e){ showToast("語音處理失敗"); }
     }).then(()=>{
       setQuickVoiceUI({ disabled:false, rec:true, ico:"⏹" });
       let left=Math.ceil(Voice.MAX_MS/1000);
-      setQuickVoiceUI({ lab:left+"s" });
-      qvTick=setInterval(()=>{ left--; if(left<=0){ if(qvTick){clearInterval(qvTick);qvTick=null;} return; } setQuickVoiceUI({ lab:left+"s" }); },1000);
+      /* 長條鈕寫得下整句 —— 「還剩幾秒」是這個功能唯一的進度回饋,
+         而「停止並送出」要講清楚按下去不是取消(取消是關掉面板)。 */
+      setQuickVoiceUI({ lab:"停止並送出 · "+left+"s" });
+      qvTick=setInterval(()=>{ left--; if(left<=0){ if(qvTick){clearInterval(qvTick);qvTick=null;} return; } setQuickVoiceUI({ lab:"停止並送出 · "+left+"s" }); },1000);
     }).catch(err=>{
       voiceRecording=false; refreshBgmDuck();   // 開麥失敗:恢復背景音樂
       resetQuickVoiceBtn();

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 81f543e59afe11c5ade826731cf56c150375bd045aae91a24d56dbb1cdea85a2)
+    真相在 styles.src.css(sha256 5e129468f0649dd806ba71623ba1c7866d75b310f3602b5aa2dc6571063e3be6)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -608,22 +608,30 @@
   #emoteText::placeholder{color:var(--muted);font-weight:700}
   #emoteText:focus{border-color:var(--accent)}
   .emote-card #emoteSend{flex:0 0 auto;width:auto;margin-top:0;padding:11px 20px;font-size:14px}
+  .emote-rec{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    margin-top:8px;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    border-radius:14px;padding:12px 16px;cursor:pointer;
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;line-height:1.2;
+    transition:transform .1s,background .15s;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  .emote-rec .qv-ico{flex:none;font-size:18px;line-height:1}
+  @media (hover:hover){ .emote-rec:hover{background:rgba(255,255,255,.18)} }
+  .emote-rec:active{transform:scale(.97)}
+  .emote-rec.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);border-color:#ff2d2d;color:#fff;
+    animation:recPulse 1s ease-in-out infinite}
+  .emote-rec:disabled{opacity:.6;cursor:default}
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
   .mp-actions{display:flex;align-items:center;gap:8px;flex:none}
   .rps-actions{justify-content:center;margin-top:16px}
-  .quick-voice,.mp-act-btn{
+  .mp-act-btn{
     flex:none;display:inline-flex;align-items:center;justify-content:center;
     width:42px;height:42px;padding:0;border-radius:50%;cursor:pointer;
     border:1px solid var(--panel-line);background:var(--accent);color:#1c1008;
     font-size:22px;line-height:1;transition:transform .1s,background .2s}
-  .quick-voice .qv-label{display:none}
-  .quick-voice .qv-ico{font-size:22px;line-height:1}
-  .quick-voice:active,.mp-act-btn:active{transform:scale(.9)}
-  @media (hover:hover){ .quick-voice:hover,.mp-act-btn:hover{transform:translateY(-1px)} }
-  .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
-  .quick-voice:disabled{opacity:.6;cursor:default}
-  :root[data-theme="midnight"] .quick-voice,:root[data-theme="midnight"] .mp-act-btn,
-  :root[data-theme="arcade"] .quick-voice,:root[data-theme="arcade"] .mp-act-btn{color:var(--daub-ink)}
+  .mp-act-btn:active{transform:scale(.9)}
+  @media (hover:hover){ .mp-act-btn:hover{transform:translateY(-1px)} }
+  :root[data-theme="midnight"] .mp-act-btn,
+  :root[data-theme="arcade"] .mp-act-btn{color:var(--daub-ink)}
   .mp-subrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
   .mp-subrow .mp-status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .mp-goal{flex:none;font-weight:800;font-size:13px;color:var(--accent-2)}
@@ -689,8 +697,7 @@
     .home-hero{margin:6px 0 2px}
     .bc-art{width:64px;height:64px}
     .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-    .quick-voice,.mp-act-btn{width:34px;height:34px;font-size:18px}
-    .quick-voice .qv-ico{font-size:18px}
+    .mp-act-btn{width:34px;height:34px;font-size:18px}
     #mpBar{padding:9px 12px}
     .row{margin-top:9px}
     .mp-subrow{margin-top:5px}
@@ -823,8 +830,7 @@
   .gmk-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
   .gmk-room-title b{font-size:15px;color:var(--text)}
   .gmk-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .gmk-room .quick-voice,.gmk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .gmk-room .quick-voice .qv-ico{font-size:18px}
+  .gmk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .gmk-room .mp-subrow{margin-top:5px}
   .gmk-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .gmk-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -953,8 +959,7 @@
   .sdk-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
   .sdk-room-title b{font-size:15px;color:var(--text)}
   .sdk-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .sdk-room .quick-voice,.sdk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .sdk-room .quick-voice .qv-ico{font-size:18px}
+  .sdk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .sdk-room .mp-subrow{margin-top:5px}
   .sdk-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .sdk-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -1244,8 +1249,7 @@
     font-size:13px;font-weight:700;color:var(--muted)}
   .mj-room .mj-room-title b{font-size:15px;color:var(--text)}
   .mj-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .mj-room .quick-voice,.mj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .mj-room .quick-voice .qv-ico{font-size:18px}
+  .mj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .mj-room .mp-subrow{margin-top:5px}
   .mj-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .mj-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -2006,8 +2010,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     display:flex;position:absolute;right:8px;top:50%;transform:translateY(-50%);gap:6px}
   body.m16-mp .mj-room .tools-docked #settingsBtn{display:none}
   body.m16-solo .mj-room .tools-docked #settingsBtn{display:none}
-  body.m16-mp .mj-room .tools-docked .tk-btn,body.m16-solo .mj-room .tools-docked .tk-btn{display:none}
-  body.m16-mp #mpBar{padding:4px 44px 4px 10px}
+  body.m16-mp #mpBar{padding:4px 112px 4px 10px}
   body.m16-mp .mj-room .row:has(> .tools-docked),
   body.m16-solo .mj-room .row:has(> .tools-docked){position:static;padding-right:0}
   body.m16-mp .mj-room .mj-room-top,body.m16-solo .mj-room .mj-room-top{flex:none}
@@ -2016,9 +2019,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   body.m16-mp .mj-room-foot,body.m16-solo .mj-room-foot{flex:1;min-width:0;margin-top:0}
   body.m16-mp .mj-room .icon-btn,body.m16-solo .mj-room .icon-btn{
     width:28px;height:28px;border-radius:9px;font-size:14px}
-  body.m16-mp .mj-room .quick-voice,body.m16-mp .mj-room .mp-act-btn{
-    width:28px;height:28px;font-size:15px}
-  body.m16-mp .mj-room .quick-voice .qv-ico{font-size:15px}
+  body.m16-mp .mj-room .mp-act-btn{width:28px;height:28px;font-size:15px}
   body.m16-mp .mj-room .mj-room-title,body.m16-solo .mj-room .mj-room-title{font-size:12px}
   body.m16-mp .mj-room .mj-room-title b,body.m16-solo .mj-room .mj-room-title b{font-size:13px}
   .m16-bigbtn{display:none}
@@ -2080,8 +2081,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     font-size:13px;font-weight:700;color:var(--muted)}
   .sv-room .sv-room-title b{font-size:15px;color:var(--text)}
   .sv-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .sv-room .quick-voice,.sv-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .sv-room .quick-voice .qv-ico{font-size:18px}
+  .sv-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .sv-room .mp-subrow{margin-top:5px}
   .sv-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .sv-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -2269,8 +2269,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     font-size:13px;font-weight:700;color:var(--muted)}
   .b2-room .b2-room-title b{font-size:15px;color:var(--text)}
   .b2-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .b2-room .quick-voice,.b2-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .b2-room .quick-voice .qv-ico{font-size:18px}
+  .b2-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .b2-room .mp-subrow{margin-top:5px}
   .b2-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .b2-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -2553,8 +2552,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .bj-room .mp-goal{flex:0 1 auto;min-width:0;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .bj-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .bj-room .quick-voice,.bj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .bj-room .quick-voice .qv-ico{font-size:18px}
+  .bj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .bj-room .mp-subrow{margin-top:5px}
   .bj-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .bj-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -3083,8 +3081,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     font-size:13px;font-weight:700;color:var(--muted)}
   .un-room .un-room-title b{font-size:15px;color:var(--text)}
   .un-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .un-room .quick-voice,.un-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .un-room .quick-voice .qv-ico{font-size:18px}
+  .un-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .un-room .mp-subrow{margin-top:5px}
   .un-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .un-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -3298,8 +3295,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     font-size:13px;font-weight:700;color:var(--muted)}
   .dc-room .dc-room-title b{font-size:15px;color:var(--text)}
   .dc-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .dc-room .quick-voice,.dc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .dc-room .quick-voice .qv-ico{font-size:18px}
+  .dc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .dc-room .mp-subrow{margin-top:5px}
   .dc-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .dc-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -3654,8 +3650,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .cy-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
   .cy-room-title b{font-size:15px;color:var(--text)}
   .cy-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .cy-room .quick-voice,.cy-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .cy-room .quick-voice .qv-ico{font-size:18px}
+  .cy-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .cy-room .mp-subrow{margin-top:5px}
   .cy-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .cy-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -3820,8 +3815,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
   .dw-room-title b{font-size:15px;color:var(--text)}
   .dw-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .dw-room .quick-voice,.dw-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .dw-room .quick-voice .qv-ico{font-size:18px}
+  .dw-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .dw-room .mp-subrow{margin-top:5px}
   .dw-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .dw-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -4111,8 +4105,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                           font-size:13px}
   .fc-room .fc-room-title b{font-size:15px;color:var(--text)}
   .fc-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .fc-room .quick-voice,.fc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .fc-room .quick-voice .qv-ico{font-size:18px}
+  .fc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .fc-room .mp-subrow{margin-top:5px}
   .fc-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .fc-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -4532,8 +4525,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                           font-size:13px}
   .tq-room .tq-room-title b{font-size:15px;color:var(--text)}
   .tq-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .tq-room .quick-voice,.tq-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .tq-room .quick-voice .qv-ico{font-size:18px}
+  .tq-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .tq-room .mp-subrow{margin-top:5px}
   .tq-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .tq-room-foot .mp-players{flex:1;min-width:0;margin-top:0}

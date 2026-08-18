@@ -1086,27 +1086,53 @@
   /* 覆蓋 .set-card .btn 的 width:100%/margin-top,讓送出鈕縮成內容寬、與輸入框同排對齊 */
   .emote-card #emoteSend{flex:0 0 auto;width:auto;margin-top:0;padding:11px 20px;font-size:14px}
 
-  /* 錄音中脈動動畫:表情面板內的錄音鈕已移除,此 keyframe 仍供房間框的快速語音鈕 .quick-voice.rec 使用 */
+  /* 🎤 語音留言:錄一段話直接送出。**v2.4.0 從房間框那顆圓形 🎤 搬回這張卡片裡。**
+     ── 為什麼搬回來 ──────────────────────────────────────────────────────────
+       v1.27.0 當初是從這裡搬出去的(那時面板裡的錄音鈕改成房間框常駐的 🎤,少按一次);
+       即時語音(v1.182.0)上線之後那個取捨反過來了 —— 房間框右半現在是
+       四顆(⛶ ⚙️ 🔊 🎙)+ 三顆(大 · 🎤 · 😀),而**七顆鈕裡有兩顆是麥克風**
+       (一顆講給人現在聽、一顆錄起來送出),擠在一起本身就在製造誤按。
+       而「錄一段送出」本來就跟 emoji / 一句話 / 語音短訊是**同一件事的四種講法**,
+       住在同一張卡片裡才對。→ 詳見 notes/05 第 N 節。
+     ★ 搬回來順帶接上面板的「傳給誰」:以前寫死送全部人,現在可以只錄給某一個人。
+     ⚠ **長條而不是圓鈕**:這裡不缺寬度,而錄音中要寫得下「⏹ 停止並送出 · 5s」——
+       圓鈕只塞得下一個數字,而「還剩幾秒」是這個功能唯一的進度回饋。
+     ⚠ 刻意**不共用** .mp-act-btn 那組圓鈕樣式(42px + border-radius:50%):
+       共用只會變成一路 override,而那組還吃 @media (max-height:560px) 的縮小規則。 */
+  .emote-rec{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    margin-top:8px;border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text);
+    border-radius:14px;padding:12px 16px;cursor:pointer;
+    font-family:'Nunito',sans-serif;font-weight:800;font-size:14px;line-height:1.2;
+    transition:transform .1s,background .15s;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  .emote-rec .qv-ico{flex:none;font-size:18px;line-height:1}
+  @media (hover:hover){ .emote-rec:hover{background:rgba(255,255,255,.18)} }
+  .emote-rec:active{transform:scale(.97)}
+  /* 錄音中:紅底 + 脈動。⚠ border-color 要一起換 —— 只換底色的話那圈灰邊會浮在紅底上 */
+  .emote-rec.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);border-color:#ff2d2d;color:#fff;
+    animation:recPulse 1s ease-in-out infinite}
+  .emote-rec:disabled{opacity:.6;cursor:default}
+
+  /* 錄音中脈動動畫,供上面的 .emote-rec.rec 使用 */
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,45,45,.5)}50%{box-shadow:0 0 0 9px rgba(255,45,45,0)}}
   /* (v1.36.2:獨立的「換一組」鈕已移除 —— 改由「🎲 自動填號」選中後變成「🎲 換一組號碼」再按一次,
      兩者本來就在做同一件事。舊的 .quick-reshuffle 浮動 FAB 與 .reshuffle-btn 內嵌樣式一併刪除) */
 
-  /* 房間框右上動作鈕:麥克風(快速語音)+ 表情。大廳/遊戲中都常駐在房間框(不再浮在盤面、不會壓到號碼格),兩顆並排 */
+  /* 房間框右上動作鈕:表情 😀。大廳/遊戲中都常駐在房間框(不再浮在盤面、不會壓到號碼格)。
+     ⚠⚠ v2.4.0 起這裡**只剩一顆** —— 原本並排的快速語音 🎤(`.quick-voice`)整組移除,
+       錄一段送出改由表情面板裡的 `.emote-rec` 提供(理由見上面那一段的長註解)。
+       `.mp-actions` 的 flex/gap 刻意留著:各頁的「大 / 小」那顆鈕也住在這個容器裡。 */
   .mp-actions{display:flex;align-items:center;gap:8px;flex:none}
-  .rps-actions{justify-content:center;margin-top:16px}   /* 猜拳蓋板內的語音/表情鈕:置中、與上方出拳結果留點間距 */
-  .quick-voice,.mp-act-btn{
+  .rps-actions{justify-content:center;margin-top:16px}   /* 猜拳蓋板內的表情鈕:置中、與上方出拳結果留點間距 */
+  .mp-act-btn{
     flex:none;display:inline-flex;align-items:center;justify-content:center;
     width:42px;height:42px;padding:0;border-radius:50%;cursor:pointer;
     border:1px solid var(--panel-line);background:var(--accent);color:#1c1008;
     font-size:22px;line-height:1;transition:transform .1s,background .2s}
-  .quick-voice .qv-label{display:none}            /* 只留麥克風圖示 */
-  .quick-voice .qv-ico{font-size:22px;line-height:1}
-  .quick-voice:active,.mp-act-btn:active{transform:scale(.9)}
-  @media (hover:hover){ .quick-voice:hover,.mp-act-btn:hover{transform:translateY(-1px)} }
-  .quick-voice.rec{background:linear-gradient(135deg,#ff5a5a,#ff2d2d);color:#fff;animation:recPulse 1s ease-in-out infinite}
-  .quick-voice:disabled{opacity:.6;cursor:default}
-  :root[data-theme="midnight"] .quick-voice,:root[data-theme="midnight"] .mp-act-btn,
-  :root[data-theme="arcade"] .quick-voice,:root[data-theme="arcade"] .mp-act-btn{color:var(--daub-ink)}
+  .mp-act-btn:active{transform:scale(.9)}
+  @media (hover:hover){ .mp-act-btn:hover{transform:translateY(-1px)} }
+  :root[data-theme="midnight"] .mp-act-btn,
+  :root[data-theme="arcade"] .mp-act-btn{color:var(--daub-ink)}
 
   /* 房間框副標列:狀態文字(輪到誰 / 等待中)+ 目標線數 🎯N線 */
   .mp-subrow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
@@ -1214,8 +1240,7 @@
     .home-hero{margin:6px 0 2px}
     .bc-art{width:64px;height:64px}
     .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-    .quick-voice,.mp-act-btn{width:34px;height:34px;font-size:18px}
-    .quick-voice .qv-ico{font-size:18px}
+    .mp-act-btn{width:34px;height:34px;font-size:18px}
     #mpBar{padding:9px 12px}
     .row{margin-top:9px}
     .mp-subrow{margin-top:5px}
@@ -1418,8 +1443,7 @@
   .gmk-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
   .gmk-room-title b{font-size:15px;color:var(--text)}
   .gmk-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .gmk-room .quick-voice,.gmk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .gmk-room .quick-voice .qv-ico{font-size:18px}
+  .gmk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .gmk-room .mp-subrow{margin-top:5px}
   /* 名單列:整條都給玩家晶片(認輸鈕在上排,不跟名字搶寬度)。
      固定兩人,所以不走 Bingo 那套橫向捲動(捲一半被切掉看起來像壞掉)——名字太長改用 … 截斷,一行永遠塞得下 */
@@ -1694,8 +1718,7 @@
   .sdk-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
   .sdk-room-title b{font-size:15px;color:var(--text)}
   .sdk-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .sdk-room .quick-voice,.sdk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .sdk-room .quick-voice .qv-ico{font-size:18px}
+  .sdk-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .sdk-room .mp-subrow{margin-top:5px}
   .sdk-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .sdk-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -2192,8 +2215,7 @@
     font-size:13px;font-weight:700;color:var(--muted)}
   .mj-room .mj-room-title b{font-size:15px;color:var(--text)}
   .mj-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .mj-room .quick-voice,.mj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .mj-room .quick-voice .qv-ico{font-size:18px}
+  .mj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .mj-room .mp-subrow{margin-top:5px}
   .mj-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .mj-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -3984,9 +4006,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      (.mj-room-top)的尾端 → 留在流裡會落在「局數」與晶片列之間,也就是整條列的中間。
      改成相對房間框 absolute 貼右緣 + 垂直居中 → 位置永遠對齊那條列的中線
      (比 v1.73.1 的 position:fixed 穩:fixed 是相對視窗,房間框高度一變就錯位)。
-     右邊那 44px 的 padding 就是留給它的位置:28 + right 8 + 與晶片的間距 8。
-     ⚠⚠ 這個數字與下面那條「⚙️ 收掉」是**同一件事的兩半**:⚙️ 又放回來的話這裡要改回
-       72(28×2 + gap 6 + right 8 = 70),否則兩顆鈕會壓到晶片列上。 */
+     ⚠⚠ **右邊那塊 padding 有兩個值,而且刻意不一樣**(v2.4.0):
+       · **單機**(`#m16SoloBar`)= **44** —— 只有 ⛶ 一顆:28 + right 8 + 與晶片的間距 8。
+       · **連線**(`#mpBar`,下面那條 id 規則)= **112** —— 即時語音的兩顆鈕在連線時
+         會出現:28×3 + gap 6×2 + right 8 + 間距 8 = 112。
+       單機吃不到那兩顆(`body:not(.mp-on) .tk-btn{display:none}`),所以不必跟著讓位。
+     ⚠ ⚙️ 又放回來的話兩個數字都要 +34(28 + gap 6),否則鈕會壓到晶片列上。 */
   /* ⚠⚠ `display:flex` 是**還原**用的,不是裝飾(v1.177.1):大牌桌那一段把
      `body.m16-big .mj-room .tools-docked` 藏起來了,而橫向這裡**沒有**「大 / 小」那顆鈕
      (v1.176.0 收掉了)—— 跟著藏就等於橫著玩再也開不了設定、也回不了全螢幕。
@@ -4008,29 +4033,36 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        (併了的話同一組裡每個 class 都拿到 id 權重)。所以這裡刻意寫成兩條。 */
   body.m16-mp .mj-room .tools-docked #settingsBtn{display:none}
   body.m16-solo .mj-room .tools-docked #settingsBtn{display:none}
-  /* ---- ②-b 即時語音的兩顆鈕:橫向**跟著 ⚙️ 一起收掉**(v1.182.0)---------------
-     ★ 同上一條的理由 —— 橫向這條列的右邊只留給 ⛶ 那 44px(28 + right 8 + 間距 8),
-       再塞兩顆 28px + gap 就是 112,而多出來的 68px 只能從**晶片列**身上拿
-       (那條列是唯一可伸縮的),四個人的台數 / 風 / 輪到誰會跟著被擠掉。
-     ★★ 所以這裡刻意選「藏起來」而不是「重算 padding」:轉回直向就在那裡,
-       跟 ⚙️ 是同一套想法。⚠ **也因此上面那條 44px 完全不用動** —— 這是刻意的,
-       不要看到多了兩顆鈕就「順手」把它改成 112(改了就是晶片列莫名其妙變窄)。
-     ⚠ 這兩顆是 class 不是 id,併成一組群組選擇器沒有紅線 6 第六類的問題
-       (那條講的是「群組裡混一個 #id」);寫成一條是為了跟上面兩條區分開來。 */
-  body.m16-mp .mj-room .tools-docked .tk-btn,body.m16-solo .mj-room .tools-docked .tk-btn{display:none}
+  /* ---- ②-b 即時語音的兩顆鈕:橫向**放回來了**(v2.4.0,v1.182.0~v2.3.x 是藏著的)------
+     使用者:「橫向模式的時候,就把即時語音的按鈕移到房間框的右邊,然後連耳麥的按鈕都要有」。
+     ★★ **為什麼當初藏、現在能放回來** —— 這一格的預算變了,不是當初判斷錯:
+         v1.182.0 當時這條列的右邊只有 44px(⛶),多塞兩顆 28px + gap 就是 112,
+         多出來的 68px 只能從**晶片列**身上拿(那是唯一可伸縮的),四家的台數 / 風 /
+         輪到誰會被擠掉 → 當時選擇「先藏起來」。
+         v2.4.0 把房間框的快速語音 🎤(28px + gap 8 = 36px)整顆移進表情面板 →
+         左半自己讓出 36px,淨損從 68 收到 **32**,那個代價晶片列付得起。
+     ★ 「連耳麥的按鈕都要有」= **兩顆都要**(聽 + 講),不是只放麥克風。
+       這是對的:v2.1.0 起「講」蘊含「聽」,只放麥克風的話「暫停說話」就沒有出口
+       (那是唯一的中間狀態,見 notes/24 第四節)。
+     ⚠ 這裡**沒有規則** —— 兩顆鈕本來就會顯示,要做的只有把上面的 padding 讓夠
+       (連線 112)。當初那條 `display:none` 已經刪掉,不要「順手」加回來。
+     ⚠ 單機不必管:`body:not(.mp-on) .tk-btn{display:none}` 已經收掉,所以單機列維持 44。 */
   /* ⚠⚠ 連線那一份要**自己再寫一次內距**(v1.178.0 才發現)。全域那條
      `@media (max-height:560px){ #mpBar{padding:9px 12px} }` 是 **id 選擇器**(1,0,0),
      壓得過上面那條 `body.m16-mp .mj-room`(0,2,1)—— 也就是說 v1.73.0 以來
      **連線的房間框從頭到尾沒有吃到橫向這一段的內距**(單機列吃得到,因為它沒有 id 規則)。
      兩個症狀:① 那一列比單機厚 10px,盤面就矮 10px;② 右邊沒有讓位 →
      絕對定位的 ⛶ 直接蓋在最後一張玩家晶片上。
-     ⚠ 照 CLAUDE.md 紅線 6:`#id` 一律自己一條,不可以跟上面那組併成群組選擇器。 */
-  body.m16-mp #mpBar{padding:4px 44px 4px 10px}
+     ⚠ 照 CLAUDE.md 紅線 6:`#id` 一律自己一條,不可以跟上面那組併成群組選擇器。
+     ⚠⚠ v2.4.0:這條的右內距從 44 變成 **112** —— 連線時 `.tools-docked` 裡是**三顆**
+       (🔊 · 🎙 · ⛶):28×3 + gap 6×2 + right 8 + 與晶片的間距 8 = 112。
+       ★ 它與上面那條 44 的**差別就是即時語音那兩顆**,而分家的理由是單機根本沒有它們。 */
+  body.m16-mp #mpBar{padding:4px 112px 4px 10px}
   /* ⚠⚠ 錨點要**還原**成外層的 .mj-room。通用那條把 `.row:has(> .tools-docked)` 設成
      position:relative(相對「那一列」貼右緣,直向要的就是這個);但橫向的 .mj-room 是
      三層並排成一行,第一層 .mj-room-top 只佔左邊一小段 —— 相對它貼右緣的話,鈕會落在
      「局數」與晶片列之間的**中間**。改回 static,上面那條才吃得到 .mj-room。
-     padding-right 也要歸零:讓位的責任已經交給 .mj-room 自己那 72px。 */
+     padding-right 也要歸零:讓位的責任已經交給 .mj-room / #mpBar 自己那 44 / 112px。 */
   body.m16-mp .mj-room .row:has(> .tools-docked),
   body.m16-solo .mj-room .row:has(> .tools-docked){position:static;padding-right:0}
   body.m16-mp .mj-room .mj-room-top,body.m16-solo .mj-room .mj-room-top{flex:none}
@@ -4039,9 +4071,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   body.m16-mp .mj-room-foot,body.m16-solo .mj-room-foot{flex:1;min-width:0;margin-top:0}
   body.m16-mp .mj-room .icon-btn,body.m16-solo .mj-room .icon-btn{
     width:28px;height:28px;border-radius:9px;font-size:14px}
-  body.m16-mp .mj-room .quick-voice,body.m16-mp .mj-room .mp-act-btn{
-    width:28px;height:28px;font-size:15px}
-  body.m16-mp .mj-room .quick-voice .qv-ico{font-size:15px}
+  body.m16-mp .mj-room .mp-act-btn{width:28px;height:28px;font-size:15px}
   body.m16-mp .mj-room .mj-room-title,body.m16-solo .mj-room .mj-room-title{font-size:12px}
   body.m16-mp .mj-room .mj-room-title b,body.m16-solo .mj-room .mj-room-title b{font-size:13px}
 
@@ -4259,8 +4289,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
      不寫這條的話它們會是 42px,跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
   .sv-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .sv-room .quick-voice,.sv-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .sv-room .quick-voice .qv-ico{font-size:18px}
+  .sv-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .sv-room .mp-subrow{margin-top:5px}
   .sv-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .sv-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -4736,8 +4765,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
      不寫這條的話它們會是 42px,跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
   .b2-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .b2-room .quick-voice,.b2-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .b2-room .quick-voice .qv-ico{font-size:18px}
+  .b2-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .b2-room .mp-subrow{margin-top:5px}
   .b2-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .b2-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -5590,8 +5618,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
      不寫這條的話它們會是 42px,跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
   .bj-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .bj-room .quick-voice,.bj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .bj-room .quick-voice .qv-ico{font-size:18px}
+  .bj-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .bj-room .mp-subrow{margin-top:5px}
   .bj-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .bj-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -6943,8 +6970,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
      不寫這條的話它們會是 42px、跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
   .un-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .un-room .quick-voice,.un-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .un-room .quick-voice .qv-ico{font-size:18px}
+  .un-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .un-room .mp-subrow{margin-top:5px}
   .un-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .un-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -7369,8 +7395,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 尺寸要與列內原本那顆返回鈕一致 —— dockTools() 會把頂列的兩顆工具鈕搬進這一列,
      不寫這條的話它們會是 42px、跟旁邊的 34px 差一截(見 ui-kit 的 dockTools) */
   .dc-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .dc-room .quick-voice,.dc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .dc-room .quick-voice .qv-ico{font-size:18px}
+  .dc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .dc-room .mp-subrow{margin-top:5px}
   .dc-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .dc-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -8256,8 +8281,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .cy-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
   .cy-room-title b{font-size:15px;color:var(--text)}
   .cy-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .cy-room .quick-voice,.cy-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .cy-room .quick-voice .qv-ico{font-size:18px}
+  .cy-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .cy-room .mp-subrow{margin-top:5px}
   .cy-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .cy-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -8499,8 +8523,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:var(--muted)}
   .dw-room-title b{font-size:15px;color:var(--text)}
   .dw-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .dw-room .quick-voice,.dw-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .dw-room .quick-voice .qv-ico{font-size:18px}
+  .dw-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .dw-room .mp-subrow{margin-top:5px}
   .dw-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .dw-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -9133,8 +9156,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                           font-size:13px}
   .fc-room .fc-room-title b{font-size:15px;color:var(--text)}
   .fc-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .fc-room .quick-voice,.fc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .fc-room .quick-voice .qv-ico{font-size:18px}
+  .fc-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .fc-room .mp-subrow{margin-top:5px}
   .fc-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .fc-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
@@ -9868,8 +9890,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                           font-size:13px}
   .tq-room .tq-room-title b{font-size:15px;color:var(--text)}
   .tq-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
-  .tq-room .quick-voice,.tq-room .mp-act-btn{width:34px;height:34px;font-size:18px}
-  .tq-room .quick-voice .qv-ico{font-size:18px}
+  .tq-room .mp-act-btn{width:34px;height:34px;font-size:18px}
   .tq-room .mp-subrow{margin-top:5px}
   .tq-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
   .tq-room-foot .mp-players{flex:1;min-width:0;margin-top:0}

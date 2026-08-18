@@ -629,7 +629,11 @@ function openEmote(target){
 }
 function closeEmote(){
   const v=$("emoteVeil"); if(v)v.classList.remove("show");
-  Voice.cancel(); voiceRecording=false; refreshBgmDuck();
+  /* ⚠⚠ **關面板 = 取消錄音**(v2.4.0 起錄音鈕就住在這張卡片裡)。
+     `Voice.cancel()` 只收掉錄音本身,鈕的 UI 狀態(紅底脈動 + `qvTick` 倒數計時器)
+     是這一支自己管的 —— 少了 resetQuickVoiceBtn() 的症狀是「下次打開面板,
+     那顆鈕還寫著 3s、還在閃」,而且那個 interval 會一直跑下去。 */
+  Voice.cancel(); voiceRecording=false; refreshBgmDuck(); resetQuickVoiceBtn();
 }
 function buildEmoteRecipients(){
   const box=$("emoteTo"); if(!box)return; box.innerHTML="";
@@ -776,10 +780,18 @@ function efFly(m){
   setTimeout(()=>{ el.remove(); efPump(); }, dur*1000+120);
 }
 
-/* ---------- 快速語音留言(錄音 → 送全部人) ---------- */
+/* ---------- 語音留言(錄音 → 送出) ----------
+   ★★ v2.4.0 這顆鈕**住在表情面板裡**(`.emote-rec`,#emoteVeil 內),不再是房間框那顆圓形 🎤。
+     搬家的理由與版面在 styles.src.css 的 `.emote-rec` 那一段;這裡只記兩個對程式碼有影響的後果:
+       ① **它吃面板的「傳給誰」**(`emoteTarget`)—— 以前寫死 "all",現在可以只錄給某一個人。
+       ② **面板一關就等於取消**(closeEmote 會 `Voice.cancel()`)—— 所以 closeEmote 一定要
+          順手 `resetQuickVoiceBtn()`,不然倒數計時器還在跑、下次打開鈕上寫著「3s」。
+   ⚠ 函式名沿用 `*QuickVoice*`:`resetQuickVoiceBtn()` 的呼叫端在 mp-core.js / online.js
+     各有一份(進 / 離線各一次),改名等於四個地方一起改,換不到任何東西。
+   ⚠ 選擇器是 `.emote-rec` 不是 `.quick-voice`:後者連同房間框那顆鈕一起在 v2.4.0 刪掉了。 */
 let voiceRecording=false, qvTick=null;
 function refreshBgmDuck(){ try{ BGM.duck(voiceRecording || voiceBusy); }catch(e){} }
-function eachQuickVoice(fn){ const list=document.querySelectorAll(".quick-voice"); for(let i=0;i<list.length;i++)fn(list[i]); }
+function eachQuickVoice(fn){ const list=document.querySelectorAll(".emote-rec"); for(let i=0;i<list.length;i++)fn(list[i]); }
 function setQuickVoiceUI(o){
   eachQuickVoice(b=>{
     if(o.disabled!=null) b.disabled=o.disabled;
@@ -791,7 +803,17 @@ function setQuickVoiceUI(o){
 }
 function resetQuickVoiceBtn(){
   if(qvTick){ clearInterval(qvTick); qvTick=null; }
-  setQuickVoiceUI({ rec:false, disabled:false, ico:"🎤", lab:"語音" });
+  /* ⚠ 閒置字樣的秒數要問 Voice.MAX_MS,不可以寫死「6 秒」——
+     那個上限改了而鈕上還寫 6,是使用者唯一看得到的說明,錯了不會有任何東西紅。 */
+  const sec=Math.round((Voice.MAX_MS||6000)/1000);
+  setQuickVoiceUI({ rec:false, disabled:false, ico:"🎤", lab:"錄一段話送出("+sec+" 秒)" });
+}
+/* 這一則要傳給誰。⚠ 一定要在**送出那一刻**再算,而且要對一次名單:
+   錄音那 6 秒裡對方可能已經離開房間 —— 送給不存在的人 = 這則語音誰都收不到,
+   而畫面上會照常跳「已送出」。對不到就退回全部人。 */
+function qvTarget(){
+  if(emoteTarget==="all")return "all";
+  return MP.roster().some(p=>p.id===emoteTarget) ? emoteTarget : "all";
 }
 function toggleQuickVoice(){
   if(!MP.isOnline())return;
@@ -807,14 +829,22 @@ function toggleQuickVoice(){
     try{
       const url=Voice.toDataURL(wav);
       if(url.length>200000){ showToast("語音太長,請再短一點"); return; }   // RTDB 友善上限
-      MP.sendEmote("all","🎤","voice",url);
-      showToast("已送出語音 🎤");
+      const to=qvTarget();
+      MP.sendEmote(to,"🎤","voice",url);
+      /* 送出後把面板收掉 —— 與 emoji / 一句話 / 語音短訊四條路一致(它們都 closeEmote())。
+         ⚠ 順序不可以顛倒:closeEmote() 會 Voice.cancel(),要在 sendEmote 之後才叫。
+            (這時錄音其實已經結束,cancel 只是把 ctx 收乾淨,但順序寫反遲早會被改成有害。) */
+      closeEmote();
+      const who=(MP.roster().find(p=>p.id===to)||{}).name;
+      showToast(to==="all" ? "已送出語音 🎤" : "已送給 "+who+" 🎤");
     }catch(e){ showToast("語音處理失敗"); }
   }).then(()=>{
     setQuickVoiceUI({ disabled:false, rec:true, ico:"⏹" });
     let left=Math.ceil(Voice.MAX_MS/1000);
-    setQuickVoiceUI({ lab:left+"s" });
-    qvTick=setInterval(()=>{ left--; if(left<=0){ if(qvTick){clearInterval(qvTick);qvTick=null;} return; } setQuickVoiceUI({ lab:left+"s" }); },1000);
+    /* 長條鈕寫得下整句 —— 「還剩幾秒」是這個功能唯一的進度回饋,
+       而「停止並送出」要講清楚按下去不是取消(取消是關掉面板)。 */
+    setQuickVoiceUI({ lab:"停止並送出 · "+left+"s" });
+    qvTick=setInterval(()=>{ left--; if(left<=0){ if(qvTick){clearInterval(qvTick);qvTick=null;} return; } setQuickVoiceUI({ lab:"停止並送出 · "+left+"s" }); },1000);
   }).catch(err=>{
     voiceRecording=false; refreshBgmDuck();
     resetQuickVoiceBtn();

@@ -44,7 +44,7 @@
   },{passive:false});
   $("emoteSend").addEventListener("click",sendCustomText);
   $("emoteText").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); sendCustomText(); } });
-  $("quickVoiceBtn").addEventListener("click",toggleQuickVoice);   // 快速語音:直接錄→送全部人(表情面板內的錄音鈕已移除,語音改由房間框的🎤)
+  $("quickVoiceBtn").addEventListener("click",toggleQuickVoice);   // 語音留言:錄一段送出。v2.4.0 起這顆鈕住在表情面板裡(.emote-rec),送給誰照面板的「傳給誰」
   $("emoteOpenBtn").addEventListener("click",()=>openEmote("all"));   // 房間框的表情鈕:開互動面板(預設傳全部人,面板內可改對象)
   $("voiceGate").addEventListener("click",playVoiceGate);          // 「點我播放語音」膠囊:手勢喚醒音訊後補播佇列
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
@@ -116,8 +116,9 @@
   $("mpNewSeason").addEventListener("click",()=>{ MP.resetScores(); MP.again(); });   // 奪冠後:重設戰績並回大廳開新賽季
   $("rpsBtns").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;MP.throwRps(b.dataset.rps);b.blur();});
   $("revealSkip").addEventListener("click",()=>MP.revealSkip());
-  $("rpsVoiceBtn").addEventListener("click",toggleQuickVoice);        // 猜拳蓋板的快速語音:與房間框那顆共用同一套狀態機
-  $("rpsEmoteBtn").addEventListener("click",()=>openEmote("all"));    // 猜拳蓋板的表情鈕:開互動面板(疊在猜拳蓋板之上,含語音短訊)
+  /* ⚠ v2.4.0 起猜拳蓋板**只剩表情鈕一顆** —— 原本旁邊的 🎤 快速語音(#rpsVoiceBtn)
+     連同房間框那顆一起移除,錄音改由面板裡的 .emote-rec 提供(一樣是這顆鈕點進去)。 */
+  $("rpsEmoteBtn").addEventListener("click",()=>openEmote("all"));    // 猜拳蓋板的表情鈕:開互動面板(疊在猜拳蓋板之上,含語音留言與語音短訊)
   $("mpVeilLeave").addEventListener("click",()=>MP.bailFromRps());
   $("orderConfirm").addEventListener("click",()=>MP.confirmOrder());
   $("mpLeaveBtn").addEventListener("click",()=>MP.askLeave());   // 房間橫幅的返回鈕:先跳確認,不再一按就斷線

@@ -187,11 +187,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="mp-actions">
         <!-- 大牌桌(v1.180.0,十一頁共用 BigMode):收掉頂列與房名 / 進度,房間框壓成一行。
              ⚠ class 是 .bj-bigbtn,而狀態掛在 body 上的是 .bj-big —— 兩個名字**一定要不一樣**。
-             ⚠ 擺在 🎤 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。 -->
+             ⚠ 擺在 😀 左邊而不是頂列:頂列自己會被收掉,鈕住在裡面就再也按不回來。 -->
         <button class="icon-btn bj-bigbtn" id="bjBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
-        <button class="quick-voice" id="quickVoiceBtn" type="button" title="快速語音留言(對全部人)" aria-label="快速語音留言,送給全部人">
-          <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">語音</span>
-        </button>
         <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
       </div>
     </div>
@@ -213,7 +210,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </button>
       <span class="label bj-room-title">單機遊玩 <b id="bjSoloLv" class="display">普通</b></span>
       <span class="mp-goal" id="bjSoloRec" aria-label="進度"></span>
-      <!-- 大牌桌:單機這一份(說明見 #bjBig)。⚠ 這條列沒有 .mp-actions(單機沒有 🎤 / 😀) -->
+      <!-- 大牌桌:單機這一份(說明見 #bjBig)。⚠ 這條列沒有 .mp-actions(單機沒有 😀) -->
       <button class="icon-btn bj-bigbtn" id="bjSoloBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
     </div>
     <div class="bj-room-foot">
@@ -536,6 +533,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="emote-phrases" id="emoteClips"></div>
       <div class="emote-sub hidden" id="myClipsSub">⭐ 我的語音</div>
       <div class="emote-phrases hidden" id="emoteMyClips"></div>
+      <!-- 🎤 語音留言:錄一段話直接送出。**v2.4.0 從房間框那顆圓形 🎤 搬進這張卡片**
+           (即時語音上線後房間框右半有七顆鈕、其中兩顆都是麥克風 → 擠在一起就是在製造誤按;
+            而「錄一段送出」本來就跟 emoji / 一句話 / 語音短訊是同一件事的四種講法)。
+           ⚠ **送給誰照卡片最上面那排「傳給誰」** —— 搬進來之前是寫死送全部人的。
+           ⚠ 錄音中把面板關掉 = 取消(closeEmote 會 Voice.cancel()),按鈕本身是「停止並送出」。
+           ⚠ id 沿用 #quickVoiceBtn(綁在 ui-kit.js 的 bindCommonUI;Bingo 在 js/main.js),
+             class 則從 .quick-voice 換成 .emote-rec —— 前者連同房間框那顆一起刪掉了。
+           ⚠ 鈕上的字由 resetQuickVoiceBtn() 依 Voice.MAX_MS 重寫,這裡只是初值。 -->
+      <div class="emote-sub">🎤 語音留言</div>
+      <button class="emote-rec" id="quickVoiceBtn" type="button" title="錄一段語音送出(最多 6 秒)" aria-label="錄一段語音送出">
+        <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">錄一段話送出(6 秒)</span>
+      </button>
       <div class="emote-input">
         <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
         <button class="btn" id="emoteSend" type="button">送出</button>
