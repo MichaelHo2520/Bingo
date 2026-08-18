@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 da904f61b14b21d466b68dd9842923dc1d6b96d92e544176e67f0db49e4a8dff)
+    真相在 styles.src.css(sha256 b6c08ae43d5d07bd006ef8558c2512d7b817314b329a4b21c2221dd58f53bb7f)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1427,7 +1427,7 @@
   .mj-mini:active{transform:scale(.9)}
   .mj-play{flex:1 1 auto;min-height:0;width:min(98vw,780px);
     display:flex;flex-direction:column;align-items:center;gap:8px}
-  .mj-boardbox{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+  .mj-boardbox{position:relative;flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
   .mj-stage{position:relative;z-index:0;
     width:calc((var(--cols,10) + var(--lmax,2) * 0.13) * var(--mjw,32px));
     height:calc((var(--rows,5) * 1.32 + var(--lmax,2) * 0.13) * var(--mjw,32px))}
@@ -1472,7 +1472,7 @@
   .mj-tile[data-suit="pc"]{color:var(--mj-pc)}
   .mj-tile[data-suit="pd"]{color:var(--mj-pd)}
   .mj-tile.blocked{filter:brightness(.84) saturate(.62)}
-  .mj-tile.sel{transform:translateY(-3px);
+  .mj-tile.sel{--sy:-3px;transform:translateY(var(--sy));
     box-shadow:inset 0 0 0 2px var(--accent),
                calc(var(--mjw,32px) * 0.055) calc(var(--mjw,32px) * 0.065) 0 0 var(--mj-side),
                0 0 0 3px var(--accent),0 6px 14px rgba(0,0,0,.35);
@@ -1484,7 +1484,12 @@
   @keyframes mj-hint{0%,100%{box-shadow:inset 0 0 0 2px var(--accent),0 0 0 2px var(--accent),0 2px 5px rgba(0,0,0,.28)}
                      50%{box-shadow:inset 0 0 0 2px var(--accent),0 0 0 7px rgba(255,255,255,.30),0 2px 5px rgba(0,0,0,.28)}}
   .mj-tile.bad{animation:mj-bad .4s ease}
-  @keyframes mj-bad{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  @keyframes mj-bad{
+    0%,100%{transform:translate(0,var(--sy,0px))}
+    25%{transform:translate(-4px,var(--sy,0px));
+        box-shadow:inset 0 0 0 2px #ff6b6b,0 0 0 4px rgba(255,86,86,.55),0 2px 8px rgba(0,0,0,.3)}
+    50%{box-shadow:inset 0 0 0 2px #ff6b6b,0 0 0 5px rgba(255,86,86,.42),0 2px 8px rgba(0,0,0,.3)}
+    75%{transform:translate(4px,var(--sy,0px))}}
   .mj-tile.gone{pointer-events:none;animation:mj-pop .26s ease forwards}
   @keyframes mj-pop{to{opacity:0;transform:scale(.5) rotate(8deg)}}
   .mj-tile.off{display:none}
@@ -1586,6 +1591,88 @@
   .mj-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
   body.solo-on .mj-react-row{display:none}
   body:not(.solo-on) .mj-stats{display:none}
+  .mj-stage::before{content:"";position:absolute;pointer-events:none;z-index:-1;
+    inset:calc(var(--mjpad,0px) * -1);
+    border-radius:calc(var(--mjw,32px) * 0.42);
+    background:
+      repeating-linear-gradient(48deg,rgba(255,255,255,.035) 0 2px,transparent 2px 6px),
+      radial-gradient(120% 92% at 50% 0%,rgba(255,255,255,.10),transparent 64%),
+      var(--panel);
+    box-shadow:inset 0 0 0 1px var(--panel-line),
+               inset 0 calc(var(--mjw,32px) * 0.1) calc(var(--mjw,32px) * 0.24) rgba(0,0,0,.3),
+               0 6px 18px rgba(0,0,0,.26)}
+  .mj-tile.gone.fly{animation:mj-fly .3s cubic-bezier(.34,.02,.5,1) forwards}
+  @keyframes mj-fly{
+    0%{opacity:1}
+    24%{opacity:1}
+    100%{opacity:0;
+         transform:translate(calc(var(--dx,0) * var(--mjw,32px)),calc(var(--dy,0) * var(--mjw,32px))) scale(.34)}}
+  .mj-spark{position:absolute;pointer-events:none;z-index:9998;
+    left:calc(var(--bx,0) * var(--mjw,32px));
+    top:calc(var(--by,0) * var(--mjw,32px));
+    width:calc(var(--mjw,32px) * 1.55);height:calc(var(--mjw,32px) * 1.55);
+    margin:calc(var(--mjw,32px) * -0.775) 0 0 calc(var(--mjw,32px) * -0.775);
+    border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.96) 0 15%,rgba(255,228,150,.82) 26%,
+                               rgba(255,196,64,.32) 46%,transparent 66%);
+    box-shadow:0 0 0 1.5px rgba(255,246,214,.8),0 0 14px rgba(255,190,60,.5);
+    animation:mj-spark .64s ease-out forwards}
+  @keyframes mj-spark{
+    0%{opacity:.96;transform:scale(.26)}
+    55%{opacity:.78}
+    100%{opacity:0;transform:scale(1.55)}}
+  .mj-spark.p0{background:radial-gradient(circle,#fff 0 12%,var(--sp0) 30%,transparent 66%)}
+  .mj-spark.p1{background:radial-gradient(circle,#fff 0 12%,var(--sp1) 30%,transparent 66%)}
+  .mj-spark.p2{background:radial-gradient(circle,#fff 0 12%,var(--sp2) 30%,transparent 66%)}
+  .mj-spark.p3{background:radial-gradient(circle,#fff 0 12%,var(--sp3) 30%,transparent 66%)}
+  .mj-spark.p4{background:radial-gradient(circle,#fff 0 12%,var(--sp4) 30%,transparent 66%)}
+  .mj-spark.p5{background:radial-gradient(circle,#fff 0 12%,var(--sp5) 30%,transparent 66%)}
+  .mj-combo{position:absolute;z-index:2;left:50%;bottom:0;
+    transform:translateX(-50%) scale(.72);opacity:0;pointer-events:none;
+    font-family:'Fredoka',sans-serif;font-weight:800;font-size:clamp(12.5px,3.4vw,17px);
+    color:#fff;white-space:nowrap;padding:3px 12px;border-radius:999px;
+    background:linear-gradient(180deg,rgba(255,162,50,.96),rgba(212,84,18,.96));
+    box-shadow:0 4px 14px rgba(0,0,0,.34),inset 0 0 0 1px rgba(255,255,255,.34)}
+  .mj-combo.on{animation:mj-combo .9s cubic-bezier(.2,.9,.3,1) forwards}
+  @keyframes mj-combo{
+    0%{opacity:0;transform:translateX(-50%) scale(.72)}
+    16%{opacity:1;transform:translateX(-50%) scale(1.12)}
+    30%{transform:translateX(-50%) scale(1)}
+    70%{opacity:1}
+    100%{opacity:0;transform:translateX(-50%) translateY(-9px) scale(.98)}}
+  .mj-tile.blocker{animation:mj-blk .62s ease}
+  @keyframes mj-blk{
+    0%,100%{box-shadow:inset 0 0 0 1px var(--mj-edge),
+            calc(var(--mjw,32px) * 0.055) calc(var(--mjw,32px) * 0.065) 0 0 var(--mj-side),
+            0 2px 5px rgba(0,0,0,.28)}
+    28%,72%{box-shadow:inset 0 0 0 2px #fff,0 0 0 4px rgba(122,192,255,.78),0 3px 10px rgba(0,0,0,.34)}}
+  .mj-stage.shuf .mj-tile:not(.off){animation:mj-wave .5s ease both;
+    animation-delay:calc(var(--c,0) * .028s)}
+  @keyframes mj-wave{
+    0%{transform:translate(0,var(--sy,0px)) rotate(0)}
+    38%{transform:translate(0,calc(var(--sy,0px) - var(--mjw,32px) * 0.13)) rotate(-2.4deg)}
+    100%{transform:translate(0,var(--sy,0px)) rotate(0)}}
+  .mj-count.mj-bump{animation:mj-bump .24s ease}
+  @keyframes mj-bump{0%,100%{transform:scale(1)}45%{transform:scale(1.16)}}
+  .mj-count.mj-one{color:#fff;box-shadow:inset 0 0 0 2px #fb923c;
+    animation:mj-one 1.1s ease-in-out infinite}
+  @keyframes mj-one{0%,100%{background:rgba(249,115,22,.2)}50%{background:rgba(249,115,22,.5)}}
+  .mj-cheer{position:fixed;inset:0;z-index:61;pointer-events:none;overflow:hidden}
+  .mj-cheer .mj-ring{position:absolute;left:var(--cx,50%);top:var(--cy,50%);
+    width:180px;height:180px;margin:-90px 0 0 -90px;border-radius:50%;
+    border:3px solid rgba(255,214,120,.9);
+    box-shadow:0 0 26px rgba(255,196,64,.55),inset 0 0 26px rgba(255,196,64,.34);
+    animation:mj-ring 1.15s cubic-bezier(.16,.7,.3,1) forwards}
+  .mj-cheer .mj-ring.r2{animation-delay:.16s;border-color:rgba(255,255,255,.78)}
+  @keyframes mj-ring{
+    0%{opacity:.95;transform:scale(.16)}
+    58%{opacity:.8}
+    100%{opacity:0;transform:scale(4.6)}}
+  .mj-cheer .mj-glow{position:absolute;left:var(--cx,50%);top:var(--cy,50%);
+    width:66vmax;height:66vmax;margin:-33vmax 0 0 -33vmax;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,206,88,.34),rgba(255,206,88,.1) 42%,transparent 68%);
+    animation:mj-glow 1.25s ease-out forwards}
+  @keyframes mj-glow{0%{opacity:.34}24%{opacity:1}100%{opacity:0}}
   @media (max-height:560px){
     .mj-hero{margin:6px 0 2px}
     .mj-art{width:64px;height:64px}

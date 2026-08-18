@@ -32,7 +32,18 @@ const MB = (function(){
   let els=[], sel=-1, enabled=false, hintPair=null, hintT=null;
   let stage=null, box=null, ro=null, lastW=null;
   let zoneEl=null, sweepEl=null;                  // 僵局的探照燈欄帶 / 過場光帶(見 showZone / flash)
+  let comboEl=null, comboN=0, comboT=null, comboAt=0;   // 連擊(見 bumpCombo)
+  let lastLeft=null, shufT=null;                  // 讀數彈跳的上一次值 / 重洗波浪的收尾
   let cbPair=null, cbBlocked=null;
+  /* ---------- 動效 class 的白名單(v2.4.4)----------
+     ★ repaint() 是**整行覆寫 className**,所以任何「掛一下就好」的動效 class 一律要
+       登記在這裡,否則下一次 repaint 會把它拿掉。
+     ⚠ 這不是預防性的規矩,是修一個真的 bug:`.bad`(配不起來的搖動)原本就掛在
+       `shake(i); repaint();` 這個順序裡 → 加上又立刻被覆寫掉,**動畫一次都沒播過**,
+       而三套 e2e 全綠(存在時間 0ms,斷言抓不到「該閃卻沒閃」)。
+       同型的坑數獨那一批已經寫進 CLAUDE.md,這裡是第二次。 */
+  const FX_CLS=["bad","blocker","fly","bump"];
+
   /* 同款高亮預設**關閉**(v1.55.0)。選一張牌就把同款的其他牌全部框亮 = 直接把答案指出來,
      這遊戲的難點本來就是「該挑哪一對」。想要輔助的人自己去設定裡開(mahjong.prefs.v1)。 */
   let sameHint=false;
@@ -75,6 +86,7 @@ const MB = (function(){
     tiles=Array.isArray(q.tiles)?q.tiles.slice():MGen.parse(q.tiles||"");
     alive=new Uint8Array(S.list.length).fill(1);
     sel=-1; hintPair=null;
+    resetCombo(); lastLeft=null;
     build();
     fit();
     repaint();
@@ -83,8 +95,13 @@ const MB = (function(){
   function setTiles(nt){
     tiles=Array.isArray(nt)?nt.slice():MGen.parse(nt||"");
     sel=-1; hintPair=null;
+    resetCombo();                 // 洗過牌就不是同一串了
     clearZone();                  // 牌全換過了,舊的探照燈框指的位置已經沒有意義
+    /* ★ paintFaces() 一定要**同步**做完(v2.4.4 的重洗波浪刻意不延後換牌面):
+       延後換面看起來比較像「翻面洗牌」,代價是那 150ms 內畫面上的牌面與 tiles 不一致 ——
+       搶牌是全房同時點的,那等於請人去點一張顯示著舊牌面的牌。波浪只做位移,不動牌面。 */
     paintFaces();
+    shufWave();
     repaint();
   }
 
@@ -134,8 +151,23 @@ const MB = (function(){
     const w=box.clientWidth, h=box.clientHeight;
     if(w<=0||h<=0)return;
     // 夾限與公式都在 MGen.tileW 裡(pickShape 用同一支,兩邊才不會給出不同答案)
-    let tw=MGen.tileW(MGen.geoOf(level,shape), w, h);
+    const geo=MGen.geoOf(level,shape);
+    let tw=MGen.tileW(geo, w, h);
     tw=Math.floor(tw*10)/10;
+    /* ---------- 絨布桌的邊距(v2.4.4)----------
+       ⚠⚠ 這一段是量出來的,不是設計出來的:桌面(.mj-stage::before)原本固定往外擴
+          0.3 / 0.36 個牌寬 → 72 牌溢出 9px、144 牌溢出 6px,**捅出一條水平捲軸**。
+          而捲軸一出現,這一支量到的 w/h 就變小 → 盤面縮一階 → 捲軸消失 → 又放大回來
+          = **自己震盪**(跳棋與飛行棋都踩過這條,CLAUDE.md 有記;死區擋不住)。
+       ★ 解法是「有多少空位就擴多少」,而不是回頭去縮盤面 —— **盤面大小的優先權高於裝飾**。
+         夾住兩軸的剩餘空間之後就沒有回饋迴路了:桌面永遠擠不出捲軸,量到的 w/h 不會被它改。
+       ★ 代價講清楚:手機直立玩 72 / 144 牌時盤面本來就吃滿寬度 → 邊距 0,
+         桌面剛好貼齊盤面(看起來是牌底下的一塊暗色底,不是一張有邊的桌子)。
+         寬螢幕與 36 牌才看得到桌邊。 */
+    const sw=(geo.cols + MGen.GEO.off*(geo.layers-1))*tw;
+    const sh=(MGen.GEO.ratio*geo.rows + MGen.GEO.off*(geo.layers-1))*tw;
+    const pad=Math.max(0, Math.min(tw*0.3, (w-sw)/2, (h-sh)/2));
+    stage.style.setProperty("--mjpad",pad.toFixed(1)+"px");
     if(lastW!==null && Math.abs(tw-lastW)<0.4) return;   // 抖動門檻:差不到 0.4px 不重寫
     lastW=tw;
     stage.style.setProperty("--mjw",tw+"px");
@@ -151,6 +183,10 @@ const MB = (function(){
       // 講清楚是哪一種擋住 —— 「被壓住」和「兩邊都有牌」的解法完全不同
       const u=S.up[i];
       const why=(u>=0&&alive[u]) ? "這張被上面壓住了" : "左右都有牌,抽不出來";
+      /* 「被上面壓住了」那句話沒說是**哪一張**壓著 → 把那張也閃一下(v2.4.4)。
+         這一條是資訊不是裝飾:在 30px 的牌上肉眼找「誰壓著誰」純粹是眼力刑求,
+         而知道是哪一張,下一步就知道要先去消掉它。 */
+      if(u>=0 && alive[u]) fxOn(u,"blocker",620);
       shake(i);
       if(cbBlocked) cbBlocked(i,why); else showToast(why,1000);
       return;
@@ -167,27 +203,134 @@ const MB = (function(){
     sel=i; Sound.unmark(); shake(i); repaint();
   }
 
-  function shake(i){
+  /* 掛一個動效 class,到時間自己收掉。
+     ⚠ 這些 class 全部要在 FX_CLS 裡 —— 中間只要有人呼叫 repaint(),沒登記的就被覆寫掉。 */
+  function fxOn(i,cls,ms){
     const el=els[i]; if(!el)return;
-    el.classList.remove("bad"); void el.offsetWidth; el.classList.add("bad");
-    setTimeout(()=>el.classList.remove("bad"),420);
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    setTimeout(()=>{ if(el) el.classList.remove(cls); },ms);
+  }
+  function shake(i){ fxOn(i,"bad",420); }
+
+  /* 一張牌的中心點,單位是「牌寬的幾倍」—— 與 CSS 的 left/top 完全同一套算式。
+     ★ 刻意**不量 getBoundingClientRect()**:位置本來就是 --c/--r/--l + --mjw 算出來的,
+       算格座標零成本;而且 rect 量到的是「動畫當下」的位置,會被 transform 汙染。 */
+  function centerOf(i){
+    const g=MGen.GEO, L=MGen.geoOf(level,shape), s=S.list[i];
+    const push=(L.layers-1-s.l)*g.off;
+    return { x:s.c+push+0.5, y:s.r*g.ratio+push+g.ratio/2 };
   }
 
-  /* 消掉一對。cls 是連線用的顏色(搶牌模式:短暫閃出是誰拿走的),單機不傳 */
-  function remove(i,j,cls){
+  /* 消掉一對。cls 是連線用的顏色(搶牌模式:短暫閃出是誰拿走的),單機不傳。
+     opt = { mine, quiet }:
+     • mine=false → 這一手是別人消的(搶牌)→ 不算進我的連擊
+     • quiet=true → 一次補很多筆(重連歸位 / 剛開打的批次同步)→ 不放爆光、不算連擊、不慶祝
+       (同 adapter 對音效與 toast 的處理:那不是「剛剛發生的事」) */
+  function remove(i,j,cls,opt){
     if(!alive[i]||!alive[j])return false;
-    [i,j].forEach(k=>{
+    opt=opt||{};
+    const quiet=!!opt.quiet, mine=opt.mine!==false;
+    /* 兩張牌互相吸過去、在中點爆一圈光(v2.4.4)。
+       原本是各自原地縮小淡出 —— 「剛才那兩張是一對」完全靠玩家自己記得,
+       而這一頁沒有回合制,消掉是使用者唯一的回饋(notes/10 紅線 8)。 */
+    const ca=centerOf(i), cb=centerOf(j);
+    const mid={ x:(ca.x+cb.x)/2, y:(ca.y+cb.y)/2 };
+    [[i,ca],[j,cb]].forEach(pr=>{
+      const k=pr[0], c=pr[1];
       alive[k]=0;
       const el=els[k]; if(!el)return;
-      el.className="mj-tile gone"+(cls?" "+cls:"");
+      // 位移量寫成「牌寬的幾倍」,CSS 再乘上 --mjw → 縮放 / 轉向都自己跟著對
+      el.style.setProperty("--dx",(mid.x-c.x).toFixed(3));
+      el.style.setProperty("--dy",(mid.y-c.y).toFixed(3));
+      el.className="mj-tile gone fly"+(cls?" "+cls:"");
       // 動畫跑完才真的收起來,不然會「啪」一下消失,看不出是哪兩張被拿走
-      setTimeout(()=>{ if(!alive[k]) el.classList.add("off"); },260);
+      setTimeout(()=>{ if(!alive[k]) el.classList.add("off"); },300);
     });
+    if(!quiet) spark(mid,cls);
     if(sel===i||sel===j) sel=-1;
     clearHint();
     clearZone();          // 有人消掉了 = 僵局解除,探照燈在這裡收掉,adapter 不必自己記得
+    if(!quiet && mine) bumpCombo();
     repaint();
+    /* 清盤的金光只在這條路放 —— 批次重建走 setAlive(),那一刻「盤面空了」是別人在別的
+       時間點做到的(重連歸位),慶祝一個沒發生在眼前的事看起來就是 bug。 */
+    if(!quiet && !left()) cheer();
     return true;
+  }
+
+  /* 中點的爆光:一圈擴散 + 一顆亮心。搶牌模式染成那個人的座位色(cls = p0~p5)。
+     位置同每張牌的做法 —— 只寫格座標,--mjw 一變它自己跟著縮。 */
+  function spark(mid,cls){
+    if(!stage)return;
+    const el=document.createElement("span");
+    el.className="mj-spark"+(cls?" "+cls:"");
+    el.style.setProperty("--bx",mid.x.toFixed(3));
+    el.style.setProperty("--by",mid.y.toFixed(3));
+    stage.appendChild(el);
+    setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); },640);
+  }
+
+  /* ---------- 連擊(v2.4.4)----------
+     ★ 只算**自己**消掉的、而且是剛剛消的(搶牌模式別人那一手也會走 remove())。
+     ⚠ 徽章刻意**不進 .mj-tools 的流**:那一列是 flex-wrap → 徽章一換行整列高一階 →
+       .mj-boardbox 矮一階 → fit() 把牌縮小 → 徽章收掉又放大回來 = **自己震盪**
+       (跳棋 / 飛行棋的捲軸震盪同構,CLAUDE.md 紅線有記)。所以它是 .mj-play 裡的
+       absolute + pointer-events:none,一格版面都不佔。 */
+  const COMBO_MS=2600;
+  function bumpCombo(){
+    const now=Date.now();
+    comboN = (now-comboAt<=COMBO_MS) ? comboN+1 : 1;
+    comboAt=now;
+    if(comboN>=2) showCombo(comboN);
+    if(comboT) clearTimeout(comboT);
+    comboT=setTimeout(resetCombo,COMBO_MS);
+  }
+  function showCombo(n){
+    // 錨在 .mj-boardbox(它 v2.4.4 加了 position:relative)—— 貼盤面下緣,而不是整塊 .mj-play 的底
+    const host=$("mjBoardBox"); if(!host)return;
+    if(!comboEl || !comboEl.parentNode){
+      comboEl=document.createElement("div");
+      comboEl.className="mj-combo";
+      host.appendChild(comboEl);
+    }
+    comboEl.textContent="🔥 連擊 ×"+n;
+    comboEl.classList.remove("on"); void comboEl.offsetWidth; comboEl.classList.add("on");
+  }
+  function resetCombo(){
+    if(comboT){ clearTimeout(comboT); comboT=null; }
+    comboN=0; comboAt=0;
+    if(comboEl) comboEl.classList.remove("on");
+  }
+
+  /* 重洗的波浪(v2.4.4):每一張牌依**欄號**晚一點起跑,由左往右漣漪過去一次。
+     ★ 延遲寫在 CSS(calc(var(--c) * .028s)),JS 只掛一個 class —— 144 張牌不可以各排一個 timeout。
+     ★ 方向與既有的光帶(.mj-sweep,左→右)刻意一致:兩件事要看起來是同一個動作。 */
+  function shufWave(){
+    if(!stage)return;
+    stage.classList.remove("shuf"); void stage.offsetWidth; stage.classList.add("shuf");
+    if(shufT) clearTimeout(shufT);
+    shufT=setTimeout(()=>{ shufT=null; if(stage) stage.classList.remove("shuf"); },900);
+  }
+
+  /* 清盤:一圈金光從盤面中心擴散(v2.4.4)。三條都是台灣麻將 v2.4.0 那批換來的:
+     ① 掛 **body** + fixed + z-index:61 —— #veil(結果卡)是 50 而且**立刻**蓋上來,
+        掛在盤面裡等於做了看不到(盤面自己還是 z-index:0 的 stacking context);
+     ② pointer-events:none 是**正確性不是禮貌** —— 它蓋在結果卡上面,
+        少了它那 1.3 秒「再來一局 / 繼續」按不下去;
+     ③ 中心點在這一刻量 rect(盤面位置隨版面、大盤面、轉向而變)。
+     ★ 它不是「你贏了」的訊號(那是贏家的彩帶 burst()),是「桌面清空了」的句號 ——
+       搶牌模式全房都會看到,而那一刻對每個人都成立。 */
+  function cheer(){
+    if(!stage)return;
+    const r=stage.getBoundingClientRect();
+    if(!r.width||!r.height)return;
+    const el=document.createElement("div");
+    el.className="mj-cheer";
+    el.style.setProperty("--cx",Math.round(r.left+r.width/2)+"px");
+    el.style.setProperty("--cy",Math.round(r.top+r.height/2)+"px");
+    el.innerHTML='<span class="mj-ring"></span><span class="mj-ring r2"></span><span class="mj-glow"></span>';
+    document.body.appendChild(el);
+    setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); },1300);
   }
 
   /* ---------- 提示 / 死局 ---------- */
@@ -299,6 +442,7 @@ const MB = (function(){
            留成設定選項給需要輔助的人。只標可動的:標了壓在底下的那些等於叫人去點點不到的東西。 */
       else if(sameHint && selG && free && MGen.grpOf(tiles[i])===selG) cls+=" same";
       if(hintPair && (hintPair[0]===i||hintPair[1]===i)) cls+=" hintpair";
+      FX_CLS.forEach(f=>{ if(el.classList.contains(f)) cls+=" "+f; });   // 見 FX_CLS 的註解
       el.className=cls;
     }
     paintCounters();
@@ -309,13 +453,27 @@ const MB = (function(){
      ★ 只給**數量**、不給是哪幾組:出題保證解得開,但玩家亂配是會走進死局的,
        這顆讀數是危險儀表;要消什麼仍然得自己掃(同數獨 v1.46.0 候選提示的原則)。 */
   function paintCounters(){
-    const lf=$("mjLeft"); if(lf) lf.textContent="🀄 "+left();
+    const lf=$("mjLeft"), n=left();
+    if(lf){
+      lf.textContent="🀄 "+n;
+      /* 數字**真的變了**才彈(v2.4.4)。repaint() 一局會跑上百次(選取 / 取消 / 重畫都會),
+         每次都彈就變成持續動畫 —— 而持續的東西一律不做動畫(讀數與音量條同一條原則)。 */
+      if(lastLeft!==null && n!==lastLeft){
+        lf.classList.remove("mj-bump"); void lf.offsetWidth; lf.classList.add("mj-bump");
+        setTimeout(()=>lf.classList.remove("mj-bump"),240);
+      }
+      lastLeft=n;
+    }
     const mv=movesLeft();
     const mo=$("mjMoves");
     if(mo){
       mo.textContent="✦ "+mv;
       mo.classList.toggle("dead",mv===0);
-      mo.title = mv===0 ? "沒有可以消的牌了 —— 會自動重洗" : "目前有 "+mv+" 組可以消(是哪幾組要自己找)";
+      // 只剩一組 = 下一步走岔就是死局(v2.4.4)。仍然**不說是哪一組** —— 同「只給數量」的原則
+      mo.classList.toggle("mj-one",mv===1);
+      mo.title = mv===0 ? "沒有可以消的牌了 —— 會自動重洗"
+               : mv===1 ? "只剩 1 組可以消 —— 走岔就會死局(接著會自動重洗)"
+               : "目前有 "+mv+" 組可以消(是哪幾組要自己找)";
     }
   }
   function markDone(){ if(stage) stage.classList.add("done"); }
@@ -333,6 +491,9 @@ const MB = (function(){
     showHint, clearHint, bestPair, moves, movesLeft, anyMove,
     // 僵局用(v1.57.0):探照燈欄帶 + 過場光帶。目前只有 adapter 呼叫,單機不碰
     showZone, clearZone, flash,
+    // 動效(v2.4.4):清盤金光由 remove() 自己觸發,暴露出來是為了 e2e 與截圖頁能單獨叫它;
+    // combo 也只給測試讀(遊戲裡的入口是消掉一對)
+    cheer, combo:()=>comboN,
     setEnabled(v){ enabled=!!v; if(stage) stage.classList.toggle("locked",!enabled); },
     // 同款高亮的開關(設定蓋板)。關掉時要立刻重畫 —— 不然當下已經框亮的那幾張會留在畫面上
     setSameHint(v){ sameHint=!!v; if(S) repaint(); },
@@ -356,6 +517,9 @@ const MB = (function(){
       sel=-1; clearHint(); clearZone(); repaint();
     },
     aliveAt:i=>!!alive[i],
+    // upAt 只給測試用:「壓住 i 的那一格是誰」是 S 的內部索引,而 e2e 要驗
+    //「點動不了的牌 → 壓住它的那張會閃」就非得指名那一格(v2.4.4)
+    upAt:i=>(S?S.up[i]:-1),
     freeAt, left, total, cleared,
     tileAt:i=>tiles[i],
     nameAt:i=>MGen.faceOf(tiles[i]||"w1").name

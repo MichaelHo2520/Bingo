@@ -442,7 +442,10 @@ const MP = MPCore.create((function(){
             bump(tally,m.seat);
             if(!quiet) pops.push(m.seat);
             const nm=MB.nameAt(m.i);
-            MB.remove(m.i,m.j,colorOf(m.seat));
+            /* ★ 第四個參數是 v2.4.4 的動效分流:mine 決定這一手算不算進**我的**連擊
+               (搶牌模式別人消的那一手也走這裡)、quiet 決定要不要放中點爆光與清盤金光
+               —— 同這一段對音效與 toast 的處理,批次補回來的不是「剛剛發生的事」。 */
+            MB.remove(m.i,m.j,colorOf(m.seat),{ mine:m.seat===me, quiet:quiet });
             if(!quiet){
               Sound.place();
               if(m.seat!==me) showToast("⚡ "+ctx.dispName(ctx.order()[m.seat]||"")+" 消掉 "+nm,1100);

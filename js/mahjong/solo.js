@@ -21,6 +21,7 @@ const Solo = (function(){
   let hints=0, shuffles=0, undos=0;
   let stack=[];            // 悔棋用:依序記下消掉的每一對 [i,j]
   let autoT=null;          // 死局自動重洗的排程(見 deadEnd())
+  let cardT=null;          // 清盤後「延後蓋結果卡」的排程(見 finish())
 
   function fmt(ms){
     const s=Math.floor(ms/1000), m=Math.floor(s/60);
@@ -67,7 +68,7 @@ const Solo = (function(){
        ★ 在**出題這一刻**決定,之後整局不再變 —— 中途轉向只縮放,不重排(重排會毀掉進行中的局)。 */
     const q=MGen.make(level, MGen.pickShape(level, innerWidth, innerHeight));
     if(!q){ showToast("出題失敗,再試一次 😥"); return; }    // 實測不會發生(單次成功率 100%),但不能讓它靜默壞掉
-    clearAuto();
+    clearAuto(); clearCard();
     elapsed=0; hints=0; shuffles=0; undos=0; paused=false; running=true; stack=[];
     MB.setBoard(q);
     MB.setEnabled(true);
@@ -78,7 +79,7 @@ const Solo = (function(){
     saveOwn();
   }
   function quit(){
-    clearAuto();
+    clearAuto(); clearCard();
     running=false; stopTick(); MB.setEnabled(false);
     /* ★ v1.156.0:暫停中離開要收掉蓋板與 ⏸/▶ 的字 —— 否則留下一張點了完全沒反應的
        全螢幕黑幕。⚠ 目前是**防禦性的、走不到**(蓋板會攔住返回鈕、finish 有 paused 守衛),
@@ -148,6 +149,7 @@ const Solo = (function(){
     paintHud();
   }
   function clearAuto(){ if(autoT){ clearTimeout(autoT); autoT=null; } }
+  function clearCard(){ if(cardT){ clearTimeout(cardT); cardT=null; } }
   function undo(){
     if(!running||paused||!stack.length)return;
     const p=stack.pop();
@@ -161,8 +163,13 @@ const Solo = (function(){
     if(!MB.anyMove()) deadEnd();
   }
 
+  /* ★ 清空之後**刻意慢 420ms 才蓋上結果卡**(v2.4.4):最後那一對的飛出與空桌金光
+     全部發生在 #veil(z-index:50,立刻蓋上來)底下的話,等於做了看不到。
+     ⚠ 只有「卡片」延後 —— 計時、鎖盤、markDone 照舊立刻做完,不然那 0.4 秒裡
+       按暫停 / 按返回就會出鬼。⚠ 離開或重開一局都要 clearCard(),否則卡片會追著人跑。
+     ★ 連線不必做這件事:結算走 { local:false },本來就多一趟往返(~100~300ms)。 */
   function finish(){
-    clearAuto();
+    clearAuto(); clearCard();
     running=false; stopTick(); MB.setEnabled(false); MB.markDone();
     const L=MGen.levelOf(level);
     const card=$("mjWinCard");
@@ -178,8 +185,7 @@ const Solo = (function(){
         '<div class="mj-stat"><span class="ms-k">悔棋</span><span class="ms-v">'+undos+' 次</span></div>';
       box.classList.remove("hidden");
     }
-    Sound.win(); burst();
-    showResult();
+    cardT=setTimeout(()=>{ cardT=null; Sound.win(); burst(); showResult(); },420);
   }
 
   return {

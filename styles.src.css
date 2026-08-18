@@ -2556,7 +2556,10 @@
      整盤外框大小完全由 --mjw × 欄列數算出來 → 轉向 / HUD 換行都自動跟著縮,不寫死常數。 */
   .mj-play{flex:1 1 auto;min-height:0;width:min(98vw,780px);
     display:flex;flex-direction:column;align-items:center;gap:8px}
-  .mj-boardbox{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
+  /* position:relative 是 v2.4.4 加的:連擊徽章(.mj-combo)要有一個錨,而它**必須是
+     absolute** —— 進了 .mj-tools 那一列的流就會震盪(理由在 board.js 的 bumpCombo)。
+     ⚠ 對版面零影響:這一格本來就是 flex 置中容器,relative 不改變任何子元素的位置。 */
+  .mj-boardbox{position:relative;flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center}
   /* ★ z-index:0 不是裝飾 —— 它讓整個盤面自成一個 stacking context(v1.56.0 修)。
      每張牌的 z-index 是「層 → 列 → 行」算出來的(l144 最大到 800 多),.mj-tile.sel 更是 9999。
      少了這一行,那些數字會直接在**根層**跟 .veil(50)/彩帶(60)/toast(70)/.pwa-tip(99) 比大小
@@ -2634,7 +2637,9 @@
      這不會把難度拿走 —— 這遊戲的難點是「該挑哪一對」,不是「哪幾張抽得出來」,
      而在 30px 的牌上用肉眼判斷有沒有被壓住純粹是眼力刑求。 */
   .mj-tile.blocked{filter:brightness(.84) saturate(.62)}
-  .mj-tile.sel{transform:translateY(-3px);
+  /* --sy 是 v2.4.4 加的:選中的抬起量交給變數,搖動的 keyframes 才帶得上它
+     (原本 @keyframes mj-bad 直接寫 translateX → 搖那 0.4 秒裡選中的牌會掉回去 3px)。 */
+  .mj-tile.sel{--sy:-3px;transform:translateY(var(--sy));
     box-shadow:inset 0 0 0 2px var(--accent),
                calc(var(--mjw,32px) * 0.055) calc(var(--mjw,32px) * 0.065) 0 0 var(--mj-side),
                0 0 0 3px var(--accent),0 6px 14px rgba(0,0,0,.35);
@@ -2647,8 +2652,18 @@
   .mj-tile.hintpair{animation:mj-hint .7s ease-in-out infinite}
   @keyframes mj-hint{0%,100%{box-shadow:inset 0 0 0 2px var(--accent),0 0 0 2px var(--accent),0 2px 5px rgba(0,0,0,.28)}
                      50%{box-shadow:inset 0 0 0 2px var(--accent),0 0 0 7px rgba(255,255,255,.30),0 2px 5px rgba(0,0,0,.28)}}
+  /* 配不起來 / 抽不出來:搖 + **紅光閃一下**(v2.4.4 補的紅光)。
+     ⚠⚠ 這個 class 在 v2.4.4 之前**一次都沒播過** —— tap() 的「配不起來」那條路是
+        `shake(i); repaint();`,而 repaint() 整行覆寫 className → 加上又立刻被拿掉。
+        修法是 board.js 的 FX_CLS 白名單(同數獨那批),不是改這裡。
+     ⚠ 位移一律帶著 var(--sy)(選中的那張抬了 3px),不可以再寫成純 translateX。 */
   .mj-tile.bad{animation:mj-bad .4s ease}
-  @keyframes mj-bad{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+  @keyframes mj-bad{
+    0%,100%{transform:translate(0,var(--sy,0px))}
+    25%{transform:translate(-4px,var(--sy,0px));
+        box-shadow:inset 0 0 0 2px #ff6b6b,0 0 0 4px rgba(255,86,86,.55),0 2px 8px rgba(0,0,0,.3)}
+    50%{box-shadow:inset 0 0 0 2px #ff6b6b,0 0 0 5px rgba(255,86,86,.42),0 2px 8px rgba(0,0,0,.3)}
+    75%{transform:translate(4px,var(--sy,0px))}}
   /* 消掉:先跑完動畫才真的收起來,不然會「啪」一下不見,看不出是哪兩張被拿走 */
   .mj-tile.gone{pointer-events:none;animation:mj-pop .26s ease forwards}
   @keyframes mj-pop{to{opacity:0;transform:scale(.5) rotate(8deg)}}
@@ -2791,6 +2806,175 @@
      規則一併處理(那些選擇器不帶遊戲前綴,四頁通用),這裡只補自己這兩塊 */
   body.solo-on .mj-react-row{display:none}
   body:not(.solo-on) .mj-stats{display:none}
+
+  /* ==========================================================================
+     體驗與動效升級(v2.4.4)—— 這一頁的第一批動效,只追加、只用 .mj-* 前綴
+     ★★ 一條總則:**每一個特效節點都是 absolute / fixed + pointer-events:none**。
+        這一頁的牌寬是 fit() 量「.mj-boardbox 的實際可視高寬」算出來的 → 任何參與流的
+        特效節點都等於「消一對之後整盤小一階」,而收掉之後又放大回來 = **自己震盪**
+        (跳棋 / 飛行棋的捲軸震盪同構;台灣麻將 v2.4.0 是同一條紅線的另一面,
+        那一頁被 innerHTML 重建咬到,這一頁會被 fit() 咬到)。
+     ★ 動畫預算照頻率分(PLAN-優化想法待辦 第六節那條通則):
+        消一對 / 讀數(每次操作)≤ 300ms · 連擊(一局多次)900ms ·
+        重洗(一局 0~3 次)500ms · 清盤(一局一次)1.25s。
+     ★ 這一整段刻意放在麻將段落的**最後** —— 幾條新規則與既有的 .mj-warm / .dead 同權重
+       (都是 (0,2,0)),平手要靠 source order,放後面才贏得到。
+     ⚠ prefers-reduced-motion 不必在這裡再寫一次:檔案開頭那條全域的
+       `*{animation-duration:.001s!important}` 已經把整段收乾淨了(嫌吵的人系統設定關得掉)。
+     ========================================================================== */
+
+  /* ---------- ① 絨布桌面 ----------
+     ⚠ 顏色一定要**跟著主題走** —— 「牌面在所有彩色主題下維持象牙白、只有桌面跟著主題變」
+       是這一頁明文的既有決策(見上面牌面配色那一段),固定的深綠絨布正好違反它。
+       所以這裡只用 --panel / --panel-line 加一層極低對比的斜織紋 + 頂光 + 內陰影。
+     ⚠ 走 ::before 的 absolute 外擴,**不可以改成給 .mj-stage 加 padding 或 border**:
+       stage 的寬高是 --mjw × 欄列數算出來的,加了就與每張牌的實際位置錯開。
+     ⚠ 外擴量也吃 --mjw(不是寫死 px)—— 36 牌在平板上牌寬 74px,固定 10px 的桌邊
+       看起來會像忘記做完。
+     z-index:-1 只在 stage 自己那個 stacking context 裡往後(stage 是 z-index:0),
+     不會掉到頁面背景後面去。 */
+  .mj-stage::before{content:"";position:absolute;pointer-events:none;z-index:-1;
+    /* ⚠⚠ 外擴量是 **JS 夾好之後寫進 --mjpad 的**,不是這裡自己乘 --mjw ——
+       固定外擴的第一版讓 72 牌溢出 9px、144 牌溢出 6px = 一條水平捲軸,
+       而捲軸會讓 fit() 量到的可視寬變小 → 盤面縮一階 → 捲軸消失 → 又放大 = 自己震盪
+       (跳棋 / 飛行棋踩過的同一條;完整理由在 board.js 的 fit())。
+       ⚠ 這也是為什麼 --mjpad 沒有像 --mjw 那樣給一個有意義的預設值:
+         沒量過就先不要往外擴。 */
+    inset:calc(var(--mjpad,0px) * -1);
+    border-radius:calc(var(--mjw,32px) * 0.42);
+    background:
+      repeating-linear-gradient(48deg,rgba(255,255,255,.035) 0 2px,transparent 2px 6px),
+      radial-gradient(120% 92% at 50% 0%,rgba(255,255,255,.10),transparent 64%),
+      var(--panel);
+    box-shadow:inset 0 0 0 1px var(--panel-line),
+               inset 0 calc(var(--mjw,32px) * 0.1) calc(var(--mjw,32px) * 0.24) rgba(0,0,0,.3),
+               0 6px 18px rgba(0,0,0,.26)}
+
+  /* ---------- ② 消一對:兩張互相吸過去 + 中點爆光 ----------
+     位移量由 board.js 寫成 --dx/--dy(單位是「牌寬的幾倍」),CSS 再乘 --mjw ——
+     縮放 / 轉向 / 大盤面都自己跟著對,而且一次 rect 都不必量。
+     ⚠ 權重 (0,3,0) 壓過既有的 .mj-tile.gone(0,2,0) → 走這條的不會再跑 mj-pop。
+       mj-pop 留著是 setAlive() 那條路的保險(它直接掛 "gone off",display:none 看不到動畫)。 */
+  .mj-tile.gone.fly{animation:mj-fly .3s cubic-bezier(.34,.02,.5,1) forwards}
+  @keyframes mj-fly{
+    0%{opacity:1}
+    24%{opacity:1}
+    100%{opacity:0;
+         transform:translate(calc(var(--dx,0) * var(--mjw,32px)),calc(var(--dy,0) * var(--mjw,32px))) scale(.34)}}
+
+  /* 中點的爆光:一圈金環 + 一顆亮心,一個節點做完。
+     ★ 刻意**不做粒子** —— 這是每 1~2 秒就發生一次的動作(一局 18~72 次),
+       粒子在這個頻率上不划算,而低階手機掉幀第一個就會怪到它頭上。
+     位置同每張牌的算法:只寫格座標,--mjw 一變它自己跟著縮。
+     置中用負 margin 而不是 transform:translate(-50%,-50%) —— transform 讓給動畫用。 */
+  .mj-spark{position:absolute;pointer-events:none;z-index:9998;
+    left:calc(var(--bx,0) * var(--mjw,32px));
+    top:calc(var(--by,0) * var(--mjw,32px));
+    width:calc(var(--mjw,32px) * 1.55);height:calc(var(--mjw,32px) * 1.55);
+    margin:calc(var(--mjw,32px) * -0.775) 0 0 calc(var(--mjw,32px) * -0.775);
+    border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.96) 0 15%,rgba(255,228,150,.82) 26%,
+                               rgba(255,196,64,.32) 46%,transparent 66%);
+    /* ⚠ 這一圈脆邊是**看圖之後補的**:金色打在象牙白的牌面上是最容易消失的組合,
+       只有柔光的第一版在牌面上幾乎讀不到(在深色桌面上反而看得清楚)。
+       白邊 + 暖外暈讓它在兩種底色上都成立。 */
+    box-shadow:0 0 0 1.5px rgba(255,246,214,.8),0 0 14px rgba(255,190,60,.5);
+    animation:mj-spark .64s ease-out forwards}
+  @keyframes mj-spark{
+    0%{opacity:.96;transform:scale(.26)}
+    55%{opacity:.78}
+    100%{opacity:0;transform:scale(1.55)}}
+  /* 搶牌:染成那個人的座位色 —— 是誰拿走的,盤面上當場就看得出來,不必回頭對 HUD */
+  .mj-spark.p0{background:radial-gradient(circle,#fff 0 12%,var(--sp0) 30%,transparent 66%)}
+  .mj-spark.p1{background:radial-gradient(circle,#fff 0 12%,var(--sp1) 30%,transparent 66%)}
+  .mj-spark.p2{background:radial-gradient(circle,#fff 0 12%,var(--sp2) 30%,transparent 66%)}
+  .mj-spark.p3{background:radial-gradient(circle,#fff 0 12%,var(--sp3) 30%,transparent 66%)}
+  .mj-spark.p4{background:radial-gradient(circle,#fff 0 12%,var(--sp4) 30%,transparent 66%)}
+  .mj-spark.p5{background:radial-gradient(circle,#fff 0 12%,var(--sp5) 30%,transparent 66%)}
+
+  /* ---------- ③ 連擊徽章 ----------
+     ⚠ absolute + pointer-events:none 是**正確性不是禮貌**:進了 .mj-tools 的流會震盪
+       (理由在 board.js 的 bumpCombo);而它貼在盤面下緣,壓到牌的時候仍然點得下去。
+     ★ 貼盤面下緣而不是盤面正中:搶牌是全房比手速,**誰的畫面被遮住誰吃虧**
+       (notes/10 明文)—— 而 .mj-boardbox 幾乎總有上下留白(牌寬多半被寬度先夾死),
+       所以實務上它落在空白處。 */
+  .mj-combo{position:absolute;z-index:2;left:50%;bottom:0;
+    transform:translateX(-50%) scale(.72);opacity:0;pointer-events:none;
+    font-family:'Fredoka',sans-serif;font-weight:800;font-size:clamp(12.5px,3.4vw,17px);
+    color:#fff;white-space:nowrap;padding:3px 12px;border-radius:999px;
+    background:linear-gradient(180deg,rgba(255,162,50,.96),rgba(212,84,18,.96));
+    box-shadow:0 4px 14px rgba(0,0,0,.34),inset 0 0 0 1px rgba(255,255,255,.34)}
+  .mj-combo.on{animation:mj-combo .9s cubic-bezier(.2,.9,.3,1) forwards}
+  @keyframes mj-combo{
+    0%{opacity:0;transform:translateX(-50%) scale(.72)}
+    16%{opacity:1;transform:translateX(-50%) scale(1.12)}
+    30%{transform:translateX(-50%) scale(1)}
+    70%{opacity:1}
+    100%{opacity:0;transform:translateX(-50%) translateY(-9px) scale(.98)}}
+
+  /* ---------- ④ 壓住你的那一張 ----------
+     「這張被上面壓住了」那句 toast 沒說是**哪一張**壓著 → 把那張閃兩下。
+     這一條是資訊不是裝飾:在 30px 的牌上肉眼找「誰壓著誰」純粹是眼力刑求。 */
+  .mj-tile.blocker{animation:mj-blk .62s ease}
+  @keyframes mj-blk{
+    0%,100%{box-shadow:inset 0 0 0 1px var(--mj-edge),
+            calc(var(--mjw,32px) * 0.055) calc(var(--mjw,32px) * 0.065) 0 0 var(--mj-side),
+            0 2px 5px rgba(0,0,0,.28)}
+    28%,72%{box-shadow:inset 0 0 0 2px #fff,0 0 0 4px rgba(122,192,255,.78),0 3px 10px rgba(0,0,0,.34)}}
+
+  /* ---------- ⑤ 重洗的波浪 ----------
+     每一張牌依**欄號**晚一點起跑,由左往右漣漪過去一次 —— 延遲寫在 CSS,
+     JS 只掛一個 class(144 張牌不可以各排一個 timeout)。方向與既有的光帶
+     (.mj-sweep,左→右)刻意一致:兩件事要看起來是同一個動作。
+     ★ 刻意**不做翻面** —— 翻面好看,但那要延後 paintFaces(),而那 150ms 內畫面上的
+       牌面與 tiles 不一致,搶牌等於請人去點一張顯示著舊牌面的牌(board.js 有記)。 */
+  .mj-stage.shuf .mj-tile:not(.off){animation:mj-wave .5s ease both;
+    animation-delay:calc(var(--c,0) * .028s)}
+  @keyframes mj-wave{
+    0%{transform:translate(0,var(--sy,0px)) rotate(0)}
+    38%{transform:translate(0,calc(var(--sy,0px) - var(--mjw,32px) * 0.13)) rotate(-2.4deg)}
+    100%{transform:translate(0,var(--sy,0px)) rotate(0)}}
+
+  /* ---------- ⑥ 兩顆讀數 ----------
+     彈跳只在數字**真的變了**那一拍掛(board.js 存了上一次的值)—— repaint() 一局跑上百次,
+     每次都彈就成了持續動畫,而持續的東西一律不做動畫。 */
+  .mj-count.mj-bump{animation:mj-bump .24s ease}
+  @keyframes mj-bump{0%,100%{transform:scale(1)}45%{transform:scale(1.16)}}
+  /* 只剩一組可消 = 下一步走岔就死局。
+     ⚠ 顏色只能用琥珀:--daub 被死局讀數(.dead)佔走了會撞義,
+       --accent-2 在幾個主題是亮黃(#ffd24a / #ffcf47)配白字讀不出來 ——
+       同 .mj-hot 那條註解記的兩個坑。 */
+  .mj-count.mj-one{color:#fff;box-shadow:inset 0 0 0 2px #fb923c;
+    animation:mj-one 1.1s ease-in-out infinite}
+  @keyframes mj-one{0%,100%{background:rgba(249,115,22,.2)}50%{background:rgba(249,115,22,.5)}}
+
+  /* ---------- ⑦ 清盤:空桌金光 ----------
+     ★ 掛 **body** + fixed + z-index:61 —— #veil(結果卡)是 50 而且立刻蓋上來,
+       掛在盤面裡等於做了看不到(台灣麻將 v2.4.0 紅線③,整段理由在 board.js 的 cheer())。
+     ★ 61 是刻意挑的:壓過結果卡(50)與彩帶(60),但**低於 toast(70)** ——
+       「盤面已重洗」那類提示在這 1.3 秒裡仍然要看得到。
+     ★ pointer-events:none 是**正確性不是禮貌**:它蓋在結果卡上面,
+       少了它那 1.3 秒「再來一局 / 繼續」按不下去。 */
+  .mj-cheer{position:fixed;inset:0;z-index:61;pointer-events:none;overflow:hidden}
+  .mj-cheer .mj-ring{position:absolute;left:var(--cx,50%);top:var(--cy,50%);
+    width:180px;height:180px;margin:-90px 0 0 -90px;border-radius:50%;
+    border:3px solid rgba(255,214,120,.9);
+    box-shadow:0 0 26px rgba(255,196,64,.55),inset 0 0 26px rgba(255,196,64,.34);
+    animation:mj-ring 1.15s cubic-bezier(.16,.7,.3,1) forwards}
+  .mj-cheer .mj-ring.r2{animation-delay:.16s;border-color:rgba(255,255,255,.78)}
+  /* ⚠ 中間要**撐住**不透明度:第一版只有頭尾兩格,0.45 秒就掉到 0.14 —— 截圖上淡到
+     會被當成「沒做出來」,而這是一局只有一次的高潮(預算最寬的那一格,不該省)。 */
+  @keyframes mj-ring{
+    0%{opacity:.95;transform:scale(.16)}
+    58%{opacity:.8}
+    100%{opacity:0;transform:scale(4.6)}}
+  /* 底下那層暖光:起始就給 .34 的不透明度(不從 0 淡入)—— 動畫時鐘不前進的環境
+     (截圖 / 診斷頁)量到 opacity 0 的話會被當成「沒做出來」,五子棋那批踩過。 */
+  .mj-cheer .mj-glow{position:absolute;left:var(--cx,50%);top:var(--cy,50%);
+    width:66vmax;height:66vmax;margin:-33vmax 0 0 -33vmax;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,206,88,.34),rgba(255,206,88,.1) 42%,transparent 68%);
+    animation:mj-glow 1.25s ease-out forwards}
+  @keyframes mj-glow{0%{opacity:.34}24%{opacity:1}100%{opacity:0}}
 
   @media (max-height:560px){
     .mj-hero{margin:6px 0 2px}
