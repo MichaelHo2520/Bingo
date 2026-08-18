@@ -187,6 +187,39 @@
        → 檔尾那一段因此補了一條 `body.is-big .row:has(> .tools-docked .tk-btn)`。
        ⚠ 動這條選擇器(加 / 減 class)就要回去看那兩處,不然又會有一邊靜靜地輸掉。 */
   body.mp-on .row:has(> .tools-docked .tk-btn){padding-right:168px}
+
+  /* ---------- 窄機:那一列真的裝不下四顆鈕(現場回報,v2.4.4+2)----------
+     ★ 症狀:359px 的手機在對局中(頂列被收掉 → 四顆鈕搬進房間框)第一列塞不下
+       〈返回 + 房名 + 玩法徽章 +「大」+ 😀〉—— 讓位讓了 168px,剩下的 136px 要裝
+       ~224px,於是 **🔇 / 🎙 直接壓在「大」與 😀 上面**、返回鍵被擠成 22px、
+       房名整個被犧牲掉(它是 flex:1;min-width:0,第一個被壓成 0 的就是它)。
+       量到會疊的範圍:320px 三頁全中 · 359px 數獨與成語接龍 · 375px 數獨;390px 起乾淨。
+     ★ 做法(使用者裁示:「窄到裝不下就直接把麥克風跟耳機收掉」):
+       **語音整個沒開的時候**才收 —— 那正是回報的情境,而且那時兩顆鈕沒有任何作用。
+     ⚠⚠ 為什麼不無條件收:那兩顆是**關掉麥克風的唯一入口**(設定面板裡沒有第二個),
+       無條件收 = 「在大廳先開了語音、開打後就再也關不掉」，正是 notes/24 紅線 6
+       與 gomoku.html 那條註解警告過的事。所以只要語音還開著,兩顆都留著,
+       改把**玩法徽章**讓給它們(徽章是這一列裡唯一可有可無的東西)。
+     ⚠ 判準用「這一列裡有沒有任何 .tk-btn.on」,**不可以逐顆看**:
+       「聽著但閉麥」時麥克風鈕掛的是 `.muted` 而**不是** `.on`(見 talk.js 的 paintBtns)
+       → 逐顆看會把那顆收掉,於是閉麥之後再也開不回來。
+       而「講」一定連帶「聽」→ 只要語音開著,耳機鈕就一定是 .on,一顆條件就夠。
+     ⚠ 讓位只在「兩顆都收掉」時縮成 84(= ⛶ + ⚙️ 的算法,同上面那條);
+       還留著的時候沿用既有的 168 —— 那本來就是為四顆鈕算的,不必再算一次。
+     ⚠⚠ 權重:上面那條 168 是 (0,4,1)(見它自己的註解)→ 這裡的歸零條刻意寫成
+       `:not(:has(…))` 讓它拿到 (0,7,1),**不是**排在後面就贏。動它要回去看那一段。
+     ⚠⚠⚠ **一定要 `:not(.is-big)`** —— 大模式底下 `.tools-docked` 整組已經 display:none、
+       讓位那條也已經歸零(檔尾 `body.is-big .row:has(> .tools-docked .tk-btn){padding-right:0}`,
+       權重 (0,4,1))。這裡的 84px 是 (0,7,1) → **會壓過它**,於是「小」與 😀 停在離右緣
+       84px 的地方 = 2.3.6 現場回報那個「大棋盤時那組鈕沒有靠右」一模一樣的症狀。
+       ⚠ 而且 `tools/t-big-consist.html` **量不到**:run-e2e 的視窗是 800px 寬,
+         這一段的 max-width:389px 根本不命中 → 會是假綠。守門靠 tools/t-room-narrow.html。 */
+  @media (max-width:389px){
+    body.mp-on:not(.is-big) .row:has(> .tools-docked .tk-btn):not(:has(> .tools-docked .tk-btn.on)) > .tools-docked .tk-btn{
+      display:none}
+    body.mp-on:not(.is-big) .row:has(> .tools-docked .tk-btn):not(:has(> .tools-docked .tk-btn.on)){padding-right:84px}
+    body.mp-on:not(.is-big) .row:has(> .tools-docked .tk-btn.on) .mp-goal{display:none}
+  }
   .tools.tools-docked{position:absolute;right:0;top:50%;transform:translateY(-50%);flex:none}
   /* ⚠ 這幾顆是**全站最常出現**的元件(頂列的 ⛶ / ⚙️ / 返回 / 語音),
      v2.2.5 那一批漏了它們 —— 卡片與按鈕都有厚度了、頂列還是平的,反而更顯眼。
