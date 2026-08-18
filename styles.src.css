@@ -8896,6 +8896,13 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-word-lbl{font-size:11.5px;color:var(--muted);font-weight:800;flex:none}
   .dw-word{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-family:'Fredoka',sans-serif;font-weight:700;font-size:20px;color:var(--accent-2)}
+  /* ★★ 題目旁那一顆圖示(v2.4.3)—— 選題卡上那顆,跟著題目一起留到畫的時候。
+     ⚠⚠ 這一列在 360px 上是**剛好塞滿**的(見下面那段 media 與 notes/21 紅線 3-D),
+       多一顆圖示就是從題目那一格身上拿寬度 —— 而題目是畫家唯一要讀的字。
+       所以實作上它只吃 line-height:1 的一個字形,並用負的 margin 把它跟題目黏回來
+       (還順便讓它們看起來是一組,而不是工具列上又多了一顆鈕)。
+     ⚠ 它是 `aria-hidden`:圖示跟旁邊那個題目講的是同一件事,讀屏软件念兩次只是造噪。 */
+  .dw-word-ic{flex:none;font-size:20px;line-height:1;margin-right:-4px}
   /* ⚠ 一律 inline-flex 置中:直線那顆裡面是 SVG,靠 baseline 排會掉下去一點點
      (只有並排時看得出來,而那正是最容易被忽略的一種歪)。 */
   .dw-tool{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:2px;
@@ -9240,28 +9247,56 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      加了四顆色塊 + 擦布之後,360px 手機上「你要畫的是」+ 題目 + 四色 + 🧽 + 🗑 清空
      會把題目擠成省略號 —— 而題目是畫家唯一要讀的字。
      所以窄畫面把兩個**純裝飾的字**藏掉(標籤與「清空」二字),圖示與功能全部留著。
-     ⚠ 不可以改成讓 .dw-tools 換行:它是 flex:none,換行就是從畫布身上拿走高度。 */
-  @media (max-width:430px){
+     ⚠ 不可以改成讓 .dw-tools 換行:它是 flex:none,換行就是從畫布身上拿走高度。
+     ★★★ **斷點是 600px,不是 430px**(v2.4.3 改)。這不是為了題目旁那顆圖示,
+       而是因為**寬版佈局在 431~565px 本來就塞不下** —— 實測 431px:
+       固定元件(標籤 58 + 五色 120 + 四顆鈕 191 + gap 56)已經超過整列寬度,
+       題目那一格被壓成 **0px**、整列溢出 29px。寬版要到 **≈566px** 才真的放得下
+       四個字(實測 561px 還是被截、600px 才餘 95px)。
+       → 這一段是「塞不下就用緊湊版」,所以斷點跟著寬版的真實需求走。
+       ⚠ 順帶一提:**e2e 就是跟在這個區間**(headless Edge 視窗最窄 ≈504px)。 */
+  @media (max-width:600px){
     .dw-word-lbl{display:none}
     .dw-clr-t{display:none}
     /* ★★ v1.163.0 又多了直線 📏 與復原 ↩️ —— 這一列變成「題目 + 四色 + **四顆**工具鈕」,
        而原本的 padding:6px 12px 在 360px 上會把題目擠成兩個字加省略號。
        → 窄畫面把工具鈕改成 30px 的**正方形圖示鈕**(那三顆的文字本來就已經藏起來了),
-         並把兩處 gap 收緊 8→6 / 5→4。
+         並把兩處 gap 收緊 8→6 / 5→4;v2.4.3 又把這一條收到 **4px**
+         (題目旁多了一顆圖示,而間距是這一列上**唯一不會讓任何東西變難按的寬度來源**)。
        ⚠ 絕對不可以改成讓 .dw-tools 換行:它是 flex:none,換行就是從畫布身上拿走高度。
        ⚠ 題目是畫家唯一要讀的字 —— 改動這一段之後一定要用**裝置模擬**量一次
          `#dwTools` 的 scrollWidth - clientWidth(必須是 0),Edge 視窗壓不到 360px。 */
-    .dw-tools{gap:6px}
+    .dw-tools{gap:4px}
     /* ★★ v1.170.0 又多了第五顆色塊(黃)。20px + gap 4 的話這一列會多吃 24px,
        而題目那一格在 360px 上只剩 80 幾 px → 直接被擠成省略號。
-       → 窄畫面把色塊縮成 18px、gap 收到 3px:五顆只比原本四顆多 10px。
+       → 窄畫面把色塊縮成 18px、gap 收到 3px:五顆只比原本四顆多 10px
+         (v2.4.3 再收到 **2px** —— 同上,色塊本體還是 18px,沒有變難按)。
        ⚠ 18px 是下限(再小手指按不到);要再加第六顆的話**只能從別的地方生空間**,
          不可以繼續縮 —— 而且一定要用裝置模擬量 scrollWidth − clientWidth === 0。 */
-    .dw-pens{gap:3px}
+    .dw-pens{gap:2px}
     .dw-sw{width:18px;height:18px}
     .dw-tool{padding:0;width:30px;height:30px;display:inline-flex;align-items:center;
       justify-content:center;font-size:15px}
     .dw-word{font-size:17px}
+    /* ★★★ 題目旁那顆圖示(v2.4.3)—— 這一列上**唯一新增的寬度**,而它本來就剛好塞滿。
+       實測(360x803x3 裝置模擬、題目格是 flex:1 吃掉剩下的全部):
+         沒圖示 **76px** → 直接加上去 **55px**,而 4 個字要 **68px** → 被截。
+       產生那 13px 的三個來源,三個都是**間距**,沒有任何東西變小或消失:
+         ① .dw-tools 的 gap 6→4  ② .dw-pens 的 gap 3→2  ③ 圖示自己的負 margin
+            (emoji 的字形實寬只有 advance 的 ≈七成,兩邊的空白本來就是白給的)。
+       → 改完是 **70px**,還是寬得下 4 個字。
+       ⚠⚠ 圖示 **不可以**拿工具鈕(30px)、色塊(18px)或分組線來換寬度 ——
+         那三個是手指要按的 / 看得懂的,而圖示只是錦上添花。
+       ⚠ 這一段改完一定要用**裝置模擬** 360x803x3 再量一次(Edge 視窗壓不到 360px):
+         `#dwTools` 的 scrollWidth - clientWidth 必須是 0,而且題目那一格 ≥ 68px
+         (題庫與自訂題目的上限都是 4 個字 × 17px)。 */
+    .dw-word-ic{font-size:17px;margin:0 -5px 0 -4px}
+  }
+
+  /* ---------- 窄**寬度**:.dw-bar 那一列(斷點跟上面不同,這是刻意的)----------
+     工具列的斷點是 600px(它塞不下),而這一列真正塞不下的只有 430px 以下 ——
+     兩列的寬度預算不一樣,合成一個斷點就是在 431~600px 白白藏掉兩個看得懂的字。 */
+  @media (max-width:430px){
     /* 字數晶片在窄畫面只留數字(「答案 3 字」→「3 字」)——
        同一列上還有回合數 + 畫家名字 + 放大鈕 + 倒數環,而那顆環是 34px 不可壓。 */
     .dw-len-l{display:none}

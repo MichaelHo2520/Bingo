@@ -73,7 +73,10 @@ const MP = MPCore.create((function () {
        症狀是猜題者那顆字數晶片整回合不出現。 */
   function wordOf() {
     const c = DWR.cleanCustom(dw && dw.cw);
-    if (c) return { w: c, a: [] };
+    /* ★ i = 圖示(v2.4.3 起畫家的工具列也要用)。自訂題目沒有題庫那一顆,
+       給它 ✏️ —— 跟選題卡那一格「✏️ 就畫這個」同一個字,
+       畫家一眼就分得出「這是我自己出的題」。 */
+    if (c) return { w: c, a: [], i: "✏️" };
     return dw && dw.w >= 0 ? DWGen.wordAt(dw.w) : null;
   }
   /* 答案幾個字 —— 頂列晶片 / 猜題框 placeholder / 系統訊息 / 分享圖**四處同一個真相**。
@@ -513,10 +516,22 @@ const MP = MPCore.create((function () {
     const assist = iAssist();                     // ⚠ 相位的判定在 mayInk 裡面,這裡不要再寫一次
     row.classList.toggle("hidden", !(drawer || assist));
     if (lbl) { lbl.textContent = drawer ? "你要畫的是" : "🖌 幫忙畫"; lbl.classList.toggle("hidden", !(drawer || assist)); }
+    const w = drawer ? wordOf() : null;
     if (wEl) {
       wEl.classList.toggle("hidden", !drawer);
-      const w = drawer ? wordOf() : null;
       wEl.textContent = w ? w.w : "";              // ⚠ 不是畫家就一律清空(不是只藏起來)
+    }
+    /* ★★ 題目旁那一顆圖示(v2.4.3)。使用者:「選好的題目在開始畫的時候…
+       順便把 emoji 也放在那裡」—— 它在選題卡上看得到、選完就不見了,
+       而它正是「這題長什麼樣子」最便宜的一個提示。
+       ⚠⚠ **只能在畫家那一台產生** —— 圖示就等於答案(🦒 就是長頸鹿),
+         幫忙畫的人雖然已經猜中了,這一格照樣清空(同上面題目那一格的理由)。
+       ⚠ 一律清 textContent,不可以只靠 CSS 藏:藏起來的話 DOM 上還是看得到答案。
+       ⚠ 題庫目前每一筆都有 i,🎨 只是保險(跟 DWGen.iconAt 同一個退路)。 */
+    const icEl = $("dwWordIc");
+    if (icEl) {
+      icEl.classList.toggle("hidden", !drawer);
+      icEl.textContent = w ? (w.i || "🎨") : "";
     }
     if (clr) clr.classList.toggle("hidden", !drawer);
   }

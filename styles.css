@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 cae2c6efe1cb954dca70398cabb5ccfdb89b99523e0aec7e658794848e517c28)
+    真相在 styles.src.css(sha256 2c9f9a53debcdb5caf60e82ee538f7f5147f12e1e35cb2be2950d3c841dc27b4)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4003,6 +4003,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-word-lbl{font-size:11.5px;color:var(--muted);font-weight:800;flex:none}
   .dw-word{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font-family:'Fredoka',sans-serif;font-weight:700;font-size:20px;color:var(--accent-2)}
+  .dw-word-ic{flex:none;font-size:20px;line-height:1;margin-right:-4px}
   .dw-tool{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:2px;
     border:1px solid var(--panel-line);border-radius:11px;padding:6px 12px;
     background:rgba(255,255,255,.08);color:var(--text);font-family:'Nunito',sans-serif;
@@ -4188,15 +4189,18 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     font-weight:800;color:var(--text)}
   .dw-aw-v{flex:none;color:var(--muted);font-weight:700}
   .dw-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
-  @media (max-width:430px){
+  @media (max-width:600px){
     .dw-word-lbl{display:none}
     .dw-clr-t{display:none}
-    .dw-tools{gap:6px}
-    .dw-pens{gap:3px}
+    .dw-tools{gap:4px}
+    .dw-pens{gap:2px}
     .dw-sw{width:18px;height:18px}
     .dw-tool{padding:0;width:30px;height:30px;display:inline-flex;align-items:center;
       justify-content:center;font-size:15px}
     .dw-word{font-size:17px}
+    .dw-word-ic{font-size:17px;margin:0 -5px 0 -4px}
+  }
+  @media (max-width:430px){
     .dw-len-l{display:none}
     .dw-fin-t{display:none}
   }

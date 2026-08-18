@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
 <!-- 你畫我猜 · v2.4.2 -->
-<meta name="version" content="2.4.2">
+<meta name="version" content="2.4.2+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -322,6 +322,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- ★ 這一格的字會換(v1.170.0):畫家看到「你要畫的是」、幫忙畫的人看到「🖌 幫忙畫」
            —— 兩種角色共用同一列工具,而幫畫的人**看不到題目那一格**(見 adapter 的 paintTools)。 -->
       <span class="dw-word-lbl" id="dwWordLbl">你要畫的是</span>
+      <!-- ★★ 選題卡上那顆圖示,跟著題目一起留到畫的時候(v2.4.3)。
+           ⚠⚠ 它跟題目同一等級是**答案**:只能在畫家自己那台產生,
+             幫忙畫的人跟猜題者一個字元都不能有(見 adapter 的 paintTools)。
+           ⚠ 它是 flex:none,而這一列在 360px 上本來就剛好塞滿 ——
+             寬度從哪裡來、量過什麼,看 styles.src.css 的 .dw-word-ic 那一段。 -->
+      <span class="dw-word-ic" id="dwWordIc" aria-hidden="true"></span>
       <span class="dw-word display" id="dwWord"></span>
       <!-- ⚠ 色塊的索引 = COLORS 的索引(board.js 的 pickColor 直接吃 id 尾巴那個數字)——
            所以黃色是 dwSw4,而 COLORS[4] 就是黃(原本那一格的橘挪到 6,理由見 board.js)。 -->
