@@ -107,12 +107,20 @@ const MP = MPCore.create((function(){
   /* ==========================================================================
      一、畫面
      ========================================================================== */
+  /* ★ 「這一顆最遠能飛幾段」——★ 段數標籤在洞上只有 5~6px 高(見 board.js 的
+     data-j 註解),真正讀得到「⚡」這個字的地方是這一列。
+     ⚠ 提示列是**固定高**的(紅線 18):這一句只能加短的,加長就把盤面推小一階。 */
+  function longHint(){
+    let m = 0;
+    spots.forEach(s => { if(s.jumps > m) m = s.jumps; });
+    return m >= 2 ? ' · <b class="tq-jn">⚡ 最長 ' + m + ' 段</b>' : "";
+  }
   function hintText(){
     if(!st || st.over) return "";
     const who = esc(nameOfSeat(st.turn));
     if(!isMyTurn()) return who + " 正在想…";
     if(pending >= 0) return "送出中…";
-    if(sel >= 0) return spots.length ? "點一個亮起來的洞" : "這一顆走不動 —— 換一顆";
+    if(sel >= 0) return spots.length ? ("點一個亮起來的洞" + longHint()) : "這一顆走不動 —— 換一顆";
     return "輪到你了 —— 點一顆自己的棋";
   }
 
@@ -568,8 +576,11 @@ const MP = MPCore.create((function(){
       if(!st) return "";
       const s = seatOf(id);
       if(s < 0 || s >= st.n) return "";
-      return '<span class="tq-ct" title="到家幾顆"><i class="tq-ct-ic"></i>' +
-             TQ.homeCount(st, s) + "/" + st.goals[s].length + "</span>";
+      const hc = TQ.homeCount(st, s), tot = st.goals[s].length;
+      /* ★ 只剩 1 顆沒歸位 → 那個人的晶片轉金色(v2.4.3)。
+         ⚠ 措辭與樣式與單機那一份是**雙胞胎**(solo.js 的 tailOf),改一邊要改另一邊。 */
+      return '<span class="tq-ct' + (tot - hc === 1 ? " tq-last" : "") + '" title="到家幾顆">' +
+             '<i class="tq-ct-ic"></i>' + hc + "/" + tot + "</span>";
     },
     lobbyStatusText(ids){ return ids.length < 2 ? "等待其他人加入…" : "等待大家準備…"; },
     readyHint(ids, ready){

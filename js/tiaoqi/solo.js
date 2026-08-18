@@ -97,14 +97,24 @@ const Solo = (function(){
   // 晶片尾巴:到家幾顆 / 共幾顆(連線那份在 adapter,措辭要一樣)
   function tailOf(s){
     if(!st) return "";
-    return '<span class="tq-ct" title="到家幾顆"><i class="tq-ct-ic"></i>' +
-           TQ.homeCount(st, s) + "/" + st.goals[s].length + "</span>";
+    const hc = TQ.homeCount(st, s), tot = st.goals[s].length;
+    // ★ 只剩 1 顆 → 轉金色(連線那份在 adapter.chipTail,兩邊要一模一樣)
+    return '<span class="tq-ct' + (tot - hc === 1 ? " tq-last" : "") + '" title="到家幾顆">' +
+           '<i class="tq-ct-ic"></i>' + hc + "/" + tot + "</span>";
   }
 
+  /* ★ 「這一顆最遠能飛幾段」——★ 段數標籤在洞上只有 5~6px 高(見 board.js 的
+     data-j 註解),真正讀得到「⚡」這個字的地方是這一列。
+     ⚠ 提示列是**固定高**的(紅線 18):這一句只能加短的,加長就把盤面推小一階。 */
+  function longHint(){
+    let m = 0;
+    spots.forEach(s => { if(s.jumps > m) m = s.jumps; });
+    return m >= 2 ? ' · <b class="tq-jn">⚡ 最長 ' + m + ' 段</b>' : "";
+  }
   function hintText(){
     if(!st || st.over) return "";
     if(st.turn !== ME) return esc(seatName(st.turn)) + " 正在想…";
-    if(sel >= 0) return spots.length ? "點一個亮起來的洞" : "這一顆走不動 —— 換一顆";
+    if(sel >= 0) return spots.length ? ("點一個亮起來的洞" + longHint()) : "這一顆走不動 —— 換一顆";
     return "輪到你了 —— 點一顆自己的棋";
   }
 

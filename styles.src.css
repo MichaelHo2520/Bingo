@@ -10612,6 +10612,116 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                box-shadow:0 0 0 3px var(--accent-2),0 0 14px rgba(255,255,255,.7)}
   @keyframes tqSpot{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
 
+  /* ---------- 落點的段數標籤(v2.4.3)----------
+     .far 只說「這是連跳落點」,數字才說「幾段」—— 而「這一顆能飛多遠」是這一頁
+     最重要的一眼資訊。
+     ⚠ 內容走 attr(data-j)(board.js 的 render 寫的),CSS 不知道也不必知道規則。
+     ⚠ 尺寸一律吃 --tq-cell:縮放走的是 .tq-board 的 transform(紅線 19),
+       但格子最小 16px 時標籤只有 5px 高 —— 所以裡面**刻意不放 emoji**
+       (任何 emoji 在那個尺寸都是一團色塊),⚡ 那個字留在提示列。
+     ⚠ 落點同時有 .spot(會脈動縮放)→ 標籤跟著脈動,那是要的:它與洞是一體的。 */
+  .tq-hole.far::after{content:attr(data-j);position:absolute;left:50%;bottom:100%;
+    transform:translate(-50%,22%);pointer-events:none;white-space:nowrap;
+    font:800 calc(var(--tq-cell) * .30)/1 'Fredoka','Nunito',sans-serif;
+    padding:calc(var(--tq-cell) * .05) calc(var(--tq-cell) * .12);border-radius:99px;
+    background:linear-gradient(180deg,#ffe694,#ffc93c);color:#5a3d02;
+    box-shadow:0 1px 2px rgba(58,38,6,.42)}
+
+  /* ---------- 落洞彩光波紋(v2.4.3)----------
+     ⚠⚠ 掛在**洞**上,不是棋子上:棋子那一格 transform 是 board.js 每一幀在寫的
+       (紅線 15),而洞的位置走 left/top、transform 是空的 —— 這是這一頁唯一
+       可以自由用 transform 做擴散的地方。
+     ⚠ 顏色由 data-rip 帶進來(= 那一顆的角索引),不是洞自己的 --cs:
+       波紋要講的是「**誰**落在這裡」。 */
+  .tq-hole.rip::before{content:"";position:absolute;left:50%;top:50%;
+    width:100%;height:100%;border-radius:50%;pointer-events:none;
+    border:calc(var(--tq-cell) * .085) solid var(--rip,var(--accent));
+    animation:tqRip .6s ease-out forwards}
+  @keyframes tqRip{
+    0%{transform:translate(-50%,-50%) scale(.62);opacity:.9}
+    100%{transform:translate(-50%,-50%) scale(2.7);opacity:0}}
+  .tq-hole[data-rip="0"]{--rip:var(--tq-c0)}
+  .tq-hole[data-rip="1"]{--rip:var(--tq-c1)}
+  .tq-hole[data-rip="2"]{--rip:var(--tq-c2)}
+  .tq-hole[data-rip="3"]{--rip:var(--tq-c3)}
+  .tq-hole[data-rip="4"]{--rip:var(--tq-c4)}
+  .tq-hole[data-rip="5"]{--rip:var(--tq-c5)}
+
+  /* ---------- 動效疊層:連跳軌跡 + 流星尾跡(v2.4.3)----------
+     ★★★ z-index 2 是刻意的:它要蓋得住 121 個洞(z 是 auto)、蓋不住棋子(z=5)——
+       軌跡從棋子**底下**穿過去,不然一條線橫過半個盤面會把沿路每一顆棋都切一半。
+     ⚠ pointer-events:none 一定要有(同 .tq-tray):它蓋滿整個盤面,
+       不關掉就整盤點不到,而症狀是「棋子沒反應」。
+     ⚠ overflow:visible —— 弧線的頂點會拱出 viewBox 之外(借力點在最上緣時)。
+     ⚠ 底下所有 stroke-width 的單位是**格**(viewBox 用 board.js 的 TRAY_W / TRAY_H),
+       所以縮放時線寬會跟著棋子一起變,不必另外調。 */
+  .tq-fx{left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:2}
+  /* 預覽的弧線:流動的虛線。★ 弧頂與動畫真的會拱到的高度是同一條(見 board.js 的 arcD)。 */
+  .tq-arc{fill:none;stroke:var(--accent-2);stroke-width:.08;stroke-linecap:round;
+          stroke-dasharray:.26 .2;opacity:.7;animation:tqArc 1.15s linear infinite}
+  @keyframes tqArc{to{stroke-dashoffset:-.46}}
+  /* 借力點:被當成跳板的那一顆棋。
+     ⚠⚠ 半徑一定要**比棋子大**(棋子半徑 0.40 格):畫在中心點的話整個被棋子蓋掉,
+       看起來像沒生效 —— 所以畫成一圈套在它外面的環。
+     ⚠ 相鄰的洞只差 1 格 → 半徑不可以超過 0.5,不然環會壓到隔壁那一顆。 */
+  /* ⚠⚠ 借力點**不可以**跟 .far 的落點環同色(第一版兩個都是 --accent-2 → 放大截圖之後
+       根本分不出「這一顆是我踩過去的跳板」與「這裡是我可以落腳的洞」,
+       而那正是這整條功能唯一要回答的問題)。
+     ★ 改用墨色:六色 / 金色 / accent-2 都被別的意思佔走了,墨色是這一頁唯一還空著的一格,
+       而且它在米色板子與六色棋子上都讀得到(同「輪到誰」那圈白+墨的道理)。 */
+  .tq-arcdot{fill:none;stroke:rgba(58,42,18,.8);stroke-width:.075;
+             stroke-dasharray:.15 .12;opacity:.95}
+  /* 流星尾跡(4 段以上)。★ 推進完全交給 CSS,duration = 這一趟的 animMs
+     → 它是**時間的函式**(紅線 2),沒有回呼、rAF 不觸發也不影響任何正確性。
+     ⚠ pathLength="1" 是 board.js 寫的 → 這裡的 dasharray 用 1 就等於「整條路徑」,
+       不必知道實際長度(不同連跳長度差好幾倍)。 */
+  .tq-tr{fill:none;stroke:#ffd75e;stroke-width:.135;stroke-linecap:round;
+         stroke-dasharray:1;animation:tqTrail var(--tq-trd,900ms) linear forwards}
+  @keyframes tqTrail{
+    0%{stroke-dashoffset:1;opacity:.95}
+    72%{opacity:.88}
+    100%{stroke-dashoffset:0;opacity:0}}
+
+  /* ---------- 終局:贏家的目標星尖覺醒(v2.4.3)----------
+     ⚠⚠ 這一組是**持續狀態**而不是一次性閃光:結果卡在最後一手演完約 140ms 後就蓋上來,
+       一次性的效果等於做給沒人看 —— 所以拆成「靜態的金」+「一次性的亮起」兩條,
+       亮起那一條關掉(減少動態效果)之後金色照樣在,而按「偷看牌面」時看到的就是它。
+     ⚠ data-won 是**目標星尖那個角**(對面那一角),由 board.js 從 goals 反查。
+     ⚠ 延遲吃 --tq-wond(= 最後一手的 animMs),所以是「棋子落定的同時亮起來」。 */
+  .tq-board[data-won="0"] .tq-hole[data-c="0"],
+  .tq-board[data-won="1"] .tq-hole[data-c="1"],
+  .tq-board[data-won="2"] .tq-hole[data-c="2"],
+  .tq-board[data-won="3"] .tq-hole[data-c="3"],
+  .tq-board[data-won="4"] .tq-hole[data-c="4"],
+  .tq-board[data-won="5"] .tq-hole[data-c="5"]{
+    background:#ffe9a8;
+    box-shadow:inset 0 1.5px 2.5px rgba(96,64,20,.30),0 0 0 1.5px #ffc93c,
+               0 0 7px 1px rgba(255,201,60,.62)}
+  .tq-board[data-won="0"] .tq-hole[data-c="0"],
+  .tq-board[data-won="1"] .tq-hole[data-c="1"],
+  .tq-board[data-won="2"] .tq-hole[data-c="2"],
+  .tq-board[data-won="3"] .tq-hole[data-c="3"],
+  .tq-board[data-won="4"] .tq-hole[data-c="4"],
+  .tq-board[data-won="5"] .tq-hole[data-c="5"]{animation:tqWake 1.25s ease-out var(--tq-wond,0ms) both}
+  @keyframes tqWake{
+    0%{box-shadow:inset 0 1.5px 2.5px rgba(96,64,20,.30);background:var(--cs,var(--tq-hole))}
+    34%{box-shadow:inset 0 1.5px 2.5px rgba(96,64,20,.30),0 0 0 2.4px #fff2bd,
+                   0 0 16px 5px rgba(255,201,60,.95);background:#fffbe8}
+    100%{box-shadow:inset 0 1.5px 2.5px rgba(96,64,20,.30),0 0 0 1.5px #ffc93c,
+                    0 0 7px 1px rgba(255,201,60,.62);background:#ffe9a8}}
+  /* 那一角的三角面板也一起亮(它是「陣地」本身,只有 10 個洞亮起來讀不出是一整塊地) */
+  .tq-board[data-won="0"] .tq-tray-home[data-c="0"],
+  .tq-board[data-won="1"] .tq-tray-home[data-c="1"],
+  .tq-board[data-won="2"] .tq-tray-home[data-c="2"],
+  .tq-board[data-won="3"] .tq-tray-home[data-c="3"],
+  .tq-board[data-won="4"] .tq-tray-home[data-c="4"],
+  .tq-board[data-won="5"] .tq-tray-home[data-c="5"]{
+    fill:#ffd75e;opacity:.8;animation:tqWakePan 1.25s ease-out var(--tq-wond,0ms) both}
+  @keyframes tqWakePan{
+    0%{opacity:.6}
+    34%{opacity:1}
+    100%{opacity:.8}}
+
   /* ---------- 棋子:玻璃彈珠 ----------
      ⚠ 位置一律走 transform(不是 left/top):transition 只有 transform 走得動 GPU。
      ⚠⚠ **不要給 transition** —— 這一頁的動畫是 rAF 每一幀自己算位置的
@@ -10785,6 +10895,13 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     /* ⚠ 只關掉呼吸,環本身要留著(opacity 已經由上面那條設成 1)——
        它帶的是「輪到誰」這個規則資訊,不是純裝飾。 */
     .tq-board[data-turn] .tq-pc::after{animation:none}
+    .tq-arc{animation:none}
+    .tq-hole.rip::before{animation:none;display:none}
+    .tq-ct.tq-last{animation:none}
+    /* ⚠ 尾跡整條拿掉(它的存在本身就是動態的);而星尖覺醒只關掉「亮起來」那一拍 ——
+       金色是上面那條靜態規則畫的,那是「誰贏了」的規則資訊,不是裝飾。 */
+    .tq-tr{display:none}
+    .tq-board[data-won] .tq-hole,.tq-board[data-won] .tq-tray-home{animation:none}
   }
 
   /* ---------- 晶片上的東西 ---------- */
@@ -10799,6 +10916,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .tq-ct{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:800;
          color:var(--muted);background:rgba(0,0,0,.06);border-radius:8px;padding:1px 5px}
   .tq-ct-ic{width:8px;height:8px;border-radius:50%;border:2px solid currentColor;box-sizing:border-box}
+  /* ★ 只剩 1 顆沒歸位(v2.4.3):那個人的晶片轉金色並慢慢呼吸 —— 終點衝刺的壓迫感。
+     ⚠ 只換 color(圈圈吃 currentColor,會跟著變),不動背景:晶片本體是共用元件
+       .mp-chip,把它的底色接管過來就會與另外十三頁分岔。 */
+  .tq-ct.tq-last{color:#c8890c;background:rgba(255,201,60,.22);
+                 animation:tqLast 1.5s ease-in-out infinite}
+  @keyframes tqLast{0%,100%{opacity:1}50%{opacity:.55}}
+  /* 提示列裡的「⚡ 最長 N 段」—— 洞上的標籤只有 5~6px 高,這裡才是讀得到那個字的地方 */
+  .tq-jn{color:var(--accent-2);white-space:nowrap}
 
   /* ---------- 結果卡 ---------- */
   .tq-result{margin:2px 0 12px}

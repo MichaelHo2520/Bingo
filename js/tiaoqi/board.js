@@ -90,8 +90,12 @@ const TQB = (function(){
   function vXY(id){ return R.posXY(R.rotId(id, rotK)); }
 
   /* 飛行中的那一顆。★ 它**只影響畫面**:真相位置已經在 render() 裡落定了。 */
-  let flight = null;                   // { el, path, startAt, dur, seg }
+  let flight = null;                   // { el, path, startAt, dur, seg, c }
   let rafId = 0;
+
+  /* 動效疊層的兩個群組 + 軌跡的去重 key(見 renderArcs) */
+  let fxArcs = null, fxTrail = null, arcKey = "";
+  let ripEl = null, ripT = 0;          // 上一顆落洞波紋(同時只留一個)
 
   /* ==========================================================================
      這一頁的音效(v2.3.4 整組重做)。★ 走 Sound.tone()(audio.js 開給各遊戲寫自己
@@ -331,9 +335,22 @@ const TQB = (function(){
       h += '<button type="button" class="tq-hole" data-id="' + id + '"' +
            (c >= 0 ? ' data-c="' + c + '"' : "") + " " + at(p.x, p.y, HOLE_R) + "></button>";
     }
+    /* ★★ 動效疊層(v2.4.3)—— 連跳軌跡預覽與 4 段以上的流星尾跡都畫在這一張 SVG 上。
+       ⚠ DOM 順序是刻意的:托盤 → 121 個洞 → **這一層** → 棋子(ensurePieces 之後才 append)
+         → 它蓋得住洞、蓋不住棋子。那正是要的:軌跡要從棋子**底下**穿過去,
+         不然一條線橫過整個盤面會把沿路的棋子都切一半。
+       ⚠ pointer-events:none 一定要有(同 .tq-tray 那條):它蓋滿整個盤面,
+         不關掉就整盤點不到,而症狀是「棋子沒反應」——很容易誤判成 adapter 壞了。
+       ⚠ 單位是**格**(viewBox 與托盤同一組 TRAY_W / TRAY_H)→ 底下的 stroke-width
+         寫的都是「幾格」而不是 px,所以縮放時線寬會跟著棋子一起變。 */
+    h += '<svg class="tq-fx" viewBox="0 0 ' + f3(TRAY_W) + " " + f3(TRAY_H) + '" aria-hidden="true">' +
+           '<g class="tq-arcs"></g><g class="tq-trail"></g></svg>';
     board.innerHTML = h;
     holeEls = [];
     for(let id = 0; id < R.N_HOLES; id++) holeEls.push(board.querySelector('.tq-hole[data-id="' + id + '"]'));
+    fxArcs = board.querySelector(".tq-arcs");
+    fxTrail = board.querySelector(".tq-trail");
+    arcKey = "";
     built = true;
   }
 
@@ -564,6 +581,108 @@ const TQB = (function(){
   }
 
   /* ==========================================================================
+     三之二、★★ 動效疊層 —— 連跳軌跡 / 流星尾跡 / 落洞波紋
+     ──────────────────────────────────────────────────────────────────────────
+       ★★★ 為什麼**不做 hover**(建議書寫的是「滑鼠懸停或手指滑向」):
+         這一頁的受眾是手機聚會,而觸控**沒有 hover** —— 手指按下去的下一件事
+         就是 click,而 click 在這一頁**當場就送出那一手**(點落點 = 起跳,
+         那是既有行為,也是建議書自己要的「一鍵起跳」)。
+         所以「先預覽、再確認」在這一頁是一個**做不出來的手勢**:
+         要嘛多一次點擊(等於把一鍵起跳拆回兩步),要嘛只閃 100ms(等於沒有)。
+       ★ 改成:**選中一顆棋的那一刻,就把所有連跳落點的軌跡一起畫出來。**
+         零新手勢、觸控與桌機完全一樣,而且順便解決了建議書沒想到的一半 ——
+         「它是踩了哪幾顆跳過去的」對**旁觀的人**也是問號(見 setTrail)。
+       ⚠ 只畫 `jumps >= 2`:單步落點就在隔壁一格,畫一條線只是把盤面弄花。
+     ========================================================================== */
+
+  /* 一段一條二次貝茲。控制點抬 2 × lift(0.38 格)→ 弧頂剛好等於動畫真的會拱到的高度,
+     所以「預覽的弧線」與「棋子飛過去的弧線」是同一條(見 frame() 的 lift)。 */
+  function segD(ia, ib){
+    const a = vXY(ia), b = vXY(ib);
+    return "M" + f3(a.x + OX) + " " + f3(a.y + OY) +
+           "Q" + f3((a.x + b.x) / 2 + OX) + " " + f3((a.y + b.y) / 2 + OY - 0.76) +
+           " " + f3(b.x + OX) + " " + f3(b.y + OY);
+  }
+  function arcD(path){
+    let d = "";
+    for(let i = 1; i < path.length; i++){
+      const a = vXY(path[i - 1]), b = vXY(path[i]);
+      if(i === 1) d += "M" + f3(a.x + OX) + " " + f3(a.y + OY);
+      d += "Q" + f3((a.x + b.x) / 2 + OX) + " " + f3((a.y + b.y) / 2 + OY - 0.76) +
+           " " + f3(b.x + OX) + " " + f3(b.y + OY);
+    }
+    return d;
+  }
+
+  /* ★★★ 以「**段**」為單位去重,不是以「落點」為單位。
+     連跳本來就是一棵樹 —— 好幾個落點共用前面幾段是常態(截圖量到 5 個落點只有 7 段獨立的)。
+     照落點各畫一條的下場是同一段疊三四層:**墨水多好幾倍、資訊一模一樣**,
+     而這一頁最怕的就是「看起來太亂了」(暗棋那批砍掉十一條的理由)。
+   ⚠ key 用排序過的一對 id:同一段被兩個落點反向走到時也要collapse 成一條。 */
+  function renderArcs(sel, spots){
+    if(!fxArcs) return;
+    const far = (spots || []).filter(s => s.jumps >= 2);
+    const key = rotK + "|" + sel + "|" + far.map(s => s.to).join(",");
+    if(key === arcKey) return;
+    arcKey = key;
+    if(!far.length){ fxArcs.innerHTML = ""; return; }
+    const seen = {};
+    let arcs = "", dots = "";
+    far.forEach(s => {
+      for(let i = 1; i < s.path.length; i++){
+        const a = s.path[i - 1], b = s.path[i];
+        const k = Math.min(a, b) + ">" + Math.max(a, b);
+        if(seen[k]) continue;
+        seen[k] = 1;
+        arcs += '<path class="tq-arc" d="' + segD(a, b) + '"/>';
+        /* ★ 借力點 = 這一段的**中點**(rules.js 的 countBorrowed 用的是同一件事:
+             被跳過去的那一格就在中點上)。標出來才回答得了「踩了哪幾顆」。
+           ⚠⚠ 半徑一定要**比棋子大**(棋子半徑 0.40 格):畫在中心點的話整個被棋子蓋掉,
+             看起來像沒生效 —— 所以畫成一圈套在它外面的環。
+           ⚠ 相鄰的洞只差 1 格 → 不可以超過 0.5,不然環會壓到隔壁那一顆。 */
+        const pa = vXY(a), pb = vXY(b);
+        dots += '<circle class="tq-arcdot" cx="' + f3((pa.x + pb.x) / 2 + OX) +
+                '" cy="' + f3((pa.y + pb.y) / 2 + OY) + '" r="0.49"/>';
+      }
+    });
+    fxArcs.innerHTML = arcs + dots;      // 環畫在線上面(線從棋子中間穿過去,環要看得見)
+  }
+
+  /* ★★ 流星尾跡(4 段以上才留)。
+     ★ 它補的是「**別人**那一手到底怎麼飛的」:軌跡預覽只有出手的人看得到
+       (選取是本地狀態),而一口氣飛過半個盤面這件事,全桌都在看。
+     ⚠ 它必須是**時間的函式**(紅線 2):這裡只寫一次 DOM,推進完全交給 CSS
+       (duration = 這一趟的 animMs)—— 沒有回呼、沒有計時器,被打斷就只是少一個裝飾。
+     ⚠ 4 段的門檻與 drama() 的 🔥 同一條線,兩邊要一起改。 */
+  function setTrail(path, dur){
+    if(!fxTrail) return;
+    fxTrail.innerHTML = (path && path.length - 1 >= 4)
+      ? '<path class="tq-tr" pathLength="1" d="' + arcD(path) + '" style="--tq-trd:' + dur + 'ms"/>'
+      : "";
+  }
+
+  /* ★ 落洞波紋:那一顆的顏色從洞裡盪一圈出來。
+     ⚠ 掛在**洞**上而不是棋子上 —— 棋子那一格 transform 是動畫每一幀在寫的(紅線 15),
+       而洞的位置走 left/top,transform 是空的。
+     ⚠ 同時只留一個:連跳落地一趟只有一次,但單步也會響 → 兩手之間要收乾淨,
+       不然上一個洞的 class 留著,下一次 render 不會幫你清(render 只 toggle
+       goal / spot / far 三個)。 */
+  function ripple(id, c){
+    const el = holeEls[id];
+    clearRipple();
+    if(!el || c == null || c < 0) return;
+    ripEl = el;
+    el.dataset.rip = c;
+    void el.offsetWidth;                 // 重播:同一個洞連續兩次也要看得到
+    el.classList.add("rip");
+    ripT = setTimeout(clearRipple, 620);
+  }
+  function clearRipple(){
+    if(ripT){ clearTimeout(ripT); ripT = 0; }
+    if(ripEl){ ripEl.classList.remove("rip"); ripEl.removeAttribute("data-rip"); ripEl = null; }
+  }
+
+  /* ==========================================================================
      四、★★★ 動畫 —— 位置是 now 的函式
      ──────────────────────────────────────────────────────────────────────────
        這一整節都是**裝飾**:它只把「已經在終點的那一顆」暫時拉回路徑上。
@@ -580,6 +699,7 @@ const TQB = (function(){
     if(flight && flight.el) flight.el.classList.remove("fly");
     flight = null;
     if(rafId){ cancelAnimationFrame(rafId); rafId = 0; }
+    if(fxTrail) fxTrail.innerHTML = "";
   }
 
   /* ★★★ 動畫的**絕對過期**:牆上時間過了就當它演完,不管 rAF 有沒有真的跑過。
@@ -604,8 +724,11 @@ const TQB = (function(){
     const el = pieceEls[seat] && pieceEls[seat][idx];
     if(!el || !path || path.length < 2) return;
     const dur = animMs(path);
-    flight = { el: el, path: path.slice(), startAt: now(), dur: dur, seg: -1 };
+    /* c = 這一顆的角索引(落洞波紋要用它的顏色)。⚠ 從 DOM 讀,不從 st 推 ——
+       這一支拿不到 st,而 dataset.c 是 ensurePieces() 寫進去的同一個值。 */
+    flight = { el: el, path: path.slice(), startAt: now(), dur: dur, seg: -1, c: +el.dataset.c };
     el.classList.add("fly");
+    setTrail(flight.path, dur);
     rafId = requestAnimationFrame(frame);
   }
   function now(){
@@ -630,6 +753,10 @@ const TQB = (function(){
          ⚠⚠ 只在「大致準時演完」時才響:分頁被丟到背景再回來時 rAF 會遲很久才觸發,
            那時候補一聲「咚」是憑空冒出來的。⚠ 離場不必擔心 —— reset() 會 stopFlight()。 */
       if(segsDone >= 2 && t < f.dur + FLIGHT_SLACK) SFX.land(segsDone);
+      /* ★ 落洞彩光波紋。⚠ 與落地音同一個「大致準時」的守衛:分頁丟到背景再回來時
+         rAF 會遲很久才觸發,那時候補一圈波紋是憑空冒出來的(而且它會蓋在別人
+         下一手的落點上)。 */
+      if(t < f.dur + FLIGHT_SLACK) ripple(f.path[f.path.length - 1], f.c);
       return;
     }
     const segs = f.path.length - 1;
@@ -678,8 +805,12 @@ const TQB = (function(){
     if(k === rotK) return;
     rotK = k;
     stopFlight();
+    clearRipple();
     built = false; shownKey = "";
     holeEls = []; pieceEls = []; lastPaint = null;
+    /* ⚠ 這兩個抓的是馬上就要被 innerHTML 清走的節點 —— 不歸零的話 renderArcs()
+       會往一個已經離開文件的 <g> 裡寫東西(不報錯,只是軌跡永遠不出現)。 */
+    fxArcs = null; fxTrail = null; arcKey = "";
   }
 
   function render(view){
@@ -711,7 +842,13 @@ const TQB = (function(){
       el.classList.toggle("goal", isGoal);
       if(isGoal) el.dataset.g = st.corners[me]; else el.removeAttribute("data-g");
       el.classList.toggle("spot", !!spotSet[id]);
-      el.classList.toggle("far", !!(spotSet[id] && spotSet[id].jumps >= 2));
+      const sp = spotSet[id];
+      el.classList.toggle("far", !!(sp && sp.jumps >= 2));
+      /* ★ 段數標籤(v2.4.3):`.far` 只說「這是連跳落點」,數字才說「幾段」——
+         而「這一顆能飛多遠」是跳棋最重要的一眼資訊。
+         ⚠ 刻意**不放 emoji**:cell 最小 16px,標籤只有 5~6px 高,任何 emoji 在
+           那個尺寸都是一團色塊;⚡ 留在提示列的文字裡(那裡讀得到)。 */
+      if(sp && sp.jumps >= 2) el.dataset.j = sp.jumps; else el.removeAttribute("data-j");
     }
     // 棋子:選中 / 我的 / 到家 / 送出中
     for(let s = 0; s < pieceEls.length; s++)
@@ -722,8 +859,33 @@ const TQB = (function(){
         el.classList.toggle("home", st.goals[s] && st.goals[s].indexOf(id) >= 0);
         el.classList.toggle("wait", s === me && id === view.pending);
       }
+    // 連跳軌跡預覽(★ 選中就畫,不等 hover —— 理由見第三之二節的檔頭)
+    renderArcs(sel, spots);
+
     // 輪到誰:那一家的角亮起來
     board.dataset.turn = st.over ? "" : String(st.corners[st.turn]);
+
+    /* ★★ 終局:贏家的**目標星尖**整個亮起來(v2.4.3)。
+       ⚠⚠ 它必須是**持續狀態**而不是一次性特效:結果卡在最後一手演完約 140ms 後就蓋上來
+         (solo.js 的節拍器 / 連線的 outcome),一次性的閃光等於做給沒人看 ——
+         做成 data-won + `animation: … both` 之後,收尾停在金色,
+         按「偷看牌面」就看得到,而那正是大家會去按的那顆鈕。
+       ⚠ 起始時間對齊最後一手飛完的那一刻:CSS 的 delay 吃 --tq-wond。
+         那仍然是**時間的函式**(紅線 2)—— 沒有回呼、rAF 不觸發也照樣會亮。
+       ⚠ data-won 存的是**目標星尖那個角**(= 對面那一角),不是贏家自己的角;
+         直接從 goals 反查,不自己算 (c+3)%6(少一次算錯的機會)。 */
+    if(st.over){
+      const sc = R.score(st);
+      const w = (sc && sc.winners && sc.winners.length) ? sc.winners[0] : -1;
+      const gh = (w >= 0 && st.goals[w] && st.goals[w].length) ? st.goals[w][0] : -1;
+      const gc = (gh >= 0) ? R.cornerOf(gh) : -1;
+      if(gc >= 0 && board.dataset.won !== String(gc)){
+        board.style.setProperty("--tq-wond", (view.anim ? animMs(view.anim.path) : 0) + "ms");
+        board.dataset.won = String(gc);
+      }
+    }else if(board.dataset.won){
+      board.removeAttribute("data-won");
+    }
 
     if(view.anim) startFlight(view.anim.seat, view.anim.idx, view.anim.path);
   }
@@ -930,6 +1092,7 @@ const TQB = (function(){
 
   function reset(){
     stopFlight();
+    clearRipple();
     stopCd();
     zoomReset();            // 換一局就回到整盤(不然上一局放大的視角會帶進新局)
     shownKey = ""; lastPaint = null;
@@ -937,9 +1100,14 @@ const TQB = (function(){
       pieceEls.forEach(r => r.forEach(el => el.remove()));
       pieceEls = [];
       board.dataset.turn = "";
+      board.removeAttribute("data-won");
+      if(fxArcs) fxArcs.innerHTML = "";
+      arcKey = "";
       [...board.querySelectorAll(".tq-hole")].forEach(el => {
-        el.classList.remove("goal", "spot", "far");
+        el.classList.remove("goal", "spot", "far", "rip");
         el.removeAttribute("data-g");
+        el.removeAttribute("data-j");
+        el.removeAttribute("data-rip");
       });
     }
   }
