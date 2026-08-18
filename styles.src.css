@@ -472,6 +472,122 @@
   .cell.just-placed{animation:place .25s ease}
   @keyframes place{from{transform:scale(.78)}to{transform:scale(1)}}
 
+  /* ==========================================================================
+     賓果 — 體驗與動效(v2.4.5)。前綴一律 `.bc-*`(這一頁的 icon 用的就是這一組)
+     ==========================================================================
+     ★ 這一段全部是**畫面**:計數、聽牌判定與勝負仍然由 game.js 的
+       `refreshLines()` / `isTenpai()` / `MP.tryWin()` 算(它們一個字都沒改)。
+     ⚠ `.cell` 的 `::before` / `::after` 在這之前**兩個都沒人用** —— 這裡各用一個,
+       下一個要在格子上加東西的人要先看這裡。 */
+
+  /* ---------- ★★ 聽牌關鍵號碼:只差這一格就連成一條 ----------
+     賓果最屏息的一刻就是「某條線只差最後一個號碼」,而舊版要玩家自己在盤面上找。
+     ⚠ 它標的是**還沒被劃記**的那一格(= 還缺的那一個號碼),由 refreshLines() 算。
+     ⚠ 權重要贏過 `.cell.callable`(連線時「輪到我、這一格還沒被叫」也在發 inset 框)——
+       兩條都是 (0,2,0),所以這一條**必須排在它後面**;而 .callable 在檔案更前面,
+       這裡順序天生就對。合掛時看到的是這一條(它自己也帶 inset 框,資訊沒少)。
+     ⚠ 呼吸只動 box-shadow,**不動 transform** —— `.cell` 的 transform 被 hover /
+       active / .just-placed 三處用著,動它就會互相蓋。 */
+  .cell.bc-reach{border-color:var(--accent);animation:bcReach 1.4s ease-in-out infinite}
+  @keyframes bcReach{
+    0%,100%{box-shadow:0 3px 0 var(--cell-edge), inset 0 0 0 2px var(--accent)}
+    50%    {box-shadow:0 3px 0 var(--cell-edge), inset 0 0 0 4px var(--accent),
+                       0 0 14px var(--accent)}}
+  /* 右上角一顆小圓點 —— 7×7 的格子只有 40px 上下,寫「聽牌點」三個字塞不下,
+     而一個點配上會呼吸的框已經足夠說「就是這一格」。 */
+  .cell.bc-reach::after{content:"";position:absolute;top:3px;right:3px;z-index:3;
+    width:6px;height:6px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 6px var(--accent)}
+
+  /* ---------- 印章式劃記:蓋下去那一刻外擴一圈墨暈 ----------
+     ⚠ 動畫掛在 `.bc-just` 上而不是 `.marked`:`.marked` 是**狀態**(重畫之後還在),
+       掛在它身上會變成「每次重畫都再蓋一次章」。 */
+  .cell.bc-just::before{content:"";position:absolute;inset:0;margin:auto;z-index:3;
+    width:78%;height:78%;border-radius:50%;pointer-events:none;
+    animation:bcStamp .5s ease-out forwards}
+  @keyframes bcStamp{
+    0%  {box-shadow:0 0 0 0 rgba(255,255,255,.60);opacity:.95}
+    100%{box-shadow:0 0 0 15px rgba(255,255,255,0);opacity:0}}
+
+  /* ---------- 動效圖層 ----------
+     ⚠⚠ 掛在 **body** 而不是 `#grid`:`render()` 每一次都把整個 grid 重建
+       (連線時對手一叫號就重建),放裡面的特效會被下一次重畫吹掉。
+     ⚠ z-index 40 —— 結果卡 `.veil` 是 50、彩帶 canvas 是 60、表情層 64:
+       對局中的特效一律排在蓋板底下。**只有 BINGO 那一塊霓虹是例外**(見下面)。 */
+  .bc-fx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+
+  /* 連線貫通的雷射。★ 位置 / 長度 / 角度由 game.js 量兩端格子中心寫成 inline。
+     ⚠ `--bc-ang` 要寫進每一個 keyframe 的 transform 裡:transform 是**整條**被覆寫的,
+       只在基底寫一次的話動畫一開始就把旋轉弄丟了(雷射會變成水平的)。 */
+  .bc-laser{position:fixed;border-radius:99px;
+    transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(0);
+    background:linear-gradient(90deg,rgba(255,255,255,0),#fff 10%,var(--accent) 38%,
+      var(--accent-2) 62%,#fff 90%,rgba(255,255,255,0));
+    filter:drop-shadow(0 0 6px var(--accent-2));
+    animation:bcLaser .9s cubic-bezier(.2,.75,.2,1) forwards}
+  /* ⚠ 高度只取一格的 0.20(game.js 量的),而且峰值**不拉到全不透明** ——
+     第一版是 0.34 + 全不透明 + 10px 光暈,雷射把那一整列的**號碼整個蓋掉**
+     (截圖才看得出來:斷言只知道「有兩道雷射」)。連成的那一列本來就是玩家
+     最想看的東西,特效不可以擋在它前面。 */
+  @keyframes bcLaser{
+    0%  {transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(0);  opacity:0}
+    16% {transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(.35);opacity:.88}
+    52% {transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(1);  opacity:.88}
+    100%{transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(1);  opacity:0}}
+
+  /* 叫號彩球(連線)。★ 現場派對最需要的就是「視線離開手機也知道叫到幾號」。
+     ⚠ 位置在 38% 高而不是正中央:正中央會壓在盤面最密的那一段上,
+       而球收掉之前玩家已經想看自己的卡片了。 */
+  .bc-ball{position:fixed;left:50%;top:38%;width:min(34vw,148px);aspect-ratio:1;
+    border-radius:50%;display:grid;place-items:center;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 32% 27%,#fff,rgba(255,255,255,.88) 10%,
+      var(--accent) 46%,var(--accent-2) 100%);
+    box-shadow:0 14px 34px rgba(0,0,0,.45),
+      inset -8px -12px 22px rgba(0,0,0,.26), inset 8px 10px 18px rgba(255,255,255,.40);
+    animation:bcBall 1.3s cubic-bezier(.2,1.4,.35,1) forwards}
+  .bc-ball b{font:900 clamp(30px,11vw,58px)/1 'Fredoka','Nunito',sans-serif;
+    color:#2a1300;text-shadow:0 2px 0 rgba(255,255,255,.45)}
+  @keyframes bcBall{
+    0%  {transform:translate(-50%,-50%) scale(.2)  rotate(-24deg);opacity:0}
+    17% {transform:translate(-50%,-50%) scale(1.13) rotate(4deg); opacity:1}
+    30% {transform:translate(-50%,-50%) scale(1)   rotate(0);     opacity:1}
+    74% {transform:translate(-50%,-50%) scale(1)   rotate(0);     opacity:1}
+    100%{transform:translate(-50%,-58%) scale(.84) rotate(0);     opacity:0}}
+
+  /* ---------- BINGO! 霓虹招牌 ----------
+     ⚠⚠ 這是這一頁**唯一**壓在結果卡之上的東西(`.veil` 是 50,這裡是 61)——
+       同台灣麻將胡牌那條:高潮特效不可以被立刻蓋上來的結果卡吃掉。
+     ⚠ 因此它**不進 `.bc-fx`**:那一層自己是 z-index 40 而 z-index 會建立堆疊脈絡,
+       放進去的子元素再大也翻不過去(game.js 那邊也註明了)。
+     ⚠ 1.6 秒之後自己收掉 → 結果卡完整露出來,不會擋著按鈕。 */
+  /* ⚠ 字**靠上面**不是正中央：結果卡自己的大字就是「BINGO!」，置中的話
+     兩個 BINGO 會疊在一起（而且霓虹還蓋到下面那兩顆鈕）—— 截圖才看得出來。
+     靠上去之後它讀起來就是「挂在慶祝上方的招牌」。 */
+  .bc-neon{position:fixed;inset:0;z-index:61;pointer-events:none;
+    display:grid;justify-items:center;align-content:start;
+    padding-top:clamp(28px,12vh,120px);
+    background:radial-gradient(58% 48% at 50% 46%,rgba(0,0,0,.22),rgba(0,0,0,.74));
+    animation:bcNeonBg 1.6s ease-out forwards}
+  @keyframes bcNeonBg{0%{opacity:0}12%{opacity:1}66%{opacity:1}100%{opacity:0}}
+  .bc-neonw{font:900 clamp(38px,14vw,116px)/1 'Fredoka','Nunito',sans-serif;letter-spacing:6px;
+    color:#fff;
+    text-shadow:0 0 8px #fff, 0 0 22px var(--accent),
+                0 0 48px var(--accent-2), 0 0 84px var(--accent-2);
+    animation:bcNeonW 1.6s cubic-bezier(.2,1.5,.3,1) forwards}
+  @keyframes bcNeonW{
+    0%  {transform:scale(2.5) rotate(-7deg);opacity:0}
+    15% {transform:scale(1)   rotate(-2deg);opacity:1}
+    66% {transform:scale(1)   rotate(-2deg);opacity:1}
+    100%{transform:scale(1.1) rotate(-2deg);opacity:0}}
+
+  /* 會動的東西一律尊重系統的「減少動態效果」。
+     ⚠ 聽牌點的框**不可以**一起關掉 —— 它是資訊不是裝飾,關掉動畫要留常亮的那一版。 */
+  @media (prefers-reduced-motion:reduce){
+    .cell.bc-reach{animation:none;box-shadow:0 3px 0 var(--cell-edge), inset 0 0 0 3px var(--accent)}
+    .bc-laser,.bc-ball,.bc-neon{display:none}
+  }
+
   /* ---------- Buttons ---------- */
   .actions{display:flex;gap:10px;width:min(92vw,520px);flex-wrap:wrap}
   .btn{

@@ -1282,12 +1282,27 @@
         g.turnIndex=nextTurn(g.turnIndex||0, g.order||[]);
       });
     }
+    /* 上一次看到的 calledList 長度 —— 叫號彩球只在「剛好多一個」時彈。
+       ⚠ -1 = 還沒看過(進場 / 重連的第一次)→ 那一次一律不彈。 */
+    let ballSeen=-1;
     function onCalled(){
       if(state.mode==="play"){
         const prev=state.marked.slice();
         applyCalledMarks();
-        if(state.marked.some((m,i)=>m&&!prev[i]))Sound.mark();
+        const fresh=[];
+        for(let i=0;i<nCells();i++) if(state.marked[i]&&!prev[i]) fresh.push(i);
+        if(fresh.length)Sound.mark();
+        /* ★ 叫號彩球(v2.4.5):新叫出來的那個號碼在畫面正中央彈一顆球。
+           ⚠ **一次只多一個才放** —— 重連歸位會一口氣補進十幾個號碼
+             (同各頁「音效不連播」那條);ballSeen < 0 的第一次也不放。 */
+        if(ballSeen>=0 && calledList.length===ballSeen+1)
+          callBall(calledList[calledList.length-1]);
+        ballSeen=calledList.length;
         render(); updateTurnUI();
+        /* ⚠⚠ 印章一定要在 render() **之後**:render() 會把整個 grid 重建,
+           class 加在它之前會被吹掉(而那時什麼錯誤都不會有,只是「有時候沒動畫」)。
+           ⚠ 一次多一格才蓋章,理由同上面那顆球。 */
+        if(fresh.length===1) stampFx(fresh[0]);
       }
     }
     function applyCalledMarks(){

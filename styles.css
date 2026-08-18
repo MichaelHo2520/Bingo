@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 9c515cc5fe0ef35965eda776b887a1771e53e5a6e1401d5a4ead0691be83ef64)
+    真相在 styles.src.css(sha256 38e804d9e7178ca484b64d5137a38403014abd4384f9ebce8fdaa3f90ae60fcd)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -239,6 +239,68 @@
   .cell.empty-cell:hover{border-color:var(--accent);border-style:solid;transform:translateY(-2px)}
   .cell.just-placed{animation:place .25s ease}
   @keyframes place{from{transform:scale(.78)}to{transform:scale(1)}}
+  .cell.bc-reach{border-color:var(--accent);animation:bcReach 1.4s ease-in-out infinite}
+  @keyframes bcReach{
+    0%,100%{box-shadow:0 3px 0 var(--cell-edge), inset 0 0 0 2px var(--accent)}
+    50%    {box-shadow:0 3px 0 var(--cell-edge), inset 0 0 0 4px var(--accent),
+                       0 0 14px var(--accent)}}
+  .cell.bc-reach::after{content:"";position:absolute;top:3px;right:3px;z-index:3;
+    width:6px;height:6px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 6px var(--accent)}
+  .cell.bc-just::before{content:"";position:absolute;inset:0;margin:auto;z-index:3;
+    width:78%;height:78%;border-radius:50%;pointer-events:none;
+    animation:bcStamp .5s ease-out forwards}
+  @keyframes bcStamp{
+    0%  {box-shadow:0 0 0 0 rgba(255,255,255,.60);opacity:.95}
+    100%{box-shadow:0 0 0 15px rgba(255,255,255,0);opacity:0}}
+  .bc-fx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+  .bc-laser{position:fixed;border-radius:99px;
+    transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(0);
+    background:linear-gradient(90deg,rgba(255,255,255,0),#fff 10%,var(--accent) 38%,
+      var(--accent-2) 62%,#fff 90%,rgba(255,255,255,0));
+    filter:drop-shadow(0 0 6px var(--accent-2));
+    animation:bcLaser .9s cubic-bezier(.2,.75,.2,1) forwards}
+  @keyframes bcLaser{
+    0%  {transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(0);  opacity:0}
+    16% {transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(.35);opacity:.88}
+    52% {transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(1);  opacity:.88}
+    100%{transform:translate(-50%,-50%) rotate(var(--bc-ang)) scaleX(1);  opacity:0}}
+  .bc-ball{position:fixed;left:50%;top:38%;width:min(34vw,148px);aspect-ratio:1;
+    border-radius:50%;display:grid;place-items:center;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 32% 27%,#fff,rgba(255,255,255,.88) 10%,
+      var(--accent) 46%,var(--accent-2) 100%);
+    box-shadow:0 14px 34px rgba(0,0,0,.45),
+      inset -8px -12px 22px rgba(0,0,0,.26), inset 8px 10px 18px rgba(255,255,255,.40);
+    animation:bcBall 1.3s cubic-bezier(.2,1.4,.35,1) forwards}
+  .bc-ball b{font:900 clamp(30px,11vw,58px)/1 'Fredoka','Nunito',sans-serif;
+    color:#2a1300;text-shadow:0 2px 0 rgba(255,255,255,.45)}
+  @keyframes bcBall{
+    0%  {transform:translate(-50%,-50%) scale(.2)  rotate(-24deg);opacity:0}
+    17% {transform:translate(-50%,-50%) scale(1.13) rotate(4deg); opacity:1}
+    30% {transform:translate(-50%,-50%) scale(1)   rotate(0);     opacity:1}
+    74% {transform:translate(-50%,-50%) scale(1)   rotate(0);     opacity:1}
+    100%{transform:translate(-50%,-58%) scale(.84) rotate(0);     opacity:0}}
+  .bc-neon{position:fixed;inset:0;z-index:61;pointer-events:none;
+    display:grid;justify-items:center;align-content:start;
+    padding-top:clamp(28px,12vh,120px);
+    background:radial-gradient(58% 48% at 50% 46%,rgba(0,0,0,.22),rgba(0,0,0,.74));
+    animation:bcNeonBg 1.6s ease-out forwards}
+  @keyframes bcNeonBg{0%{opacity:0}12%{opacity:1}66%{opacity:1}100%{opacity:0}}
+  .bc-neonw{font:900 clamp(38px,14vw,116px)/1 'Fredoka','Nunito',sans-serif;letter-spacing:6px;
+    color:#fff;
+    text-shadow:0 0 8px #fff, 0 0 22px var(--accent),
+                0 0 48px var(--accent-2), 0 0 84px var(--accent-2);
+    animation:bcNeonW 1.6s cubic-bezier(.2,1.5,.3,1) forwards}
+  @keyframes bcNeonW{
+    0%  {transform:scale(2.5) rotate(-7deg);opacity:0}
+    15% {transform:scale(1)   rotate(-2deg);opacity:1}
+    66% {transform:scale(1)   rotate(-2deg);opacity:1}
+    100%{transform:scale(1.1) rotate(-2deg);opacity:0}}
+  @media (prefers-reduced-motion:reduce){
+    .cell.bc-reach{animation:none;box-shadow:0 3px 0 var(--cell-edge), inset 0 0 0 3px var(--accent)}
+    .bc-laser,.bc-ball,.bc-neon{display:none}
+  }
   .actions{display:flex;gap:10px;width:min(92vw,520px);flex-wrap:wrap}
   .btn{
     flex:1;min-width:120px;border:0;border-radius:15px;padding:15px 16px;cursor:pointer;

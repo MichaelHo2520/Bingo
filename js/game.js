@@ -20,6 +20,9 @@
     return L;
   }
   let LINES=buildLines(SIZE);
+  /* ★ 上一次已經連成的線(索引集合)—— 只有**剛剛才連成**的那幾條會放雷射。
+     ⚠ 它是純畫面狀態,`resetMarquee()`(開新局的唯一入口)會把它清掉。 */
+  let bcDone=null;
   // 套用格線欄列數;欄列模板與字級都在 CSS 由 --cols / --cellsize 推導(字級不再逐級寫死 clamp)
   function applyGridCols(){
     // 格子越多 → 間距/圓角縮小,把空間讓給格子本身,增加手機觸控面積、減少 6×6 / 7×7 的誤觸
@@ -201,16 +204,35 @@
     const cell=grid.children[i];
     cell.classList.toggle("marked",state.marked[i]);
     cell.setAttribute("aria-pressed",state.marked[i]?"true":"false");
+    if(state.marked[i]) stampFx(i);          // ★ 印章式劃記(v2.4.5)
     refreshLines();
   }
 
   function refreshLines(){
     const inLine=new Set();
     let done=0;
-    LINES.forEach(line=>{
-      if(line.every(idx=>state.marked[idx])){done++;line.forEach(idx=>inLine.add(idx));}
+    /* ★★ 這一輪順便算兩件**副產品**(v2.4.5):
+         nowDone —— 哪幾條線連成了(與上一次比 → 剛剛才連成的那幾條放雷射)
+         reach   —— 只差一格就連成的那一格(= 聽牌點,金色呼吸)
+       ⚠⚠ `done` 的算法一個字都沒有變(還是「整條都劃記了才 +1」)——
+         勝負判定與 MP.tryWin() 走的仍然是原本那一條路,動畫碰不到它。 */
+    const nowDone=new Set(), reach=new Set();
+    LINES.forEach((line,li)=>{
+      let n=0, miss=-1;
+      for(let k=0;k<line.length;k++){ if(state.marked[line[k]])n++; else miss=line[k]; }
+      if(n===line.length){ done++; nowDone.add(li); line.forEach(idx=>inLine.add(idx)); }
+      else if(n===line.length-1) reach.add(miss);
     });
-    for(let i=0;i<nCells();i++)grid.children[i].classList.toggle("inline",inLine.has(i));
+    for(let i=0;i<nCells();i++){
+      const c=grid.children[i]; if(!c) continue;
+      c.classList.toggle("inline",inLine.has(i));
+      /* 聽牌點:只在對局中、還沒贏、而且那一格**還沒被劃記**時才標
+         (它講的就是「還缺的那一格」)。 */
+      c.classList.toggle("bc-reach", state.mode==="play" && !state.won && reach.has(i));
+    }
+    const fresh=[]; nowDone.forEach(li=>{ if(!bcDone || !bcDone.has(li)) fresh.push(li); });
+    if(bcDone) lineFx(fresh);      // ⚠ 第一次(bcDone === null)一律不放:那是「剛進場」
+    bcDone=nowDone;
 
     $("lineCount").textContent=done;
     $("remain").textContent=Math.max(0,state.target-done);
@@ -257,6 +279,7 @@
     $("spWinBtns").classList.remove("hidden");
     $("mpWinBtns").classList.add("hidden");
     $("winScores").classList.add("hidden"); $("winChamp").classList.add("hidden"); $("mpNewSeason").classList.add("hidden");   // 單機:不顯示連線排行/冠軍
+    bingoNeon();                             // ★ 全場熄燈 + 霓虹招牌(v2.4.5)
     showResult();
     burst();
   }
@@ -373,6 +396,9 @@
   // 灰的會像壞掉、也和五子棋/數獨那兩頁的品牌字不一樣。開打才全部熄掉,
   // 之後由 refreshLines() 依完成線數逐一點亮(那才是它的本業:進度顯示)。
   function resetMarquee(){
+    // ⚠ 順手把雷射的 diff 清掉 —— 這一支是「開新局」的唯一入口(單機與連線都經過它)。
+    //   不清的話新局第一次算出來的線會被當成「上一局就連成了」而不放光。
+    bcDone=null;
     const lit = state.mode==="play" ? 0 : 5;
     [...$("marquee").children].forEach((b,k)=>b.classList.toggle("lit", k<lit));
   }
@@ -478,6 +504,96 @@
         ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);ctx.restore();});
       if(t<160)requestAnimationFrame(loop);else ctx.clearRect(0,0,cv.width,cv.height);
     })();
+  }
+
+
+  /* ==========================================================================
+     動效(v2.4.5)—— ★ 全部只影響畫面
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠⚠ `refreshLines()` 的**計數與勝負判定一個字都沒有動** —— 建議書那條
+         「聽牌計算與連線勝利檢查必須維持純函式,不可因視覺動畫延遲而影響 checkWin()」
+         就是這件事:雷射 / 聽牌點是**同一輪迴圈順便算出來的副產品**,
+         而 `done`、`state.won`、`MP.tryWin()` 走的還是原本那一條路。
+       ⚠ 特效節點一律掛在獨立的 fixed 圖層 `.bc-fx`,不掛 `#grid`:
+         `render()` 每一次都把整個 grid 重建,放裡面會被下一次重畫吹掉。
+       ⚠ 這一支與 `js/shared/ui-kit.js` **沒有雙胞胎** —— 它是 Bingo 專屬的動效,
+         另外十三頁各有自己的一份(CLAUDE.md 紅線 4 講的是「基礎設施」,不是這個)。
+     ========================================================================== */
+  function fxLayer(){
+    let el=document.querySelector(".bc-fx");
+    if(!el){ el=document.createElement("div"); el.className="bc-fx"; document.body.appendChild(el); }
+    return el;
+  }
+
+  /* 剛連成的那幾條線:沿著線掃一道彩虹雷射。
+     ⚠ 只畫**剛剛才連成**的那幾條(fresh)—— 每次重畫都畫的話盤面上會永遠有光在跑。
+     ⚠ 兩端取的是那一條線的頭尾格子中心,長度再多留 0.9 格:雷射要蓋過整條線,
+       停在格子中心看起來像「短了一截」。 */
+  function lineFx(fresh){
+    if(!fresh.length) return;
+    fresh.forEach((li,k)=>{
+      const line=LINES[li];
+      const a=grid.children[line[0]], b=grid.children[line[line.length-1]];
+      if(!a||!b) return;
+      const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+      const x1=ra.left+ra.width/2, y1=ra.top+ra.height/2;
+      const x2=rb.left+rb.width/2, y2=rb.top+rb.height/2;
+      const len=Math.hypot(x2-x1,y2-y1)+ra.width*0.9;
+      const ang=Math.atan2(y2-y1,x2-x1)*180/Math.PI;
+      const el=document.createElement("div");
+      el.className="bc-laser";
+      el.setAttribute("style","left:"+((x1+x2)/2)+"px;top:"+((y1+y2)/2)+"px;width:"+len.toFixed(1)+
+        "px;height:"+Math.max(5,ra.height*0.20).toFixed(1)+"px;--bc-ang:"+ang.toFixed(2)+
+        "deg;animation-delay:"+(k*0.12).toFixed(2)+"s");
+      fxLayer().appendChild(el);
+      setTimeout(()=>{ if(el.parentNode)el.parentNode.removeChild(el); },1000+k*140);
+    });
+    /* 一個號碼同時連通兩條以上 —— 這一頁最爽的一刻,而舊版與「連成一條」長得一模一樣。 */
+    if(fresh.length>=2){
+      showToast(fresh.length>=3 ? ("🔥 "+fresh.length+" 線共鳴!") : "⚡ 雙線齊發!", 2000);
+      try{
+        Sound.tone(784,{type:"triangle",dur:0.22,vol:0.18});
+        Sound.tone(1046,{type:"triangle",dur:0.42,vol:0.16,delay:0.12});
+      }catch(e){}
+    }
+  }
+
+  /* 印章式劃記:剛蓋上去的那一格外擴一圈墨暈。
+     ⚠ 一定要先 remove 再強制 reflow 再 add —— class 名沒換的話瀏覽器不會重播動畫,
+       而連續叫到同一格附近時看起來就是「有時候有、有時候沒有」。 */
+  function stampFx(i){
+    const c=grid.children[i];
+    if(!c) return;
+    c.classList.remove("bc-just");
+    void c.offsetWidth;
+    c.classList.add("bc-just");
+    // 放完就把 class 拿掉 —— 單機那一條路不會 render()，class 會一直累下去。
+    c.addEventListener("animationend", function(){ c.classList.remove("bc-just"); }, { once:true });
+  }
+
+  /* 叫號彩球:畫面正中央彈出一顆球,大字寫著剛叫出來的號碼。
+     ★ 它畫的是**公開資訊**(誰都看得到叫了什麼),與我的卡片上有沒有那個號碼無關 ——
+       現場派對最需要的就是「視線離開手機也知道叫到幾號」。
+     ⚠ 只有連線用得到:單機是自己一格一格點,每點一下彈一顆球會變成噪音。 */
+  function callBall(n){
+    const el=document.createElement("div");
+    el.className="bc-ball";
+    el.innerHTML='<b>'+n+'</b>';
+    fxLayer().appendChild(el);
+    setTimeout(()=>{ if(el.parentNode)el.parentNode.removeChild(el); },1300);
+  }
+
+  /* BINGO 達成的那一刻:全螢幕壓一層暗 + 中央一塊霓虹招牌。
+     ⚠⚠ 它是這一頁**唯一**掛在結果卡之上的東西(`.veil` 是 z-index 50,這一層是 61)——
+       同台灣麻將胡牌那條:高潮特效不可以被立刻蓋上來的結果卡吃掉。
+     ⚠ 因此它**不進 `.bc-fx`**(那一層是 z-index 40,而 z-index 會建立堆疊脈絡,
+       放進去的子元素再大也翻不過去)。 */
+  function bingoNeon(){
+    const el=document.createElement("div");
+    el.className="bc-neon";
+    el.innerHTML='<span class="bc-neonw">BINGO!</span>';
+    document.body.appendChild(el);
+    setTimeout(()=>{ if(el.parentNode)el.parentNode.removeChild(el); },1600);
   }
 
   /* ---------- Theme & fullscreen ---------- */
