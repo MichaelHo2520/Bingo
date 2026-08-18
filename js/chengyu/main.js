@@ -49,6 +49,21 @@ function paintLevelHint() {
   el.textContent = L.label + " " + L.name + " · 空 " + L.holes + " 格 · " + L.desc;
 }
 
+/* ---------- 結果卡的朱紅大印(v2.4.1) ----------
+   單機解完整張盤、連線拿下這一局(含並列)才蓋;輸的那一份不蓋。
+   ⚠ 兩邊都要走這一支,不要各自 innerHTML —— 收印的地方有五處(開新局 / 離開 / 換局 /
+     回大廳 / 單機退出),分成兩份一定會有一處漏掉,而漏掉的症狀是「上一局的印還在」。 */
+let sealKey = "";
+function paintSeal(text, key) {
+  const el = $("cySeal"); if (!el) return;
+  if (!text) { el.classList.add("hidden"); el.classList.remove("stamp"); el.innerHTML = ""; sealKey = ""; return; }
+  if (key && key === sealKey) return;      // 同一盤只蓋一次(outcome() 會被反覆呼叫)
+  sealKey = key || "";
+  el.innerHTML = [...text].map(c => '<span>' + esc(c) + '</span>').join("");
+  el.classList.remove("hidden");
+  el.classList.remove("stamp"); void el.offsetWidth; el.classList.add("stamp");
+}
+
 /* ---------- 盤面:點格 → 點字卡 ---------- */
 CYB.init({
   onNum(i, ch) { if (Solo.running()) Solo.onNum(i, ch); else MP.play(i, ch); },

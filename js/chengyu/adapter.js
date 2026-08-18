@@ -116,7 +116,7 @@ const MP = MPCore.create((function () {
     const right = (CYB.solAt(i) === ch);
     if (!right) {
       CYB.flashWrong(i);
-      CYB.freeze(FREEZE_MS);
+      CYB.freeze(FREEZE_MS, i);      // 第二個參數 = 這一格結霜,倒數歸零時碎冰(v2.4.1)
       showToast("填錯了,冷靜 3 秒 🥶", 1400);
       try { Sound.lose(); } catch (e) {}
       ctx.txGame(g => {
@@ -181,7 +181,9 @@ const MP = MPCore.create((function () {
        使用者剛點好的格子會在他點字卡**之前**被偷偷換掉 → 字填到別的格子 → 多半是錯的
        → 凍結 3 秒。連中幾次,那一台看起來就是「一直按不動」。 */
   function keepSel(keep) {
-    if (keep < 0 || CYB.isBlock(keep) || CYB.isGiven(keep) || CYB.valueAt(keep)) CYB.setSel(CYB.firstEmpty());
+    /* ⚠ 換選格的條件一個字都不能放寬(紅線 12):只有「原本就沒選 / 那一格已經不能填了」
+       才動它。v2.4.1 只換掉**退路的目的地** —— firstEmpty() 改成同一條成語的下一個空格。 */
+    if (keep < 0 || CYB.isBlock(keep) || CYB.isGiven(keep) || CYB.valueAt(keep)) CYB.setSel(CYB.nextHole(keep));
     else CYB.setSel(keep);
   }
   function reconcile() {
@@ -353,7 +355,9 @@ const MP = MPCore.create((function () {
           bump(tally, f.seat, f.ok);
           if (!quiet) { const d = (tally[f.seat] || 0) - before; if (d) pops.push([f.seat, d]); }
           if (f.ok) {
-            CYB.fill(f.i, charList[f.v], colorOf(f.seat));
+            /* 第四個參數 = 播落字鈐印 + 判定貫通。⚠ quiet(一次補很多筆 = 重連歸位 / 剛開打的
+               批次同步)一律不播 —— 連播十幾道流光會變成好幾秒的慢動作(飛行棋踩過)。 */
+            CYB.fill(f.i, charList[f.v], colorOf(f.seat), !quiet);
             if (!quiet && f.seat !== me) {
               CYB.flashTaken(f.i);
               Sound.place();
@@ -363,6 +367,12 @@ const MP = MPCore.create((function () {
             showToast("😅 " + ctx.dispName(ctx.order()[f.seat] || "") + " 填錯了", 1100);
           }
         });
+        /* ★ 自動跳格(v2.4.1)。連線這一邊以前**完全沒有**:填完之後選格還停在那一格上,
+           下一次點字卡只會得到「這格已經被填走了」—— 每填一個字都得先手動點下一格。
+           ⚠ 判準是「我選的那一格現在填掉了」(不管是我自己填的還是被別人搶走),所以它
+             永遠不會把使用者剛點好的**空格**換掉 —— 紅線 12 那個 bug 進不來。 */
+        const cur = CYB.sel();
+        if (cur >= 0 && CYB.valueAt(cur)) CYB.setSel(CYB.nextHole(cur));
       }
       const done = holes > 0 && CYB.isComplete();
       renderHud();
@@ -380,6 +390,7 @@ const MP = MPCore.create((function () {
     },
     backToLobby() {
       showScreen("lobby");
+      paintSeal(null);
       $("mpBar").classList.remove("playing");
       puzKey = null; fills = []; tally = []; charList = []; lastG = null;
       stopSync();
@@ -390,6 +401,7 @@ const MP = MPCore.create((function () {
     },
     enterPlaying() {
       showScreen("play");
+      paintSeal(null);
       $("mpBar").classList.add("playing");
       CYB.unfreeze();
       /* ★ 續局時這支是上一盤的結果卡收掉、新的一盤開打的那一刻(核心已經 closeWin)——
@@ -399,6 +411,7 @@ const MP = MPCore.create((function () {
       Sound.start();
     },
     onLeave() {
+      paintSeal(null);
       puzKey = null; fills = []; tally = []; charList = []; lastG = null;
       stopSync();
       CYB.setEnabled(false); CYB.unfreeze();
@@ -446,7 +459,12 @@ const MP = MPCore.create((function () {
     /* ---------- 結果 ---------- */
     outcome(w, { iWon, isDraw }) {
       CYB.setEnabled(false); CYB.unfreeze();
+      CYB.markDone();                    // 盤面收工:整張紙鍍一層金光(偷看盤面時看得到)
       renderHud(); renderWinnerRow(w, isDraw);
+      /* 朱紅大印:★ 只有贏家(含並列)蓋 —— 輸的那一份蓋「狀元及第」是嘲諷不是儀式,
+         比照台灣麻將 fx.js 的印章。⚠ 鑰匙用 roundId:outcome() 會被反覆呼叫
+         (核心的 players / scores 監聽一動就重畫),沒有鑰匙它每隔幾秒就重蓋一次。 */
+      paintSeal((iWon || isDraw) ? "狀元及第" : null, ctx.roundId() || "-");
       const box = $("cyStats"); if (box) { box.classList.add("hidden"); box.innerHTML = ""; }
       /* 局間續局的腳註。★ 每一次都要重畫 —— outcome() 會被反覆呼叫(核心的 players / scores
          監聽一動就 showOutcome()),而「還在等 N 人」正是靠那幾次重畫才會跟著別人按鈕動。

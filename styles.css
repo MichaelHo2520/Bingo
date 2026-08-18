@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 5e129468f0649dd806ba71623ba1c7866d75b310f3602b5aa2dc6571063e3be6)
+    真相在 styles.src.css(sha256 c9e2480e0e5f6c616997101995f16282627ad2d461b3a47ce71aecffd0b948f0)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3629,15 +3629,26 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .dc-tray-pcs .dc-p{width:22px;height:22px}
   }
   :root{ --cy-paper:#fff6ec; --cy-line:rgba(74,43,31,.22); --cy-thick:rgba(74,43,31,.62);
-         --cy-given:#4a2b1f; --cy-sel:rgba(255,138,61,.30); --cy-block:rgba(74,43,31,.12); }
+         --cy-given:#4a2b1f; --cy-sel:rgba(255,138,61,.30); --cy-block:rgba(74,43,31,.12);
+         --cy-track:rgba(255,138,61,.14); --cy-track2:rgba(255,138,61,.06);
+         --cy-gold:#d9942a; --cy-fiber:rgba(74,43,31,.05);
+         --cy-seal:#b3241f; }
   :root[data-theme="midnight"]{ --cy-paper:#141a33; --cy-line:rgba(140,190,255,.20); --cy-thick:rgba(140,190,255,.55);
-         --cy-given:#dbe6ff; --cy-sel:rgba(34,224,255,.26); --cy-block:rgba(140,190,255,.10); }
+         --cy-given:#dbe6ff; --cy-sel:rgba(34,224,255,.26); --cy-block:rgba(140,190,255,.10);
+         --cy-track:rgba(34,224,255,.13); --cy-track2:rgba(34,224,255,.055);
+         --cy-gold:#ffd479; --cy-fiber:rgba(140,190,255,.06); }
   :root[data-theme="bubblegum"]{ --cy-paper:#ffffff; --cy-line:rgba(122,43,99,.20); --cy-thick:rgba(122,43,99,.55);
-         --cy-given:#7a2b63; --cy-sel:rgba(255,79,163,.24); --cy-block:rgba(122,43,99,.10); }
+         --cy-given:#7a2b63; --cy-sel:rgba(255,79,163,.24); --cy-block:rgba(122,43,99,.10);
+         --cy-track:rgba(255,79,163,.12); --cy-track2:rgba(255,79,163,.05);
+         --cy-gold:#dc9a2c; --cy-fiber:rgba(122,43,99,.05); }
   :root[data-theme="meadow"]{ --cy-paper:#f7fbec; --cy-line:rgba(39,66,36,.20); --cy-thick:rgba(39,66,36,.58);
-         --cy-given:#274224; --cy-sel:rgba(108,192,74,.28); --cy-block:rgba(39,66,36,.10); }
+         --cy-given:#274224; --cy-sel:rgba(108,192,74,.28); --cy-block:rgba(39,66,36,.10);
+         --cy-track:rgba(108,192,74,.15); --cy-track2:rgba(108,192,74,.06);
+         --cy-gold:#bf8a17; --cy-fiber:rgba(39,66,36,.05); }
   :root[data-theme="arcade"]{ --cy-paper:#0e0e12; --cy-line:rgba(255,230,0,.18); --cy-thick:rgba(255,230,0,.5);
-         --cy-given:#f5f5f5; --cy-sel:rgba(255,230,0,.24); --cy-block:rgba(255,230,0,.08); }
+         --cy-given:#f5f5f5; --cy-sel:rgba(255,230,0,.24); --cy-block:rgba(255,230,0,.08);
+         --cy-track:rgba(255,230,0,.12); --cy-track2:rgba(255,230,0,.05);
+         --cy-gold:#ffe600; --cy-fiber:rgba(255,230,0,.07); }
   .cy-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
@@ -3758,7 +3769,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     22%{opacity:1;transform:translateY(0)}
     100%{opacity:0;transform:translateY(-10px)}
   }
-  .cy-win{padding:30px 22px}
+  .cy-win{padding:30px 22px;position:relative}
   .cy-win p{margin:8px 0 16px}
   .cy-win.lose .word{background:none;color:#ff8f8f;-webkit-text-fill-color:#ff8f8f}
   .cy-win.draw .word{background:none;color:var(--muted);-webkit-text-fill-color:var(--muted)}
@@ -3781,6 +3792,78 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .cy-next b{font-weight:800;font-size:1.15em;color:var(--accent)}
   body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .cy-react-row,body.solo-on #mpWinBtns,body.solo-on #cyNext{display:none}
   body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .cy-stats{display:none}
+  .cy-cell.track:not(.sel){background-color:var(--cy-track)}
+  .cy-cell.xtrack:not(.sel){background-color:var(--cy-track2)}
+  .cy-cell.filled.p0{--cy-ink:var(--sp0)}
+  .cy-cell.filled.p1{--cy-ink:var(--sp1)}
+  .cy-cell.filled.p2{--cy-ink:var(--sp2)}
+  .cy-cell.filled.p3{--cy-ink:var(--sp3)}
+  .cy-cell.filled.p4{--cy-ink:var(--sp4)}
+  .cy-cell.filled.p5{--cy-ink:var(--sp5)}
+  .cy-cell.filled.me{--cy-ink:var(--accent)}
+  .cy-cell.filled.hintfill{--cy-ink:var(--accent-2)}
+  .cy-cell::after{content:"";position:absolute;inset:0;border-radius:3px;
+    pointer-events:none;opacity:0}
+  .cy-cell.ink{animation:cyInk .34s cubic-bezier(.34,1.56,.64,1)}
+  .cy-cell.ink .cy-v{animation:cyInkV .34s cubic-bezier(.34,1.56,.64,1)}
+  .cy-cell.ink::after{animation:cyRipple .5s ease-out}
+  @keyframes cyInk{ 0%{transform:scale(.84)} 100%{transform:scale(1)} }
+  @keyframes cyInkV{ 0%{opacity:.15;transform:scale(1.55)} 55%{opacity:1;transform:scale(.93)} 100%{transform:scale(1)} }
+  @keyframes cyRipple{ 0%{opacity:.6;box-shadow:inset 0 0 0 0 var(--cy-ink,var(--accent))}
+                       100%{opacity:0;box-shadow:inset 0 0 0 10px var(--cy-ink,var(--accent))} }
+  .cy-cell.taken::after{animation:cyClaim .7s ease-out}
+  @keyframes cyClaim{ 0%{opacity:0;box-shadow:inset 0 0 0 4px var(--cy-ink,var(--accent))}
+                      25%{opacity:1;box-shadow:inset 0 0 0 2px var(--cy-ink,var(--accent))}
+                      75%{opacity:1;box-shadow:inset 0 0 0 2px var(--cy-ink,var(--accent))}
+                      100%{opacity:0;box-shadow:inset 0 0 0 2px var(--cy-ink,var(--accent))} }
+  .cy-fx{position:absolute;inset:0;pointer-events:none;z-index:3}
+  .cy-sweep{position:absolute;border-radius:4px;overflow:hidden;
+    box-shadow:0 0 0 2px var(--cy-gold),0 0 16px 1px var(--cy-gold);
+    animation:cySweepBox .95s ease-out forwards}
+  .cy-sweep::before{content:"";position:absolute;left:0;top:0;width:55%;height:100%;
+    background:linear-gradient(90deg,transparent,var(--cy-gold),transparent);
+    animation:cySweepH .62s cubic-bezier(.4,0,.2,1)}
+  .cy-sweep.v::before{width:100%;height:55%;
+    background:linear-gradient(180deg,transparent,var(--cy-gold),transparent);
+    animation:cySweepV .62s cubic-bezier(.4,0,.2,1)}
+  @keyframes cySweepBox{ 0%{opacity:0} 12%{opacity:1} 66%{opacity:1} 100%{opacity:0} }
+  @keyframes cySweepH{ from{transform:translateX(-180%)} to{transform:translateX(320%)} }
+  @keyframes cySweepV{ from{transform:translateY(-180%)} to{transform:translateY(320%)} }
+  .cy-cell.wdone:not(.sel){box-shadow:inset 0 0 0 1px var(--cy-gold)}
+  .cy-board.done{box-shadow:0 0 0 3px var(--cy-gold),0 0 38px -6px var(--cy-gold),0 10px 30px rgba(0,0,0,.22)}
+  .cy-cell.frost::after{opacity:.92;
+    background:
+      repeating-linear-gradient(58deg,rgba(255,255,255,.5) 0 1px,transparent 1px 5px),
+      repeating-linear-gradient(-58deg,rgba(255,255,255,.4) 0 1px,transparent 1px 6px),
+      linear-gradient(140deg,rgba(176,226,255,.82),rgba(240,252,255,.55) 45%,rgba(150,210,255,.78));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
+    animation:cyFrostIn .45s ease-out backwards}
+  @keyframes cyFrostIn{ from{opacity:0;transform:scale(.35) rotate(-25deg)} to{opacity:.92;transform:none} }
+  .cy-cell.shatter::after{opacity:.92;
+    background:linear-gradient(140deg,rgba(176,226,255,.82),rgba(240,252,255,.55) 45%,rgba(150,210,255,.78));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
+    animation:cyShatter .5s ease-out forwards}
+  @keyframes cyShatter{ 0%{opacity:.92;transform:none;filter:blur(0)}
+                        100%{opacity:0;transform:scale(1.8) rotate(11deg);filter:blur(2px)} }
+  .cy-cell:not(.block){background-image:repeating-linear-gradient(0deg,var(--cy-fiber) 0 1px,transparent 1px 4px)}
+  .cy-cell.block{background-image:repeating-linear-gradient(45deg,transparent 0 6px,var(--cy-fiber) 6px 7px)}
+  .cy-board{background-image:
+    repeating-linear-gradient(0deg,var(--cy-fiber) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(90deg,var(--cy-fiber) 0 1px,transparent 1px 9px)}
+  .cy-key{box-shadow:0 2px 0 rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.16)}
+  .cy-key:active{transform:translateY(2px) scale(.97);
+    box-shadow:0 0 0 rgba(0,0,0,0),inset 0 2px 5px rgba(0,0,0,.28)}
+  .cy-key.done{box-shadow:none}
+  .cy-seal{margin:14px auto 2px;pointer-events:none;
+    width:62px;height:62px;border-radius:7px;
+    display:grid;grid-template-rows:1fr 1fr;grid-auto-flow:column;direction:rtl;place-items:center;
+    background:var(--cy-seal);color:#fff;opacity:.94;transform:rotate(-9deg);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.85),0 3px 10px rgba(0,0,0,.38)}
+  .cy-seal span{font-weight:900;font-size:22px;line-height:1}
+  .cy-win .cy-seal.stamp{animation:cySeal .5s cubic-bezier(.2,1.5,.35,1) .34s backwards}
+  @keyframes cySeal{ 0%{opacity:0;transform:rotate(14deg) scale(1.8)}
+                     62%{opacity:1;transform:rotate(-13deg) scale(.93)}
+                     100%{opacity:.94;transform:rotate(-9deg) scale(1)} }
   @media (max-height:620px){
     .cy-hero{margin:6px 0 2px}
     .cy-art{width:64px;height:64px}

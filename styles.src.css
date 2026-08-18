@@ -8252,15 +8252,26 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ========================================================================== */
 
   :root{ --cy-paper:#fff6ec; --cy-line:rgba(74,43,31,.22); --cy-thick:rgba(74,43,31,.62);
-         --cy-given:#4a2b1f; --cy-sel:rgba(255,138,61,.30); --cy-block:rgba(74,43,31,.12); }
+         --cy-given:#4a2b1f; --cy-sel:rgba(255,138,61,.30); --cy-block:rgba(74,43,31,.12);
+         --cy-track:rgba(255,138,61,.14); --cy-track2:rgba(255,138,61,.06);
+         --cy-gold:#d9942a; --cy-fiber:rgba(74,43,31,.05);
+         --cy-seal:#b3241f; }
   :root[data-theme="midnight"]{ --cy-paper:#141a33; --cy-line:rgba(140,190,255,.20); --cy-thick:rgba(140,190,255,.55);
-         --cy-given:#dbe6ff; --cy-sel:rgba(34,224,255,.26); --cy-block:rgba(140,190,255,.10); }
+         --cy-given:#dbe6ff; --cy-sel:rgba(34,224,255,.26); --cy-block:rgba(140,190,255,.10);
+         --cy-track:rgba(34,224,255,.13); --cy-track2:rgba(34,224,255,.055);
+         --cy-gold:#ffd479; --cy-fiber:rgba(140,190,255,.06); }
   :root[data-theme="bubblegum"]{ --cy-paper:#ffffff; --cy-line:rgba(122,43,99,.20); --cy-thick:rgba(122,43,99,.55);
-         --cy-given:#7a2b63; --cy-sel:rgba(255,79,163,.24); --cy-block:rgba(122,43,99,.10); }
+         --cy-given:#7a2b63; --cy-sel:rgba(255,79,163,.24); --cy-block:rgba(122,43,99,.10);
+         --cy-track:rgba(255,79,163,.12); --cy-track2:rgba(255,79,163,.05);
+         --cy-gold:#dc9a2c; --cy-fiber:rgba(122,43,99,.05); }
   :root[data-theme="meadow"]{ --cy-paper:#f7fbec; --cy-line:rgba(39,66,36,.20); --cy-thick:rgba(39,66,36,.58);
-         --cy-given:#274224; --cy-sel:rgba(108,192,74,.28); --cy-block:rgba(39,66,36,.10); }
+         --cy-given:#274224; --cy-sel:rgba(108,192,74,.28); --cy-block:rgba(39,66,36,.10);
+         --cy-track:rgba(108,192,74,.15); --cy-track2:rgba(108,192,74,.06);
+         --cy-gold:#bf8a17; --cy-fiber:rgba(39,66,36,.05); }
   :root[data-theme="arcade"]{ --cy-paper:#0e0e12; --cy-line:rgba(255,230,0,.18); --cy-thick:rgba(255,230,0,.5);
-         --cy-given:#f5f5f5; --cy-sel:rgba(255,230,0,.24); --cy-block:rgba(255,230,0,.08); }
+         --cy-given:#f5f5f5; --cy-sel:rgba(255,230,0,.24); --cy-block:rgba(255,230,0,.08);
+         --cy-track:rgba(255,230,0,.12); --cy-track2:rgba(255,230,0,.05);
+         --cy-gold:#ffe600; --cy-fiber:rgba(255,230,0,.07); }
 
   .cy-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));
@@ -8415,7 +8426,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   }
 
   /* ---------- 結果卡 ---------- */
-  .cy-win{padding:30px 22px}
+  .cy-win{padding:30px 22px;position:relative}   /* position:relative = 朱紅大印的定位基準 */
   .cy-win p{margin:8px 0 16px}
   .cy-win.lose .word{background:none;color:#ff8f8f;-webkit-text-fill-color:#ff8f8f}
   .cy-win.draw .word{background:none;color:var(--muted);-webkit-text-fill-color:var(--muted)}
@@ -8450,6 +8461,143 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        完整說明寫在數獨那一份的註解裡。 */
   body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .cy-react-row,body.solo-on #mpWinBtns,body.solo-on #cyNext{display:none}
   body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .cy-stats{display:none}
+
+  /* ==========================================================================
+     動效與質感(v2.4.1) —— 照 notes/Gemini建議/成語接龍體驗與動畫優化建議.md 篩過的十條。
+     三條自己的約束(踩過的坑都在別頁付過學費了):
+     ① 覆蓋層一律 position:absolute + pointer-events:none —— .cy-board 是 grid,
+        普通子元素會變成多出來的一格,盤面當場歪掉。
+     ② 一個 px 都不可以撐開 .cy-stage:fitStage() 量的就是它,撐開 = 盤面縮一階
+        (跳棋的「捲軸自己震盪」是同一條邊界,見 notes/23)。
+     ③ 動效一律掛在瞬時 class 上,而 board.js 的 repaint() 是整行覆寫 className ——
+        新增的動效 class 要同時登記進那邊的 FX_CLS,不然畫到一半會被靜靜抹掉。
+     ========================================================================== */
+
+  /* ---------- ① 成語光軌:點一格 = 整條 4 格亮起來 ----------
+     主方向(track)亮、交叉方向(xtrack)淡;交叉點再點一下就換主方向。
+     ⚠ 一律用 background-color 而不是 background 簡寫 —— 簡寫會把下面那層宣紙纖維
+       (background-image)一起清掉,那條規則的權重比這裡低。
+     ⚠ :not(.sel) 不可省:.cy-cell.sel 寫在前面而且同權重,不排除就會被光軌蓋掉,
+       選中的那一格反而不見了。 */
+  .cy-cell.track:not(.sel){background-color:var(--cy-track)}
+  .cy-cell.xtrack:not(.sel){background-color:var(--cy-track2)}
+
+  /* ---------- ② 印泥色:每個玩家的字都有自己的一罐 ----------
+     底下的鈐印漣漪 / 落款光環都吃這個變數,不必為六個顏色各寫一組 keyframes。 */
+  .cy-cell.filled.p0{--cy-ink:var(--sp0)}
+  .cy-cell.filled.p1{--cy-ink:var(--sp1)}
+  .cy-cell.filled.p2{--cy-ink:var(--sp2)}
+  .cy-cell.filled.p3{--cy-ink:var(--sp3)}
+  .cy-cell.filled.p4{--cy-ink:var(--sp4)}
+  .cy-cell.filled.p5{--cy-ink:var(--sp5)}
+  .cy-cell.filled.me{--cy-ink:var(--accent)}
+  .cy-cell.filled.hintfill{--cy-ink:var(--accent-2)}
+
+  /* ---------- ③ 落字鈐印:下壓回彈 + 一圈水墨漣漪 ----------
+     ::after 是格子的動效層(漣漪 / 冰晶 / 落款共用它),平常 opacity:0 完全不存在感。 */
+  .cy-cell::after{content:"";position:absolute;inset:0;border-radius:3px;
+    pointer-events:none;opacity:0}
+  .cy-cell.ink{animation:cyInk .34s cubic-bezier(.34,1.56,.64,1)}
+  .cy-cell.ink .cy-v{animation:cyInkV .34s cubic-bezier(.34,1.56,.64,1)}
+  .cy-cell.ink::after{animation:cyRipple .5s ease-out}
+  @keyframes cyInk{ 0%{transform:scale(.84)} 100%{transform:scale(1)} }
+  @keyframes cyInkV{ 0%{opacity:.15;transform:scale(1.55)} 55%{opacity:1;transform:scale(.93)} 100%{transform:scale(1)} }
+  @keyframes cyRipple{ 0%{opacity:.6;box-shadow:inset 0 0 0 0 var(--cy-ink,var(--accent))}
+                       100%{opacity:0;box-shadow:inset 0 0 0 10px var(--cy-ink,var(--accent))} }
+
+  /* ---------- ④ 被別人搶走:對手顏色的印泥落款 ----------
+     原本只有一下放大脈動(看得出有事發生,看不出是誰)。補一圈對手色的框:
+     連線搶字最要緊的資訊就是「誰搶走的」,而 HUD 在盤面外面,眼睛來不及移過去。 */
+  .cy-cell.taken::after{animation:cyClaim .7s ease-out}
+  @keyframes cyClaim{ 0%{opacity:0;box-shadow:inset 0 0 0 4px var(--cy-ink,var(--accent))}
+                      25%{opacity:1;box-shadow:inset 0 0 0 2px var(--cy-ink,var(--accent))}
+                      75%{opacity:1;box-shadow:inset 0 0 0 2px var(--cy-ink,var(--accent))}
+                      100%{opacity:0;box-shadow:inset 0 0 0 2px var(--cy-ink,var(--accent))} }
+
+  /* ---------- ⑤ 成語貫通:金色毛筆流光劃過 4 格 ----------
+     .cy-fx 是覆蓋層(board.js 的 buildBoard 建的),流光是它的子元素,座標由 JS 照
+     PAD / GAP / --cy-cell 算成絕對 px —— 與 grid 版面完全脫鉤,盤面一個 px 都不會動。 */
+  .cy-fx{position:absolute;inset:0;pointer-events:none;z-index:3}
+  .cy-sweep{position:absolute;border-radius:4px;overflow:hidden;
+    box-shadow:0 0 0 2px var(--cy-gold),0 0 16px 1px var(--cy-gold);
+    animation:cySweepBox .95s ease-out forwards}
+  .cy-sweep::before{content:"";position:absolute;left:0;top:0;width:55%;height:100%;
+    background:linear-gradient(90deg,transparent,var(--cy-gold),transparent);
+    animation:cySweepH .62s cubic-bezier(.4,0,.2,1)}
+  .cy-sweep.v::before{width:100%;height:55%;
+    background:linear-gradient(180deg,transparent,var(--cy-gold),transparent);
+    animation:cySweepV .62s cubic-bezier(.4,0,.2,1)}
+  @keyframes cySweepBox{ 0%{opacity:0} 12%{opacity:1} 66%{opacity:1} 100%{opacity:0} }
+  @keyframes cySweepH{ from{transform:translateX(-180%)} to{transform:translateX(320%)} }
+  @keyframes cySweepV{ from{transform:translateY(-180%)} to{transform:translateY(320%)} }
+  /* 貫通之後那 4 格永久換成金色細框(給定字也一起)——「這條已經解出來了」要一眼看得到,
+     不然大盤面上玩家會反覆回頭確認同一條。⚠ :not(.sel) 同上,不排除會蓋掉選中框。 */
+  .cy-cell.wdone:not(.sel){box-shadow:inset 0 0 0 1px var(--cy-gold)}
+  /* 整張盤解完:紙本身鍍一層金光(結果卡按「先看看盤面」時看得到) */
+  .cy-board.done{box-shadow:0 0 0 3px var(--cy-gold),0 0 38px -6px var(--cy-gold),0 10px 30px rgba(0,0,0,.22)}
+
+  /* ---------- ⑥ 填錯結霜 → 3 秒後破冰 ----------
+     原本填錯只有紅閃 + 盤面轉灰 + 中央一個數字。冰晶把「這一格是我剛剛填錯的」與
+     「還要等多久」綁在同一個東西上,而碎裂那一下正是「可以再填了」的訊號。
+     ⚠ 冰晶是白藍色的固定值,不吃主題 —— 冰在五個主題裡都是冰。 */
+  .cy-cell.frost::after{opacity:.92;
+    background:
+      repeating-linear-gradient(58deg,rgba(255,255,255,.5) 0 1px,transparent 1px 5px),
+      repeating-linear-gradient(-58deg,rgba(255,255,255,.4) 0 1px,transparent 1px 6px),
+      linear-gradient(140deg,rgba(176,226,255,.82),rgba(240,252,255,.55) 45%,rgba(150,210,255,.78));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
+    animation:cyFrostIn .45s ease-out backwards}
+  @keyframes cyFrostIn{ from{opacity:0;transform:scale(.35) rotate(-25deg)} to{opacity:.92;transform:none} }
+  .cy-cell.shatter::after{opacity:.92;
+    background:linear-gradient(140deg,rgba(176,226,255,.82),rgba(240,252,255,.55) 45%,rgba(150,210,255,.78));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
+    animation:cyShatter .5s ease-out forwards}
+  @keyframes cyShatter{ 0%{opacity:.92;transform:none;filter:blur(0)}
+                        100%{opacity:0;transform:scale(1.8) rotate(11deg);filter:blur(2px)} }
+
+  /* ---------- ⑦ 宣紙纖維與淡墨隔欄 ----------
+     極淡(alpha 0.05 上下)—— 這是質感不是圖案,量得到但注意不到才是對的。
+     ⚠ 只寫 background-image,不可以用 background 簡寫:格子的底色分了選中 / 光軌 /
+       裝飾格好幾種,簡寫會把它們一起洗掉。 */
+  .cy-cell:not(.block){background-image:repeating-linear-gradient(0deg,var(--cy-fiber) 0 1px,transparent 1px 4px)}
+  .cy-cell.block{background-image:repeating-linear-gradient(45deg,transparent 0 6px,var(--cy-fiber) 6px 7px)}
+  .cy-board{background-image:
+    repeating-linear-gradient(0deg,var(--cy-fiber) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(90deg,var(--cy-fiber) 0 1px,transparent 1px 9px)}
+
+  /* ---------- ⑧ 字卡:木刻活字的按壓感 ----------
+     下緣一條實心影子當「厚度」,按下去把厚度收掉並下沉 2px = 真的壓下去了。
+     ⚠ 寫在既有 .cy-key / .cy-key:active 後面,同權重靠順序覆蓋(這一段一律只追加)。 */
+  .cy-key{box-shadow:0 2px 0 rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.16)}
+  .cy-key:active{transform:translateY(2px) scale(.97);
+    box-shadow:0 0 0 rgba(0,0,0,0),inset 0 2px 5px rgba(0,0,0,.28)}
+  .cy-key.done{box-shadow:none}
+
+  /* ---------- ⑨ 結果卡的朱紅大印 ----------
+     四個字照傳統印章的順序排:右上 → 右下 → 左上 → 左下(grid 直向流 + direction:rtl)。
+     ★ 它**住在卡片的流內**(比照台灣麻將 fx.js 的印章),不疊在右上角。兩個理由都是量出來的:
+       ① 疊上去會蓋掉「完成!」的驚嘆號 —— 標題是 clamp(46px,15vw,76px),窄機上一定撞,
+          而這件事**只有截圖看得出來**(斷言問的是「印在不在、幾個字」,那時候全是綠的)。
+       ② 結果卡是 overflow-y:auto(單軸 visible 會被算成 auto),絕對定位 + 放大的那一下
+          會把角甩出卡片右緣 → 閃出一條水平捲軸(實測 38px)。
+       流內置中之後,放大往左右對稱長,而卡片兩側各有 22px 內距 + 大量餘寬 → 量到 0/0。
+     ⚠ 權重要壓過 .win-card:not(.confirm-card) 那條 winRise(0,2,0),所以是 .cy-win .cy-seal
+       (同權重、寫在後面)而不是單獨的 .cy-seal。 */
+  .cy-seal{margin:14px auto 2px;pointer-events:none;
+    width:62px;height:62px;border-radius:7px;
+    display:grid;grid-template-rows:1fr 1fr;grid-auto-flow:column;direction:rtl;place-items:center;
+    background:var(--cy-seal);color:#fff;opacity:.94;transform:rotate(-9deg);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.85),0 3px 10px rgba(0,0,0,.38)}
+  .cy-seal span{font-weight:900;font-size:22px;line-height:1}
+  .cy-win .cy-seal.stamp{animation:cySeal .5s cubic-bezier(.2,1.5,.35,1) .34s backwards}
+  /* ⚠⚠ backwards + 0.34 秒延遲 = 印章在落下**之前**就以 0% 那一格的樣子存在了 0.34 秒。
+     那一格若放得太大 / 轉得太多,結果卡(overflow-y:auto)會當場閃一條捲軸出來 ——
+     絕對定位在右上角的版本實測甩出 38px(高 × 放大倍率 × sin(角度),再減掉離邊的距離)。
+     ★ 這條界線量得到,改 keyframes 之後一定要重量一次:
+       node tools/gen-cy-shot.js 之後開 ?shot=win,title 裡的「結果卡捲軸」必須是 0/0。 */
+  @keyframes cySeal{ 0%{opacity:0;transform:rotate(14deg) scale(1.8)}
+                     62%{opacity:1;transform:rotate(-13deg) scale(.93)}
+                     100%{opacity:.94;transform:rotate(-9deg) scale(1)} }
 
   /* ---------- 矮視窗(橫向手機):盤面優先,周邊全部再壓一號 ---------- */
   @media (max-height:620px){

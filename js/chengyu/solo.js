@@ -54,6 +54,7 @@ const Solo = (function () {
     level = lv || level;
     q = CYGen.make(level);
     elapsed = 0; mistakes = 0; hints = 0; paused = false; running = true;
+    paintSeal(null);              // 上一局的朱紅大印(結果卡是共用的,不收會活到下一局)
     CYB.setPuzzle(q);
     CYB.setEnabled(true);
     CYB.setSel(CYB.firstEmpty());
@@ -68,6 +69,7 @@ const Solo = (function () {
        全螢幕黑幕。⚠ 目前是**防禦性的、走不到**(蓋板會攔住返回鈕、finish 有 paused 守衛),
        真正生效的是 ui-kit.js 的 BACK_LAYERS —— 完整說明在 js/sudoku/solo.js 的 quit()。 */
     paused = false;
+    paintSeal(null);
     const pv = $("cyPauseVeil"); if (pv) pv.classList.remove("show");
     const pb = $("cyPauseBtn"); if (pb) pb.textContent = "⏸";
     closeWin();
@@ -87,12 +89,14 @@ const Solo = (function () {
     if (!running || paused) return;
     if (CYB.valueAt(i) === ch) { CYB.clear(i); return; }   // 再點同一個字 = 清掉
     if (CYB.solAt(i) === ch) {
-      CYB.fill(i, ch, "me");
+      CYB.fill(i, ch, "me", true);      // 第四個參數 = 播落字鈐印 + 判定這條成語有沒有貫通
       Sound.place();
       if (CYB.isComplete()) finish();
       else {
-        const nx = CYB.firstEmpty();
-        if (nx >= 0 && CYB.valueAt(i)) CYB.setSel(nx);      // 自動跳到下一個空格,少點一次
+        /* ★ 跳的是「同一條成語的下一個空格」,不是全盤第一個空格(v2.4.1)——
+           後者多半在盤面另一頭,等於每填一個字就把玩家的思緒打斷一次。 */
+        const nx = CYB.nextHole(i);
+        if (nx >= 0 && CYB.valueAt(i)) CYB.setSel(nx);
       }
     } else {
       mistakes++;
@@ -108,7 +112,7 @@ const Solo = (function () {
     if (i < 0 || CYB.valueAt(i)) i = CYB.firstEmpty();
     if (i < 0) return;
     hints++;
-    CYB.fill(i, CYB.solAt(i), "hintfill");   // ★ 不可叫 hint:撞既有的 .hint 說明文字樣式
+    CYB.fill(i, CYB.solAt(i), "hintfill", true);   // ★ 不可叫 hint:撞既有的 .hint 說明文字樣式
     CYB.setSel(i);
     Sound.place();
     paintHud();
@@ -130,6 +134,8 @@ const Solo = (function () {
         '<div class="cy-stat"><span class="ss-k">提示</span><span class="ss-v">' + hints + ' 次</span></div>';
       box.classList.remove("hidden");
     }
+    /* 朱紅大印(v2.4.1):蓋在結果卡右上角。單機是「一個人把整張盤解完」→ 才高八斗。 */
+    paintSeal("才高八斗");
     Sound.win(); burst();
     showResult();
   }
