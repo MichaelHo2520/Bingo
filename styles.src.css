@@ -5675,10 +5675,72 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ 只給**牌桌上**那一排:手牌一縮就等於格位變了(那是 v1.77.0 的紅線)。 */
   .b2-tcs .b2-card{flex:0 1 auto;min-width:0}
 
+  /* ---------- 剛落桌的那一格(v2.4.5)----------
+     ★ 「有人出牌了」在這之前只有「那一格的內容換了」—— 對手一多就完全看不出來
+       是誰動的。這一組是第四個訊號,但它**只活 0.4 秒**,不與三條軌搶通道
+       (三條軌講的是持續狀態,這一條講的是「剛剛」)。
+     ⚠ 只動 transform / filter:那一格的 border 是「目前最大」那一軌的,
+       background 是「這是我」那一軌的,一碰就會蓋掉別人。 */
+  .b2-tmv.just{animation:b2Land .38s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes b2Land{0%{transform:scale(1.06)}58%{transform:scale(.985)}100%{transform:scale(1)}}
+  /* 那一手的牌**依序落下** —— 順子 / 葫蘆 / 鐵支 一次五張,同時跳出來看不出是一組。
+     ⚠ 用 nth-child 而不是 JS 寫 --i:桌上那一排最多五張(T_MAXC),寫五條就到頂,
+       而 board.js 那邊完全不必為了動畫多傳一個欄位。 */
+  .b2-tmv.just .b2-tcs .b2-card{animation:b2Drop .34s cubic-bezier(.25,1.4,.4,1) both}
+  .b2-tmv.just .b2-tcs .b2-card:nth-child(2){animation-delay:.06s}
+  .b2-tmv.just .b2-tcs .b2-card:nth-child(3){animation-delay:.12s}
+  .b2-tmv.just .b2-tcs .b2-card:nth-child(4){animation-delay:.18s}
+  .b2-tmv.just .b2-tcs .b2-card:nth-child(5){animation-delay:.24s}
+  @keyframes b2Drop{
+    0%  {opacity:0;transform:translateY(-16px) scale(1.18) rotate(-5deg)}
+    62% {opacity:1;transform:translateY(0) scale(.97) rotate(0)}
+    100%{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    .b2-tmv.just,.b2-tmv.just .b2-tcs .b2-card{animation:none}
+    .b2-tla{animation:none}
+  }
+
   /* 無敵牌型的記號:鐵支 / 同花順壓得過任何牌型,那件事一定要看得出來。
      ⚠ 在座位版它住在那一列的最右邊,所以字級比舊版小一號(一格只有五張牌的寬度)。 */
   .b2-rbomb{flex:none;padding:1px 5px;border-radius:8px;background:var(--b2-redlit);
     font:800 9.5px/1.5 'Nunito',sans-serif;color:#2a0d0d}
+
+  /* ==========================================================================
+     ★★ 桌布上的字一律**固定白**(v2.4.5)—— 這是 notes/16 從 v1.107.2 就記著的待辦
+     ──────────────────────────────────────────────────────────────────────────
+       桌布(`.b2-trick`)是**寫死的深綠**,而這幾條字吃 `--text` / `--muted` ——
+       那兩支跟著主題走:bubblegum 的 `--text` 是 #6a1f57(深紫)、`--muted` 是 #a76b96,
+       壓在深綠上幾乎看不見。桌布固定 → 上面的字也必須固定。
+       ⚠ 選擇器一律限定在 `.b2-trick` 裡面:同樣這幾個 class 在結果卡與蓋板上還會用到,
+         那些地方的底色**是**跟著主題的,不可以一起改。(逐字照 UNO `.un-table` 那一段。)
+       ⚠ 「我」那一格的金名字 `.b2-tmv.me .b2-tnm` 是 (0,3,0)、這裡是 (0,2,0)
+         → 金色照樣贏,不必再寫一條例外。三條軌一個都沒有被動到。
+       ★ 排七 `.sv-tracks` **不必跟進**:它的軌道格子用的是自己的固定色,
+         桌布上沒有吃主題變數的字(notes/15 有記)。
+     ========================================================================== */
+  .b2-trick .b2-tlbl{color:rgba(255,255,255,.76)}
+  .b2-trick .b2-tttl{color:#fff;background:rgba(255,255,255,.17)}
+  .b2-trick .b2-thint{color:rgba(255,255,255,.82)}
+  .b2-trick .b2-thint b{color:#ffd489}
+  .b2-trick .b2-tnm{color:#fff}
+  .b2-trick .b2-tct{color:#fff;background:rgba(255,255,255,.19)}
+  .b2-trick .b2-tpass{color:rgba(255,255,255,.60)}
+  .b2-trick .b2-twait{color:rgba(255,255,255,.60)}
+
+  /* ---------- 「有人拉了」的警示條(v2.4.5)----------
+     全桌最緊繃的一刻,在這之前只有一句一閃而過的 toast + 晶片上一個很小的「拉」字。
+     ⚠⚠ 牌情紅線:這一顆膠囊裡**只有名字 + 一個「拉」字**,牌型 / 張數 / 牌值一個都不准,
+       連 title 都不行(豁免範圍精確到一個 bit)。
+     ⚠ 它住在桌子上方那一列(`.b2-tlbl` 本來就 wrap),不動座位格的三條軌 ——
+       那三條刻意分屬「不同顏色 + 不同位置 + 不同動靜」,而 ::before / ::after 都用掉了。 */
+  .b2-tla{flex:none;padding:1px 8px;border-radius:9px;
+    font:900 11px/1.45 'Nunito',sans-serif;letter-spacing:.5px;
+    color:#fff;background:rgba(176,32,24,.86);
+    box-shadow:0 0 0 1px rgba(255,120,100,.55);
+    animation:b2LaBeat 1.25s ease-in-out infinite}
+  @keyframes b2LaBeat{
+    0%,100%{box-shadow:0 0 0 1px rgba(255,120,100,.50), 0 0 0 0 rgba(224,60,45,.42)}
+    55%    {box-shadow:0 0 0 1px rgba(255,170,150,.90), 0 0 0 6px rgba(224,60,45,0)}}
 
   /* ==========================================================================
      大老二 v1.98.0 —— ★★★ 牌桌上三個訊號 = 三條軌
@@ -5732,6 +5794,53 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 會動的東西一律尊重系統的「減少動態效果」→ 那時改成常亮(訊號不可以消失) */
   @media (prefers-reduced-motion:reduce){
     .b2-tmv.act::after{animation:none;opacity:1}
+  }
+
+  /* ==========================================================================
+     大老二 — 動效圖層 .b2-fx(v2.4.5):摔牌 + 無敵牌型的特寫
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠⚠ 掛在 **body** 而不是 `#b2Stage`:`render()` 每次整份覆寫 stage 的
+         innerHTML,放裡面會被下一次重畫吃掉(而這一頁對手一出牌就會重畫)。
+       ⚠ z-index 40 —— 結果卡 `.veil` 是 50、表情層 64:對局中的特效一律排在蓋板底下。
+       ⚠ 特寫**只給鐵支 / 同花順**:順子與葫蘆一局會出很多次,每次都蓋整片就是洗版
+         (那兩種交給格子裡「依序落下」的節奏)。
+     ========================================================================== */
+  .b2-fx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+
+  /* 摔牌:從手上那幾張的位置飛進桌上那一格(位移 / 縮放由 board.js 量完寫成 inline) */
+  .b2-flyc{position:fixed;animation:b2Fly .52s cubic-bezier(.3,.02,.2,1) forwards}
+  .b2-flyc .b2-card{width:100%;height:100%}
+  @keyframes b2Fly{
+    from{transform:translate(0,0) scale(1) rotate(0);opacity:1}
+    to  {transform:translate(var(--fx),var(--fy)) scale(var(--fs)) rotate(6deg);opacity:.12}}
+
+  /* 鐵支 / 同花順的特寫。★ 兩種給不同的底光:鐵支是**壓制**(暗紅雷)、
+     同花順是**至尊**(彩芒)—— 這一頁只有這兩種壓得過任何牌型,值得分得出來。
+     ⚠ tN 的 N 是 `B2.T_*` 的值(規則層那一份),不要在這裡自己編一組。 */
+  .b2-cut{position:fixed;display:grid;place-items:center;overflow:hidden;border-radius:14px;
+    animation:b2Cut 1.05s ease-out forwards;
+    background:radial-gradient(80% 70% at 50% 50%,rgba(0,0,0,.55),rgba(0,0,0,.14) 74%,rgba(0,0,0,0))}
+  @keyframes b2Cut{0%{opacity:0}12%{opacity:1}74%{opacity:1}100%{opacity:0}}
+  .b2-cutw{font:900 clamp(30px,11vw,62px)/1 'Fredoka','Nunito',sans-serif;letter-spacing:4px;
+    color:#fff;text-shadow:0 3px 18px rgba(0,0,0,.75);
+    animation:b2CutW 1.05s cubic-bezier(.18,1.5,.32,1) forwards}
+  @keyframes b2CutW{
+    0%  {transform:scale(2.6) rotate(-10deg);opacity:0}
+    16% {transform:scale(1)   rotate(-3deg); opacity:1}
+    76% {transform:scale(1)   rotate(-3deg); opacity:1}
+    100%{transform:scale(1.14) rotate(-3deg);opacity:0}}
+  /* 鐵支(T_QUAD = 6):暗紅雷 */
+  .b2-cut.t5{background:radial-gradient(82% 72% at 50% 50%,
+    rgba(190,30,20,.66),rgba(30,0,0,.40) 72%,rgba(0,0,0,0))}
+  .b2-cut.t5 .b2-cutw{color:#ffd9cf}
+  /* 同花順(T_SF = 7):彩芒 */
+  .b2-cut.t6{background:
+    radial-gradient(82% 72% at 50% 50%,rgba(255,226,150,.62),rgba(20,10,40,.42) 72%,rgba(0,0,0,0)),
+    conic-gradient(from 0deg,rgba(255,120,120,.30),rgba(255,230,140,.30),
+      rgba(120,255,190,.30),rgba(140,190,255,.30),rgba(255,120,120,.30))}
+  .b2-cut.t6 .b2-cutw{color:#fff8e0}
+  @media (prefers-reduced-motion:reduce){
+    .b2-flyc{display:none}
   }
 
   /* ==========================================================================
@@ -5943,6 +6052,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     background:rgba(255,255,255,.18);font:800 11px/1 'Nunito',sans-serif;color:var(--text)}
   .b2-rrow.win .b2-rno{background:var(--accent);color:#1c1008}
   .b2-rcrown{flex:none;font-size:12px;line-height:1}
+  /* 整局一張牌都沒出過（v2.4.5）—— 這一頁最好笑的一種輸法。
+     ⚠ 文案只講事實，**不提罰分 ×2** —— 這一頁算的是名次分，沒有那回事。 */
+  .b2-rshut{flex:none;padding:1px 6px;border-radius:8px;
+    font:900 9.5px/1.6 'Nunito',sans-serif;letter-spacing:.4px;
+    color:#fff;background:linear-gradient(135deg,#b0261c,#7d1410);
+    box-shadow:0 1px 4px rgba(176,38,28,.5)}
   /* ⚠ .b2-rname 不可以 flex:1 —— 那會把「你」徽章與 🏆 一路推到分數旁邊,
      而它們標的正是這個名字。另外 .win-card 是 text-align:center,這格要自己寫死 left。 */
   .b2-rname{flex:0 1 auto;min-width:0;text-align:left;

@@ -76,6 +76,8 @@ const B2B = (function(){
   let ord = null, ordKey = null;            // ★ 玩家自己拖出來的顯示順序 / 它屬於哪一局(第八節)
   let drag = null, noClick = false;         // 拖曳中的狀態 / 這一下的 click 要不要吃掉
   let lastV = null;                         // 最後一次 render 收到的 v(拖曳中延後重畫用)
+  /* 動效的 diff 狀態(v2.4.5,見第九節)。⚠ 全部只影響畫面,一個都不進真相。 */
+  let fxActs = null, fxKey = null, fxFly = null;
 
   /* ==========================================================================
      一、牌面
@@ -214,6 +216,8 @@ const B2B = (function(){
          講同一件事是刻意的 —— 使用者要的就是「知道現在換誰了」,而純文字在
          reduced-motion / 電子書主題下是青光條的可讀後備。 */
     if(waiting) cls += " act";
+    // ★ 這一手是**剛剛**打出來的 → 落桌的衝擊(v2.4.5,從 diff 推,見第九節)
+    if(seat === v.justSeat) cls += " just";
     let body = "";
     if(act && act.pass){
       body = '<span class="b2-tpass">✕ Pass</span>';
@@ -308,9 +312,25 @@ const B2B = (function(){
     for(let s = 0; s < n; s++)
       cells += seatHTML(v, s, act[s], s === topSeat, POS[n][(s - me + n) % n]);
 
+    /* ★★ 「有人拉了」的警示條(v2.4.5)—— 這是全桌最緊繃的一刻,而在這之前它只有
+       ① 一句一閃而過的 toast ② 玩家晶片上一個很小的「拉」字。
+       ⚠⚠ 牌情紅線(notes/16 第五節):這裡**只准出現名字 + 一個「拉」字**。
+         牌型、張數、牌值一個都不准,連 title 都不行 —— 豁免範圍精確到一個 bit。
+       ⚠ 它住在**桌子上方那一列**(`.b2-tlbl`,本來就會 wrap)而不是座位格上:
+         座位格的三條軌(我 / 在等他 / 目前最大)刻意分屬「不同顏色 + 不同位置 +
+         不同動靜」而且 ::before / ::after 都用掉了,硬塞第四條就會開始互相蓋。
+       ⚠ 也不放桌心 `.b2-tmid` —— 那一格只有 44px 寬(`--b2-tmw`),字進去就被裁掉,
+         而把它撐開等於左右兩格變窄 = 牌被擠窄。 */
+    let laBar = "";
+    const laList = v.la || [];
+    for(let s = 0; s < n; s++){
+      if(!laList[s]) continue;
+      const lnm = (v.names && v.names[s]) || ("玩家" + (s + 1));
+      laBar += '<span class="b2-tla">' + (s === v.me ? "你" : esc(lnm)) + ' 拉</span>';
+    }
     return '<div class="b2-trick' + (list.length ? "" : " empty") + '">' +
              '<div class="b2-tlbl"><span class="b2-tttl">' + lbl + '</span>' +
-               (hint ? '<span class="b2-thint">' + hint + '</span>' : "") + '</div>' +
+               (hint ? '<span class="b2-thint">' + hint + '</span>' : "") + laBar + '</div>' +
              /* ⚠ s2/s3/s4 決定**版型**(CSS 的 grid-template-areas),而它是「人數」
                 這種資料 —— 一整局不變,所以這一塊的高度與「這一輪進行到哪」無關。
               ★★ 桌心 `.b2-tmid`(桌子正中央那個淡淡的 🎴)是**每一種人數都有**的
@@ -510,6 +530,11 @@ const B2B = (function(){
     // 選取的牌若已經不在手上(換局 / 出牌之後)就丟掉,不然會殘留一個選不掉的框
     sel = sel.filter(c => v.hand.indexOf(c) >= 0);
 
+    /* ★ 這一手是誰打的、是什麼牌型 —— 從「上一次的桌面 vs 這一次的桌面」推出來
+       (見第九節:四條路徑都會經過 render(),在動作點各插一次遲早漏掉一條)。 */
+    const fx = diffTrick(v);
+    v.justSeat = fx.seat;
+
     let h = trickHTML(v);
 
     /* 手牌。★ 亮起「配得出組合」的那幾張(見檔頭)——
@@ -533,6 +558,9 @@ const B2B = (function(){
          而 --b2-tfit 是 inline 寫在它身上的(寫到 :root 去不會有作用)。
        ⚠ 同一個同步流程裡量 + 改變數 → 只 paint 一次,使用者看不到「先小一下再變大」。 */
     fitTrick();
+    /* ⚠ 一定要在 fitTrick() **之後**:飛牌的落點是量桌上那一格的牌,
+       而那些牌的寬度是 fitTrick() 這一行才定下來的。 */
+    runFx(fx, v);
 
     /* ✗ 「捲到最新那一手」那一段 v1.83.0 拿掉了 —— 這張牌桌**沒有時間順序**,
        格子的位置由座位號碼決定。舊版是「由舊到新的清單」才需要每次把 scrollTop 推到底。
@@ -793,6 +821,125 @@ const B2B = (function(){
   }
 
   /* ==========================================================================
+     九、動效(v2.4.5)—— ★★ 從「桌面的 diff」推,不在動作點插呼叫
+     ──────────────────────────────────────────────────────────────────────────
+       這一頁有四條路徑會讓桌上多一手:我出牌(單機)、我出牌(連線)、AI 出牌、
+       別人出牌的快照。在四個地方各插一次特效呼叫遲早會漏掉一條,而**漏掉的那一條
+       不會壞、也不報錯**(只是那個人出牌時沒有動畫)—— 沒有測試抓得到。
+       `render()` 一定會被四條路徑呼叫,而 diff 在四邊是同一件事。
+
+       ⚠⚠ **一次變動一格以上就什麼都不放**:批次同步 / 重連歸位會一口氣補很多手,
+         而且「一輪結束 → 桌面整份清空」也是一次多格的變動(那不是「有人剛出牌」)。
+       ⚠ 換局(`v.key` 換了)與第一次畫一律不放 —— 那是「剛載入」不是「剛出牌」。
+       ⚠ 特效節點掛在獨立的 fixed 圖層 `.b2-fx`:`render()` 每次整份覆寫
+         `stage.innerHTML`,放裡面會被下一次重畫吃掉;z-index 40(結果卡 .veil 是 50)。
+     ========================================================================== */
+  function diffTrick(v){
+    const key = String(v.key == null ? "" : v.key);
+    const now = {};
+    (v.trick || []).forEach(m => {
+      now[m.seat] = m.pass ? "p" : ("c" + m.cards.slice().sort((a, b) => a - b).join("."));
+    });
+    const out = { seat: -1, act: null };
+    if(fxActs && fxKey === key){
+      let changed = 0, hit = -1;
+      const seen = {};
+      Object.keys(now).forEach(s => { seen[s] = 1; });
+      Object.keys(fxActs).forEach(s => { seen[s] = 1; });
+      Object.keys(seen).forEach(s => {
+        if((fxActs[s] || "") === (now[s] || "")) return;
+        changed++;
+        if(now[s] && now[s].charAt(0) === "c") hit = +s;
+      });
+      if(changed === 1 && hit >= 0){
+        out.seat = hit;
+        (v.trick || []).forEach(m => { if(m.seat === hit && !m.pass) out.act = m; });
+      }
+    }
+    fxActs = now; fxKey = key;
+    return out;
+  }
+
+  function fxLayer(){
+    let el = document.querySelector(".b2-fx");
+    if(!el){
+      el = document.createElement("div");
+      el.className = "b2-fx";
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function fxSpawn(cls, css, ms, inner){
+    const el = document.createElement("div");
+    el.className = cls;
+    el.setAttribute("style", css);
+    if(inner) el.innerHTML = inner;
+    fxLayer().appendChild(el);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, ms);
+    return el;
+  }
+
+  function runFx(fx, v){
+    if(fx.seat < 0){ fxFly = null; return; }
+    /* ① 我自己出的那幾張:從手上飛到桌上那一格(出發點是**出手前**量的,見 armFly)。
+       ⚠ 只做自己那幾張 —— 別人的牌在畫面上沒有出發點。
+       ⚠ 逐張對 `data-c` 配,不是照順序配:桌上那一排走 sortShow()(帶 2 的順子是
+         2-3-4-5-6),而手牌走玩家自己拖出來的顯示順序,兩邊的順序本來就不一樣。 */
+    if(fxFly && fx.seat === v.me && Date.now() - fxFly.at < 2500){
+      const cell = stage && stage.querySelector(".b2-tmv.just .b2-tcs");
+      const outs = cell ? cell.querySelectorAll(".b2-card") : [];
+      for(let i = 0; i < outs.length; i++){
+        const id = outs[i].dataset.c;
+        const from = fxFly.rect[id];
+        if(!from) continue;
+        const to = outs[i].getBoundingClientRect();
+        const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+        const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+        const g = fxSpawn("b2-flyc", "left:" + from.left + "px;top:" + from.top + "px;width:" +
+          from.width + "px;height:" + from.height + "px;--fx:" + dx + "px;--fy:" + dy +
+          "px;--fs:" + (to.width / Math.max(1, from.width)).toFixed(3) +
+          ";animation-delay:" + (i * 0.05).toFixed(2) + "s", 620);
+        g.innerHTML = cardHTML(+id, "");
+      }
+    }
+    fxFly = null;
+    /* ② 鐵支 / 同花順 —— 這一頁最大的一刻,值得一張特寫。
+       ⚠ 只有無敵牌型才放(`R.isBomb`):順子 / 葫蘆一局會出很多次,每次都蓋整片
+         就是洗版,那兩種交給格子裡「依序落下」的節奏(CSS 的 .just 那組)。
+       ⚠ 牌型名一律問 `R.T_NAME` —— 這一頁「誰比較大」的落地點只有規則層那一份。 */
+    if(fx.act && R.isBomb(fx.act.t)){
+      const tr = stage && stage.querySelector(".b2-trick");
+      if(tr){
+        const b = tr.getBoundingClientRect();
+        if(b.width){
+          fxSpawn("b2-cut t" + fx.act.t, "left:" + b.left + "px;top:" + b.top + "px;width:" +
+            b.width + "px;height:" + b.height + "px", 1050,
+            '<span class="b2-cutw">' + (R.T_NAME[fx.act.t] || "") + '</span>');
+        }
+      }
+      try{
+        Sound.tone(180, { type:"sawtooth", dur:0.26, vol:0.20 });
+        Sound.tone(90,  { type:"sine",     dur:0.42, vol:0.22, delay:0.05 });
+        Sound.tone(720, { type:"triangle", dur:0.30, vol:0.14, delay:0.14 });
+      }catch(e){}
+    }
+  }
+
+  /* 出手**之前**把那幾張牌現在在畫面上的位置記下來 —— 送出去之後手牌就重畫了。
+     呼叫端:solo.js / adapter.js 的「出牌」那一支(Pass 不必,它沒有牌要飛)。
+     ⚠ 只記位置不記狀態:這一手最後有沒有成立由規則層決定,不成立的話 diff 就不會有
+       那一格,替身自然不會生出來(2500ms 之後也一律作廢)。 */
+  function armFly(cards){
+    if(!stage || !cards || !cards.length) return;
+    const rect = {};
+    cards.forEach(c => {
+      const el = stage.querySelector('.b2-hand .b2-card[data-c="' + c + '"]');
+      if(el) rect[c] = el.getBoundingClientRect();
+    });
+    fxFly = { rect: rect, at: Date.now() };
+  }
+
+  /* ==========================================================================
      五、結果卡的排名表 —— ★ 唯一會翻開別人手牌的地方
      ==========================================================================
        ★ 兩個訊號**完全分開**(排七 v1.75.2 的教訓,使用者:「你會把第一名特別框起來,
@@ -820,6 +967,13 @@ const B2B = (function(){
           //   而「這一列是我」還有框在標,訊號沒少
           (me && nm !== "你" ? '<span class="you-badge">你</span>' : "") +
           (first ? '<span class="b2-rcrown" title="第一名">🏆</span>' : "") +
+          /* ★ 一張都沒出過 = 被關門（v2.4.5）—— 這一頁最好笑的一種輸法，
+             而舊版的結果卡上它只是「剩 13 張」（數字看不出來那是滿手牌）。
+             ⚠ 判準是「還拿著**開局那么多張**」，不是寫死 13 —— 2/3 人局一人發得更多。
+             ⚠ 文案不提「罰分 ×2」：這一頁算的是**名次分**，沒有那回事，
+               寫了就是在畫面上造一條假規則。 */
+          (left.length && left.length === R.dealCounts(st.hands.length)[r.seat]
+            ? '<span class="b2-rshut" title="整局一張牌都沒出過">🚪 關門</span>' : "") +
           // ⚠ 這一格刻意**不用 🏆** —— 同一列的 🏆 已經是「這局第一名」,
           //   同一個符號兩個意思比兩張表還難懂
           (w ? '<span class="b2-rwin" title="累積分">' + w.n + ' 分' +
@@ -1084,7 +1238,7 @@ const B2B = (function(){
     mount, render, renderActs, resultHTML, stopCd, selInfoOf,
     cardHTML,
     // 「拉」(v1.81.0):公告 · 晶片記號 · 單獨播那一聲(單機與連線共用)
-    announceLa, laChipHTML, la,
+    announceLa, laChipHTML, la, armFly,
     // 一手的聲音(v1.81.1):動作聲 + 喊牌語音,三個呼叫點共用
     moveSfx,
     sel: () => sel.slice(),

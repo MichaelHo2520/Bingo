@@ -103,6 +103,9 @@ const MP = MPCore.create((function(){
       turnName: st.over ? "" : nameOfSeat(st.turn),
       over: !!ctx.winner() || st.over,
       hot: po ? po.cards : null,
+      // ★ 「誰在拉」（v2.4.5）—— 桌子上方那一列的警示條吃它。
+      //   ⚠ 牌情紅線：這一支回的是**一個 bit 的陣列**，不帶任何牌型 / 牌值。
+      la: B2.laSeats(st),
       /* ★ 換局才變 → 盤面照它丟掉玩家自訂的手牌順序(見 board.js 第八節)。
          ⚠ 用 roundId 而不是 deal / moves.length:同消消樂那條「新局判定一律用
            roundId」,拿手牌或手數去推會把「出掉一手」誤判成新局。 */
@@ -190,6 +193,8 @@ const MP = MPCore.create((function(){
     if(!cs.length){ showToast("先點要出的牌"); return; }
     const why = B2.whyNot(cs, st);
     if(why){ showToast(why, 2400); return; }
+      // ★ 飛牌的出發點只有這一刻量得到（送出去之後手牌就重畫了）—— 見 board.js armFly()
+    B2B.armFly(cs);
     send(B2.encMove(cs));
   }
 

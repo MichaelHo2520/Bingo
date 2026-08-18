@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 e1f8c533aed4d3dd78499ec7ed0547901d10bf9c28165a27895f4150c2523efe)
+    真相在 styles.src.css(sha256 e9c07e898c50eb0ace17d58c16f9f44056aa1fbc7612a386c877627a6eb9ca2f)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -2652,8 +2652,39 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .b2-tcs{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:3px;
     min-height:var(--b2-tch);overflow:hidden}
   .b2-tcs .b2-card{flex:0 1 auto;min-width:0}
+  .b2-tmv.just{animation:b2Land .38s cubic-bezier(.2,1.5,.4,1)}
+  @keyframes b2Land{0%{transform:scale(1.06)}58%{transform:scale(.985)}100%{transform:scale(1)}}
+  .b2-tmv.just .b2-tcs .b2-card{animation:b2Drop .34s cubic-bezier(.25,1.4,.4,1) both}
+  .b2-tmv.just .b2-tcs .b2-card:nth-child(2){animation-delay:.06s}
+  .b2-tmv.just .b2-tcs .b2-card:nth-child(3){animation-delay:.12s}
+  .b2-tmv.just .b2-tcs .b2-card:nth-child(4){animation-delay:.18s}
+  .b2-tmv.just .b2-tcs .b2-card:nth-child(5){animation-delay:.24s}
+  @keyframes b2Drop{
+    0%  {opacity:0;transform:translateY(-16px) scale(1.18) rotate(-5deg)}
+    62% {opacity:1;transform:translateY(0) scale(.97) rotate(0)}
+    100%{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    .b2-tmv.just,.b2-tmv.just .b2-tcs .b2-card{animation:none}
+    .b2-tla{animation:none}
+  }
   .b2-rbomb{flex:none;padding:1px 5px;border-radius:8px;background:var(--b2-redlit);
     font:800 9.5px/1.5 'Nunito',sans-serif;color:#2a0d0d}
+  .b2-trick .b2-tlbl{color:rgba(255,255,255,.76)}
+  .b2-trick .b2-tttl{color:#fff;background:rgba(255,255,255,.17)}
+  .b2-trick .b2-thint{color:rgba(255,255,255,.82)}
+  .b2-trick .b2-thint b{color:#ffd489}
+  .b2-trick .b2-tnm{color:#fff}
+  .b2-trick .b2-tct{color:#fff;background:rgba(255,255,255,.19)}
+  .b2-trick .b2-tpass{color:rgba(255,255,255,.60)}
+  .b2-trick .b2-twait{color:rgba(255,255,255,.60)}
+  .b2-tla{flex:none;padding:1px 8px;border-radius:9px;
+    font:900 11px/1.45 'Nunito',sans-serif;letter-spacing:.5px;
+    color:#fff;background:rgba(176,32,24,.86);
+    box-shadow:0 0 0 1px rgba(255,120,100,.55);
+    animation:b2LaBeat 1.25s ease-in-out infinite}
+  @keyframes b2LaBeat{
+    0%,100%{box-shadow:0 0 0 1px rgba(255,120,100,.50), 0 0 0 0 rgba(224,60,45,.42)}
+    55%    {box-shadow:0 0 0 1px rgba(255,170,150,.90), 0 0 0 6px rgba(224,60,45,0)}}
   :root{ --b2-turn:#6ec8ff; }
   .b2-tmv.me,.b2-tmv.me.top{
     background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
@@ -2666,6 +2697,35 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @keyframes b2Turn{0%,100%{opacity:.45}50%{opacity:1}}
   @media (prefers-reduced-motion:reduce){
     .b2-tmv.act::after{animation:none;opacity:1}
+  }
+  .b2-fx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+  .b2-flyc{position:fixed;animation:b2Fly .52s cubic-bezier(.3,.02,.2,1) forwards}
+  .b2-flyc .b2-card{width:100%;height:100%}
+  @keyframes b2Fly{
+    from{transform:translate(0,0) scale(1) rotate(0);opacity:1}
+    to  {transform:translate(var(--fx),var(--fy)) scale(var(--fs)) rotate(6deg);opacity:.12}}
+  .b2-cut{position:fixed;display:grid;place-items:center;overflow:hidden;border-radius:14px;
+    animation:b2Cut 1.05s ease-out forwards;
+    background:radial-gradient(80% 70% at 50% 50%,rgba(0,0,0,.55),rgba(0,0,0,.14) 74%,rgba(0,0,0,0))}
+  @keyframes b2Cut{0%{opacity:0}12%{opacity:1}74%{opacity:1}100%{opacity:0}}
+  .b2-cutw{font:900 clamp(30px,11vw,62px)/1 'Fredoka','Nunito',sans-serif;letter-spacing:4px;
+    color:#fff;text-shadow:0 3px 18px rgba(0,0,0,.75);
+    animation:b2CutW 1.05s cubic-bezier(.18,1.5,.32,1) forwards}
+  @keyframes b2CutW{
+    0%  {transform:scale(2.6) rotate(-10deg);opacity:0}
+    16% {transform:scale(1)   rotate(-3deg); opacity:1}
+    76% {transform:scale(1)   rotate(-3deg); opacity:1}
+    100%{transform:scale(1.14) rotate(-3deg);opacity:0}}
+  .b2-cut.t5{background:radial-gradient(82% 72% at 50% 50%,
+    rgba(190,30,20,.66),rgba(30,0,0,.40) 72%,rgba(0,0,0,0))}
+  .b2-cut.t5 .b2-cutw{color:#ffd9cf}
+  .b2-cut.t6{background:
+    radial-gradient(82% 72% at 50% 50%,rgba(255,226,150,.62),rgba(20,10,40,.42) 72%,rgba(0,0,0,0)),
+    conic-gradient(from 0deg,rgba(255,120,120,.30),rgba(255,230,140,.30),
+      rgba(120,255,190,.30),rgba(140,190,255,.30),rgba(255,120,120,.30))}
+  .b2-cut.t6 .b2-cutw{color:#fff8e0}
+  @media (prefers-reduced-motion:reduce){
+    .b2-flyc{display:none}
   }
   .set-card.b2-rules-card{width:min(92vw,480px);max-width:none;
     display:flex;flex-direction:column;overflow:hidden}
@@ -2754,6 +2814,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     background:rgba(255,255,255,.18);font:800 11px/1 'Nunito',sans-serif;color:var(--text)}
   .b2-rrow.win .b2-rno{background:var(--accent);color:#1c1008}
   .b2-rcrown{flex:none;font-size:12px;line-height:1}
+  .b2-rshut{flex:none;padding:1px 6px;border-radius:8px;
+    font:900 9.5px/1.6 'Nunito',sans-serif;letter-spacing:.4px;
+    color:#fff;background:linear-gradient(135deg,#b0261c,#7d1410);
+    box-shadow:0 1px 4px rgba(176,38,28,.5)}
   .b2-rname{flex:0 1 auto;min-width:0;text-align:left;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     font:800 13.5px/1.2 'Nunito',sans-serif;color:var(--text)}
