@@ -84,18 +84,28 @@ const BJB = (function(){
      ⚠⚠ hidx 一律由呼叫端從 **BJ.hiddenIdx(st, seat, me)** 拿 —— 這一支自己不判斷
        任何相位,而且畫面端**絕對不可以**自己算「他大概停手了吧」那類近似條件。
        v1.86.0 起蓋著的不只莊家:每個非我閒家的**第一張**也蓋著(見 rules.js 六之三)。 */
-  function cardsHTML(cards, cls, hidx){
+  /* ⚠ `m` 是**純畫面**的動效記號(v2.4.5,見六之三):`m.just` 起的那幾張是這一次
+     才多出來的、`m.flip` 那一張是剛從牌背翻開的。它一個位元都不影響牌情:
+     蓋不蓋著仍然只看 `hidx`(而 hidx 一律由呼叫端從 `BJ.hiddenIdx()` 拿)。 */
+  function cardsHTML(cards, cls, hidx, m){
     if(!cards || !cards.length) return "";
     const k = (hidx === undefined || hidx === null) ? -1 : hidx;
     let h = "";
-    for(let i = 0; i < cards.length; i++)
-      h += (i === k) ? backCard(cls) : cardHTML(cards[i], cls);
+    for(let i = 0; i < cards.length; i++){
+      let c2 = cls || "";
+      if(m){
+        if(m.just !== undefined && i >= m.just) c2 += " just";
+        if(m.flip === i && i !== k) c2 += " flip";
+      }
+      h += (i === k) ? backCard(c2) : cardHTML(cards[i], c2);
+    }
     return h;
   }
   /* 某個座位的一手牌 + 它的點數膠囊 —— ★ 牌情只在這兩支裡落地。 */
   function handOf(st, seat, me, cls){
     if(!st) return "";
-    return cardsHTML(st.hands[seat], cls, R.hiddenIdx(st, seat, me));
+    return cardsHTML(st.hands[seat], cls, R.hiddenIdx(st, seat, me),
+                     fxMark ? fxMark[seat] : null);
   }
 
   /* 點數膠囊。★ 雙值(「7 / 17」)一律走 BJ.valueTxt —— 這一頁**不准**自己算點數
@@ -281,6 +291,12 @@ const BJB = (function(){
     const st = v.st;
     return !!(grabOpen && st && v.me === st.dealer && R.canGrab(st, s));
   }
+  /* 「他最後會是幾點」的區間 —— ⚠ 只吃 `R.shownCards()`(看得見的那幾張)。
+     爆折成 22 → 顯示成「爆」:區間要講的是「會不會過」,不是「爆多少」。 */
+  function rangeTxt(st, s, me){
+    const rg = R.rangeOf(R.shownCards(st, s, me));
+    return rg.lo + "~" + (rg.hi > 21 ? "爆" : rg.hi);
+  }
 
   /* 一個注區。★ 我自己那一格獨占整列;★★ v1.87.0 起**每個人的牌同一個尺寸**
      (牌寬吃 --bj-cardw,由 planTable 一支算出來)—— 所以這裡一個 class 都不必挑。
@@ -304,6 +320,10 @@ const BJB = (function(){
     if(bust) cls += " bust";
     if(st && st.caught[s] >= 0) cls += " caught";
     if(turn) cls += " act";
+    /* ★ 停手 = 這一格**定型了**(v2.4.5)。舊版只有右邊一個很小的「✋停」,
+       而「誰已經不會再變」正是莊家決定要不要抓人時最先要掃過的東西。
+       ⚠ 爆了 / 被抓已經各有自己的底色,不要再疊一層(那會變成三種紅褐色互相蓋)。 */
+    if(st && st.phase === "play" && st.done[s] && !bust && st.caught[s] < 0) cls += " stood";
     /* ★★★ v1.87.0:抓人展開時**整格就是那顆鈕**(使用者:「我是想要直接在牌桌上點人」)。
        data-grab 是唯一的落點 —— mount 那邊只認它,不認 class(class 是給樣式看的)。 */
     if(tgt) cls += " target";
@@ -341,6 +361,14 @@ const BJB = (function(){
                (st ? handOf(st, s, v.me, "")
                    : '<span class="bj-bwait">🎴 等發牌…</span>') +
              '</div>' +
+             /* ★★ 抓人時的**點數區間**(v2.4.5)。台式抓人最好玩的地方就是
+                「他看得見的是 8,底下那張 1~11 → 9~18」,而那件事在這之前
+                得玩家自己在腦子裡算。
+                ⚠⚠ 一律走 `R.rangeOf(R.shownCards(...))` —— 那一支**只吃看得見的牌**,
+                  結構上不可能把暗牌算進去(見 rules.js 那段註解)。
+                ⚠ 它是**絕對定位**的,一個像素都不占版面:頭列的寬度預算早就滿了
+                  (notes/17 的 hdOver 守門),往那裡加東西一定擠爆。 */
+             (tgt ? '<span class="bj-grng">' + rangeTxt(st, s, v.me) + '</span>' : "") +
            '</div>';
   }
 
@@ -562,6 +590,10 @@ const BJB = (function(){
      ========================================================================== */
   function render(v, again){
     if(!stage) return;
+    /* ★ 新牌 / 翻牌的記號要在寫 innerHTML **之前**算好(handOf 讀它)。
+       ⚠ `again`(learnChrome 之後整份重畫那一次)**不可以再算一次** ——
+         算了會把記號清掉,那一次的滑入動畫就靜靜地不見了。 */
+    if(!again) calcFxMark(v);
     const n = v.n || (v.st ? v.st.n : 2);
     // ⚠ v1.90.0:下注階段也要知道莊家是誰(否則格數會從 n 掉到 n−1 = 牌換一次大小)
     const d = dealerOf(v);
@@ -1021,6 +1053,79 @@ const BJB = (function(){
   /* 每次重畫都叫一次(單機 solo.paint() / 連線 adapter.paint() 各一行)。
      v = { st, names[], me, key, betDone[] } —— key 就是「這是哪一局」。
      ⚠ betDone 只在**下注那一段**有意義(那時 st 是 null,見兩個呼叫端)。 */
+  /* ==========================================================================
+     六之三、動效層(v2.4.5)—— 特寫 / 新牌滑入 / 暗牌翻開
+     ──────────────────────────────────────────────────────────────────────────
+       ★★ 特寫的掛點只有一個:`announce()` 裡 `bid()` 選出來的那一聲。
+         那一支已經是這一頁「一次重畫只響一聲」的唯一入口,而且優先權來自**規則層的階**
+         (`R.tierRank`)—— 特寫跟著它走,就不會出現「聲音說 21 點、畫面演過五關」。
+         ⚠ 不要為了「動畫想早一點出來」另外找地方插呼叫:那就是第二份優先權。
+
+       ★ 新牌滑入 / 暗牌翻開走的是**牌數與 hiddenIdx 的 diff**,不吃任何相位判斷 ——
+         發牌、要牌、被抓翻牌、莊家掀底牌四件事在 diff 上是同一件事。
+       ⚠⚠ diff **不需要 round key**:張數只會增加,一旦有任何一家變少就一定是重發
+         (最少 2 張、發牌是一次給 2 張)→ 那一次什麼都不標。
+         `st` 變成 null(下注階段)也一律清掉。
+       ⚠ 特效節點掛獨立的 fixed 圖層 `.bj-fx`:`render()` 每次整份覆寫 stage 的
+         innerHTML;z-index 40(結果卡 `.veil` 是 50、過場 `#bjHand` 在 stage 內是 3)。
+     ========================================================================== */
+  let fxCnt = null, fxHid = null;
+  let fxMark = null;                        // fxMark[seat] = { just, flip }(見 handOf)
+
+  function calcFxMark(v){
+    const st = v && v.st;
+    if(!st || !st.hands){ fxCnt = null; fxHid = null; fxMark = null; return; }
+    const cnt = [], hid = [];
+    let shrank = false;
+    for(let s = 0; s < st.n; s++){
+      cnt[s] = st.hands[s].length;
+      hid[s] = R.hiddenIdx(st, s, v.me);
+      if(fxCnt && cnt[s] < (fxCnt[s] || 0)) shrank = true;
+    }
+    const out = [];
+    if(fxCnt && !shrank){
+      for(let s = 0; s < st.n; s++){
+        const o = {};
+        if(cnt[s] > (fxCnt[s] || 0)) o.just = fxCnt[s] || 0;   // 這個 index 起都是新的
+        if(fxHid[s] >= 0 && hid[s] !== fxHid[s]) o.flip = fxHid[s];
+        out[s] = o;
+      }
+    }
+    fxCnt = cnt; fxHid = hid;
+    fxMark = out.length ? out : null;
+  }
+
+  function fxLayer(){
+    let el = document.querySelector(".bj-fx");
+    if(!el){
+      el = document.createElement("div");
+      el.className = "bj-fx";
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  const CUT = {
+    bust:   { t: "爆了",   c: "bust" },
+    bj:     { t: "21 點",  c: "bj" },
+    dragon: { t: "過五關", c: "dragon" },
+    grab:   { t: "抓!",   c: "grab" }
+  };
+  function cutIn(key){
+    const o = CUT[key];
+    if(!o) return;
+    const tb = stage && stage.querySelector(".bj-table");
+    if(!tb) return;
+    const b = tb.getBoundingClientRect();
+    if(!b.width) return;                    // 桌子還沒有版面(hidden)→ 什麼都不放
+    const el = document.createElement("div");
+    el.className = "bj-cut " + o.c;
+    el.setAttribute("style", "left:" + b.left + "px;top:" + b.top + "px;" +
+      "width:" + b.width + "px;height:" + b.height + "px");
+    el.innerHTML = '<span class="bj-cutw">' + o.t + '</span>';
+    fxLayer().appendChild(el);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 1000);
+  }
+
   function announce(v){
     const st = v && v.st;
     if(!st || !st.hands){
@@ -1088,6 +1193,10 @@ const BJB = (function(){
        ⚠ 優先權**不寫在這裡** —— 全部由上面 bid() 的名次決定(而階的名次來自規則層)。 */
     if(snd === "reveal") revealSfx();
     else if(snd) evSfx(snd);                        // ★ 動作聲 + 喊出來那一句兩層
+    /* ★ 特寫跟著**同一個 snd** 走(v2.4.5)—— 聲音與畫面共用一份優先權,
+       所以不可能出現「聲音說 21 點、畫面演過五關」。翻牌不放特寫:它每一局都會發生,
+       而它的戲劇性已經由那張牌自己的翻牌動畫(`.bj-card.flip`)講完了。 */
+    if(snd && snd !== "reveal") cutIn(snd);
   }
   /* 換局 / 離場:把 diff 的種子清掉(下一次只記不響)+ 收掉抓人那一排。
      ⚠ v1.92.0 起也要清掉**過場的 key**:再打一場時第一局的 key 會與上一場一樣
@@ -1095,6 +1204,8 @@ const BJB = (function(){
   function resetAnnounce(){
     anPrev = null; anKey = ""; anCaught = null; anRev = false; anBets = null;
     grabOpen = false; handKey = ""; hVoted = false;
+    // ⚠ 動效的 diff 也要一起清:不清的話換局第一次畫會把整桌的牌都當成「剛發的」
+    fxCnt = null; fxHid = null; fxMark = null;
   }
 
   /* ==========================================================================

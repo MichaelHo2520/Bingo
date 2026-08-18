@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 e9c07e898c50eb0ace17d58c16f9f44056aa1fbc7612a386c877627a6eb9ca2f)
+    真相在 styles.src.css(sha256 78ebc23387e3debb300eb64fa48f0ceb0f115b271ef8364125c2ea93cff25453)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -2952,6 +2952,19 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .bj-dcs{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;
     min-height:calc(var(--bj-cw) * 0.72 * 1.42);overflow:hidden}
   .bj-dcs .bj-card,.bj-scs .bj-card{flex:0 1 auto;min-width:0}
+  .bj-card.just{animation:bjDeal .30s cubic-bezier(.22,1.35,.36,1) both}
+  @keyframes bjDeal{
+    0%  {opacity:0;transform:translate(14px,-20px) rotate(9deg) scale(1.06)}
+    100%{opacity:1;transform:none}}
+  .bj-card.flip{animation:bjFlip .42s cubic-bezier(.3,.8,.3,1) both;
+    transform-style:preserve-3d;backface-visibility:hidden}
+  @keyframes bjFlip{
+    0%  {transform:rotateY(-92deg) scale(1.05)}
+    58% {transform:rotateY(8deg)   scale(1.02)}
+    100%{transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    .bj-card.just,.bj-card.flip{animation:none}
+  }
   .bj-dwait{font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted)}
   .bj-seats{flex:0 1 auto;min-height:0;overflow-y:auto;
     display:flex;flex-direction:column;gap:4px}
@@ -2983,6 +2996,31 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .bj-pt.bj{background:var(--accent-2);color:#2a1c00}
   .bj-pt.dragon{background:rgba(129,199,132,.3);color:#dcffdd}
   .bj-pt.part b{font-weight:800;font-size:9.5px;opacity:.7;margin-left:1px}
+  .bj-fx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+  .bj-cut{position:fixed;display:grid;place-items:center;overflow:hidden;border-radius:14px;
+    animation:bjCut 1s ease-out forwards;
+    background:radial-gradient(78% 68% at 50% 50%,rgba(0,0,0,.50),rgba(0,0,0,.12) 74%,rgba(0,0,0,0))}
+  @keyframes bjCut{0%{opacity:0}13%{opacity:1}72%{opacity:1}100%{opacity:0}}
+  .bj-cutw{font:900 clamp(26px,9vw,54px)/1 'Fredoka','Nunito',sans-serif;letter-spacing:3px;
+    color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.7);
+    animation:bjCutW 1s cubic-bezier(.2,1.45,.35,1) forwards}
+  @keyframes bjCutW{
+    0%  {transform:scale(2.4) rotate(-8deg);opacity:0}
+    17% {transform:scale(1)   rotate(-3deg);opacity:1}
+    74% {transform:scale(1)   rotate(-3deg);opacity:1}
+    100%{transform:scale(1.12) rotate(-3deg);opacity:0}}
+  .bj-cut.bust{background:radial-gradient(80% 70% at 50% 50%,
+    rgba(206,44,32,.62),rgba(30,0,0,.36) 72%,rgba(0,0,0,0))}
+  .bj-cut.bust .bj-cutw{color:#ffd7cf}
+  .bj-cut.bj{background:radial-gradient(80% 70% at 50% 50%,
+    rgba(120,72,0,.74),rgba(20,12,0,.42) 72%,rgba(0,0,0,0))}
+  .bj-cut.bj .bj-cutw{color:#ffe08a}
+  .bj-cut.dragon{background:radial-gradient(80% 70% at 50% 50%,
+    rgba(20,110,58,.68),rgba(0,24,12,.40) 72%,rgba(0,0,0,0))}
+  .bj-cut.dragon .bj-cutw{color:#c8ffd4}
+  .bj-cut.grab{background:radial-gradient(80% 70% at 50% 50%,
+    rgba(150,96,0,.68),rgba(24,14,0,.40) 72%,rgba(0,0,0,0))}
+  .bj-cut.grab .bj-cutw{color:#ffd489}
   .bj-mine{flex:none;min-height:var(--bj-mh);display:flex;flex-direction:column;gap:3px;
     padding:4px 8px;border:2px solid transparent;border-radius:11px;
     background:rgba(255,255,255,.09)}
@@ -3159,6 +3197,23 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .bj-box.act{border-color:rgba(255,255,255,.42)}
   .bj-box.bust{background:linear-gradient(180deg,rgba(224,83,63,.22),rgba(224,83,63,.07))}
   .bj-box.caught{background:linear-gradient(180deg,rgba(255,196,84,.20),rgba(255,196,84,.07))}
+  .bj-box.stood{filter:saturate(.86) brightness(.94);
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02)),
+      repeating-linear-gradient(135deg,rgba(255,255,255,.045) 0 6px,rgba(0,0,0,0) 6px 12px)}
+  .bj-box{position:relative}
+  .bj-grng{position:absolute;right:5px;bottom:4px;pointer-events:none;
+    padding:1px 6px;border-radius:7px;
+    font:900 10.5px/1.5 'Nunito',sans-serif;letter-spacing:.3px;
+    color:#20140a;background:rgba(255,255,255,.90);
+    box-shadow:0 1px 4px rgba(0,0,0,.45)}
+  .bj-table .bj-dnm,.bj-table .bj-bnm,.bj-table .bj-snm{color:#fff}
+  .bj-table .bj-dwait,.bj-table .bj-bwait{color:rgba(255,255,255,.62)}
+  .bj-table .bj-st:not(.ok):not(.bad):not(.wait){color:rgba(255,255,255,.66)}
+  .bj-table .bj-st.wait{color:#ffd489}
+  .bj-table .bj-pt:not(.bust):not(.bj):not(.dragon){color:#fff}
+  .bj-table .bj-bet{color:#fff}
+  .bj-table .bj-bet i{color:rgba(255,255,255,.62)}
+  .bj-table .bj-bet b{color:#ffd489}
   .bj-box.me{border-color:#ffd489;
     background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
   .bj-box.target{border-color:#ffc454;box-shadow:0 0 0 3px rgba(255,196,84,.22)}

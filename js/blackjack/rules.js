@@ -306,6 +306,28 @@ const BJ = (function(){
   }
   const isBJ = cards => cards.length === 2 && valueOf(cards).best === 21;
 
+  /* ★★ 只吃「**看得見的那幾張** + 一張還不知道的牌」,回這一手的點數區間(v2.4.5)。
+     用途只有一個:莊家展開抓人時,把他本來要在腦子裡算的東西畫出來
+     (「明牌 8 → 9~18 點」)。
+
+     ⚠⚠ 它刻意收 `shown` 而不是 `(st, seat)` —— 這樣呼叫端**一定得先經過
+       `BJ.shownCards()`** 才拿得到參數,不可能不小心把暗牌餵進來。
+       這一頁的牌情紅線就是「畫面端絕不可以自己算暗牌」,而這一支是那條紅線的形狀。
+     ⚠ 十三種點數全部試一遍(不是自己推 1~11):A 的軟硬、J/Q/K 都算 10 這些
+       全部交給 `valueOf()` —— 在這裡再寫一次就是第二份「點數怎麼算」。
+     ⚠ 爆一律折成 22:區間要講的是「會不會過」,不是「爆多少」。 */
+  function rangeOf(shown){
+    const list = shown || [];
+    let lo = 99, hi = -1;
+    for(let r = 1; r <= NRANK; r++){
+      const v = valueOf(list.concat([cardOf(0, r)]));
+      const p = v.bust ? 22 : v.best;
+      if(p < lo) lo = p;
+      if(p > hi) hi = p;
+    }
+    return { lo: lo, hi: hi };
+  }
+
   /* ==========================================================================
      四、四個階:爆 < 普通 < 過五關 < **21 點**
      ──────────────────────────────────────────────────────────────────────────
@@ -846,7 +868,7 @@ const BJ = (function(){
     normRules, defRules, betTiers, betSteps, minBet, clampBet,
     normFirst, firstTok, mkFirst,
     // 點數與階
-    valueOf, valueTxt, isBJ, tierOf, mulOf,
+    valueOf, valueTxt, isBJ, tierOf, mulOf, rangeOf,
     // 座位牌堆
     maxDraw, seatCards, closedAt,
     // 補牌線(下限)與抓人

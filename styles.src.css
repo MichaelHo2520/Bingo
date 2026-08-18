@@ -6433,6 +6433,29 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      所以這裡明寫 flex:0 1 auto + min-width:0 讓它縮得動。
      ⚠ 只給**桌上**那幾排:我的手牌一縮就等於格位變了。 */
   .bj-dcs .bj-card,.bj-scs .bj-card{flex:0 1 auto;min-width:0}
+
+  /* ---------- 發牌 / 要牌:新的那幾張滑進來(v2.4.5)----------
+     ★ 這一頁在這之前**完全沒有「牌來了」的動作** —— 要牌只是那一格忽然多一張,
+       而閒家是**同時**補牌的:好幾格同時多一張的時候根本看不出剛剛發生了什麼。
+     ⚠ 只動 transform / opacity:牌的寬高是 planTable 量出來的(--bj-cardw),
+       動到尺寸就會與那一套打架。
+     ⚠ 一定要 `both`:動畫還沒輪到自己之前那張牌是「已經畫好的」,少了它
+       只有第一張有動畫(同排七結果卡那條)。 */
+  .bj-card.just{animation:bjDeal .30s cubic-bezier(.22,1.35,.36,1) both}
+  @keyframes bjDeal{
+    0%  {opacity:0;transform:translate(14px,-20px) rotate(9deg) scale(1.06)}
+    100%{opacity:1;transform:none}}
+  /* 暗牌翻開 —— 台式 21 點最戲劇的一刻(莊家掀底牌 / 被抓的人攤牌)。
+     ★ 用 3D 翻轉而不是淡入:淡入看起來像「那張牌換了一張」,翻轉才是「掀開」。 */
+  .bj-card.flip{animation:bjFlip .42s cubic-bezier(.3,.8,.3,1) both;
+    transform-style:preserve-3d;backface-visibility:hidden}
+  @keyframes bjFlip{
+    0%  {transform:rotateY(-92deg) scale(1.05)}
+    58% {transform:rotateY(8deg)   scale(1.02)}
+    100%{transform:none}}
+  @media (prefers-reduced-motion:reduce){
+    .bj-card.just,.bj-card.flip{animation:none}
+  }
   .bj-dwait{font:700 11.5px/1 'Nunito',sans-serif;color:var(--muted)}
 
   /* ---------- 其他閒家(一列一人,★ 單行)----------
@@ -6489,6 +6512,44 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 「4 + ?」= 這個數字只算了明牌那一張(莊家還沒翻牌)。
      ⚠ 那個 <b>+ ?</b> 要比數字淡:它不是點數的一部分,是「還有一張不知道」 */
   .bj-pt.part b{font-weight:800;font-size:9.5px;opacity:.7;margin-left:1px}
+
+  /* ==========================================================================
+     21點 — 動效圖層 .bj-fx(v2.4.5):爆 / 21點 / 過五關 / 抓人 的特寫
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠⚠ 掛在 **body** 而不是 `#bjStage`:`render()` 每次整份覆寫 stage 的
+         innerHTML(而這一頁閒家是同時補牌,重畫非常頻繁)。
+       ⚠ z-index 40 —— 結果卡 `.veil` 是 50、過場 `#bjHand` 是 stage 裡的 z-index:3:
+         特寫要壓得過牌桌、但**不可以**壓過結算的過場與結果卡。
+       ⚠ 尺寸 / 位置由 board.js 當下量 `.bj-table` 寫成 inline —— 這一頁的桌子高度
+         是 `planTable()` 算出來的(人數 + 視窗),寫死一定跑出桌外。
+       ★ 顏色與點數膠囊那一組**同一套語彙**:爆是紅、21 點是 accent、過五關是綠、
+         抓人是琥珀。改這裡的話那一組要一起改(notes/17 那條「四條一起改」)。
+     ========================================================================== */
+  .bj-fx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+  .bj-cut{position:fixed;display:grid;place-items:center;overflow:hidden;border-radius:14px;
+    animation:bjCut 1s ease-out forwards;
+    background:radial-gradient(78% 68% at 50% 50%,rgba(0,0,0,.50),rgba(0,0,0,.12) 74%,rgba(0,0,0,0))}
+  @keyframes bjCut{0%{opacity:0}13%{opacity:1}72%{opacity:1}100%{opacity:0}}
+  .bj-cutw{font:900 clamp(26px,9vw,54px)/1 'Fredoka','Nunito',sans-serif;letter-spacing:3px;
+    color:#fff;text-shadow:0 3px 16px rgba(0,0,0,.7);
+    animation:bjCutW 1s cubic-bezier(.2,1.45,.35,1) forwards}
+  @keyframes bjCutW{
+    0%  {transform:scale(2.4) rotate(-8deg);opacity:0}
+    17% {transform:scale(1)   rotate(-3deg);opacity:1}
+    74% {transform:scale(1)   rotate(-3deg);opacity:1}
+    100%{transform:scale(1.12) rotate(-3deg);opacity:0}}
+  .bj-cut.bust{background:radial-gradient(80% 70% at 50% 50%,
+    rgba(206,44,32,.62),rgba(30,0,0,.36) 72%,rgba(0,0,0,0))}
+  .bj-cut.bust .bj-cutw{color:#ffd7cf}
+  .bj-cut.bj{background:radial-gradient(80% 70% at 50% 50%,
+    rgba(120,72,0,.74),rgba(20,12,0,.42) 72%,rgba(0,0,0,0))}
+  .bj-cut.bj .bj-cutw{color:#ffe08a}
+  .bj-cut.dragon{background:radial-gradient(80% 70% at 50% 50%,
+    rgba(20,110,58,.68),rgba(0,24,12,.40) 72%,rgba(0,0,0,0))}
+  .bj-cut.dragon .bj-cutw{color:#c8ffd4}
+  .bj-cut.grab{background:radial-gradient(80% 70% at 50% 50%,
+    rgba(150,96,0,.68),rgba(24,14,0,.40) 72%,rgba(0,0,0,0))}
+  .bj-cut.grab .bj-cutw{color:#ffd489}
 
   /* ---------- 我的手牌 ----------
      ★★ 格位是**固定的**(照大老二 v1.77.0):容器寬 = --bj-slots × 一格、靠左填,
@@ -6872,6 +6933,47 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .bj-box.act{border-color:rgba(255,255,255,.42)}
   .bj-box.bust{background:linear-gradient(180deg,rgba(224,83,63,.22),rgba(224,83,63,.07))}
   .bj-box.caught{background:linear-gradient(180deg,rgba(255,196,84,.20),rgba(255,196,84,.07))}
+  /* ★ 停手 = 這一格定型了(v2.4.5)。舊版只有右邊一個很小的「✋停」,而「誰已經不會再變」
+     正是莊家決定要不要抓人時最先掃過的東西 —— 給它一層很淡的斜紋 + 壓一點亮度。
+     ⚠ 排在 .bust / .caught **後面**但只在它們都不成立時才掛(board.js 那邊的條件),
+       所以三種底色不會互相蓋。
+     ⚠ 不動 border:那是「現在在等他」與「抓得動」兩條軌的通道。 */
+  .bj-box.stood{filter:saturate(.86) brightness(.94);
+    background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02)),
+      repeating-linear-gradient(135deg,rgba(255,255,255,.045) 0 6px,rgba(0,0,0,0) 6px 12px)}
+
+  /* ★★ 抓人時的點數區間籤(v2.4.5)。
+     ⚠⚠ **絕對定位,一個像素都不占版面** —— 頭列的寬度預算早就滿了
+       (notes/17 版面第 3 條:守門量的是頭列的 scrollWidth − clientWidth),
+       往那裡加東西一定擠爆,而症狀是「名字被省略號吃光之後右邊那組被靜靜擠出去」。
+     ⚠ 它只在 `.bj-box.target`(抓得動的那幾格)存在,而那是莊家展開抓人的那幾秒。 */
+  .bj-box{position:relative}
+  .bj-grng{position:absolute;right:5px;bottom:4px;pointer-events:none;
+    padding:1px 6px;border-radius:7px;
+    font:900 10.5px/1.5 'Nunito',sans-serif;letter-spacing:.3px;
+    color:#20140a;background:rgba(255,255,255,.90);
+    box-shadow:0 1px 4px rgba(0,0,0,.45)}
+
+  /* ==========================================================================
+     ★★ 桌布上的字一律**固定色**(v2.4.5)—— 與大老二同一批、同一個理由
+     ──────────────────────────────────────────────────────────────────────────
+       `.bj-table` 的綠呢是**寫死的深綠**,而底下這幾條吃 `--text` / `--muted`:
+       bubblegum 的 `--text` 是 #6a1f57(深紫)、`--muted` 是 #a76b96,壓上去對比很低。
+       (notes/17 版面第 1 條就記著「UNO 已經修了,這一頁還沒」。)
+       ⚠ 選擇器一律限定在 `.bj-table` 裡面:同樣這幾個 class 在結果卡 / 過場 / 蓋板上
+         還會用到,那些地方的底色**是**跟著主題的。
+       ⚠⚠ `.bj-pt` 與 `.bj-st` 各有幾個**帶語意的變體**(爆 / 21點 / 過五關 / 停 / 等)——
+         它們是 (0,2,0) 而這裡也是 (0,2,0),寫在後面會把它們**全部蓋成白的**
+         = 顏色這條管道整個消失(而顏色正是玩家判斷「哪一個比較厲害」的第一個管道)。
+         所以一律用 `:not()` 把變體讓開,不要靠順序。 */
+  .bj-table .bj-dnm,.bj-table .bj-bnm,.bj-table .bj-snm{color:#fff}
+  .bj-table .bj-dwait,.bj-table .bj-bwait{color:rgba(255,255,255,.62)}
+  .bj-table .bj-st:not(.ok):not(.bad):not(.wait){color:rgba(255,255,255,.66)}
+  .bj-table .bj-st.wait{color:#ffd489}
+  .bj-table .bj-pt:not(.bust):not(.bj):not(.dragon){color:#fff}
+  .bj-table .bj-bet{color:#fff}
+  .bj-table .bj-bet i{color:rgba(255,255,255,.62)}
+  .bj-table .bj-bet b{color:#ffd489}
   /* ★ 我自己那一格:金框 + 亮底 + 徽章(要求①「很清楚知道自己坐在哪」) */
   .bj-box.me{border-color:#ffd489;
     background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
