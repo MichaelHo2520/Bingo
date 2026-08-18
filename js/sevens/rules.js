@@ -276,6 +276,27 @@ const SV = (function(){
     return 0;
   }
 
+  /* ★★ 蓋掉這張牌,那條龍在它那一側**還有幾張從此永遠出不了**(v2.4.5)。
+     這是蓋牌真正的代價 —— 罰分只算自己蓋掉的那一張,但被它封在後面的牌,
+     持有的人遲早也只能蓋掉(誰持有是保密的,所以這裡只能算「幾張」)。
+
+     ⚠ **它不吃 tracks,而那不是漏掉參數** —— 龍是連續的:♠Q 出過就代表 ♠J 一定出過,
+       所以「還在手上的那張牌後面那些」必然一張都還沒出。硬把 tracks 收進來只會多一份
+       可以和事實走鐘的東西。
+     ⚠ 7 是兩側的根,蓋掉它整條龍(另外 12 張)全鎖死。 */
+  function sealOf(card){
+    const r = rankOf(card);
+    return r === 7 ? 12 : (r > 7 ? 13 - r : r - 1);
+  }
+  /* 上面那些被封死的牌裡,**有幾張在我自己手上**(顯示端用:封住別人也可能封住自己)。
+     ⚠ hand 是呼叫端自己的手牌 —— 這一支不知道別人有什麼,也不該知道。 */
+  function sealMine(card, hand){
+    const s = suitOf(card), r = rankOf(card);
+    if(r === 7) return hand.filter(c => c !== card && suitOf(c) === s).length;
+    return hand.filter(c => c !== card && suitOf(c) === s &&
+      (r > 7 ? rankOf(c) > r : rankOf(c) < r)).length;
+  }
+
   return {
     // 常數
     NSUIT, NRANK, NCARD, SPADE7, SUIT_KEY, SUIT_NAME, VS15,
@@ -293,7 +314,7 @@ const SV = (function(){
     // 結算
     ptsOf, score,
     // 小工具
-    onTable, opensAfter
+    onTable, opensAfter, sealOf, sealMine
   };
 })();
 

@@ -4890,7 +4890,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ 基準要用 --sv-cellw(格子**實際**寬)而不是 --sv-cw(牌寬):窄機上格子會被
        13 等分壓得比牌寬小(26.3 vs 29.6),照牌寬算出來的字會偏大一成。
      ⚠ 字級寫在 .sv-cell 上、子元素一律用 em —— 兩件事才會一起變(花色 .84em = .42/.50)。 */
-  .sv-cell{min-height:26px;aspect-ratio:.72;border-radius:4px;
+  .sv-cell{min-height:26px;aspect-ratio:.72;border-radius:4px;position:relative;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:calc(var(--sv-cellw) * .03);
     background:rgba(255,255,255,.05);color:rgba(255,255,255,.34);
@@ -4911,10 +4911,60 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .sv-cell.on{background:var(--sv-face);color:var(--sv-blk);box-shadow:0 1px 0 rgba(0,0,0,.24)}
   .sv-cell.on i{color:var(--sv-blk)}
   .sv-track.red .sv-cell.on,.sv-track.red .sv-cell.on i{color:var(--sv-red)}
-  /* 起手那格(7):四條龍都從它長出去,還沒開的龍靠它指出「從這裡開」 */
-  .sv-cell.seven{box-shadow:inset 0 0 0 1px rgba(255,255,255,.20)}
-  .sv-cell.seven.on{box-shadow:0 1px 0 rgba(0,0,0,.24)}
+  /* 起手那格(7):四條龍都從它長出去,還沒開的龍靠它指出「從這裡開」
+     ⚠ v2.4.5 把白框換成燙金 —— 白色與它旁邊十二格的暗格框幾乎同一個亮度,
+       「四個起點」在放大截圖上看得出來、在手機上看不出來。 */
+  .sv-cell.seven{box-shadow:inset 0 0 0 1px rgba(245,201,106,.46)}
+  .sv-cell.seven.on{box-shadow:0 1px 0 rgba(0,0,0,.24), inset 0 0 0 1px rgba(186,140,44,.55)}
+
+  /* ---------- ★★ 幽靈骨牌:這一格的牌在我手上(v2.4.5)----------
+     排七的靈魂是「記牌與控線」,而「我手上的 ♠J 卡在哪」本來就是**我自己的牌** ——
+     標出來不是替玩家算牌(那會是紅線),是省去他在手牌與軌道之間來回對照。
+     ⚠ 順序要在 .open 之前:兩者都是 (0,2,0),而「這是接口」的訊號要贏過
+       「這張在我手上」;兩件同時成立時由下面 (0,3,0) 的 .mine.open 收走。 */
+  .sv-cell.mine{background:rgba(255,255,255,.12);color:rgba(255,255,255,.66);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.24)}
+  .sv-cell.mine i{color:rgba(255,255,255,.66)}
+  .sv-track.red .sv-cell.mine i{color:rgba(255,150,150,.80)}
+
   .sv-cell.open{background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 1.6px var(--accent)}
+
+  /* ★ 接口 + 在我手上 = **這張現在就打得出去** → 金色呼吸。
+     它與手牌那一排的 .can 講同一件事,差別是這裡順便說「打出去會落在哪一格」。 */
+  .sv-cell.mine.open{background:rgba(255,208,120,.22);color:#ffe6b4;
+    animation:svHot 1.5s ease-in-out infinite}
+  .sv-cell.mine.open i{color:#ffe6b4}
+  @keyframes svHot{
+    0%,100%{box-shadow:inset 0 0 0 2px #f3c46a, 0 0 5px rgba(243,196,106,.30)}
+    50%    {box-shadow:inset 0 0 0 2px #ffdf9a, 0 0 13px rgba(255,223,154,.62)}}
+
+  /* ---------- ★★ 封路預覽:選了一張要蓋掉的牌(v2.4.5)----------
+     蓋掉 ♠J,♠Q ♠K 從此也永遠出不了 —— 那才是蓋牌真正的代價,而罰分只算蓋掉的那一張。
+     .seal   = 要蓋掉的那一格   .sealed = 被它封在後面、從此不會亮的那些格
+     ⚠ 這兩組只在蓋牌模式選了牌時存在,出牌模式一格都不會有(board.js 的 o.seal < 0)。 */
+  .sv-cell.seal{background:rgba(224,83,63,.38);color:#ffd9d2;
+    box-shadow:inset 0 0 0 2px #e0533f}
+  .sv-cell.seal i{color:#ffd9d2}
+  .sv-cell.sealed{box-shadow:inset 0 0 0 1px rgba(224,83,63,.40);
+    background:repeating-linear-gradient(45deg,rgba(224,83,63,.22) 0 3px,rgba(0,0,0,0) 3px 6px)}
+
+  /* ---------- 金色龍骨:相鄰兩格都亮著就接一節(v2.4.5)----------
+     一條接通的龍要看得出來是**一條**,不是十三個各自亮著的格子。
+     ⚠ 橋接的寬度吃 --sv-cgap(格子間距)+2px 蓋住兩側圓角,間距改了它自己會跟上。 */
+  .sv-cell.on.lnk::after{content:"";position:absolute;top:50%;
+    right:calc(var(--sv-cgap) * -1 - 1px);width:calc(var(--sv-cgap) + 2px);height:2px;
+    transform:translateY(-50%);border-radius:1px;
+    background:linear-gradient(90deg,#e2ae52,#ffe9b0,#e2ae52)}
+
+  /* 落槽脈衝:這一手剛填上的那一格(從 diff 推,見 board.js 第八節) */
+  .sv-cell.just{animation:svSnap .42s cubic-bezier(.2,1.5,.4,1);z-index:1}
+  @keyframes svSnap{
+    0%  {transform:scale(1.38);filter:brightness(2)}
+    58% {transform:scale(.96);filter:brightness(1)}
+    100%{transform:scale(1)}}
+
+  /* 一條龍從 A 通到 K:那一列從此鑲一圈金邊(靜態就看得見,不必等動畫) */
+  .sv-track.done .sv-cells{box-shadow:0 0 0 1.5px rgba(245,201,106,.55);border-radius:6px}
 
   /* ⚠ 盤面**沒有對手列**(v1.75.2 拿掉)。使用者:「在人物的框框裡一定有說了現在的牌狀況,
      但是你在牌池裡下面又再一次的顯示這個資訊」—— 「誰 / 輪到誰 / 剩幾張 / 蓋幾張」
@@ -5103,6 +5153,18 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .sv-rcards{display:flex;flex-wrap:wrap;gap:2px;align-items:center;padding-left:25px}
   .sv-rcn{font-size:11px;font-weight:700;color:var(--muted);margin-right:3px}
   .sv-clean{font-size:11px;font-weight:800;color:var(--accent)}
+  /* ★ 蓋掉的牌是整局唯一看不到的東西 → 結果卡上一列一列翻開(v2.4.5)。
+     ⚠ 推遲吃的是 board.js 寫在**列**上的 --i(不是每一張牌):牌數每個人不一樣,
+       掛在牌上的話蓋得多的人反而翻到最後,順序讀起來是亂的。
+     ⚠ `both` 不可省 —— 少了它第四列在自己那 0.42s 到之前是「已經畫好的」,
+       等於只有前面幾列有動畫。 */
+  .sv-rcards{animation:svReveal .34s ease-out both;
+    animation-delay:calc(var(--i,0) * .14s + .08s);transform-origin:top center}
+  @keyframes svReveal{from{opacity:0;transform:translateY(-5px) rotateX(72deg)}
+                      to{opacity:1;transform:none}}
+  /* 一張都沒蓋而且拿第一 —— 這一頁最高的成就 */
+  .sv-clean.gold{color:#291705;background:linear-gradient(135deg,#ffdf9a,#eeb44c);
+    border-radius:999px;padding:2px 9px;box-shadow:0 1px 5px rgba(238,180,76,.45)}
   /* 排名表下面那行小字(單機的「人數 · 難度 · 戰績」)—— 舊版跟「我的罰分」擠在
      大字底下當第二行,那些是**局外的資訊**,降級放到表尾才不搶注意力 */
   .sv-rfoot{margin-top:9px;font:700 11.5px/1.4 'Nunito',sans-serif;color:var(--muted);text-align:center}
@@ -5129,6 +5191,41 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 對局中才放寬(大廳與選單維持 .panel 原本的 520,不然會一塊寬一塊窄)。
      ⚠ 房間框用 92vw 不是 98vw:它有底色與圓角,98vw 超出 body 的 padding 會被
        overflow:hidden 削掉看得見的一角(台灣麻將 v1.68.1 踩過)。 */
+  /* ==========================================================================
+     排七 — 動效圖層 .sv-fx(v2.4.5)
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠⚠ 這一層掛在 **body** 而不是 `#svStage` 裡面,兩個原因缺一不可:
+         ① `SVB.render()` 每一次都整份覆寫 stage.innerHTML → 放裡面的特效會被
+            下一次重畫吃掉(而重畫隨時可能發生,不只出牌那一刻);
+         ② 單機 e2e 有一條牌情不變量在數 `#svStage .sv-card` 的張數
+            (= 我的手牌 + 我自己蓋的)—— 飛牌的替身也是一張 `.sv-card`,
+            掛進 stage 會讓那條斷言**間歇性紅**,而且紅得毫無道理可循。
+       ⚠ z-index 40:結果卡 `.veil` 是 50、表情層是 64 —— 遊戲中的特效一律排在
+         蓋板**底下**,不然結算的時候會有一道金光壓在結果卡上面。
+     ========================================================================== */
+  .sv-fx{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+
+  /* 出牌:從手上那張的位置飛進軌道格子裡(位移 / 縮放由 board.js 量完寫成 inline 變數) */
+  .sv-flyc{position:fixed;animation:svFly .48s cubic-bezier(.35,.02,.2,1) forwards}
+  .sv-flyc .sv-card{width:100%;height:100%}
+  @keyframes svFly{
+    from{transform:translate(0,0) scale(1) rotate(0);opacity:1}
+    to  {transform:translate(var(--fx),var(--fy)) scale(var(--fs)) rotate(-7deg);opacity:.15}}
+
+  /* ♠7 開局:一圈金色衝擊波從那一格擴出去(整場只會放這一次) */
+  .sv-boom{position:fixed;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;
+    box-shadow:0 0 0 2px rgba(255,223,154,.92), 0 0 18px rgba(255,205,110,.55);
+    animation:svBoom .95s ease-out forwards}
+  @keyframes svBoom{from{transform:scale(1);opacity:.95}to{transform:scale(24);opacity:0}}
+
+  /* A 通到 K:一道金光從那一列掃過去 */
+  .sv-drag{position:fixed;border-radius:8px;overflow:hidden}
+  .sv-drag::after{content:"";position:absolute;inset:0;transform:translateX(-115%);
+    background:linear-gradient(100deg,rgba(255,223,154,0) 0%,rgba(255,243,206,.88) 45%,
+      rgba(255,223,154,0) 72%);
+    animation:svDragSweep 1.2s ease-out forwards}
+  @keyframes svDragSweep{to{transform:translateX(115%)}}
+
   body.sv-mp .sv-room,body.sv-solo .sv-room{width:min(92vw,700px)}
   /* ★ 頂列(品牌字 + ⛶ / ⚙️)跟著同一個數字 —— 不放寬的話桌機上那兩顆鈕停在房間框裡面
      90px 的地方。理由與六頁共通的注意事項寫在 body.m16-mp .topbar 那條。

@@ -31,6 +31,9 @@ const SVB = (function(){
   let sel = -1;                            // 蓋牌模式選中的那張
   let cdKey = "", cdT = null;              // 倒數環:用 key 去重,不看 timer(見下)
   let lastCover = false;                   // 上一次畫的是不是蓋牌模式(進場那一刻要給提示,見 render)
+  let prevT = null;                        // 上一次畫的軌道簽章(動效全部從 diff 推,見第八節)
+  let hand0 = [];                          // 最後一次畫的手牌 —— 動作列要算「封死幾張是我自己的」
+  let fly = null;                          // 我自己出的那張牌:出手前量到的位置(見 armFly)
 
   /* ==========================================================================
      一、牌面
@@ -74,20 +77,55 @@ const SVB = (function(){
      只有數字的格子看起來是表格,不是牌;而**花色本來就是牌的一半**。
      ⚠ 行首那顆 `.sv-suit` 標籤因此**整個拿掉**了(每格都有花色之後它純屬重複),
        連帶 `.sv-track.off` 也不必了 —— 「這條龍還沒開」看得出來:一格白的都沒有。 */
-  function trackHTML(tracks, s){
+  /* ★★ 格子上疊了幾組**互不干擾**的記號(v2.4.5),每一組都只吃「我自己知道的東西」:
+
+       .on              出過了(既有)
+       .open            現在接得上的兩個位置 —— 公開資訊(既有)
+       .mine            **這一格的牌在我手上** ← 幽靈骨牌。排七的靈魂是「記牌與控線」,
+                        而「我手上的 ♠J 卡在哪」本來就是我自己的牌,標出來不是替玩家算牌,
+                        是省去他在手牌與軌道之間來回對照
+       .mine.open       兩者同時成立 = **這張現在就打得出去** → 金色呼吸
+       .seal / .sealed  蓋牌模式選中一張時,那一格與它後面**從此永遠出不了**的那些格子
+                        (真正的代價;罰分只算蓋掉的那一張,被封在後面的牌別人也只能蓋)
+       .lnk             右邊那格也亮著 → 中間補一節金色龍骨(接通的一條龍看得出是一條)
+       .just            這一手剛填上的那一格 → 落槽脈衝(從 diff 推,見第八節)
+
+     ⚠ `.mine` 一律只讀呼叫端傳進來的**我的手牌** —— 它不是牌情豁免,是「我的東西畫在
+       我自己的螢幕上」。想拿它畫別人的牌就是踩紅線(見檔頭)。 */
+  function trackHTML(tracks, s, o){
     const t = tracks[s], ends = R.endsOf(tracks, s);
+    const done = !!(t && t.lo === 1 && t.hi === 13);
     let cells = "";
     for(let r = 1; r <= 13; r++){
+      const c = R.cardOf(s, r);
       const on = t && r >= t.lo && r <= t.hi;
-      const cls = "sv-cell" + (on ? " on" : "") + (r === 7 ? " seven" : "") +
-                  (ends.indexOf(r) >= 0 ? " open" : "");
+      let cls = "sv-cell" + (on ? " on" : "") + (r === 7 ? " seven" : "") +
+                (ends.indexOf(r) >= 0 ? " open" : "");
+      if(!on && o.mine[c]) cls += " mine";
+      if(on && t && r < t.hi) cls += " lnk";
+      if(o.seal >= 0){
+        if(c === o.seal) cls += " seal";
+        else if(!on && sealedBy(o.seal, c)) cls += " sealed";
+      }
+      if(o.just[c]) cls += " just";
       // 還沒出的也照畫,只是暗的 —— 「♠J 還沒出」一眼看得到,不必數格子
       cells += '<span class="' + cls + '"><b>' + R.rankTxt(r) + '</b>' +
                '<i>' + suitSVG(s) + '</i></span>';
     }
-    return '<div class="sv-track' + (R.isRed(R.cardOf(s, 1)) ? " red" : "") + '">' +
+    return '<div class="sv-track' + (R.isRed(R.cardOf(s, 1)) ? " red" : "") +
+             (done ? " done" : "") + '">' +
              '<div class="sv-cells">' + cells + '</div>' +
            '</div>';
+  }
+  /* 蓋掉 `seal` 這張之後,`c` 會不會被封死(同花色、同一側、比它遠)。
+     ⚠ 判斷式與 SV.sealOf() 是同一條界線,但那一支回**張數**、這一支回**是不是** ——
+       兩邊都很短,合成一支反而要在回傳值上分岔。 */
+  function sealedBy(seal, c){
+    const s = R.suitOf(seal), r = R.rankOf(seal);
+    if(R.suitOf(c) !== s) return false;
+    const cr = R.rankOf(c);
+    if(r === 7) return true;
+    return r > 7 ? cr > r : cr < r;
   }
 
   /* ==========================================================================
@@ -114,8 +152,20 @@ const SVB = (function(){
          先 render() 再 renderActs()(solo.js / adapter.js 的 paint)。 */
     if(sel >= 0 && v.hand.indexOf(sel) < 0) sel = -1;
 
+    // ★ 動效全部從「這一次的軌道 vs 上一次的軌道」推出來(見第八節)——
+    //   單機、連線、AI、對手四條路徑的動作點完全不同,而 diff 在四邊是同一件事。
+    const cover0 = v.mode === "cover";
+    const fx = diffTracks(v.tracks);
+    const mine = {};
+    hand0 = v.hand.slice();
+    v.hand.forEach(c => { mine[c] = 1; });
+    const justMap = {};
+    fx.cells.forEach(c => { justMap[c] = 1; });
+
     let h = '<div class="sv-tracks">';
-    for(let s = 0; s < 4; s++) h += trackHTML(v.tracks, s);
+    for(let s = 0; s < 4; s++){
+      h += trackHTML(v.tracks, s, { mine: mine, seal: cover0 ? sel : -1, just: justMap });
+    }
     h += '</div>';
 
     // 我的蓋牌堆:自己看得到自己蓋了什麼(別人看到的是張數,見上面那條牌情紅線)
@@ -129,7 +179,7 @@ const SVB = (function(){
 
     // 手牌。★ 不可出的壓暗但**仍然可點** —— 點下去由 solo / adapter 給回饋,
     //   不用 disabled 讓牌靜默吃掉點擊(CLAUDE.md 的紅線,Bingo v1.27.3 的「假死」教訓)
-    const cover = v.mode === "cover";
+    const cover = cover0;
     // ★ 進入蓋牌模式那一刻要**看得到也聽得到**(見下方 coverBarHTML / coverCue 的註解):
     //   `.just` 只掛在切進去的那一次重畫上,之後點牌重畫就不再脈動(否則每點一張閃一次是雜訊)。
     const just = cover && !lastCover;
@@ -152,6 +202,7 @@ const SVB = (function(){
       (v.hand.length ? "" : '<span class="sv-empty">手牌出完了 ✨</span>') +
       '</div>';
     stage.innerHTML = h;
+    runFx(fx);
   }
 
   /* ==========================================================================
@@ -204,8 +255,15 @@ const SVB = (function(){
     // 沒牌可出 → 蓋牌模式。★ 「為什麼會這樣」由手牌區頂上的橫幅講(coverBarHTML,貼著牌),
     //   這一列只講「接下來按什麼」—— 兩件擠在同一行正是使用者說的「突然間很難理解」。
     if(sel < 0) return '<span class="sv-atip">☝ 在上面挑一張要蓋掉的牌</span>';
+    /* ★ 蓋牌的代價不只是罰分(v2.4.5)—— 蓋掉 ♠J,♠Q ♠K 從此也永遠出不了。
+       這一句只講「封死幾張」(公開事實,誰拿著那幾張是保密的);
+       實際哪幾格會死由軌道上的 `.sealed` 直接畫出來,兩邊講同一件事。
+       ⚠ 「你自己手上也有 M 張」只在 M > 0 時才接 —— 那是真正會回頭咬自己的那一半。 */
+    const seal = R.sealOf(sel), own = R.sealMine(sel, hand0);
     return '<button class="btn danger sv-act" data-act="cover">確定蓋掉 ' + R.nameOf(sel) +
-           '（罰 ' + R.rankOf(sel) + ' 分）</button>';
+           '（罰 ' + R.rankOf(sel) + ' 分' +
+           (seal ? ' · 封死 ' + seal + ' 張' + (own ? '，你還有 ' + own + ' 張' : '') : '') +
+           '）</button>';
   }
 
   function renderActs(info){
@@ -287,12 +345,18 @@ const SVB = (function(){
        見 adapter.js 的 baseWins。 */
   function resultHTML(st, names, mySeat, foot, wins){
     const sc = R.score(st);
-    return '<div class="sv-rank">' + sc.sorted.map(r => {
+    /* ★ 蓋牌是這一頁全場唯一看不到的東西,所以結果卡上它們是**一列一列翻開**的
+       (`--i` 推遲的動畫,v2.4.5)—— 一次全部跳出來等於把揭曉的那一刻偷走。
+       遲到第四列也才 0.42s,不會讓人等。
+       ⚠ 推遲掛在**列**上不是每一張牌上:牌數每個人不一樣,掛在牌上的話蓋得多的人
+         反而翻到最後,順序讀起來是亂的。 */
+    return '<div class="sv-rank">' + sc.sorted.map((r, i) => {
       const pile = st.piles[r.seat].slice().sort((a, b) => a - b);
       const me = r.seat === mySeat, first = r.rank === 1;
       const nm = names[r.seat] || ("玩家" + (r.seat + 1));
       const w = wins ? wins[r.seat] : null;
-      return '<div class="sv-rrow' + (me ? " me" : "") + (first ? " win" : "") + '">' +
+      return '<div class="sv-rrow' + (me ? " me" : "") + (first ? " win" : "") +
+        (first && !pile.length ? " flawless" : "") + '" style="--i:' + i + '">' +
         '<div class="sv-rmain' + (w ? " has-win" : "") + '">' +
           '<span class="sv-rno">' + r.rank + '</span>' +
           '<span class="sv-rname">' + esc(nm) + '</span>' +
@@ -310,11 +374,131 @@ const SVB = (function(){
           (pile.length
             ? '<span class="sv-rcn">蓋 ' + pile.length + ' 張</span>' +
               pile.map(c => cardHTML(c, "tiny")).join("")
-            : '<span class="sv-clean">一張都沒蓋 ✨</span>') +
+            : (first
+                // ★ 一張都沒蓋而且拿第一 —— 這一頁最高的成就,值得一枚金印
+                ? '<span class="sv-clean gold">👑 零蓋牌過關</span>'
+                : '<span class="sv-clean">一張都沒蓋 ✨</span>')) +
         '</div>' +
       '</div>';
     }).join("") + '</div>' +
     (foot ? '<div class="sv-rfoot">' + foot + '</div>' : "");
+  }
+
+  /* ==========================================================================
+     八、動效(v2.4.5)—— ★★ 全部從「軌道的 diff」推,不在動作點插呼叫
+     ──────────────────────────────────────────────────────────────────────────
+       這一頁有四條路徑會讓軌道多一格:我出牌(單機)、我出牌(連線)、AI 出牌、
+       別人出牌的快照。在四個地方各插一次特效呼叫遲早會漏掉一條,而**漏掉的那一條
+       不會壞、也不報錯**(只是那個人出牌時沒有動畫)—— 所以照 adapter 那條既有的
+       做法走 diff:`render()` 一定會被四條路徑呼叫,diff 在四邊是同一件事。
+
+       ⚠⚠ **一次多了一格以上就什麼都不放**(批次同步 / 重連歸位會一口氣補十幾手)——
+         同 adapter.js 那條「音效不連播」。不擋的話重連當下會炸出十幾道光。
+       ⚠ 第一次畫(`prevT === null`)也一律不放:那是「剛載入」,不是「剛剛有人出牌」。
+       ⚠ 特效節點一律掛在**獨立的 fixed 圖層**而不是 `#svStage` 裡面:
+         ① `render()` 每次都整份覆寫 stage.innerHTML,放裡面會被下一次重畫吃掉;
+         ② 單機 e2e 有一條牌情不變量在數 `#svStage .sv-card` 的張數
+            (= 我的手牌 + 我自己蓋的),飛牌的替身掛進去會讓那條**間歇性紅**。
+         z-index 給 40:結果卡 `.veil` 是 50,慶祝動畫不可以蓋在它上面。
+     ========================================================================== */
+  function diffTracks(tracks){
+    const now = tracks.map(t => t ? (t.lo + ":" + t.hi) : "");
+    const out = { cells: [], boom: false, dragon: -1 };
+    if(prevT){
+      for(let s = 0; s < 4; s++){
+        if(prevT[s] === now[s]) continue;
+        const t = tracks[s];
+        if(!t) continue;                                  // 換局清空 → 不是「有人出牌」
+        if(!prevT[s]) out.cells.push(R.cardOf(s, 7));      // 這條龍剛開,新的那格一定是 7
+        else{
+          const o = prevT[s].split(":");
+          if(t.lo < +o[0]) out.cells.push(R.cardOf(s, t.lo));
+          if(t.hi > +o[1]) out.cells.push(R.cardOf(s, t.hi));
+        }
+        if(t.lo === 1 && t.hi === 13) out.dragon = s;      // 這一手把整條龍走完了
+      }
+      // 開局第一手一定是 ♠7,而且那時候四條龍都還沒開
+      if(prevT.every(x => !x) && out.cells.length === 1 && out.cells[0] === R.SPADE7) out.boom = true;
+    }
+    prevT = now;
+    if(out.cells.length !== 1){ out.cells = []; out.boom = false; out.dragon = -1; }
+    return out;
+  }
+
+  function fxLayer(){
+    let el = document.querySelector(".sv-fx");
+    if(!el){
+      el = document.createElement("div");
+      el.className = "sv-fx";
+      document.body.appendChild(el);
+    }
+    return el;
+  }
+  function spawn(cls, css, ms){
+    const el = document.createElement("div");
+    el.className = cls;
+    el.setAttribute("style", css);
+    fxLayer().appendChild(el);
+    setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, ms);
+    return el;
+  }
+  function cellRect(card){
+    const s = R.suitOf(card), r = R.rankOf(card);
+    const tr = stage && stage.querySelectorAll(".sv-track")[s];
+    const cell = tr && tr.querySelectorAll(".sv-cell")[r - 1];
+    return cell ? cell.getBoundingClientRect() : null;
+  }
+
+  function runFx(fx){
+    if(!fx.cells.length){ fly = null; return; }
+    const card = fx.cells[0];
+    const to = cellRect(card);
+    /* ① 我自己出的那一張:從手上飛到格子裡(位置是**出手前**量的,見 armFly)。
+       ⚠ 只做自己那一張 —— 別人的牌在畫面上沒有出發點,硬從螢幕邊緣飛進來反而看不懂。 */
+    if(fly && fly.card === card && to && Date.now() - fly.at < 2500){
+      const f = fly.rect;
+      const dx = (to.left + to.width / 2) - (f.left + f.width / 2);
+      const dy = (to.top + to.height / 2) - (f.top + f.height / 2);
+      const g = spawn("sv-flyc", "left:" + f.left + "px;top:" + f.top + "px;width:" + f.width +
+        "px;height:" + f.height + "px;--fx:" + dx + "px;--fy:" + dy + "px;--fs:" +
+        (to.width / Math.max(1, f.width)).toFixed(3), 480);
+      g.innerHTML = cardHTML(card, "fly");
+    }
+    fly = null;
+    // ② ♠7 開局:整片綠呢上的一圈金色衝擊波
+    if(fx.boom && to){
+      spawn("sv-boom", "left:" + (to.left + to.width / 2) + "px;top:" + (to.top + to.height / 2) + "px", 1000);
+      try{
+        Sound.tone(523, { type:"triangle", dur:0.5, vol:0.20 });
+        Sound.tone(784, { type:"triangle", dur:0.6, vol:0.16, delay:0.06 });
+      }catch(e){}
+    }
+    // ③ 一條龍走完 A~K:整排掃一道金光(那一列從此掛 .done,靜態也看得出來)
+    if(fx.dragon >= 0){
+      const tr = stage && stage.querySelectorAll(".sv-track")[fx.dragon];
+      if(tr){
+        const b = tr.getBoundingClientRect();
+        spawn("sv-drag", "left:" + b.left + "px;top:" + b.top + "px;width:" + b.width +
+          "px;height:" + b.height + "px", 1300);
+      }
+      try{
+        showToast(R.SUIT_NAME[fx.dragon] + " 從 A 一路通到 K 了 🐉", 1600);
+        Sound.tone(659, { type:"triangle", dur:0.22, vol:0.17 });
+        Sound.tone(880, { type:"triangle", dur:0.22, vol:0.17, delay:0.13 });
+        Sound.tone(1175, { type:"triangle", dur:0.5, vol:0.15, delay:0.26 });
+      }catch(e){}
+    }
+  }
+
+  /* 出手**之前**把那張牌現在在畫面上的位置記下來 —— 送出去之後手牌就重畫了,
+     那時候已經量不到出發點。呼叫端:solo.tap() / adapter.tap() 的「出牌」那一支。
+     ⚠ 只記位置不記狀態:這一手最後有沒有成立由規則層決定,不成立的話 diff 就不會有
+       那一格,替身自然不會生出來(2500ms 之後也一律作廢)。 */
+  function armFly(card){
+    if(!stage) return;
+    const el = stage.querySelector('.sv-hand .sv-card[data-c="' + card + '"]');
+    if(!el) return;
+    fly = { card: card, rect: el.getBoundingClientRect(), at: Date.now() };
   }
 
   /* ==========================================================================
@@ -342,7 +526,7 @@ const SVB = (function(){
   }
 
   return {
-    mount, render, renderActs, resultHTML, stopCd,
+    mount, render, renderActs, resultHTML, stopCd, armFly,
     cardHTML, suitSVG,
     sel: () => sel,
     setSel(c){ sel = c; },

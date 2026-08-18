@@ -116,6 +116,8 @@ const MP = MPCore.create((function(){
     const can = SV.legal(st.hands[mySeat()], st.tracks);
     if(can.length){
       if(can.indexOf(card) < 0){ showToast(SV.whyNot(card, st.tracks)); return; }
+      // ★ 飛牌的出發點只有這一刻量得到(送出去之後手牌就重畫了)—— 見 board.js armFly()
+      SVB.armFly(card);
       send(card, false);
     }else{
       // 蓋牌是兩段式:先選,再按「確定蓋掉」(不可逆而且直接加罰分,誤點代價太高)
