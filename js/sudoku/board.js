@@ -23,12 +23,27 @@ const SB = (function(){
   let assist=false;                  // 候選提示(連線房主決定):選中的空格標出「有幾個數字可填」
   let cbPick=null, cbNum=null, cbErase=null;
   let board, pad, wrap;
+  let fxLayer=null;                  // 動效覆蓋層:金色光波住這裡,絕不進 grid 的版面流
+  let swept=new Set();               // 已經播過光波的行 / 列 / 宮(同一條只播一次)
+  let frostAt=-1;                    // 這一次凍結是哪一格結的霜(解凍時在那一格碎冰)
+  let claim=false;                   // 搶格才把「佔領暈染」打開(單機 / 競速全盤同一色,染了只是整片變糊)
+  let gen=0;                         // 盤面世代:給跨局的延遲回呼認人(螺旋點亮排了一整秒的 setTimeout)
 
   /* ---------- 建立 ---------- */
   function init(o){
     o=o||{};
     cbPick=o.onPick||null; cbNum=o.onNum||null; cbErase=o.onErase||null;
     wrap=$("sdkStage"); board=$("sdkBoard"); pad=$("sdkPad");
+    /* 動效覆蓋層。★ 一定要掛在 .sdk-stage 上,**不可以**掛進 .sdk-board ——
+       盤面是 display:grid,多一個子元素就多一個 grid item,整盤會被擠掉一格。
+       stage 是 position:relative、board 是 absolute inset:0 → 兩者座標系相同,
+       光波可以直接用百分比定位(n 是幾就切幾份),不必量任何 px。 */
+    if(wrap && !fxLayer){
+      fxLayer=document.createElement("div");
+      fxLayer.className="sdk-fx";
+      fxLayer.setAttribute("aria-hidden","true");
+      wrap.appendChild(fxLayer);
+    }
   }
 
   // q = { n, bw, bh, puzzle, sol };owner 之後由 fill() 帶入
@@ -39,12 +54,16 @@ const SB = (function(){
     owners=new Array(n*n).fill(null);
     notes=[]; for(let i=0;i<n*n;i++) notes.push(new Set());
     sel=-1; noteMode=false;
+    swept=new Set(); frostAt=-1; gen++;
+    if(fxLayer) fxLayer.innerHTML="";
     buildBoard(); buildPad(); repaint();
   }
   function buildBoard(){
     board.innerHTML="";
     board.style.setProperty("--sn", String(n));
     board.classList.toggle("sdk-6", n<=6);   // ★ 不可叫 mini:styles.css 有裸的 .mini 小按鈕規則
+    board.classList.remove("done");          // ⚠ 上一局的「滿盤鍍金」不清掉的話,新的一盤一開就是金的
+    board.classList.toggle("claim",claim);   // 佔領暈染的旗標住在 board 上,重建盤面要接回來
     cells=[];
     for(let i=0;i<n*n;i++){
       const r=Math.floor(i/n), c=i%n;
@@ -114,18 +133,30 @@ const SB = (function(){
   }
 
   /* ---------- 資料寫入(由呼叫端決定對錯與同步) ---------- */
-  // cls:填入者的顏色 class(連線搶格用 p0~p5;單機用 me)
-  function fill(i,v,cls){
+  /* cls:填入者的顏色 class(連線搶格用 p0~p5;單機用 me)
+     ★★ fx = 「這是**剛剛發生**的一手」。動效只吃這個旗標,不看別的:
+       整盤重建(重連 / 中途歸位)一次會呼叫幾十次 fill(),連播的下場是幾十道
+       金色光波排隊放完(飛行棋的批次同步踩過同一個坑,notes/22)。
+     ⚠ 但 sweepAt() **無論如何都要跑** —— 它同時負責「把這條記進 swept」。
+       重建時不記的話,之後隨便填到同一條線上的任何一格,都會為一條早就完成的
+       行/列/宮再播一次光波。 */
+  function fill(i,v,cls,fx){
     if(i<0||i>=n*n||puzzle[i])return;
+    const isNew=!vals[i];
     vals[i]=v; owners[i]=cls||"me";
     notes[i].clear();
     // 填進去就把同列/同行/同宮的筆記清掉(手動擦很煩)
     eachPeer(i,j=>notes[j].delete(v));
     repaint();
+    if(fx && isNew) stamp(i);
+    sweepAt(i,!!fx);
   }
   function clear(i){
     if(i<0||i>=n*n||puzzle[i])return;
-    vals[i]=0; owners[i]=null; notes[i].clear(); repaint();
+    vals[i]=0; owners[i]=null; notes[i].clear();
+    // 這一格被清掉 → 它所在的行 / 列 / 宮不再是完成狀態,之後重新填滿要能再播一次光波
+    unsweep(i);
+    repaint();
   }
   function toggleNote(i,v){
     if(puzzle[i]||vals[i])return;
@@ -158,6 +189,11 @@ const SB = (function(){
   }
 
   /* ---------- 畫面 ---------- */
+  /* ⚠ repaint() 是**整行覆寫 className**,所以正在播的動效 class 要自己接回來 ——
+     漏了的話,任何一次重畫(別人填了一格、選格移動、心跳對帳)都會把畫到一半的
+     鈐印 / 冰晶 / 搶格脈動 / 螺旋金光靜靜抹掉,而那看起來只像是「動畫偶爾不播」。
+     ★ 新增動效 class 一定要同時登記進這個陣列。 */
+  const FX_CLS=["wrong","taken","ink","frost","shatter","lit"];
   function repaint(){
     const selV = sel>=0 ? vals[sel] : 0;
     for(let i=0;i<n*n;i++){
@@ -171,6 +207,7 @@ const SB = (function(){
       if(i===sel) cls+=" sel";
       else if(sel>=0 && isPeer(i,sel)) cls+=" peer";
       if(v && selV && v===selV) cls+=" same";
+      FX_CLS.forEach(f=>{ if(el.classList.contains(f)) cls+=" "+f; });
       el.className=cls;
       el.querySelector(".sdk-v").textContent = v ? String(v) : "";
       const nt=el.querySelector(".sdk-nt");
@@ -198,11 +235,85 @@ const SB = (function(){
       let left=n;
       for(let i=0;i<n*n;i++) if(vals[i]===v) left--;
       const tag=b.querySelector(".sdk-kleft");
-      if(tag) tag.textContent = left>0 ? String(left) : "";
+      // 這個數字整盤都填滿了 → 角標從「還剩幾格」換成一個綠勾,整顆再淡下去。
+      // 只換字不換位置:玩家掃鍵盤時找的是同一個角落
+      if(tag) tag.textContent = left>0 ? String(left) : "✓";
       b.classList.toggle("done", left<=0);
       b.classList.toggle("on", noteMode);
     });
   }
+  /* ---------- 動效 ----------
+     共通做法:掛一個瞬時 class,到時間再拿掉。remove → 讀 offsetWidth → add 是為了
+     重啟同一支動畫(連續填同一格時沒有這一下會完全不動)。 */
+  function fx(i,cls,ms){
+    const el=cells[i]; if(!el)return;
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    setTimeout(()=>{ const e2=cells[i]; if(e2) e2.classList.remove(cls); },ms);
+  }
+  // 活字印刷:數字重重扣印下去,格子下沉回彈 + 邊緣擴散一圈自己顏色的光波紋
+  function stamp(i){ fx(i,"ink",560); }
+
+  /* 行 / 列 / 宮的完成光波。key 是 "r3" / "c5" / "b2",記進 swept 就不再重播 ——
+     心跳對帳、別人補填、重連歸位都可能讓同一條再走一次這裡。
+     ⚠ play=false 時**只記不播**(整盤重建);見 fill() 上面那段。 */
+  function rowFull(r){ for(let k=0;k<n;k++) if(!vals[r*n+k]) return false; return true; }
+  function colFull(c){ for(let k=0;k<n;k++) if(!vals[k*n+c]) return false; return true; }
+  function boxFull(br,bc){
+    for(let dr=0;dr<bh;dr++) for(let dc=0;dc<bw;dc++) if(!vals[(br*bh+dr)*n+bc*bw+dc]) return false;
+    return true;
+  }
+  function sweepAt(i,play){
+    if(i<0||i>=n*n)return;
+    const r=Math.floor(i/n), c=i%n, br=Math.floor(r/bh), bc=Math.floor(c/bw);
+    let hit=0;
+    if(!swept.has("r"+r) && rowFull(r)){ swept.add("r"+r); if(play){ sweep(0,r*(100/n),100,100/n,"h"); hit++; } }
+    if(!swept.has("c"+c) && colFull(c)){ swept.add("c"+c); if(play){ sweep(c*(100/n),0,100/n,100,"v"); hit++; } }
+    const bk="b"+br+"_"+bc;
+    if(!swept.has(bk) && boxFull(br,bc)){
+      swept.add(bk);
+      if(play){ sweep(bc*bw*(100/n),br*bh*(100/n),bw*(100/n),bh*(100/n),"h"); hit++; }
+    }
+    // 一次填格可能同時湊滿行 + 列 + 宮 → 音效只放一次,不然是三聲疊在一起的噪音
+    if(hit){ try{ Sound.line(); }catch(e){} }
+  }
+  // 光波本體:一個絕對定位的矩形,座標一律用**百分比**(stage 與 board 同座標系,
+  // 盤面大小由 CSS 自己夾)—— 不量任何 px,轉向 / 大盤面切換都不必重算
+  function sweep(left,top,w,h,dir){
+    if(!fxLayer)return;
+    const el=document.createElement("div");
+    el.className="sdk-sweep "+dir;
+    el.style.left=left+"%"; el.style.top=top+"%";
+    el.style.width=w+"%";   el.style.height=h+"%";
+    fxLayer.appendChild(el);
+    setTimeout(()=>{ if(el.parentNode) el.parentNode.removeChild(el); },1000);
+  }
+  // 清掉一格 → 它所在的三條線退回未完成,把記號拿掉才能重新播
+  function unsweep(i){
+    if(i<0||i>=n*n)return;
+    const r=Math.floor(i/n), c=i%n;
+    swept.delete("r"+r); swept.delete("c"+c);
+    swept.delete("b"+Math.floor(r/bh)+"_"+Math.floor(c/bw));
+  }
+
+  /* 結霜 / 破冰:填錯凍結的那幾秒,那一格蓋一層冰晶;倒數歸零時碎掉。
+     冰晶把「是哪一格填錯的」與「還要等多久」綁在同一個東西上,而碎裂那一下
+     正好就是「可以再填了」的訊號。⚠ 只有真的凍結才結霜(單機填錯不凍結,只有紅閃)。 */
+  function frost(i){
+    thaw(true);
+    if(i==null||i<0||i>=n*n)return;
+    frostAt=i;
+    const el=cells[i]; if(el) el.classList.add("frost");
+  }
+  function thaw(silent){
+    if(frostAt<0)return;
+    const i=frostAt; frostAt=-1;
+    const el=cells[i]; if(!el)return;
+    el.classList.remove("frost");
+    if(silent){ el.classList.remove("shatter"); return; }
+    fx(i,"shatter",520);
+    try{ Sound.emote(); }catch(e){}
+  }
+
   function flashWrong(i){
     const el=cells[i]; if(!el)return;
     el.classList.remove("wrong"); void el.offsetWidth; el.classList.add("wrong");
@@ -214,11 +325,33 @@ const SB = (function(){
     el.classList.remove("taken"); void el.offsetWidth; el.classList.add("taken");
     setTimeout(()=>el.classList.remove("taken"),700);
   }
-  function markDone(){ if(board) board.classList.add("done"); }
+  /* 滿盤解鎖:盤面鍍一層金,而且從中心往外呈螺旋依序點亮每一格。
+     ⚠ 已經點過就不再點:搶格是「誰看到誰結算」,applyGame 每收一份快照都會再判一次填滿。
+     ⚠ 螺旋排了整整一秒多的 setTimeout —— 中途換局(再來一局 / 重連重建)時那批回呼
+       還在飛,不認世代的話會把 .lit **加到新的一盤**上(移除是無害的,加上去不是)。 */
+  function markDone(){
+    if(!board || board.classList.contains("done"))return;
+    board.classList.add("done");
+    const my=gen, mid=(n-1)/2, ord=[];
+    for(let i=0;i<n*n;i++){
+      const dr=Math.floor(i/n)-mid, dc=i%n-mid;
+      ord.push({ i:i, d:Math.sqrt(dr*dr+dc*dc), a:Math.atan2(dr,dc) });
+    }
+    // 先按離中心的距離分層,同層再按角度 → 看起來就是一圈一圈轉出去
+    ord.sort((x,y)=>(x.d-y.d)||(x.a-y.a));
+    ord.forEach((o,k)=>setTimeout(()=>{
+      if(my!==gen)return;
+      const el=cells[o.i]; if(!el)return;
+      el.classList.add("lit");
+      setTimeout(()=>{ const e2=cells[o.i]; if(e2) e2.classList.remove("lit"); },720);
+    },k*14));
+  }
 
   /* ---------- 凍結(填錯的懲罰) ---------- */
-  function freeze(ms){
+  // at = 填錯的那一格(選填):有給就在那一格結霜,倒數歸零時碎冰
+  function freeze(ms,at){
     frozenUntil=Date.now()+ms;
+    frost(at);
     if(wrap) wrap.classList.add("frozen");
     if(freezeTick) clearInterval(freezeTick);
     const paint=()=>{
@@ -229,6 +362,7 @@ const SB = (function(){
         clearInterval(freezeTick); freezeTick=null;
         if(wrap) wrap.classList.remove("frozen");
         if(el) el.classList.add("hidden");
+        thaw(false);          // 碎冰 = 「可以再填了」,這一下就是解凍的訊號
       }
     };
     paint();
@@ -236,6 +370,7 @@ const SB = (function(){
   }
   function unfreeze(){
     frozenUntil=0;
+    thaw(true);               // 強制解凍(離開 / 換局)不放碎冰:那不是「等完了」
     if(freezeTick){ clearInterval(freezeTick); freezeTick=null; }
     if(wrap) wrap.classList.remove("frozen");
     const el=$("sdkFreeze"); if(el) el.classList.add("hidden");
@@ -262,6 +397,10 @@ const SB = (function(){
     // 值沒變就不重畫:applyGame 每次同步都會呼叫這支,盤面已經夠忙了
     setAssist(v){ v=!!v; if(v===assist)return; assist=v; repaint(); },
     assist:()=>assist,
+    /* 佔領暈染:填對的格子鋪一層填格者顏色的水墨暈染。**只有搶格才開** ——
+       單機與競速全盤都是同一個顏色,染了只是把整張紙塗成一片,反而更難掃。
+       ⚠ 掛在盤面上(.sdk-board.claim)而不是每一格:六個顏色共用同一條 CSS 規則。 */
+    setClaim(v){ claim=!!v; if(board) board.classList.toggle("claim",claim); },
     setSel(i){ sel=i; repaint(); },
     sel:()=>sel,
     valueAt:i=>vals[i]||0,

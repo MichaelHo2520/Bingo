@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 2c9f9a53debcdb5caf60e82ee538f7f5147f12e1e35cb2be2950d3c841dc27b4)
+    真相在 styles.src.css(sha256 d76aa4724968724ace3927d4ac7ee42f0e348c61ceb613d543739841bd37e116)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -933,19 +933,24 @@
   }
   :root{ --sdk-paper:#fff6ec; --sdk-line:rgba(74,43,31,.22); --sdk-thick:rgba(74,43,31,.62);
          --sdk-given:#4a2b1f; --sdk-sel:rgba(255,138,61,.30); --sdk-peer:rgba(255,138,61,.10);
-         --sdk-same:rgba(255,210,74,.30); --sdk-note:rgba(74,43,31,.5); }
+         --sdk-same:rgba(255,210,74,.30); --sdk-note:rgba(74,43,31,.5);
+         --sdk-gold:#d9942a; --sdk-fiber:rgba(74,43,31,.05); }
   :root[data-theme="midnight"]{ --sdk-paper:#141a33; --sdk-line:rgba(140,190,255,.20); --sdk-thick:rgba(140,190,255,.55);
          --sdk-given:#dbe6ff; --sdk-sel:rgba(34,224,255,.26); --sdk-peer:rgba(34,224,255,.09);
-         --sdk-same:rgba(255,75,216,.24); --sdk-note:rgba(219,230,255,.5); }
+         --sdk-same:rgba(255,75,216,.24); --sdk-note:rgba(219,230,255,.5);
+         --sdk-gold:#ffd479; --sdk-fiber:rgba(140,190,255,.06); }
   :root[data-theme="bubblegum"]{ --sdk-paper:#ffffff; --sdk-line:rgba(122,43,99,.20); --sdk-thick:rgba(122,43,99,.55);
          --sdk-given:#7a2b63; --sdk-sel:rgba(255,79,163,.24); --sdk-peer:rgba(255,79,163,.09);
-         --sdk-same:rgba(155,107,255,.22); --sdk-note:rgba(122,43,99,.5); }
+         --sdk-same:rgba(155,107,255,.22); --sdk-note:rgba(122,43,99,.5);
+         --sdk-gold:#dc9a2c; --sdk-fiber:rgba(122,43,99,.045); }
   :root[data-theme="meadow"]{ --sdk-paper:#f7fbec; --sdk-line:rgba(39,66,36,.20); --sdk-thick:rgba(39,66,36,.58);
          --sdk-given:#274224; --sdk-sel:rgba(108,192,74,.28); --sdk-peer:rgba(108,192,74,.10);
-         --sdk-same:rgba(255,207,71,.30); --sdk-note:rgba(39,66,36,.5); }
+         --sdk-same:rgba(255,207,71,.30); --sdk-note:rgba(39,66,36,.5);
+         --sdk-gold:#bf8a17; --sdk-fiber:rgba(39,66,36,.05); }
   :root[data-theme="arcade"]{ --sdk-paper:#0e0e12; --sdk-line:rgba(255,230,0,.18); --sdk-thick:rgba(255,230,0,.5);
          --sdk-given:#f5f5f5; --sdk-sel:rgba(255,230,0,.24); --sdk-peer:rgba(255,230,0,.08);
-         --sdk-same:rgba(255,45,85,.26); --sdk-note:rgba(245,245,245,.45); }
+         --sdk-same:rgba(255,45,85,.26); --sdk-note:rgba(245,245,245,.45);
+         --sdk-gold:#ffe600; --sdk-fiber:rgba(255,230,0,.07); }
   :root{ --sp0:#ff7a33; --sp1:#3d8bff; --sp2:#3fc45a; --sp3:#b06bff; --sp4:#ff4d8d; --sp5:#00bfa8; }
   .sdk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent-2));
@@ -1116,6 +1121,102 @@
   .sdk-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
   body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .sdk-react-row,body.solo-on #mpWinBtns{display:none}
   body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .sdk-stats{display:none}
+  .sdk-stage{background-image:
+    repeating-linear-gradient(0deg,var(--sdk-fiber) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(90deg,var(--sdk-fiber) 0 1px,transparent 1px 9px)}
+  .sdk-cell.filled.p0{--sdk-ink:var(--sp0)}
+  .sdk-cell.filled.p1{--sdk-ink:var(--sp1)}
+  .sdk-cell.filled.p2{--sdk-ink:var(--sp2)}
+  .sdk-cell.filled.p3{--sdk-ink:var(--sp3)}
+  .sdk-cell.filled.p4{--sdk-ink:var(--sp4)}
+  .sdk-cell.filled.p5{--sdk-ink:var(--sp5)}
+  .sdk-cell.filled.me{--sdk-ink:var(--accent)}
+  .sdk-cell.filled.hintfill{--sdk-ink:var(--accent-2)}
+  .sdk-cell::before{content:"";position:absolute;inset:2px;z-index:0;border-radius:3px;
+    pointer-events:none;opacity:0;background:var(--sdk-ink,var(--accent));
+    -webkit-mask-image:radial-gradient(118% 118% at 32% 26%,#000 8%,rgba(0,0,0,.55) 54%,transparent 86%);
+    mask-image:radial-gradient(118% 118% at 32% 26%,#000 8%,rgba(0,0,0,.55) 54%,transparent 86%);
+    transition:opacity .22s}
+  .sdk-cell::after{content:"";position:absolute;inset:0;z-index:1;border-radius:3px;
+    pointer-events:none;opacity:0}
+  .sdk-v{position:relative;z-index:2}
+  .sdk-nt{z-index:2}
+  .sdk-board.claim .sdk-cell.filled::before{opacity:.2}
+  .sdk-cell.ink{animation:sdkInk .36s cubic-bezier(.34,1.56,.64,1)}
+  .sdk-cell.ink .sdk-v{animation:sdkInkV .36s cubic-bezier(.34,1.56,.64,1)}
+  .sdk-cell.ink::after{animation:sdkRipple .54s ease-out}
+  @keyframes sdkInk{ 0%{transform:scale(.84)} 100%{transform:scale(1)} }
+  @keyframes sdkInkV{ 0%{opacity:.15;transform:scale(1.55)} 55%{opacity:1;transform:scale(.93)} 100%{transform:scale(1)} }
+  @keyframes sdkRipple{ 0%{opacity:.6;box-shadow:inset 0 0 0 0 var(--sdk-ink,var(--accent))}
+                        100%{opacity:0;box-shadow:inset 0 0 0 10px var(--sdk-ink,var(--accent))} }
+  .sdk-cell.taken::after{animation:sdkClaim .7s ease-out}
+  @keyframes sdkClaim{ 0%{opacity:0;box-shadow:inset 0 0 0 4px var(--sdk-ink,var(--accent))}
+                       25%{opacity:1;box-shadow:inset 0 0 0 2px var(--sdk-ink,var(--accent))}
+                       75%{opacity:1;box-shadow:inset 0 0 0 2px var(--sdk-ink,var(--accent))}
+                       100%{opacity:0;box-shadow:inset 0 0 0 2px var(--sdk-ink,var(--accent))} }
+  .sdk-fx{position:absolute;inset:0;pointer-events:none;z-index:3}
+  .sdk-sweep{position:absolute;overflow:hidden;border-radius:3px;
+    box-shadow:0 0 0 2px var(--sdk-gold),0 0 16px 1px var(--sdk-gold);
+    animation:sdkSweepBox .95s ease-out forwards}
+  .sdk-sweep::before{content:"";position:absolute;left:0;top:0;width:55%;height:100%;
+    background:linear-gradient(90deg,transparent,var(--sdk-gold),transparent);
+    animation:sdkSweepH .62s cubic-bezier(.4,0,.2,1)}
+  .sdk-sweep.v::before{width:100%;height:55%;
+    background:linear-gradient(180deg,transparent,var(--sdk-gold),transparent);
+    animation:sdkSweepV .62s cubic-bezier(.4,0,.2,1)}
+  @keyframes sdkSweepBox{ 0%{opacity:0} 12%{opacity:1} 66%{opacity:1} 100%{opacity:0} }
+  @keyframes sdkSweepH{ from{transform:translateX(-180%)} to{transform:translateX(320%)} }
+  @keyframes sdkSweepV{ from{transform:translateY(-180%)} to{transform:translateY(320%)} }
+  .sdk-cell.frost::after{opacity:.92;
+    background:
+      repeating-linear-gradient(58deg,rgba(255,255,255,.5) 0 1px,transparent 1px 5px),
+      repeating-linear-gradient(-58deg,rgba(255,255,255,.4) 0 1px,transparent 1px 6px),
+      linear-gradient(140deg,rgba(176,226,255,.82),rgba(240,252,255,.55) 45%,rgba(150,210,255,.78));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
+    filter:saturate(2.2);
+    animation:sdkFrostIn .45s ease-out backwards}
+  @keyframes sdkFrostIn{ from{opacity:0;transform:scale(.35) rotate(-25deg)} to{opacity:.92;transform:none} }
+  .sdk-cell.shatter::after{opacity:.92;
+    background:linear-gradient(140deg,rgba(176,226,255,.82),rgba(240,252,255,.55) 45%,rgba(150,210,255,.78));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
+    animation:sdkShatter .5s ease-out forwards}
+  @keyframes sdkShatter{ 0%{opacity:.92;transform:none;filter:blur(0)}
+                         100%{opacity:0;transform:scale(1.8) rotate(11deg);filter:blur(2px)} }
+  .sdk-stage:has(.sdk-board.done){
+    box-shadow:0 0 0 3px var(--sdk-gold),0 0 40px -6px var(--sdk-gold),0 10px 30px rgba(0,0,0,.22)}
+  .sdk-cell.lit::after{animation:sdkLit .72s ease-out}
+  .sdk-cell.lit .sdk-v{animation:sdkLitV .72s ease-out}
+  @keyframes sdkLit{ 0%{opacity:0;box-shadow:inset 0 0 0 0 var(--sdk-gold)}
+                     30%{opacity:1;box-shadow:inset 0 0 0 3px var(--sdk-gold)}
+                     100%{opacity:0;box-shadow:inset 0 0 0 7px var(--sdk-gold)} }
+  @keyframes sdkLitV{ 0%,100%{transform:none;filter:none}
+                      30%{transform:scale(1.34);filter:drop-shadow(0 0 6px var(--sdk-gold))} }
+  .sdk-key{box-shadow:0 2px 0 rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.16);
+    touch-action:manipulation}
+  .sdk-key:active{transform:translateY(2px) scale(.97);
+    box-shadow:0 0 0 rgba(0,0,0,0),inset 0 2px 5px rgba(0,0,0,.28)}
+  .sdk-key.done{box-shadow:none;opacity:.42}
+  .sdk-key.done .sdk-kleft{color:#5fe08a;font-size:12px}
+  .sdk-terr{grid-column:1/-1;display:flex;height:7px;border-radius:999px;overflow:hidden;
+    background:rgba(0,0,0,.24);box-shadow:inset 0 0 0 1px var(--panel-line)}
+  .sdk-terr i{display:block;height:100%;transition:width .3s}
+  .sdk-terr i.p0{background:var(--sp0)} .sdk-terr i.p1{background:var(--sp1)}
+  .sdk-terr i.p2{background:var(--sp2)} .sdk-terr i.p3{background:var(--sp3)}
+  .sdk-terr i.p4{background:var(--sp4)} .sdk-terr i.p5{background:var(--sp5)}
+  .sdk-hcard.hot{animation:sdkHot 1.2s ease-out}
+  @keyframes sdkHot{
+    0%{box-shadow:0 0 0 0 rgba(255,150,50,.85)}
+    35%{box-shadow:0 0 0 5px rgba(255,150,50,0),0 0 18px 2px rgba(255,150,50,.75)}
+    100%{box-shadow:0 0 0 0 rgba(255,150,50,0)}
+  }
+  .sdk-title{display:inline-block;margin:10px 0 0;padding:5px 15px;border-radius:999px;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;line-height:1.2;
+    background:linear-gradient(135deg,var(--sdk-gold),var(--accent));color:#1c1008;
+    box-shadow:0 3px 10px rgba(0,0,0,.3)}
+  .sdk-title.pop{animation:sdkTitlePop .5s cubic-bezier(.2,1.5,.35,1) .18s backwards}
+  @keyframes sdkTitlePop{ 0%{opacity:0;transform:scale(.6)}
+                          62%{opacity:1;transform:scale(1.06)}
+                          100%{opacity:1;transform:scale(1)} }
   @media (max-height:620px){
     .sdk-hero{margin:6px 0 2px}
     .sdk-art{width:64px;height:64px}
@@ -1127,6 +1228,7 @@
     .sdk-hud{gap:4px}
     .sdk-hcard{padding:4px 6px 5px}
     .sdk-hval{font-size:16px}
+    .sdk-terr{height:5px}
     .sdk-play{gap:7px}
   }
   @media (max-height:620px) and (min-width:600px){

@@ -1673,19 +1673,24 @@
   /* 盤面配色:各主題各給一組 */
   :root{ --sdk-paper:#fff6ec; --sdk-line:rgba(74,43,31,.22); --sdk-thick:rgba(74,43,31,.62);
          --sdk-given:#4a2b1f; --sdk-sel:rgba(255,138,61,.30); --sdk-peer:rgba(255,138,61,.10);
-         --sdk-same:rgba(255,210,74,.30); --sdk-note:rgba(74,43,31,.5); }
+         --sdk-same:rgba(255,210,74,.30); --sdk-note:rgba(74,43,31,.5);
+         --sdk-gold:#d9942a; --sdk-fiber:rgba(74,43,31,.05); }
   :root[data-theme="midnight"]{ --sdk-paper:#141a33; --sdk-line:rgba(140,190,255,.20); --sdk-thick:rgba(140,190,255,.55);
          --sdk-given:#dbe6ff; --sdk-sel:rgba(34,224,255,.26); --sdk-peer:rgba(34,224,255,.09);
-         --sdk-same:rgba(255,75,216,.24); --sdk-note:rgba(219,230,255,.5); }
+         --sdk-same:rgba(255,75,216,.24); --sdk-note:rgba(219,230,255,.5);
+         --sdk-gold:#ffd479; --sdk-fiber:rgba(140,190,255,.06); }
   :root[data-theme="bubblegum"]{ --sdk-paper:#ffffff; --sdk-line:rgba(122,43,99,.20); --sdk-thick:rgba(122,43,99,.55);
          --sdk-given:#7a2b63; --sdk-sel:rgba(255,79,163,.24); --sdk-peer:rgba(255,79,163,.09);
-         --sdk-same:rgba(155,107,255,.22); --sdk-note:rgba(122,43,99,.5); }
+         --sdk-same:rgba(155,107,255,.22); --sdk-note:rgba(122,43,99,.5);
+         --sdk-gold:#dc9a2c; --sdk-fiber:rgba(122,43,99,.045); }
   :root[data-theme="meadow"]{ --sdk-paper:#f7fbec; --sdk-line:rgba(39,66,36,.20); --sdk-thick:rgba(39,66,36,.58);
          --sdk-given:#274224; --sdk-sel:rgba(108,192,74,.28); --sdk-peer:rgba(108,192,74,.10);
-         --sdk-same:rgba(255,207,71,.30); --sdk-note:rgba(39,66,36,.5); }
+         --sdk-same:rgba(255,207,71,.30); --sdk-note:rgba(39,66,36,.5);
+         --sdk-gold:#bf8a17; --sdk-fiber:rgba(39,66,36,.05); }
   :root[data-theme="arcade"]{ --sdk-paper:#0e0e12; --sdk-line:rgba(255,230,0,.18); --sdk-thick:rgba(255,230,0,.5);
          --sdk-given:#f5f5f5; --sdk-sel:rgba(255,230,0,.24); --sdk-peer:rgba(255,230,0,.08);
-         --sdk-same:rgba(255,45,85,.26); --sdk-note:rgba(245,245,245,.45); }
+         --sdk-same:rgba(255,45,85,.26); --sdk-note:rgba(245,245,245,.45);
+         --sdk-gold:#ffe600; --sdk-fiber:rgba(255,230,0,.07); }
 
   /* 玩家顏色:六人各一色(v1.47.0 由四色擴到六色),刻意不用主題變數 —— 不同主題下也要能穩定分辨誰是誰。
      選色被兩件事同時夾住:同一組變數會畫在**淺色紙面**(sunset/bubblegum/meadow 的盤面數字)
@@ -1939,6 +1944,175 @@
   body.solo-on #winScores,body.solo-on #winChamp,body.solo-on .sdk-react-row,body.solo-on #mpWinBtns{display:none}
   body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .sdk-stats{display:none}
 
+  /* ==========================================================================
+     數獨 · 質感與動效
+     ★ 這一段只「追加」,一律 .sdk-* 前綴,而且刻意排在上面所有基礎規則之後 ——
+       其中幾條(鍵盤的立體感)是靠順序覆蓋同權重的既有規則。
+     ⚠ 三條界線,踩到任何一條都不是「動畫醜一點」而是功能壞掉:
+       ① **一個 px 都不可以撐開版面**:盤面是 height:min(100%,92vw,460px) 自己夾的,
+          動效一律走絕對定位的覆蓋層(::before / ::after / .sdk-fx),不進版面流。
+       ② **不可以改格子的 background**:底色分了 sel / peer / same / wrong 好幾種,
+          動它就是把三層高亮洗掉(而三層高亮是 9×9 在手機上掃得動的唯一原因)。
+          → 常駐的佔領暈染走 ::before,瞬時動效走 ::after,兩層互不打架。
+       ③ board.js 的 repaint() 是**整行覆寫 className** → 這裡新增的瞬時 class
+          一定要同時登記進那邊的 FX_CLS,不然畫到一半會被靜靜抹掉。
+     ========================================================================== */
+
+  /* ---------- ① 紙的纖維 ----------
+     極淡(alpha 0.05 上下)—— 這是質感不是圖案,量得到但注意不到才是對的。
+     ⚠ 只寫 background-image:.sdk-stage 的底色是 background 簡寫,用簡寫會把它洗掉。 */
+  .sdk-stage{background-image:
+    repeating-linear-gradient(0deg,var(--sdk-fiber) 0 1px,transparent 1px 4px),
+    repeating-linear-gradient(90deg,var(--sdk-fiber) 0 1px,transparent 1px 9px)}
+
+  /* ---------- ② 印泥色:每個玩家一罐 ----------
+     底下的暈染 / 漣漪 / 搶格落款全部吃這個變數,不必為六個顏色各寫一組 keyframes。 */
+  .sdk-cell.filled.p0{--sdk-ink:var(--sp0)}
+  .sdk-cell.filled.p1{--sdk-ink:var(--sp1)}
+  .sdk-cell.filled.p2{--sdk-ink:var(--sp2)}
+  .sdk-cell.filled.p3{--sdk-ink:var(--sp3)}
+  .sdk-cell.filled.p4{--sdk-ink:var(--sp4)}
+  .sdk-cell.filled.p5{--sdk-ink:var(--sp5)}
+  .sdk-cell.filled.me{--sdk-ink:var(--accent)}
+  .sdk-cell.filled.hintfill{--sdk-ink:var(--accent-2)}
+
+  /* ---------- ③ 兩層動效層 ----------
+     ::before = 常駐(佔領暈染)· ::after = 瞬時(漣漪 / 冰晶 / 金光)。
+     ⚠ ::before 用 inset:2px **不是 0**:格線是 inset box-shadow(細 1px、宮線 3px),
+       而子層一定畫在 inset 陰影之上 —— 貼到 0 就會把格線與選中框壓掉一層顏色。
+       退 2px 之後不但線完好,看起來也更像一塊沉在格子裡的墨。 */
+  .sdk-cell::before{content:"";position:absolute;inset:2px;z-index:0;border-radius:3px;
+    pointer-events:none;opacity:0;background:var(--sdk-ink,var(--accent));
+    -webkit-mask-image:radial-gradient(118% 118% at 32% 26%,#000 8%,rgba(0,0,0,.55) 54%,transparent 86%);
+    mask-image:radial-gradient(118% 118% at 32% 26%,#000 8%,rgba(0,0,0,.55) 54%,transparent 86%);
+    transition:opacity .22s}
+  .sdk-cell::after{content:"";position:absolute;inset:0;z-index:1;border-radius:3px;
+    pointer-events:none;opacity:0}
+  .sdk-v{position:relative;z-index:2}
+  .sdk-nt{z-index:2}
+  /* 佔領暈染**只有搶格開**(board.js 的 setClaim)—— 單機與競速整盤都是同一個顏色,
+     染了只是把整張紙塗成一片,反而更難掃。搶格才有「這格是誰的」這件事。 */
+  .sdk-board.claim .sdk-cell.filled::before{opacity:.2}
+
+  /* ---------- ④ 落字鈐印:活字扣印 + 一圈自己顏色的漣漪 ---------- */
+  .sdk-cell.ink{animation:sdkInk .36s cubic-bezier(.34,1.56,.64,1)}
+  .sdk-cell.ink .sdk-v{animation:sdkInkV .36s cubic-bezier(.34,1.56,.64,1)}
+  .sdk-cell.ink::after{animation:sdkRipple .54s ease-out}
+  @keyframes sdkInk{ 0%{transform:scale(.84)} 100%{transform:scale(1)} }
+  @keyframes sdkInkV{ 0%{opacity:.15;transform:scale(1.55)} 55%{opacity:1;transform:scale(.93)} 100%{transform:scale(1)} }
+  @keyframes sdkRipple{ 0%{opacity:.6;box-shadow:inset 0 0 0 0 var(--sdk-ink,var(--accent))}
+                        100%{opacity:0;box-shadow:inset 0 0 0 10px var(--sdk-ink,var(--accent))} }
+
+  /* ---------- ⑤ 被別人搶走:對手顏色的落款 ----------
+     原本只有放大脈動(看得出有事發生,看不出是誰)。補一圈對手色的框:
+     搶格最要緊的資訊就是「誰搶走的」,而 HUD 在盤面外面,眼睛來不及移過去。 */
+  .sdk-cell.taken::after{animation:sdkClaim .7s ease-out}
+  @keyframes sdkClaim{ 0%{opacity:0;box-shadow:inset 0 0 0 4px var(--sdk-ink,var(--accent))}
+                       25%{opacity:1;box-shadow:inset 0 0 0 2px var(--sdk-ink,var(--accent))}
+                       75%{opacity:1;box-shadow:inset 0 0 0 2px var(--sdk-ink,var(--accent))}
+                       100%{opacity:0;box-shadow:inset 0 0 0 2px var(--sdk-ink,var(--accent))} }
+
+  /* ---------- ⑥ 行 / 列 / 宮湊滿:金色光波橫掃 ----------
+     .sdk-fx 是覆蓋層(board.js 的 init 建的,掛在 .sdk-stage 上)。
+     ⚠ 它**不可以**掛進 .sdk-board:盤面是 display:grid,多一個子元素就多一個 grid item。
+     ⚠ 座標一律百分比(stage 與 board 同座標系)—— 不量任何 px,
+       所以轉向 / 大盤面切換 / 6×6 與 9×9 互換都不必重算。 */
+  .sdk-fx{position:absolute;inset:0;pointer-events:none;z-index:3}
+  .sdk-sweep{position:absolute;overflow:hidden;border-radius:3px;
+    box-shadow:0 0 0 2px var(--sdk-gold),0 0 16px 1px var(--sdk-gold);
+    animation:sdkSweepBox .95s ease-out forwards}
+  .sdk-sweep::before{content:"";position:absolute;left:0;top:0;width:55%;height:100%;
+    background:linear-gradient(90deg,transparent,var(--sdk-gold),transparent);
+    animation:sdkSweepH .62s cubic-bezier(.4,0,.2,1)}
+  .sdk-sweep.v::before{width:100%;height:55%;
+    background:linear-gradient(180deg,transparent,var(--sdk-gold),transparent);
+    animation:sdkSweepV .62s cubic-bezier(.4,0,.2,1)}
+  @keyframes sdkSweepBox{ 0%{opacity:0} 12%{opacity:1} 66%{opacity:1} 100%{opacity:0} }
+  @keyframes sdkSweepH{ from{transform:translateX(-180%)} to{transform:translateX(320%)} }
+  @keyframes sdkSweepV{ from{transform:translateY(-180%)} to{transform:translateY(320%)} }
+
+  /* ---------- ⑦ 填錯結霜 → 倒數歸零時破冰 ----------
+     原本填錯只有紅閃 + 盤面轉灰 + 中央一個數字。冰晶把「是哪一格填錯的」與
+     「還要等多久」綁在同一個東西上,而碎裂那一下正好是「可以再填了」的訊號。
+     ⚠ 冰晶是白藍色的固定值,不吃主題 —— 冰在五個主題裡都是冰。 */
+  .sdk-cell.frost::after{opacity:.92;
+    background:
+      repeating-linear-gradient(58deg,rgba(255,255,255,.5) 0 1px,transparent 1px 5px),
+      repeating-linear-gradient(-58deg,rgba(255,255,255,.4) 0 1px,transparent 1px 6px),
+      linear-gradient(140deg,rgba(176,226,255,.82),rgba(240,252,255,.55) 45%,rgba(150,210,255,.78));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
+    /* ⚠ 這一格的冰是**藍**的,但整個盤面在凍結時掛著 .sdk-stage.frozen 的
+       filter:grayscale(.5) —— 不先自己補回飽和度,截圖量到的就是一塊灰色的網,
+       完全看不出是冰(子元素的 filter 先套,父層的 grayscale 再套上去,剛好抵銷)。 */
+    filter:saturate(2.2);
+    animation:sdkFrostIn .45s ease-out backwards}
+  @keyframes sdkFrostIn{ from{opacity:0;transform:scale(.35) rotate(-25deg)} to{opacity:.92;transform:none} }
+  .sdk-cell.shatter::after{opacity:.92;
+    background:linear-gradient(140deg,rgba(176,226,255,.82),rgba(240,252,255,.55) 45%,rgba(150,210,255,.78));
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
+    animation:sdkShatter .5s ease-out forwards}
+  @keyframes sdkShatter{ 0%{opacity:.92;transform:none;filter:blur(0)}
+                         100%{opacity:0;transform:scale(1.8) rotate(11deg);filter:blur(2px)} }
+
+  /* ---------- ⑧ 滿盤解鎖:整張紙鍍金 + 由中心往外的螺旋點亮 ----------
+     ⚠ 鍍金掛在 .sdk-stage 上而不是 .sdk-board:board 是 absolute inset:0,
+       住在 overflow:hidden 的 stage 裡面 —— 外擴的光暈會被整圈裁掉,什麼都看不到。 */
+  .sdk-stage:has(.sdk-board.done){
+    box-shadow:0 0 0 3px var(--sdk-gold),0 0 40px -6px var(--sdk-gold),0 10px 30px rgba(0,0,0,.22)}
+  .sdk-cell.lit::after{animation:sdkLit .72s ease-out}
+  .sdk-cell.lit .sdk-v{animation:sdkLitV .72s ease-out}
+  @keyframes sdkLit{ 0%{opacity:0;box-shadow:inset 0 0 0 0 var(--sdk-gold)}
+                     30%{opacity:1;box-shadow:inset 0 0 0 3px var(--sdk-gold)}
+                     100%{opacity:0;box-shadow:inset 0 0 0 7px var(--sdk-gold)} }
+  @keyframes sdkLitV{ 0%,100%{transform:none;filter:none}
+                      30%{transform:scale(1.34);filter:drop-shadow(0 0 6px var(--sdk-gold))} }
+
+  /* ---------- ⑨ 數字鍵盤:木刻活字的按壓感 + 集滿打勾 ----------
+     下緣一條實心影子當「厚度」,按下去把厚度收掉並下沉 2px = 真的壓下去了。
+     ⚠ 刻意**不動尺寸**:鍵盤與盤面共用同一份剩餘高度(.sdk-boardbox 是 flex:1),
+       鍵一長高盤面就縮一圈,而矮視窗那一組數字是量出來的。要更好按只能靠手感。
+     ⚠ 寫在既有 .sdk-key / .sdk-key:active 之後,同權重靠順序覆蓋。 */
+  .sdk-key{box-shadow:0 2px 0 rgba(0,0,0,.26),inset 0 1px 0 rgba(255,255,255,.16);
+    touch-action:manipulation}
+  .sdk-key:active{transform:translateY(2px) scale(.97);
+    box-shadow:0 0 0 rgba(0,0,0,0),inset 0 2px 5px rgba(0,0,0,.28)}
+  .sdk-key.done{box-shadow:none;opacity:.42}
+  /* 這個數字整盤填滿了 → 角標從「還剩幾格」換成綠勾(字由 board.js 的 paintPad 換) */
+  .sdk-key.done .sdk-kleft{color:#5fe08a;font-size:12px}
+
+  /* ---------- ⑩ 搶格領地比例條 ----------
+     一條橫的堆疊條,每個人一段,右邊剩下的是還沒被搶走的格子。
+     它跟卡片下面那條細進度條講的**不是同一件事**:那條是「我填了幾成」,
+     這條是「盤面現在被誰佔著」—— 領先多少一眼就看得出來,不必一張一張讀數字。
+     ⚠ grid-column:1/-1 不可省:#sdkHud 是 grid,不橫跨整列的話它會被當成第一張卡片。 */
+  .sdk-terr{grid-column:1/-1;display:flex;height:7px;border-radius:999px;overflow:hidden;
+    background:rgba(0,0,0,.24);box-shadow:inset 0 0 0 1px var(--panel-line)}
+  .sdk-terr i{display:block;height:100%;transition:width .3s}
+  .sdk-terr i.p0{background:var(--sp0)} .sdk-terr i.p1{background:var(--sp1)}
+  .sdk-terr i.p2{background:var(--sp2)} .sdk-terr i.p3{background:var(--sp3)}
+  .sdk-terr i.p4{background:var(--sp4)} .sdk-terr i.p5{background:var(--sp5)}
+  /* 連搶 3 格以上:那個人的卡片燒一下。字走既有的吐司管道 ——
+     對戰中最寶貴的是垂直空間,為了一句話再開一列不值得。 */
+  .sdk-hcard.hot{animation:sdkHot 1.2s ease-out}
+  @keyframes sdkHot{
+    0%{box-shadow:0 0 0 0 rgba(255,150,50,.85)}
+    35%{box-shadow:0 0 0 5px rgba(255,150,50,0),0 0 18px 2px rgba(255,150,50,.75)}
+    100%{box-shadow:0 0 0 0 rgba(255,150,50,0)}
+  }
+
+  /* ---------- ⑪ 結果卡的頭銜 ----------
+     ⚠ 0% 那一格刻意是**縮小**不是放大:.win-card 是 overflow-y:auto,
+       而 backwards + 延遲 = 元素會先以 0% 的樣子存在那 0.18 秒 ——
+       放大的話那一下會把卡片撐出一條捲軸(成語接龍的朱紅大印踩過,見那一段的註解)。 */
+  .sdk-title{display:inline-block;margin:10px 0 0;padding:5px 15px;border-radius:999px;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;line-height:1.2;
+    background:linear-gradient(135deg,var(--sdk-gold),var(--accent));color:#1c1008;
+    box-shadow:0 3px 10px rgba(0,0,0,.3)}
+  .sdk-title.pop{animation:sdkTitlePop .5s cubic-bezier(.2,1.5,.35,1) .18s backwards}
+  @keyframes sdkTitlePop{ 0%{opacity:0;transform:scale(.6)}
+                          62%{opacity:1;transform:scale(1.06)}
+                          100%{opacity:1;transform:scale(1)} }
+
   /* ---------- 矮視窗(橫向手機):盤面優先,周邊全部再壓一號 ---------- */
   @media (max-height:620px){
     .sdk-hero{margin:6px 0 2px}
@@ -1951,6 +2125,7 @@
     .sdk-hud{gap:4px}
     .sdk-hcard{padding:4px 6px 5px}
     .sdk-hval{font-size:16px}
+    .sdk-terr{height:5px}
     .sdk-play{gap:7px}
   }
   /* 橫向手機(矮但寬,667px 起跳):高度才是稀缺資源、寬度反而有剩

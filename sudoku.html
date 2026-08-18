@@ -16,8 +16,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>數獨 ｜ 單機練習與連線對戰</title>
-<!-- 數獨 · v2.4.2 -->
-<meta name="version" content="2.4.2">
+<!-- 數獨 · v2.4.2+1 -->
+<meta name="version" content="2.4.2+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -257,6 +257,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="win-card sdk-win" id="sdkWinCard">
       <div class="word display" id="winWord">完成!</div>
       <div class="sdk-winner" id="sdkWinner"></div>
+      <!-- 頭銜:只發給贏家 / 並列者與單機完成者(solo.js 的 finish 與 adapter 的 outcome
+           各自呼叫 paintSdkTitle);空字串就整顆收起來 -->
+      <div class="sdk-title hidden" id="sdkTitle"></div>
       <p id="winMsg"></p>
       <div class="sdk-stats hidden" id="sdkStats"></div>
       <div class="win-champ hidden" id="winChamp"></div>

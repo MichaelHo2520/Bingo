@@ -57,6 +57,7 @@ const Solo = (function(){
     level=lv||level;
     q=SGen.make(level);
     elapsed=0; mistakes=0; hints=0; paused=false; running=true;
+    SB.setClaim(false);      // 佔領暈染是搶格專用(單機全盤同一色,染了只是整片變糊)
     SB.setPuzzle(q);
     SB.setEnabled(true);
     SB.setSel(SB.firstEmpty());
@@ -102,7 +103,7 @@ const Solo = (function(){
     if(!running||paused)return;
     if(SB.valueAt(i)===v){ SB.clear(i); return; }       // 再點同一個數字 = 清掉
     if(SB.solAt(i)===v){
-      SB.fill(i,v,"me");
+      SB.fill(i,v,"me",true);      // true = 這是剛剛下的一手 → 放鈐印 / 行列宮光波
       Sound.place();
       if(SB.isComplete()) finish();
       else{
@@ -123,7 +124,7 @@ const Solo = (function(){
     if(i<0||SB.valueAt(i)) i=SB.firstEmpty();
     if(i<0)return;
     hints++;
-    SB.fill(i,SB.solAt(i),"hintfill");   // ★ 不可叫 hint:撞既有的 .hint 說明文字樣式
+    SB.fill(i,SB.solAt(i),"hintfill",true);   // ★ 不可叫 hint:撞既有的 .hint 說明文字樣式
     SB.setSel(i);
     Sound.place();
     paintHud();
@@ -138,6 +139,14 @@ const Solo = (function(){
     if(card){ card.classList.remove("win","lose","draw"); card.classList.add("win"); }
     $("winWord").textContent="完成!";
     $("winMsg").textContent=L.label+" "+L.name+" · 用了 "+fmt(elapsed);
+    /* 頭銜:用這一局真的發生過的事發銜,不用時間(時間跟難度綁在一起,講不清楚)。
+       ⚠ 三個條件由嚴到寬排,第一個命中就停。 */
+    paintSdkTitle(
+      (mistakes===0&&hints===0) ? "🧩 邏輯大師 · 零失誤零提示" :
+      (hints===0)               ? "✒️ 純手工完成 · 沒用提示" :
+      (mistakes===0)            ? "🎯 零失誤" :
+                                  "🧠 解開了"
+    );
     // 單機專屬統計列(連線的排行榜/表情列在 showScreen 時已收起)
     const box=$("sdkStats");
     if(box){

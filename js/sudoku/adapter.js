@@ -24,6 +24,7 @@ const MP = MPCore.create((function(){
   let ctx=null;
   let puzKey=null, holes=0, fills=[], tally=[], prog={};
   let myMiss=0, startedAt=0;
+  let stkSeat=-1, stkN=0;          // 連搶:誰、連幾格(只看「搶對」,填錯不列入也不打斷別人的)
 
   /* ---------- fills 的整數編碼 ---------- */
   // i(0~80) / v(1~9) / seat(0~5) / ok(0|1) → 單一整數(上限 12955,RTDB 存起來最省)
@@ -53,6 +54,16 @@ const MP = MPCore.create((function(){
     t[seat] = ok ? cur+1 : (as ? Math.max(0,cur-1) : cur);
   }
 
+  /* 連搶:fills 是**有序**的全房共同事實 → 各台重放的結果一定一致,不必另外同步。
+     只有「搶對」進得來:填錯不是誰的手速比較快,拿它打斷別人的連段講不通。
+     ⚠ 這一支必須跟 bump() 一樣「三條路徑都走到」(結算不需要,它不畫畫面),
+       否則重連歸位那一台的連段會從 0 重數,跟別人對不上。 */
+  function bumpStreak(seat,ok){
+    if(!ok)return 0;
+    if(seat===stkSeat) stkN++; else { stkSeat=seat; stkN=1; }
+    return stkN;
+  }
+
   /* ---------- 即時比分 HUD(盤面上方那一列) ---------- */
   function renderHud(){
     const box=$("sdkHud"); if(!box)return;
@@ -61,7 +72,7 @@ const MP = MPCore.create((function(){
     box.classList.remove("hidden");
     // 5 人以上一列排不下(窄機一張卡不到 55px)→ 掛旗標讓 CSS 換成 3 欄兩列
     box.classList.toggle("sdk-hud-two", ord.length>4);
-    box.innerHTML=ord.map((id,seat)=>{
+    box.innerHTML=territory(ord)+ord.map((id,seat)=>{
       const nm=esc(ctx.dispName(id));
       let val, sub;
       if(gMode==="grab"){
@@ -83,13 +94,41 @@ const MP = MPCore.create((function(){
              '</div>';
     }).join("");
   }
+  /* 領地比例條(只有搶格有):一條橫的堆疊條,每個人一段,右邊剩下的是還沒被搶走的格子。
+     它跟每張卡片下面那條細進度條講的**不是同一件事** —— 那條是「我填了幾成」,
+     這條是「盤面現在被誰佔著」,一眼就看得出領先多少,而卡片要一張一張讀數字。
+     ⚠ 這一條是 #sdkHud 的子元素,而 #sdkHud 是 grid → 一定要 grid-column:1/-1
+       橫跨整列(CSS 那邊),不然它會被當成第一張卡片擠進去。
+     ⚠ 分母用 holes(這一局總共有幾個空格)不用「已填數」:用已填數的話,
+       開局第一格填下去就是 100%,條子會一路從滿的縮回來,完全反直覺。 */
+  function territory(ord){
+    if(gMode!=="grab"||!holes)return "";
+    const segs=ord.map((id,seat)=>{
+      const w=Math.max(0,Math.min(100,((tally[seat]||0)/holes)*100));
+      return w>0 ? '<i class="'+colorOf(seat)+'" style="width:'+w.toFixed(2)+'%"></i>' : "";
+    }).join("");
+    return '<div class="sdk-terr" aria-hidden="true">'+segs+'</div>';
+  }
+  /* 連搶三格以上:那個人的卡片燒起來 + 一則吐司。刻意用既有的吐司管道 ——
+     這是對戰中最寶貴的垂直空間,為了一句話再開一列不值得。
+     ⚠ 同 popScore:renderHud() 會重建 innerHTML,所以一定要在它之後才掛。 */
+  function flameHud(seat,n){
+    const box=$("sdkHud"); if(!box)return;
+    const card=box.querySelectorAll(".sdk-hcard")[seat];
+    if(!card)return;
+    card.classList.remove("hot"); void card.offsetWidth; card.classList.add("hot");
+    setTimeout(()=>card.classList.remove("hot"),1200);
+  }
+
   /* 分數變動時在那個人的 HUD 卡片上飄一個 +1 / −1。
      計分規則不寫成說明文字塞進盤面上方(那是玩的時候最寶貴的垂直空間),
      改成讓玩家從「結果」學規則 —— 看到扣分飄出來,比讀任何一行字都清楚。
      renderHud() 會重建 innerHTML,所以飄字一定要在它之後才掛。 */
   function popScore(seat,delta){
     const box=$("sdkHud"); if(!box)return;
-    const card=box.children[seat]; if(!card)return;
+    /* ⚠ 這裡**不可以**用 box.children[seat]:領地比例條是 #sdkHud 的第一個子元素,
+       用 children 會整組偏一格(0 號的飄字掛到條子上 = 看不見,最後一個直接掛不上)。 */
+    const card=box.querySelectorAll(".sdk-hcard")[seat]; if(!card)return;
     const el=document.createElement("span");
     el.className="sdk-pop "+(delta>0?"up":"down");
     el.textContent=(delta>0?"+":"−")+Math.abs(delta);
@@ -116,7 +155,7 @@ const MP = MPCore.create((function(){
     if(!right){
       myMiss++;
       SB.flashWrong(i);
-      SB.freeze(FREEZE_MS);
+      SB.freeze(FREEZE_MS,i);      // 帶上格號 → 那一格結霜,倒數歸零時碎冰
       showToast(gAssist?"填錯了 −1 分,冷靜 3 秒 🥶":"填錯了,冷靜 3 秒 🥶",1400);
       try{ Sound.lose(); }catch(e){}
       ctx.txGame(g=>{
@@ -137,17 +176,17 @@ const MP = MPCore.create((function(){
   function playRace(i,v){
     if(SB.valueAt(i)===v){ SB.clear(i); pushProgress(); return; }
     if(SB.solAt(i)===v){
-      SB.fill(i,v,colorOf(mySeat()));
+      SB.fill(i,v,colorOf(mySeat()),true);   // true = 剛剛下的一手 → 鈐印 + 行列宮光波
       Sound.place();
       pushProgress();
-      if(SB.isComplete()) settleRace();
+      if(SB.isComplete()){ SB.markDone(); settleRace(); }
       else{ const nx=SB.firstEmpty(); if(nx>=0) SB.setSel(nx); }
     }else{
       myMiss++;
       SB.flashWrong(i);
       // 競速沒有分數可扣,輔助模式的懲罰只能是時間。不開輔助時維持原本「只計錯、不擋手」
       if(gAssist){
-        SB.freeze(FREEZE_MS);
+        SB.freeze(FREEZE_MS,i);
         showToast("填錯了,冷靜 3 秒 🥶",1400);
       }
       try{ Sound.lose(); }catch(e){}
@@ -267,7 +306,7 @@ const MP = MPCore.create((function(){
 
     /* ---------- 一局的生命週期 ---------- */
     lobbyGame(){ return { fills:[], puzzle:null, sol:null }; },
-    resetRound(){ puzKey=null; fills=[]; tally=[]; myMiss=0; prog={}; },
+    resetRound(){ puzKey=null; fills=[]; tally=[]; myMiss=0; prog={}; stkSeat=-1; stkN=0; },
     newGame(ids, prev){
       const q=SGen.make(diff);
       // 座位順序每局輪換一次,顏色才不會永遠同一個人拿 p0
@@ -283,6 +322,7 @@ const MP = MPCore.create((function(){
       gDiff=SGen.LEVELS[g.diff]?g.diff:"e9";
       gAssist=!!g.assist;
       SB.setAssist(gAssist);          // 每次都設:重連歸位時也要跟著這局鎖定的值
+      SB.setClaim(gMode==="grab");    // 佔領暈染只有搶格開(競速全盤同一色,染了只是整片變糊)
       // 題目換了(新的一局)→ 重建盤面
       if(g.puzzle && g.puzzle!==puzKey){
         const L=SGen.levelOf(gDiff);
@@ -292,7 +332,7 @@ const MP = MPCore.create((function(){
         SB.setPuzzle({ n:L.n, bw:L.bw, bh:L.bh, puzzle:g.puzzle, sol:g.sol });
         puzKey=g.puzzle;
         holes=SB.remaining();
-        fills=[]; tally=[]; myMiss=0; startedAt=Date.now();
+        fills=[]; tally=[]; myMiss=0; startedAt=Date.now(); stkSeat=-1; stkN=0;
         SB.setSel(SB.firstEmpty());
         if(gMode==="race") pushProgress();
       }
@@ -304,13 +344,16 @@ const MP = MPCore.create((function(){
       if(gMode==="grab"){
         const next=Array.isArray(g.fills)?g.fills:[];
         const pops=[];                 // 這批要飄的分數變動 (seat, delta)
+        const hot=[];                  // 這批要報的連搶 (seat, 連幾格)
         // 能延續就只補新的幾筆,否則整盤重建(重連 / 中途歸位)
         const extend = next.length>=fills.length && fills.every((v,k)=>next[k]===v);
         if(!extend){
           const L=SGen.levelOf(gDiff);
           SB.setPuzzle({ n:L.n, bw:L.bw, bh:L.bh, puzzle:g.puzzle, sol:g.sol });
-          holes=SB.remaining(); tally=[];
-          next.forEach(c=>{ const f=decFill(c); if(f.ok) SB.fill(f.i,f.v,colorOf(f.seat)); bump(tally,f.seat,f.ok,gAssist); });
+          holes=SB.remaining(); tally=[]; stkSeat=-1; stkN=0;
+          // ⚠ fill() 不帶 fx:一次幾十筆,連播的下場是幾十道光波排隊放完。
+          //   但連搶要照樣重放 —— 它跟 bump() 一樣是「三條路徑都得走到」的狀態。
+          next.forEach(c=>{ const f=decFill(c); if(f.ok) SB.fill(f.i,f.v,colorOf(f.seat)); bump(tally,f.seat,f.ok,gAssist); bumpStreak(f.seat,f.ok); });
           fills=next.slice();
           SB.setSel(SB.firstEmpty());
         }else{
@@ -323,9 +366,12 @@ const MP = MPCore.create((function(){
             const f=decFill(c);
             const before=tally[f.seat]||0;
             bump(tally,f.seat,f.ok,gAssist);
+            const run=bumpStreak(f.seat,f.ok);
+            // 連搶三格起報,之後每兩格再報一次(每一格都報的話,兩人局裡快的那個會一直洗版)
+            if(!quiet && run>=3 && run%2===1) hot.push([f.seat,run]);
             if(!quiet){ const d=(tally[f.seat]||0)-before; if(d) pops.push([f.seat,d]); }
             if(f.ok){
-              SB.fill(f.i,f.v,colorOf(f.seat));
+              SB.fill(f.i,f.v,colorOf(f.seat),!quiet);
               if(!quiet && f.seat!==me){
                 SB.flashTaken(f.i);
                 Sound.place();
@@ -339,8 +385,13 @@ const MP = MPCore.create((function(){
         // 填滿的判定改看盤面本身。原本是「總分 >= 空格數」,扣分之後總分會小於填對的格數,
         // 那個判定會永遠不成立 → 整局結不了。
         const done = holes>0 && SB.isComplete();
+        if(done) SB.markDone();                  // 滿盤:鍍金 + 由中心往外的螺旋點亮(自己擋重播)
         renderHud();
         pops.forEach(p=>popScore(p[0],p[1]));    // 一定要在 renderHud() 之後(它會重建 innerHTML)
+        hot.forEach(h=>{                         // 同上,連搶的燒卡也要等 HUD 重建完
+          flameHud(h[0],h[1]);
+          showToast("🔥 "+ctx.dispName(ctx.order()[h[0]]||"")+" "+h[1]+" 連搶!",1300);
+        });
         if(done && !ctx.winner()) settleGrab();
       }else{
         renderHud();
@@ -358,7 +409,8 @@ const MP = MPCore.create((function(){
     backToLobby(){
       showScreen("lobby");
       $("mpBar").classList.remove("playing");
-      puzKey=null; fills=[]; tally=[]; myMiss=0;
+      puzKey=null; fills=[]; tally=[]; myMiss=0; stkSeat=-1; stkN=0;
+      paintSdkTitle("");
       SB.setEnabled(false); SB.unfreeze();
       const box=$("sdkHud"); if(box){ box.classList.add("hidden"); box.innerHTML=""; }
       ruleHint();
@@ -372,7 +424,8 @@ const MP = MPCore.create((function(){
       Sound.start();
     },
     onLeave(){
-      puzKey=null; fills=[]; tally=[]; prog={}; myMiss=0;
+      puzKey=null; fills=[]; tally=[]; prog={}; myMiss=0; stkSeat=-1; stkN=0;
+      paintSdkTitle("");
       SB.setEnabled(false); SB.unfreeze();
       const box=$("sdkHud"); if(box){ box.classList.add("hidden"); box.innerHTML=""; }
     },
@@ -428,6 +481,13 @@ const MP = MPCore.create((function(){
       SB.setEnabled(false); SB.unfreeze();
       renderHud(); renderWinnerRow(w,isDraw);
       const box=$("sdkStats"); if(box){ box.classList.add("hidden"); box.innerHTML=""; }
+      /* 頭銜只發給贏家與並列者。發給輸家的話那不是頭銜,是安慰獎 ——
+         而這張卡片上「誰贏了」已經寫得很清楚,再補一句只會互相打架。 */
+      paintSdkTitle(
+        isDraw ? (mine?"🤝 平分秋色":"") :
+        !iWon  ? "" :
+        gMode==="race" ? "🏁 極速解謎 · 最快解完整盤" : "⚡ 搶格神手 · 拿下最多格"
+      );
       if(gMode==="race"){
         const secs=w.ms?(" · "+Math.round(w.ms/1000)+" 秒"):"";
         if(iWon) return { word:"你贏了!", msg:"最快解完整盤 🎉"+secs };

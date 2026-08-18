@@ -54,6 +54,18 @@ function paintLevelHint(){
   el.textContent=L.label+" "+L.name+" · 空 "+L.holes+" 格 · "+L.desc;
 }
 
+/* ---------- 結果卡的頭銜 ----------
+   單機與連線共用同一顆 #sdkTitle,兩邊各自在算完成績之後呼叫。
+   ⚠ 空字串 = 收起來(整個藏掉,不是留一塊空的)—— 輸家那一張不發頭銜。
+   ⚠ 每次都要重設 .pop 才會重播動畫:結果卡是同一張 DOM,反覆開關並不會重建它。 */
+function paintSdkTitle(text){
+  const el=$("sdkTitle"); if(!el)return;
+  if(!text){ el.classList.add("hidden"); el.classList.remove("pop"); el.textContent=""; return; }
+  el.textContent=text;
+  el.classList.remove("hidden");
+  el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop");
+}
+
 /* ---------- 盤面:點格 → 點數字 ---------- */
 SB.init({
   onNum(i,v){ if(Solo.running()) Solo.onNum(i,v); else MP.play(i,v); },
