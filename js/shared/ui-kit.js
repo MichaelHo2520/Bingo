@@ -1256,6 +1256,8 @@ addEventListener("resize", syncTools);
      房間框 / 單機列裡面**,那兩層在選單與大廳都是 hidden → class 一旦留在非對局
      畫面上,就沒有任何東西可以把它關回來(你畫我猜 v1.161.0 用一個 bug 換來的教訓)。
      ⚠ 而且必然會發生:狀態記在偏好裡,開頁那一刻就套用。
+     ★ v2.4.1 補上另一面:**不在對局畫面時鈕自己 `.hidden`** —— 連線的房間框在大廳就
+       看得見,守衛壓著不生效 = 使用者眼中的「按了沒反應」(細節在下面 apply() 裡)。
    ★★ ② 換畫面時要叫 sync() —— class 掛在 body 上,離開對局沒人脫它就留著。
    ★ ③ 兩顆鈕(連線 / 單機)共用同一份狀態,字面一起換,不要各自 textContent。
    ⚠ 字面是「大 / 小」中文字,不是 ⤢ / ⤡(那兩個箭頭在手機上細得像雜訊)。
@@ -1267,7 +1269,8 @@ const BigMode = (function(){
   function live(){ return !cfg || !cfg.live || !!cfg.live(); }
   function apply(){
     if(!cfg) return;
-    document.body.classList.toggle(cfg.cls, want && live());
+    const inPlay = live();
+    document.body.classList.toggle(cfg.cls, want && inPlay);
     const on = document.body.classList.contains(cfg.cls);
     /* ★★ 通用旗標(v1.182.3):版面規則一律掛在 `body.is-big` 上,**不必逐遊戲列前綴**。
        在此之前 styles.src.css 檔尾是十一組群組選擇器、每組為每個遊戲寫一行
@@ -1291,6 +1294,19 @@ const BigMode = (function(){
     const btns = document.querySelectorAll("." + cfg.btn);
     for(let i=0;i<btns.length;i++){
       const b = btns[i];
+      /* ★★★ 不在對局畫面就把鈕**藏起來**(v2.4.1)。使用者:「全部的連線對戰模式,
+         還沒開始遊戲的時候,emoji 旁邊的大棋盤模式按鈕,按了也不會有什麼反應,
+         這個時候應該要隱藏起來」。
+         ⚠ 根因是紅線 ① 的另一面:連線的房間框**在大廳就已經看得見**(房名 / 人物 / 😀
+           都住在裡面),而鈕就在那一列 → 大廳按下去 want 翻面、上面那行 `want && inPlay`
+           卻立刻把 class 關掉,畫面上一個 px 都不會動 = 「按了沒反應」。
+           守衛本身是對的(class 留在非對局畫面上就再也關不回來),少的是**把按不動的
+           鈕收掉**。單機那一顆不受影響:單機列本來就跟對局畫面一起出現。
+         ⚠ 藏的是**鈕**,不是意願:want 照舊留著 → 開局之後鈕回來、上一場的大模式也回來。
+         ⚠ 用共用的 `.hidden`(display:none!important),不新增任何 CSS 規則 ——
+           這顆鈕在十一頁有十一個前綴 class,寫成 CSS 就是十一條要登記的雙胞胎。
+         ★ 守門:tools/t-big-consist.html 的 E 條(大廳:房間框看得見、鈕看不見)。 */
+      b.classList.toggle("hidden", !inPlay);
       b.classList.toggle("on", on);
       b.textContent = on ? "小" : "大";
       b.title = on ? "回一般大小" : (cfg.name || "放大");

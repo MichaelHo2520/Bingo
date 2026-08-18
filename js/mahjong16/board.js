@@ -216,7 +216,8 @@ const M16B = (function(){
     return !!el && !el.classList.contains("hidden");
   }
   function applyBig(){
-    document.body.classList.toggle("m16-big", big && playLive());
+    const inPlay = playLive();
+    document.body.classList.toggle("m16-big", big && inPlay);
     const on = document.body.classList.contains("m16-big");
     /* 兩顆鈕(連線 #m16Big / 單機 #m16SoloBig)一起同步 —— 同一份狀態,不可以各說各話。
        ⚠ 字面用「大 / 小」不用 ⤢ / ⤡:那兩個箭頭在手機上細得像雜訊
@@ -224,6 +225,15 @@ const M16B = (function(){
     const btns = document.querySelectorAll(".m16-bigbtn");
     for(let i=0;i<btns.length;i++){
       const b = btns[i];
+      /* ★★★ 不在牌桌畫面就把鈕**藏起來**(v2.4.1,與 ui-kit 的 BigMode 同一件事)。
+         使用者:「還沒開始遊戲的時候,emoji 旁邊的大棋盤模式按鈕,按了也不會有什麼反應,
+         這個時候應該要隱藏起來」—— 連線的房間框在**大廳**就已經看得見,而上面那道
+         playLive() 守衛會把 class 立刻關掉 → 畫面一個 px 都不動 = 「按了沒反應」。
+         ⚠ 藏的是鈕不是意願:big 照舊留著,開局之後鈕與大牌桌一起回來。
+         ⚠ 單機那一顆(#m16SoloBig)不受影響:單機列本來就跟牌桌畫面一起出現。
+         ⚠ 與橫向那條 `.m16-bigbtn{display:none}` 各管各的,兩者都是 display:none,疊了也沒事。
+         ★ 守門:tools/t-big-consist.html 的 E 條。 */
+      b.classList.toggle("hidden", !inPlay);
       b.classList.toggle("on", on);
       b.textContent = on ? "小" : "大";
       b.title = on ? "回一般大小" : "大牌桌";
