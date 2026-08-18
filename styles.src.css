@@ -2007,13 +2007,30 @@
   .sdk-key.done{opacity:.34}
   .sdk-key.erase .sdk-kn{font-size:19px}
 
-  /* ---------- 即時比分 HUD(連線對戰中,盤面上方那一列) ---------- */
+  /* ---------- 即時比分 HUD(連線對戰中,盤面上方那一列) ----------
+     ★★ 欄數由 renderHud() 掛 .sdk-hud-c1 ~ c6 **明講**,刻意不用 repeat(auto-fit,…):
+       auto-fit 的軌數是「容器寬 ÷ 軌的最小寬」,而 minmax(0,1fr) 的最小是 0 →
+       瀏覽器改用一個內建下限(1px)去除,一列會被展開成**幾十條 1px 的軌**。
+       平時看不出來(auto-fit 把沒有元素的軌塌掉了),但只要有任何一個子元素
+       `grid-column:1/-1` 跨過去,那幾十條就**全部不塌** —— 每張卡片只分到一條:
+       實測 464px 寬 / 4 人 → 67 軌、卡片 18px,名字疊成一團看不出是什麼
+       (橫向 6 人更慘:104 軌、卡片 16px,連盤面都被擠到只剩 44px)。
+       ⚠ 所以「HUD 是 grid」與「領地條要橫跨整列」兩件事一起成立時,欄數就**不可以**
+         是 auto 的 —— 這一條是 v2.4.4 現場回報的那個「房間框全部亂掉」。→ notes/08 */
   .sdk-hud{flex:none;width:100%;display:grid;gap:6px;
-    grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+    grid-template-columns:repeat(4,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c1{grid-template-columns:minmax(0,1fr)}
+  .sdk-hud.sdk-hud-c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c5{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c6{grid-template-columns:repeat(6,minmax(0,1fr))}
   /* 5~6 人:硬塞一列的話,窄機(359px 可用寬)一張卡只剩 55px —— 名字被切光、分數還會溢出。
      改 3 欄兩列:同樣的窄機每張 115px,桌機 169px。5 人時第二列只有兩張、右邊留白,
      但「看得懂誰是誰」比排面整齊重要。多出來的一列高度由 .sdk-boardbox 自動吸收
-     (盤面是 height:min(100%,92vw,460px),不必回頭調常數)。 */
+     (盤面是 height:min(100%,92vw,460px),不必回頭調常數)。
+     ⚠ 這一條一定要排在上面那組 .sdk-hud-cN **之後**:兩邊權重同樣是 (0,2,0),
+       靠順序取勝 —— 挪到前面去的話 5~6 人就再也換不成兩列了。 */
   .sdk-hud.sdk-hud-two{grid-template-columns:repeat(3,minmax(0,1fr))}
   .sdk-hud.sdk-hud-two .sdk-hcard{padding:4px 7px 5px}
   .sdk-hud.sdk-hud-two .sdk-hname{font-size:11px}
@@ -2276,7 +2293,12 @@
      → 5~6 人收回一列,把兩列 HUD 多吃的那 ~45px 還給盤面。
      min-width 是為了不誤傷「桌機把視窗拉得又矮又窄」那種情況(那時還是要兩列)。 */
   @media (max-height:620px) and (min-width:600px){
-    .sdk-hud.sdk-hud-two{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+    /* ⚠ 這裡要把 5~6 人「還原成一列」,而 .sdk-hud-cN 在外面已經被 .sdk-hud-two
+       用順序壓掉了 → 只能兩個 class 一起寫把權重拉到 (0,3,0)。
+       ⚠⚠ 不可以圖省事寫回 repeat(auto-fit,…):領地條一跨過去就是幾十條 1px 的軌
+         (上面 .sdk-hud 那一段有實測數字)。 */
+    .sdk-hud.sdk-hud-two.sdk-hud-c5{grid-template-columns:repeat(5,minmax(0,1fr))}
+    .sdk-hud.sdk-hud-two.sdk-hud-c6{grid-template-columns:repeat(6,minmax(0,1fr))}
   }
   /* 盤面被鎖住(未開打 / 已結束)時,鍵盤跟著失效並變淡 —— 不讓它看起來還能按 */
   .sdk-play:has(.sdk-stage.locked) .sdk-pad{opacity:.4;pointer-events:none}

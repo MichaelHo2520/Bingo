@@ -72,6 +72,12 @@ const MP = MPCore.create((function(){
     box.classList.remove("hidden");
     // 5 人以上一列排不下(窄機一張卡不到 55px)→ 掛旗標讓 CSS 換成 3 欄兩列
     box.classList.toggle("sdk-hud-two", ord.length>4);
+    /* 幾個人就掛 .sdk-hud-c<幾>:HUD 的欄數**一定要明講**,不可以交給
+       repeat(auto-fit,…) 自己長 —— 領地條是 grid-column:1/-1,而 auto-fit 把一列
+       展開成幾十條 1px 的軌,一跨過去就全部不塌,每張卡片只剩 18px(v2.4.4 現場回報)。
+       ⚠ 這裡只講「有幾個人」,「一列還是兩列」仍然是 CSS 的事(它才看得到視窗多高)。 */
+    const cols=Math.min(6,Math.max(1,ord.length));
+    for(let k=1;k<=6;k++) box.classList.toggle("sdk-hud-c"+k, k===cols);
     box.innerHTML=territory(ord)+ord.map((id,seat)=>{
       const nm=esc(ctx.dispName(id));
       let val, sub;
@@ -99,6 +105,10 @@ const MP = MPCore.create((function(){
      這條是「盤面現在被誰佔著」,一眼就看得出領先多少,而卡片要一張一張讀數字。
      ⚠ 這一條是 #sdkHud 的子元素,而 #sdkHud 是 grid → 一定要 grid-column:1/-1
        橫跨整列(CSS 那邊),不然它會被當成第一張卡片擠進去。
+     ⚠⚠ 而那個 1/-1 反過來把「HUD 有幾欄」綁死了:**不可以**再讓欄數是 auto 的
+       (repeat(auto-fit,…) 會展開成幾十條 1px 的軌,一被跨過去就全部不塌 →
+       每張卡片剩 18px)。欄數改由 renderHud() 掛 .sdk-hud-c<N> 明講,
+       兩件事是一體的,動任何一邊都要一起看。
      ⚠ 分母用 holes(這一局總共有幾個空格)不用「已填數」:用已填數的話,
        開局第一格填下去就是 100%,條子會一路從滿的縮回來,完全反直覺。 */
   function territory(ord){

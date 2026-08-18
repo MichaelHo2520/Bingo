@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 78ebc23387e3debb300eb64fa48f0ceb0f115b271ef8364125c2ea93cff25453)
+    真相在 styles.src.css(sha256 9c515cc5fe0ef35965eda776b887a1771e53e5a6e1401d5a4ead0691be83ef64)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -1130,7 +1130,13 @@
   .sdk-key.done{opacity:.34}
   .sdk-key.erase .sdk-kn{font-size:19px}
   .sdk-hud{flex:none;width:100%;display:grid;gap:6px;
-    grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+    grid-template-columns:repeat(4,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c1{grid-template-columns:minmax(0,1fr)}
+  .sdk-hud.sdk-hud-c2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c3{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c4{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c5{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .sdk-hud.sdk-hud-c6{grid-template-columns:repeat(6,minmax(0,1fr))}
   .sdk-hud.sdk-hud-two{grid-template-columns:repeat(3,minmax(0,1fr))}
   .sdk-hud.sdk-hud-two .sdk-hcard{padding:4px 7px 5px}
   .sdk-hud.sdk-hud-two .sdk-hname{font-size:11px}
@@ -1292,7 +1298,8 @@
     .sdk-play{gap:7px}
   }
   @media (max-height:620px) and (min-width:600px){
-    .sdk-hud.sdk-hud-two{grid-template-columns:repeat(auto-fit,minmax(0,1fr))}
+    .sdk-hud.sdk-hud-two.sdk-hud-c5{grid-template-columns:repeat(5,minmax(0,1fr))}
+    .sdk-hud.sdk-hud-two.sdk-hud-c6{grid-template-columns:repeat(6,minmax(0,1fr))}
   }
   .sdk-play:has(.sdk-stage.locked) .sdk-pad{opacity:.4;pointer-events:none}
   @media (max-height:780px) and (pointer:coarse){
