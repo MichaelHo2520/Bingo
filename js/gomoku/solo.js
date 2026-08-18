@@ -78,6 +78,16 @@ const Solo = (function(){
     const u = $("gmkUndoBtn");
     if(u) u.disabled = !canUndo();
   }
+  /* ★ 「第 N 手」(v2.4.4)—— 建議書那對「兩側木質棋笥」裡真正有用的一半。
+     ⚠ 棋笥本體不做:它要吃掉盤面**寬度**,而這一頁在手機上就是被寬度卡住的
+       (`.gmk-stage` 是 `min(92vw,520px)`)。持子方本來就在這顆膠囊上,
+       只有「走到第幾手」是新資訊 → 塞進膠囊 = 零版面成本。
+     ⚠ 第 0 手不顯示(開局寫「第 0 手」很怪),而且結束了也不顯示(那時講的是勝負)。 */
+  function stepTag(){
+    const k = GB.stepCount();
+    return k > 0 ? ('<span class="gmk-step">第 ' + k + ' 手</span>') : "";
+  }
+
   // 「輪到誰」膠囊:單機沿用連線那顆(#gmkTurn),電腦對決文案換成電腦、朋友模式換成黑白棋
   function paintTurn(){
     const cap = $("gmkTurn"), txt = $("gmkTurnTxt");
@@ -85,10 +95,11 @@ const Solo = (function(){
     const dot = cap.querySelector(".gmk-dot");
     const overColor = isFriend() ? (mv.length ? cOf(mv.length - 1) : "b") : human;
     if(dot) dot.className = "gmk-dot " + (over ? overColor : turnColor());
-    if(over) txt.textContent = "這局結束";
-    else if(isFriend()) txt.textContent = "輪到" + (turnColor() === "b" ? "⚫ 黑棋" : "⚪ 白棋");
-    else if(busy) txt.textContent = "電腦思考中…";
-    else txt.textContent = myTurn() ? "輪到你" : "電腦下棋中…";
+    // ⚠ 這四行的文案本身沒有使用者輸入,但格式與連線那一份刻意一致(它們是雙胞胎)
+    if(over) txt.innerHTML = "這局結束";
+    else if(isFriend()) txt.innerHTML = "輪到" + (turnColor() === "b" ? "⚫ 黑棋" : "⚪ 白棋") + stepTag();
+    else if(busy) txt.innerHTML = "電腦思考中…" + stepTag();
+    else txt.innerHTML = (myTurn() ? "輪到你" : "電腦下棋中…") + stepTag();
     cap.classList.toggle("mine", !over && !busy && (isFriend() || myTurn()));
     GB.setInteractive(active && !over && !busy && (isFriend() || myTurn()), isFriend() ? turnColor() : human);
   }

@@ -1376,8 +1376,48 @@
     right:calc(var(--gcell,40px) / 2); bottom:calc(var(--gcell,40px) / 2);
     border:2px solid var(--gmk-frame);
   }
+  /* ---------- 木紋 + 浮雕格線(v2.4.4)----------
+     ⚠⚠⚠ **刻意全部掛在 ::before,`.gmk-board` 的 background 一個字都不碰。**
+       上面那一段寫著「border 會讓格線的 background-position 位移」——同一個陷阱的另一面是:
+       `background-size` / `background-position` 只寫一個值時是**套用到所有 layer** 的,
+       所以一旦為了木紋去加 layer,那兩條真的格線就必須改成逐層寫的逗號清單 ——
+       **寫錯一格就是整盤格線偏半個像素,而斷言完全看不出來**(只有截圖看得到)。
+       掛在 ::before 上等於零風險:格線那兩層完全沒被動到。
+     ★ 木紋照「跳棋那塊木托盤」學到的三件事(缺一件就像條碼):
+       ① **不等距** —— 三層週期互質(17 / 29 / 43),疊起來看不出重複
+       ② **低對比** —— alpha 一律 <= 0.055,亮暗交給底色
+       ③ **偶爾一條深的** —— 年輪線,間隔比淺紋大得多
+     ★ 浮雕:在每條深格線的右邊 / 下面 1px 補一條**亮線** —— 那就是「刻進木頭裡」的錯覺。
+     ⚠ z 序:parent 的 ::before 相當於它的第一個子元素 → 疊在**格線之上、星位與棋子之下**。
+       木紋壓在格線上是對的(紋理在木頭裡、線是刻上去的),而 alpha 低到看不出壓字。 */
+  .gmk-board::before{
+    content:"";position:absolute;inset:0;pointer-events:none;border-radius:6px;
+    background-image:
+      repeating-linear-gradient(90deg,
+        rgba(92,58,20,.05) 0 1px, rgba(255,244,214,.045) 1px 2px, rgba(0,0,0,0) 2px 17px),
+      repeating-linear-gradient(90deg,
+        rgba(92,58,20,.035) 0 1px, rgba(0,0,0,0) 1px 29px),
+      repeating-linear-gradient(90deg,
+        rgba(64,38,10,.055) 0 2px, rgba(0,0,0,0) 2px 43px),
+      linear-gradient(to right, rgba(255,255,255,.19) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.19) 1px, transparent 1px);
+    background-size:
+      auto, auto, auto,
+      var(--gcell,40px) var(--gcell,40px),
+      var(--gcell,40px) var(--gcell,40px);
+    background-position:
+      0 0, 7px 0, 19px 0,
+      calc(var(--gcell,40px) / 2 + 1px) 0,
+      0 calc(var(--gcell,40px) / 2 + 1px);
+  }
+
   /* 星位(天元 + 四星):5 個小圓點,由 board.js 依盤面大小放置 */
-  .gmk-star{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--gmk-star);
+  /* ★ 星位:v2.4.4 起是「內刻的燙金圓點」—— 金色本體 + 一圈暗影(刻痕)+ 一點高光。
+     ⚠ 尺寸不動:7px 是量過的(大盤面九星時再大就與棋子搶注意力)。
+     ⚠ 顏色**不吃主題**是刻意的(同 `--gmk-wood` 那一組的做法):燙金在六個主題上都要是金的。 */
+  .gmk-star{position:absolute;width:7px;height:7px;border-radius:50%;
+    background:radial-gradient(circle at 36% 30%, #ffe9a6 0%, #f0bd45 52%, #b8832a 100%);
+    box-shadow:0 0 0 .5px rgba(70,44,10,.55), inset 0 -.5px .5px rgba(255,255,255,.5);
     transform:translate(-50%,-50%);pointer-events:none}
 
   /* 棋子:absolute 定位在交叉點,落子時只 append 一顆(不整盤重畫) */
@@ -1386,9 +1426,21 @@
     border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;
     animation:gmkDrop .16s ease-out;
   }
-  .gmk-stone.b{background:radial-gradient(circle at 34% 28%, #7a7a7a 0%, #2b2b2b 45%, #050505 100%);
+  /* ---------- 材質:黑曜石 / 羊脂白玉(v2.4.4)----------
+     ⚠ 只加 background 的 layer,**不動 box-shadow 也不動 transform** ——
+       那一格 transform 是 translate(-50%,-50%) 加 gmkDrop 在用的(見上面那條)。
+     ★ 黑子:玄黑底上一抹**冷冽的月光高光**(帶一點藍),那是黑曜石與「純黑塑膠」的差別。
+     ★ 白子:奶白底 + 下半部一層**由內透出來的珠光**(次表面散射的廉價版)。
+     ⚠ 兩顆的第一層都刻意很小(橢圓 16%×11%):高光一大就變成塑膠。 */
+  .gmk-stone.b{background:
+      radial-gradient(ellipse 16% 11% at 33% 24%, rgba(214,232,255,.92), rgba(190,214,245,.28) 55%, rgba(255,255,255,0) 100%),
+      radial-gradient(ellipse 52% 40% at 62% 78%, rgba(120,140,170,.16), rgba(255,255,255,0) 70%),
+      radial-gradient(circle at 34% 28%, #7a7a7a 0%, #2b2b2b 45%, #050505 100%);
     box-shadow:0 2px 5px rgba(0,0,0,.45), inset 0 -1px 3px rgba(255,255,255,.10)}
-  .gmk-stone.w{background:radial-gradient(circle at 34% 28%, #ffffff 0%, #f2ede4 45%, #c3bcb0 100%);
+  .gmk-stone.w{background:
+      radial-gradient(ellipse 16% 11% at 33% 24%, rgba(255,255,255,.98), rgba(255,255,255,.42) 55%, rgba(255,255,255,0) 100%),
+      radial-gradient(ellipse 60% 46% at 50% 82%, rgba(255,250,235,.75), rgba(255,246,225,0) 72%),
+      radial-gradient(circle at 34% 28%, #ffffff 0%, #f2ede4 45%, #c3bcb0 100%);
     box-shadow:0 2px 5px rgba(0,0,0,.35), inset 0 -1px 3px rgba(0,0,0,.10)}
   @keyframes gmkDrop{ from{transform:translate(-50%,-50%) scale(.4);opacity:.3} to{transform:translate(-50%,-50%) scale(1);opacity:1} }
   /* 最後一手:小圓環標記(對手下在哪一眼看到) */
@@ -1397,9 +1449,86 @@
     border:2.5px solid var(--accent);animation:gmkLast 1.4s ease-in-out infinite;
   }
   @keyframes gmkLast{ 0%,100%{opacity:.45} 50%{opacity:1} }
-  /* 連五那 5 顆:醒目光環 */
-  .gmk-stone.win{z-index:2;box-shadow:0 0 0 3px var(--accent), 0 0 14px 3px var(--accent);animation:gmkWin .9s ease-in-out infinite alternate}
+  /* ★★ 擴散水波(v2.4.4)—— 建議書列了兩條,而它們**是同一個機制**:
+       「落子的金色氣浪」(一次性)與「最後一手的呼吸光圈」(常駐)。
+       最新落下的那一顆**就是**最後一手 → 一圈慢慢往外盪的水波同時兌現兩件事,
+       比做兩層省一半的墨水,而且不會在同一顆棋上疊兩種動畫。
+     ⚠ transform 寫在 ::before 上,與棋子本體那一格(translate(-50%,-50%) + gmkDrop)無關。 */
+  .gmk-stone.last::before{
+    content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;
+    border:1.5px solid var(--accent);animation:gmkRipple 1.9s ease-out infinite;
+  }
+  /* ⚠ 最大只擴到 1.62 倍:相鄰的洞只差 1 格,而棋子是 0.88 格 —— 擴到兩倍就會**壓在
+     隔壁那一顆上面**(第一版做 2.05,放大截圖之後水波直接吃掉旁邊那顆棋的警示圈)。
+     ⚠ 邊也從 2px 收到 1.5px:縮放走的是 canvas 的 transform,3 倍時 2px 會變成 6px 的粗環。 */
+  @keyframes gmkRipple{ 0%{transform:scale(.86);opacity:.62} 58%{opacity:0} 100%{transform:scale(1.62);opacity:0} }
+  /* ★★★ 「四」的警示(v2.4.4):再一子就成五的那幾顆,套一圈暗紅虛線。
+     ⚠⚠ **刻意沒有動畫**,而且是 outline 不是 box-shadow —— 兩個都是有原因的:
+       ① `.gmk-stone` 的 `animation` 那一格是 gmkDrop 在用的。在這裡宣告 animation 會
+          **取代**它,而 syncThreats() 是在 play() 裡**同步**跑的 → 剛落下那一顆可能
+          當場就被標成「四」→ **它的落子動畫會被取消**(看起來像那一手沒有落子動畫)。
+       ② box-shadow 那一格被 `.b` / `.w` / `.win` 三條佔著,插進去就是一場權重與
+          來源順序的仗;outline 沒有人在用,而且 outline-offset 剛好把環擺到棋子外面。
+     ★ 靜態也是對的:一個「四」可能在盤上留好幾手,會動的東西留在那裡就是洗版。
+     ⚠ 只標**那幾顆棋**,不標「下哪裡會成五」的空點 —— 標空點等於把答案畫在盤上。 */
+  .gmk-stone.four{outline:2px dashed rgba(255,110,92,.85);outline-offset:2px}
+  /* 連五那 5 顆:醒目光環。★ v2.4.4 起**依序點亮** —— 延遲 = 在那條線上排第幾顆(--wi 由 board.js 寫)。 */
+  .gmk-stone.win{z-index:2;box-shadow:0 0 0 3px var(--accent), 0 0 14px 3px var(--accent);
+    animation:gmkWinFlare .46s ease-out both, gmkWin .9s ease-in-out infinite alternate;
+    animation-delay:calc(var(--wi,0) * 90ms), calc(var(--wi,0) * 90ms + 460ms)}
   @keyframes gmkWin{ from{box-shadow:0 0 0 3px var(--accent), 0 0 6px 1px var(--accent)} to{box-shadow:0 0 0 3px var(--accent), 0 0 20px 6px var(--accent)} }
+  /* 點亮那一下:先炸一圈白金再收成常駐光環(★ 只動 box-shadow / filter,不碰 transform) */
+  @keyframes gmkWinFlare{
+    0%{box-shadow:0 0 0 2px var(--accent), 0 0 0 0 rgba(255,240,190,.9);filter:brightness(1)}
+    45%{box-shadow:0 0 0 4px #fff2bd, 0 0 22px 9px rgba(255,201,60,.95);filter:brightness(1.35)}
+    100%{box-shadow:0 0 0 3px var(--accent), 0 0 14px 3px var(--accent);filter:brightness(1)}
+  }
+  /* ★★ 五連珠的金色光柱(v2.4.4):board.js 算好角度 / 長度後 append 一根。
+     ⚠ z-index 0:棋子是 1、連五那五顆是 2 → 光柱從它們**底下**穿過去
+       (壓在棋子上面的話五顆棋會被一根金條蓋掉,而那五顆正是主角)。
+     ⚠ 寬度由 JS 寫成 px(棋盤是固定 px、縮放走 canvas 的 transform)—— 這裡只給高度與外觀。 */
+  /* ⚠⚠ 高度一定要**比棋子還高**(棋子是 0.88 格,相鄰的洞只差 1 格 → 五顆幾乎連在一起)。
+       第一版做 0.44 格,結果整根光柱**完全被那五顆棋擋住** —— 而診斷字串照樣回「光柱 1」,
+       e2e 也照樣綠(它們只問節點在不在)。放大截圖才看出來。
+     ★ 現在是 1.1 格:光柱從五顆棋底下穿過去,兩側各露出一圈金色的光暈。 */
+  /* ⚠⚠⚠ 芯要**近白**、不可以是純金色 —— 棋盤是米黃木頭(--gmk-wood),
+       金色打在上面**幾乎沒有對比**:第二版做成 rgba(255,209,84) 的金條,
+       高度也加到 1.1 格了,截圖出來還是**看不見**(而診斷回「光柱 1」、e2e 全綠)。
+       現在是「白熱的芯 + 金色的暈」:白在米黃上讀得到,金負責「這是金光」那個語意。
+     ⚠ 高度 1.25 格(棋子是 0.88)→ 兩側各露出約 0.19 格的光暈。 */
+  .gmk-beam{position:absolute;z-index:0;pointer-events:none;
+    height:calc(var(--gcell,40px) * 1.25);border-radius:999px;
+    background:linear-gradient(90deg, rgba(255,236,170,0), rgba(255,255,255,.97) 16%,
+                                      rgba(255,250,225,.97) 50%, rgba(255,255,255,.97) 84%, rgba(255,236,170,0));
+    box-shadow:0 0 24px 9px rgba(255,196,44,.8), 0 0 6px 2px rgba(255,255,255,.7);
+    /* ★★★ 這一條**刻意完全沒有動畫**,opacity 直接寫在宣告本體上。
+       ⚠⚠⚠ 這是量出來的結論,前後翻了三版:
+         · 第一版 height 0.44 格 → 整根被那五顆棋擋住(棋子是 0.88 格)
+         · 第二版純金色 → 打在米黃木板上幾乎沒有對比,看不出來
+         · 第三版 `gmkBeam .85s both` + delay .42s + clip-path 掃出來 →
+           **永遠看不見**:診斷量到 `opacity 0 · clip inset(0px 50%)`,也就是
+           **卡在 0% 那一格**(CSS 動畫的時鐘在 headless 下完全不前進,
+           而 fill-mode 讓「動畫沒跑」= 套用 0%)。改成不帶 fill-mode 也一樣,
+           因為動畫**是 active 的**、只是時間停在 0。
+       ★ 結論就是這個專案已經記過兩次的同一條原則(跳棋紅線 2 / 星尖覺醒):
+         **靜態就要看得見,動畫只能是裝飾** —— 而「從 opacity 0 淡入」本質上
+         違反那條原則(那個東西的存在本身就靠動畫)。
+       ⚠ 同理不要拿 clip-path 當「掃出來」的手段:它的 0% 就是「寬度收成 0」。 */
+    opacity:.92}
+  /* ---------- 落子準星(v2.4.4)----------
+     ★★★ 建議書要的是「手指上方 50px 的放大鏡」,這一頁換成**貫穿棋盤的十字線** ——
+       完整理由在 board.js 的 showAim 檔頭,一句話:**按住滑動已經被單指平移佔走了**,
+       而十字線把「瞄到哪一列哪一行」畫到**盤外**,手指蓋住交叉點照樣讀得到。
+     ⚠ 一定要 pointer-events:none:它蓋滿整個棋盤,吃得到事件就整盤點不到
+       (而症狀是「點了沒反應」,會往手勢層去找)。
+     ⚠ z-index 不給(auto)→ 它在 HTML 裡排在棋子之前 → 線從棋子**底下**穿過去。
+     ⚠ 位置吃 --ax / --ay(board.js 寫的 px),與棋子同一套座標系。 */
+  .gmk-aim{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .1s linear}
+  .gmk-aim.show{opacity:.7}
+  .gmk-aim i{position:absolute;background:var(--accent);border-radius:2px}
+  .gmk-aim-h{left:0;right:0;top:var(--ay,0);height:2px;transform:translateY(-50%)}
+  .gmk-aim-v{top:0;bottom:0;left:var(--ax,0);width:2px;transform:translateX(-50%)}
+
   /* 桌機滑鼠移過去的預覽子(半透明);觸控裝置不顯示 */
   .gmk-ghost{position:absolute;width:calc(var(--gcell,40px) * .88);height:calc(var(--gcell,40px) * .88);
     border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;opacity:.34;display:none}
@@ -1426,6 +1555,10 @@
   :root[data-theme="bubblegum"] .gmk-turn{background:rgba(255,255,255,.6)}
 
   /* 棋子色小圖示(⚫/⚪ 用實心圓畫,不靠 emoji 避免各平台字型差異) */
+  /* ★ 「第 N 手」(v2.4.4):塞在「輪到誰」膠囊裡 —— 建議書那對「兩側木質棋笥」
+     真正有用的一半,而且是零版面成本的那一半(棋笥本體要吃盤面寬度,見 notes/06 紅線 8)。 */
+  .gmk-step{margin-left:6px;padding:1px 6px;border-radius:999px;
+    font-size:11px;font-weight:800;background:rgba(0,0,0,.18);opacity:.9}
   .gmk-dot{width:13px;height:13px;border-radius:50%;flex:none;display:inline-block}
   .gmk-dot.b{background:#111;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
   .gmk-dot.w{background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
@@ -1518,6 +1651,17 @@
   /* 五子棋頂列標題(取代 BINGO 跑馬燈) */
   .gmk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;color:var(--marquee);letter-spacing:.06em}
+
+  /* 會動的東西一律尊重系統的「減少動態效果」。
+     ⚠ 關掉的只有**動**的那一半:「四」的虛線環本來就是靜態的(規則資訊,不是裝飾)、
+       連五的光環與光柱要留著(那是「誰贏了、贏在哪一條線」)—— 所以這裡只拿掉動畫,
+       靜態外觀由各自的宣告本體撐著。 */
+  @media (prefers-reduced-motion:reduce){
+    .gmk-stone.last::before{display:none}
+    .gmk-stone.last::after{animation:none}
+    .gmk-stone.win{animation:none}
+    .gmk-aim{transition:none}
+  }
 
   @media (max-height:560px){
     .gmk-turn{top:5px;padding:4px 11px;font-size:12px}

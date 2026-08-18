@@ -17,7 +17,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>五子棋 ｜ 連線對戰 · 本機對戰</title>
 <!-- 五子棋連線對戰 + 本機對戰(電腦 / 朋友) · v2.4.3 -->
-<meta name="version" content="2.4.3">
+<meta name="version" content="2.4.3+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -246,6 +246,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   <div class="gmk-stage hidden" id="gmkStage">
     <div class="gmk-canvas" id="gmkCanvas">
       <div class="gmk-board" id="gmkBoard">
+        <!-- ★ 落子準星(v2.4.4):按住時橫豎兩條線貫穿整個棋盤 —— 手指蓋住交叉點時,
+             「我瞄到哪一列哪一行」只有靠伸到盤外的線才看得到(見 board.js 的 showAim)。
+             ⚠ 它與 #gmkGhost 一樣住在 #gmkBoard 裡面(跟著 canvas 的 transform 縮放),
+               而且一律 pointer-events:none —— 疊在棋盤上、又吃得到事件的話會擋掉落子。 -->
+        <div class="gmk-aim" id="gmkAim" aria-hidden="true"><i class="gmk-aim-h"></i><i class="gmk-aim-v"></i></div>
         <div class="gmk-ghost" id="gmkGhost" aria-hidden="true"></div>
       </div>
     </div>

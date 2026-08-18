@@ -53,6 +53,16 @@ const MP = MPCore.create((function(){
     }
   }
 
+  /* ★ 「第 N 手」(v2.4.4)—— 建議書那對「兩側木質棋笥」裡真正有用的一半。
+     ⚠ 棋笥本體不做:它要吃掉盤面**寬度**,而這一頁在手機上就是被寬度卡住的
+       (`.gmk-stage` 是 `min(92vw,520px)`)。持子方本來就在這顆膠囊上,
+       只有「走到第幾手」是新資訊 → 塞進膠囊 = 零版面成本。
+     ⚠ 第 0 手不顯示(開局寫「第 0 手」很怪),而且結束了也不顯示(那時講的是勝負)。 */
+  function stepTag(){
+    const k = GB.stepCount();
+    return k > 0 ? ('<span class="gmk-step">第 ' + k + ' 手</span>') : "";
+  }
+
   /* ---------- 輪到誰:棋盤上緣的膠囊(自己的回合會高亮脈動) ---------- */
   function updateTurnUI(){
     const cap=$("gmkTurn"), txt=$("gmkTurnTxt");
@@ -64,7 +74,9 @@ const MP = MPCore.create((function(){
     const dot=cap.querySelector(".gmk-dot");
     if(dot) dot.className="gmk-dot "+color;
     if(w) txt.textContent="這局結束";
-    else txt.textContent = mine ? "輪到你" : ("輪到 "+(tid?ctx.dispName(tid):"對手"));
+    /* ⚠ 名字要自己 esc() —— 這一行從 textContent 換成 innerHTML 了(要放「第 N 手」那顆膠囊),
+       而 dispName() 是玩家自己打的字(notes/07 踩坑 #9 是同一個洞)。 */
+    else txt.innerHTML = (mine ? "輪到你" : ("輪到 " + esc(tid ? ctx.dispName(tid) : "對手"))) + stepTag();
     cap.classList.toggle("mine", mine && !w);
     GB.setInteractive(mine && !w && !ctx.abandoned(), myColor());
     notifyMyTurn(mine && !w);

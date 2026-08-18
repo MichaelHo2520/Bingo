@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 93f63269093ad1f48ec2fb3c9b2de6b62774b3ce6f2393224a997d757f0e12de)
+    真相在 styles.src.css(sha256 da904f61b14b21d466b68dd9842923dc1d6b96d92e544176e67f0db49e4a8dff)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -782,16 +782,44 @@
     right:calc(var(--gcell,40px) / 2); bottom:calc(var(--gcell,40px) / 2);
     border:2px solid var(--gmk-frame);
   }
-  .gmk-star{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--gmk-star);
+  .gmk-board::before{
+    content:"";position:absolute;inset:0;pointer-events:none;border-radius:6px;
+    background-image:
+      repeating-linear-gradient(90deg,
+        rgba(92,58,20,.05) 0 1px, rgba(255,244,214,.045) 1px 2px, rgba(0,0,0,0) 2px 17px),
+      repeating-linear-gradient(90deg,
+        rgba(92,58,20,.035) 0 1px, rgba(0,0,0,0) 1px 29px),
+      repeating-linear-gradient(90deg,
+        rgba(64,38,10,.055) 0 2px, rgba(0,0,0,0) 2px 43px),
+      linear-gradient(to right, rgba(255,255,255,.19) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,.19) 1px, transparent 1px);
+    background-size:
+      auto, auto, auto,
+      var(--gcell,40px) var(--gcell,40px),
+      var(--gcell,40px) var(--gcell,40px);
+    background-position:
+      0 0, 7px 0, 19px 0,
+      calc(var(--gcell,40px) / 2 + 1px) 0,
+      0 calc(var(--gcell,40px) / 2 + 1px);
+  }
+  .gmk-star{position:absolute;width:7px;height:7px;border-radius:50%;
+    background:radial-gradient(circle at 36% 30%, #ffe9a6 0%, #f0bd45 52%, #b8832a 100%);
+    box-shadow:0 0 0 .5px rgba(70,44,10,.55), inset 0 -.5px .5px rgba(255,255,255,.5);
     transform:translate(-50%,-50%);pointer-events:none}
   .gmk-stone{
     position:absolute;width:calc(var(--gcell,40px) * .88);height:calc(var(--gcell,40px) * .88);
     border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;
     animation:gmkDrop .16s ease-out;
   }
-  .gmk-stone.b{background:radial-gradient(circle at 34% 28%, #7a7a7a 0%, #2b2b2b 45%, #050505 100%);
+  .gmk-stone.b{background:
+      radial-gradient(ellipse 16% 11% at 33% 24%, rgba(214,232,255,.92), rgba(190,214,245,.28) 55%, rgba(255,255,255,0) 100%),
+      radial-gradient(ellipse 52% 40% at 62% 78%, rgba(120,140,170,.16), rgba(255,255,255,0) 70%),
+      radial-gradient(circle at 34% 28%, #7a7a7a 0%, #2b2b2b 45%, #050505 100%);
     box-shadow:0 2px 5px rgba(0,0,0,.45), inset 0 -1px 3px rgba(255,255,255,.10)}
-  .gmk-stone.w{background:radial-gradient(circle at 34% 28%, #ffffff 0%, #f2ede4 45%, #c3bcb0 100%);
+  .gmk-stone.w{background:
+      radial-gradient(ellipse 16% 11% at 33% 24%, rgba(255,255,255,.98), rgba(255,255,255,.42) 55%, rgba(255,255,255,0) 100%),
+      radial-gradient(ellipse 60% 46% at 50% 82%, rgba(255,250,235,.75), rgba(255,246,225,0) 72%),
+      radial-gradient(circle at 34% 28%, #ffffff 0%, #f2ede4 45%, #c3bcb0 100%);
     box-shadow:0 2px 5px rgba(0,0,0,.35), inset 0 -1px 3px rgba(0,0,0,.10)}
   @keyframes gmkDrop{ from{transform:translate(-50%,-50%) scale(.4);opacity:.3} to{transform:translate(-50%,-50%) scale(1);opacity:1} }
   .gmk-stone.last::after{
@@ -799,8 +827,32 @@
     border:2.5px solid var(--accent);animation:gmkLast 1.4s ease-in-out infinite;
   }
   @keyframes gmkLast{ 0%,100%{opacity:.45} 50%{opacity:1} }
-  .gmk-stone.win{z-index:2;box-shadow:0 0 0 3px var(--accent), 0 0 14px 3px var(--accent);animation:gmkWin .9s ease-in-out infinite alternate}
+  .gmk-stone.last::before{
+    content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;
+    border:1.5px solid var(--accent);animation:gmkRipple 1.9s ease-out infinite;
+  }
+  @keyframes gmkRipple{ 0%{transform:scale(.86);opacity:.62} 58%{opacity:0} 100%{transform:scale(1.62);opacity:0} }
+  .gmk-stone.four{outline:2px dashed rgba(255,110,92,.85);outline-offset:2px}
+  .gmk-stone.win{z-index:2;box-shadow:0 0 0 3px var(--accent), 0 0 14px 3px var(--accent);
+    animation:gmkWinFlare .46s ease-out both, gmkWin .9s ease-in-out infinite alternate;
+    animation-delay:calc(var(--wi,0) * 90ms), calc(var(--wi,0) * 90ms + 460ms)}
   @keyframes gmkWin{ from{box-shadow:0 0 0 3px var(--accent), 0 0 6px 1px var(--accent)} to{box-shadow:0 0 0 3px var(--accent), 0 0 20px 6px var(--accent)} }
+  @keyframes gmkWinFlare{
+    0%{box-shadow:0 0 0 2px var(--accent), 0 0 0 0 rgba(255,240,190,.9);filter:brightness(1)}
+    45%{box-shadow:0 0 0 4px #fff2bd, 0 0 22px 9px rgba(255,201,60,.95);filter:brightness(1.35)}
+    100%{box-shadow:0 0 0 3px var(--accent), 0 0 14px 3px var(--accent);filter:brightness(1)}
+  }
+  .gmk-beam{position:absolute;z-index:0;pointer-events:none;
+    height:calc(var(--gcell,40px) * 1.25);border-radius:999px;
+    background:linear-gradient(90deg, rgba(255,236,170,0), rgba(255,255,255,.97) 16%,
+                                      rgba(255,250,225,.97) 50%, rgba(255,255,255,.97) 84%, rgba(255,236,170,0));
+    box-shadow:0 0 24px 9px rgba(255,196,44,.8), 0 0 6px 2px rgba(255,255,255,.7);
+    opacity:.92}
+  .gmk-aim{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .1s linear}
+  .gmk-aim.show{opacity:.7}
+  .gmk-aim i{position:absolute;background:var(--accent);border-radius:2px}
+  .gmk-aim-h{left:0;right:0;top:var(--ay,0);height:2px;transform:translateY(-50%)}
+  .gmk-aim-v{top:0;bottom:0;left:var(--ax,0);width:2px;transform:translateX(-50%)}
   .gmk-ghost{position:absolute;width:calc(var(--gcell,40px) * .88);height:calc(var(--gcell,40px) * .88);
     border-radius:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:1;opacity:.34;display:none}
   .gmk-ghost.show{display:block}
@@ -820,6 +872,8 @@
   @keyframes gmkTurnPulse{ 0%,100%{transform:translateX(-50%) scale(1)} 50%{transform:translateX(-50%) scale(1.045)} }
   :root[data-theme="midnight"] .gmk-turn.mine,:root[data-theme="arcade"] .gmk-turn.mine{color:var(--daub-ink)}
   :root[data-theme="bubblegum"] .gmk-turn{background:rgba(255,255,255,.6)}
+  .gmk-step{margin-left:6px;padding:1px 6px;border-radius:999px;
+    font-size:11px;font-weight:800;background:rgba(0,0,0,.18);opacity:.9}
   .gmk-dot{width:13px;height:13px;border-radius:50%;flex:none;display:inline-block}
   .gmk-dot.b{background:#111;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
   .gmk-dot.w{background:#fff;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
@@ -886,6 +940,12 @@
     box-shadow:inset 0 0 0 1px rgba(0,0,0,.32)}
   .gmk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(24px,7.5vw,34px);
     line-height:1;color:var(--marquee);letter-spacing:.06em}
+  @media (prefers-reduced-motion:reduce){
+    .gmk-stone.last::before{display:none}
+    .gmk-stone.last::after{animation:none}
+    .gmk-stone.win{animation:none}
+    .gmk-aim{transition:none}
+  }
   @media (max-height:560px){
     .gmk-turn{top:5px;padding:4px 11px;font-size:12px}
     .gmk-zoom button{width:32px;height:32px;font-size:15px}
