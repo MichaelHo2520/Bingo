@@ -351,6 +351,116 @@ const Talk = (function () {
     resumeCtx(lacx);
   }
 
+  /* ==========================================================================
+     省流:Opus DTX + 依 mesh 人數動態限碼率(v2.5.1)
+     ──────────────────────────────────────────────────────────────────────────
+     ★★★ 為什麼是**上行**:mesh 的下行本來就只有 N-1 條進來、每個人一份;上行卻是
+       **同一段話乘以 N-1 份**(六人局要同時送給另外五個人)。而手機那一段
+       (行動網路 / 家用非對稱寬頻)本來就是整條路上最窄的。所以要省只省上行。
+
+     ① **DTX(靜音期不送封包)** —— 真正大的那一筆。一場派對裡每個人有八成時間
+        沒在講話,但編碼器**照樣每 20ms 送一包**。`usedtx=1` 之後靜音期只送稀疏的
+        comfort noise,那八成時間的上行幾乎歸零。
+        ⚠ 它要靠 `noiseSuppression` 把底噪壓掉才咬得住(openMic 本來就開著)——
+          吵的環境省得少,但那不會壞掉,只是省得少。
+     ② **碼率上限** —— 空間比 DTX 小得多。Chrome 單聲道 Opus 預設就在 32kbps 附近
+        (**64kbps 是立體聲的預設**,而 openMic 已經指定 channelCount:1 → 走不到那裡)。
+        它真正的價值在「**人多才收緊**」:兩個人講話沒有理由降音質,六個人才有。
+
+     ★★★ 兩個關鍵設計,共同點是**只改自己的上行、不依賴對方**:
+     ⚠ **DTX 改的是「對方寄來的」那份 SDP,不是自己送出去的那份。**
+       RFC 7587 的 `usedtx` / `maxaveragebitrate` 是**接收方的宣告**(「我希望收到什麼」),
+       由**送話方的編碼器**去遵守 → 想讓**我的**編碼器開 DTX,要改的就是
+       **對方寄給我的**那一份(它宣告的正是對方想收到什麼)。兩個好處:
+         · 只碰 `onDesc` 一個地方,**完全不動 Perfect Negotiation 的
+           `setLocalDescription()` 無參數形式** —— 那個形式是刻意的(見 onDesc 裡
+           `have-remote-offer` 那一段的長註解);要改自己送出去的 SDP 就得拆成
+           `createOffer()` → 改字串 → `setLocalDescription(o)`,那是在整支最脆弱的
+           地方動刀,而它壞掉的樣子正好是「要開開關關好幾次才通」。
+         · **不依賴對方的版本**。對方跑舊版(收到 SDP 不會改)也一樣成立:
+           我改我收到的、我的編碼器照做 —— 每一台各自管好自己的上行,零跨版本相依。
+     ⚠ **碼率走 `sender.setParameters()`,刻意不寫進 SDP。**
+       寫進 SDP 的話「人數變了要改碼率」就得**重新協商**,而重新協商 = 幾秒空白
+       (紅線 14:connected 的線一個字都不要碰)。setParameters 不必協商。
+
+     ⚠ 兩個都留一行 kill switch(同 LOCAL_METER 的先例)。DTX 已知的代價是
+       **句首第一個音節偶爾會被削掉一點**(編碼器要重新起來),而那聽起來就像
+       「網路不好」—— 現場分不出來,所以它一定要能一行關掉再聽一次。
+     ★ 診斷:`Talk.diag()` 多了 `dtx`(這條線收到的 SDP 真的被改到了嗎)與
+       `rate`(現在給這條線的上限,0 = 還沒套上去)。`dtx:false` 表示對方的 SDP 裡
+       找不到 opus 的 rtpmap —— 正常瀏覽器不會這樣,出現就是 SDP 被別的東西動過。
+     ========================================================================== */
+  const OPUS_DTX = true;    // ← 一行 kill switch:句首被吃字就關掉
+  const RATE_CAP = true;    // ← 一行 kill switch:人多時嫌悶就關掉
+
+  /* 語音裡的**其他人**有幾個 → 我的上行給多少上限(bps)。
+     ⚠ 數的是 `heard`(真的在語音裡),不是房裡的人數 —— 沒開語音的人不佔我的上行,
+       把他們算進去會讓「四個人在玩、只有兩個開語音」被無謂地降到最低檔。 */
+  function rateFor(n) {
+    if (n <= 1) return 40000;   // 一對一:不必省,給好一點的音質
+    if (n <= 3) return 32000;   // 三、四人:與 Chrome 單聲道預設同級
+    return 24000;               // 五人以上:收緊(5 × 24k = 120kbps 上行)
+  }
+
+  /* 每次 report() 都會叫(人進出 / 接上 / 收到 SDP 都會走到那裡),靠 `P.rateAt`
+     擋掉重複 —— 沒變的時候只是一個整數比較,所以放在那條熱路徑上是安全的。 */
+  function applyRate() {
+    if (!RATE_CAP) return;
+    let n = 0;
+    for (const id in peers) { if (peers[id].heard) n++; }
+    const want = rateFor(n);
+    for (const id in peers) {
+      const P = peers[id];
+      if (P.rateAt === want) continue;
+      const sd = P.tx && P.tx.sender;
+      // 不支援的瀏覽器:記下來別再問(這一條就是沒有上限,不影響通話)
+      if (!sd || !sd.getParameters || !sd.setParameters) { P.rateAt = want; continue; }
+      let prm = null;
+      try { prm = sd.getParameters(); } catch (e) { }
+      /* ⚠ 協商完成前 `encodings` 可能還是空的 → **先不要動,也不要記 rateAt**,
+         下一次 report() 再來。自己塞一個新的 encodings 陣列進去會被規格擋下來
+         (長度必須與現有的一致),而那個例外會靜靜地被吞掉 = 永遠沒有上限。 */
+      if (!prm || !prm.encodings || !prm.encodings.length) continue;
+      prm.encodings[0].maxBitrate = want;
+      /* ⚠ 先記再送:setParameters 在某些瀏覽器上對 audio 會 reject,
+         記在後面的話這裡就變成每 120ms 重試一次的迴圈。 */
+      P.rateAt = want;
+      try { const r = sd.setParameters(prm); if (r && r.catch) r.catch(() => { }); } catch (e) { }
+    }
+  }
+
+  /* 把 opus 的 fmtp 補上 `usedtx=1`。⚠ 只認 opus 的 payload type(一份 SDP 裡還有
+     紅噪 / telephone-event 那幾條,改到它們是沒意義的),而且**找不到 opus 就原樣回傳**
+     —— 這一支任何一步失手都必須退回「什麼都沒做」,絕不可以吐出一份壞掉的 SDP。 */
+  function tuneSdp(sdp) {
+    if (!OPUS_DTX) return String(sdp || "");
+    const s = String(sdp || "");
+    if (!/^a=rtpmap:\d+\s+opus\//im.test(s)) return s;
+    const eol = s.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
+    const lines = s.split(/\r\n|\n/);
+    const isOpus = Object.create(null);
+    lines.forEach(L => { const m = /^a=rtpmap:(\d+)\s+opus\//i.exec(L); if (m) isOpus[m[1]] = true; });
+    const seen = Object.create(null);
+    const out = lines.map(L => {
+      const f = /^a=fmtp:(\d+)\s+(.*)$/.exec(L);
+      if (!f || !isOpus[f[1]]) return L;
+      seen[f[1]] = true;
+      return "a=fmtp:" + f[1] + " " + withDtx(f[2]);
+    });
+    // 有 rtpmap 卻沒有 fmtp(規格允許,實務少見)→ 自己補一行接在它後面
+    for (const pt in isOpus) {
+      if (seen[pt]) continue;
+      const re = new RegExp("^a=rtpmap:" + pt + "\\s+opus/", "i");
+      const at = out.findIndex(L => re.test(L));
+      if (at >= 0) out.splice(at + 1, 0, "a=fmtp:" + pt + " usedtx=1");
+    }
+    return out.join(eol);
+  }
+  function withDtx(params) {
+    if (/(^|;)\s*usedtx=/i.test(params)) return params.replace(/(^|;)(\s*)usedtx=[^;]*/i, "$1$2usedtx=1");
+    return params.replace(/;\s*$/, "") + ";usedtx=1";
+  }
+
   /* ---------- 一條連線 ---------- */
   /* heardSeed:重建時把「我已經聽過這個人」帶過來(見下面 P.heard 的說明)。
      ⚠ **rgen 刻意不帶過來**:新的 P 一律從空的世代開始,第一封信直接收下 ——
@@ -387,7 +497,10 @@ const Talk = (function () {
          → 只有**收到過對方的 SDP** 才算「他在語音裡」;在那之前不顯示、也不對帳。
          ⚠ 這樣不會漏修:雙方都在跑對帳,誰在等誰就會重貼,一定有一邊先動。 */
       heard: !!heardSeed,
-      badSince: 0        // 從什麼時候開始不是 connected(0 = 沒壞);對帳只看這個
+      badSince: 0,       // 從什麼時候開始不是 connected(0 = 沒壞);對帳只看這個
+      /* 省流那一組的狀態(見上面「Opus DTX + 動態碼率」)。
+         rateAt = 已經套上去的上限(0 = 還沒套),applyRate 靠它擋掉重複呼叫。 */
+      dtx: false, rateAt: 0
     };
     peers[id] = P;
 
@@ -538,7 +651,11 @@ const Talk = (function () {
     /* 收到 SDP = 「這個人真的在語音裡」的唯一證據(見 peerOf 裡 heard 的長註解)。 */
     P.heard = true;
     if (d.g) P.rgen = d.g;
-    const desc = { type: d.t, sdp: d.s };
+    /* ★ 省流:**改對方寄來的**那一份(它宣告的是「對方想收到什麼」,由我的編碼器遵守)
+       —— 為什麼是這一份而不是自己送出去的,見上面 tuneSdp 那一整段的長註解。 */
+    const tuned = tuneSdp(d.s);
+    P.dtx = tuned !== d.s;
+    const desc = { type: d.t, sdp: tuned };
     try {
       /* Perfect Negotiation 的收端。衝突 = 對方送 offer 來的時候我自己也正在送。 */
       const offerCollision = desc.type === "offer" &&
@@ -1030,6 +1147,9 @@ const Talk = (function () {
 
   /* ---------- 對外狀態 ---------- */
   function report() {
+    /* ★ 省流:人進出 / 接上 / 收到 SDP 都會走到這裡,而「語音裡有幾個人」正是碼率的
+       唯一輸入 → 掛在這裡就不必再找別的觸發點。沒變的時候它只是一輪整數比較。 */
+    applyRate();
     const spk = [], bad = [];
     for (const id in peers) {
       if (peers[id].speaking) spk.push(id);
@@ -1411,6 +1531,9 @@ const Talk = (function () {
              `recv` 是事實(receiver 真的在收嗎)、`dir` 是意圖(協商出來的方向),
              `an` / `spk` 是音量分析那一路(它死掉的話綠框會停,但聲音照樣聽得到)。 */
           recv: recvLive(P), spk: !!P.speaking, an: !!P.analyser,
+          /* v2.5.1 省流那一組:`dtx` = 這條線收到的 SDP 真的被補上 usedtx 了嗎、
+             `rate` = 現在給這條線的上行上限(0 = 還沒套上去)。 */
+          dtx: !!P.dtx, rate: P.rateAt || 0,
           badMs: P.badSince ? (Date.now() - P.badSince) : 0,
           gen: P.gen, rgen: P.rgen, pend: P.pend.length, needPlay: !!P.needPlay
         };
