@@ -204,14 +204,14 @@
     const cell=grid.children[i];
     cell.classList.toggle("marked",state.marked[i]);
     cell.setAttribute("aria-pressed",state.marked[i]?"true":"false");
-    if(state.marked[i]) stampFx(i);          // ★ 印章式劃記(v2.4.5)
+    if(state.marked[i]) stampFx(i);          // ★ 印章式劃記(v2.5.0)
     refreshLines();
   }
 
   function refreshLines(){
     const inLine=new Set();
     let done=0;
-    /* ★★ 這一輪順便算兩件**副產品**(v2.4.5):
+    /* ★★ 這一輪順便算兩件**副產品**(v2.5.0):
          nowDone —— 哪幾條線連成了(與上一次比 → 剛剛才連成的那幾條放雷射)
          reach   —— 只差一格就連成的那一格(= 聽牌點,金色呼吸)
        ⚠⚠ `done` 的算法一個字都沒有變(還是「整條都劃記了才 +1」)——
@@ -279,7 +279,7 @@
     $("spWinBtns").classList.remove("hidden");
     $("mpWinBtns").classList.add("hidden");
     $("winScores").classList.add("hidden"); $("winChamp").classList.add("hidden"); $("mpNewSeason").classList.add("hidden");   // 單機:不顯示連線排行/冠軍
-    bingoNeon();                             // ★ 全場熄燈 + 霓虹招牌(v2.4.5)
+    bingoNeon();                             // ★ 全場熄燈 + 霓虹招牌(v2.5.0)
     showResult();
     burst();
   }
@@ -508,7 +508,7 @@
 
 
   /* ==========================================================================
-     動效(v2.4.5)—— ★ 全部只影響畫面
+     動效(v2.5.0)—— ★ 全部只影響畫面
      ──────────────────────────────────────────────────────────────────────────
        ⚠⚠ `refreshLines()` 的**計數與勝負判定一個字都沒有動** —— 建議書那條
          「聽牌計算與連線勝利檢查必須維持純函式,不可因視覺動畫延遲而影響 checkWin()」

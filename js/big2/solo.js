@@ -136,7 +136,7 @@ const Solo = (function(){
       turnName: st.over ? "" : seatName(st.turn),
       over: over,
       hot: po ? po.cards : null,
-      // ★ 「誰在拉」（v2.4.5）—— 桌子上方那一列的警示條吃它。
+      // ★ 「誰在拉」（v2.5.0）—— 桌子上方那一列的警示條吃它。
       //   ⚠ 牌情紅線：這一支回的是**一個 bit 的陣列**，不帶任何牌型 / 牌值。
       la: B2.laSeats(st),
       key: "solo:" + round          // ★ 換局才變 → 盤面照它丟掉玩家自訂的手牌順序

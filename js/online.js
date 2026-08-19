@@ -1292,7 +1292,7 @@
         const fresh=[];
         for(let i=0;i<nCells();i++) if(state.marked[i]&&!prev[i]) fresh.push(i);
         if(fresh.length)Sound.mark();
-        /* ★ 叫號彩球(v2.4.5):新叫出來的那個號碼在畫面正中央彈一顆球。
+        /* ★ 叫號彩球(v2.5.0):新叫出來的那個號碼在畫面正中央彈一顆球。
            ⚠ **一次只多一個才放** —— 重連歸位會一口氣補進十幾個號碼
              (同各頁「音效不連播」那條);ballSeen < 0 的第一次也不放。 */
         if(ballSeen>=0 && calledList.length===ballSeen+1)

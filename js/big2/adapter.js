@@ -103,7 +103,7 @@ const MP = MPCore.create((function(){
       turnName: st.over ? "" : nameOfSeat(st.turn),
       over: !!ctx.winner() || st.over,
       hot: po ? po.cards : null,
-      // ★ 「誰在拉」（v2.4.5）—— 桌子上方那一列的警示條吃它。
+      // ★ 「誰在拉」（v2.5.0）—— 桌子上方那一列的警示條吃它。
       //   ⚠ 牌情紅線：這一支回的是**一個 bit 的陣列**，不帶任何牌型 / 牌值。
       la: B2.laSeats(st),
       /* ★ 換局才變 → 盤面照它丟掉玩家自訂的手牌順序(見 board.js 第八節)。
@@ -281,7 +281,7 @@ const MP = MPCore.create((function(){
               是哪一種,不可以再寫死「帶 2 的最大」。⚠ 文案走 b2RulesText(main.js 那一支),
               大廳摘要 / 面板底部 / 這一格三處共用同一句(三份會走鐘)。 */
            "<b>" + esc(b2RulesText(rules)) + "</b>(房主可改)。<br>" +
-           /* ⚠ v2.4.5:「打到只剩一家」變成房規(rules.end)→ 這一行**不可以再寫死**。
+           /* ⚠ v2.5.0:「打到只剩一家」變成房規(rules.end)→ 這一行**不可以再寫死**。
               現在是哪一種已經寫在上面那句 b2RulesText 裡,這裡只留不隨房規變的部分。 */
            "<b>出完的人退出</b>;名次分 <b>5 / 3 / 1</b>,最後一名 <b>0</b> 分。<br>" +
            "出牌倒數:" + sec + "。";
@@ -308,7 +308,7 @@ const MP = MPCore.create((function(){
       if(k === "b2Rules"){
         const next = B2.normRules(v);
         /* ⚠⚠ 「沒改就什麼都不做」一律問 B2.sameRules(逐項比 RULE_KEYS)——
-           v2.4.5 之前這裡寫死 `next.str === rules.str`,而加了第二項房規(end)之後
+           v2.5.0 之前這裡寫死 `next.str === rules.str`,而加了第二項房規(end)之後
            那一行會**默默擋掉只改 end 的那一筆**:訪客那邊房規永遠停在舊值、
            而且不 unready、不重畫,看起來像「房主改了但我沒收到」。⚠ 兩份都要改。 */
         if(B2.sameRules(next, rules)) return;

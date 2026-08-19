@@ -254,7 +254,7 @@ const B2 = (function(){
   const STR_HI = "hi", STR_LO = "lo";
   const STR_OPTS = [STR_HI, STR_LO];
   /* ==========================================================================
-     ★★★ v2.4.5:第二項房規「結束方式」(end)
+     ★★★ v2.5.0:第二項房規「結束方式」(end)
      ──────────────────────────────────────────────────────────────────────────
        使用者:「我想要加一個規則選項,第一個贏了就是就結算」
          · last (預設) = 舊行為:出完的人退出、牌局繼續,打到只剩一家
@@ -491,7 +491,7 @@ const B2 = (function(){
       if(!hand.length && st.finished.indexOf(seat) < 0) st.finished.push(seat);
     }
 
-    /* ★★ 這局結束了沒 —— **兩條路都是房規**(v2.4.5 加了第二條):
+    /* ★★ 這局結束了沒 —— **兩條路都是房規**(v2.5.0 加了第二條):
          · 只剩一家還有牌   → 永遠結束(last 那一派就只靠這條)
          · end === "first"  → **有人出完那一瞬間**就結束
        ⚠ 一律問 endOf(st)(= st.rules,開局那一刻凍結的那一份)。拿本地那一份
@@ -897,7 +897,7 @@ const B2 = (function(){
     shuffled, newDeal, handsOf, dealCounts,
     // 牌型
     isBomb, bombLv, straightOf, classify, beats,
-    // ★★★ 房規:順子大小(str,v1.100.0)+ 結束方式(end,v2.4.5)。
+    // ★★★ 房規:順子大小(str,v1.100.0)+ 結束方式(end,v2.5.0)。
     // normRules 是白名單守門;RULE_KEYS / sameRules 是「改了沒改」唯一的問法
     normRules, defRules, strOf, endOf, sameRules, RULE_KEYS,
     STR_HI, STR_LO, STR_OPTS, END_LAST, END_FIRST, END_OPTS,
