@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 4c9a00e36f41fb41ab766e7ad592cef0fe93d51ef1d295031812cd8114c2d7a5)
+    真相在 styles.src.css(sha256 d647718c0e214d745200c40f31a0d986cf3dafa9f6daff8016ca34253ae1a7d2)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4040,6 +4040,13 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-skin-pick.readonly .dc-skin:not(.on){opacity:.42}
   .dc-skin-pick.readonly .dc-skin:not(.on):hover{background:rgba(255,255,255,.05)}
   .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift)}
+  .dc-sq .dc-p{transition:transform .16s cubic-bezier(.25,.7,.35,1)}
+  .dc-sel .dc-p{transform:translateY(-3px);
+    box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift),
+      0 calc(var(--dc-th) + 9px) 13px rgba(18,7,0,.34)}
+  @media (hover:hover) and (pointer:fine){
+    .dc-board.dc-mine .dc-sq:hover:not(.dc-sel) .dc-p{transform:translateY(-1.5px)}
+  }
   .dc-tgt{box-shadow:inset 0 0 0 3px var(--dc-tgt),var(--dc-groove)}
   .dc-tgt.dc-t-eat,.dc-tgt.dc-t-jump{box-shadow:inset 0 0 0 3px var(--dc-tgt-eat),var(--dc-groove)}
   .dc-tgt.dc-t-rush,.dc-tgt.dc-t-rushDark,.dc-tgt.dc-t-dark{
@@ -4069,13 +4076,25 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-hit .dc-flip3d .dc-p{animation:none}
   .dc-flip3d{position:relative;width:80%;height:80%;transform-style:preserve-3d;
     --dc-th:calc(var(--dc-cell,44px) * .105);margin-bottom:var(--dc-th);
-    animation:dcFlipIn .38s cubic-bezier(.22,.61,.36,1) both}
+    --dc-flipdur:.38s;
+    animation:dcFlipIn var(--dc-flipdur) cubic-bezier(.22,.61,.36,1) both}
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
     -webkit-backface-visibility:hidden}
   .dc-face .dc-p,.dc-face.dc-p{margin-bottom:0}
   .dc-face-f{transform:rotateY(180deg)}
   .dc-face .dc-p{width:100%;height:100%}
   @keyframes dcFlipIn{ from{transform:rotateY(0)} to{transform:rotateY(180deg)} }
+  .dc-sq .dc-face-f::after{content:"";position:absolute;inset:0;border-radius:50%;
+    pointer-events:none;background-repeat:no-repeat;background-size:230% 100%;
+    background-image:linear-gradient(112deg,
+      rgba(255,255,255,0) 34%, rgba(255,255,255,.13) 43%,
+      rgba(255,255,255,.46) 50%, rgba(255,255,255,.13) 57%, rgba(255,255,255,0) 66%);
+    animation:dcSheen .46s cubic-bezier(.33,.02,.5,1) var(--dc-flipdur,.38s) both}
+  @keyframes dcSheen{
+    0%{background-position:128% 50%;opacity:0}
+    18%{opacity:1}
+    100%{background-position:-32% 50%;opacity:0}
+  }
   .dc-p.dc-sliding{z-index:5}
   .dc-reveal{position:absolute;display:flex;align-items:center;justify-content:center;
     pointer-events:none;z-index:8;will-change:transform;
@@ -4173,6 +4192,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @media (prefers-reduced-motion:reduce){
     .dc-cd.dc-hot{animation:none}
     .dc-cdn.dc-beat{animation:none}
+    .dc-sq .dc-face-f::after{animation:none;opacity:0}
+    .dc-sq .dc-p{transition:none}
   }
   .win-card.dc-win{width:min(88vw,420px);max-width:none;padding:26px 24px}
   .win-card.dc-win .word{font-size:clamp(28px,7.2vw,40px)}
@@ -4190,6 +4211,21 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-r-n{text-align:center;font-weight:800}
   .dc-plus{font-style:normal;font-size:11px;color:var(--accent-2);margin-left:2px}
   .dc-none{color:var(--muted);font-size:12px}
+  .dc-seal{margin:12px auto 2px;pointer-events:none;
+    width:60px;height:60px;border-radius:6px;
+    display:grid;grid-template-rows:1fr 1fr;grid-auto-flow:column;direction:rtl;place-items:center;
+    background:#b3241f;color:#fff;opacity:.95;transform:rotate(-8deg);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.86),0 3px 10px rgba(0,0,0,.38)}
+  .dc-seal span{font:900 21px/1 'Noto Serif TC','Songti TC','PMingLiU',serif}
+  .dc-win .dc-seal.dc-stamp{animation:dcSeal .5s cubic-bezier(.2,1.5,.35,1) .3s backwards}
+  @keyframes dcSeal{
+    0%{opacity:0;transform:rotate(13deg) scale(1.7)}
+    62%{opacity:1;transform:rotate(-11deg) scale(.94)}
+    100%{opacity:.95;transform:rotate(-8deg) scale(1)}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .dc-win .dc-seal.dc-stamp{animation:none}
+  }
   .dc-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
   body.solo-on .dc-react-row{display:none}
   .set-card.dc-rules-card{width:min(92vw,480px);max-width:none;

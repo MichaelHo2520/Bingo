@@ -365,7 +365,10 @@ const MP = MPCore.create((function(){
          單機與連線的動作路徑完全不同,但「有人吃了一顆」在兩邊是同一個 diff。
          ⚠ 換局那一手一定要跳過(整包重來,diff 沒有意義);
          ⚠ 批次同步(重連歸位)也不連播,不然一口氣響幾十聲。 */
-      if(!fresh && moves.length === prevLen + 1) DCB.moveSfx(st);
+      /* ★ 第二個參數 = 這一手是不是我走的,**只影響震動**(聲音兩邊都要出)——
+         比的是 `st.last.seat`(真相層記的走子方),不是「現在輪到誰」:連吃時回合
+         留在同一個人身上,拿 turn 去反推會全部算反。 */
+      if(!fresh && moves.length === prevLen + 1) DCB.moveSfx(st, !!(st.last && st.last.seat === mySeat()));
 
       // 這一手的錨點:手數變了就重新起算(公開動作,雙方看得到)
       if(moves.length !== lastLen){
@@ -473,6 +476,10 @@ const MP = MPCore.create((function(){
          ⚠ 措辭與單機那份(solo.js 的 finish())刻意寫成同一個格式:只講「怎麼結束的」,
             幾勝由下面那張表說。 */
       const how = (st && st.over) ? DCB.endText(st, me) : "";
+      /* 硃砂大印:贏 / 平手才蓋,輸的那一份不蓋。
+         ⚠ 第二個參數是去重用的 —— 這一支會被**反覆呼叫**(見 DCB.setSeal 的註解)。 */
+      DCB.setSeal(isDraw ? "draw" : (iWon ? "win" : ""),
+                  curRound + ":" + moves.length + ":" + (st ? st.winner : -1));
       if(isDraw) return { word: "平手!", msg: esc(how) + " —— 兩邊各得 1 勝 🤝" };
       if(iWon)   return { word: "你贏了!", msg: esc(how) + " 🎉" };
       const ws = (w && w.ids || []).map(id => esc(ctx.dispName(id))).join("、");

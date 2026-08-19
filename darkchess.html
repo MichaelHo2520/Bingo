@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>象棋暗棋 ｜ 本機對戰 + 2 人連線</title>
 <!-- 象棋暗棋 · v2.5.0 -->
-<meta name="version" content="2.5.0">
+<meta name="version" content="2.5.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -304,6 +304,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="win-card dc-win" id="dcWinCard">
       <div class="word display" id="winWord">本局結束</div>
       <p id="winMsg"></p>
+      <!-- 終局的硃砂大印(v2.5.0+)。⚠ 住在卡片的**流內**、不可以改成絕對定位到角上
+           ——會蓋掉 #winWord,而結果卡是 overflow-y:auto、放大的那一格會閃出捲軸
+           (理由與量到的數字見 board.js 的 setSeal())。四個字由 JS 拆成四個 <span>。 -->
+      <div class="dc-seal hidden" id="dcSeal" aria-hidden="true"></div>
       <div class="dc-result hidden" id="dcResult"></div>
       <div class="win-champ hidden" id="winChamp"></div>
       <div class="win-scores hidden" id="winScores"></div>

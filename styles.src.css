@@ -8986,6 +8986,32 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* ⚠ 這四條都會**整份覆蓋** box-shadow —— 一定要把厚度(--dc-lift)/ 刻線(--dc-groove)
      接回去,不然被選中 / 被標成落點的那一格會忽然變扁、或忽然沒有格線。 */
   .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift)}
+  /* ---------- 「拿起棋子」的手感(v2.5.0+)----------
+     ★ 建議書 1.3。真的下棋時手指按住棋子會先**提起來**一點,而這一頁的棋子已經有
+       實體的厚度(--dc-lift 那疊側壁),所以「浮起來 + 影子放大變柔」是它現成就能講的話。
+       選中的那一顆浮 3px、底下多一道更遠更柔的影子 = 它離開了盤面、握在手上。
+     ⚠⚠⚠ 這是 `.dc-p` 身上**唯一**一份常駐的 transform,而 v1.150.1 那條註解
+       (「讓出厚度用 margin-bottom 而不是 transform」)講的就是為什麼要小心:
+       三個地方也在寫 `.dc-p` 的 transform,而它們的優先級各不相同 ——
+       ① `slidePiece()` 寫的是 **inline** style(贏過這裡)→ 滑動中不浮,滑完才浮;
+       ② `dcScreenPulse` / `dcHitGlow` 是 **CSS animation**(也贏過這裡)→ 那 0.42 秒不浮;
+       ③ 這一條是普通宣告,墊在最底下。三者不會互相蓋掉,只會依序讓位。
+     ⚠ 因此要配一條 `transition` —— 連吃時那顆子是「滑進落點 → 仍然被選中」,
+       inline transform 被清掉的那一刻若沒有過渡,它會**瞬間往上跳 3px**。
+       有了 .16s 的過渡,那一下讀起來就是「落定之後又被拿起來」(而它確實還握在手上)。
+     ⚠⚠ 懸停那一份鎖在 `(hover:hover) and (pointer:fine)` 裡:觸控裝置的 :hover 是
+       黏著的(點過的那一格會一直浮著),而這一頁的每一格都是 <button>。
+     ⚠⚠⚠ 只在 `.dc-board.dc-mine`(輪到我)才浮 —— 不是我的回合浮起來等於在騙人,
+       而「現在能不能動」是這一頁最要緊的一條訊號(見上面 .turn 那段)。 */
+  /* ⚠ 限定 `.dc-sq` 底下 —— 吃子欄與記牌盤那些**刻意扁掉**的小棋子沒有位移可言,
+     而它們共用同一個 `.dc-p`(那份扁樣式是 v1.142.0 的結論)。 */
+  .dc-sq .dc-p{transition:transform .16s cubic-bezier(.25,.7,.35,1)}
+  .dc-sel .dc-p{transform:translateY(-3px);
+    box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift),
+      0 calc(var(--dc-th) + 9px) 13px rgba(18,7,0,.34)}
+  @media (hover:hover) and (pointer:fine){
+    .dc-board.dc-mine .dc-sq:hover:not(.dc-sel) .dc-p{transform:translateY(-1.5px)}
+  }
   .dc-tgt{box-shadow:inset 0 0 0 3px var(--dc-tgt),var(--dc-groove)}
   .dc-tgt.dc-t-eat,.dc-tgt.dc-t-jump{box-shadow:inset 0 0 0 3px var(--dc-tgt-eat),var(--dc-groove)}
   /* 遠距離的三種(車直衝 / 車直衝打暗子 / 連吃翻暗棋)另給一個顏色 —— 它們是房規才有的手,
@@ -9083,9 +9109,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ --dc-th 在這裡**重複宣告一次**是必要的:它原本宣告在 .dc-p 身上,而 .dc-p 在翻牌時
        是這一層的**子孫**、拿不到反向繼承。⚠⚠ 兩處的算式必須一模一樣 ——
        這條與底下那條「寬高要與 .dc-p 同一個數字」是同一種雙胞胎。 */
+  /* ⚠⚠⚠ 旋轉的時長存成 `--dc-flipdur` 而不是寫死 .38s —— 底下那道漆面光澤的**延遲**
+     必須等於它(光要在翻定之後才掠過,理由見那一段)。寫死的話就是一組雙胞胎:
+     改了這裡而沒改那裡的下場是「翻到一半就開始反光」= 兩個貴的東西又同時在動,
+     而那正是 v1.137.5 / v2.3.5 兩次「不順」的病灶。 */
   .dc-flip3d{position:relative;width:80%;height:80%;transform-style:preserve-3d;
     --dc-th:calc(var(--dc-cell,44px) * .105);margin-bottom:var(--dc-th);
-    animation:dcFlipIn .38s cubic-bezier(.22,.61,.36,1) both}
+    --dc-flipdur:.38s;
+    animation:dcFlipIn var(--dc-flipdur) cubic-bezier(.22,.61,.36,1) both}
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
     -webkit-backface-visibility:hidden}
   /* ⚠ 兩張臉是 absolute + inset:0 的滿版,厚度已經由外層 .dc-flip3d 讓過了 ——
@@ -9105,6 +9136,38 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        兩張臉大小不一致本身也是 bug(翻到一半會忽然縮一下)。 */
   .dc-face .dc-p{width:100%;height:100%}
   @keyframes dcFlipIn{ from{transform:rotateY(0)} to{transform:rotateY(180deg)} }
+  /* ---------- 翻開之後,漆面掠過一道光(v2.5.0+)----------
+     ★ 建議書 2.1「翻牌瞬間的光澤流轉」。要傳達的是「這顆是**上了生漆的實木**」——
+       溫潤的料轉向光源時會反出一道柔光,而這一頁的棋子已經有六層漸層在做木紋與倒角,
+       缺的就是「會動的那道反光」。
+     ⚠⚠⚠ **刻意排在旋轉結束之後**(delay 吃 `.dc-flip3d` 的 `--dc-flipdur`,
+       所以那個數字只有一份、不會走鐘),不是建議書寫的
+       「旋轉通過 90°~180° 的區間內」—— 這一頁最貴的兩條教訓都是同一件事:
+       v1.137.5「翻牌那一格不要再疊 dcHitGlow」、v2.3.5「翻與飛不可以同時播」,
+       兩次都是**兩個貴的東西同時搶主執行緒**(`.dc-p` 的底是六層漸層 + 九道 box-shadow,
+       而 `.dc-flip3d` 是 preserve-3d 子樹,旋轉中疊任何要重繪的東西都會逐幀重新光柵化)。
+       錯開之後任何一刻都只有一件事在動,而看起來反而更對:**翻定了才反光**。
+     ⚠ 只掛在**盤面上**那一顆(`.dc-sq` 底下)—— 飛到棋盤正中央那顆(`.dc-reveal`)的
+       翻牌是 dcRevealLift 時間軸裡的一段(19%~40%),`--dc-flipdur` 這個延遲對不上它;
+       而那一支正是 v2.3.5 花整版修順的動畫,不要再往它身上疊東西。
+     ⚠⚠ 用 `background-position` 掃而不是子元素 transform:這樣不必動 DOM
+       (`flipWrapHTML()` 是與 `.dc-reveal` 共用的,加節點兩邊都會多),
+       而重繪範圍就是這一顆 ~60px 的圓 —— 而且此刻主執行緒是空的。
+     ⚠ `border-radius:50%` 是規格不是美觀:背景是照 border-box 裁的,少了它光帶會掃出
+       圓形棋子之外、變成一個方形的亮塊。
+     ⚠ 光帶的傾角(112deg)與雕刻字、漆圈受光邊同向(左上暗、右下受光),
+       方向反了會看起來像另一個光源。 */
+  .dc-sq .dc-face-f::after{content:"";position:absolute;inset:0;border-radius:50%;
+    pointer-events:none;background-repeat:no-repeat;background-size:230% 100%;
+    background-image:linear-gradient(112deg,
+      rgba(255,255,255,0) 34%, rgba(255,255,255,.13) 43%,
+      rgba(255,255,255,.46) 50%, rgba(255,255,255,.13) 57%, rgba(255,255,255,0) 66%);
+    animation:dcSheen .46s cubic-bezier(.33,.02,.5,1) var(--dc-flipdur,.38s) both}
+  @keyframes dcSheen{
+    0%{background-position:128% 50%;opacity:0}
+    18%{opacity:1}
+    100%{background-position:-32% 50%;opacity:0}
+  }
 
   /* ---------- 吃子 / 移動的滑入動畫(board.js 算完 rect 後用 JS 補 transform)----------
      ⚠ 這裡只放「滑動中」需要的殼:實際的 translate 由 board.js 的 slidePiece() 寫成
@@ -9366,10 +9429,15 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-cd.dc-hot .dc-cdn{color:var(--daub)}
   .dc-cd.dc-hot{animation:m16cdhot .9s ease-in-out infinite}
 
-  /* 會動的東西一律尊重系統的「減少動態效果」(同 m16 那條) */
+  /* 會動的東西一律尊重系統的「減少動態效果」(同 m16 那條)
+     ⚠ v2.5.0+ 新增的三樣一起收:漆面光澤(掃過去的那道光)、拿起棋子的浮起過渡、
+       落款的下壓回彈。⚠ 收的是**動畫**不是狀態 —— 印章照樣蓋在那裡、選中的那顆照樣
+       浮著,只是不再演過程(這一頁的每一個標記都同時是資訊,不可以連著拿掉)。 */
   @media (prefers-reduced-motion:reduce){
     .dc-cd.dc-hot{animation:none}
     .dc-cdn.dc-beat{animation:none}
+    .dc-sq .dc-face-f::after{animation:none;opacity:0}
+    .dc-sq .dc-p{transition:none}
   }
 
   /* ---------- 結果卡 ----------
@@ -9393,6 +9461,47 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-r-n{text-align:center;font-weight:800}
   .dc-plus{font-style:normal;font-size:11px;color:var(--accent-2);margin-left:2px}
   .dc-none{color:var(--muted);font-size:12px}
+  /* ---------- 終局的硃砂大印(v2.5.0+)----------
+     ★ 建議書 5.1。做法**沿用專案已有的兩個先例**(台灣麻將 `.m16-fxstamp`、
+       成語接龍 `.cy-seal`),不另發明一種:四個字照傳統印章的順序排
+       (右上 → 右下 → 左上 → 左下 = grid 直向流 + `direction:rtl`)、落款時下壓回彈。
+     ⚠⚠⚠ 它是**卡片流內**的一個直接子元素,不是絕對定位到角上的浮層 ——
+       兩個理由都是成語接龍量出來的(這一頁同構,不要「順手」搬到角上):
+       ① 疊上去會撞 `#winWord`(這一頁 clamp(28px,7.2vw,40px)),窄機一定撞;
+       ② 結果卡是 overflow-y:auto,絕對定位 + 放大的那一格會把角甩出右緣 → 閃一條捲軸。
+     ⚠ 權重要壓過 `.win-card:not(.confirm-card) > *` 那條 winRise(0,2,0)——
+       所以是 `.dc-win .dc-seal.dc-stamp`(0,3,0),不是單獨的 `.dc-seal.dc-stamp`。
+       ⚠⚠ 而且它多當一個直接子元素,會把後面幾塊的 winRise 延遲各往後推一格
+       (那條規則有 `:nth-child(n+6)` 封頂,所以最多推 55ms,看不出來)。
+     ⚠ 字用**襯線體** —— 與棋子上的字同一個字族(紅線:棋子的字用襯線體,
+       用內文的 Nunito 會像貼紙),印章更是非襯線不可。
+     ⚠⚠ 硃砂色寫死不吃主題:印章就是紅的,而它不參與「紅 vs 黑是規則本體」那條
+       (它不是棋子)—— 五個主題下都是同一枚印。 */
+  .dc-seal{margin:12px auto 2px;pointer-events:none;
+    width:60px;height:60px;border-radius:6px;
+    display:grid;grid-template-rows:1fr 1fr;grid-auto-flow:column;direction:rtl;place-items:center;
+    background:#b3241f;color:#fff;opacity:.95;transform:rotate(-8deg);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.86),0 3px 10px rgba(0,0,0,.38)}
+  .dc-seal span{font:900 21px/1 'Noto Serif TC','Songti TC','PMingLiU',serif}
+  .dc-win .dc-seal.dc-stamp{animation:dcSeal .5s cubic-bezier(.2,1.5,.35,1) .3s backwards}
+  /* ⚠ `backwards` + 0.3 秒延遲 = 印章在落下**之前**就以 0% 那一格的樣子存在了 0.3 秒。
+     那一格若放得太大 / 轉得太多,卡片(overflow-y:auto)會當場閃一條捲軸出來。
+     60px × 1.7 ≈ 102px,而卡片內容寬最窄也有 ~250px(min(88vw,420px) − 48px 內距)
+     → 左右都還有餘。★ 改 keyframes 之後要重量一次(見 tools/gen-dc-shot.js 的 ?mode=seal)。 */
+  @keyframes dcSeal{
+    0%{opacity:0;transform:rotate(13deg) scale(1.7)}
+    62%{opacity:1;transform:rotate(-11deg) scale(.94)}
+    100%{opacity:.95;transform:rotate(-8deg) scale(1)}
+  }
+  /* ⚠⚠⚠ 這一條**一定要寫在上面那條 `animation:` 的後面** —— media query 不加權重,
+     同權重比的是「誰在後面」。上面那個 prefers-reduced-motion 區塊在檔案裡的位置比
+     `.dc-seal.dc-stamp` 的宣告**更早**,寫在那裡等於沒寫(而且不會有任何測試會紅)。
+     ⚠ 收的是動畫不是印章:落款直接出現在最終形態,不演那一下下壓回彈。
+     ★ 檔頭那條全域的 `*{animation-duration:.001s!important}` 擋不乾淨這一種 ——
+       `backwards` + 0.3 秒延遲的組合會讓它先以 0% 那一格(opacity 0)停 0.3 秒才跳出來。 */
+  @media (prefers-reduced-motion:reduce){
+    .dc-win .dc-seal.dc-stamp{animation:none}
+  }
   /* 賽後表情列(單機沒有對手可以送 → 整列收起來) */
   .dc-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
   body.solo-on .dc-react-row{display:none}

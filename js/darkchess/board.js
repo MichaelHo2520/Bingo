@@ -51,38 +51,143 @@ const DCB = (function(){
      ──────────────────────────────────────────────────────────────────────────
        ⚠ 刻意不加音檔:動 mp3/ 要四處一起改(sfx 的 ensureDefs、sw.js 的 CORE、
          兩支產生器),而暗棋這幾個聲音用合成音就夠了。
+
+     ── ★★★ 為什麼多一支 knock():木頭的辨識點不在音高 ──────────────────────
+       舊版六個音全部是 `Sound.tone()`(純振盪器 + 滑音)—— 那是**電子 beep**,
+       跟「木棋子扣在木盤上」差得很遠。實體那一下聽起來是兩件事疊起來的:
+         ① 開頭 3~5ms 一段**寬頻雜訊**(「啪」)—— 兩塊硬物碰撞的瞬態,
+            這一段才是耳朵用來判斷「這是木頭不是塑膠 / 不是電子音」的線索;
+         ② 接著是**木腔共鳴**(「嗒」)—— 有音高,而且音高高低就是「這件東西多大」。
+       `Sound.tone()` 只做得出②。所以①在這裡自己合(白雜訊 buffer → 濾波 → 極短包封),
+       ②照舊交給 `Sound.tone()`。
+       ⚠ 濾波中心頻率(o.f)就是「木料的硬度 / 件的大小」這一個旋鈕:
+         高 = 清脆小件(翻牌)、低 = 厚重大件(吃子),不必為每個音各寫一套。
+
+     ── ⚠ 為什麼 knock() 寫在這裡而不是加進 js/audio.js ─────────────────────
+       `audio.js` 十四頁全部載入,動它要跑整輪回歸(CLAUDE.md 紅線 3),而目前只有
+       暗棋要用。哪天第二頁也要,再往上搬成 `Sound.knock()`——
+       自己拿 `Sound.ctx()` 建節點這件事本身有先例(`ui-kit.js` 的語音留言就是)。
+       ⚠⚠ 代價要知道:它**繞過 masterNode**(那顆沒有對外暴露),所以靜音與總音量
+         要自己吃 —— 開火前問 `Sound.isMuted()`、音量乘 `Sound.vol()`。
+         唯一的差別是「拉音量滑桿的同一瞬間正在響的那 60ms 不會跟著變」,聽不出來。
+       ⚠⚠⚠ `vol` 有可能是 0(使用者把音效音量拉到底)—— `exponentialRampToValueAtTime`
+         的目標值不可以是 0(會丟例外),所以要早退。
      ========================================================================== */
+  let nzBuf = null;
+  function noiseBuf(c){
+    if(nzBuf && nzBuf.sampleRate === c.sampleRate) return nzBuf;
+    const n = Math.floor(c.sampleRate * 0.2);
+    const b = c.createBuffer(1, n, c.sampleRate);
+    const d = b.getChannelData(0);
+    for(let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    nzBuf = b;
+    return b;
+  }
+  /* 一記敲擊的瞬態:雜訊脈衝 → 濾波 → 4ms 上升 + 指數衰減。
+     o.f/o.fTo = 濾波(掃頻的話就是「敲下去之後亮度迅速掉下來」)· o.type = 濾波器種類
+     o.q = 共振尖銳度 · o.dur = 衰減長度 · o.vol = 音量 · o.delay = 延後幾秒 */
+  function knock(o){
+    if(Sound.isMuted && Sound.isMuted()) return;
+    const c = (Sound.ctx && Sound.ctx()) || null;
+    if(!c) return;
+    o = o || {};
+    const vol = (o.vol == null ? 0.2 : o.vol) * ((Sound.vol && Sound.vol()) || 0);
+    if(!(vol > 0.0005)) return;
+    const t = c.currentTime + (o.delay || 0);
+    const dur = o.dur || 0.05;
+    try{
+      const s = c.createBufferSource();
+      s.buffer = noiseBuf(c);
+      const f = c.createBiquadFilter();
+      f.type = o.type || "lowpass";
+      f.frequency.setValueAtTime(o.f || 1600, t);
+      if(o.fTo) f.frequency.exponentialRampToValueAtTime(o.fTo, t + dur);
+      f.Q.value = (o.q == null ? 1 : o.q);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(vol, t + 0.004);      // 4ms 上升 = 那一下「啪」
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      s.connect(f).connect(g).connect(c.destination);
+      s.start(t);
+      s.stop(t + dur + 0.02);
+    }catch(e){}
+  }
   const sfx = {
-    flip(){ Sound.tone(880, { type: "triangle", dur: 0.07, vol: 0.16, slideTo: 1180 }); },
-    move(){ Sound.tone(520, { type: "triangle", dur: 0.09, vol: 0.15, slideTo: 660 }); },
-    eat(){  Sound.tone(300, { type: "sine", dur: 0.12, vol: 0.30, slideTo: 150 });
-            Sound.tone(760, { type: "square", dur: 0.05, vol: 0.09, delay: 0.01 }); },
-    // 連吃:第 n 顆比第 n-1 顆高一階(玩家聽得出「還在吃」)
-    chain(n){ const f = 520 + Math.min(6, n) * 90;
-              Sound.tone(f, { type: "triangle", dur: 0.10, vol: 0.24, slideTo: f * 1.5 }); },
-    cannon(){ Sound.tone(180, { type: "sawtooth", dur: 0.16, vol: 0.26, slideTo: 70 });
-              Sound.tone(1200, { type: "square", dur: 0.04, vol: 0.10 }); },
+    /* 翻牌:指甲把木牌掀起來的那一下 —— 極短、偏高、幾乎沒有音高(帶通只留「嗒」的亮部) */
+    flip(){ knock({ f: 2500, type: "bandpass", q: 1.1, dur: 0.045, vol: 0.20 });
+            Sound.tone(1240, { type: "triangle", dur: 0.05, vol: 0.06, slideTo: 960 }); },
+    /* 落子:木棋子扣在木盤上 = 雜訊「啪」+ 一顆低的木腔共鳴「咚」
+       ⚠ 低頻那一顆在手機喇叭上多半聽不到 —— 那沒關係,它退化成只剩敲擊聲,
+         而**桌機 / 耳機**上就是它把「電子 beep」變成「木頭」的那一半。 */
+    move(){ knock({ f: 1800, fTo: 900, type: "lowpass", dur: 0.055, vol: 0.24 });
+            Sound.tone(228, { type: "triangle", dur: 0.10, vol: 0.15, slideTo: 178 });
+            Sound.tone(456, { type: "sine", dur: 0.06, vol: 0.06 }); },
+    /* 吃子:同一記敲擊壓低一階(= 更大件)再加**厚一階的木腔**(~150→104Hz 快速衰減)
+       —— 「重重扣下去」的扎實打擊感,而不是另換一種音色。 */
+    eat(){  knock({ f: 1350, fTo: 620, type: "lowpass", dur: 0.08, vol: 0.30 });
+            Sound.tone(150, { type: "triangle", dur: 0.16, vol: 0.26, slideTo: 104 });
+            Sound.tone(300, { type: "sine", dur: 0.09, vol: 0.09 }); },
+    /* 連吃:第 n 顆比第 n-1 顆高一階(玩家聽得出「還在吃」)——
+       ★ 這條分級是舊版就定下來的,這一版只換音色:敲擊與木腔一起往上抬,
+         而**每一下自己還是往下衰**(木頭被敲一下不會往上滑)。 */
+    chain(n){ const k = Math.min(6, n), f = 150 + k * 26;
+              knock({ f: 1300 + k * 140, fTo: 640, type: "lowpass", dur: 0.075, vol: 0.28 });
+              Sound.tone(f, { type: "triangle", dur: 0.14, vol: 0.24, slideTo: f * 0.72 });
+              Sound.tone(f * 3, { type: "sine", dur: 0.07, vol: 0.08 }); },
+    /* 炮:高頻的**木裂聲** + 沉悶的低頻風暴 —— 「隔空發力」的厚重震撼。
+       ⚠ 兩記 knock 疊在同一拍是刻意的:高通那一記負責「裂」、低通掃頻那一記負責「悶」。 */
+    cannon(){ knock({ f: 3000, type: "highpass", dur: 0.055, vol: 0.20 });
+              knock({ f: 460, fTo: 120, type: "lowpass", dur: 0.20, vol: 0.30 });
+              Sound.tone(126, { type: "triangle", dur: 0.22, vol: 0.22, slideTo: 72 }); },
+    /* 「結束連吃」是**操作**不是落子 —— 保持原本那顆柔和的下行二音,不做成敲擊,
+       不然玩家會以為又吃了一顆。 */
     stop(){ Sound.tone(440, { type: "sine", dur: 0.10, vol: 0.14, slideTo: 330 }); }
   };
 
+  /* ---------- 觸覺微震(手機)----------
+     ★ 走全站共用的偏好 `vibrateOn`(設定頁那顆「震動」開關,宣告在 ui-kit.js)——
+       這一頁**不另外做一顆開關**:嫌吵的人在設定頁關掉,連線的「輪到你」也是同一顆。
+     ⚠ iOS Safari 沒有 `navigator.vibrate` → 自動略過(同 Bingo / 五子棋 / 飛行棋);
+       引用一律 `typeof vibrateOn !== "undefined"`(它是別的檔宣告的,將來搬走就是 ReferenceError)。
+     ⚠⚠ 節奏刻意與聲音**同一套分級**:翻牌最輕 → 落子輕 → 吃子扎實 → 連吃是雙擊脈衝。
+       手上讀得出「剛剛那一下是吃到了」而不必看畫面,這才是它存在的理由
+       (單純「每一手都震一下」等於沒有資訊)。
+     ⚠⚠⚠ **只有自己這一手才震**(moveSfx 的第二個參數)—— 聲音兩邊都要出,
+       但震動不是:單機對電腦時電腦一局要走幾十手,每一手都震一下就是整場在抖,
+       而且那個震動完全不對應使用者的任何動作。 */
+  const BZ = { flip: 12, move: 8, eat: 25, chain: [15, 40, 22], cannon: [12, 34, 30] };
+  function buzz(pat){
+    try{
+      if(typeof vibrateOn !== "undefined" && vibrateOn && navigator.vibrate) navigator.vibrate(pat);
+    }catch(e){}
+  }
+
   /* 走「前後兩份的 diff」而不是在動作點插 sfx.xxx() ——
-     單機與連線的動作路徑完全不同,但「有人吃了一顆」在兩邊是同一個 diff。 */
-  function moveSfx(st){
+     單機與連線的動作路徑完全不同,但「有人吃了一顆」在兩邊是同一個 diff。
+     ★ mine = 這一手是不是**這台裝置的人**走的(呼叫端拿 `st.last.seat` 比出來的)——
+       只影響震動,不影響聲音:對手走了什麼一定要聽得到,但震動只回饋自己的動作
+       (理由見上面 BZ 那一段的 ⚠⚠⚠)。 */
+  function moveSfx(st, mine){
     const L = st && st.last;
     if(!L) return;
-    if(L.kind === "flip"){ sfx.flip(); return; }
-    if(L.kind === "move"){ sfx.move(); return; }
+    const bz = mine ? buzz : function(){};
+    if(L.kind === "flip"){ sfx.flip(); bz(BZ.flip); return; }
+    if(L.kind === "move"){ sfx.move(); bz(BZ.move); return; }
     if(L.kind === "stop"){ sfx.stop(); return; }
-    if(L.kind === "darkSelf"){ sfx.flip(); return; }
+    /* ★ 認輸這一手**不出聲**(v2.5.0+ 順手修的既有小 bug)—— 它沒有自己的分支,
+       以前會一路掉到最下面那個 else 去播「吃子」的重擊聲,而下一拍 finish() 馬上
+       就播勝 / 敗音了。以前只是多一聲悶響,加了震動之後會變成「按投降手機扎實震一下」。 */
+    if(L.kind === "resign") return;
+    if(L.kind === "darkSelf"){ sfx.flip(); bz(BZ.flip); return; }
     /* ★ 翻攻吃不動(v1.120.x 起兩顆都活,不再被反吃)—— 跟 darkSelf 一樣是
        「白花一手,沒有賠掉任何東西」,不是 oops。 */
-    if(L.kind === "darkMiss"){ sfx.flip(); return; }
+    if(L.kind === "darkMiss"){ sfx.flip(); bz(BZ.flip); return; }
     /* ★ 炮打到自己人(v1.118.0 起兩顆都活)—— 開了一炮、只翻開一顆,所以是
        「炮聲 + 翻棋聲」而**不是** oops:沒有賠掉任何東西,只是白花一手。 */
-    if(L.kind === "jumpSelf"){ sfx.cannon(); sfx.flip(); return; }
-    if(L.kind === "jump"){ sfx.cannon(); return; }
-    if(st.chainLen > 1) sfx.chain(st.chainLen);
-    else sfx.eat();
+    if(L.kind === "jumpSelf"){ sfx.cannon(); sfx.flip(); bz(BZ.cannon); return; }
+    if(L.kind === "jump"){ sfx.cannon(); bz(BZ.cannon); return; }
+    if(st.chainLen > 1){ sfx.chain(st.chainLen); bz(BZ.chain); }
+    else { sfx.eat(); bz(BZ.eat); }
   }
 
   /* ==========================================================================
@@ -885,6 +990,41 @@ const DCB = (function(){
   function sumTail(st){
     return "(紅 " + DC.sumSide(st, DC.RED) + " · 黑 " + DC.sumSide(st, DC.BLACK) + ")";
   }
+  /* ---------- 結果卡的硃砂大印 ----------
+     ★ 建議書:「終局蓋下一枚古樸方正的硃砂紅印章」。做法直接沿用**這個專案已經有的
+       兩個先例**(台灣麻將 fx.js 的「大贏家」、成語接龍的 `.cy-seal`),不另發明一種:
+       四個字照傳統印章的順序排(右上 → 右下 → 左上 → 左下)、住在卡片的**流內**、
+       落下時下壓回彈 + 微微傾斜。暗棋是十四頁裡最東方的一頁,這一枚印放在這裡最不突兀。
+     ⚠⚠⚠ 為什麼一定要在**流內**、不可以絕對定位到卡片角上(成語接龍量過的兩件事,
+       這一頁同構,不要「順手」改成疊在角上):
+       ① 疊上去會蓋掉 `.word`(這一頁是 clamp(28px,7.2vw,40px)),窄機一定撞 ——
+          而這件事**只有截圖看得出來**(斷言問的是「印在不在、幾個字」,那時候全是綠的);
+       ② 結果卡是 overflow-y:auto,絕對定位 + 放大的那一格會把角甩出卡片右緣 → 閃出捲軸。
+     ⚠ **只有「贏 / 平手」才蓋,輸的那一份不蓋** —— 不必再對他強調一次。
+       本機雙人沒有「我」的視角 → 用中性的那一句(同 endText(st, -1) 的處理)。
+     ⚠⚠ `key` 是去重用的:連線的 `outcome()` 會被**反覆呼叫**,不去重的話印章一直重蓋
+       (成語接龍踩過同一件事)。⚠ 換局時 `reset()` 會把它清掉,所以「連兩局的 key 剛好
+       一樣」不會讓第二局漏掉那一下落款。
+     ★ 刻意**不加**建議書的「金箔光點粒子」—— 贏的那一刻已經有 burst() 的彩帶,
+       再灑一層金箔是同一件事做兩遍(而且結果卡上疊粒子動畫要重繪整張卡)。 */
+  const SEAL_TXT = { win: "大獲全勝", side: "旗開得勝", draw: "勢均力敵" };
+  let sealKey = "";
+  function setSeal(kind, key){
+    const el = $("dcSeal");
+    if(!el) return;
+    const txt = SEAL_TXT[kind] || "";
+    if(!txt){
+      el.classList.add("hidden"); el.classList.remove("dc-stamp");
+      el.innerHTML = ""; sealKey = "";
+      return;
+    }
+    const k = kind + "|" + (key == null ? "" : key);
+    if(k === sealKey) return;                  // 同一局只蓋一次
+    sealKey = k;
+    el.innerHTML = [...txt].map(c => "<span>" + esc(c) + "</span>").join("");
+    el.classList.remove("hidden");
+    el.classList.remove("dc-stamp"); void el.offsetWidth; el.classList.add("dc-stamp");
+  }
   function endText(st, mySeat){
     if(st.endBy === "wipe")  return "吃光對方所有棋子";
     if(st.endBy === "stuck") return "對方無子可動,也無暗棋可翻";
@@ -966,6 +1106,7 @@ const DCB = (function(){
 
   function reset(){
     sel = -1; lastKey = -1; cur = null; prevUp = {};
+    sealKey = "";                   // ⚠ 換局:不清的話「連兩局的 key 剛好一樣」會漏掉那一下落款
     stopCd();
     clearReveals();                 // ⚠ 它掛在 stage 上,不會被下面那行 board.innerHTML 帶走
     clearOverlays();                // ⚠ 同上:悶局倒數 / 記牌盤兩塊浮層也在 stage 上
@@ -979,7 +1120,7 @@ const DCB = (function(){
     clearSel(){ sel = -1; },
     sel: () => sel,
     isWide: () => wide,
-    pieceHTML, backHTML, resultHTML, endText,
+    pieceHTML, backHTML, resultHTML, endText, setSeal,
     moveSfx, sfx, stopCd
   };
 })();

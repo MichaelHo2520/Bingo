@@ -156,7 +156,10 @@ const Solo = (function(){
     if(!nx || nx.bad >= 0) return false;              // 不合法 → 不寫進 moves
     moves.push(mv);
     st = nx;
-    DCB.moveSfx(st);
+    /* ★ 第二個參數 = 這一手是不是「這台裝置的人」走的,**只影響震動**(聲音兩邊都要出) ——
+       電腦一局要走幾十手,每一手都震一下就是整場在抖,而那個震動不對應使用者的任何動作。
+       ⚠ 朋友模式(本機雙人)兩個人共用同一支手機 → 兩邊都算自己人。 */
+    DCB.moveSfx(st, isFriend() || !!(st.last && st.last.seat === mySeat));
     paint();
     if(st.over){ if(isFriend()) finishFriend(); else finish(); return true; }
     if(!isFriend() && st.turn !== mySeat) aiTurn();
@@ -240,6 +243,8 @@ const Solo = (function(){
     const card = $("dcWinCard");
     if(card){ card.classList.remove("win", "lose", "draw"); card.classList.add(res); }
     $("winWord").textContent = res === "win" ? "你贏了!" : res === "lose" ? "你輸了" : "平手!";
+    // 硃砂大印:贏 / 平手才蓋,輸的那一份不蓋(見 DCB.setSeal 的註解)
+    DCB.setSeal(res === "lose" ? "" : res, moves.length + ":" + st.winner);
     const box = $("dcResult");
     if(box){
       /* ★ 「幾勝」在單機就是**這個難度的累積戰績**(和局兩邊各記一勝,同連線的算法)。
@@ -274,7 +279,9 @@ const Solo = (function(){
 
     const card = $("dcWinCard");
     if(card){ card.classList.remove("win", "lose", "draw"); card.classList.add(draw ? "draw" : "win"); }
+    /* 本機雙人沒有「我」的視角 → 印章用中性的那一句(同 endText(st, -1) 的處理) */
     $("winWord").textContent = draw ? "平手!" : (DC.sideName(st.col[st.winner]) + "方獲勝!");
+    DCB.setSeal(draw ? "draw" : "side", moves.length + ":" + st.winner);
     const box = $("dcResult");
     if(box){
       const wins = [0, 1].map(seat => ({ n: friendRec[st.col[seat]] || 0, plus: (!draw && seat === st.winner) ? 1 : 0 }));
