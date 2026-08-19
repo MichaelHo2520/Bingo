@@ -9685,7 +9685,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   body:not(.solo-on) #soloWinBtns,body:not(.solo-on) .cy-stats{display:none}
 
   /* ==========================================================================
-     動效與質感(v2.4.1) —— 照 notes/Gemini建議/成語接龍體驗與動畫優化建議.md 篩過的十條。
+     動效與質感(v2.4.1) —— 照 Gemini《成語接龍體驗與動畫優化建議》篩過的十條
+     (建議書原文 2026-08-19 除役;做了什麼與砍掉的四條在 notes/20-成語接龍.md)。
      三條自己的約束(踩過的坑都在別頁付過學費了):
      ① 覆蓋層一律 position:absolute + pointer-events:none —— .cy-board 是 grid,
         普通子元素會變成多出來的一格,盤面當場歪掉。
