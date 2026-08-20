@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 d647718c0e214d745200c40f31a0d986cf3dafa9f6daff8016ca34253ae1a7d2)
+    真相在 styles.src.css(sha256 54d1f2ea4388469f931bb47c7b81a13e39ac3dbbf6403f98dd0f5c87c5253655)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -2307,9 +2307,6 @@ body.m16-solo .mj-room{width:min(98vw - 16px,944px)}
 body.m16-solo .topbar{width:min(98vw - 16px,944px)}
 .set-row.m16-vrow{flex-wrap:wrap}
 .m16-vrow .m16-vseg{flex:1 1 100%}
-@media (min-width:400px){
-  .m16-vrow .m16-vseg{flex:0 1 auto}
-}
 .m16-bigbtn{font-family:'Nunito',sans-serif;font-weight:800}
 .m16-bigbtn.on{border-color:var(--accent);color:var(--accent);background:rgba(255,255,255,.16)}
 body.m16-big .topbar{display:none}
