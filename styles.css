@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 9e360fe9fb6895db88864e9b3b63229efd391fbf556196017829ac1aaedbdffc)
+    真相在 styles.src.css(sha256 e502b8e6982d86c2f5f2fcabfac4993b67bf1b9d813da9f345b4e8e8a9502b53)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3739,6 +3739,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          --dc-red:#c62828; --dc-blk:#2b2622;
          --dc-ink-r:#8e1f27; --dc-ink-b:#241f1c;
          --dc-cap-face:#f5ebd2;
+         --dc-thr:.105;
          --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(52,28,8,.05);
          --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6;
          --dc-x:#c62828; --dc-x-lit:rgba(255,247,233,.92); --dc-x-op:.7;
@@ -3926,12 +3927,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-board::before{content:"";position:absolute;inset:9px;border-radius:12px;pointer-events:none;
     box-shadow:inset 0 0 0 1px rgba(44,23,6,.62),inset 0 0 0 2px rgba(255,240,210,.14)}
   .dc-sq{--dc-groove:0 0 0 2px var(--dc-cut),0 2px 1px -1px var(--dc-lit);
+    --dc-th:calc(var(--dc-cell,44px) * var(--dc-thr));
+    --dc-poff:calc(var(--dc-th) / -2);
     position:relative;appearance:none;-webkit-appearance:none;border:0;padding:0;margin:0;
     background:var(--dc-slot);border-radius:4px;cursor:pointer;box-shadow:var(--dc-groove);
     display:flex;align-items:center;justify-content:center;perspective:340px;
     -webkit-tap-highlight-color:transparent;touch-action:manipulation}
   .dc-board:not(.dc-mine) .dc-sq{cursor:default}
-  .dc-p{--dc-th:calc(var(--dc-cell,44px) * .105);
+  .dc-p{--dc-th:calc(var(--dc-cell,44px) * var(--dc-thr));
     --dc-lift:
       0 calc(var(--dc-th) * .10) 0 var(--dc-s1),
       0 calc(var(--dc-th) * .22) 0 var(--dc-s2),
@@ -4057,12 +4060,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-tgt.dc-empty::after{content:"";position:absolute;width:26%;height:26%;border-radius:50%;
     background:var(--dc-tgt);opacity:.75}
   .dc-tgt:not(.dc-empty)::after{content:"";position:absolute;inset:7%;border-radius:50%;
-    pointer-events:none;border:2px solid var(--dc-tgt-eat);opacity:.9}
+    pointer-events:none;border:2px solid var(--dc-tgt-eat);opacity:.9;
+    transform:translateY(var(--dc-poff))}
   .dc-tgt.dc-t-rush:not(.dc-empty)::after,
   .dc-tgt.dc-t-rushDark:not(.dc-empty)::after,
   .dc-tgt.dc-t-dark:not(.dc-empty)::after{border-color:var(--dc-tgt-far)}
   .dc-sq .dc-x{position:absolute;left:0;top:0;width:100%;height:100%;
-    pointer-events:none;overflow:visible;opacity:var(--dc-x-op)}
+    pointer-events:none;overflow:visible;opacity:var(--dc-x-op);
+    transform:translateY(var(--dc-poff))}
   .dc-x path{fill:none;stroke-linecap:round}
   .dc-xh{stroke:var(--dc-x-lit);stroke-width:7.5}
   .dc-xi{stroke:var(--dc-x);stroke-width:4.5}
@@ -4079,10 +4084,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     100%{box-shadow:0 0 0 0 transparent,0 0 0 0 transparent,var(--dc-lift)}
   }
   .dc-sq.dc-lastto::before{content:"";position:absolute;inset:9%;border-radius:8px;
-    border:2px solid var(--accent);opacity:.55;pointer-events:none}
+    border:2px solid var(--accent);opacity:.55;pointer-events:none;
+    transform:translateY(var(--dc-poff))}
   .dc-hit .dc-flip3d .dc-p{animation:none}
   .dc-flip3d{position:relative;width:80%;height:80%;transform-style:preserve-3d;
-    --dc-th:calc(var(--dc-cell,44px) * .105);margin-bottom:var(--dc-th);
+    --dc-th:calc(var(--dc-cell,44px) * var(--dc-thr));margin-bottom:var(--dc-th);
     --dc-flipdur:.38s;
     animation:dcFlipIn var(--dc-flipdur) cubic-bezier(.22,.61,.36,1) both}
   .dc-face{position:absolute;inset:0;width:100%;height:100%;backface-visibility:hidden;
