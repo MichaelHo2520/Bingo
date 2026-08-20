@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 54d1f2ea4388469f931bb47c7b81a13e39ac3dbbf6403f98dd0f5c87c5253655)
+    真相在 styles.src.css(sha256 98f0da44613c6b5b863b7970e3dc8c5bb615fad7ab66c0b011486313a7b7025d)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -191,6 +191,9 @@
   .seg.col::before{display:none}
   .seg.col button.on{background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2)}
   .seg.col.readonly button.on{background:rgba(0,0,0,.16);box-shadow:none}
+  .seg:has(> button:nth-child(6))::before{display:none}
+  .seg:has(> button:nth-child(6)) button.on{background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .seg:has(> button:nth-child(6)).readonly button.on{background:rgba(0,0,0,.16);box-shadow:none}
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
   .field{margin-top:12px}
@@ -3352,6 +3355,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .bj-sn.p0{background:var(--sp0)}.bj-sn.p1{background:var(--sp1)}.bj-sn.p2{background:var(--sp2)}
   .bj-sn.p3{background:var(--sp3)}.bj-sn.p4{background:var(--sp4)}.bj-sn.p5{background:var(--sp5)}
   .bj-first-who{flex-wrap:wrap}
+  .bj-first-who::before{display:none}
+  .bj-first-who button.on{background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .bj-first-who.readonly button.on{background:rgba(0,0,0,.16);box-shadow:none}
   .bj-first-lbl{font:800 10.5px/1.4 'Nunito',sans-serif;color:var(--muted);margin-top:2px}
   .bj-first-note{font:800 10.5px/1.4 'Nunito',sans-serif;color:#ffb4a2;margin-top:4px}
   :root{ --bj-turn:#6ec8ff; }

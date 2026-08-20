@@ -474,6 +474,26 @@
   .seg.col button.on{background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2)}
   .seg.col.readonly button.on{background:rgba(0,0,0,.16);box-shadow:none}
 
+  /* ==========================================================================
+     ★★★ 第 6 個選項起**自動**退回「`.on` 自己畫底」(v2.5.1)
+     ── 為什麼 ────────────────────────────────────────────────────────────────
+       上面的寬度規則只寫到 5 格。第 6 個以上**沒有任何 `:has()` 命中** →
+       滑塊沒有 width → 絕對定位 + 只給 left 的空元素 = **0 寬** → 藥丸整顆消失,
+       而背景已經不由 button 畫了 → **那一列變成「看不出選了哪個」**。
+       原本這件事只靠 `tools/test-registry.js` 第五節去數 HTML 裡的 button 擋住,
+       但那是**靜態**的 —— 21點的「點名誰先當莊」是一位玩家一顆、`main.js` 灌進來的,
+       六人局實測滑塊 `width` 就是 `0px`(而測試全綠)。
+     ★ 所以除了那支守門,這裡再加一道**畫面上的**保險:選項數一多就自動降級成
+       「沒有滑動動畫,但看得出選了哪個」—— 2~5 格照舊滑,6 格以上退回舊做法。
+     ⚠ 這不是「可以隨便加第 6 個選項」的許可:降級掉的是這一輪最有感的那個動畫,
+       所以 test-registry 那條**照樣要紅**,只是紅的意思從「壞了」變成「你確定嗎」。
+     ⚠ 選擇器要用 `:has(> button:nth-child(6))`(**不帶 `:last-child`**)——
+       帶了就只命中「剛好 6 個」,7 個以上又漏掉。
+     ========================================================================== */
+  .seg:has(> button:nth-child(6))::before{display:none}
+  .seg:has(> button:nth-child(6)) button.on{background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .seg:has(> button:nth-child(6)).readonly button.on{background:rgba(0,0,0,.16);box-shadow:none}
+
   :root[data-theme="midnight"] .seg button.on,
   :root[data-theme="arcade"] .seg button.on{color:var(--daub-ink)}
 
@@ -7431,8 +7451,21 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .bj-sn.p3{background:var(--sp3)}.bj-sn.p4{background:var(--sp4)}.bj-sn.p5{background:var(--sp5)}
 
   /* 房規面板:「點名誰先當莊」那一排(選項由 main.js 生成 → 這裡只管排版)。
-     ⚠ 名字長短不一 → 允許換行(這是設定面板,不是寫死高度的動作列)。 */
+     ⚠ 名字長短不一 → 允許換行(這是設定面板,不是寫死高度的動作列)。
+
+     ── ★★★ 這一排**不用**共用的滑塊(v2.5.1)────────────────────────────────
+       共用滑塊(見 `.seg::before` 那一節)有兩個前提:**每格等寬**、**排成一行**。
+       這一排兩個都不保證,而且不是排版沒調好,是**它的選項是玩家名字**:
+         · 一位玩家一顆 → 2~6 顆(`maxPlayers` 是 6)。實測**六人局滑塊寬 0px**
+           (第 6 格沒有任何寬度規則命中)→ 點名之後完全看不出點了誰。
+         · 名字長短不一 + 上面那條 `flex-wrap` → 一長就換行,滑塊只算得出第一行。
+       ⚠ 上一節那條「第 6 個起自動降級」已經接住六人局,但**五人以下換行照樣歪** ——
+         名字是使用者輸入的資料,長度不可控 → 這一排一律退回「`.on` 自己畫底」。
+       ⚠ 唯讀(訪客看房主的設定)那一份要跟著搬,理由同 `.seg.col` 那一節。 */
   .bj-first-who{flex-wrap:wrap}
+  .bj-first-who::before{display:none}
+  .bj-first-who button.on{background:var(--accent);box-shadow:0 4px 14px rgba(0,0,0,.2)}
+  .bj-first-who.readonly button.on{background:rgba(0,0,0,.16);box-shadow:none}
   .bj-first-lbl{font:800 10.5px/1.4 'Nunito',sans-serif;color:var(--muted);margin-top:2px}
   .bj-first-note{font:800 10.5px/1.4 'Nunito',sans-serif;color:#ffb4a2;margin-top:4px}
 
