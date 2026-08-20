@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 e502b8e6982d86c2f5f2fcabfac4993b67bf1b9d813da9f345b4e8e8a9502b53)
+    真相在 styles.src.css(sha256 01b5639b8b03e4fbc496311d1463cef1f49b9bad1806f50c23e724f75e88666c)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -3743,6 +3743,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(52,28,8,.05);
          --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6;
          --dc-x:#c62828; --dc-x-lit:rgba(255,247,233,.92); --dc-x-op:.7;
+         --dc-sel:rgba(245,190,105,.95); --dc-sel-glow:rgba(255,190,90,.55);
+         --dc-last-glow:rgba(255,193,102,.4);
          --dc-slab:#8a5c30; --dc-slab-d:#6b4420; --dc-slab-l:#a06e3d;
          --dc-cut:rgba(48,25,7,.42); --dc-lit:rgba(255,238,205,.18);
          --dc-grainimg:url("data:image/svg+xml;utf8,\
@@ -4045,10 +4047,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-skin-hint{margin-top:6px;font-size:11px;color:var(--muted);text-align:center}
   .dc-skin-pick.readonly .dc-skin:not(.on){opacity:.42}
   .dc-skin-pick.readonly .dc-skin:not(.on):hover{background:rgba(255,255,255,.05)}
-  .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift)}
+  .dc-sel .dc-p{box-shadow:0 0 0 2px var(--dc-sel),0 0 16px 5px var(--dc-sel-glow),var(--dc-lift)}
   .dc-sq .dc-p{transition:transform .16s cubic-bezier(.25,.7,.35,1)}
   .dc-sel .dc-p{transform:translateY(-3px);
-    box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift),
+    box-shadow:0 0 0 2px var(--dc-sel),0 0 16px 5px var(--dc-sel-glow),var(--dc-lift),
       0 calc(var(--dc-th) + 9px) 13px rgba(18,7,0,.34)}
   @media (hover:hover) and (pointer:fine){
     .dc-board.dc-mine .dc-sq:hover:not(.dc-sel) .dc-p{transform:translateY(-1.5px)}
@@ -4083,9 +4085,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     0%{box-shadow:0 0 0 3px var(--dc-tgt-eat),0 0 16px 5px var(--dc-tgt-eat),var(--dc-lift)}
     100%{box-shadow:0 0 0 0 transparent,0 0 0 0 transparent,var(--dc-lift)}
   }
-  .dc-sq.dc-lastto::before{content:"";position:absolute;inset:9%;border-radius:8px;
-    border:2px solid var(--accent);opacity:.55;pointer-events:none;
-    transform:translateY(var(--dc-poff))}
+  .dc-sq.dc-lastto::before{content:"";position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle,var(--dc-last-glow) 55%,rgba(255,193,102,0) 78%);
+    pointer-events:none;transform:translateY(var(--dc-poff))}
   .dc-hit .dc-flip3d .dc-p{animation:none}
   .dc-flip3d{position:relative;width:80%;height:80%;transform-style:preserve-3d;
     --dc-th:calc(var(--dc-cell,44px) * var(--dc-thr));margin-bottom:var(--dc-th);

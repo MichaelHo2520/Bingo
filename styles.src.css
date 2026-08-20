@@ -8424,6 +8424,19 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
               細線就算濃到 .82 字也自己透出來了。所以要再調的話**先動線寬**,
               透明度只是微調(現在停在細 4.5 + .7,是那四張的中間值)。 */
          --dc-x:#c62828; --dc-x-lit:rgba(255,247,233,.92); --dc-x-op:.7;
+         /* ★★★ 「選中」與「上一手落點」的暖光(v2.5.1+4)。使用者:「你看一下這個圈,
+            怎麼感覺沒很好看」+「還有旁邊那個士的正方形框,也覺得很奇怪」。
+            ⚠⚠ 這兩個原本吃的是主題的 `--accent` —— 而**盤面上其他每一種顏色都刻意
+              不吃主題**(--dc-tgt / --dc-tgt-eat / --dc-tgt-far / --dc-x 都是寫死的)。
+              它們是這條規矩的例外,而代價在 bubblegum(粉紅)/ arcade 那幾套主題上最明顯:
+              木頭盤面上一圈粉紅。改成寫死的暖金之後,五個主題看起來都是「燈打在棋子上」。
+            ⚠ 選中那圈**細**(2px,原本是 3px)+ 一圈柔光:粗的實色圈會橫切過棋子的側壁
+              (那疊 --dc-lift 的實色陰影),看起來像「木頭上套了一個塑膠環」;
+              而原本再往外那圈 rgba(0,0,0,.25) 的灰邊更是直接讀成髒。
+            ⚠ 落點那一塊改成**沒有形狀的光暈**:圓棋子外面套方框本來就怪,
+              而且框的下緣一定會被棋子的厚度撐破(它是往下長的)。 */
+         --dc-sel:rgba(245,190,105,.95); --dc-sel-glow:rgba(255,190,90,.55);
+         --dc-last-glow:rgba(255,193,102,.4);
          /* 棋盤那一塊木頭:深一階的胡桃色。★ 棋子是淺楓木,兩者的明度**一定要拉開** ——
             同一階的話子會埋進盤裡,小格子的手機上尤其看不出哪一格有子。 */
          --dc-slab:#8a5c30; --dc-slab-d:#6b4420; --dc-slab-l:#a06e3d;
@@ -9084,7 +9097,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        不可以為了美觀弱化它,也不要以為「反正動作列還會講一次」。 */
   /* ⚠ 這四條都會**整份覆蓋** box-shadow —— 一定要把厚度(--dc-lift)/ 刻線(--dc-groove)
      接回去,不然被選中 / 被標成落點的那一格會忽然變扁、或忽然沒有格線。 */
-  .dc-sel .dc-p{box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift)}
+  .dc-sel .dc-p{box-shadow:0 0 0 2px var(--dc-sel),0 0 16px 5px var(--dc-sel-glow),var(--dc-lift)}
   /* ---------- 「拿起棋子」的手感(v2.5.0+)----------
      ★ 建議書 1.3。真的下棋時手指按住棋子會先**提起來**一點,而這一頁的棋子已經有
        實體的厚度(--dc-lift 那疊側壁),所以「浮起來 + 影子放大變柔」是它現成就能講的話。
@@ -9106,7 +9119,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      而它們共用同一個 `.dc-p`(那份扁樣式是 v1.142.0 的結論)。 */
   .dc-sq .dc-p{transition:transform .16s cubic-bezier(.25,.7,.35,1)}
   .dc-sel .dc-p{transform:translateY(-3px);
-    box-shadow:0 0 0 3px var(--accent),0 0 0 5px rgba(0,0,0,.25),var(--dc-lift),
+    box-shadow:0 0 0 2px var(--dc-sel),0 0 16px 5px var(--dc-sel-glow),var(--dc-lift),
       0 calc(var(--dc-th) + 9px) 13px rgba(18,7,0,.34)}
   @media (hover:hover) and (pointer:fine){
     .dc-board.dc-mine .dc-sq:hover:not(.dc-sel) .dc-p{transform:translateY(-1.5px)}
@@ -9201,9 +9214,21 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      版本,棋盤本身的動畫已經夠多(翻牌 / 滑動 / 飛到正中央),再疊一個持續脈動只是雜訊。
      ⚠ 用 ::before 疊一層而不是動 box-shadow —— 才不會跟 .dc-tgt / .dc-sel 既有的
      box-shadow 蓋掉彼此(同一格可能同時是「上一手落點」又是「這一手能吃的目標」)。 */
-  .dc-sq.dc-lastto::before{content:"";position:absolute;inset:9%;border-radius:8px;
-    border:2px solid var(--accent);opacity:.55;pointer-events:none;
-    transform:translateY(var(--dc-poff))}
+  /* ★★ v2.5.1+4:從「一圈圓角方框」改成**一團沒有形狀的暖光暈**。
+     使用者:「旁邊那個士的正方形框,也覺得很奇怪」——兩個病:
+       ① 圓棋子外面套方框;② 框是畫在格子上的,而棋子的厚度往**下**長 →
+          框的下緣一定被撐破(補了 --dc-poff 也只是把破的地方換個位置)。
+     ★ 光暈沒有邊、沒有形狀 → 上面兩個病都不存在,而且它**不會變成第四種輪廓語彙**
+       (方框 = 落點 / 圓環 = 吃得到 / X = 跳板,再加一種輪廓就是在猜謎)。
+     ⚠ 它仍然要補 --dc-poff:光心要對準圓餅,不然光看起來是從棋子下面漏出來的。
+     ⚠⚠⚠ **兩個色停位置不可以照直覺調**:棋子畫在這一層**上面**,所以「中心最亮」的
+       漸層等於把光藏在棋子底下 —— 第一版寫 `var(...)` 起頭 + 68% 收,截圖裡幾乎看不見
+       (而**沒有棋子的那一格反而很明顯**,所以只看空格的截圖會以為做好了)。
+       55% 那一段是**平台**(維持全亮到半徑 55%,而圓餅只有 40%)→ 亮的部分正好露在
+       棋子外圈;78% 才收乾淨。⚠ 收邊也不可以拿掉:滿格的漸層會讓整格看起來像換了一塊木頭。 */
+  .dc-sq.dc-lastto::before{content:"";position:absolute;inset:0;border-radius:50%;
+    background:radial-gradient(circle,var(--dc-last-glow) 55%,rgba(255,193,102,0) 78%);
+    pointer-events:none;transform:translateY(var(--dc-poff))}
   /* ⚠⚠ v1.137.5:翻牌那一格**不要**再疊這個光暈 —— box-shadow 動畫要逐格重繪,跟
      .dc-flip3d 的 3D 旋轉(transform,靠合成器)同時搶主執行緒,使用者反饋「翻開子
      的時候最後都會好像卡了一下」,這是原因之一(另一半是下面 dcFlipIn 的回彈曲線)。
