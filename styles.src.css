@@ -5894,11 +5894,25 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        進畫面,多數字型沒有會變豆腐方框(CLAUDE.md 的禁令)。
      ⚠ overflow:hidden + min-width:0:桌心只有 44px 寬,字級再大也不可以把那一欄撐開
        (撐開就等於左右兩格變窄 = 牌被擠窄)。 */
+  /* ★★ v2.5.2:🎴 本身是一張**深色**的牌 → 半透明壓在深綠上讀起來是一塊髒斑
+     (建議書講的「夾在縫隙裡的小符號」)。用 filter 把它洗成灰白的淺壓紋:
+     grayscale 去掉紅藍、brightness 拉到比桌布亮、contrast 壓平細節 → 變成
+     一枚融進綠呢的浮水印,而不是一個黑點。
+     ⚠⚠ 一定要用 filter 而**不是**換字元或加字級:那一欄只有 44px 寬(--b2-tmw)
+       且 overflow:hidden,任何會變大的做法不是被裁就是把左右兩格擠窄(= 牌被擠窄)。
+     ⚠ filter 不佔版面,診斷字串量的 tmid 尺寸一個 px 都不會變。 */
   .b2-tmid{grid-area:m;display:flex;align-items:center;justify-content:center;
     min-width:0;overflow:hidden;font-size:26px;line-height:1;
-    opacity:.16;pointer-events:none;user-select:none}
-  /* 這一輪還沒有人出牌 → 桌心亮一點 =「桌面是空的」(桌布本身不變,它是桌子) */
-  .b2-trick.empty .b2-tmid{opacity:.26}
+    opacity:.16;filter:grayscale(1) brightness(2.6) contrast(.55);
+    pointer-events:none;user-select:none}
+  /* 這一輪還沒有人出牌 → 桌心亮一點 =「桌面是空的」(桌布本身不變,它是桌子)
+     ★ v2.5.2 再加一層很慢的呼吸:「一輪結束、桌面清乾淨了」在畫面上原本是
+       **四格同時變空**,而那看起來跟「大家都還沒動」一模一樣。
+     ⚠ 動的是 opacity,不是 font-size / transform —— 桌心那一欄只有 44px 寬
+       且 overflow:hidden,任何會變大的做法都會被裁(而撐開那一欄 = 左右兩格變窄
+       = 牌被擠窄,那是 --b2-tmw 那條紅線)。 */
+  .b2-trick.empty .b2-tmid{opacity:.26;animation:b2Mid 3.4s ease-in-out infinite}
+  @keyframes b2Mid{0%,100%{opacity:.19}50%{opacity:.34}}
 
   /* ⚠⚠ border 是 2px **透明**的(不是「沒有 border」):亮框(.top)只換顏色,
      所以標不標「目前最大」都不會讓那一格高 4px —— 差了的話整桌的高度就跟著
@@ -5916,7 +5930,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ 這一條要寫在 .top 之前 —— 「目前最大」的底色必須贏(見下一條)。
      ⚠ v1.98.0:`.b2-tmv.me` 的那一層淡底色**從這裡搬到檔尾**(它現在是金色的,
        而金底必須排在 .top 的亮底後面才不會被蓋掉 —— 見「三軌」那一段)。 */
-  .b2-tmv.idle{background:rgba(255,255,255,.03)}
+  /* ★★ v2.5.2:還沒表態的那一格**完全透明** —— 綠呢直接透出來。
+     使用者(Gemini 建議書):四個固定尺寸的深色方塊讓牌桌看起來像後台監控看板;
+     開局那一刻四格都是空的,整片就是四個灰盒子。
+     ⚠⚠ 去掉的**只有 background** —— min-height / border(2px 透明)/ padding
+       一個字都沒動,所以「空的格子與出五張牌的格子一樣大」那條紅線完全沒鬆。
+     ⚠ 去底之後那一格靠什麼存在?名字列(座位色徽章 + 白名字)—— 它壓在綠呢上
+       本來就看得清楚,而那一列的高度是寫死的 18px。 */
+  .b2-tmv.idle{background:transparent}
   /* ★ 目前最大的那一手要一眼認得出來 —— 玩家要判斷的就是「我壓不壓得過它」。
      ⚠⚠ 這個框畫過三種,前兩種都畫不完整(使用者兩次回饋「黃色框都沒辦法完整」):
         ① inset box-shadow(v1.77)→ 畫在元素自己的背景上,被裡面那幾張牌
@@ -5928,7 +5949,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
            子元素只住在 padding box 裡蓋不到它,捲動容器也裁不到 —— 四邊必定完整。
         ⚠ 所以這裡**不要**再改回任何一種 box-shadow 畫法。 */
   .b2-tmv.top{background:rgba(255,255,255,.12);border-color:var(--accent)}
-  .b2-tmv.pass{opacity:.72}
+  /* ★ Pass 也去底(v2.5.2,同 idle 那條的理由)—— 「本輪不跟」只是一個動作,
+     不值得一個五張牌大小的深色方塊。它現在由 .b2-tpass 那顆印章自己說話。
+     ⚠ opacity 從 .72 提到 .82:底沒了之後整格本來就退得夠遠,再壓下去
+       名字會開始看不清(而「誰 Pass 了」是記牌的一部分)。 */
+  .b2-tmv.pass{background:transparent;opacity:.82}
   /* 一格的第一列:座位色點 · 名字 ·「你」· 牌型 · 無敵。
      ★ 名字太長就 ellipsis ——「誰」在玩家晶片列有完整的一份,
        而這一格的寬度是留給**牌**的(五張牌的最壞情況)。 */
@@ -5960,7 +5985,20 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .b2-tct{flex:none;margin-left:auto;
     padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.14);
     font:800 10.5px/1.5 'Nunito',sans-serif;color:var(--text)}
-  .b2-tpass{font:900 12px/1 'Nunito',sans-serif;color:var(--muted);letter-spacing:.5px}
+  /* ★★ 「✕ Pass」印章(v2.5.2)—— 膠囊 + 細框 + 拉開的字距,像蓋在桌布上的一枚章。
+     ⚠⚠ 高度是這條唯一的風險:它住在 .b2-tcs 裡,而那一格的高度靠
+       `.b2-tcs{min-height:--b2-tch}` 撐(--b2-tch = 牌寬 × 1.42)。
+       **最壞情況在矮視窗那一段**(@media max-height:600px 把 --b2-cw 換成
+       clamp(24px,6.8vw,34px)):24 × .66 = 15.84 → --b2-tch 只有 **22.5px**。
+       這顆印章的外框高 = 11 × 1.35 + 上下 padding 4 + border 2 ≈ **20.9px**,
+       只剩 1.6px 餘裕 —— 改字級 / padding / border 前**一定要把這個算式重算一次**,
+       超過就是整桌高一階(手牌會跳)。⚠ 別照直立那組的 27px 算,那組寬鬆得多。
+       ★ 守門是「空的 / Pass 的 / 出五張牌的三種格子一樣大」那一節(同時畫三種再比)。
+     ✗ **刻意不旋轉**:傾斜 6 度時外接矩形會多出約 7px,在上面那個最壞情況下
+       角會被 .b2-tcs 的 overflow:hidden 裁掉(而 transform 不佔版面 → 斷言看不到)。 */
+  .b2-tpass{padding:2px 11px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.08);
+    font:900 11px/1.35 'Nunito',sans-serif;color:var(--muted);letter-spacing:1.5px}
   /* 輪到他、還沒動 —— ⚠ 只有這三個字,牌情一律不准進這一格 */
   .b2-twait{font:700 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
   /* 那一格的牌:**一定要 nowrap + 固定高度**(五張牌剛好一排)——
@@ -6041,6 +6079,71 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @keyframes b2LaBeat{
     0%,100%{box-shadow:0 0 0 1px rgba(255,120,100,.50), 0 0 0 0 rgba(224,60,45,.42)}
     55%    {box-shadow:0 0 0 1px rgba(255,170,150,.90), 0 0 0 6px rgba(224,60,45,0)}}
+
+  /* ==========================================================================
+     大老二 v2.5.2 —— ★★★ 桌上那幾手牌的兩級階層(現在最大 / 已被壓過)
+     ==========================================================================
+       出發點(使用者交來的建議書「大老二牌局中間區域介面優化建議」):桌上同時
+       擺著三四手牌時,**現在要壓的是哪一手**在 0.1 秒內認不出來 —— 舊版
+       「目前最大」只有一圈 --accent 的框,而那圈框與旁邊三格深色方塊在視覺
+       重量上是平起平坐的。
+
+     ── ★★ 這一組刻意**不是第四條軌** ────────────────────────────────────────
+       三軌(我 / 在等他 / 目前最大)講的是**格子的狀態**,通道是
+       border · background · ::before · ::after —— 四個位置全部用掉了。
+       這一組講的是**那一手牌本身**,所以它整組落在格子**裡面那一層**:
+           .b2-tmv.top  .b2-tcs → 金色托盤(牌底下的光暈)
+           .b2-tmv.beat .b2-tcs → 淡到 .72
+       兩條都只碰 .b2-tcs / .b2-tct,格子自己的 border 與 background 一個字都沒動
+       → 三軌照樣三個都畫得完整(那是 v1.98.0 整版在守的事)。
+
+     ── ⚠⚠ 為什麼淡的是牌、不是整格 ──────────────────────────────────────────
+       ① 整格 opacity 會把**名字列**一起淡掉,而這一頁的核心是記牌:「誰出過什麼」
+          要一眼看得完(建議書自己也把它列成第一條不可妥協的事)。
+       ② 更硬的理由:整格 opacity 會連 .b2-tmv.me 的金條與 .b2-tmv.act 的青光條
+          一起淡掉 —— 那兩條講的是「他是誰 / 在等誰」,與「這一手被壓過了」無關。
+       所以淡的只有牌與牌型膠囊,座位徽章與名字維持 100%。
+
+     ── ⚠ 這一整段一個字都不佔版面 ──────────────────────────────────────────
+       只有 background / opacity / color / transform —— 沒有 padding、沒有 border、
+       沒有字級。「空的格子與出五張牌的格子一樣大」與「手牌不准跳」兩條沒被碰到。
+     ========================================================================== */
+  /* ① 現在最大的那一手:牌底下墊一層金色托盤(由下往上的光暈,像聚光燈打在桌面上)。
+     ⚠ 畫在 .b2-tcs 上而**不是**格子上 —— 格子的 background 是「這是我」那一軌的
+       (.b2-tmv.me 的金底),碰它就會蓋掉別人。 */
+  .b2-tmv.top .b2-tcs{border-radius:9px;
+    background:
+      radial-gradient(72% 128% at 50% 104%, rgba(255,212,137,.30), rgba(255,212,137,0) 74%),
+      linear-gradient(180deg, rgba(255,212,137,0), rgba(255,212,137,.10))}
+  /* 牌型膠囊跟著鍍金 —— 玩家要判斷的「我壓不壓得過它」就寫在那顆膠囊上。
+     ⚠ (0,3,0) 贏得過「桌布上的字固定白」那條 .b2-trick .b2-tct (0,2,0)。 */
+  .b2-trick .b2-tmv.top .b2-tct{color:#2a1c00;background:#ffd489}
+
+  /* ② 已經被壓過的那幾手:**連底色一起去掉**,牌直接落在綠呢上。
+     ★ 去底之後桌面上「有底色的格子」只剩 top 一格 —— 那正是建議書要的張力:
+       最大的那一手是全桌唯一的托盤,其餘幾手自然地攤在桌布上。
+     ⚠ 這一條排在 .b2-tmv.me 的金底**前面**(那一段在下面)→ 「我出的牌被壓過」時
+       金底照樣在,身分那一軌沒被動到。
+     ⚠ 牌只淡到 .78(不是 .72):底沒了本身就已經降了一階,再壓下去記牌會開始吃力。 */
+  .b2-tmv.beat{background:transparent}
+  .b2-tmv.beat .b2-tcs{opacity:.78}
+  .b2-trick .b2-tmv.beat .b2-tct{color:rgba(255,255,255,.62);background:rgba(255,255,255,.10)}
+
+  /* ③ 「我」那一格輪到自己時的向下引導語(board.js 掛的 .b2-twait.mine)。
+     ★ 底下的手牌列與動作鈕已經是一整排「輪到你了」,中間那格再寫一次「思考中…」
+       是重複的 —— 改成一句往下指的話,動線就是「中間看局勢 → 下面做操作」。
+     ⚠⚠ (0,2,0) 與「桌布上的字固定白」那條 .b2-trick .b2-twait 同級 → **靠順序贏**
+       (這一段排在它後面)。把這一段搬到那一段前面的話,顏色會靜靜地退回灰白。 */
+  .b2-twait.mine{color:#8fe0ff;letter-spacing:.5px;
+    animation:b2Guide 1.9s ease-in-out infinite}
+  @keyframes b2Guide{
+    0%,100%{opacity:.62;transform:translateY(-1px)}
+    50%    {opacity:1;transform:translateY(1px)}}
+  /* 會動的一律尊重系統的「減少動態效果」→ 改成常亮(訊號不可以消失) */
+  @media (prefers-reduced-motion:reduce){
+    .b2-twait.mine{animation:none;opacity:1}
+    .b2-trick.empty .b2-tmid{animation:none}
+  }
 
   /* ==========================================================================
      大老二 v1.98.0 —— ★★★ 牌桌上三個訊號 = 三條軌

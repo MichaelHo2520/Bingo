@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 c72c49ceae6ff9e580e0923d8a6c615a540771e12b0391dd1f95b23d32b2b83f)
+    真相在 styles.src.css(sha256 9a6873f534a263d3f5246b9fff7ef1462a3d2d86d917153b4baf695a050a918d)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -2710,15 +2710,17 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     width:min(100%,calc((100% - var(--b2-tmw) - 14px) / 2))}
   .b2-tmid{grid-area:m;display:flex;align-items:center;justify-content:center;
     min-width:0;overflow:hidden;font-size:26px;line-height:1;
-    opacity:.16;pointer-events:none;user-select:none}
-  .b2-trick.empty .b2-tmid{opacity:.26}
+    opacity:.16;filter:grayscale(1) brightness(2.6) contrast(.55);
+    pointer-events:none;user-select:none}
+  .b2-trick.empty .b2-tmid{opacity:.26;animation:b2Mid 3.4s ease-in-out infinite}
+  @keyframes b2Mid{0%,100%{opacity:.19}50%{opacity:.34}}
   .b2-tmv{min-height:var(--b2-tph);position:relative;
     display:flex;flex-direction:column;justify-content:center;gap:2px;
     padding:3px 5px;border:2px solid transparent;border-radius:10px;
     background:rgba(255,255,255,.05)}
-  .b2-tmv.idle{background:rgba(255,255,255,.03)}
+  .b2-tmv.idle{background:transparent}
   .b2-tmv.top{background:rgba(255,255,255,.12);border-color:var(--accent)}
-  .b2-tmv.pass{opacity:.72}
+  .b2-tmv.pass{background:transparent;opacity:.82}
   .b2-thd{display:flex;align-items:center;gap:4px;min-width:0;height:18px;overflow:hidden}
   .b2-sn{flex:none;min-width:15px;height:15px;padding:0 3px;border-radius:8px;
     display:inline-flex;align-items:center;justify-content:center;
@@ -2733,7 +2735,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .b2-tct{flex:none;margin-left:auto;
     padding:1px 6px;border-radius:8px;background:rgba(255,255,255,.14);
     font:800 10.5px/1.5 'Nunito',sans-serif;color:var(--text)}
-  .b2-tpass{font:900 12px/1 'Nunito',sans-serif;color:var(--muted);letter-spacing:.5px}
+  .b2-tpass{padding:2px 11px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.08);
+    font:900 11px/1.35 'Nunito',sans-serif;color:var(--muted);letter-spacing:1.5px}
   .b2-twait{font:700 10.5px/1 'Nunito',sans-serif;color:var(--muted)}
   .b2-tcs{display:flex;flex-wrap:nowrap;align-items:center;justify-content:center;gap:3px;
     min-height:var(--b2-tch);overflow:hidden}
@@ -2771,6 +2775,23 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @keyframes b2LaBeat{
     0%,100%{box-shadow:0 0 0 1px rgba(255,120,100,.50), 0 0 0 0 rgba(224,60,45,.42)}
     55%    {box-shadow:0 0 0 1px rgba(255,170,150,.90), 0 0 0 6px rgba(224,60,45,0)}}
+  .b2-tmv.top .b2-tcs{border-radius:9px;
+    background:
+      radial-gradient(72% 128% at 50% 104%, rgba(255,212,137,.30), rgba(255,212,137,0) 74%),
+      linear-gradient(180deg, rgba(255,212,137,0), rgba(255,212,137,.10))}
+  .b2-trick .b2-tmv.top .b2-tct{color:#2a1c00;background:#ffd489}
+  .b2-tmv.beat{background:transparent}
+  .b2-tmv.beat .b2-tcs{opacity:.78}
+  .b2-trick .b2-tmv.beat .b2-tct{color:rgba(255,255,255,.62);background:rgba(255,255,255,.10)}
+  .b2-twait.mine{color:#8fe0ff;letter-spacing:.5px;
+    animation:b2Guide 1.9s ease-in-out infinite}
+  @keyframes b2Guide{
+    0%,100%{opacity:.62;transform:translateY(-1px)}
+    50%    {opacity:1;transform:translateY(1px)}}
+  @media (prefers-reduced-motion:reduce){
+    .b2-twait.mine{animation:none;opacity:1}
+    .b2-trick.empty .b2-tmid{animation:none}
+  }
   :root{ --b2-turn:#6ec8ff; }
   .b2-tmv.me,.b2-tmv.me.top{
     background:linear-gradient(180deg,rgba(255,212,137,.20),rgba(255,212,137,.06))}
