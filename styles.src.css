@@ -8539,11 +8539,15 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
             ⚠ 落點那一塊改成**沒有形狀的光暈**:圓棋子外面套方框本來就怪,
               而且框的下緣一定會被棋子的厚度撐破(它是往下長的)。 */
          --dc-sel:rgba(245,190,105,.95); --dc-sel-glow:rgba(255,190,90,.55);
-         /* ★★ 「上一手落點」的小圓章(v2.5.1+5)—— 使用者:「如果上一手的棋,你在他的
-            右上角,插一個小棋子,這樣表示如何?」。**青綠是盤面上唯一還沒被佔用的顏色**
-            (綠=走 / 橘紅=吃 / 紫=房規才有的吃 / 紅=跳板的 X / 暖金=選中),
+         /* ★★ 「上一手落點」的**四角折角**(v2.5.1+6)。**青綠是盤面上唯一還沒被佔用的
+            顏色**(綠=走 / 橘紅=吃 / 紫=房規才有的吃 / 紅=跳板的 X / 暖金=選中),
             而冷色在暖木盤上跳得最開(這條判準 v2.3.7 選跳板色時就寫過)。
-            ⚠ 它原本是 v2.3.7 跳板那個青(--dc-scr),跳板改成紅 X 之後那個顏色空出來了。 */
+            ⚠ 它原本是 v2.3.7 跳板那個青(--dc-scr),跳板改成紅 X 之後那個顏色空出來了。
+            ⚠⚠ **不可以照建議書改成暖金** —— `--dc-sel`(選中)v2.5.1+4 已經是
+              rgba(245,190,105,.95),而建議書開的 rgba(245,195,105,.92) 是同一個顏色;
+              連吃時同一格會**同時**是 .dc-sel 與 .dc-lastto,兩個標記就只剩形狀分得開。
+            ⚠ --dc-last-hi 是折角的**主色**,不是高光 —— 細線要的對比比色塊高得多:
+              #1f8f9c 對胡桃木盤 #8a5c30 只有 1.54:1,#63d3de 才有 3.36:1。 */
          --dc-last:#1f8f9c; --dc-last-hi:#63d3de; --dc-last-lo:#166f7a;
          /* 棋盤那一塊木頭:深一階的胡桃色。★ 棋子是淺楓木,兩者的明度**一定要拉開** ——
             同一階的話子會埋進盤裡,小格子的手機上尤其看不出哪一格有子。 */
@@ -8915,15 +8919,20 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        照格子置中所以整圈低了 3px(下緣壓到餅、上緣露出一條縫)。
        ★ 判準很好記:**畫在 `.dc-p` 上的(如 `.dc-sel` 的 box-shadow)天生就對齊,
          畫在 `.dc-sq` 上的一律要補 --dc-poff。** 現在吃它的有三個:
-         `.dc-tgt::after`(貼著棋子的圓環)· `.dc-x`(跳板的紅 X)· `.dc-lastto::before`。
+         `.dc-tgt::after`(貼著棋子的圓環)· `.dc-x`(跳板的紅 X)。
        ⚠ **空格那條 `.dc-tgt.dc-empty::after` 不可以補** —— 那一格沒有棋子,
          它要對齊的就是格子本身。
+       ⚠⚠ **`.dc-lastto::before`(上一手落點的四角折角)v2.5.1+6 起也不補** ——
+         它框的是**格子**不是棋子,而且補了會被推出格外、在盤面邊緣被切掉;
+         那條的算式寫在它自己那一段的註解裡。
      ⚠ --dc-thr(厚度佔一格的比例)只有 :root 一份,`.dc-p` / `.dc-flip3d` / 這裡都吃它。 */
   .dc-sq{--dc-groove:0 0 0 2px var(--dc-cut),0 2px 1px -1px var(--dc-lit);
     --dc-th:calc(var(--dc-cell,44px) * var(--dc-thr));
     --dc-poff:calc(var(--dc-th) / -2);
-    /* 選中時圓餅往上浮多少(「拿起棋子」的手感)。★ 存成變數是因為**貼在棋子上的浮層
-       要跟著浮**:連吃時同一格會同時是 .dc-sel 與 .dc-lastto,小圓章沒跟上就差 3px。 */
+    /* 選中時圓餅往上浮多少(「拿起棋子」的手感)。
+       ⚠ v2.5.1+5 曾經有第二個人用它(那一版的「上一手落點」是插在棋子右上角的小圓章,
+         連吃時同一格同時是 .dc-sel 與 .dc-lastto,沒跟著浮就差 3px);v2.5.1+6 落點
+         改成框住格子的四角折角之後,**又只剩棋子自己在用**。 */
     --dc-pick:3px;
     position:relative;appearance:none;-webkit-appearance:none;border:0;padding:0;margin:0;
     background:var(--dc-slot);border-radius:4px;cursor:pointer;box-shadow:var(--dc-groove);
@@ -9325,8 +9334,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      版本,棋盤本身的動畫已經夠多(翻牌 / 滑動 / 飛到正中央),再疊一個持續脈動只是雜訊。
      ⚠ 用 ::before 疊一層而不是動 box-shadow —— 才不會跟 .dc-tgt / .dc-sel 既有的
      box-shadow 蓋掉彼此(同一格可能同時是「上一手落點」又是「這一手能吃的目標」)。 */
-  /* ★★★ v2.5.1+5:「上一手落點」改成**棋子右上角插一枚小圓章**(使用者提的做法)。
-     這一格前後換過三種畫法,而每一種被換掉的理由都值得記著,不要走回頭路:
+  /* ★★★ v2.5.1+6:「上一手落點」改成**格子四角的折角**(中式棋盤星位那種直角定位線)。
+     這一格前後換過四種畫法,每一種被換掉的理由都值得記著,不要走回頭路:
        ① 圓角方框(~v2.5.1+3):圓棋子外面套方框本來就怪,而且框畫在格子上、
           棋子的厚度往**下**長 → 框的下緣一定被撐破。
        ② 暖光暈(v2.5.1+4):使用者「很不容易看,而且你也沒有對的很準」。兩個真的病 ——
@@ -9335,21 +9344,50 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
           (量得到的圓心其實是準的,但一邊被切掉就是斜的)。
           ★ 教訓:**貼著棋子的「氛圍型」標記,在盤面邊緣一定會被裁** —— 要嘛收在格子裡,
             要嘛別用氛圍。
-       ③ 小圓章(現在):完全收在格子裡(right/top 5%,一格 59px 時離邊 3px)→ 不會被裁;
-          它有**明確的輪廓**,所以在任何棋子上都一樣清楚,不必跟木頭比對比度。
-     ⚠ 位置一律用 right/top **不要用 inset**:同時給 left 與 right 會 over-constrained,
-       瀏覽器直接忽略 right → 圓章跑到左上角(lab 裡踩過一次,截圖才發現)。
-     ⚠ 它要跟著棋子的兩個位移:--dc-poff(厚度讓出來的一半)與 --dc-pick(選中浮起) ——
-       連吃時同一格會同時是 .dc-sel 與 .dc-lastto。
-     ⚠ 26% 是「一眼看得到」與「不壓到字」的折衷(比過 23% / 27% / 29%);
-       裡面那圈奶油內緣是刻意的:少了它就只是一顆色點,有了它才像「插在角上的一枚小棋」。 */
-  .dc-sq.dc-lastto::before{content:"";position:absolute;
-    width:26%;height:26%;right:5%;top:5%;border-radius:50%;
-    background:radial-gradient(circle at 34% 30%,var(--dc-last-hi),var(--dc-last) 68%,var(--dc-last-lo));
-    box-shadow:0 0 0 1.5px var(--dc-x-lit),0 1px 3px rgba(0,0,0,.45),
-               inset 0 0 0 2px rgba(255,247,233,.5);
-    pointer-events:none;transform:translateY(var(--dc-poff))}
-  .dc-sq.dc-sel.dc-lastto::before{transform:translateY(calc(var(--dc-poff) - var(--dc-pick)))}
+       ③ 右上角小圓章(v2.5.1+5):收在格子裡、輪廓明確,前兩個病都好了,但它是
+          **壓在棋子身上的一塊非對稱色塊** —— 圓餅 + 正中央對稱的刻字,右上角插一顆 26%
+          的球,小格子的手機上會壓到「車」「卒」的右上筆劃,而且讀起來像 App 的未讀
+          通知點,跟這一頁的木頭工藝感衝突(這一條是使用者拿建議書來換掉它的理由)。
+       ④ 四角折角(現在):標記從「貼在棋子上」改回**框住這一格** —— 棋子一個像素都沒
+          被壓到,而「這一格剛剛動過」本來就是定位語彙,不該像貼標籤一樣貼在子身上。
+     ★★★ **它刻意不補 --dc-poff**,是「畫在 .dc-sq 上的浮層一律補 --dc-poff」那條的
+       **唯一例外**,而且是算出來的:棋子讓出厚度走的是 margin-bottom,所以
+       **「圓餅 + 厚度」那一整塊的外框本來就照格子置中**(上緣 8.5% − th/2、
+       下緣 91.5% + th/2,中點正好 50%)—— 折角照格子擺才框得對稱。
+       ⚠⚠ 補了才會壞:poff = −th/2 = −5.25%,而折角收在 inset 5% → 上面那兩支被推到
+       −0.25%,**貼死在格線上、最外圈那一列又要被盤面的框切掉**,正是 ② 那個病。
+       ⚠ 同理 .dc-sel 那條「跟著棋子浮起來」也一起拿掉了 —— 格子不會浮,而且棋子從
+       框裡浮出來剛好就是「拿起來」的手感。
+     ★ 尺寸全部是 --dc-cell 的百分比(同 .dc-x 的做法):手機的小格子、BigMode、
+       直立 / 橫放都自己跟著走,不必寫第二份。線寬另外給 max() 保底,免得小格子上細到不見。
+     ⚠ 折角離棋子最近的一點是**橫臂的末端**(25%, 5%),距圓心 46.9%,而圓餅的半徑是
+       41.5% —— **留的那 5.4% 是算過的**,arm 再長就會壓到棋子。
+     ⚠ 主色是 --dc-last-hi 不是 --dc-last(細線要對比,理由在色票那一段);底下墊一道
+       深色 drop-shadow 當描邊 —— 落點那一格也可能是明棋的淺色木頭,同色壓同色會不見。
+     ⚠ 八層 background 一律用**長寫**(-image / -size / -position / -repeat),
+       不可以縮成 `background` 簡寫:簡寫會把沒寫到的那幾個一起重設。 */
+  .dc-sq.dc-lastto::before{content:"";position:absolute;inset:5%;pointer-events:none;
+    --dc-lb-arm:calc(var(--dc-cell,44px) * .2);
+    --dc-lb-w:max(1.5px,calc(var(--dc-cell,44px) * .032));
+    background-image:
+      linear-gradient(to right,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to bottom,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to left,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to bottom,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to right,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to top,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to left,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to top,var(--dc-last-hi),var(--dc-last));
+    background-size:
+      var(--dc-lb-arm) var(--dc-lb-w),var(--dc-lb-w) var(--dc-lb-arm),
+      var(--dc-lb-arm) var(--dc-lb-w),var(--dc-lb-w) var(--dc-lb-arm),
+      var(--dc-lb-arm) var(--dc-lb-w),var(--dc-lb-w) var(--dc-lb-arm),
+      var(--dc-lb-arm) var(--dc-lb-w),var(--dc-lb-w) var(--dc-lb-arm);
+    background-position:
+      left top,left top,right top,right top,
+      left bottom,left bottom,right bottom,right bottom;
+    background-repeat:no-repeat;
+    filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.5))}
   /* ⚠⚠ v1.137.5:翻牌那一格**不要**再疊這個光暈 —— box-shadow 動畫要逐格重繪,跟
      .dc-flip3d 的 3D 旋轉(transform,靠合成器)同時搶主執行緒,使用者反饋「翻開子
      的時候最後都會好像卡了一下」,這是原因之一(另一半是下面 dcFlipIn 的回彈曲線)。

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 9a6873f534a263d3f5246b9fff7ef1462a3d2d86d917153b4baf695a050a918d)
+    真相在 styles.src.css(sha256 1618e7e29023eaede7b588b6beda8d1bc24b74dfc522cbd1f2bd83841208c997)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4107,13 +4107,28 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     0%{box-shadow:0 0 0 3px var(--dc-tgt-eat),0 0 16px 5px var(--dc-tgt-eat),var(--dc-lift)}
     100%{box-shadow:0 0 0 0 transparent,0 0 0 0 transparent,var(--dc-lift)}
   }
-  .dc-sq.dc-lastto::before{content:"";position:absolute;
-    width:26%;height:26%;right:5%;top:5%;border-radius:50%;
-    background:radial-gradient(circle at 34% 30%,var(--dc-last-hi),var(--dc-last) 68%,var(--dc-last-lo));
-    box-shadow:0 0 0 1.5px var(--dc-x-lit),0 1px 3px rgba(0,0,0,.45),
-               inset 0 0 0 2px rgba(255,247,233,.5);
-    pointer-events:none;transform:translateY(var(--dc-poff))}
-  .dc-sq.dc-sel.dc-lastto::before{transform:translateY(calc(var(--dc-poff) - var(--dc-pick)))}
+  .dc-sq.dc-lastto::before{content:"";position:absolute;inset:5%;pointer-events:none;
+    --dc-lb-arm:calc(var(--dc-cell,44px) * .2);
+    --dc-lb-w:max(1.5px,calc(var(--dc-cell,44px) * .032));
+    background-image:
+      linear-gradient(to right,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to bottom,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to left,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to bottom,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to right,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to top,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to left,var(--dc-last-hi),var(--dc-last)),
+      linear-gradient(to top,var(--dc-last-hi),var(--dc-last));
+    background-size:
+      var(--dc-lb-arm) var(--dc-lb-w),var(--dc-lb-w) var(--dc-lb-arm),
+      var(--dc-lb-arm) var(--dc-lb-w),var(--dc-lb-w) var(--dc-lb-arm),
+      var(--dc-lb-arm) var(--dc-lb-w),var(--dc-lb-w) var(--dc-lb-arm),
+      var(--dc-lb-arm) var(--dc-lb-w),var(--dc-lb-w) var(--dc-lb-arm);
+    background-position:
+      left top,left top,right top,right top,
+      left bottom,left bottom,right bottom,right bottom;
+    background-repeat:no-repeat;
+    filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.5))}
   .dc-hit .dc-flip3d .dc-p{animation:none}
   .dc-flip3d{position:relative;width:80%;height:80%;transform-style:preserve-3d;
     --dc-th:calc(var(--dc-cell,44px) * var(--dc-thr));margin-bottom:var(--dc-th);
