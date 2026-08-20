@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 682b039f4b5c3cf1b870ab8d6232c2e5b2e83a8a0df64c330ed309c72d6ad1c4)
+    真相在 styles.src.css(sha256 03cd79bdfb8192394e58e6a7dd6dc855923b1d5609b6fbe24e11e08ba9b7c0fe)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4709,23 +4709,28 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-word-ic{flex:none;font-size:20px;line-height:1;margin-right:-4px}
   .dw-tool{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:2px;
     border:1px solid var(--panel-line);border-radius:11px;padding:6px 12px;
+    min-width:38px;min-height:38px;
     background:rgba(255,255,255,.08);color:var(--text);font-family:'Nunito',sans-serif;
-    font-weight:800;font-size:13px;cursor:pointer;transition:.15s}
+    font-weight:800;font-size:13px;cursor:pointer;transition:.15s;
+    -webkit-tap-highlight-color:transparent}
   .dw-tool:hover{background:rgba(255,255,255,.16)}
-  .dw-tool:active{transform:scale(.94)}
+  .dw-tool:active{transform:scale(.92)}
   .dw-sep{flex:none;width:1px;height:20px;background:var(--panel-line);opacity:.8}
-  .dw-pens{flex:none;display:flex;align-items:center;gap:5px}
-  .dw-sw{width:20px;height:20px;padding:0;border-radius:50%;flex:none;cursor:pointer;
-    border:2px solid rgba(255,255,255,.5);box-shadow:0 1px 3px rgba(0,0,0,.35);
-    transition:transform .12s,border-color .12s}
-  .dw-sw:active{transform:scale(.88)}
-  .dw-sw.on{border-color:var(--accent);transform:scale(1.18)}
+  .dw-pens{flex:none;display:flex;align-self:stretch;align-items:stretch;gap:0}
+  .dw-sw{width:32px;min-height:30px;flex:none;padding:0;border:none;background:none;cursor:pointer;
+    display:grid;place-items:center;border-radius:999px;
+    -webkit-tap-highlight-color:transparent;transition:background .12s,box-shadow .12s}
+  .dw-sw::before{content:"";width:26px;height:26px;border-radius:50%;
+    background:var(--dw-sw,#8b8b8b);border:2px solid rgba(255,255,255,.55);
+    box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .12s,border-color .12s}
+  .dw-sw:active::before{transform:scale(.86)}
+  .dw-sw.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent)}
+  .dw-sw.on::before{border-color:rgba(255,255,255,.95)}
   .dw-tool.on{border-color:var(--accent);background:var(--accent);color:#2a1136;
     box-shadow:0 2px 10px rgba(0,0,0,.28)}
   .dw-tool.on:hover{background:var(--accent)}
   .dw-tool:disabled{opacity:.35;cursor:default;pointer-events:none}
   .dw-ink.erasing{cursor:cell}
-  .dw-ink.lining{cursor:crosshair}
   .dw-say{flex:none;height:74px;overflow-y:auto;overscroll-behavior:contain;
     display:flex;flex-direction:column;gap:3px;padding:6px 9px;
     background:var(--panel);border:1px solid var(--panel-line);border-radius:12px}
@@ -4777,16 +4782,6 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-flash.hidden{display:none}
   .dw-flash.go{animation:dw-flash .76s ease-out forwards}
   @keyframes dw-flash{0%{opacity:0}8%{opacity:.92}100%{opacity:0}}
-  .dw-shapes{position:absolute;top:8px;right:8px;display:flex;gap:4px;
-    padding:3px;border-radius:999px;border:1px solid rgba(0,0,0,.14);
-    background:rgba(255,255,255,.88);box-shadow:0 2px 8px rgba(0,0,0,.20)}
-  .dw-shapes.hidden{display:none}
-  .dw-shp{width:28px;height:28px;padding:0;border:none;border-radius:50%;cursor:pointer;
-    display:inline-flex;align-items:center;justify-content:center;
-    background:transparent;color:var(--dw-ink);transition:background .12s,color .12s}
-  .dw-shp:active{transform:scale(.9)}
-  .dw-shp.on{background:var(--dw-ink);color:var(--dw-paper)}
-  .dw-ln svg{width:17px;height:17px}
   .dw-tool.armed{background:var(--daub);border-color:var(--daub);color:#fff;
     animation:dw-arm .9s ease-in-out infinite}
   .dw-tool.armed:hover{background:var(--daub)}
@@ -4896,14 +4891,15 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .dw-word-lbl{display:none}
     .dw-clr-t{display:none}
     .dw-tools{gap:4px}
-    .dw-pens{gap:2px}
-    .dw-sw{width:18px;height:18px}
-    .dw-tool{padding:0;width:30px;height:30px;display:inline-flex;align-items:center;
-      justify-content:center;font-size:15px}
+    .dw-sw{width:25px}
+    .dw-sw::before{width:22px;height:22px}
+    .dw-tool{padding:0;width:36px;height:36px;display:inline-flex;align-items:center;
+      justify-content:center;font-size:18px}
     .dw-word{font-size:17px}
     .dw-word-ic{font-size:17px;margin:0 -5px 0 -4px}
   }
   @media (max-width:430px){
+    .dw-word-ic{display:none}
     .dw-len-l{display:none}
     .dw-len.msk .dw-hcat-t{display:none}
     .dw-len.msk .dw-hc{width:11px}

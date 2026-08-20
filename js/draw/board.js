@@ -68,7 +68,7 @@
       ⚠ 兩指下去的那一刻**一定要把第一根手指剛剛起的那一筆退掉**(abortStroke)——
         不然每次縮放都會在紙上留一個點。
 
-   ⑦ **形狀工具(v2.4.1)—— 而「油漆桶」刻意不做,那不是漏做。**
+   ⑦ **「油漆桶」刻意不做,那不是漏做。**(v2.4.1 寫下;v2.5.4 把當年的替代方案移除了)
       Gemini 建議書把「填色油漆桶(Flood Fill)」列在第一順位,理由是「倒數計時下手動
       塗滿大面積色塊非常耗時」。那個痛點是真的,但 **flood fill 與這一頁的架構相衝**,
       三條都是結構性的、不是實作難度:
@@ -78,17 +78,26 @@
           高解析度那台縫還在 → **整張紙都變色**。同一個房間裡兩個人看到的圖完全不同,
           而且誰會漏色**事前算不出來**。這比「畫得慢」嚴重一個量級。
         ★★★ **② 真相是 replay,所以每次 repaint() 都要把每一次填色重跑一遍。**
-          `repaint()` 在直線 / 形狀預覽時是**每個 pointermove 跑一次**(見 previewShape),
-          兩指縮放同理。一次 flood fill = getImageData + BFS + putImageData ≈ 800×600 的
-          48 萬像素;填個五次之後,拖一條直線就會變成幻燈片。
+          `repaint()` 在**兩指縮放**時是每一幀跑一次(v2.5.3 之前形狀預覽也是每個
+          pointermove 跑一次)。一次 flood fill = getImageData + BFS + putImageData
+          ≈ 800×600 的 48 萬像素;填個五次之後,兩指一撐就會變成幻燈片。
         ★★ **③ 紙是 CSS 背景、canvas 是透明的**(擦布靠 destination-out 露出紙,見 3-C)——
           於是「可以填的地方」與「被擦掉的地方」在像素上**完全一樣**,填色會直接跨過
           擦布的痕跡漫出去。要繞開就得改成「canvas 自己填紙色」,而那會讓擦布失效。
-      → 改成把既有的「直線」升級成**三種形狀:直線 / 矩形 / 圓形**。
-      ★★ 它們全部是「只有幾個點的一筆 `s`」—— **線上格式一個字都沒改**,舊版收到照樣
-        畫得出來(同 v1.163.0 直線那條的 CP 值來源)。矩形是 5 個點、圓形是 49 個點。
-      ⚠ 「填滿」這件事沒有被解決,那是已知的取捨:要填滿只能靠粗筆刷(WIDTHS 的 UI
-        還沒做,而 #dwTools 在 360px 上塞不下第五顆鈕 —— 見 notes/21 第六節)。
+      → v2.4.1 的做法是把既有的「直線」升級成**三種形狀:直線 / 矩形 / 圓形**
+        (全部是「只有幾個點的一筆 `s`」,線上格式一個字都沒改)。
+
+      ★★★ **而 v2.5.4 把那一整組移除了 —— 換來的是色塊與工具鈕的觸控熱區。**
+        使用者的回報是「按不準、容易誤觸、手指大很難按」,而這一列在 360px 上
+        **量出來是零空隙**(`.dw-tools` 331.2px、溢出 0、題目那一格 69.9px 而 4 個字要 68px)
+        → 想讓任何東西變大,唯一的來源就是「拿掉一個東西」。
+        直線那顆鈕(30px + 4px 間距)是這一列上**唯一拿掉不會少掉能力**的東西:
+        形狀在底層只是一筆點數很少的 `s`,**移除 UI 不動線上格式** ——
+        舊版畫家送出來的形狀,新版照樣畫得出來(反過來也一樣,新版只是不再產生它)。
+      ⚠⚠ 所以要**加回來很便宜**(一顆鈕 + 這一支的一個模式),但加回來就是把那 34px
+        還回去 → 色塊會回到 18px。**兩者不可能同時要**,這是量出來的,不是取捨的偏好。
+      ⚠ 「填滿大面積」因此又變成沒有解的:要解只能靠**粗筆刷**(`WIDTHS` 有三檔
+        [4,8,16],但沒有 UI)—— 而那同樣要一顆鈕的寬度。見 notes/遊戲/21 的紅線 24。
    ========================================================================== */
 
 const DWB = (function () {
@@ -169,20 +178,9 @@ const DWB = (function () {
   let mySids = new Set();
   let curC = DEF_C, curW = DEF_W;
   let curEr = false;                      // 現在拿的是擦布嗎(只影響自己這一端要送 s 還是 e)
-  /* ★ 直線模式(v1.163.0):按下去記起點、放開才成一筆。中間那段只是**預覽**,
-     不進 strokes、也不送出去 —— 一條直線最後只推送一次(兩個點)。
-     ⚠ 直線走的是完全獨立的路徑,不碰 drawing / pend / flush(那三個是徒手畫的節流機制)。
-     ★★ v2.4.1 起這個模式底下有**三種形狀**(見檔頭 ⑦):直線 / 矩形 / 圓形。
-     ⚠⚠ `curLine` 的語意刻意沒變 —— 它照舊是「三選一模式裡的那一格」(紅線 24),
-       所以 `stats().tool` 照樣回 "line"、`#dwLine` 照樣是**切換鈕**(按一下回到一般筆)。
-       形狀是它底下的第二層,住在浮在紙上的 `.dw-shapes`(不佔工具列的寬度)。
-     ⚠ 形狀**不必每回合歸零**?—— 要。resetInk() 一起清:上一位畫家挑的形狀
-       與顏色 / 擦布同一族,換人就該回到最單純的狀態。 */
-  let curLine = false;
-  const SHAPES = ["line", "rect", "oval"];
-  const SHAPE_IDS = { line: "dwShpLine", rect: "dwShpRect", oval: "dwShpOval" };
-  let curShape = "line";
-  let lineFrom = null, lineTo = null;
+  /* ⚠ v1.163.0~v2.5.3 這裡還有一組直線 / 形狀的狀態(curLine / curShape / lineFrom …)。
+     v2.5.4 整組移除,理由與「加回來要付什麼」在檔頭 ⑦ —— 模式現在是**二選一**:
+     一般筆 vs 擦布(`curEr` 就是全部的真相)。 */
   /* 畫布四周留這麼多(v1.155.2):`.dw-stage` 是 overflow:hidden,而紙有一圈 3px 的外框
      (`.dw-ink` 的第一段 box-shadow)—— 貼死就會被削掉,看起來像沒有邊。 */
   const INK_PAD = 4;
@@ -212,8 +210,8 @@ const DWB = (function () {
     vy = Math.max(boxH * (1 - vk), Math.min(0, vy));
   }
   /* ⚠⚠ 縮放的重畫**刻意是同步的**,不可以「聰明地」合到 requestAnimationFrame 裡:
-       ① 直線 / 形狀預覽(previewShape)本來就是每一個 pointermove 整張 repaint —— 這一頁的
-          筆劃量(一回合幾十筆)重畫一次是微不足道的成本,兩指一幀畫兩遍也一樣
+       ① 這一頁的筆劃量(一回合幾十筆)整張重畫一次是微不足道的成本,兩指一幀畫兩遍也一樣
+          (v2.5.3 之前的形狀預覽更兇:每一個 pointermove 都整張 repaint,照樣沒事)
        ② ⚠ **rAF 在 headless e2e 一次都不派**(紅線 3-B 踩過:用它等會整支測試當場掛住)
           → 走 rAF 的話這個功能就變成「只能靠眼睛看」的那一類,守不住。
      ⚠ 以畫布上某一點為錨縮放(兩指的中心 / 滑鼠游標)——
@@ -348,7 +346,7 @@ const DWB = (function () {
 
   /* 邏輯座標 → 畫布的裝置像素。★ 中間那兩個 vk / vx 就是兩指縮放(見檔頭 ⑥),
      沒縮放時 vk=1、vx=0 → 與 v2.0.0 逐字相同。
-     ⚠ 畫的每一條路徑都只准走這兩支(strokePath / drawTail / applyRec 的續段 / previewShape),
+     ⚠ 畫的每一條路徑都只准走這兩支(strokePath / drawTail / applyRec 的續段),
        自己另外算一份的地方就是「縮放之後只有那一種筆畫錯位」的來源。 */
   function sx(x) { return (x * boxW / LW * vk + vx) * dpr; }
   function sy(y) { return (y * boxH / LH * vk + vy) * dpr; }
@@ -536,9 +534,8 @@ const DWB = (function () {
   function resetInk() {
     strokes = []; byId = {}; drawing = null;
     pend = []; pendSid = -1; pendEr = false; nextSid = 1;
-    /* ★ 每一回合把筆歸零:換人畫的時候不該繼承上一位畫家挑的顏色 / 還拿著擦布 / 還在直線模式。 */
+    /* ★ 每一回合把筆歸零:換人畫的時候不該繼承上一位畫家挑的顏色 / 還拿著擦布。 */
     curC = DEF_C; curW = DEF_W; curEr = false;
-    curLine = false; curShape = "line"; lineFrom = null; lineTo = null;
     /* ★ 縮放也要歸位(v2.1.0):上一位畫家放大到某個角落去畫細節,
        下一回合換人時畫面不該還停在那個角落 —— 而且新的一張是空的,停在那裡看起來像壞掉。
        ⚠ 手指狀態一起清:換回合時可能正按著(相位是別人推的,不會有 pointerup 收尾)。 */
@@ -592,63 +589,6 @@ const DWB = (function () {
        漏還原的症狀是「之後畫的每一筆都是半透明的」,而且 DOM / 記錄全部正常。
        這裡用 try 之外的方式保證:設完立刻在同一支函式裡還原(不要跨函式)。
      ⚠ 預覽**不進 strokes、不送出去**:它每次 pointermove 都會被 repaint() 蓋掉重畫。 */
-  /* ★★ 形狀 → 邏輯座標點陣(v2.4.1,見檔頭 ⑦)。**回傳的就是一筆 `s` 的 p 陣列** ——
-     直線 2 個點、矩形 5 個點(收尾回到起點)、圓形 49 個點。
-     ⚠ 一律 Math.round + 夾在座標系內:編碼直接 join(","),浮點數會讓每一筆胖三倍
-       (而且 `applyRec` 那邊 isFinite 通過、畫出來一樣,沒有任何斷言會紅)。
-     ⚠ 圓形取 48 段:再少會看得出是多邊形(在放大到 4 倍的畫布上尤其明顯),
-       再多只是白白加位元組 —— 48 段 ≈ 400 bytes,與徒手畫一小段差不多。
-     ⚠⚠ 圓形是**內接在拖曳出來的方框裡**(不是「以起點為圓心」):使用者拖的是一個框,
-       而框的直覺就是外接矩形;以起點為圓心的話手指一定在圓的正中央 → 看不見自己在畫什麼。 */
-  const OVAL_SEG = 48;
-  function shapePts(a, b, shape) {
-    const clamp = (v, hi) => Math.max(0, Math.min(hi, Math.round(v)));
-    if (shape === "rect") {
-      const x0 = a[0], y0 = a[1], x1 = b[0], y1 = b[1];
-      return [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0];
-    }
-    if (shape === "oval") {
-      const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2;
-      const rx = Math.abs(b[0] - a[0]) / 2, ry = Math.abs(b[1] - a[1]) / 2;
-      const out = [];
-      for (let i = 0; i <= OVAL_SEG; i++) {
-        const t = i / OVAL_SEG * Math.PI * 2;
-        out.push(clamp(cx + rx * Math.cos(t), LW - 1), clamp(cy + ry * Math.sin(t), LH - 1));
-      }
-      return out;
-    }
-    return [a[0], a[1], b[0], b[1]];
-  }
-  /* 拖曳中的預覽。⚠ 這一支**每個 pointermove 都會跑一次整張 repaint()**(見 onMove)——
-     檔頭 ⑦ 講的「油漆桶會讓這裡變幻燈片」指的就是它。 */
-  function previewShape() {
-    if (!ctx || !lineFrom || !lineTo) return;
-    const pts = shapePts(lineFrom, lineTo, curShape);
-    penStyle({ c: curC, w: curW, er: curEr });
-    if (!curEr) ctx.globalAlpha = 0.55;                 // 擦布不透明化(destination-out 看不出深淺)
-    ctx.beginPath();
-    ctx.moveTo(sx(pts[0]), sy(pts[1]));
-    for (let i = 2; i < pts.length; i += 2) ctx.lineTo(sx(pts[i]), sy(pts[i + 1]));
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-    penEnd();
-  }
-  /* 直線放手 → 成一筆(兩個點)並**一次推送完畢**。
-     ⚠ 不走 pend / flush:那套節流是給徒手畫的連續取樣用的,一條直線只有兩個點。
-     ⚠ 但要先 flush() —— 上一筆徒手畫可能還有沒送出去的點,順序反了對方會看到接錯。 */
-  function commitShape() {
-    const a = lineFrom, b = lineTo || lineFrom;
-    lineFrom = null; lineTo = null;
-    if (!a) return;
-    flush();
-    const sid = sidBase + nextSid++;       // ★ 帶座位命名空間(見 SID_SPAN 那段)
-    const s = { sid: sid, c: curC, w: curW, p: shapePts(a, b, curShape), er: curEr };
-    byId[sid] = s; strokes.push(s);
-    mySids.add(sid);                      // 這一筆的回音要擋掉(見 applyRec)
-    repaint();                            // ⚠ 一定要整張重畫:預覽那條半透明的線還在畫布上
-    cb.onStroke && cb.onStroke(encode(sid, curC, curW, s.p, curEr));
-    syncTool();
-  }
   /* ==========================================================================
      ★★★ 兩指縮放 / 平移(v2.1.0,見檔頭 ⑥)
      ──────────────────────────────────────────────────────────────────────────
@@ -704,7 +644,6 @@ const DWB = (function () {
          那是紅線 19:這一頁的真相是照順序 replay,抽掉中間一筆會讓後面的擦布擦錯東西)
      ⚠ 沒送過的那一條**一定要把 pend 清掉**,不然下一次 flush 會把這幾個點接到別的筆上。 */
   function abortStroke() {
-    if (lineFrom) { lineFrom = null; lineTo = null; repaint(); }
     const s = drawing;
     if (!s) return;
     drawing = null;
@@ -738,8 +677,6 @@ const DWB = (function () {
     e.preventDefault();
     try { cv.setPointerCapture(e.pointerId); } catch (_) {}
     const p = pos(e);
-    // ★ 直線:按下去只記起點,放開才成筆(中間都是預覽)
-    if (curLine) { lineFrom = p; lineTo = p; return; }
     const sid = sidBase + nextSid++;       // ★ 帶座位命名空間(見 SID_SPAN 那段)
     drawing = { sid: sid, c: curC, w: curW, p: [p[0], p[1]], er: curEr };
     byId[sid] = drawing; strokes.push(drawing);
@@ -760,16 +697,6 @@ const DWB = (function () {
     if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinch) { e.preventDefault(); movePinch(); return; }
     if (!enabled) return;
-    // ★ 直線:拖到哪就預覽到哪(⚠ 這一段一定要排在 drawing 那道守衛前面)
-    if (lineFrom) {
-      e.preventDefault();
-      const q = pos(e);
-      const ddx = q[0] - lineTo[0], ddy = q[1] - lineTo[1];
-      if (ddx * ddx + ddy * ddy < MIN_D * MIN_D) return;        // 動太小就別重畫(整張 repaint 有成本)
-      lineTo = q;
-      repaint(); previewShape();
-      return;
-    }
     if (!drawing) return;
     e.preventDefault();
     const p = pos(e);
@@ -792,54 +719,34 @@ const DWB = (function () {
       return;
     }
     if (!ptrs.size) pinchLock = false;
-    // ★ 直線:放手才成一筆(⚠ 排在 drawing 那道守衛前面 —— 直線期間 drawing 一直是 null)
-    if (lineFrom) {
-      try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
-      commitShape();
-      return;
-    }
     if (!drawing) return;
     try { cv.releasePointerCapture(e.pointerId); } catch (_) {}
     drawing = null;
     flush();                                                    // 放手一定要立刻送(不然最後一段會慢 70ms)
   }
-  /* 工具列:四顆色塊 + 擦布。⚠ 用事件委派掛在 #dwTools 上 —— 那一列會被 hidden/顯示,
-     但元素不會重建,所以掛一次就夠(不必每回合重綁)。 */
+  /* 工具列:五顆色塊 + 擦布 / 復原 / 清空。⚠ 用事件委派掛在 #dwTools 上 —— 那一列會被
+     hidden/顯示,但元素不會重建,所以掛一次就夠(不必每回合重綁)。 */
   function bindTools() {
     const box = $("dwTools"); if (!box) return;
     /* ★★ 色塊的顏色**在這裡設**,CSS 裡刻意沒有色碼 —— COLORS 是唯一真相。
-       兩邊各寫一份的症狀是「色塊看起來是藍的、畫出來是綠的」,而且沒有任何斷言會紅。 */
+       兩邊各寫一份的症狀是「色塊看起來是藍的、畫出來是綠的」,而且沒有任何斷言會紅。
+       ⚠⚠ v2.5.4 起寫的是**自訂屬性 `--dw-sw`**,不是 `style.background`:
+         那顆鈕本身現在是「整個節距大小的透明熱區」,看得見的圓是 CSS 的 ::before 畫的
+         (熱區從 18×18 變成 28×36 的來源,見 styles.src.css 的 .dw-sw 那一段)。
+         而鈕自己的 background 已經被**選中狀態那塊底色**用掉了 —— 兩者寫在同一個
+         地方會互相蓋掉(而且是 inline style 贏 → 選中狀態會整顆變成筆色)。
+       ⚠ 這一行仍然是「顏色只有 COLORS 一份」的實作:CSS 那邊只有 `var(--dw-sw)`,沒有色碼。 */
     for (let i = 0; i < SWATCHES; i++) {
       const b = $("dwSw" + i);
-      if (b) b.style.background = COLORS[i];
+      if (b) b.style.setProperty("--dw-sw", COLORS[i]);
     }
     box.addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
       if (b.id === "dwErase") { toggleEraser(); return; }
       if (b.id === "dwUndo") { undo(); return; }        // v1.163.0
-      if (b.id === "dwLine") { toggleLine(); return; }  // v1.163.0
       const m = /^dwSw(\d)$/.exec(b.id || "");
       if (m) pickColor(+m[1]);
     });
-    bindShapes();
-    syncTool();
-  }
-  /* ★★ 形狀條(v2.4.1,見檔頭 ⑦)。它**不住在 #dwTools 裡**(浮在紙上),所以另外綁一次。
-     ⚠ 按了形狀一律順手把直線模式打開 —— 這一條是「按了沒反應」的唯一防線:
-       形狀條只在直線模式下看得見,理論上按不到它時模式一定是開的;
-       但畫布鎖住 / 相位剛換的那一瞬間 class 可能還沒同步,補這一道零成本。 */
-  function bindShapes() {
-    const box = $("dwShapes"); if (!box) return;
-    box.addEventListener("click", e => {
-      const b = e.target.closest("button"); if (!b) return;
-      pickShape(b.dataset.s);
-    });
-  }
-  function pickShape(s) {
-    if (SHAPES.indexOf(s) < 0) return;
-    curShape = s;
-    if (!curLine) curLine = true;
-    modeToast(s === "rect" ? "▭ 矩形:拖出一個框" : s === "oval" ? "◯ 圓形:拖出一個框" : "📐 直線:按住拉一條直的");
     syncTool();
   }
   function bindDraw() {
@@ -849,8 +756,7 @@ const DWB = (function () {
     cv.addEventListener("pointermove", onMove);
     cv.addEventListener("pointerup", onUp);
     cv.addEventListener("pointercancel", onUp);
-    // ⚠ 直線也要收(lineFrom):手指滑出畫布時那一筆得結掉,不然它會一直預覽著
-    cv.addEventListener("pointerleave", e => { if (drawing || lineFrom) onUp(e); });
+    cv.addEventListener("pointerleave", e => { if (drawing) onUp(e); });
     /* 滾輪縮放(桌機)。⚠ passive:false 不可省 —— 少了它 preventDefault() 無效,
        捲的會是整頁,而不是縮放畫布。 */
     cv.addEventListener("wheel", onWheel, { passive: false });
@@ -880,13 +786,10 @@ const DWB = (function () {
       try { showToast("🔍 兩指撐開可以放大畫板,細節更好畫", 2400); } catch (e) {}
     }
     if (!enabled && drawing) { drawing = null; flush(); }
-    /* ⚠ 時間到的那一刻可能正拖著一條還沒放手的直線 —— 丟掉(不是 commit):
-       相位已經換了,adapter 的 ink() 也寫不進去,留著只會在畫布上掛一條預覽線。 */
-    if (!enabled && lineFrom) { lineFrom = null; lineTo = null; repaint(); }
     if (!enabled) clrDisarm();        // ⚠ 相位換掉時武裝要收:下一回合第一次按不該直接清光
-    /* ⚠ 形狀條的顯示條件含 enabled(見 syncTool)→ 這裡改了它就一定要重畫一次,
-       不然相位換掉之後那一條會留在紙上(而且只有「上一回合拿著直線」時才看得到)。 */
-    if (enabled !== was) syncTool();
+    /* ⚠ v2.5.3 之前這裡還有一行 `if (enabled !== was) syncTool()` —— 那是為了「形狀條
+       收不到 paintTools 的收納」而補的(見檔頭 ⑦ 的移除紀錄)。形狀條沒了之後
+       syncTool() 一個字都不看 enabled,留著只是每次換相位多跑一次無效的重畫。 */
     if (cv) cv.classList.toggle("live", enabled);
     /* ★★ 可以下筆的那一刻就把自己的形狀推出去(v2.2.0)——
        ⚠ 不可以只靠 fit() 那條:畫家的畫布通常從 pick 相位到 draw 相位一個 px 都沒動,
@@ -930,7 +833,6 @@ const DWB = (function () {
     clrDisarm();                      // ⚠ 直接呼叫這一支的路徑(e2e / 診斷頁)也要把武裝收掉
     if (!enabled) return;
     drawing = null; pend = []; pendSid = -1;
-    lineFrom = null; lineTo = null;   // 拖到一半的直線也一起丟掉
     if (flushT) { clearTimeout(flushT); flushT = null; }
     strokes = []; byId = {}; mySids.clear(); clearCanvas();
     curEr = false;                    // 清空之後回到筆(擦空白的紙沒有意義)
@@ -992,57 +894,27 @@ const DWB = (function () {
     }
     const er = $("dwErase");
     if (er) { er.classList.toggle("on", curEr); er.setAttribute("aria-pressed", curEr ? "true" : "false"); }
-    const ln = $("dwLine");
-    if (ln) { ln.classList.toggle("on", curLine); ln.setAttribute("aria-pressed", curLine ? "true" : "false"); }
-    /* ★★ 形狀條:直線模式 **而且畫得動**才出現(v2.4.1)。
-       ⚠⚠ `enabled` 那一半不可省 —— 它住在 `.dw-wrap` 裡,**不在 `#dwTools` 那一列**,
-         所以 `paintTools()` 把工具列收起來時它**不會跟著消失**:相位換到 pick / show
-         之後,上一回合留下來的 `curLine` 會讓它繼續浮在選題卡與拍立得上面。
-         (另一半是 CSS:它不可以有 z-index,不然連蓋板都蓋不住它。) */
-    const shBox = $("dwShapes");
-    if (shBox) shBox.classList.toggle("hidden", !(curLine && enabled));
-    let curBtn = null;
-    for (let i = 0; i < SHAPES.length; i++) {
-      const b = $(SHAPE_IDS[SHAPES[i]]);
-      if (!b) continue;
-      const on = SHAPES[i] === curShape;
-      b.classList.toggle("on", on);
-      b.setAttribute("aria-pressed", on ? "true" : "false");
-      if (on) curBtn = b;
-    }
-    /* ★★★ 工具列那顆鈕的圖示要跟著形狀換(紅線 24:「哪一顆亮著」是使用者判斷
-       現在能做什麼的唯一線索 —— 亮著一顆斜線卻在畫矩形就是在騙人)。
-       ⚠⚠ 圖示**從形狀條那三顆鈕身上抄過來**,不在 JS 裡另寫一份 SVG:
-         兩份 SVG 漂移的症狀是「工具列的圖示與形狀條對不起來」,而那沒有任何斷言會紅
-         (同色塊的顏色只准有 COLORS 一份的理由)。尺寸差異交給 CSS 的 .dw-ln svg。 */
-    if (ln && curBtn && ln.dataset.shape !== curShape) {
-      ln.dataset.shape = curShape;
-      ln.innerHTML = curBtn.innerHTML;
-      const nm = curShape === "rect" ? "矩形" : curShape === "oval" ? "圓形" : "直線";
-      ln.setAttribute("aria-label", nm);
-      ln.title = nm + "(按住拉一個" + (curShape === "line" ? "條" : "框") + ";再按一次回到一般筆)";
-    }
     /* ⚠ 復原鈕沒東西可撤時要**真的鎖住**(disabled),不是只調透明度 ——
        按了沒反應比灰著更讓人以為壞了。 */
     const un = $("dwUndo");
     if (un) un.disabled = !lastLive();
-    // 只改鼠標樣式,不影響任何幾何。⚠ 三種模式互斥,所以這兩個 class 不可能同時掛上
-    if (cv) { cv.classList.toggle("erasing", curEr); cv.classList.toggle("lining", curLine); }
+    // 只改鼠標樣式,不影響任何幾何
+    if (cv) cv.classList.toggle("erasing", curEr);
   }
   /* ==========================================================================
-     ★★★ 筆 / 直線 / 擦布是**三選一的模式**(v1.165.0)
+     ★★★ 筆 / 擦布是**二選一的模式**(v1.165.0 定案三選一;v2.5.4 收成二選一)
      ──────────────────────────────────────────────────────────────────────────
        使用者:「擦布跟直線工具不要同時用,現在工具有點不容易了解在幹嘛」。
        v1.163.0~v1.164.0 讓直線與擦布**各自獨立**(想法是「擦一條直線很自然」),
        代價是畫面上會出現「兩顆同時亮著」,而使用者根本推不出那代表什麼 ——
        兩個獨立的布林 = 四種狀態,但工具列只講得出「哪幾顆亮著」。
-       → 現在是互斥的三種模式,**永遠只有一顆亮**(或都不亮 = 一般筆)。
+       → v1.165.0 改成互斥的三種模式;v2.5.4 移除直線之後只剩**筆 vs 擦布**,
+         而「現在拿的是哪一支」變成一句話:**亮著的那一顆色塊,或者亮著的擦布**。
        ⚠ 畫面上的分組與填色在 draw.html / styles.css,但**互斥的真相在這裡** ——
-         只改 CSS 的話兩個旗標還是會同時成立,而 stats().tool 會說謊。
+         只改 CSS 的話旗標還是會不一致,而 stats().tool 會說謊。
      ========================================================================== */
   function modeToast(txt) { try { showToast(txt, 1100); } catch (e) {} }
-  /* 選色。⚠ 從**擦布**回到筆(擦布模式下顏色沒有意義),但**直線模式保留** ——
-     在直線模式下換顏色是合理的需求,把人踢回一般筆很煩。 */
+  /* 選色。⚠ 從**擦布**回到筆(擦布模式下顏色沒有意義)。 */
   function pickColor(i) {
     if (!COLORS[i]) return;
     curC = i;
@@ -1051,17 +923,7 @@ const DWB = (function () {
   }
   function toggleEraser(on) {
     curEr = (on === undefined) ? !curEr : !!on;
-    if (curEr && curLine) { curLine = false; lineFrom = null; lineTo = null; }   // 互斥
     modeToast(curEr ? "🧽 擦布:擦掉一部分" : "✏️ 一般筆");
-    syncTool();
-  }
-  function toggleLine(on) {
-    curLine = (on === undefined) ? !curLine : !!on;
-    if (curLine && curEr) curEr = false;                                          // 互斥
-    if (!curLine && lineFrom) { lineFrom = null; lineTo = null; repaint(); }
-    modeToast(!curLine ? "✏️ 一般筆"
-              : curShape === "rect" ? "▭ 矩形:拖出一個框"
-              : curShape === "oval" ? "◯ 圓形:拖出一個框" : "📐 直線:按住拉一條直的");
     syncTool();
   }
 
@@ -1794,7 +1656,7 @@ const DWB = (function () {
     init, fit, resetInk, applyRec, setEnabled, clearInk, setBrush, setSeat,
     /* v2.2.0:這一回合我是不是畫家(= 畫布形狀的來源,見檔頭 ①)。 */
     setArtist,
-    pickColor, toggleEraser, toggleLine, undo, syncTool,
+    pickColor, toggleEraser, undo, syncTool,
     /* 兩指縮放(v2.1.0)。zoomAt 匯出只給診斷 / e2e 用 —— 真人走的是手勢與那顆晶片。 */
     resetView, zoomAt,
     setShotInfo, shareShot, shotLines, shotDataUrl,
@@ -1815,8 +1677,7 @@ const DWB = (function () {
       return { n: live.length, pts: live.reduce((a, s) => a + s.p.length / 2, 0),
                er: live.filter(s => s.er).length,        // 幾筆是擦除(v1.157.0)
                un: strokes.length - live.length,         // 幾筆被撤銷了(v1.163.0)
-               c: curC, tool: curEr ? "er" : (curLine ? "line" : "pen"),
-               line: curLine, shape: curShape, w: boxW, h: boxH,
+               c: curC, tool: curEr ? "er" : "pen", w: boxW, h: boxH,
                /* v2.1.0:兩指縮放的檢視狀態(倍率 + 位移)。守門要量得到
                   「放大之後送出去的座標有沒有跟著歪掉」。 */
                k: vk, vx: vx, vy: vy,

@@ -10591,31 +10591,57 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      (只有並排時看得出來,而那正是最容易被忽略的一種歪)。 */
   .dw-tool{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:2px;
     border:1px solid var(--panel-line);border-radius:11px;padding:6px 12px;
+    min-width:38px;min-height:38px;
     background:rgba(255,255,255,.08);color:var(--text);font-family:'Nunito',sans-serif;
-    font-weight:800;font-size:13px;cursor:pointer;transition:.15s}
+    font-weight:800;font-size:13px;cursor:pointer;transition:.15s;
+    -webkit-tap-highlight-color:transparent}
   .dw-tool:hover{background:rgba(255,255,255,.16)}
-  .dw-tool:active{transform:scale(.94)}
-  /* ★★ 模式(直線 / 擦布)與動作(復原 / 清空)之間的分組線(v1.165.0)——
+  .dw-tool:active{transform:scale(.92)}
+  /* ★★ 模式(擦布)與動作(復原 / 清空)之間的分組線(v1.165.0;v2.5.4 起模式只剩一顆)——
      使用者:「現在工具有點不容易了解在幹嘛」。這一條線幾乎不佔寬度(1px),
      但它是「這兩顆是切換、那兩顆是按一下就做」最便宜的說明。
      ⚠ 只放**一條**:色塊是圓的、工具鈕是圓角方的,那一組本來就分得出來,
        再多一條就是從題目那一格身上拿寬度(360px 上題目只剩 80 幾 px)。 */
   .dw-sep{flex:none;width:1px;height:20px;background:var(--panel-line);opacity:.8}
-  /* ---------- 四色 + 擦布(v1.157.0)----------
-     ⚠ 色塊的 background **不在這裡寫** —— 由 js/draw/board.js 讀 COLORS[i] 設 inline style
-       (單一真相,見 draw.html 那段註解)。這裡只管形狀與「哪一顆亮著」。
-     ⚠ 尺寸 20px:這一列是 flex:none、絕對不可以換行(換行就吃掉畫布的高度),
-       而 20px 是「手指按得到」與「360px 手機放得下四顆 + 擦布 + 清空」的交會點。 */
-  .dw-pens{flex:none;display:flex;align-items:center;gap:5px}
-  .dw-sw{width:20px;height:20px;padding:0;border-radius:50%;flex:none;cursor:pointer;
-    border:2px solid rgba(255,255,255,.5);box-shadow:0 1px 3px rgba(0,0,0,.35);
-    transition:transform .12s,border-color .12s}
-  .dw-sw:active{transform:scale(.88)}
-  .dw-sw.on{border-color:var(--accent);transform:scale(1.18)}
+  /* ---------- ★★★ 五色 + 擦布(v1.157.0;v2.5.4 把熱區與那個圓拆開)----------
+     使用者的回報是「按不準、容易誤觸、手指大很難按」,而在此之前**鈕本身就是那個圓**
+     → 窄畫面上熱區只有 **18×18 = 324px²**,那正是按不準的來源。
+
+     ★★★ **現在鈕吃滿整個「節距」(色塊 + 間距),看得見的圓交給 ::before。**
+       量出來的結果(360×803×3 裝置模擬):熱區 **25×38 = 950px²**(+193%)、
+       圓從 18px 變 22px(+49% 面積),而 `#dwTools` 的 scrollWidth − clientWidth 還是 0。
+     ⚠⚠ 所以 `.dw-pens` 的 gap 是 **0** —— 間距住在鈕的內側。給它 gap 就等於在兩顆
+       熱區之間鑿一條「按了沒反應」的溝,而那條溝正好在手指最容易落下的地方。
+     ⚠ `min-height:30px` 是**保險不是設計值**:高度是「從那一列借」來的,而借得到的前提是
+       那一列裡還有別的東西(工具鈕)在撐高度 —— 萬一哪天某個狀態把三顆鈕全藏起來,
+       這一排就會塌成 0 高(而那是**看得到卻按不到**,最難查的一種)。實測時它永遠不生效。
+     ⚠⚠ 高度靠 **align-items:stretch** 從那一列身上拿(不寫死 px):
+       這一列的高度由工具鈕決定,寫死的話兩邊一改就會分岔,而「熱區比看起來矮一截」
+       是量不到的(scrollWidth 正常、截圖也正常)。
+     ⚠ 顏色仍然**不在這裡寫**:由 js/draw/board.js 讀 COLORS[i] 設 `--dw-sw`
+       (單一真相;兩份漂移的症狀是「色塊看起來是藍的、畫出來是綠的」)。
+       ★ 帶 fallback 是為了診斷頁:JS 還沒跑時那五顆不該是隱形的。
+
+     ★★★ **選中狀態刻意「不放大」(v2.5.4 拿掉了 transform:scale(1.18))。**
+       transform 會**連帶放大熱區**:18px + scale 1.18 = 21.2px,而節距只有 20px
+       → **選中的那一顆會蓋掉左右鄰居各 0.6px**,於是「想按隔壁那個顏色卻又按到現在
+       這一顆」= 使用者說的「誤觸」有一半是這條造成的。放大是在製造它要解決的問題。
+       → 改成 **底色晶片 + 內描邊的環**:它永遠等於節距,不可能溢出去壓到鄰居。
+     ⚠ `:active` 的縮小留著(那是**變小**,不會壓到鄰居),而且縮的是圓、不是熱區。 */
+  .dw-pens{flex:none;display:flex;align-self:stretch;align-items:stretch;gap:0}
+  .dw-sw{width:32px;min-height:30px;flex:none;padding:0;border:none;background:none;cursor:pointer;
+    display:grid;place-items:center;border-radius:999px;
+    -webkit-tap-highlight-color:transparent;transition:background .12s,box-shadow .12s}
+  .dw-sw::before{content:"";width:26px;height:26px;border-radius:50%;
+    background:var(--dw-sw,#8b8b8b);border:2px solid rgba(255,255,255,.55);
+    box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .12s,border-color .12s}
+  .dw-sw:active::before{transform:scale(.86)}
+  .dw-sw.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent)}
+  .dw-sw.on::before{border-color:rgba(255,255,255,.95)}
   /* ★★ 「現在拿的是這個」一定要**整顆填色**(v1.165.0)。
-     在此之前只換邊框 + 加一點白 —— 在 30px 的鈕上根本看不出來,而這一頁的三種模式
-     (筆 / 直線 / 擦布)是互斥的,「哪一顆亮著」就是使用者判斷現在能做什麼的**唯一線索**。
-     使用者:「現在工具有點不容易了解在幹嘛」。
+     在此之前只換邊框 + 加一點白 —— 在 30px 的鈕上根本看不出來,而這一頁的模式
+     (筆 / 擦布,v2.5.4 之前還有直線)是互斥的,「哪一顆亮著」就是使用者判斷
+     現在能做什麼的**唯一線索**。使用者:「現在工具有點不容易了解在幹嘛」。
      ⚠ 文字色要夠深:填的是 --accent(亮橘),白字在上面會糊掉。 */
   .dw-tool.on{border-color:var(--accent);background:var(--accent);color:#2a1136;
     box-shadow:0 2px 10px rgba(0,0,0,.28)}
@@ -10625,7 +10651,6 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        看起來像「按到了但沒反應」,比灰著更讓人以為壞掉。 */
   .dw-tool:disabled{opacity:.35;cursor:default;pointer-events:none}
   .dw-ink.erasing{cursor:cell}
-  .dw-ink.lining{cursor:crosshair}
 
   /* ---------- 猜題訊息列 ----------
      ⚠ 高度固定成三行左右並自己捲:讓它跟著內容長高的話,每有人猜一次
@@ -10696,9 +10721,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ 它是 .dw-stage 的孩子、.dw-wrap 的兄弟 → 被 .dw-stage 的 overflow:hidden 切齊,
        兩端進出畫面剛剛好,不必自己做遮罩。
      ⚠⚠ pointer-events:none 不可省:它橫過整張紙,吃得到點擊就是「畫到一半忽然畫不動」。
-     ⚠⚠ top 是 **46px 不是 16px** —— 紙的左上角有倍率晶片 .dw-pinch、右上角有形狀條
-       .dw-shapes,16px 會**正好橫過那兩顆**。它只是被蓋住兩秒鐘(z-index 比較高),
-       但那兩秒剛好是畫家最可能想換形狀的時候。往下讓開一整列就沒事了。 */
+     ⚠⚠ top 是 **46px 不是 16px** —— 紙的左上角有倍率晶片 .dw-pinch(v2.5.4 之前
+       右上角還有形狀條),16px 會**正好橫過它**。它只是被蓋住兩秒鐘(z-index 比較高),
+       但那兩秒剛好是畫家最可能想縮回原本大小的時候。往下讓開一整列就沒事了。 */
   .dw-banner{position:absolute;left:0;right:0;top:46px;z-index:3;pointer-events:none;
     display:flex;align-items:center;justify-content:center;gap:8px;
     padding:8px 14px;opacity:0;
@@ -10730,30 +10755,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-flash.go{animation:dw-flash .76s ease-out forwards}
   @keyframes dw-flash{0%{opacity:0}8%{opacity:.92}100%{opacity:0}}
 
-  /* ---------- ③ 形狀條:直線 / 矩形 / 圓形(建議書 2.1 的「幾何輔助形狀」)----------
-     ⚠⚠ 刻意**不放進 #dwTools** —— 那一列在 360px 上已經剛好塞滿(紅線 3-D),
-       而且形狀是「進了直線模式才需要選」的東西,平常擺在那裡是純雜訊。
-       跟 .dw-pinch 同一套:浮在紙上、只在需要時出現、蓋住的那一小角是刻意的取捨。
-     ⚠ 貼**右上角**(.dw-pinch 佔了左上)。公布答案那一層的分享鈕也在右上,
-       但兩者相位互斥(這一條只在 draw 相位、而且只有拿著直線工具時才在)。
-     ⚠ 顏色不可以吃 --text / --panel:它疊在紙上,而紙不跟主題走(紅線 11)。
-     ⚠⚠⚠ **不可以給它 z-index。** 它與 #dwOver 同一個堆疊脈絡(都住在 .dw-wrap 裡),
-       而 #dwOver 沒有 z-index —— 給了 z-index:2 就會**浮在選題 / 公布答案的蓋板上面**,
-       那時根本不能畫,留著只是擋字。.dw-pinch 從 v2.1.0 起就是靠「排在 #dwOver 前面
-       且不設 z-index」壓在下面的,這一條照抄它。 */
-  .dw-shapes{position:absolute;top:8px;right:8px;display:flex;gap:4px;
-    padding:3px;border-radius:999px;border:1px solid rgba(0,0,0,.14);
-    background:rgba(255,255,255,.88);box-shadow:0 2px 8px rgba(0,0,0,.20)}
-  .dw-shapes.hidden{display:none}
-  .dw-shp{width:28px;height:28px;padding:0;border:none;border-radius:50%;cursor:pointer;
-    display:inline-flex;align-items:center;justify-content:center;
-    background:transparent;color:var(--dw-ink);transition:background .12s,color .12s}
-  .dw-shp:active{transform:scale(.9)}
-  /* ⚠ 亮起來一律**整顆填色**(紅線 24):只換邊框在 28px 上根本看不出來 */
-  .dw-shp.on{background:var(--dw-ink);color:var(--dw-paper)}
-  /* 工具列那顆鈕的圖示會跟著形狀換(js/draw/board.js 的 syncTool 從形狀條抄過來)——
-     ⚠ 抄來的 SVG 帶著 15px 的寬高屬性,尺寸統一由這一條接手。 */
-  .dw-ln svg{width:17px;height:17px}
+  /* ---------- ③ (空號)形狀選擇條 —— v2.4.1 加、v2.5.4 移除 ----------
+     那一條浮在紙上的直線 / 矩形 / 圓形選擇條,連同工具列那顆直線鈕一起拿掉了。
+     ⚠ 它本身**不佔工具列的寬度**(浮在畫布右上角),所以刪它省不到寬度 ——
+       省下來的是工具列那顆鈕的 30px + 4px 間距,而那 34px 全部進了色塊的熱區
+       (見上面 .dw-sw 那一段)。理由與「加回來要付什麼」在 js/draw/board.js 檔頭 ⑦。
+     ⚠ 編號留著不遞補:下面第 ④ ⑤ 節與 notes 的交叉引用都照這個號碼寫。 */
 
   /* ---------- ④ 清空的兩段式:武裝中要一眼看得出來(建議書 2.1)----------
      ⚠ 窄畫面(≤430px)那一段把 .dw-clr-t 藏起來 → 那時候「確定?」三個字是看不到的,
@@ -10881,7 +10888,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
 
   /* ---------- ⑩ 會暈車的人(以及省電模式)----------
      ⚠ 這一段只關掉**裝飾性**的循環動畫與入場動畫,不關「狀態看得出來」的那一半:
-       .dw-tool.armed 的底色、.dw-shp.on 的填色、.dw-input.near 的火苗晶片全部留著 ——
+       .dw-tool.armed 的底色、.dw-tool.on / .dw-sw.on 的填色、.dw-input.near 的火苗晶片
+       全部留著 ——
        那些是資訊,不是特效(關掉的話兩段式確認就變成「按了沒反應」)。 */
   @media (prefers-reduced-motion:reduce){
     .dw-banner.go,.dw-flash.go,.dw-cd.bomb,.dw-cd.bomb::after,.dw-stage.dw-hot::after,
@@ -10932,6 +10940,21 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      會把題目擠成省略號 —— 而題目是畫家唯一要讀的字。
      所以窄畫面把兩個**純裝飾的字**藏掉(標籤與「清空」二字),圖示與功能全部留著。
      ⚠ 不可以改成讓 .dw-tools 換行:它是 flex:none,換行就是從畫布身上拿走高度。
+     ★★★ **v2.5.4 的寬度帳(量出來的,不是估的)** —— 360×803×3 裝置模擬,
+       這一列的可用寬是 **331.2px**,而它是**零空隙**的(溢出 0、題目那一格 69.9px、
+       4 個字要 68px → 餘裕 1.9px)。所以「把色塊放大」的唯一來源就是拿掉一個東西:
+         · 拿掉直線鈕 …… **+34px**(30 + 一個間距)
+         · ≤430px 藏掉題目旁那顆圖示 …… **+18.3px**(見下面那段 media)
+       花在哪:色塊的節距 20 → **25px**、工具鈕 30 → **38px**(那一列跟著高 8px,
+       而色塊是 stretch → 熱區的高度**跟著工具鈕一起長**,這是同一筆錢買兩樣東西)。
+       決算:5×25 + 3×38 + 1(分組線)+ 5×4(間距)+ 68(題目)= **328 ≤ 331.2** ✓
+       實測熱區:色塊 **25×38 = 950px²**(原本 18×18 = 324,+193%)、
+                 工具鈕 **38×38 = 1444px²**(原本 30×30 = 900,+60%)。
+       ⚠ 代價是畫布矮 8px(424 → 416,1.9%)—— 那是刻意付的:
+         「多出來的空間永遠是畫布的」講的是**不要讓 UI 悄悄長大**,
+         而這一次是拿 8px 去買「按得到」,量過、寫在這裡。
+     ⚠⚠ 這一列的高度是**工具鈕撐出來的** → 調工具鈕的 px 等於在調畫布的高。
+       36px 那個數字是「畫布只讓 6px」與「熱區 936px²」的交會點,不是隨手寫的。
      ★★★ **斷點是 600px,不是 430px**(v2.4.3 改)。這不是為了題目旁那顆圖示,
        而是因為**寬版佈局在 431~565px 本來就塞不下** —— 實測 431px:
        固定元件(標籤 58 + 五色 120 + 四顆鈕 191 + gap 56)已經超過整列寬度,
@@ -10942,25 +10965,36 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @media (max-width:600px){
     .dw-word-lbl{display:none}
     .dw-clr-t{display:none}
-    /* ★★ v1.163.0 又多了直線 📏 與復原 ↩️ —— 這一列變成「題目 + 四色 + **四顆**工具鈕」,
+    /* ★★ v1.163.0 又多了直線 📏 與復原 ↩️ —— 這一列曾經是「題目 + 五色 + **四顆**工具鈕」,
        而原本的 padding:6px 12px 在 360px 上會把題目擠成兩個字加省略號。
-       → 窄畫面把工具鈕改成 30px 的**正方形圖示鈕**(那三顆的文字本來就已經藏起來了),
+       → 窄畫面把工具鈕改成**正方形圖示鈕**(那三顆的文字本來就已經藏起來了),
          並把兩處 gap 收緊 8→6 / 5→4;v2.4.3 又把這一條收到 **4px**
          (題目旁多了一顆圖示,而間距是這一列上**唯一不會讓任何東西變難按的寬度來源**)。
+       ★ v2.5.4 直線鈕移除 → 只剩**三顆**,而那 34px 換成了 30 → **36px**(見上面的寬度帳)。
        ⚠ 絕對不可以改成讓 .dw-tools 換行:它是 flex:none,換行就是從畫布身上拿走高度。
        ⚠ 題目是畫家唯一要讀的字 —— 改動這一段之後一定要用**裝置模擬**量一次
          `#dwTools` 的 scrollWidth - clientWidth(必須是 0),Edge 視窗壓不到 360px。 */
     .dw-tools{gap:4px}
     /* ★★ v1.170.0 又多了第五顆色塊(黃)。20px + gap 4 的話這一列會多吃 24px,
        而題目那一格在 360px 上只剩 80 幾 px → 直接被擠成省略號。
-       → 窄畫面把色塊縮成 18px、gap 收到 3px:五顆只比原本四顆多 10px
-         (v2.4.3 再收到 **2px** —— 同上,色塊本體還是 18px,沒有變難按)。
-       ⚠ 18px 是下限(再小手指按不到);要再加第六顆的話**只能從別的地方生空間**,
-         不可以繼續縮 —— 而且一定要用裝置模擬量 scrollWidth − clientWidth === 0。 */
-    .dw-pens{gap:2px}
-    .dw-sw{width:18px;height:18px}
-    .dw-tool{padding:0;width:30px;height:30px;display:inline-flex;align-items:center;
-      justify-content:center;font-size:15px}
+       → v1.170.0~v2.5.3 的做法是把色塊縮成 **18px**、gap 收到 2px。
+       ★★★ **而那正是「按不準」的來源** —— 鈕本身就是那個圓,熱區只有 18×18。
+         v2.5.4 起鈕吃滿節距、圓由 ::before 畫,所以這裡調的是**兩個不同的數字**:
+           · `.dw-sw` 的 width = **節距**(熱區的寬,26px)
+           · `::before` 的 width/height = **看得見的那個圓**(22px)
+         兩者的差 4px 就是「看起來的間距」—— 而它是熱區的一部分,按下去有反應。
+       ⚠⚠ 要再加第六顆色塊的話**只能從別的地方生空間**(這一列早就是零空隙了),
+         而**不可以把節距縮回 20px 以下** —— 那等於把 v2.5.4 這一版整個退回去。
+         改完一定要用裝置模擬量 scrollWidth − clientWidth === 0。 */
+    .dw-sw{width:25px}
+    .dw-sw::before{width:22px;height:22px}
+    /* ⚠ 這裡的 width/height 其實**贏不過**基礎那條 min-width/min-height:38px
+       (min-* 的優先權高於 width)—— 所以窄畫面的鈕實測是 **38×38**,寫 36 只是下限。
+       ⚠⚠ 那 2px 的差就是題目那一格的生死線:實測 38px 的鈕會把題目壓到 **66.2px**
+         而 4 個字要 68 → **被截**。補回來的方式是色塊節距 26 → 25(色塊圓不動),
+         決算 5×25 + 3×38 + 1 + 5×4 + 68 = 328 ≤ 331.2 ✓(題目實得 71.2px)。 */
+    .dw-tool{padding:0;width:36px;height:36px;display:inline-flex;align-items:center;
+      justify-content:center;font-size:18px}
     .dw-word{font-size:17px}
     /* ★★★ 題目旁那顆圖示(v2.4.3)—— 這一列上**唯一新增的寬度**,而它本來就剛好塞滿。
        實測(360x803x3 裝置模擬、題目格是 flex:1 吃掉剩下的全部):
@@ -10981,6 +11015,13 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      工具列的斷點是 600px(它塞不下),而這一列真正塞不下的只有 430px 以下 ——
      兩列的寬度預算不一樣,合成一個斷點就是在 431~600px 白白藏掉兩個看得懂的字。 */
   @media (max-width:430px){
+    /* ★★★ 題目旁那顆圖示(v2.4.3 加)在**真正的手機寬度**上收掉(v2.5.4)。
+       它是這一列上唯一「錦上添花」的東西 —— v2.4.3 那段註解自己就寫了
+       「⚠⚠ 圖示不可以拿工具鈕、色塊或分組線來換寬度,那三個是手指要按的」,
+       而現在正是反過來用它:**+18.3px**(圖示本體 14.3 + 一個間距 4)全部進色塊的節距。
+       ⚠ 431~600px 照舊看得到它(那個區間的寬度夠,見上面的寬度帳)。
+       ⚠ 藏的是圖示不是題目 —— 題目那四個字一個都不准掉。 */
+    .dw-word-ic{display:none}
     /* 字數晶片在窄畫面只留數字(「答案 3 字」→「3 字」)——
        同一列上還有回合數 + 畫家名字 + 放大鈕 + 倒數環,而那顆環是 34px 不可壓。 */
     .dw-len-l{display:none}
