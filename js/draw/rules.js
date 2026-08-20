@@ -53,7 +53,14 @@ const DWR = (function () {
      ⚠ 因此**舊房間(沒有這一欄)會退回「開」** —— 這是刻意的,不是漏寫。
        想關掉的房主按一下就好,而那顆鈕就在大廳。 */
   const CUS = [0, 1];
-  const DEF_SEC = 60, DEF_ROUNDS = 2, DEF_DIFF = "std", DEF_CO = 0, DEF_CU = 1;
+  /* ★★★ 階梯式提示(v2.5.3):0 = 關(經典玩法)、1 = 開。
+     使用者要解的痛點是「畫得抽象時全場乾等到時間到」——
+     ⚠ 預設**開**(同 cu、與 co 相反)。它確實動到計分(拿了提示才猜中的分數會折),
+       但那正是它成立的前提:不折的話「等提示」永遠是最佳策略。預設關的話
+       等於每一場都要先去翻設定,而這一條就是為了現場體驗才做的。
+     ⚠ 因此**舊房間(沒有這一欄)會退回「開」** —— 刻意的,不是漏寫。 */
+  const HIS = [0, 1];
+  const DEF_SEC = 60, DEF_ROUNDS = 2, DEF_DIFF = "std", DEF_CO = 0, DEF_CU = 1, DEF_HI = 1;
 
   /* ---------- 房規:白名單正規化 ----------
      ⚠ 一律走這一支(不要在別處各自 if):舊房間沒有這個欄位、手改 DB 的怪值
@@ -68,19 +75,21 @@ const DWR = (function () {
       rounds: ROUNDS.indexOf(r.rounds) >= 0 ? r.rounds : DEF_ROUNDS,
       diff: DIFFS.indexOf(r.diff) >= 0 ? r.diff : DEF_DIFF,
       co: COS.indexOf(r.co) >= 0 ? r.co : DEF_CO,
-      cu: CUS.indexOf(r.cu) >= 0 ? r.cu : DEF_CU
+      cu: CUS.indexOf(r.cu) >= 0 ? r.cu : DEF_CU,
+      hi: HIS.indexOf(r.hi) >= 0 ? r.hi : DEF_HI
     };
   }
   function sameRules(a, b) {
     a = normRules(a); b = normRules(b);
     return a.sec === b.sec && a.rounds === b.rounds && a.diff === b.diff
-        && a.co === b.co && a.cu === b.cu;
+        && a.co === b.co && a.cu === b.cu && a.hi === b.hi;
   }
   /* ★ 畫家可不可以自己出題(v1.171.1)—— **唯一的真相**:
      蓋板上那一格畫不畫得出來、以及送出時擋不擋,兩邊都問這一支
      (比照 mayInk;分兩處各寫一次 if 就是兩個真相,遲早會不一致)。
      ⚠ 吃的是**開局凍結的那一份**(dw.rules),不是大廳當下的 rules。 */
   function mayOwnWord(rules) { return normRules(rules).cu === 1; }
+  function mayHint(rules) { return normRules(rules).hi === 1; }
 
   /* ---------- ★★★ 誰的筆畫得進去(v1.170.0 共同作畫)----------
      使用者:「假如還有人沒猜出來,其他人可以幫忙畫,但幫忙畫的人要是一定猜成功了」。
@@ -234,6 +243,109 @@ const DWR = (function () {
   const COOL_MS = 3000;
   function coolMs() { return COOL_MS; }
 
+  /* ==========================================================================
+     ★★★ 階梯式提示(v2.5.3)—— 純函式,而且「每一台各自算」
+     ──────────────────────────────────────────────────────────────────────────
+       需求來源:notes/Gemini建議/你畫我猜末段提示機制優化建議.md。要解的痛點是
+       「畫家畫得抽象 / 猜的人陷入盲區 → 全場乾等到時間到」(v1.167.0 拿掉失格之後,
+       沒人猜中的那一題就是硬等 60~120 秒,見紅線 27)。
+
+       ★★ **一個位元組都不寫進 DB。** 三個輸入全部是每一台本來就有的東西:
+         · 這一段開始的時間 `d.at` + 這一段有多長(房規的 sec)→ 現在是第幾階段
+         · `d.mid` + `d.n` → 揭露哪幾個字的**亂數種子**(決定性 → 每一台完全一致)
+         · 題目本身(DB 上是明碼,紅線 6)
+       所以它沒有第二個真相、不會有人先看到提示、也不必動資料庫規則。
+       ⚠⚠ 這一條**不可以**改成「由 host 算完寫進 d.hint」:那等於把一件算得出來的事
+         變成一次寫入 + 一次同步延遲,而且慢半拍收到的人分數會算錯(見下面的 settle)。
+
+       ★ 三個門檻用「**剩餘時間的比例**」而不是秒數 —— 房規有 60 / 90 / 120 三種,
+         寫成秒數的話 120 秒那一檔的第一階段會在剩 50% 之前就冒出來(或反過來)。
+         60 秒 → 30 / 15 / 7.5 秒;120 秒 → 60 / 30 / 15 秒。
+       ⚠ 建議書寫的是 45/60/90(那是 v2.4.1 之前的房規),比例換算之後一致。
+
+       階梯(st):
+         0  自由作畫期 —— 只有「幾個字」(v1.161.0 就有的公開提示,紅線 25)
+         1  剩 50% —— 題目**分類**徽章(見 DWGen.CATS)
+         2  剩 25% —— 隨機揭露 1 個字
+         3  剩 12.5% —— 4 個字以上再揭露 1 個(上限見 revealCap)
+
+       ⚠⚠⚠ **揭露上限是總字數的一半(向下取整)** —— 所以:
+         · 1 個字的題(題庫有 29 條)**永遠不揭露**:揭露就是直接報答案。
+         · 2~3 個字最多 1 個、4 個字以上最多 2 個。
+         建議書寫的「不超過 50%」就是這一條,而 1 個字那個邊界它沒有講到 ——
+         floor(1/2)=0 剛好把它擋掉,**不要改成 Math.ceil**。
+
+       ★★ 分數係數 f:**跟「真的拿到了什麼提示」掛鉤,不是跟時間掛鉤**。
+         · 已經揭露到字 → 0.5
+         · 只有分類 → 0.75
+         · 什麼都沒有 → 1.0
+         ⚠ 為什麼不直接看 st:**畫家自己出的題沒有分類**(dw.cw,見 DWGen.catAt),
+           而 1 個字的題永遠不揭露 —— 照 st 折的話那兩種情況會「沒拿到提示卻被扣分」,
+           而玩家完全看不出來為什麼。所以 hasCat 與 revealCap 都要餵進來。
+       ⚠ 房規關掉(on=false)時一律回 `{st:0, rv:0, f:1}` —— 那時候連折扣都不存在。 */
+  const HINT_LEFT = [0.5, 0.25, 0.125];      // 剩餘比例的三個門檻(對應 st = 1 / 2 / 3)
+  const HINT_F1 = 0.75;                      // 只拿到分類
+  const HINT_F2 = 0.5;                       // 已經開了字
+  /* 這一題最多揭露幾個字。⚠ floor 不是 ceil(見上面那段:1 個字的題永遠 0)。 */
+  function revealCap(len) { return Math.floor(Math.max(0, len | 0) / 2); }
+  /* ms = 這一段已經過了幾毫秒 · total = 這一段有多長 · len = 正解幾個字
+     on = 房規開著沒 · hasCat = 這一題有分類沒(自訂題目沒有)
+     → { st, rv, f }。⚠ 一律防呆:total <= 0(舊快照 / 還沒開始)時回第 0 階段。 */
+  function hintAt(ms, total, len, on, hasCat) {
+    const zero = { st: 0, rv: 0, f: 1 };
+    if (!on) return zero;
+    const t = +total || 0;
+    if (t <= 0) return zero;
+    const left = (t - Math.max(0, +ms || 0)) / t;      // 剩餘比例(可能 < 0,那就是最後一階)
+    let st = 0;
+    for (let i = 0; i < HINT_LEFT.length; i++) if (left <= HINT_LEFT[i]) st = i + 1;
+    const cap = revealCap(len);
+    const rv = st >= 3 ? Math.min(2, cap) : st >= 2 ? Math.min(1, cap) : 0;
+    const f = rv >= 1 ? HINT_F2 : (st >= 1 && hasCat ? HINT_F1 : 1);
+    return { st: st, rv: rv, f: f };
+  }
+
+  /* ---------- 揭露哪幾個字:決定性亂數 ----------
+     ★★★ **每一台看到的位置必須一模一樣**(建議書三之1的「重要原則」)——
+       兩台不一樣的話畫面上完全正常,但兩個人講的提示對不上,而且沒有人查得出來。
+       → 做法是「種子 + 題目」的雜湊,種子由呼叫端給 `mid + ":" + n`
+         (這一場的識別碼 + 第幾回合;每回合都不一樣、而每一台都算得出同一個值)。
+     ⚠ 題目本身也進雜湊:不進的話同一回合換題(自訂題目改主意)會開在同一個位置,
+       而那沒有壞處但也沒有理由。
+     ⚠ 用 FNV-1a + LCG 的 Fisher-Yates,**不可以用 Math.random()** ——
+       那會讓每一台開在不同的位置(這一整條紅線就白做了)。同 UNO 的決定性 PRNG。 */
+  function hash32(s) {
+    let h = 2166136261 >>> 0;
+    const str = String(s == null ? "" : s);
+    for (let i = 0; i < str.length; i++) { h = (h ^ str.charCodeAt(i)) >>> 0; h = Math.imul(h, 16777619) >>> 0; }
+    return h >>> 0;
+  }
+  /* 揭露的順序(索引陣列;前 k 個就是要揭露的那幾格)。 */
+  function revealOrder(word, seed) {
+    const cs = Array.from(String(word == null ? "" : word));
+    const idx = cs.map((c, i) => i);
+    let h = hash32(String(seed) + "|" + cs.join(""));
+    for (let i = idx.length - 1; i > 0; i--) {
+      h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
+      const j = h % (i + 1);
+      const t = idx[i]; idx[i] = idx[j]; idx[j] = t;
+    }
+    return idx;
+  }
+  /* ★★★ 給畫面用的遮罩:陣列,**揭露的那幾格是字元、其餘一律是 null**。
+     ⚠⚠ 回的是 null 而不是 "_" 或那個字 —— 這一支的呼叫端會把它寫進 DOM,
+       而「沒揭露的字一個都不進 DOM」是紅線 6 / 25 的結構性保證
+       (偷看 DOM 比偷看 DB 容易太多)。畫底線是**畫面層的事**,不是這裡的事。
+     ⚠ k 一律再夾一次 revealCap:呼叫端算錯也不會多開一格。 */
+  function revealMask(word, seed, k) {
+    const cs = Array.from(String(word == null ? "" : word));
+    const n = Math.min(Math.max(0, k | 0), revealCap(cs.length));
+    const ord = revealOrder(cs.join(""), seed);
+    const on = {};
+    for (let i = 0; i < n; i++) on[ord[i]] = 1;
+    return cs.map((c, i) => (on[i] ? c : null));
+  }
+
   /* ---------- 這一回合誰是畫家 ----------
      ★ order 是開局凍結的座位表;第 n 回合(0-based)由 order[n % order.length] 畫。
      ⚠ 但**離開的人不畫** —— 見 plan() / nextLive()。 */
@@ -336,6 +448,25 @@ const DWR = (function () {
     return Math.round(s / k * DRAW_MULT / 10) * 10;
   }
 
+  /* ---------- ★★★ 拿了提示才猜中 → 分數要折(v2.5.3)----------
+     ★ 不折的話「**等提示**」就是最佳策略:反正到剩 25% 會開一個字,早猜只是多冒錯的風險。
+       折了之後階梯才有意義 —— 早猜的人拿滿分,靠提示的人拿一半。
+     ★★ 折扣的判定吃的是 **`hits[id].t`(那個人猜中時已經過了幾毫秒)**,
+       也就是與畫面上的階梯**同一個真相**(見 hintAt)——
+       所以不必在猜中那一刻多寫一個欄位進 DB,結算時算得出來。
+     ⚠ hc(hint context)= `{ ms: 這一段有多長, len: 正解幾個字, cat: 有沒有分類 }`;
+       **傳 null / 不傳 = 房規關掉**(或舊版呼叫端)→ 一律不折,行為與 v2.5.2 逐分相同。
+     ⚠ 取整到 10:分數表全部是 10 的倍數,折完出現 112.5 會讓結果卡看起來像壞掉。
+     ⚠⚠ **`drawerPts` 吃的是折完的總和** —— 這是刻意的,而且紅線 18 那條
+       「畫好嚴格優於畫爛」照樣成立:畫得好 → 大家早猜中 → 折得少 → 總和大 →
+       畫家分跟著大。它只是把「畫爛拖到提示才有人猜中」那條路的收益一起壓下去。 */
+  function hintCut(p, ms, hc) {
+    if (!hc) return p;
+    const h = hintAt(ms, hc.ms, hc.len, true, !!hc.cat);
+    if (h.f >= 1) return p;
+    return Math.round(p * h.f / 10) * 10;
+  }
+
   /* ---------- 一回合的完整結算 ----------
      hits = { pid: {t:猜中時的毫秒數, o:第幾個猜中(0-based)} }(由 adapter 在交易裡寫)
      guessers = 這一回合「有資格猜」的人數(= 回合開始時在房裡的人 − 畫家)
@@ -345,14 +476,14 @@ const DWR = (function () {
      ⚠ v1.163.0 起畫家分吃的是**猜題者這一回合拿到的總分**(見 drawerPts),
        所以那個總和一定要在這裡邊算邊累加 —— 不可以事後拿 res 重算,
        因為畫家自己那一格也會寫進 res(加起來就把畫家分算進分母了)。 */
-  function settle(drawerId, hits, guessers) {
+  function settle(drawerId, hits, guessers, hc) {
     const res = {};
     const solo = guessers === 1;
     const ids = Object.keys(hits || {});
     let sum = 0;
     ids.forEach(id => {
       const h = hits[id] || {};
-      const p = guessPts(h.o | 0, h.t | 0, solo);
+      const p = hintCut(guessPts(h.o | 0, h.t | 0, solo), h.t | 0, hc);
       res[id] = (res[id] || 0) + p;
       sum += p;
     });
@@ -464,11 +595,12 @@ const DWR = (function () {
   }
 
   return {
-    PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, COS, CUS,
-    DEF_SEC, DEF_ROUNDS, DEF_DIFF, DEF_CO, DEF_CU,
-    normRules, sameRules, mayInk, mayOwnWord, norm, hit, near, cleanCustom, CUSTOM_MAX, COOL_MS, coolMs,
+    PICK_MS, SHOW_MS, SECS, ROUNDS, DIFFS, COS, CUS, HIS,
+    DEF_SEC, DEF_ROUNDS, DEF_DIFF, DEF_CO, DEF_CU, DEF_HI,
+    normRules, sameRules, mayInk, mayOwnWord, mayHint, norm, hit, near, cleanCustom, CUSTOM_MAX, COOL_MS, coolMs,
+    HINT_LEFT, HINT_F1, HINT_F2, revealCap, hintAt, revealOrder, revealMask,
     drawerAt, totalOf, plan, nextLive,
-    guessPts, drawerPts, settle, roundDone,
+    guessPts, drawerPts, hintCut, settle, roundDone,
     blankSt, tally, awards,
     standings, champs
   };

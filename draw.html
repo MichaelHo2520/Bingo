@@ -199,6 +199,22 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
 
+      <!-- ★★★ 階梯式提示(v2.5.3)。要解的痛點是「畫得抽象 / 猜的人陷入盲區 →
+           全場乾等到時間到」(v1.167.0 拿掉失格之後,沒人猜中的那一題就是硬等 60~120 秒)。
+           作畫過半給**分類**、剩四分之一起**隨機開字**(最多開總字數的一半)。
+           ⚠⚠ 拿了提示才猜中的分數會折(75% / 50%)—— 不折的話「等提示」就是最佳策略,
+              整個階梯就白做了。唯一的真相在 js/draw/rules.js 的 hintAt / hintCut。
+           ⚠ 預設**開**(同自訂題目、與共同作畫相反):它就是為了現場體驗才做的,
+              預設關等於每一場都要先來翻設定。舊房間也會退回開。
+           ⚠ 沒揭露的字**一個都不進 DOM**(見 board.js 的 setHint)—— 同紅線 6。 -->
+      <div class="field">
+        <span class="field-label" id="dwHiLabel">階梯式提示</span>
+        <div class="seg" id="dwHiSeg" aria-label="要不要在倒數末段放提示">
+          <button data-v="0">🔒 只給字數</button>
+          <button class="on" data-v="1">💡 分類 + 開字</button>
+        </div>
+      </div>
+
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">

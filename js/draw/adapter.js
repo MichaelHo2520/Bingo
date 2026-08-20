@@ -46,6 +46,11 @@ const MP = MPCore.create((function () {
      只在開新的一場 / 回大廳 / 離開時清。共同作畫是房規,每回合都播就是刷版。 */
   let saidCo = false;
   let coolEnd = 0;                      // 我的冷卻到什麼時候(本地)
+  /* ★★ 階梯式提示的去重(v2.5.3)。三個都是**這一回合**的 → attachRound 裡清。
+     · hintKey  上一次算出來的「階段 / 開了幾個字」,一樣就不重畫(這一支跟著 200ms 的
+                倒數 tick 跑,不去重的話等於每 200ms 重畫一次頂列與輸入列)
+     · saidCat / saidRv  猜題列那兩則播報過沒有(**播一次就好**,每 tick 播一次是刷版) */
+  let hintKey = "", saidCat = false, saidRv = 0;
   /* ★ 放大模式(v1.155.0):吃掉猜題列與頂列,全部讓給畫布。存在偏好裡(ownPrefs),
      下次進來記得住 —— 一場要開關好幾次的東西,每次都要重按太煩。 */
   let zoom = false;
@@ -71,17 +76,57 @@ const MP = MPCore.create((function () {
        自訂題目的 `dw.w` 留在 -1(它不進 d.used,那是題庫索引的清單),
        寫 `dw.w >= 0` 的地方在自訂題目那一回合會全部靜靜地當成「還沒選題」——
        症狀是猜題者那顆字數晶片整回合不出現。 */
-  function wordOf() {
-    const c = DWR.cleanCustom(dw && dw.cw);
+  function wordOf(d) {
+    d = d || dw;
+    const c = DWR.cleanCustom(d && d.cw);
     /* ★ i = 圖示(v2.4.3 起畫家的工具列也要用)。自訂題目沒有題庫那一顆,
        給它 ✏️ —— 跟選題卡那一格「✏️ 就畫這個」同一個字,
        畫家一眼就分得出「這是我自己出的題」。 */
     if (c) return { w: c, a: [], i: "✏️" };
-    return dw && dw.w >= 0 ? DWGen.wordAt(dw.w) : null;
+    return d && d.w >= 0 ? DWGen.wordAt(d.w) : null;
   }
   /* 答案幾個字 —— 頂列晶片 / 猜題框 placeholder / 系統訊息 / 分享圖**四處同一個真相**。
      ⚠ 一律 Array.from 數字元(理由見 DWGen.lenAt 那一段)。 */
-  function wordLen() { const w = wordOf(); return w ? Array.from(w.w).length : 0; }
+  function wordLen(d) { const w = wordOf(d); return w ? Array.from(w.w).length : 0; }
+
+  /* ==========================================================================
+     ★★★ 階梯式提示(v2.5.3)—— adapter 這一半只有「把 dw 翻譯成參數」
+     ──────────────────────────────────────────────────────────────────────────
+       演算法整包在 DWR(hintAt / revealMask,純函式)。這裡兩支:
+         · hintCtx(d) —— 結算時要的三個數(這一段多長 / 幾個字 / 有沒有分類)
+         · hintNow()  —— 畫面現在要顯示什麼(階段 / 分類 / 遮罩)
+       ★★ **一個位元組都不寫進 DB**(理由在 DWR 那一段):每一台從 `d.at` +
+         房規的秒數自己算,而揭露位置由 `mid + ":" + n` 當種子 → 決定性、每台一致。
+       ⚠⚠ 分類來自**題庫那一筆的 `c`**(DWGen.catOf)—— 畫家自己出的題沒有分類,
+         那一回合的第一階段就是「沒有」,而且**分數也不折**(見 DWR.hintCut)。
+       ⚠ hintCtx 一定要吃得下「交易回呼裡的 g.dw」:toShow 是在交易裡結算的,
+         那時候模組的 `dw` 可能還是上一份快照。 */
+  function hintCtx(d) {
+    d = d || dw;
+    if (!d || !DWR.mayHint(d.rules)) return null;
+    const w = wordOf(d);
+    if (!w) return null;
+    return {
+      ms: DWR.normRules(d.rules).sec * 1000,      // ⚠ 用房規算,不用 phaseMs():結算那一刻相位可能已經在換
+      len: Array.from(w.w).length,
+      cat: !!DWGen.catOf(w.c)
+    };
+  }
+  /* 現在該顯示什麼。★ 回的 mask 是 DWR.revealMask 的陣列(**沒揭露的那幾格是 null**)——
+     「沒揭露的字一個都不進 DOM」是紅線 6 / 25 的結構性保證,底線是畫面層自己補的。 */
+  function hintNow() {
+    const off = { st: 0, rv: 0, cat: null, mask: null };
+    if (!dw || dw.ph !== "draw") return off;
+    const hc = hintCtx();
+    if (!hc) return off;
+    const w = wordOf();
+    const h = DWR.hintAt(Date.now() - (dw.at || 0), hc.ms, hc.len, true, hc.cat);
+    return {
+      st: h.st, rv: h.rv,
+      cat: (h.st >= 1 && hc.cat) ? DWGen.catOf(w.c) : null,
+      mask: h.rv > 0 ? DWR.revealMask(w.w, (dw.mid || 0) + ":" + dw.n, h.rv) : null
+    };
+  }
 
   /* ★★★ 筆劃 / 猜題訊息的節點路徑一定要帶 **mid(這一場的識別碼)**。
      回合索引每一場都從 0 重新算 —— 只用 ink/{n} 的話,同一間房打第二場時
@@ -153,7 +198,9 @@ const MP = MPCore.create((function () {
       const d = g.dw;
       if (!d || d.ph !== "draw" || d.seq !== seq) return false;
       const drawer = DWR.drawerAt(g.order || [], d.n);
-      const add = DWR.settle(drawer, d.hits || {}, d.gs | 0);
+      /* ★★ v2.5.3:拿了提示才猜中的分數要折(hintCtx 回 null = 房規關掉 → 一分都不折)。
+         ⚠ 一定要傳 **交易裡的 d**,不是模組的 dw:那一份才是這一回合真正的題目與房規。 */
+      const add = DWR.settle(drawer, d.hits || {}, d.gs | 0, hintCtx(d));
       const pts = Object.assign({}, d.pts || {});
       Object.keys(add).forEach(id => { pts[id] = (pts[id] || 0) + add[id]; });
       d.pts = pts;
@@ -396,6 +443,8 @@ const MP = MPCore.create((function () {
        ⚠ 這些子節點的監聽核心收不掉(見檔頭 ①),detachRound() 一定要自己叫。
      ========================================================================== */
   function attachRound(d) {
+    // ★ 提示是「這一回合」的:新回合一律從第 0 階段重新播(v2.5.3)
+    hintKey = ""; saidCat = false; saidRv = 0;
     const key = (d.mid || 0) + "#" + d.n;
     if (inkRound === key) return;
     detachRound();
@@ -479,9 +528,11 @@ const MP = MPCore.create((function () {
          (畫家看的是工具列那一格題目)、**題目真的選好了**(wordOf() 不是 null)。
        ⚠⚠ 第三個條件從 v1.171.0 起**一定要問 wordOf()**,不可以退回 `dw.w >= 0`:
          畫家自己出題那一回合 dw.w 留在 -1(見 wordOf 那一段)。
-       ⚠ 傳出去的只有**數字**,題目文字一個字都不進 DOM(見 DWB.setLen 那段)。 */
+       ⚠ 傳出去的只有**數字**與「已經揭露的那幾個字」,其餘一個字都不進 DOM
+         (v2.5.3 起這一格也是階梯式提示的出口,見 DWB.setHint 那一段)。 */
     const lenOn = dw.ph === "draw" && !iAmDrawer() && !!wordOf();
-    DWB.setLen(lenOn ? wordLen() : 0);
+    const h = lenOn ? hintNow() : null;
+    DWB.setHint(lenOn ? { len: wordLen(), cat: h.cat, mask: h.mask } : null);
     const ms = phaseMs(dw);
     if (ms && dw.ph !== "over") DWB.setCd((dw.at || 0) + ms, ms, dw.ph + "#" + dw.seq);
     else DWB.setCd(0, 0);
@@ -499,8 +550,11 @@ const MP = MPCore.create((function () {
     }
     // 放棄了(v1.168.0):輸入列留著、但鎖住並說清楚原因(不能反悔,見 giveUp)
     if (dw.gv && dw.gv[me]) { DWB.setGuess({ show: true, can: false, why: "🏳️ 你放棄了這一題" }); return; }
-    // ★ len:正解幾個字(v1.161.0)—— placeholder 上也講一次,打字時眼睛就在這一格
-    DWB.setGuess({ show: true, can: true, coolEnd: coolEnd, len: wordLen() });
+    /* ★ len:正解幾個字(v1.161.0)—— placeholder 上也講一次,打字時眼睛就在這一格。
+       ★★ v2.5.3:開了字之後 placeholder 換成遮罩(「＿奶＿＿」)—— 同一個理由,
+         手指在打字時眼睛不會抬到頂列那顆晶片去。⚠ 遮罩由 board 自己組字串
+         (它拿到的陣列裡沒揭露的那幾格是 null,見 DWR.revealMask)。 */
+    DWB.setGuess({ show: true, can: true, coolEnd: coolEnd, len: wordLen(), mask: hintNow().mask });
   }
   /* 工具列。★★ v1.170.0 起有**兩種角色**共用這一列:
        · 畫家 —— 題目 + 五色 + 直線 / 擦布 / 復原 / 清空(全套)
@@ -601,6 +655,38 @@ const MP = MPCore.create((function () {
     try { Sound.place(); } catch (e) {}
   }
 
+  /* ---------- ★★ 階梯式提示:播報 + 跟著倒數 tick 同步(v2.5.3)----------
+     ★ 呼叫端只有兩個:①每一份快照(applyGame,涵蓋重連 / 換回合)②倒數的 200ms tick
+       (board.js 的 tickCd 回呼)—— **刻意不另外開 timer**:那一支本來就在跑,
+       而且它的錨點是「相位開始時間 + 這一段多長」,分頁被凍結過也不會走鐘。
+     ⚠⚠ 一定要**去重**(hintKey):不去重就是每 200ms 重畫一次頂列 + 輸入列,
+       而 CLAUDE.md 紅線 7 那條「不要在每次換畫面的路徑上做重算」講的就是這個
+       (症狀會是別頁的版面斷言一起紅 —— 載入變慢)。
+     ⚠ 畫家不必收:他看得到題目,提示對他只是雜訊。 */
+  function syncHint(force) {
+    if (!dw || ctx.phase() !== "playing") return;
+    const h = hintNow();
+    const k = h.st + "/" + h.rv;
+    if (!force && k === hintKey) return;
+    hintKey = k;
+    paintBar(); paintGuessRow();
+    if (iAmDrawer()) return;
+    /* 分類徽章冒出來 → 猜題列講一次(眼睛在畫布與猜題列上,頂列很容易被忽略) */
+    if (h.cat && !saidCat) {
+      saidCat = true;
+      DWB.sysSay("💡 提示:這一題是【" + h.cat.n + "】" + h.cat.i);
+      DWB.hintPop();
+      try { Sound.place(); } catch (e) {}
+    }
+    /* 開字 → 同上。⚠ 用 `>` 比大小而不是布林:4 個字的題會開兩次,兩次都要講。 */
+    if (h.rv > saidRv) {
+      saidRv = h.rv;
+      DWB.sysSay("💡 提示:" + DWB.maskText(h.mask) + "(猜中的分數會折)");
+      DWB.hintPop();
+      try { Sound.mark(); } catch (e) {}
+    }
+  }
+
   /* ---------- 大廳的規則說明 ---------- */
   function ruleHint() {
     const el = $("dwRuleHint"); if (!el) return;
@@ -617,6 +703,12 @@ const MP = MPCore.create((function () {
       /* ★ 自訂題目(v1.171.1)。⚠ **關掉時才講**:它預設開著,而預設值不必在規則說明裡
          佔一行(那一段每多一句就少一點被讀完的機會);關掉是房主特地按的,那才要講。 */
       (rules.cu ? "" : "<br>✏️ 這一場<b>不能自己出題</b>,畫家只能從三個候選裡挑。") +
+      /* ★★ 階梯式提示(v2.5.3)。⚠ **兩種都要講**:開著的時候要講清楚「分數會折」
+         (不然拿了提示才猜中的人會覺得算錯了),關掉的時候要講「沒有提示」
+         —— 它預設開著,習慣了之後忽然沒有反而更像壞掉。 */
+      (rules.hi
+        ? "<br>💡 <b>階梯式提示</b>:過半給<b>分類</b>、剩四分之一起<b>隨機開字</b>(最多開一半)—— 拿了提示才猜中的分數會折(75% / 50%)。"
+        : "<br>💡 這一場<b>沒有提示</b>,只看得到答案幾個字。") +
       "<br>每人當 <b>" + rules.rounds + "</b> 次畫家 · 一回合 <b>" + rules.sec + "</b> 秒 · 題目「" +
       L.label + "」(" + L.desc + ")";
   }
@@ -658,6 +750,7 @@ const MP = MPCore.create((function () {
     resetRound() {
       detachRound();
       dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; saidCo = false; coolEnd = 0;
+      hintKey = ""; saidCat = false; saidRv = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd(); DWB.setEnabled(false);
     },
     /* 開一場。★ 座位表:有上一場就整個輪一位(讓不同的人先當畫家),否則洗牌。
@@ -743,6 +836,10 @@ const MP = MPCore.create((function () {
 
       announceHits(); announceGv(); announceFin();
       paintHud(); paintBar(); paintTools(); paintGuessRow(); paintOver();
+      /* ★★ 階梯式提示(v2.5.3):force 對帳一次 —— 中途重連的人要立刻補上已經
+         放出來的提示(旗標是本地的,他手上是空的 → 兩則會一次補齊,那是對的)。
+         ⚠ 一定要排在 attachRound() **後面**:那一支會 clearSay(),順序反了播報會被清掉。 */
+      syncHint(true);
       DWB.fit();
 
       /* 每個猜題者都定案了 → 不必等到 60 秒(規則書第 13 節)。
@@ -765,6 +862,7 @@ const MP = MPCore.create((function () {
       $("mpBar").classList.remove("playing");
       clearPhaseT(); detachRound();
       dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; saidCo = false; coolEnd = 0;
+      hintKey = ""; saidCat = false; saidRv = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
       DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]);
       ruleHint();
@@ -778,6 +876,7 @@ const MP = MPCore.create((function () {
     onLeave() {
       clearPhaseT(); detachRound();
       dw = null; curN = -1; curPh = ""; seenHits = {}; seenGv = {}; seenFin = false; saidCo = false; coolEnd = 0;
+      hintKey = ""; saidCat = false; saidRv = 0;
       DWB.resetInk(); DWB.clearSay(); DWB.hideOver(); DWB.stopCd();
       DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]);
     },
@@ -786,7 +885,7 @@ const MP = MPCore.create((function () {
     syncSetup() {
       const isHost = ctx.isHost();
       [["dwSecSeg", "sec"], ["dwRoundSeg", "rounds"], ["dwDiffSeg", "diff"],
-       ["dwCoSeg", "co"], ["dwCuSeg", "cu"]].forEach(([id, key]) => {
+       ["dwCoSeg", "co"], ["dwCuSeg", "cu"], ["dwHiSeg", "hi"]].forEach(([id, key]) => {
         const seg = $(id); if (!seg) return;
         seg.classList.toggle("readonly", !isHost);
         [...seg.children].forEach(b => {
@@ -796,7 +895,7 @@ const MP = MPCore.create((function () {
       });
       [["dwSecLabel", "作畫秒數"], ["dwRoundLabel", "每人當幾次畫家"],
        ["dwDiffLabel", "題目難度"], ["dwCoLabel", "共同作畫"],
-       ["dwCuLabel", "自訂題目"]].forEach(([id, base]) => {
+       ["dwCuLabel", "自訂題目"], ["dwHiLabel", "階梯式提示"]].forEach(([id, base]) => {
         const el = $(id); if (el) el.textContent = isHost ? base : (base + "(房主決定)");
       });
       ruleHint();
@@ -900,6 +999,9 @@ const MP = MPCore.create((function () {
     /* ---------- 額外暴露給 main.js ---------- */
     api: {
       pick, pickOwn, ink, inkClear, guess, giveUp, setFin, react,
+      /* ★ 階梯式提示跟著倒數的 200ms tick 走(v2.5.3)—— board.js 的 tickCd 回呼進來,
+         去重與播報都在 syncHint 裡面(見那一段)。 */
+      hintTick() { syncHint(false); },
       zoom: () => zoom,
       toggleZoom() { zoom = !zoom; DWB.setZoom(zoom); savePrefs(); },
       rules: () => DWR.normRules(rules),
@@ -916,7 +1018,7 @@ const MP = MPCore.create((function () {
       },
       // 診斷 / e2e 用:目前這一場的狀態(不對外顯示)
       state: () => (dw ? { n: dw.n, ph: dw.ph, seq: dw.seq, w: dw.w, cw: dw.cw || "", len: wordLen(),
-                           hits: dw.hits, miss: dw.miss,
+                           hint: hintNow(), hits: dw.hits, miss: dw.miss,
                            gv: dw.gv, fin: dw.fin, pts: dw.pts, st: dw.st } : null)
     }
   };

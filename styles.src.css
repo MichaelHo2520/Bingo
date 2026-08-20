@@ -10383,6 +10383,36 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     background:rgba(255,255,255,.08);color:var(--muted);
     font-family:'Nunito',sans-serif;font-weight:800;font-size:11.5px;line-height:1}
   .dw-len b{font-family:'Fredoka',sans-serif;font-weight:700;font-size:14px;color:var(--accent-2)}
+  /* ---------- ★★★ 階梯式提示(v2.5.3)——(分類徽章 + 開字方格)----------
+     這一格從 v1.161.0 的「答案 4 字」演化成三個樣子(演算法在 js/draw/rules.js 的
+     hintAt、畫在 js/draw/board.js 的 setHint):
+       st0  `答案 4 字`   st1  `🐾動物 4 字`   st2+ `🐾動物 ▁珠▁▁`
+     ⚠⚠ **沒有揭露的字一個都不進 DOM** —— 空方格是空的 `<b>`,不是「寫上去再遮起來」
+       (紅線 6 / 25:偷看 DOM 比偷看 DB 容易太多)。
+     ⚠ 整組都是 `flex:none` + `nowrap`:.dw-bar 絕對不可以換行(換行就是從畫布身上
+       拿走高度,見紅線 17)。360px 的寬度預算:最寬的 st2 + 4 個字實測 ≈116px,
+       而這一列給它的空間 ≈140px(其餘是回合數 75 + 放大鈕 30 + 倒數環 30 + 四個 gap)。
+     ⚠ 顏色沿用 --accent-2(同畫家那一格題目 .dw-word)—— 兩邊講的是同一件事。 */
+  .dw-hcat{flex:none;display:inline-flex;align-items:center;gap:1px;padding:1px 5px;
+    border-radius:999px;background:rgba(255,255,255,.10);
+    box-shadow:inset 0 0 0 1px var(--panel-line);
+    font-weight:800;font-size:11px;color:var(--text);letter-spacing:.3px}
+  .dw-hmask{flex:none;display:inline-flex;align-items:flex-end;gap:2px}
+  /* 一格 = 一個字。空的只留一條圓角底線(等寬 → 幾個字一眼數得出來);
+     ⚠ 高度要跟數字那一版差不多(16px),不然提示放出來的那一刻整列會跳一下。 */
+  .dw-hc{display:inline-block;width:13px;height:16px;line-height:16px;text-align:center;
+    font-family:'Fredoka',sans-serif;font-weight:700;font-size:13px;
+    border-bottom:2px solid var(--panel-line);border-radius:2px;color:transparent}
+  .dw-hc.on{color:var(--accent-2);border-bottom-color:var(--accent-2)}
+  /* ★ 提示剛冒出來的那一下:彈一下 + 金色外發光(建議書六之2)。
+     ⚠ 只動 transform / box-shadow,**不進版面流**(紅線 36)——
+       這一列是 flex:none,一個不小心撐高就是把畫布壓小,而沒有人會聯想到動畫。 */
+  .dw-len.pop{animation:dwHintPop .8s cubic-bezier(.2,1.6,.35,1)}
+  @keyframes dwHintPop{
+    0%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,209,102,0)}
+    22%{transform:scale(1.18);box-shadow:0 0 12px 3px rgba(255,209,102,.55)}
+    100%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,209,102,0)}
+  }
   /* ---------- 畫家的「畫完了」(v1.168.0)----------
      住在 .dw-bar 裡,與猜題者的字數格 .dw-len 互斥(一個人只會是畫家或猜題者之一)。
      ⚠ 亮起來一定要**整顆填色**(同 v1.165.0 那三顆模式鈕的結論):只換邊框在這個尺寸
@@ -10857,7 +10887,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .dw-banner.go,.dw-flash.go,.dw-cd.bomb,.dw-cd.bomb::after,.dw-stage.dw-hot::after,
     .dw-over.pick .dw-pickbtn,.dw-over.pick .dw-pickbtn.on::after,.dw-over.wait .dw-ov-card,
     .dw-over.show .dw-ov-card,.dw-luv,.dw-say-row,.dw-tool.armed,
-    .dw-input.near .dw-guess,.dw-input.near::before{animation:none}
+    .dw-input.near .dw-guess,.dw-input.near::before,.dw-len.pop{animation:none}
     .dw-banner.go{opacity:1}
   }
 
@@ -10954,6 +10984,12 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     /* 字數晶片在窄畫面只留數字(「答案 3 字」→「3 字」)——
        同一列上還有回合數 + 畫家名字 + 放大鈕 + 倒數環,而那顆環是 34px 不可壓。 */
     .dw-len-l{display:none}
+    /* ★★ 開字之後那一格最寬 → 分類只留圖示(v2.5.3)。實測 360x803x3:不收的話
+       .dw-role 只剩 33px 而且被截(「🎨 麥克」→「🎨 麥…」),而畫家是誰是猜題者
+       唯一要知道的人;分類本身在猜題列已經播過一則,圖示留著當提醒就夠。
+       ⚠ 只在**有遮罩**時收(.dw-len.msk)—— 第一階段那一格還很窄,沒有必要。 */
+    .dw-len.msk .dw-hcat-t{display:none}
+    .dw-len.msk .dw-hc{width:11px}
     /* 「✅ 畫完了」在窄畫面只留圖示(v1.168.0):同一列上有回合數 + 你是畫家 + 放大鈕 +
        倒數環,而 .dw-role 是 flex:1 會先被壓成省略號 ——「🎨 你是畫...」比少三個字更糟。
        ⚠ 圖示留著就好:那一顆亮不亮才是它要講的事(而 title / aria-pressed 都還在)。 */

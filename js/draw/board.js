@@ -128,7 +128,7 @@ const DWB = (function () {
   const MAX_PTS = 24;                    // 一批最多幾個點(超過就立刻送)
   const MIN_D = 4;                       // 與上一個取樣點的距離小於這麼多(邏輯單位)就丟掉
 
-  let cb = {};                           // { onStroke, onClear, onGuess, onPick, onPickOwn, onGiveUp, onFin, onReact }
+  let cb = {};                           // { onStroke, onClear, onGuess, onPick, onPickOwn, onGiveUp, onFin, onReact, onTick }
   let cv = null, ctx = null, dpr = 1;
   let boxW = 0, boxH = 0;                // 畫布的 CSS 尺寸(px)
   /* ---------- 形狀的來源(v2.2.0,見檔頭 ①)----------
@@ -1093,7 +1093,7 @@ const DWB = (function () {
     const el = $("dwCd"); if (el) el.classList.remove("bomb");
     cdAlert(false);
   }
-  function tickCd() {
+  function tickCd(fromTimer) {
     const el = $("dwCd"); if (!el) return;
     const left = Math.max(0, cdEnd - Date.now());
     const sec = Math.ceil(left / 1000);
@@ -1108,6 +1108,14 @@ const DWB = (function () {
       cdLastSec = sec;
       if (sec <= 3) { try { Sound.unmark(); } catch (e) {} }
     }
+    /* ★★ 階梯式提示搭這一班車(v2.5.3):adapter 每次收到都自己去重,而這一支的錨點
+       是「相位開始時間 + 這一段多長」→ 分頁被凍結過也不會走鐘,比另開一個 timer 穩。
+       ⚠⚠ **只在 interval 那條路上派**(fromTimer)—— setCd() 開頭那一次同步 tick
+         不可以派:回呼會走到 adapter 的 paintBar() → 再叫一次 setCd(),而那一刻
+         `cdT` 還沒指派完 → 內層會**再開一個 interval** 而外層把它覆蓋掉
+         (漏掉的那個 interval 永遠不會被 clear,一場下來累積十幾個)。
+         開場的那一次由 adapter 的 applyGame 自己 force 同步,不缺。 */
+    if (fromTimer && cb.onTick) cb.onTick(left, cdTotal, cdDraw);
     if (left <= 0) stopCd();
   }
   function setCd(endAt, totalMs, key) {
@@ -1123,7 +1131,7 @@ const DWB = (function () {
     cdEnd = endAt; cdTotal = totalMs;
     if (cdT) clearInterval(cdT);
     tickCd();
-    cdT = setInterval(tickCd, 200);
+    cdT = setInterval(() => tickCd(true), 200);
   }
   function setRoundInfo(txt, roleTxt, roleCls) {
     const r = $("dwRound"); if (r) r.textContent = txt || "";
@@ -1134,21 +1142,71 @@ const DWB = (function () {
       o.classList.toggle("hidden", !roleTxt);
     }
   }
-  /* ★★ 猜題者的字數提示(v1.161.0)。n = 正解有幾個字;**0 = 整格收起來**。
-     使用者:「我覺得要猜的人應該要知道有幾個字,這樣才不會太廣泛」——
+  /* ★★★ 猜題者的提示格(v1.161.0 的「幾個字」+ v2.5.3 的階梯式提示)。
+     使用者(v1.161.0):「我覺得要猜的人應該要知道有幾個字,這樣才不會太廣泛」——
      沒有這一格的話「畫了一隻四隻腳的動物」可以是貓 / 狗 / 牛 / 長頸鹿,範圍大到猜不動。
-     ⚠⚠ 這一格**只准放數字**,絕對不可以放題目本身(連「遮起來的字」也不行)——
-       偷看 DOM 比偷看 DB 容易太多,那正是 paintPick 對非畫家連文字都不產生的同一條理由。
+     ★★ v2.5.3 起同一格演化成三個樣子(階梯的演算法在 DWR.hintAt,這一支只管畫):
+         st0  `答案 4 字`
+         st1  `🐾 動物 4 字`         ← 過半:分類徽章
+         st2+ `🐾 動物 ＿珠＿＿`      ← 剩四分之一起:隨機開字(字數由方格數看得出來)
+     ⚠⚠⚠ **沒有揭露的字一個都不可以進 DOM** —— 那是紅線 6 / 25 的結構性保證
+       (偷看 DOM 比偷看 DB 容易太多)。所以 adapter 傳進來的 `mask` 陣列裡
+       **沒揭露的那幾格是 `null`**,底線方格是這一支自己補的空 `<b>`;
+       絕對不可以改成「把整個題目寫進去再用 CSS 遮起來」。
+     ⚠ 開了字之後**不再另外寫數字**:方格自己就是字數,兩份寫在同一顆晶片上是雜訊,
+       而這一列在 360px 上塞不下(見紅線 37 那筆寬度預算)。
      ⚠ 誰看得到、什麼時候顯示一律由 adapter 的 paintBar 決定(這一支只管畫),
        而**畫家不需要**:他看的是工具列那一格題目本身。
      ⚠ 這一格住在 .dw-bar(既有的一列)裡,不是新開一列 —— 這一頁多出來的垂直空間
        永遠是畫布的(見 notes/21 紅線 17)。 */
-  function setLen(n) {
+  const MASK_CH = "＿";            // 全形底線:純文字版(placeholder / 猜題列)的空格
+  /* 把 mask 陣列變成一行字。⚠ 全形的字寬剛好與漢字一樣 → 不必靠 letter-spacing 排版,
+     而 placeholder 與猜題列都只吃字串。 */
+  function maskText(mask) {
+    if (!mask || !mask.length) return "";
+    return mask.map(c => (c == null ? MASK_CH : c)).join("");
+  }
+  function setHint(o) {
     const el = $("dwLen"); if (!el) return;
-    const k = Math.max(0, n | 0);
-    el.classList.toggle("hidden", !k);
-    el.innerHTML = k ? '<span class="dw-len-l">答案</span><b>' + k + '</b> 字' : "";
-    el.setAttribute("aria-label", k ? ("答案有 " + k + " 個字") : "");
+    const len = o ? Math.max(0, o.len | 0) : 0;
+    el.classList.toggle("hidden", !len);
+    if (!len) { el.innerHTML = ""; el.setAttribute("aria-label", ""); return; }
+    const cat = o.cat;
+    const mask = (o.mask && o.mask.length) ? o.mask : null;
+    let html = "";
+    /* ⚠ 分類的**名字**要能單獨藏起來(.dw-hcat-t)—— 開字之後這一格最寬,而 360px 上
+       .dw-role(畫家名字)是 flex:1、會先被壓成省略號。實測不收的話它只剩 33px
+       (「🎨 麥克」變成「🎨 麥…」),而畫家是誰是猜題者唯一要知道的人。
+       → 窄畫面 + 有遮罩時只留圖示(分類本身在猜題列已經播過一則)。 */
+    if (cat) html += '<span class="dw-hcat">' + cat.i + '<span class="dw-hcat-t">' + cat.n + '</span></span>';
+    el.classList.toggle("msk", !!mask);
+    if (mask) {
+      html += '<span class="dw-hmask">' +
+        mask.map(c => '<b class="dw-hc' + (c == null ? '' : ' on') + '">' + (c == null ? '' : esc(c)) + '</b>').join("") +
+        '</span>';
+    } else {
+      /* ⚠ 有分類徽章時就不寫「答案」兩個字了 —— 「🍜食物答案4 字」讀起來是壞的,
+         而那兩個字在有徽章的時候本來就沒有資訊量(窄畫面也早就把它藏掉了)。 */
+      if (!cat) html += '<span class="dw-len-l">答案</span>';
+      html += '<b>' + len + '</b> 字';
+    }
+    el.innerHTML = html;
+    el.setAttribute("aria-label",
+      (cat ? ("分類 " + cat.n + "、") : "") +
+      (mask ? ("已經開字 " + maskText(mask)) : ("答案有 " + len + " 個字")));
+  }
+  /* ★ 提示剛冒出來的那一下:整顆晶片彈一下 + 金色外發光(建議書六之2)。
+     ⚠ 一定要先把 class 拔掉再強制 reflow —— 連續兩階提示(4 個字的題會開兩次)
+       之間只隔幾秒,不重啟動畫的話第二次完全不會動。
+     ⚠ 動畫本身純粹是 transform + box-shadow,**不進版面流**(紅線 36)。 */
+  let popT = null;
+  function hintPop() {
+    const el = $("dwLen"); if (!el) return;
+    el.classList.remove("pop");
+    void el.offsetWidth;
+    el.classList.add("pop");
+    if (popT) clearTimeout(popT);
+    popT = setTimeout(() => { popT = null; el.classList.remove("pop"); }, 900);
   }
 
   /* ---------- 畫家的「畫完了」(v1.168.0)----------
@@ -1354,7 +1412,7 @@ const DWB = (function () {
             '<span class="dw-say-t">' + esc(text) + '</span>');
   }
   /* 猜中的:★★ **只講「誰猜中了」,不播內容**(檔頭 ④)。
-     ⚠ v1.161.0 起「正解幾個字」是**公開的提示**(見 setLen),但這裡照樣一個字都不播:
+     ⚠ v1.161.0 起「正解幾個字」是**公開的提示**(見 setHint),但這裡照樣一個字都不播:
        猜中的人打的可能是**同義詞**(貓咪 / 小貓),長度與正解不一樣 → 播了等於多送一條
        正解之外的線索;而內容本身更是直接把答案報給全房。「字數公開」不等於「這一則可以播」。 */
   function addHit(name, seat, rank, secs) {
@@ -1516,8 +1574,13 @@ const DWB = (function () {
       const can = st.can && left <= 0;
       inp.disabled = !can; btn.disabled = !can;
       row.classList.toggle("cool", left > 0);
+      /* ★★ v2.5.3:開了字之後 placeholder 換成遮罩(「＿珠＿＿」)。理由同 v1.161.0 的
+         字數提示 —— 手指在打字時眼睛不會抬到頂列那顆晶片去。
+         ⚠ 沒揭露的字在陣列裡是 null(見 DWR.revealMask),這裡補的是全形底線。 */
+      const mt = maskText(st.mask);
       inp.placeholder = left > 0 ? ("冷卻中… " + Math.ceil(left / 1000) + " 秒")
-                                 : (can ? ("打出你猜的答案" + (st.len > 0 ? " · " + st.len + " 個字" : ""))
+                                 : (can ? (mt ? ("猜這個:" + mt)
+                                              : ("打出你猜的答案" + (st.len > 0 ? " · " + st.len + " 個字" : "")))
                                         : (st.why || "現在不能猜"));
       if (left <= 0 && coolT) { clearInterval(coolT); coolT = null; }
     };
@@ -1735,7 +1798,7 @@ const DWB = (function () {
     /* 兩指縮放(v2.1.0)。zoomAt 匯出只給診斷 / e2e 用 —— 真人走的是手勢與那顆晶片。 */
     resetView, zoomAt,
     setShotInfo, shareShot, shotLines, shotDataUrl,
-    setCd, stopCd, setRoundInfo, setLen, setZoom,
+    setCd, stopCd, setRoundInfo, setHint, maskText, hintPop, setZoom,
     setFinBtn, gvArmed, gvDisarm, setMini,
     /* v2.4.1:清空的兩段式(畫面上那顆 🗑 走這一支;clearInk 是真的動手的那一支) */
     clearAsk, clrArmed, clrDisarm,

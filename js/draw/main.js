@@ -54,7 +54,11 @@ DWB.init({
   onGiveUp() { MP.giveUp(); },
   onFin(on) { MP.setFin(on); },
   /* ★ v2.4.1:公布答案那張卡上的三顆點讚鈕。送的是**既有的表情**,不是新的同步通道 */
-  onReact(emoji) { MP.react(emoji); }
+  onReact(emoji) { MP.react(emoji); },
+  /* ★★ v2.5.3:階梯式提示搭倒數環的 200ms tick(board.js 的 tickCd)。
+     ⚠ 刻意不另外開 timer:倒數那一支的錨點是「相位開始時間 + 這一段多長」,
+       分頁被凍結過也不會走鐘;而去重與播報都在 adapter 的 syncHint 裡。 */
+  onTick() { MP.hintTick(); }
 });
 
 /* ---------- 對局:畫家工具列 ---------- */
@@ -78,6 +82,7 @@ $("dwDiffSeg").addEventListener("click", e => { const b = e.target.closest("butt
    換成預設值,而 setRule 看到「換掉了」就整個不動 → 症狀是「按了那顆鈕完全沒反應」。 */
 $("dwCoSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) MP.setRule("co", +b.dataset.v); });
 $("dwCuSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) MP.setRule("cu", +b.dataset.v); });
+$("dwHiSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) MP.setRule("hi", +b.dataset.v); });
 $("scoreSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (b) MP.setScoreMode(b.dataset.score); });
 /* ⚠ 這一頁的目標分數一次跳 **250**,不是 1 —— 一場的總得分是幾百分起跳
    (規則書那張 850 / 720 的表),±1 的話要按幾百下。核心的 clampGoal 對任何步進都成立。 */
