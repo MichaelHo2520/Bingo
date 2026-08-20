@@ -38,7 +38,7 @@
        ⚠ **不要**改成「要用的時候才載」—— 那會讓第一次贏的那一下延遲一兩秒才出聲。
        ⚠ 這一項只解掉「搶上行」那一半。真正把那 1.37 MB 變小要重編碼成 mp3
          (SFX 改成候選陣列 + sw.js 的 CORE 同一版進 repo),**還沒做** ——
-         見 notes/27-待辦與想法.md 的 1-1。 */
+         見 notes/plan/PLAN-離線快取與資產瘦身.md 第一節。 */
     let preArmed=false;
     function armPreload(){
       if(preArmed)return; preArmed=true;
