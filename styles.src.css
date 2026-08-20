@@ -10873,6 +10873,13 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-luv:nth-child(3){animation-delay:.12s}
   .dw-luv:hover{background:rgba(255,255,255,.30)}
   .dw-luv:active{transform:scale(.88)}
+  /* ★★ 按下去的即時回饋(v2.5.5,使用者回報「按了沒反應」)。
+     飛出來的表情要 ≈1 秒才看得見,而這張卡只活 5 秒 —— 那一秒要有東西講話。
+     ⚠ 講話的是**底色**,不是文字色:那三顆是彩色 emoji,吃不到 `color`(紅線 8)。
+     ⚠ 縮放留很小(1.06 = +2px):三顆之間的間距只有 5px,放大過頭就會壓到鄰居的熱區
+       —— 同 .dw-sw 那條「選中不可以放大」的理由(notes/13 第二十七節)。 */
+  .dw-luv.sent{background:var(--accent);transform:scale(1.06);
+    box-shadow:0 2px 12px rgba(0,0,0,.32);animation:none}
   @keyframes dw-luvin{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:none}}
 
   /* ---------- ⑨ 猜題列:氣泡卡片流(建議書 3.1)----------

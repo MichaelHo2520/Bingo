@@ -378,10 +378,19 @@ const MP = MPCore.create((function () {
      ⚠⚠ 它**只是把既有的表情送出去** —— 核心的 sendEmote 負責寫 DB、飛出動畫與音效,
        這一頁一行新的同步邏輯都沒有(所以也不必動資料庫規則)。
      ⚠ 一律送給 "all":這一刻要的是「全場一起笑」,而挑對象要多一步(那張卡只活 5 秒)。
-     ⚠ 只在 show 相位放行:別的相位那三顆鈕根本不在畫面上,這是寫入端的第二道門。 */
+     ⚠ 只在 show 相位放行:別的相位那三顆鈕根本不在畫面上,這是寫入端的第二道門。
+     ⚠⚠⚠ **這裡以前包著一個 `try{}catch(e){}`,而它把整個功能吞掉了整整三個版本。**
+       `ctx.sendEmote` 在 v2.5.5 之前**不存在**(那個名字只在對外的 `MP.*` 上)——
+       於是每次按都是一個被靜靜吃掉的 TypeError:鈕有縮放動畫、沒有錯誤、
+       沒有任何訊息,而**什麼都不會發生**。使用者回報「按了沒什麼反應」才抓到。
+       → **不要把 catch 加回來。** 這一行沒有任何「預期中的例外」可以吞:
+         `sendEmote` 自己第一行就有 `if(!roomRef||!meId)return;`,沒進房是安靜的;
+         真的丟錯就該讓它浮上來(e2e 的 N 節在守「零 JS 錯誤」)。
+     ★ 守門:e2e 的 S 節 —— 按下去要**真的在 DB 的 emotes 節點多一筆**。
+       只驗「有沒有呼叫到 react()」是抓不到的(它當年就是被呼叫到了)。 */
   function react(emoji) {
     if (!dw || dw.ph !== "show" || !emoji) return;
-    try { ctx.sendEmote("all", String(emoji).slice(0, 8), "emoji"); } catch (e) {}
+    ctx.sendEmote("all", String(emoji).slice(0, 8), "emoji");
   }
 
   /* ★★ 放棄這一題(v1.168.0)。使用者:「如果真的猜不到,我想多一個放棄的功能,

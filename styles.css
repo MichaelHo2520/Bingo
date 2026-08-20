@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 03cd79bdfb8192394e58e6a7dd6dc855923b1d5609b6fbe24e11e08ba9b7c0fe)
+    真相在 styles.src.css(sha256 162203d5b2a8558a9b60849fce7fcd38336461abac69ec5e7a7eb4c08b04f281)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4849,6 +4849,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-luv:nth-child(3){animation-delay:.12s}
   .dw-luv:hover{background:rgba(255,255,255,.30)}
   .dw-luv:active{transform:scale(.88)}
+  .dw-luv.sent{background:var(--accent);transform:scale(1.06);
+    box-shadow:0 2px 12px rgba(0,0,0,.32);animation:none}
   @keyframes dw-luvin{0%{opacity:0;transform:scale(.4)}100%{opacity:1;transform:none}}
   .dw-say-row{animation:dw-sayin .26s ease-out}
   @keyframes dw-sayin{0%{opacity:0;transform:translateX(-7px)}100%{opacity:1;transform:none}}

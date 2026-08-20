@@ -1630,6 +1630,15 @@ const MPCore = (function(){
       dispName, youTag, scoreOf,
       txGame, setRoomField, unreadyOnFieldChange, readyUp,
       renderPlayers, syncSetup, updateGoal,
+      /* ★★ v2.5.5 補進來的:adapter 也要送得出表情。
+         ⚠⚠ 它**在此之前只存在於對外的 `MP.*`**,而 js/draw/adapter.js 的 react()
+           呼叫的是 `ctx.sendEmote(...)` → TypeError,並且被那一行外面的
+           `try{}catch(e){}` 整個吞掉 → **公布答案卡上那三顆點讚鈕從 v2.4.1 加進去
+           到 v2.5.4 一次都沒有作用過**,而畫面上完全看不出來(按下去有縮放動畫、
+           沒有錯誤、沒有任何訊息)。是使用者回報「按了沒什麼反應」才發現的。
+         ★ 補在 ctx 而不是叫 adapter 去抓全域的 MP:「送表情」本來就是 adapter
+           該有的能力,而繞過 ctx 去抓全域是另一種會慢慢長出來的耦合。 */
+      sendEmote,
       maxPlayers:MAX_PLAYERS, minPlayers:MIN_PLAYERS,
       // adapter 自己要讀寫的房內節點(見 A.listen / A.extraNodes);沒進房時回 null
       ref:(path)=>roomRef?roomRef.child(path):null

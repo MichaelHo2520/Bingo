@@ -1171,6 +1171,25 @@ const DWB = (function () {
              '<div class="dw-ov-s">不選的話時間到會幫你選第一個</div></div>', "pick");
     if (box) box.dataset.pk = key;
   }
+  /* ★★ 點讚鈕按下去要**立刻**有反應(v2.5.5,使用者回報)。
+     飛出來的那個表情要 **≈1 秒**才看得見(起飛 0.34s + 淡入到看得清楚),而公布答案
+     那張卡只活 **5 秒** —— 中間那一秒完全沒有反應,使用者的結論就是「按了沒反應」。
+     ⚠ 這一段**純本地**:不進 DB、不影響任何判定,只是把那一秒填起來。
+     ⚠ 不靠 `color`:那三顆是**彩色 emoji**,吃不到 color(CLAUDE.md 紅線 8)
+       → 講話的是**底色**。
+     ⚠ 蓋板每換一次快照就整段重畫 → 這個 class 會跟著消失,那沒關係(它只活 0.9 秒);
+       但 timer 一定要收,不然它會去清一個已經被換掉的元素。 */
+  let luvT = null;
+  function luvSent(btn) {
+    if (!btn) return;
+    btn.classList.add("sent");
+    if (luvT) clearTimeout(luvT);
+    luvT = setTimeout(() => {
+      luvT = null;
+      const box = $("dwOver"); if (!box) return;
+      box.querySelectorAll(".dw-luv.sent").forEach(x => x.classList.remove("sent"));
+    }, 900);
+  }
   /* 三顆題目鈕 + 自己出題的送出。⚠ 用**事件委派、而且只綁一次** —— 綁在 paintPick 裡的話
      每重畫一次就多疊一個監聽(相位快照一動就重畫),按一下會送出好幾次。 */
   function ownSubmit() {
@@ -1184,7 +1203,7 @@ const DWB = (function () {
          會每重畫一次多疊一個監聽 → 按一下送出好幾次)。 */
       if (e.target.closest(".dw-shbtn")) { shareShot(); return; }
       const rb = e.target.closest(".dw-luv");
-      if (rb) { cb.onReact && cb.onReact(rb.dataset.e); return; }
+      if (rb) { luvSent(rb); cb.onReact && cb.onReact(rb.dataset.e); return; }
       if (e.target.closest(".dw-own-b")) { ownSubmit(); return; }
       const b = e.target.closest(".dw-pickbtn"); if (!b) return;
       const k = +b.dataset.k;
