@@ -8399,11 +8399,16 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          --dc-cap-face:#f5ebd2;
          --dc-well:#7d5231; --dc-well-e:#5c3a21; --dc-slot:rgba(52,28,8,.05);
          --dc-tgt:#2e9c4a; --dc-tgt-eat:#e0563b; --dc-tgt-far:#8a5cd6;
-         /* ★ 炮的跳板(v2.3.7)。⚠ 它**一定要是這三個之外的第四種顏色** ——
-            跳板不是落點(點下去什麼都不會發生),第一版拿 --dc-tgt-eat 畫,
-            截圖一看就是「那顆好像也吃得到」。冷色在暖木盤上跳得最開,
-            而綠 / 紅 / 紫都已經被「走 / 吃 / 房規才有的吃」佔走了。 */
-         --dc-scr:#31c8d8;
+         /* ★★ 炮的跳板(v2.3.7 是一圈青色虛線,v2.5.2 起是**紅色 X**)。
+            ⚠⚠ 原本那條「**一定要是三種落點之外的第四種顏色**」的規矩,v2.5.2 起
+              由**形狀**接手:v2.3.7 第一版拿 --dc-tgt-eat 畫成一圈框,截圖一看就是
+              「那顆好像也吃得到」—— 病灶是**框**(落點的語彙全是框與環),不是紅色。
+              X 不在那一套語彙裡,所以紅色反而變成最直白的講法:「這一格點不下去」。
+              ★ 換句話說:要再改回**框 / 環**類的形狀,這條顧慮就自動回來,顏色要換冷色。
+            ⚠ 是深紅不是橘紅(--dc-tgt-eat 的 #e0563b):橘紅畫在淺楓木的棋子上會被木色吃掉。
+            ⚠ --dc-x-lit 那條**淺色描邊**不是裝飾:跳板可能是紅漆字的明棋,紅蓋紅就看不清 ——
+              而哪一顆當跳板是隨機的,截圖不一定撞得到。 */
+         --dc-x:#c62828; --dc-x-lit:rgba(255,247,233,.92);
          /* 棋盤那一塊木頭:深一階的胡桃色。★ 棋子是淺楓木,兩者的明度**一定要拉開** ——
             同一階的話子會埋進盤裡,小格子的手機上尤其看不出哪一格有子。 */
          --dc-slab:#8a5c30; --dc-slab-d:#6b4420; --dc-slab-l:#a06e3d;
@@ -9104,16 +9109,26 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dc-tgt.dc-t-rush:not(.dc-empty)::after,
   .dc-tgt.dc-t-rushDark:not(.dc-empty)::after,
   .dc-tgt.dc-t-dark:not(.dc-empty)::after{border-color:var(--dc-tgt-far)}
-  /* ★★★ 炮的**跳板**(炮架):選中炮的時候,被它拿來當跳板的那幾顆亮一圈虛線。
+  /* ★★★ 炮的**跳板**(炮架):選中炮的時候,被它拿來當跳板的那幾顆蓋一個**紅色 X**。
      這是炮唯一「畫面上完全看不出來」的一段 —— 目標亮在三格外,而「為什麼打得到」
      全靠中間那顆子。標它等於把規則畫出來,新手不必翻說明。
-     ⚠⚠ 用 **outline** 而不是 box-shadow / ::before / ::after:那三個在這一格上
-       全都名花有主(box-shadow = .dc-tgt/.dc-from,::before = .dc-lastto,
-       ::after = 上面那兩條落點),而跳板那一格**同時是其中任何一種都完全可能**
-       (它自己也可能是我這一手吃得到的目標)。outline 是第四條互不干涉的路,
-       而且不佔版面、不影響 fitBoard()。
-     ⚠ outline-offset 給負值讓它縮在格子裡面,不然會壓到隔壁格的刻線上。 */
-  .dc-sq.dc-screen{outline:2px dashed var(--dc-scr);outline-offset:-3px;border-radius:4px}
+     ★ v2.5.2 從「一圈青色虛線」改成 X(使用者:「前面不能移動的是用藍色的虛線,
+       我們有辦法改成畫個紅色 X 嗎?」)—— 虛線框被讀成「這格好像可以做什麼」,
+       而它其實是這一格唯一「點下去什麼都不會發生」的標記。X 沒有這個誤讀空間。
+     ⚠⚠ 它是 board.js 的 xHTML() **多畫的一個 <svg> 節點**,不是偽元素:這一格的
+       box-shadow(.dc-tgt/.dc-from)、::before(.dc-lastto)、::after(上面那兩條落點)
+       全都名花有主,而跳板那一格**同時是其中任何一種都完全可能**(它自己也可能是我這一手
+       吃得到的目標)—— 這也是 v2.3.7 當初選 outline 的原因,但 X 要兩條線、一層偽元素畫不出來。
+     ⚠ absolute + 不佔版面 → 不影響 fitBoard()(那條紅線在跳棋 / 飛行棋 / 麻將消消樂踩過三次)。
+     ⚠⚠ 兩條 path 是**同一條路徑畫兩次**(粗的淺色在下、細的紅色在上)——
+       描邊不可以改用 box-shadow / filter:兩條線交叉,單獨描邊會在交叉處留一道淺色橫痕。
+     ⚠ 尺寸一律 viewBox 的 %(32~68 + 11 的線寬 ≈ 一格的 47%)—— 縮到手機的小格子
+       或放大到 BigMode 都自己跟著走,不必寫第二份。 */
+  .dc-sq .dc-x{position:absolute;left:0;top:0;width:100%;height:100%;
+    pointer-events:none;overflow:visible}
+  .dc-x path{fill:none;stroke-linecap:round}
+  .dc-xh{stroke:var(--dc-x-lit);stroke-width:20}
+  .dc-xi{stroke:var(--dc-x);stroke-width:11}
   /* 炮打出去那一下,跳板輕輕震一下(board.js 的 pulseScreen)。
      ⚠⚠ 動 transform 不動 box-shadow:.dc-p 的底是六層漸層 + 九道陰影,動陰影要逐格重繪,
        而這一拍主執行緒正忙著攻擊方的滑動(v1.137.5「兩個貴的東西同時搶主執行緒」)。
@@ -9570,6 +9585,20 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 賽後表情列(單機沒有對手可以送 → 整列收起來) */
   .dc-react-row{display:flex;justify-content:center;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 16px}
   body.solo-on .dc-react-row{display:none}
+
+  /* ★★ 大廳 / 單機第二層那顆「📋 改規則」——**與底下那顆「開始對局」等高**(v2.5.2)。
+     使用者回報「這兩個按鈕的高度是不是不太一樣,這樣有點奇怪」,而那是兩條共用規則疊出來的:
+       「改規則」= .block-btn(padding 13px · 字 16px)+ .btn.ghost 的 1px 邊框 → 50px
+       「開始對局」= .home-btn(padding 16px · 字 18px,**沒有**邊框)          → 58px
+     ⚠⚠ 對齊的算式是「**兩顆的字級一定要一樣**」:高度 = 2×padding + 邊框 + 行框,
+       而行框只由字級決定(兩顆同一個字體堆疊)—— 18px 的行框量到 26px,
+       所以 15+15+2+26 = 58 = 16+16+26,一格都不差。
+       ⚠ **只調 padding、留著 16px 的字對不起來** —— 兩個行框差 4px,而那是字體的度量,
+         不是可以在這裡算出來的常數(換字體就走鐘,而且沒有任何測試會紅)。
+     ⚠ 主次之分改由**顏色**扛(橘色漸層 vs 半透明的面),不再靠大小 ——
+       一樣高之後反而不會看起來像「上面那顆沒做完」。
+     ⚠⚠ 刻意不動 .block-btn / .home-btn:那兩條是十五頁共用的。 */
+  .dc-rules-btn{padding:15px 16px;font-size:18px}
 
   /* ---------- 房規面板 ----------
      ⚠ 只有**中間那塊**會捲(卡片自己 overflow:hidden + .set-body flex:1/min-height:0)

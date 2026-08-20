@@ -157,7 +157,13 @@ const DC = (function(){
           漏掉這一層的症狀是「連吃關著、暗棋連吃卻還在生效」。
      ========================================================================== */
   function defRules(){
-    return { chain: false, chainDark: false, rush: false, rushBig: false, foeCaps: false };
+    /* ⚠⚠ foeCaps 是這裡**唯一預設開著**的一條(v2.5.2,使用者:「規則的預設對手吃子改為顯示」)
+       —— 它不影響任何判定,而「對手吃了什麼要自己記」在親友聚會的現場幾乎沒人做得到。
+       ★ 這一條預設翻面之後有三個地方跟著非改不可,漏掉哪一個都不報錯:
+         ① normRules() 的那一行(見下面的 ⚠⚠)
+         ② rulesText() 的摘要(它列的是「與標準不同的地方」→ 這一組的兩格正好與另外兩組相反)
+         ③ 舊的本機偏好裡那一欄是**明碼的 false**(adapter.js / solo.js 各一道一次性水位線)。 */
+    return { chain: false, chainDark: false, rush: false, rushBig: false, foeCaps: true };
   }
   function normRules(o){
     const r = defRules();
@@ -166,7 +172,12 @@ const DC = (function(){
       r.chainDark = !!o.chainDark && r.chain;
       r.rush     = !!o.rush;
       r.rushBig  = !!o.rushBig && r.rush;
-      r.foeCaps  = !!o.foeCaps;
+      /* ⚠⚠ 這一條要「**沒帶就用預設**」,不可以寫成 `!!o.foeCaps` —— 另外四條的預設都是
+         false,`!!undefined` 剛好等於它們的預設值,那是巧合;foeCaps 預設 true 之後巧合就
+         沒了,而症狀是「手改 DB / 舊房間少了這一欄 → 靜靜地回到不顯示」。
+         ⚠ 只認 undefined:**明碼的 false 是玩家自己選的**,一律留著
+           (舊偏好那份「不是他選的 false」在 adapter.js / solo.js 的水位線處理,不在這裡)。 */
+      r.foeCaps  = (o.foeCaps === undefined) ? r.foeCaps : !!o.foeCaps;
     }
     return r;
   }
@@ -191,8 +202,25 @@ const DC = (function(){
   const LV_TEXT = {
     chain: ["", "明棋連吃", "暗棋連吃"],
     rush:  ["", "車直衝", "直衝吃大子"],
-    caps:  ["", "顯示對手吃子"]
+    /* ⚠⚠ 這一組的兩格與另外兩組**正好相反**:摘要的規格是「列出與標準暗棋不一樣的地方」,
+       而 v2.5.2 起「顯示」才是標準 → 第 1 段(顯示)沒話講、第 0 段(不顯示)才要講出來。
+       ⚠ 面板上那兩顆鈕的字**不吃這裡**(寫在 darkchess.html),它們照舊是「不顯示 / 顯示」。 */
+    caps:  ["不顯示對手吃子", ""]
   };
+  /* ★★ 舊偏好的一次性水位線(v2.5.2)——「對手吃子」的預設從關翻成開,而**舊的偏好裡
+     那一欄是明碼的 false**(normRules 一律寫滿五欄),什麼都不做的話老玩家永遠看不到新預設,
+     而他們並沒有「選過」不顯示 —— 那只是舊的預設被存下來了。
+     ⚠ 只補 foeCaps 一欄:連吃 / 車直衝是他真的選過的,一個字都不要動。
+     ⚠ 這是**偏好**的水位線,不是房間的 —— 別人開的房(game.rules / dcRules)照 normRules 走,
+       明碼的 false 就是房主的選擇。
+     ⚠⚠ 兩份偏好各存一份版號(連線 `darkchess.prefs.v1` 的 dcRulesV /
+       單機 `darkchess.solo.v1` 的 rulesV)—— 那兩份刻意不共用,見 solo.js 的 OWN_KEY。 */
+  const RULES_V = 2;
+  function migRules(o, v){
+    const r = normRules(o);
+    if((+v || 0) < RULES_V) r.foeCaps = defRules().foeCaps;
+    return r;
+  }
   function ruleLevel(o, kind){
     const r = normRules(o);
     if(kind === "chain") return r.chain ? (r.chainDark ? 2 : 1) : 0;
@@ -209,9 +237,9 @@ const DC = (function(){
   function rulesText(o){
     const r = normRules(o), on = [];
     const c = ruleLevel(r, "chain"), u = ruleLevel(r, "rush"), p = ruleLevel(r, "caps");
-    if(c) on.push(LV_TEXT.chain[c]);
-    if(u) on.push(LV_TEXT.rush[u]);
-    if(p) on.push(LV_TEXT.caps[p]);
+    /* ⚠ 判斷式是「**那一格有字**」而不是「段位不是 0」—— caps 那一組要講的是第 0 段
+       (見 LV_TEXT 的 ⚠⚠),用 `if(p)` 的話它永遠講不出話來,而且不會有任何測試會紅。 */
+    [LV_TEXT.chain[c], LV_TEXT.rush[u], LV_TEXT.caps[p]].forEach(t => { if(t) on.push(t); });
     return on.length ? on.join(" · ") : "標準暗棋";
   }
 
@@ -844,7 +872,7 @@ const DC = (function(){
     // 幾何
     rowOf, colOf, nbs, adjacent, ray, screensBetween, blockedBetween, screenIdx,
     // 房規
-    defRules, normRules, rulesText, ruleLevel, setRuleLevel, LV_TEXT,
+    defRules, normRules, migRules, RULES_V, rulesText, ruleLevel, setRuleLevel, LV_TEXT,
     // 規則
     canBeat, sideAt, seatSide, seatOfSide,
     moveTargets, chainTargets, flipTargets, capTargets, legalMoves,

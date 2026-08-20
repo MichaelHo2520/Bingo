@@ -48,13 +48,16 @@ const Solo = (function(){
       if(LV[o.level]) level = o.level;
       if(["me", "ai", "random"].indexOf(o.first) >= 0) first = o.first;
       if(["ai", "friend"].indexOf(o.opponent) >= 0) opponent = o.opponent;
-      if(o.rules) rules = DC.normRules(o.rules);        // ⚠ 一律 normRules:舊版存的值可能認不得
+      /* ⚠ 一律過一次:舊版存的值可能認不得。⚠⚠ 而且走的是 **migRules** ——
+         「對手吃子」的預設 v2.5.2 翻成開,舊偏好裡那一欄是明碼的 false(見 rules.js)。 */
+      if(o.rules) rules = DC.migRules(o.rules, o.rulesV);
       rec = (o.rec && typeof o.rec === "object") ? o.rec : {};
     }catch(e){}
     Object.keys(LV).forEach(k => { if(!rec[k]) rec[k] = blank(); });
   }
   function saveOwn(){
-    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, first, opponent, rules: DC.normRules(rules), rec })); }catch(e){}
+    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, first, opponent,
+      rules: DC.normRules(rules), rulesV: DC.RULES_V, rec })); }catch(e){}
   }
   const recOf = k => rec[k] || blank();
   function recText(k){

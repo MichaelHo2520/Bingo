@@ -488,14 +488,18 @@ const MP = MPCore.create((function(){
 
     /* ---------- 偏好 ---------- */
     // ⚠ big = 大棋盤(v1.178.4):存的是「意願」,BigMode 自己決定這一刻要不要生效
-    ownPrefs(){ return { turnSec: turnSec, dcRules: DC.normRules(rules), skin: skin, big: BigMode.get() }; },
+    ownPrefs(){ return { turnSec: turnSec, dcRules: DC.normRules(rules), dcRulesV: DC.RULES_V,
+                         skin: skin, big: BigMode.get() }; },
     usePrefs(o){
       // 大棋盤:舊偏好沒有這欄 → 預設關。這一刻畫面還在選單,BigMode 的守衛會壓著不生效。
       BigMode.set(!!o.big);
       if(typeof o.turnSec === "number" && (o.turnSec === 0 || (o.turnSec >= 10 && o.turnSec <= 180))) turnSec = o.turnSec;
       /* ★ 我上次當房主設的房規 → 下次建房自動帶回來(同 turnSec)。
          ⚠ 一律 normRules:那份 JSON 住在 localStorage,版本一換就可能有認不出的值。 */
-      if(o.dcRules) rules = DC.normRules(o.dcRules);
+      /* ⚠⚠ 走 migRules 不是 normRules:「對手吃子」的預設 v2.5.2 翻成開,而舊的偏好裡
+         那一欄是明碼的 false → 少了這道水位線,老玩家更新後永遠看不到新預設
+         (而且不會有任何測試會紅,因為規則層自己是對的)。理由寫在 rules.js 的 migRules。 */
+      if(o.dcRules) rules = DC.migRules(o.dcRules, o.dcRulesV);
       /* ★ 棋子樣式:**純本機偏好**,不進房規也不進房間欄位(連線時雙方可以不一樣)。
          ⚠ 一律用白名單擋:那份 JSON 住在 localStorage,舊版 / 手改都可能塞進認不出的值,
            而認不出的值會變成「body 上掛了一個沒有規則的 class」= 棋子回到 fallback,

@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>象棋暗棋 ｜ 本機對戰 + 2 人連線</title>
 <!-- 象棋暗棋 · v2.5.1 -->
-<meta name="version" content="2.5.1">
+<meta name="version" content="2.5.1+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -132,7 +132,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            (照大老二 / 21點 / UNO 那一套:兩邊各一顆入口鈕 → 一組 DOM、一支 syncRules) -->
       <div class="field">
         <span class="field-label">房規</span>
-        <button class="btn ghost block-btn" id="dcSoloRules" type="button">📋 改規則</button>
+        <button class="btn ghost block-btn dc-rules-btn" id="dcSoloRules" type="button">📋 改規則</button>
       </div>
       <button class="btn primary block-btn home-btn" id="dcStartSolo">開始對局</button>
       <div class="home-hint" id="dcSoloHint"></div>
@@ -252,7 +252,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            這裡只有一顆入口鈕 + 一行摘要。⚠ 對戰中不給改(規則在開局那一刻就凍了) -->
       <div class="field">
         <span class="field-label" id="dcRulesLabel">房規</span>
-        <button class="btn ghost block-btn" id="dcRulesOpen" type="button">📋 改規則</button>
+        <button class="btn ghost block-btn dc-rules-btn" id="dcRulesOpen" type="button">📋 改規則</button>
       </div>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
@@ -377,8 +377,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
                  「自己吃的永遠看得到」寫在下面的房規說明裡。 -->
             <span class="set-lbl">對手吃子<span class="set-sub">看不看得到對手吃了哪幾顆</span></span>
             <div class="seg" id="dcCapsSeg" data-rp="caps" aria-label="對手吃子">
-              <button class="on" data-rv="0">不顯示</button>
-              <button data-rv="1">顯示</button>
+              <!-- ⚠ v2.5.2:預設從「不顯示」翻成**顯示**(使用者要的)。這裡的 .on 只是
+                   第一次上漆,真相是 syncRules() 照 DC.ruleLevel() 重畫 —— 但兩邊
+                   對不起來的話,面板開起來前那一瞬間會閃一下錯的那一段。 -->
+              <button data-rv="0">不顯示</button>
+              <button class="on" data-rv="1">顯示</button>
             </div>
           </div>
         </div>
