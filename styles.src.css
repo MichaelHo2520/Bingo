@@ -61,6 +61,30 @@
   html{scrollbar-width:none;-ms-overflow-style:none}
   ::-webkit-scrollbar{width:0;height:0;display:none}
   html,body{height:100%}
+
+  /* ---------- 全站不可選字(v2.5.6) ----------
+     ★ 症狀:首頁要開「伺服器狀態」得連點七下品牌字「派對遊戲」,而連點在瀏覽器眼裡
+       就是雙擊 / 三擊 —— 第二下起把那四個字選成一片藍(使用者:「在派對遊戲的字上面
+       按要進伺服器狀態,有時候都會選到文字」)。同一件事在每一頁都成立:牌名、台數、
+       玩家暱稱、分數、題目都是普通 DOM 文字,滑鼠拖過或手機長按一定命中。
+     ★ 這是把 v1.105.0 台灣麻將那份**區域**規則升級成全站 —— 當年只掛在對局中的兩個
+       body class 上,理由是「別圖方便寫成全站,那會跨到另外七頁去」;而現在使用者要的
+       正是那個「跨到每一頁」。原本 m16 那兩條已由這裡涵蓋,不再留第二份。
+     ⚠⚠ input / textarea 一定要放回 text,兩個理由都是踩過的:
+       ① 表情面板的「一句話」、暱稱 / 房號 / 你畫我猜的猜題格,整片 none 之後連自己
+          打的字都選不起來 —— 打錯字改不掉。
+       ② js/shared/qr.js 的 legacyCopy 是**常態路徑**(本機測試走 http,
+          navigator.clipboard 不存在):它靠一個臨時 textarea 加 select() 加
+          execCommand("copy") 把連結送進剪貼簿,而 user-select:none 會讓 select()
+          選不到東西 → 邀請朋友的「複製連結」直接失效。
+     ⚠ touch-callout 也要一起關(iOS 長按會跳出「拷貝 / 查詢」的原生選單,
+       那在遊戲畫面上等於誤觸),但 input / textarea 要放回 default,
+       否則長按貼上的選單也被一起擋掉。
+     ⚠ user-select 不影響 pointer 事件:點牌 / 拖牌 / 拖曳排序的手勢一個都沒動,
+       表情鈕「按住不放」那條測試量的也還是 none。 */
+  html,body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  input,textarea,[contenteditable="true"]{
+    user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
   body{
     font-family:'Nunito',system-ui,sans-serif;
     color:var(--text);
@@ -3370,10 +3394,11 @@ body.m16-mp .topbar{width:min(98vw - 16px,944px)}
      那是刻意的,別圖方便寫成 `body{user-select:none}`(那會跨到另外七頁去)。
    ⚠⚠ input / textarea 一定要放回 text:表情面板的「一句話」在對局中開得到,
      整片 none 之後那格連自己打的字都選不起來(改不掉錯字)。
-   user-select 不影響 pointer 事件,點牌 / 拖牌的手勢一個都沒動。 */
-body.m16-mp,body.m16-solo{user-select:none;-webkit-user-select:none}
-body.m16-mp input,body.m16-mp textarea,
-body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:text}
+   user-select 不影響 pointer 事件,點牌 / 拖牌的手勢一個都沒動。
+   ⚠⚠ v2.5.6:**這兩條規則已經搬到檔頭的全域段**(html,body 一律 none、
+     input / textarea 放回 text),因為使用者要的就是「每一頁都不要選到字」——
+     上面那句「別圖方便寫成全站」是 v1.105.0 當時的判斷,現在已經被推翻,
+     留著是為了讓後來的人知道這裡曾經只管一頁。**不要在這裡再加第二份。** */
 
 /* 盤面容器。★ isolation:isolate —— 照 v1.56.0 那條紅線先把 stacking context 關起來,
    之後要加任何覆蓋層都掛在裡面,不會跑到根層去跟 .veil/.toast/.pwa-tip 比大小。

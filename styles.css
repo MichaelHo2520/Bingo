@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 162203d5b2a8558a9b60849fce7fcd38336461abac69ec5e7a7eb4c08b04f281)
+    真相在 styles.src.css(sha256 896dc039f9ef35951b0e39303053d422574fee8878a46b80dec667d0888d29fb)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -42,6 +42,9 @@
   html{scrollbar-width:none;-ms-overflow-style:none}
   ::-webkit-scrollbar{width:0;height:0;display:none}
   html,body{height:100%}
+  html,body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+  input,textarea,[contenteditable="true"]{
+    user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
   body{
     font-family:'Nunito',system-ui,sans-serif;
     color:var(--text);
@@ -1780,9 +1783,6 @@ body.m16-mp .mj-play{width:min(98vw,960px)}
 body.m16-mp .mj-room{width:min(98vw - 16px,944px)}
 body.m16-mp .topbar .topver{display:none}
 body.m16-mp .topbar{width:min(98vw - 16px,944px)}
-body.m16-mp,body.m16-solo{user-select:none;-webkit-user-select:none}
-body.m16-mp input,body.m16-mp textarea,
-body.m16-solo input,body.m16-solo textarea{user-select:text;-webkit-user-select:text}
 .m16-stage{position:relative;isolation:isolate;z-index:0;
   display:flex;flex-direction:column;gap:6px;padding:6px 8px;
   width:100%;scrollbar-gutter:stable;

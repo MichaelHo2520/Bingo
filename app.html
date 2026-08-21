@@ -20,8 +20,8 @@
 <!-- 只寫「派對遊戲」,不列舉遊戲名(理由同 index.html)。外殼是頂層 document,
      分頁標籤看到的是這一行 —— 內層 iframe 的 <title> 不會蓋掉它 -->
 <title>派對遊戲</title>
-<!-- 外殼(shell)· v2.5.5 -->
-<meta name="version" content="2.5.5">
+<!-- 外殼(shell)· v2.5.6 -->
+<meta name="version" content="2.5.6">
 <!--
   外殼:三個遊戲跑在下面那個滿版 iframe 裡,換遊戲 = 換 iframe 的 src。
 
@@ -39,6 +39,10 @@
 -->
 <style>
   html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#2a1136;overscroll-behavior:none}
+  /* 全站不可選字(v2.5.6):外殼平常只有一個滿版 iframe,看得見的文字是 .noscript
+     那一段 —— 但這一頁是頂層 document,拖曳落在 iframe 之外時仍然吃得到。
+     iframe 內是獨立 document,這條管不到它(那十四頁靠 styles.css 自己那一份)。 */
+  html,body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   #stage{display:block;width:100%;height:100%;border:0}
   .noscript{color:#eee;font:16px/1.6 system-ui,sans-serif;padding:24px}
   .noscript a{color:#ffd24a}
