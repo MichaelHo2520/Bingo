@@ -10507,7 +10507,18 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ 顏色是**固定的木色**,不吃主題變數 —— 同紙那條(紅線 11):畫框跟著 midnight
        變深的話,深色主題下畫布與背景之間就沒有邊界了。
      ⚠ 內側那一圈半透明白是「畫布微微凸起」的高光,不是裝飾:少了它木框看起來是貼上去的。 */
-  .dw-ink{display:block;border-radius:14px;background:var(--dw-paper);
+  /* ★★ 紙的纖維紋理(v2.7.0)—— 兩層極淡的斜向條紋疊在紙色上。
+     ⚠ 濃度是**量過眼睛的**:alpha 只有 .022 / .018,再深一點 4px 的細線就開始糊
+       (筆最細是 WIDTHS[0] = 4 個邏輯單位,在 330px 寬的手機上約 1.3px)。
+     ⚠ 它純粹是 `background-image` → **零版面成本、零重繪成本**(不是每一幀的東西)。
+     ⚠⚠ 匯出圖**刻意沒有紋理**:`paintTo()` 那條路是用 `paperColor()` 填純色,
+       而 `paperColor()` 讀的是 computed `backgroundColor`(仍然是 --dw-paper)——
+       分享出去的是一張乾淨的白紙,那是取捨不是 bug(見 notes/遊戲/21)。
+     ⚠ 顏色一律固定值,不吃主題(同紅線 11:紙不跟著 midnight 變深)。 */
+  .dw-ink{display:block;border-radius:14px;
+    background-color:var(--dw-paper);
+    background-image:repeating-linear-gradient(58deg,rgba(120,96,64,.022) 0 1px,transparent 1px 4px),
+                     repeating-linear-gradient(-32deg,rgba(120,96,64,.018) 0 1px,transparent 1px 6px);
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),
                0 0 0 3px var(--dw-edge),0 0 0 5px var(--dw-edge2),
                0 10px 30px rgba(0,0,0,.28);
@@ -10663,6 +10674,82 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-sw:active::before{transform:scale(.86)}
   .dw-sw.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent)}
   .dw-sw.on::before{border-color:rgba(255,255,255,.95)}
+
+  /* ==========================================================================
+     ★★★ 收合式筆盤(v2.7.0)—— 工具列上只剩一顆「現在這支筆」
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「筆的顏色切換,是不是把他做成一種可以收起來,按一下然後又打開可以選顏色」。
+       在此之前那一列固定站著五顆色塊(5 × 25 = 125px),而它是**零空隙**的
+       (v2.5.4 的決算 328 / 331.2px)—— 於是粗細、第六第七色、窄畫面的題目圖示
+       全部排不進來。收起來之後多出 ≈87px,那筆錢一次買到三樣(見 board.js 那一段)。
+
+       ★★ **面板不受那一列的寬度預算管** → 每一顆色票 44×44
+         (v2.5.4 記過「建議書要的 44×44 在一列裡物理上做不到」—— 收起來之後做得到了)。
+       ⚠⚠ 面板是 `.dw-tools` 的 **absolute 子元素**,往上彈(`bottom:100%`):
+         · 掛進 `.dw-stage` 會被它的 `overflow:hidden` 裁掉;
+         · 進版面流就是從畫布身上拿高度(紅線 17 / 36);
+         · `left/right:0` 是為了不把那一列的 **scrollWidth** 撐大(溢出斷言量的就是它)。
+       ⚠ 那顆筆鈕的 `▾` 是 `::after`:`::before` 已經被那個圓用掉了。 */
+  .dw-tools{position:relative}
+  /* ⚠⚠ `align-self:stretch` 是**非有不可**的:v2.5.4 那五顆色塊的高度是靠
+     `.dw-pens{align-items:stretch}` 從那一列身上借來的,而那個容器隨著收合一起消失了
+     → 少了這一行,筆鈕的熱區只有 `min-height` 的 **30px**(量出來是 38×30),
+     而那正是 v2.5.4 花了一整版在解的「按不準」。實測補上之後是 38×38。 */
+  .dw-pen{position:relative;align-self:stretch}
+  .dw-pen::after{content:"▾";position:absolute;right:0;bottom:1px;font-size:9px;line-height:1;
+    color:var(--muted);pointer-events:none}
+  .dw-pen.open::after{color:var(--accent)}
+  /* ⚠⚠ 面板的底色是**固定的深色,刻意不吃 `var(--panel)`** —— 它疊在**紙**上,
+     而紙是固定的淺色、不跟主題走(紅線 11)。第一版用了主題變數,結果在
+     sunset 主題下 `--panel` 是半透明白 → 疊在紙上變成米白面板,
+     而粗細那一排的圓點(當時吃 `--text`)也是淺色 → **整排幾乎看不見**。
+     ⚠ 這與 `.dw-pinch` / `.dw-pop` 是同一條:凡是浮在紙上的東西,顏色一律寫死。 */
+  .dw-pal{position:absolute;left:0;right:0;bottom:calc(100% + 6px);z-index:6;
+    display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;
+    border:1px solid rgba(255,255,255,.16);background:rgba(30,26,48,.97);
+    box-shadow:0 10px 30px rgba(0,0,0,.42)}
+  .dw-pal-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px}
+  /* ⚠ 分隔靠一條細線,不要用空白:那一排色票與粗細講的是兩件事。 */
+  .dw-pal-w{border-top:1px solid rgba(255,255,255,.16);padding-top:6px}
+  /* 每一顆色票:44×44 的熱區 + 30px 的圓(同 .dw-sw 那一套「鈕 ≠ 圓」)。
+     ⚠ 顏色一樣住在 `--dw-sw`(JS 讀 COLORS 寫進去)—— CSS 裡沒有第二份色碼。 */
+  /* ⚠⚠ **七顆一定要排成一行**,所以寬度是 `flex:1 1 38px` 而不是寫死 44 ——
+     實測 360px 手機:面板可用寬 315px,7 × 44 + 6 × 4 = **332 > 315 → 換行**,
+     而換行的代價是面板從 116px 長到 **167px**(蓋掉紙的 40%)。
+     自適應之後每一顆實得 ≈41.5px(仍然是 v2.5.4 那 25px 熱區的 1.66 倍),
+     而寬螢幕上自動長回 44。⚠ `flex-wrap` 留著當安全網,不是預期行為。 */
+  .dw-pc{flex:1 1 38px;max-width:44px;height:44px;padding:0;border:none;background:none;cursor:pointer;
+    display:grid;place-items:center;border-radius:12px;
+    -webkit-tap-highlight-color:transparent;transition:background .12s,box-shadow .12s}
+  .dw-pc::before{content:"";width:30px;height:30px;border-radius:50%;
+    background:var(--dw-sw,#8b8b8b);border:2px solid rgba(255,255,255,.55);
+    box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .12s,border-color .12s}
+  .dw-pc:active::before{transform:scale(.88)}
+  .dw-pc.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent)}
+  .dw-pc.on::before{border-color:rgba(255,255,255,.95)}
+  /* 粗細:圓點的大小由 JS 依 WIDTHS 算(`--dw-pwsz`)—— 同樣不在 CSS 裡寫第二份數字。 */
+  .dw-pw{flex:1 1 44px;max-width:64px;height:44px;padding:0;border:none;background:none;cursor:pointer;
+    display:grid;place-items:center;border-radius:12px;
+    -webkit-tap-highlight-color:transparent;transition:background .12s,box-shadow .12s}
+  /* ⚠ 圓點是**固定白**,同上面那條(吃 --text 的話深色主題下是白點、淺色主題下是黑點,
+     而面板的底永遠是深的 → 淺色主題那幾顆會整排消失)。 */
+  .dw-pw::before{content:"";width:var(--dw-pwsz,10px);height:var(--dw-pwsz,10px);border-radius:50%;
+    background:#fff;opacity:.86;transition:transform .12s}
+  .dw-pw:active::before{transform:scale(.88)}
+  .dw-pw.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent)}
+  .dw-pw.on::before{opacity:1}
+
+  /* ==========================================================================
+     ★★★ 描圖底(v2.7.0)—— 題目的 emoji 淡淡浮在紙上,只有畫家看得到
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠⚠ `pointer-events:none` 是硬需求:它蓋滿整張紙,吃得到點擊就是**畫布中央
+         按不到**(而那正是最常畫的地方)。
+       ⚠ absolute + inset:0 → `fit()` 量不到它,畫布一個 px 都不會變(紅線 36)。
+       ⚠ **灰階**是刻意的:彩色 emoji 壓在紙上會跟筆色搶注意力,而它只是輪廓參考。
+       ⚠ 字級由 JS 依畫布大小寫進 `--dw-gsz`(fit() 那一支)—— CSS 這裡只給退路。 */
+  .dw-guide{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center;
+    font-size:var(--dw-gsz,180px);line-height:1;opacity:.13;filter:grayscale(1);
+    -webkit-user-select:none;user-select:none}
   /* ★★ 「現在拿的是這個」一定要**整顆填色**(v1.165.0)。
      在此之前只換邊框 + 加一點白 —— 在 30px 的鈕上根本看不出來,而這一頁的模式
      (筆 / 擦布,v2.5.4 之前還有直線)是互斥的,「哪一顆亮著」就是使用者判斷
@@ -10952,6 +11039,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* ⚠ 不透明度要夠高(.94):它疊在**淺色的紙**上,半透明會把綠洗成灰綠 ——
      而這一則與旁邊那幾則的差別全靠顏色在講(截圖上看得出來,DOM 量不到)。 */
   .dw-pop.hit{background:rgba(18,142,84,.94);box-shadow:0 3px 14px rgba(0,0,0,.34)}
+  /* ★★ 系統訊息(v2.7.0:畫完了 / 放棄)—— 深藍灰,**刻意與綠色分開**:
+     綠是「有人猜中了」,而「可以開始猜了」是另一件事,兩者長一樣就是誤導。
+     ⚠ 同一族的規矩:顏色是固定值(它疊在淺色的紙上,吃 --panel 會在 midnight 變白底白字)。 */
+  .dw-pop.sys{background:rgba(38,44,68,.92)}
+  .dw-pop.sys .dw-pop-t{color:rgba(255,255,255,.94)}
   .dw-pop.out{animation:dw-popout .38s ease-in forwards}
   @keyframes dw-popin{0%{opacity:0;transform:translateY(10px) scale(.94)}100%{opacity:1;transform:none}}
   @keyframes dw-popout{0%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px) scale(.97)}}
@@ -11057,8 +11149,16 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        ⚠⚠ 要再加第六顆色塊的話**只能從別的地方生空間**(這一列早就是零空隙了),
          而**不可以把節距縮回 20px 以下** —— 那等於把 v2.5.4 這一版整個退回去。
          改完一定要用裝置模擬量 scrollWidth − clientWidth === 0。 */
-    .dw-sw{width:25px}
-    .dw-sw::before{width:22px;height:22px}
+    /* ★★★ v2.7.0:這一列上只剩**一顆**筆鈕(五顆色塊搬進筆盤)——
+       所以窄畫面不必再把它縮到 25px 了,反而應該給它與工具鈕**一樣的 38px**:
+       它現在是「換筆色 / 換粗細」唯一的入口,而 v2.5.4 那一輪的教訓就是
+       「熱區小就是按不準」。新的決算(360×803×3,可用 331.2px):
+         筆 38 + 💡 38 + 擦布 38 + 復原 38 + 清空 38 + 分組線 1 + 間距 6×4 = 215
+         → 題目那一格實得 **≈116px**(v2.5.4 是 69.9px),而 4 個字只要 68px。
+       ⚠ 多出來的錢沒有全部拿去給別的東西,是刻意的:題目是畫家唯一要讀的字,
+         而它在 v2.5.4 的餘裕只有 1.9px。 */
+    .dw-sw{width:38px}
+    .dw-sw::before{width:26px;height:26px}
     /* ⚠ 這裡的 width/height 其實**贏不過**基礎那條 min-width/min-height:38px
        (min-* 的優先權高於 width)—— 所以窄畫面的鈕實測是 **38×38**,寫 36 只是下限。
        ⚠⚠ 那 2px 的差就是題目那一格的生死線:實測 38px 的鈕會把題目壓到 **66.2px**
@@ -11091,8 +11191,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        「⚠⚠ 圖示不可以拿工具鈕、色塊或分組線來換寬度,那三個是手指要按的」,
        而現在正是反過來用它:**+18.3px**(圖示本體 14.3 + 一個間距 4)全部進色塊的節距。
        ⚠ 431~600px 照舊看得到它(那個區間的寬度夠,見上面的寬度帳)。
-       ⚠ 藏的是圖示不是題目 —— 題目那四個字一個都不准掉。 */
-    .dw-word-ic{display:none}
+       ⚠ 藏的是圖示不是題目 —— 題目那四個字一個都不准掉。
+       ★★★ **v2.7.0 把它還回來了** —— 五顆色塊收成一顆之後這一列多出 ≈87px,
+         而 v2.5.4 借走它的理由(「色塊的節距只能從它身上生」)已經不存在。
+         ⚠ 它同時是描圖底的伏筆:畫家看得到那顆 emoji,才知道 💡 會描出什麼。 */
     /* 字數晶片在窄畫面只留數字(「答案 3 字」→「3 字」)——
        同一列上還有回合數 + 畫家名字 + 放大鈕 + 倒數環,而那顆環是 34px 不可壓。 */
     .dw-len-l{display:none}

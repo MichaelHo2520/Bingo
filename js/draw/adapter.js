@@ -620,6 +620,12 @@ const MP = MPCore.create((function () {
       icEl.classList.toggle("hidden", !drawer);
       icEl.textContent = w ? (w.i || "🎨") : "";
     }
+    /* ★★★ 描圖底(v2.7.0):同一顆 emoji 再餵給畫布那一層。
+       ⚠⚠ **與上面那一格同一條紀律** —— 只有畫家給,幫忙畫的人與猜題者一律給空字串
+         (board.js 那邊收到 "" 就把內容清掉、連鈕都收起來)。
+         它跟題目同一等級是答案,不可以只靠 CSS 藏(紅線 6 / 37)。
+       ⚠ 這裡是**每一份 game 快照**都會走到的路 → 換人畫 / 換相位 / 重連都會自動歸位。 */
+    DWB.setGuide(drawer && w ? (w.i || "") : "");
     if (clr) clr.classList.toggle("hidden", !drawer);
   }
   function paintOver() {
@@ -680,7 +686,11 @@ const MP = MPCore.create((function () {
     Object.keys(dw.gv).forEach(id => {
       if (seenGv[id]) return;
       seenGv[id] = 1;
-      DWB.sysSay("🏳️ " + (id === ctx.me() ? "你" : ctx.dispName(id)) + "放棄了這一題");
+      const who = (id === ctx.me() ? "你" : ctx.dispName(id));
+      DWB.sysSay("🏳️ " + who + "放棄了這一題");
+      /* ★ v2.7.0:也浮到畫板上(同 popArm 那道重放閘 —— 這一支本來就靠 seenGv 去重,
+         而 seenGv 在 attachRound 就清空 → 重連時會把已經放棄的人補播一次,那是對的)。 */
+      if (dw && dw.ph === "draw") DWB.popSys("🏳️ " + who + "放棄了");
     });
   }
   /* 畫家說「畫完了」→ 猜題列跳一則 + 輕輕出個聲(v1.168.0)。
@@ -690,6 +700,9 @@ const MP = MPCore.create((function () {
     if (!dw || dw.ph !== "draw" || !dw.fin || seenFin || iAmDrawer()) return;
     seenFin = true;
     DWB.sysSay("✅ " + ctx.dispName(drawerId() || "") + "說畫完了,可以猜了!");
+    /* ★★ v2.7.0:這一則**最該浮** —— 它是「可以開始搶分了」的信號,
+       而猜題列在熱鬧的時候捲得很快(v2.6.0 只做了猜對 / 猜錯)。 */
+    DWB.popSys("✅ " + ctx.dispName(drawerId() || "") + "畫完了,可以猜了");
     try { Sound.place(); } catch (e) {}
   }
 
@@ -735,6 +748,15 @@ const MP = MPCore.create((function () {
     el.innerHTML = "一人畫、其他人打字搶答。<b>越早猜中分數越高</b>(200 / 150 / 100 / 50)," +
       "而<b>畫家跟著大家的分數抽成</b> —— 讓越多人猜懂,自己拿越多;猜錯只凍結 <b>3 秒</b>,冷完繼續猜。" +
       "<br>真的猜不出來可以按 <b>🏳️ 放棄</b>(大家都猜中或放棄就直接公布);畫家畫夠了可以按 <b>✅ 畫完了</b>提醒大家。" +
+      /* ★★ v2.7.0 補的兩句,而它們都是「本來就成立、只是從來沒有人講」:
+         ① **不可以寫字** —— 這是你畫我猜的基本規則,而畫面上完全沒有提過
+           (受眾是親友聚會,CLAUDE.md 說不做防作弊 → 講一句就夠,不必用程式擋)。
+         ② **不會畫可以自己出題** —— 自訂題目預設就是開的,但玩家不見得知道
+           (它其實就是「換一題」的超級版:畫家可以直接出一個他會畫的)。
+         ⚠ 第二句只在房規開著時講(關掉時下面已經有一句在講關掉了)。 */
+      "<br>✏️ 畫的時候<b>不可以寫字或數字</b>(那就沒得猜了)" +
+      (rules.cu ? ",真的不會畫就在選題那一頁<b>自己出一個題目</b>。" : "。") +
+      "<br>💡 畫家可以開<b>描圖底</b>(工具列那顆燈泡)—— 題目的圖案會淡淡浮在紙上,<b>只有畫家看得到</b>。" +
       /* ★ 共同作畫要講清楚兩件事:誰能幫(已經猜中的人)、以及**幫畫不會加分**
          —— 不講的話會有人以為幫畫有分,而它純粹是「不用乾等」的玩法(見 notes/21 紅線 30)。 */
       (rules.co ? "<br>🖌 <b>共同作畫</b>:已經猜中的人可以一起畫,幫還沒猜到的人一把(幫畫不加分,清空只有畫家能按)。" : "") +

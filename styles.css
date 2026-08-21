@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 1a9a4d65a03a429be98e75ea75c82e7ec58c199963619620f8b3579b7539add5)
+    真相在 styles.src.css(sha256 6df3cca476b6348b2db4f2a96fb86f3353e36b3df7e3c207a4714b20f0153315)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4650,7 +4650,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-stage{flex:1 1 0;min-height:120px;width:100%;position:relative;
     display:flex;align-items:center;justify-content:center;overflow:hidden}
   .dw-wrap{position:relative;flex:none}
-  .dw-ink{display:block;border-radius:14px;background:var(--dw-paper);
+  .dw-ink{display:block;border-radius:14px;
+    background-color:var(--dw-paper);
+    background-image:repeating-linear-gradient(58deg,rgba(120,96,64,.022) 0 1px,transparent 1px 4px),
+                     repeating-linear-gradient(-32deg,rgba(120,96,64,.018) 0 1px,transparent 1px 6px);
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.55),
                0 0 0 3px var(--dw-edge),0 0 0 5px var(--dw-edge2),
                0 10px 30px rgba(0,0,0,.28);
@@ -4726,6 +4729,37 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-sw:active::before{transform:scale(.86)}
   .dw-sw.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent)}
   .dw-sw.on::before{border-color:rgba(255,255,255,.95)}
+  .dw-tools{position:relative}
+  .dw-pen{position:relative;align-self:stretch}
+  .dw-pen::after{content:"▾";position:absolute;right:0;bottom:1px;font-size:9px;line-height:1;
+    color:var(--muted);pointer-events:none}
+  .dw-pen.open::after{color:var(--accent)}
+  .dw-pal{position:absolute;left:0;right:0;bottom:calc(100% + 6px);z-index:6;
+    display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;
+    border:1px solid rgba(255,255,255,.16);background:rgba(30,26,48,.97);
+    box-shadow:0 10px 30px rgba(0,0,0,.42)}
+  .dw-pal-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:4px}
+  .dw-pal-w{border-top:1px solid rgba(255,255,255,.16);padding-top:6px}
+  .dw-pc{flex:1 1 38px;max-width:44px;height:44px;padding:0;border:none;background:none;cursor:pointer;
+    display:grid;place-items:center;border-radius:12px;
+    -webkit-tap-highlight-color:transparent;transition:background .12s,box-shadow .12s}
+  .dw-pc::before{content:"";width:30px;height:30px;border-radius:50%;
+    background:var(--dw-sw,#8b8b8b);border:2px solid rgba(255,255,255,.55);
+    box-shadow:0 1px 3px rgba(0,0,0,.35);transition:transform .12s,border-color .12s}
+  .dw-pc:active::before{transform:scale(.88)}
+  .dw-pc.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent)}
+  .dw-pc.on::before{border-color:rgba(255,255,255,.95)}
+  .dw-pw{flex:1 1 44px;max-width:64px;height:44px;padding:0;border:none;background:none;cursor:pointer;
+    display:grid;place-items:center;border-radius:12px;
+    -webkit-tap-highlight-color:transparent;transition:background .12s,box-shadow .12s}
+  .dw-pw::before{content:"";width:var(--dw-pwsz,10px);height:var(--dw-pwsz,10px);border-radius:50%;
+    background:#fff;opacity:.86;transition:transform .12s}
+  .dw-pw:active::before{transform:scale(.88)}
+  .dw-pw.on{background:rgba(255,255,255,.14);box-shadow:inset 0 0 0 2px var(--accent)}
+  .dw-pw.on::before{opacity:1}
+  .dw-guide{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center;
+    font-size:var(--dw-gsz,180px);line-height:1;opacity:.13;filter:grayscale(1);
+    -webkit-user-select:none;user-select:none}
   .dw-tool.on{border-color:var(--accent);background:var(--accent);color:#2a1136;
     box-shadow:0 2px 10px rgba(0,0,0,.28)}
   .dw-tool.on:hover{background:var(--accent)}
@@ -4871,6 +4905,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .dw-pop.me .dw-pop-n{color:#ffd166}
   .dw-pop.hit{background:rgba(18,142,84,.94);box-shadow:0 3px 14px rgba(0,0,0,.34)}
+  .dw-pop.sys{background:rgba(38,44,68,.92)}
+  .dw-pop.sys .dw-pop-t{color:rgba(255,255,255,.94)}
   .dw-pop.out{animation:dw-popout .38s ease-in forwards}
   @keyframes dw-popin{0%{opacity:0;transform:translateY(10px) scale(.94)}100%{opacity:1;transform:none}}
   @keyframes dw-popout{0%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px) scale(.97)}}
@@ -4911,15 +4947,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .dw-word-lbl{display:none}
     .dw-clr-t{display:none}
     .dw-tools{gap:4px}
-    .dw-sw{width:25px}
-    .dw-sw::before{width:22px;height:22px}
+    .dw-sw{width:38px}
+    .dw-sw::before{width:26px;height:26px}
     .dw-tool{padding:0;width:36px;height:36px;display:inline-flex;align-items:center;
       justify-content:center;font-size:18px}
     .dw-word{font-size:17px}
     .dw-word-ic{font-size:17px;margin:0 -5px 0 -4px}
   }
   @media (max-width:430px){
-    .dw-word-ic{display:none}
     .dw-len-l{display:none}
     .dw-len.msk .dw-hcat-t{display:none}
     .dw-len.msk .dw-hc{width:11px}

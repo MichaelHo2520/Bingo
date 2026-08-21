@@ -99,6 +99,13 @@
         還回去 → 色塊會回到 18px。**兩者不可能同時要**,這是量出來的,不是取捨的偏好。
       ⚠ 「填滿大面積」因此又變成沒有解的:要解只能靠**粗筆刷**(`WIDTHS` 有三檔
         [4,8,16],但沒有 UI)—— 而那同樣要一顆鈕的寬度。見 notes/遊戲/21 的紅線 24。
+
+      ★★★ **v2.7.0 把上面那個死結解開了,而解法是「不佔那一列」** ——
+        五顆色塊收成**一顆**「現在這支筆」,七色與四檔粗細搬進浮在紙上的收合式筆盤
+        (使用者:「筆的顏色切換,是不是把他做成一種可以收起來,按一下然後又打開可以選顏色」)。
+        那一列因此多出 ≈87px:粗細有 UI 了(填大面積的解)、紫橘兩色放得下了、
+        題目那一格從 ≈70px 變 ≈116px。⚠ 而且面板不受那一列的寬度預算管 ——
+        每一顆色票都做到 44×44,那正是 v2.5.4 當年「在一列裡物理上做不到」的尺寸。
    ========================================================================== */
 
 const DWB = (function () {
@@ -112,7 +119,7 @@ const DWB = (function () {
      ★★ 黃色(v1.170.0)。使用者:「畫筆的顏色再幫我加上黃色」。
      ⚠⚠ **它刻意放在 index 4**(原本那一格是「橘」,橘往後挪到 6)——
        這是唯一不會在新舊版同房時出錯的位置,而理由是「**index 4 從來沒有任何 client
-       送得出來**」:UI 只放前四顆(見 SWATCHES),而 setBrush() 除了 board 自己沒有人叫,
+       送得出來**」:UI 當年只放前四顆(v2.7.0 起七色全開,見 PAL_C),而 setBrush() 除了 board 自己沒有人叫,
        所以 DB 裡不存在 c=4 的舊資料。
        · 放在 index 4 → 舊版收到 c=4 會畫成**橘**(相近色,看得出是同一張圖)
        · 若改成 append 到 index 6 → 舊版走 `COLORS[6] || COLORS[0]` → **畫成墨黑**(整條線變色)
@@ -121,7 +128,17 @@ const DWB = (function () {
      ⚠ 黃色在淺色紙上本來就比較淡(紙是 #fffdf7)—— 所以取的是**金黃**而不是純黃,
        純黃(#ffe000 那一類)在紙上幾乎看不見。 */
   const COLORS = ["#20242c", "#e0413a", "#2f7de0", "#2fa14a", "#e9b400", "#8c4bd8", "#e8992b"];
-  const WIDTHS = [4, 8, 16];             // 邏輯單位(1000 寬的座標系裡)
+  /* ★★★ 筆粗細(v2.7.0 放開 UI,而且 append 了第四檔 32)。
+     ⚠⚠ **只能往後面 append,不可以動 0~2** —— 同 COLORS 那條「靠索引同步」的約定
+       (`w` 每一批都寫進記錄,舊版收到就照這個表查)。
+     ★ append 到 index 3 是安全的,而且**安全的理由與黃色那一格不一樣**:
+       舊版的 `WIDTHS[3]` 是 undefined → 走 `|| WIDTHS[DEF_W]` **退回中等粗細 8**,
+       也就是「他那台看到的線比較細」,圖的形狀一個點都沒變。
+       (顏色那邊沒有這條退路 —— `COLORS[6] || COLORS[0]` 會把橘畫成墨黑,整條變色。)
+     ⚠ 32 是為了「填大面積」而加的(v2.4.1 的形狀工具在 v2.5.4 被移除之後,
+       那個痛點一直沒有解 —— 見 notes/遊戲/21 第六節)。**擦布維持 30 不動**:
+       兩者差 2px,來回塗抹擦得掉,而動擦布寬就要動 `e` 記錄的解讀方式(舊版不跟)。 */
+  const WIDTHS = [4, 8, 16, 32];         // 邏輯單位(1000 寬的座標系裡)
   const DEF_C = 0, DEF_W = 1;
   /* ★★★ 擦布(v1.157.0)。**它是一筆「記錄」,不是像素操作** ——
      這一頁的真相是 replay(照順序重放整包 ink),重連的人是靠重放把圖畫回來的。
@@ -306,6 +323,9 @@ const DWB = (function () {
        少了這兩行,蓋板會跟著 .dw-stage 的尺寸把畫布外面那一圈也蓋黑(見 draw.html 那段註解)。 */
     const wrap = $("dwWrap");
     if (wrap) { wrap.style.width = w + "px"; wrap.style.height = h + "px"; }
+    /* ★ 描圖底的字級跟著畫布走(v2.7.0)。⚠ 寫在 wrap 上而不是 guide 上:
+       guide 的 textContent 會被清成空字串,但變數是尺寸、與內容無關。 */
+    if (wrap) wrap.style.setProperty("--dw-gsz", Math.round(Math.min(w, h) * 0.62) + "px");
     /* ⚠ 舞台變大變小之後位移的合法範圍跟著變(vx 的下限是 boxW*(1-vk))——
        不夾一次的話,轉向 / 按放大鈕 / 手機鍵盤收起來都可能讓紙的邊緣露出背景。 */
     clampView();
@@ -378,14 +398,53 @@ const DWB = (function () {
     }
   }
   function penEnd() { ctx.globalCompositeOperation = "source-over"; }
+
+  /* ==========================================================================
+     ★★★ 筆觸平滑(v2.7.0)—— 中點二次貝茲,而且**它只是渲染**
+     ──────────────────────────────────────────────────────────────────────────
+       在此之前每一段都是 `lineTo`,手指畫弧線時看得出一節一節的稜角
+       (取樣點之間隔著 MIN_D 4 個邏輯單位 + 70ms 的批次,快畫時間隔更大)。
+
+       公式:`moveTo(p0)` → 對每一個中間點 i 畫 `quadraticCurveTo(p[i], mid(p[i],p[i+1]))`
+             → 最後 `lineTo(最後一點)`。控制點是取樣點本身,曲線穿過的是**相鄰兩點的中點**。
+
+       ★★★ **為什麼這在這一頁是安全的(三條缺一不可)**:
+       ① **`strokes` 一個點都沒有變** —— 線上格式、座標系、節流參數全部沒動,
+          舊版與新版同房只是「他那台的線比較有稜角」,一筆資料都不會解錯。
+       ② **每一台從同一組點、用同一支函式算** → replay 的結果一致(這是這一頁的地基)。
+       ③ **可以增量畫**:第 i 段只依賴 p[i-1] / p[i] / p[i+1] —— 所以 `drawTail()`
+          與 `applyRec()` 的續段照樣只畫新的那一小段,不必整筆重畫。
+          ⚠⚠ **絕對不可以改成「續段時整筆重畫」** —— 共同作畫時兩個人的筆交錯疊著,
+            整筆重畫會把自己這一筆蓋到後畫的那一筆上面(順序就是這一頁的真相)。
+
+       ⚠ 四個畫的地方**一律走這一支**:strokePath / drawTail / applyRec 的續段 /
+         **paintTo(匯出圖)**。漏掉最後那個的症狀是「畫面上是曲線、分享出去是折線」,
+         而按分享的人自己不會看那張圖(v2.2.0 的「分享圖一直被壓扁」就是這樣躺了兩版)。
+       ⚠ 起點 `i0` 是**陣列索引**(一定是偶數),`fx/fy` 是座標映射 ——
+         畫面上走 sx/sy(含兩指縮放),匯出走 kx/ky。中點在哪個座標系算都一樣(線性變換)。
+     ========================================================================== */
+  function tracePath(g, p, i0, fx, fy) {
+    const n = p.length;
+    if (n - i0 < 2) return;
+    g.moveTo(fx(p[i0]), fy(p[i0 + 1]));
+    // 只有一個點的筆劃(點一下)畫成一個圓點,否則什麼都看不到
+    if (n - i0 === 2) { g.lineTo(fx(p[i0]) + 0.01, fy(p[i0 + 1])); return; }
+    if (n - i0 === 4) { g.lineTo(fx(p[i0 + 2]), fy(p[i0 + 3])); return; }
+    for (let i = i0 + 2; i < n - 2; i += 2) {
+      const mx = (p[i] + p[i + 2]) / 2, my = (p[i + 1] + p[i + 3]) / 2;
+      g.quadraticCurveTo(fx(p[i]), fy(p[i + 1]), fx(mx), fy(my));
+    }
+    /* ⚠ 收尾一定要 `lineTo` 到**真的最後一點**:少了它筆尖會落後半段,
+       而 drawTail() 為了即時回饋一定會畫到那一點 → 兩邊不一致的症狀是
+       「重畫一次之後線尾巴縮回去了」。 */
+    g.lineTo(fx(p[n - 2]), fy(p[n - 1]));
+  }
+
   function strokePath(s) {
     if (!ctx || s.p.length < 2) return;
     penStyle(s);
     ctx.beginPath();
-    ctx.moveTo(sx(s.p[0]), sy(s.p[1]));
-    for (let i = 2; i < s.p.length; i += 2) ctx.lineTo(sx(s.p[i]), sy(s.p[i + 1]));
-    // 只有一個點的筆劃(點一下)畫成一個圓點,否則什麼都看不到
-    if (s.p.length === 2) ctx.lineTo(sx(s.p[0]) + 0.01, sy(s.p[1]));
+    tracePath(ctx, s.p, 0, sx, sy);
     ctx.stroke();
     penEnd();
   }
@@ -396,14 +455,15 @@ const DWB = (function () {
        ⚠ 被撤銷的那幾筆(un)只是跳過,**留在陣列裡不動**(見 applyRec 的 "u" 那段)。 */
     for (let i = 0; i < strokes.length; i++) if (!strokes[i].un) strokePath(strokes[i]);
   }
-  /* 增量畫「這一筆最後兩個點之間那一段」—— 整張重畫在筆劃多的時候會掉幀 */
+  /* 增量畫「這一筆最尾巴那一小段」—— 整張重畫在筆劃多的時候會掉幀。
+     ⚠ v2.7.0 起要**退兩個點**再畫(`n-6`):曲線的最後一段需要前一個取樣點當控制點,
+       只畫 n-4 → n-2 的話那一小段會退化成直線,而且與 repaint() 畫出來的形狀對不上。
+     ⚠ 重疊畫一小段是刻意的(實色筆疊上去看不出來),它換到的是「筆尖不落後」。 */
   function drawTail(s) {
-    if (!ctx || s.p.length < 4) { strokePath(s); return; }
-    const n = s.p.length;
+    if (!ctx || s.p.length < 6) { strokePath(s); return; }
     penStyle(s);
     ctx.beginPath();
-    ctx.moveTo(sx(s.p[n - 4]), sy(s.p[n - 3]));
-    ctx.lineTo(sx(s.p[n - 2]), sy(s.p[n - 1]));
+    tracePath(ctx, s.p, s.p.length - 6, sx, sy);
     ctx.stroke();
     penEnd();
   }
@@ -522,12 +582,15 @@ const DWB = (function () {
     s.p = s.p.concat(pts);
     if (fresh) strokePath(s);
     else {
-      // 續段:從接點開始逐段補畫(不必整張重畫)
+      /* 續段:從接點開始逐段補畫(不必整張重畫)。
+         ⚠ v2.7.0 起往回退**兩個點**(`start - 4`):平滑後的曲線需要前一個取樣點當控制點,
+           從接點正上方開始畫的話,兩批之間那一段會退化成直線 —— 而那正是
+           「別人那台的線在每 70ms 的接縫處有一個小折角」,自己這台完全正常。
+         ⚠ 一定要走 penStyle:擦布的續段也要 destination-out。 */
       const start = s.p.length - pts.length;
-      penStyle(s);                       // ⚠ 一定要走它:擦布的續段也要 destination-out
+      penStyle(s);
       ctx.beginPath();
-      ctx.moveTo(sx(s.p[start - 2]), sy(s.p[start - 1]));
-      for (let i = start; i < s.p.length; i += 2) ctx.lineTo(sx(s.p[i]), sy(s.p[i + 1]));
+      tracePath(ctx, s.p, Math.max(0, start - 4), sx, sy);
       ctx.stroke();
       penEnd();
     }
@@ -542,6 +605,8 @@ const DWB = (function () {
        ⚠ 手指狀態一起清:換回合時可能正按著(相位是別人推的,不會有 pointerup 收尾)。 */
     resetView();
     ptrs.clear(); pinch = null; pinchLock = false;
+    /* ★ 筆盤(v2.7.0)也要收起來:換回合時它可能還開著,而下一秒蓋板就會蓋上來。 */
+    palOpen = false;
     syncTool();
     mySids.clear();                       // ⚠ 一定要跟著清:重連重放整包時它必須是空的
     /* ★★ 形狀的來源也要歸零(v2.2.0,見檔頭 ①):下一回合換人畫,形狀要重新收一次
@@ -727,26 +792,95 @@ const DWB = (function () {
   }
   /* 工具列:五顆色塊 + 擦布 / 復原 / 清空。⚠ 用事件委派掛在 #dwTools 上 —— 那一列會被
      hidden/顯示,但元素不會重建,所以掛一次就夠(不必每回合重綁)。 */
+  /* ==========================================================================
+     ★★★ 收合式筆盤(v2.7.0)—— 工具列上只留**一顆**「現在這支筆」
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「筆的顏色切換,是不是把他做成一種可以收起來,按一下然後又打開可以選顏色」。
+
+       在此之前那一列固定站著**五顆色塊**(5 × 25 = 125px),而這一列是**零空隙**的
+       (v2.5.4 的決算:328 / 331.2px,題目那一格只剩 69.9px 而 4 個字要 68px)——
+       於是「加粗細」「加第六第七色」「把題目圖示放回窄畫面」全部做不到。
+
+       ★★★ 收起來之後這一列多出 **≈87px**,而那筆錢一次買到三樣東西:
+         ① **粗細真的有 UI 了** —— `WIDTHS` 從 v1.154.0 就帶在每一批記錄裡,
+            缺的一直只是 UI(notes/遊戲/21 第六節把它列為「唯一還沒解的痛點」)。
+         ② **七色全開** —— 紫(5)橘(6)本來就在 COLORS 裡,只是排不進那一列。
+         ③ 題目那一格從 ≈70px 變 ≈116px,窄畫面的題目圖示也可以還回去。
+
+       ★★ **而且它讓 v2.5.4 那條「44×44 在一列裡物理上做不到」失效** ——
+         面板浮在紙上,不受那一列的寬度預算管:每一顆色票都可以是 44×44
+         (Gemini 建議書當初要的尺寸,當年因為那一列塞不下而只能給 25×38)。
+
+       ⚠⚠ **面板是 `.dw-tools` 的 absolute 子元素,往上彈**(`bottom:100%`)——
+         三個理由,每一個都踩過同族的坑:
+         · 掛在 `.dw-stage` 裡會被它的 `overflow:hidden` 裁掉;
+         · 進了版面流就是從畫布身上拿高度(紅線 17 / 36 那一族);
+         · `left/right:0` 是為了不讓它把 `.dw-tools` 的 **scrollWidth 撐大** ——
+           那一列的溢出斷言(F6e)量的就是它。
+       ⚠ 選完顏色 / 粗細**自動收起來**:那一刻手指要回畫布,面板留著就是擋路。
+       ⚠ 「哪一支筆在手上」的真相照舊只有 `syncTool()` 一支在寫(紅線 24)。
+     ========================================================================== */
+  const PAL_C = COLORS.length;           // 面板放**全部**七色(工具列只剩一顆當前色)
+  let palOpen = false;
+
+  function palBox() { return $("dwPal"); }
+  function togglePal(on) {
+    palOpen = (on === undefined) ? !palOpen : !!on;
+    /* ⚠ 不能畫的時候不准打開(猜題者的工具列本來就是 hidden,這是第二道) */
+    if (palOpen && !enabled) palOpen = false;
+    syncPal();
+  }
+  function syncPal() {
+    const box = palBox(), btn = $("dwPen");
+    if (box) box.classList.toggle("hidden", !palOpen);
+    if (btn) btn.setAttribute("aria-expanded", palOpen ? "true" : "false");
+    if (btn) btn.classList.toggle("open", palOpen);
+  }
+  /* 面板裡那幾顆的內容(顏色 / 粗細)也是 JS 依 COLORS / WIDTHS 產生的 ——
+     ⚠ 同紅線 3-D:CSS 裡**不可以**有第二份色碼,不然「看起來是藍的、畫出來是綠的」。 */
+  function buildPal() {
+    const cRow = $("dwPalC"), wRow = $("dwPalW");
+    if (cRow && !cRow.children.length) {
+      for (let i = 0; i < PAL_C; i++) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "dw-pc"; b.id = "dwPc" + i;
+        b.setAttribute("aria-label", "第 " + (i + 1) + " 色");
+        b.style.setProperty("--dw-sw", COLORS[i]);
+        cRow.appendChild(b);
+      }
+    }
+    if (wRow && !wRow.children.length) {
+      for (let i = 0; i < WIDTHS.length; i++) {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "dw-pw"; b.id = "dwPw" + i;
+        b.setAttribute("aria-label", "筆粗 " + (i + 1));
+        /* 圓點的大小照 WIDTHS 的比例走(邏輯單位 → 面板上的 px),
+           ⚠ 這裡同樣不寫第二份數字:它是 WIDTHS 算出來的。 */
+        b.style.setProperty("--dw-pwsz", Math.round(6 + WIDTHS[i] * 0.62) + "px");
+        wRow.appendChild(b);
+      }
+    }
+  }
+
   function bindTools() {
     const box = $("dwTools"); if (!box) return;
-    /* ★★ 色塊的顏色**在這裡設**,CSS 裡刻意沒有色碼 —— COLORS 是唯一真相。
+    buildPal();
+    /* ★★ 顏色**在這裡設**,CSS 裡刻意沒有色碼 —— COLORS 是唯一真相。
        兩邊各寫一份的症狀是「色塊看起來是藍的、畫出來是綠的」,而且沒有任何斷言會紅。
-       ⚠⚠ v2.5.4 起寫的是**自訂屬性 `--dw-sw`**,不是 `style.background`:
-         那顆鈕本身現在是「整個節距大小的透明熱區」,看得見的圓是 CSS 的 ::before 畫的
-         (熱區從 18×18 變成 28×36 的來源,見 styles.src.css 的 .dw-sw 那一段)。
-         而鈕自己的 background 已經被**選中狀態那塊底色**用掉了 —— 兩者寫在同一個
-         地方會互相蓋掉(而且是 inline style 贏 → 選中狀態會整顆變成筆色)。
-       ⚠ 這一行仍然是「顏色只有 COLORS 一份」的實作:CSS 那邊只有 `var(--dw-sw)`,沒有色碼。 */
-    for (let i = 0; i < SWATCHES; i++) {
-      const b = $("dwSw" + i);
-      if (b) b.style.setProperty("--dw-sw", COLORS[i]);
-    }
+       ⚠⚠ 寫的是**自訂屬性 `--dw-sw`**,不是 `style.background`:那顆鈕的 background
+         被**選中狀態那塊底色**用掉了(inline style 會贏 → 選中的那一顆會整格變成筆色)。 */
+    const pen = $("dwPen");
+    if (pen) pen.style.setProperty("--dw-sw", COLORS[curC] || COLORS[0]);
     box.addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
+      if (b.id === "dwPen") { togglePal(); return; }          // v2.7.0:開 / 收筆盤
+      if (b.id === "dwGuideBtn") { toggleGuide(); return; }   // v2.7.0:描圖底(⚠ #dwGuide 是紙上那一層)
       if (b.id === "dwErase") { toggleEraser(); return; }
-      if (b.id === "dwUndo") { undo(); return; }        // v1.163.0
-      const m = /^dwSw(\d)$/.exec(b.id || "");
-      if (m) pickColor(+m[1]);
+      if (b.id === "dwUndo") { undo(); return; }              // v1.163.0
+      const mc = /^dwPc(\d+)$/.exec(b.id || "");
+      if (mc) { pickColor(+mc[1]); return; }
+      const mw = /^dwPw(\d+)$/.exec(b.id || "");
+      if (mw) { pickWidth(+mw[1]); return; }
     });
     syncTool();
   }
@@ -769,6 +903,10 @@ const DWB = (function () {
      ⚠ 只在放大時出現(vk > 1)—— 沒縮放時它是純粹的雜訊,而且會擋住紙的一角。
      ⚠ 它住在 `.dw-wrap` 裡、**排在 `#dwOver` 前面**:選題 / 公布答案的蓋板要蓋得住它。 */
   function syncZoomChip() {
+    /* ★ 描圖底(v2.7.0)跟著倍率走:放大時它會與已經畫下去的線錯位 → 直接藏起來。
+       ⚠ 這一行要在 `if (!b) return` **前面** —— 倍率晶片不存在(診斷頁 / 舊 DOM)
+         不代表描圖底不必同步。 */
+    syncGuide();
     const b = $("dwPinch"); if (!b) return;
     const on = vk > 1.005;
     b.classList.toggle("hidden", !on);
@@ -788,6 +926,11 @@ const DWB = (function () {
     }
     if (!enabled && drawing) { drawing = null; flush(); }
     if (!enabled) clrDisarm();        // ⚠ 相位換掉時武裝要收:下一回合第一次按不該直接清光
+    /* ★ 筆盤與描圖底(v2.7.0):不能畫的時候一律收乾淨 ——
+       ⚠ 描圖底特別重要,它是**題目的圖示**:相位一換(公布答案 / 換人畫)還留在紙上
+         就是把答案留在畫面上。這裡是唯一必經的閘,不要只靠 paintTools。 */
+    if (!enabled) { palOpen = false; syncPal(); }
+    if (!enabled) setGuide("");
     /* ⚠ v2.5.3 之前這裡還有一行 `if (enabled !== was) syncTool()` —— 那是為了「形狀條
        收不到 paintTools 的收納」而補的(見檔頭 ⑦ 的移除紀錄)。形狀條沒了之後
        syncTool() 一個字都不看 enabled,留著只是每次換相位多跑一次無效的重畫。 */
@@ -876,22 +1019,26 @@ const DWB = (function () {
     if (COLORS[c]) curC = c;
     if (WIDTHS[w]) curW = w;
   }
-  /* ---------- 工具列的狀態(v1.157.0:四色 + 擦布;v1.170.0 加黃 = 五色) ----------
-     ★ 只有這一支會碰畫面上的 on 狀態 —— 選色 / 選擦布 / 清空 / 換回合都走它,
-       所以「畫面上亮的那一顆」與 curC / curEr 不可能不一致。
-     ⚠ 色塊放**前五色**(墨黑 / 紅 / 藍 / 綠 / 黃)—— COLORS 有七個,紫與橘沒有 UI。
-       那不是漏做:`#dwTools` 那一列在 360px 的手機上要同時放題目 + 色塊 + 四顆工具鈕,
-       再多兩顆會把題目擠到只剩省略號,而題目是畫家唯一要讀的字。
-     ⚠⚠ 加第五顆的時候色塊在窄畫面跟著縮成 18px、gap 收到 3px(styles.css 那條 media)——
-       改這個數字之後**一定要用裝置模擬量一次** `#dwTools` 的 scrollWidth − clientWidth
-       (必須是 0),Edge 的視窗寬度壓不到 360px(見 notes/21 第五節)。
-     ⚠ 這個數字同時是「UI 有幾顆」與「掃哪幾個 COLORS 索引」——
-       所以黃色只能放在 index 4(見 COLORS 那段),不能 append 到尾巴。 */
-  const SWATCHES = 5;
+  /* ---------- 工具列的狀態(v1.157.0 四色 + 擦布;v1.170.0 五色;v2.7.0 收成一顆筆)----------
+     ★ 只有這一支會碰畫面上的 on 狀態 —— 選色 / 選粗細 / 選擦布 / 清空 / 換回合都走它,
+       所以「畫面上亮的那一顆」與 curC / curW / curEr 不可能不一致。
+     ⚠⚠ v2.7.0 起工具列上**只有一顆筆鈕**(顯示現在的顏色),七色與四檔粗細住在
+       收合式筆盤裡(見上面 PAL_C 那一段)。⚠ 那顆鈕的圓要跟著 curC 換色 ——
+       它現在是「現在拿的是哪一支筆」唯一的視覺線索(紅線 24)。
+     ⚠ 擦布模式時筆鈕要**退掉亮框**(但圓照舊顯示筆色:回到筆的時候就是那個顏色)。 */
   function syncTool() {
-    for (let i = 0; i < SWATCHES; i++) {
-      const b = $("dwSw" + i);
+    const pen = $("dwPen");
+    if (pen) {
+      pen.style.setProperty("--dw-sw", COLORS[curC] || COLORS[0]);
+      pen.classList.toggle("on", !curEr);
+    }
+    for (let i = 0; i < PAL_C; i++) {
+      const b = $("dwPc" + i);
       if (b) b.classList.toggle("on", !curEr && curC === i);
+    }
+    for (let i = 0; i < WIDTHS.length; i++) {
+      const b = $("dwPw" + i);
+      if (b) b.classList.toggle("on", curW === i);
     }
     const er = $("dwErase");
     if (er) { er.classList.toggle("on", curEr); er.setAttribute("aria-pressed", curEr ? "true" : "false"); }
@@ -901,6 +1048,8 @@ const DWB = (function () {
     if (un) un.disabled = !lastLive();
     // 只改鼠標樣式,不影響任何幾何
     if (cv) cv.classList.toggle("erasing", curEr);
+    syncPal();
+    syncGuide();
   }
   /* ==========================================================================
      ★★★ 筆 / 擦布是**二選一的模式**(v1.165.0 定案三選一;v2.5.4 收成二選一)
@@ -915,17 +1064,82 @@ const DWB = (function () {
          只改 CSS 的話旗標還是會不一致,而 stats().tool 會說謊。
      ========================================================================== */
   function modeToast(txt) { try { showToast(txt, 1100); } catch (e) {} }
-  /* 選色。⚠ 從**擦布**回到筆(擦布模式下顏色沒有意義)。 */
+  /* 選色。⚠ 從**擦布**回到筆(擦布模式下顏色沒有意義)。
+     ⚠ v2.7.0:選完自動收起筆盤 —— 那一刻手指要回畫布,面板留著就是擋路。 */
   function pickColor(i) {
     if (!COLORS[i]) return;
     curC = i;
     if (curEr) { curEr = false; modeToast("✏️ 換回筆"); }
+    palOpen = false;
+    syncTool();
+  }
+  /* ★★ 選粗細(v2.7.0)。**線上格式一個字都沒改** —— `w` 從 v1.154.0 就寫在每一批
+     記錄裡(`s<sid>,<c>,<w>,…`),在此之前只是永遠送 DEF_W。
+     ⚠ 同 pickColor:擦布模式下選粗細等於「我要用筆了」,所以一併切回筆。 */
+  function pickWidth(i) {
+    if (!WIDTHS[i]) return;
+    curW = i;
+    if (curEr) { curEr = false; modeToast("✏️ 換回筆"); }
+    palOpen = false;
     syncTool();
   }
   function toggleEraser(on) {
     curEr = (on === undefined) ? !curEr : !!on;
     modeToast(curEr ? "🧽 擦布:擦掉一部分" : "✏️ 一般筆");
+    palOpen = false;                 // ⚠ 換模式時筆盤要收(它講的是筆的事)
     syncTool();
+  }
+
+  /* ==========================================================================
+     ★★★ 描圖底(v2.7.0)—— 題目的 emoji 淡淡浮在紙上,**只有畫家看得到**
+     ──────────────────────────────────────────────────────────────────────────
+       使用者要解的是「畫家如果不會畫怎麼辦」。題庫每一題本來就有一顆 `i`
+       (給畫家看的 emoji,v2.4.3 起也顯示在題目旁)—— 那顆 emoji 就是一張
+       **現成的輪廓參考**,而且**零資料成本**(916 題每一筆都有)。
+
+       ★★★ **四條讓它在這一頁安全的理由**:
+       ① **它是 DOM,不是 canvas** —— 不進 `strokes`、不進 replay、不進線上格式,
+          而且 `paintTo()` 只畫 strokes → **分享圖自動乾淨**(紅線 21/22 一個字都不必動)。
+       ② **absolute + `pointer-events:none`** —— `fit()` 量不到它,畫布一個 px 都不會變
+          (紅線 36 那一族;這一頁的版面翻過四次,任何進版面流的東西都是地雷)。
+       ③ **只有畫家那台寫 textContent** —— 幫畫的人與猜題者一律清成空字串,
+          **不是用 CSS 藏**(紅線 6 / 37:偷看 DOM 比偷看 DB 容易太多)。
+       ④ **預設關,由畫家自己按** —— 開著的話大家畫出來的圖會長得很像,
+          而「畫得歪七扭八很好笑」正是這個遊戲的樂趣。它是救生圈,不是常態。
+
+       ⚠⚠ **兩指縮放時直接藏起來**:畫布內部做的是檢視變換(vk/vx/vy 只走 sx/sy),
+         而這一層是 DOM —— 不藏就會與已經畫下去的線錯位。
+         同步 transform 等於維護第二套座標系,不划算。
+       ⚠ 灰階是刻意的:彩色 emoji 壓在紙上會跟筆色搶注意力,而它只是輪廓。
+     ========================================================================== */
+  let guideIc = "", guideOn = false;
+  /* adapter 每一份快照餵一次:畫家給題目的 emoji,其他人一律給空字串。 */
+  function setGuide(ic) {
+    const v = String(ic == null ? "" : ic);
+    if (v === guideIc) return;
+    guideIc = v;
+    if (!guideIc) guideOn = false;      // ⚠ 換人畫 / 換相位 → 連開關一起歸零
+    syncGuide();
+  }
+  function toggleGuide(on) {
+    if (!guideIc) return;
+    guideOn = (on === undefined) ? !guideOn : !!on;
+    modeToast(guideOn ? "💡 描圖底:照著淡淡的形狀畫" : "💡 描圖底關掉了");
+    syncGuide();
+  }
+  function syncGuide() {
+    const el = $("dwGuide"), btn = $("dwGuideBtn");
+    /* ⚠ 兩指放大時藏起來(見上面那段);`vk` 是這一台自己的檢視倍率。 */
+    const show = !!guideIc && guideOn && vk <= 1.001;
+    if (el) {
+      el.textContent = show ? guideIc : "";      // ⚠ 一律清內容,不是只藏起來
+      el.classList.toggle("hidden", !show);
+    }
+    if (btn) {
+      btn.classList.toggle("hidden", !guideIc);  // 沒題目(不是畫家)就連鈕都不給
+      btn.classList.toggle("on", guideOn);
+      btn.setAttribute("aria-pressed", guideOn ? "true" : "false");
+    }
   }
 
   /* ==========================================================================
@@ -1413,6 +1627,14 @@ const DWB = (function () {
            '<span class="dw-pop-n">' + esc(name) + '</span>' +
            '<span class="dw-pop-t">✅ 猜中了</span>');
   }
+  /* ★★ 系統訊息也浮(v2.7.0):「✅ 某某說畫完了」與「🏳️ 某某放棄了」。
+     v2.6.0 只讓猜對 / 猜錯浮起來,而**「可以開始猜了」漏看的代價其實更大** ——
+     它是一個「現在開始搶分」的信號,而猜題列在熱鬧的時候捲得很快。
+     ⚠ 用**系統色(灰)**,不可以用綠:綠是「猜中了」的顏色,兩件事長一樣就是誤導。
+     ⚠ 它與 sysSay() 是兩個出口、同一份內容(那一支是紀錄,這一支是當下)。 */
+  function popSys(txt) {
+    popRow("sys", '<span class="dw-pop-t">' + esc(txt) + '</span>');
+  }
   function seatDot(seat) { return '<span class="dw-seat p' + ((seat | 0) % 6) + '"></span>'; }
   /* ⚠ 換回合(clearSay)與離開作畫相位都要清:留著的話那幾則會浮在選題卡 / 公布答案卡上面
      (它的 z-index 比蓋板高 —— 讓開的方式刻意選「清空」而不是調 z-index,
@@ -1625,10 +1847,11 @@ const DWB = (function () {
         g.strokeStyle = COLORS[s.c] || COLORS[0];
         g.lineWidth = Math.max(1, (WIDTHS[s.w] || WIDTHS[DEF_W]) * kx);
       }
+      /* ⚠⚠ 平滑(v2.7.0)一定要**連匯出圖一起**走 tracePath ——
+         漏掉這裡的症狀是「畫面上是曲線、分享出去的那張是折線」,
+         而按分享的人自己不會看那張圖(它直接進系統分享匣)。 */
       g.beginPath();
-      g.moveTo(s.p[0] * kx, s.p[1] * ky);
-      for (let j = 2; j < s.p.length; j += 2) g.lineTo(s.p[j] * kx, s.p[j + 1] * ky);
-      if (s.p.length === 2) g.lineTo(s.p[0] * kx + 0.01, s.p[1] * ky);
+      tracePath(g, s.p, 0, x => x * kx, y => y * ky);
       g.stroke();
     }
     g.globalCompositeOperation = "source-over";     // ⚠ 一定要還原(同 penEnd)
@@ -1729,6 +1952,9 @@ const DWB = (function () {
     /* v2.2.0:這一回合我是不是畫家(= 畫布形狀的來源,見檔頭 ①)。 */
     setArtist,
     pickColor, toggleEraser, undo, syncTool,
+    /* v2.7.0:收合式筆盤(七色 + 四檔粗細)與描圖底。
+       ⚠ setGuide 由 adapter 每一份快照餵一次 —— 畫家給題目的 emoji、其他人一律給 ""。 */
+    pickWidth, togglePal, setGuide, toggleGuide,
     /* 兩指縮放(v2.1.0)。zoomAt 匯出只給診斷 / e2e 用 —— 真人走的是手勢與那顆晶片。 */
     resetView, zoomAt,
     setShotInfo, shareShot, shotLines, shotDataUrl,
@@ -1744,6 +1970,7 @@ const DWB = (function () {
        那兩支重連時會被 child_added 整批重放,而浮字重放一次就是一進房噴滿畫面
        (擋在 adapter 的 popArm,見那一支的註解)。 */
     popSay, popHit, clearPop, popCount,
+    popSys,                        // v2.7.0:系統訊息(畫完了 / 放棄)也浮一則
     LW, LH, COLORS, WIDTHS,
     /* 診斷 / 測試用:目前畫了幾筆、共幾個點、畫布現在多大。
        ⚠ n / pts 一律只算**看得見的**(跳過被撤銷的)—— 那才是「畫面上有什麼」;
@@ -1754,6 +1981,10 @@ const DWB = (function () {
                er: live.filter(s => s.er).length,        // 幾筆是擦除(v1.157.0)
                un: strokes.length - live.length,         // 幾筆被撤銷了(v1.163.0)
                c: curC, tool: curEr ? "er" : "pen", w: boxW, h: boxH,
+               /* v2.7.0:筆粗細的**索引**(不是 px —— `w` 這個名字被畫布寬度佔走了)、
+                  筆盤開著沒、描圖底開著沒。守門要量得到「選了粗筆之後送出去那一批
+                  的 w 欄位真的變了」(只驗 UI 亮哪一顆是驗不到粗細有沒有上線的)。 */
+               bw: curW, pal: palOpen, gd: guideOn, gic: guideIc,
                /* v2.1.0:兩指縮放的檢視狀態(倍率 + 位移)。守門要量得到
                   「放大之後送出去的座標有沒有跟著歪掉」。 */
                k: vk, vx: vx, vy: vy,
