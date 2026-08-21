@@ -9502,6 +9502,26 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     100%{background-position:-32% 50%;opacity:0}
   }
 
+  /* ---------- 終局攤牌:局結束之後把還蓋著的那幾顆一起翻開(v2.7.1)----------
+     ★ 借的就是上面那支 `.dc-flip3d` / `dcFlipIn`,**不另做一支動畫**(換一支動畫就是
+       多一個接縫,v2.3.5 那次就是把「播完換一支」整個拿掉才修順的)。
+       每一格的延遲由 board.js 寫成 inline 的 `--dc-rvd`(照**對角線**排,55ms 一階)。
+     ★★ 「延遲中的那顆長什麼樣子」是 `animation-fill-mode:both` **免費給的**:
+       延遲那段時間它停在 `from`(rotateY(0))= 背面朝上 = 那一顆還蓋著,
+       時間到了才自己翻過來。不必另外寫一個「等待中」的狀態。
+     ⚠⚠⚠ **攤開時刻意把漆面光澤關掉。** 一次會有二十幾顆在翻,而那道光澤是
+       `background-position` 動畫(要重繪)—— 再每顆疊一道正好是這一頁最貴的那條教訓
+       (v1.137.5「翻牌那一格不要再疊 dcHitGlow」· v2.3.5「翻與飛不可以同時播」):
+       **任何一刻只准有一件事在動**。⚠ 單顆翻牌那條路不受影響(它身上沒有 `.dc-rv`)。
+     ⚠ 關的方式照上面 prefers-reduced-motion 那條的同一個寫法(`animation:none;opacity:0`)
+       —— 少了 `opacity:0` 的話動畫一停,那道光帶會**靜靜地停在畫面上**變成一塊亮斑
+       (keyframes 的 0% 才是 opacity:0,不是元素的預設值)。 */
+  .dc-sq.dc-rv .dc-flip3d{animation-delay:var(--dc-rvd,0ms)}
+  .dc-sq.dc-rv .dc-face-f::after{animation:none;opacity:0}
+  /* 結果卡上那顆「攤開 / 蓋回去」與「先看看棋盤 👀」並排(兩顆都是 inline-block 的
+     .peek-link)—— 只補一個間距,其餘全部沿用共用樣式。 */
+  .dc-win .dc-revealbtn{margin-right:16px}
+
   /* ---------- 吃子 / 移動的滑入動畫(board.js 算完 rect 後用 JS 補 transform)----------
      ⚠ 這裡只放「滑動中」需要的殼:實際的 translate 由 board.js 的 slidePiece() 寫成
        inline style(算兩格的 getBoundingClientRect 差,不靠 CSS 猜位移量)。 */
@@ -9771,6 +9791,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .dc-cdn.dc-beat{animation:none}
     .dc-sq .dc-face-f::after{animation:none;opacity:0}
     .dc-sq .dc-p{transition:none}
+    /* ⚠ 終局攤牌:`animation:none` 一定要配 `transform:rotateY(180deg)` ——
+       只寫 animation:none 的話那顆停在 `from`(rotateY(0))= **背面朝上**,
+       攤開等於沒攤開(而且看起來完全像功能壞掉)。 */
+    .dc-sq.dc-rv .dc-flip3d{animation:none;transform:rotateY(180deg)}
   }
 
   /* ---------- 結果卡 ----------

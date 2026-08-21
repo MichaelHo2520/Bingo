@@ -306,6 +306,12 @@ $("mpLeaveWin").addEventListener("click", () => MP.askLeave());
 $("mpNewSeason").addEventListener("click", () => { MP.resetScores(); MP.again(); });
 $("winPeek").addEventListener("click", peekBoard);
 $("reopenWin").addEventListener("click", showResult);
+/* ★★ 終局攤牌(v2.7.1):按「攤開」→ 盤面全翻開 + 卡片收起(沿用 peekBoard 那條既有的路,
+   使用者已經認得那個手勢);按「蓋回去」→ 只換檢視,卡片留著。
+   ⚠ 「現在能不能攤」的判斷全在 DCB.canReveal() 裡面,這裡不要再判一次
+     (兩份判斷遲早走鐘,而走鐘的方向如果是「對局中也攤得開」就是直接漏牌情)。
+   ⚠ 單機 / 連線共用這一顆:攤開是**純本地的檢視**,一個 DB 欄位都不寫。 */
+$("dcRevealBtn").addEventListener("click", () => { if(DCB.toggleReveal()) peekBoard(); });
 // 賽後表情列:四顆一鍵送給全部人(結果卡不關,對方也看得到飛出來的表情),😀 開完整面板。
 // 節流 600ms:結果卡是強制回應視窗,手指停在上面很容易連點狂送。
 let reactAt = 0;

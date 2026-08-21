@@ -45,6 +45,66 @@ const DCB = (function(){
      看清楚」那段動畫,見三之一節的 playMoveFx()。paint() 在畫下一手之前讀舊值決定
      這一手要不要播翻開動畫,畫完當下這一手才把它更新成新值。 */
   let prevUp = {};
+  /* ==========================================================================
+     ★★★ 終局攤牌(v2.7.1)—— 局結束之後把還蓋著的那幾顆翻開給大家看
+     ──────────────────────────────────────────────────────────────────────────
+       暗棋從頭到尾在問一句話:**那顆到底是什麼?** 而牌情紅線(檔頭第一條)保證了
+       翻開之前一個字都不會漏。**局結束的那一刻,那道保護就沒有理由了** ——
+       在此之前也沒有出口:結果卡只講「誰贏 · 幾勝」(那是對的,不要往上加東西),
+       而「先看看棋盤 👀」掀開的是**還蓋著的**盤面。悶局比子那種結局尤其難受:
+       判你輸,而你連對方剩什麼都沒看到。
+
+     ⚠⚠⚠ **落地方式只有一種是安全的:餵一份 `st` 的複本,不要動 paint() 那行三元式。**
+       牌情紅線的守門是 `tools/test-pages.js` H 節那條**逐字比對**
+       (`c.up ? pieceHTML(c.p) : backHTML()`)—— 所以攤開不是改那一行,而是讓 paint()
+       畫的時候拿到一份「cells 全部 up:true」的複本(viewSt())。
+       那行三元式一個字都不必改,`backHTML()` 仍然是零參數。
+
+     ⚠ 三道守衛讓它不可能漏牌:
+       ① `canReveal()` 要求 `st.over || cur.over` —— 對局中一律回 false;
+       ② `paint()` 開頭無條件複驗一次(局還沒結束就把旗標關掉),
+          所以就算誰去外面亂設也漏不出來;
+       ③ `reset()` 清掉旗標 —— **少了這一步就是「上一局攤開過,下一局開局直接漏光」**,
+          而那是這整條功能唯一真正危險的地方(e2e B 節在守)。
+
+     ⚠ 連線:攤開是**純本地的檢視**,一個 DB 欄位都不寫、`txGame` 一次都不叫。
+       兩台各自看、各自收,互不影響。
+
+     ★ `revealFx` 是**一次性**的:只有「剛按下去」那一次 paint 才播翻牌動畫。
+       不然 ResizeObserver(轉向 / 網址列收合)每觸發一次就會把整盤重新翻一遍。 */
+  let revealAll = false;              // 現在是不是攤開的檢視
+  let revealFx  = false;              // 這一次 paint 要不要播「翻開」動畫(一次性)
+
+  /* 還蓋著幾顆(讀的是真相,不是檢視)—— 0 顆就沒有攤開的必要,鈕不出現 */
+  function hiddenLeft(){
+    const st = cur && cur.st;
+    if(!st) return 0;
+    let n = 0;
+    for(let i = 0; i < DC.NSQ; i++){ const c = st.cells[i]; if(c && !c.up) n++; }
+    return n;
+  }
+  function overNow(){
+    const st = cur && cur.st;
+    return !!(st && (st.over || cur.over));
+  }
+  function canReveal(){ return overNow() && hiddenLeft() > 0; }
+  /* 攤開時給 paint() 的**檢視狀態**:cells 全部 up:true 的淺複本。
+     ⚠ 只複製 cells 那一層(每一格再淺複本一次)—— last / rules / caps / idle 全部沿用原物件,
+       那些 renderActs / syncIdle / 結果卡都還要用,而它們讀的一律是 cur.st(真相)。 */
+  function viewSt(){
+    const st = cur.st;
+    if(!revealAll) return st;
+    const cells = st.cells.map(c => (c && !c.up) ? Object.assign({}, c, { up: true }) : c);
+    return Object.assign({}, st, { cells: cells });
+  }
+  function setReveal(on){
+    const want = !!on && canReveal();
+    if(want === revealAll){ syncRevealBtn(); return revealAll; }
+    revealAll = want;
+    revealFx = want;                  // 只有「翻開」那一次播動畫,蓋回去不播
+    paint();
+    return revealAll;
+  }
 
   /* ==========================================================================
      一、音效 —— 全部用合成音,不進 mp3/
@@ -303,7 +363,13 @@ const DCB = (function(){
 
   function paint(){
     if(!board || !cur || !cur.st) return;
-    const st = cur.st;
+    /* ⚠⚠ 攤開的守衛②(見檔頭那一段):局還沒結束就無條件把旗標關掉。
+       這一行不是保守,它是「就算誰在外面亂設也漏不出去」的那道結構性保證。 */
+    if(revealAll && !overNow()){ revealAll = false; revealFx = false; }
+    /* truth = 真相(prevUp / renderActs / syncIdle / 結果卡都讀它)
+       st    = 畫盤面用的**檢視**(攤開時是一份 cells 全部 up:true 的淺複本) */
+    const truth = cur.st;
+    const st = viewSt();
     const mySide = (typeof cur.mySide === "number") ? cur.mySide : -1;
     const canAct = !!cur.mine && !cur.over && !st.over;
 
@@ -347,8 +413,14 @@ const DCB = (function(){
     const out = [];
     for(let i = 0; i < DC.NSQ; i++){
       const g = gridAt(i), c = st.cells[i];
+      const tc = truth.cells[i];
+      /* ★ 終局攤牌:這一格是「真相還蓋著、檢視已翻開」的那一種 → 要播翻開動畫。
+         ⚠ 只有 revealFx(按下去那一次)才播;之後的 paint(轉向 / resize)照樣是
+           攤開的檢視,但不再重新翻一遍。 */
+      const rvHere = revealFx && !!tc && !tc.up;
       const cls = ["dc-sq"];
       if(!c) cls.push("dc-empty");
+      if(rvHere) cls.push("dc-rv");
       if(i === sel) cls.push("dc-sel");
       if(tgtMap[i]) cls.push("dc-tgt", "dc-t-" + tgtMap[i]);
       if(screens[i]) cls.push("dc-screen");
@@ -359,15 +431,25 @@ const DCB = (function(){
       if(L && typeof L.to === "number" && L.to === i) cls.push("dc-lastto");
       if(L && L.from === i && !c) cls.push("dc-from");
       // ★ 這一格是不是「這一手剛翻開」——pieceHTML() 讀這個模組變數決定要不要播翻牌動畫
-      pendingFlip = !!(c && c.up && fresh && L && REVEAL_KINDS[L.kind] && L.to === i);
+      //   ⚠ 終局攤牌那一次也要套(rvHere),它借的就是同一支 .dc-flip3d
+      pendingFlip = !!(c && c.up && (rvHere || (fresh && L && REVEAL_KINDS[L.kind] && L.to === i)));
+      /* ★ 攤開的錯開延遲:照**對角線**排(row + col),同一條對角線上同時翻。
+         這樣任何一刻只有三四顆在轉,不是二十幾顆一起 —— 而「兩個貴的東西不要同時動」
+         正是這一頁最貴的兩條教訓(v1.137.5 / v2.3.5)。⚠ 55ms 這個數字與 CSS 那條
+         `.dc-sq.dc-rv` 的 sheen 關閉是一組:見 styles.src.css 那一段。 */
+      const rvStyle = rvHere ? (";--dc-rvd:" + ((g.row + g.col - 2) * 55) + "ms") : "";
       out.push('<button type="button" class="' + cls.join(" ") + '" data-sq="' + i +
-               '" style="grid-row:' + g.row + ';grid-column:' + g.col + '">' +
+               '" style="grid-row:' + g.row + ';grid-column:' + g.col + rvStyle + '">' +
                (c ? (c.up ? pieceHTML(c.p) : backHTML()) : "") +
                /* ⚠ 排在棋子**後面**是刻意的:兩者都沒有 z-index,靠 DOM 順序決定誰在上面
                   (棋子在 .dc-sel / 翻牌時有 transform → 會跟 absolute 的 X 同一層排)。 */
                (screens[i] ? xHTML() : "") +
                "</button>");
-      prevUp[i] = !!(c && c.up);      // ★ 更新成「現在」的翻開狀態,給下一手比較用
+      /* ★ 更新成「現在」的翻開狀態,給下一手比較用。
+         ⚠⚠ 讀的一定是 **truth** 不是檢視 —— 攤開的複本每一格都是 up:true,
+           拿它去寫 prevUp 就等於把「這一格上一次還蓋著」這個事實抹掉,
+           而那是 playMoveFx() 判斷「要不要播翻開讓你看清楚」的唯一依據。 */
+      prevUp[i] = !!(tc && tc.up);
     }
     pendingFlip = false;           // ⚠ 迴圈外的 pieceHTML() 呼叫(吃子欄、結果卡)一律不套
     board.innerHTML = out.join("");
@@ -384,9 +466,13 @@ const DCB = (function(){
        而且只在「這一手真的是新的」時播(fresh),不然每次 setState 都重播一次。 */
     if(fresh && L) playMoveFx(L, wasHiddenAtTo);
     /* ★ 兩塊浮層(悶局倒數 / 記牌盤)—— 掛在 .dc-stage 上、absolute、不佔版面,
-       所以**不影響 fitBoard()**(那正是它們不做成「動作列多一行」的原因,見四節的 ⚠⚠⚠)。 */
-    syncIdle(st);
+       所以**不影響 fitBoard()**(那正是它們不做成「動作列多一行」的原因,見四節的 ⚠⚠⚠)。
+       ⚠ 一律餵 truth:記牌盤讀的是 cur.st(它自己會在局結束時收掉),而悶局浮標
+         看的 idle / over 兩個欄位在複本裡是一樣的 —— 但傳真相才不必每次回頭想一次。 */
+    syncIdle(truth);
     syncTally();
+    revealFx = false;      // ⚠ 一次性:消費掉,下一次 paint 不再重新翻一遍
+    syncRevealBtn();
   }
 
   /* ==========================================================================
@@ -948,6 +1034,24 @@ const DCB = (function(){
     });
   }
 
+  /* ---------- 終局攤牌那顆鈕(v2.7.1)----------
+     ★ 由 **paint() 自己同步**,不是讓 main.js 在某個時機去叫 —— 結果卡出現的路徑有四條
+       (單機贏 / 單機和 / 朋友模式 / 連線的 outcome(),而 outcome() 還會被反覆呼叫),
+       每一條都補一次呼叫遲早會漏。paint() 是這四條路的共同上游(solo.js 的 finish()
+       與 adapter.js 的 paint() 都先畫盤面再開卡),掛在這裡一次涵蓋全部。
+     ⚠ 文案要報**還蓋著幾顆**:那個數字本身就是「值不值得按」的答案
+       (剩兩顆的時候沒有人想按)。
+     ⚠ 蓋回去那一段刻意也留著:攤開之後 `.dc-lastto` 那些記號還在,有人會想比對
+       「原本看得到的是什麼樣子」。 */
+  function syncRevealBtn(){
+    const b = $("dcRevealBtn");
+    if(!b) return;
+    const show = revealAll || canReveal();
+    b.classList.toggle("hidden", !show);
+    if(!show) return;
+    b.textContent = revealAll ? "🔒 蓋回去" : ("🔓 攤開沒翻開的 " + hiddenLeft() + " 顆");
+  }
+
   /* ==========================================================================
      五、點擊流程
      ──────────────────────────────────────────────────────────────────────────
@@ -1136,6 +1240,10 @@ const DCB = (function(){
   function reset(){
     sel = -1; lastKey = -1; cur = null; prevUp = {};
     sealKey = "";                   // ⚠ 換局:不清的話「連兩局的 key 剛好一樣」會漏掉那一下落款
+    /* ⚠⚠⚠ 攤開的守衛③ —— **少了這兩行就是「上一局攤開過,下一局開局直接把牌情漏光」**,
+       而那是整條攤牌功能唯一真正危險的地方(e2e B 節在守:開局一個棋名都不准出現)。 */
+    revealAll = false; revealFx = false;
+    syncRevealBtn();
     stopCd();
     clearReveals();                 // ⚠ 它掛在 stage 上,不會被下面那行 board.innerHTML 帶走
     clearOverlays();                // ⚠ 同上:悶局倒數 / 記牌盤兩塊浮層也在 stage 上
@@ -1150,6 +1258,13 @@ const DCB = (function(){
     sel: () => sel,
     isWide: () => wide,
     pieceHTML, backHTML, resultHTML, endText, setSeal,
-    moveSfx, sfx, stopCd
+    moveSfx, sfx, stopCd,
+    /* 終局攤牌(v2.7.1)。★ 對外只有一顆開關 + 兩個查詢 ——
+       「現在能不能攤」的判斷收在 canReveal() 一支裡面(局要結束、而且真的還有蓋著的),
+       main.js 不必自己重算一次。 */
+    toggleReveal(){ return setReveal(!revealAll); },
+    setReveal, canReveal,
+    isRevealed: () => revealAll,
+    hiddenLeft                       // 給 e2e / 診斷頁用
   };
 })();

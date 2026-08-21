@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 85774a03914b78d74046d73f7f32de5036c1afc06fe95811bd85b316301c3668)
+    真相在 styles.src.css(sha256 3a2cdcb39d5313bddca7b0731bd8a282b44fd6e291b324b3eb2dffa63d1c7c0b)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4151,6 +4151,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     18%{opacity:1}
     100%{background-position:-32% 50%;opacity:0}
   }
+  .dc-sq.dc-rv .dc-flip3d{animation-delay:var(--dc-rvd,0ms)}
+  .dc-sq.dc-rv .dc-face-f::after{animation:none;opacity:0}
+  .dc-win .dc-revealbtn{margin-right:16px}
   .dc-p.dc-sliding{z-index:5}
   .dc-reveal{position:absolute;display:flex;align-items:center;justify-content:center;
     pointer-events:none;z-index:8;will-change:transform;
@@ -4250,6 +4253,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .dc-cdn.dc-beat{animation:none}
     .dc-sq .dc-face-f::after{animation:none;opacity:0}
     .dc-sq .dc-p{transition:none}
+    .dc-sq.dc-rv .dc-flip3d{animation:none;transform:rotateY(180deg)}
   }
   .win-card.dc-win{width:min(88vw,420px);max-width:none;padding:26px 24px}
   .win-card.dc-win .word{font-size:clamp(28px,7.2vw,40px)}
