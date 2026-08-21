@@ -16,7 +16,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>你畫我猜 ｜ 連線對戰</title>
 <!-- 你畫我猜 · v2.5.6 -->
-<meta name="version" content="2.5.6">
+<meta name="version" content="2.5.6+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -283,6 +283,19 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
          ⚠ pointer-events:none 不可省:它橫過整張紙,吃得到點擊就是「畫到一半忽然畫不動」。 -->
     <div class="dw-stage" id="dwStage">
       <div class="dw-banner hidden" id="dwBanner" aria-live="polite"></div>
+      <!-- ★★★ 猜題浮字層(v2.6.0)。使用者:「如果有人猜出答案或是猜錯答案,我們現在只有
+           顯示在下方的顯示框裡,但那裡其實不容易即時去看到,反而沒這麼有趣了,我希望可以
+           類似像 emoji 那樣的,直接在中間顯示出來,大家當下猜的情況」。
+           → 猜錯的內容 + 猜中的「誰猜中了」浮在**畫板底部**往上堆,下方 #dwSay 照舊留著當紀錄。
+           ⚠⚠ 同 #dwBanner:它是 .dw-stage 的孩子、**.dw-wrap 的兄弟** + position:absolute
+              → fit() 量的是 .dw-stage 的外框與 .dw-wrap 的尺寸,**畫布一個 px 都不會動**(紅線 17)。
+           ⚠⚠ pointer-events:none 不可省 —— 它疊在紙的下半部,而那正是畫家的手在的地方
+              (吃得到點擊就是「畫到一半忽然畫不動」)。
+           ⚠ 貼**底部**不是正中央:紙的中央是圖的重心,而底部這一條半透明、又緊鄰輸入框,
+              視線移動最短。⚠ 猜中的內容一個字都不進來(紅線 5),浮的是「誰猜中了」。
+           ⚠ z-index 比 #dwBanner(3)低 → 有人搶先的彈幕永遠在浮字上面;
+              而選題 / 公布答案的蓋板靠「離開 draw 相位就清空」讓開(見 adapter 的 clearPop)。 -->
+      <div class="dw-pop-l" id="dwPop" aria-hidden="true"></div>
       <!-- ⚠⚠ 蓋板一定要包在 .dw-wrap 裡面、而**不是**直接掛在 .dw-stage 上:
            .dw-stage 比畫布大一圈(v1.155.2 起是 INK_PAD 的 4px,在此之前 4:3 的鎖
            常常讓它高出一大截)—— 蓋板 inset:0 掛在 stage 上的話,那半透明的黑會連

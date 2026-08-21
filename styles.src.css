@@ -10918,6 +10918,44 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     background:linear-gradient(135deg,rgba(95,224,138,.20),rgba(95,224,138,.06));
     box-shadow:inset 0 0 0 1px rgba(95,224,138,.35)}
 
+  /* ---------- ⑪ 猜題浮字:猜對 / 猜錯浮到畫板上(v2.6.0)----------
+     使用者:「如果有人猜出答案或是猜錯答案,我們現在只有顯示在下方的顯示框裡,
+     但那裡其實不容易即時去看到,反而沒這麼有趣了,我希望可以類似像 emoji 那樣的,
+     直接在中間顯示出來,大家當下猜的情況」。
+     ⚠⚠ **這一節的位置刻意排在下面第 ⑩ 節(prefers-reduced-motion)前面** ——
+       媒體查詢**不增加權重**,排在它後面的話那一段的 animation:none 會被這裡的
+       animation 直接蓋掉,而症狀只有開了「減少動態」的人看得到(自己一台永遠測不出來)。
+       → 所以編號跳號是刻意的,不要為了順序把它搬到後面去。
+     ⚠ 這一層與 .dw-banner 同族:position:absolute + pointer-events:none
+       → fit() 量不到它,**畫布一個 px 都不會變小**(紅線 17,那一格翻過四次)。
+     ⚠ 貼**底部**而不是正中央:紙的中央是圖的重心,而底部這一條緊鄰輸入框,
+       視線移動最短。四則堆滿約 112px,z-index 比彈幕(3)低 → 有人搶先時彈幕在上面。
+     ⚠⚠ 顏色一律固定值(紅線 11):它疊在**淺色的紙**上,吃 --panel / --text 的話
+       midnight 與 arcade 主題就是白底白字(那是只有切主題才看得到的坑)。 */
+  .dw-pop-l{position:absolute;left:0;right:0;bottom:7px;z-index:2;pointer-events:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+    gap:4px;padding:0 10px}
+  .dw-pop{max-width:100%;display:flex;align-items:center;gap:6px;
+    padding:4px 11px;border-radius:999px;
+    background:rgba(26,28,38,.84);box-shadow:0 3px 12px rgba(0,0,0,.30);
+    font-size:13.5px;line-height:1.35;
+    animation:dw-popin .3s cubic-bezier(.16,1,.3,1)}
+  .dw-pop-n{font-weight:800;color:rgba(255,255,255,.66);flex:none;
+    max-width:5.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dw-pop-t{font-weight:800;color:#fff;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* 自己那一則:名字換成暖黃(固定值,同上)—— 一整排都是別人的字時,
+     自己剛打的那句要找得到(而輸入框裡已經清空了,那句話只剩這裡看得到) */
+  .dw-pop.me .dw-pop-n{color:#ffd166}
+  /* 猜中的:整顆換成綠底(同 .dw-say-hit 那一族的語意)。
+     ⚠ 它照舊**一個字的內容都沒有**(紅線 5)—— 綠色講的是「有人中了」,不是中了什麼。 */
+  /* ⚠ 不透明度要夠高(.94):它疊在**淺色的紙**上,半透明會把綠洗成灰綠 ——
+     而這一則與旁邊那幾則的差別全靠顏色在講(截圖上看得出來,DOM 量不到)。 */
+  .dw-pop.hit{background:rgba(18,142,84,.94);box-shadow:0 3px 14px rgba(0,0,0,.34)}
+  .dw-pop.out{animation:dw-popout .38s ease-in forwards}
+  @keyframes dw-popin{0%{opacity:0;transform:translateY(10px) scale(.94)}100%{opacity:1;transform:none}}
+  @keyframes dw-popout{0%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px) scale(.97)}}
+
   /* ---------- ⑩ 會暈車的人(以及省電模式)----------
      ⚠ 這一段只關掉**裝飾性**的循環動畫與入場動畫,不關「狀態看得出來」的那一半:
        .dw-tool.armed 的底色、.dw-tool.on / .dw-sw.on 的填色、.dw-input.near 的火苗晶片
@@ -10927,7 +10965,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .dw-banner.go,.dw-flash.go,.dw-cd.bomb,.dw-cd.bomb::after,.dw-stage.dw-hot::after,
     .dw-over.pick .dw-pickbtn,.dw-over.pick .dw-pickbtn.on::after,.dw-over.wait .dw-ov-card,
     .dw-over.show .dw-ov-card,.dw-luv,.dw-say-row,.dw-tool.armed,
-    .dw-input.near .dw-guess,.dw-input.near::before,.dw-len.pop{animation:none}
+    .dw-input.near .dw-guess,.dw-input.near::before,.dw-len.pop,
+    .dw-pop,.dw-pop.out{animation:none}
     .dw-banner.go{opacity:1}
   }
 

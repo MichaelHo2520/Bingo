@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 896dc039f9ef35951b0e39303053d422574fee8878a46b80dec667d0888d29fb)
+    真相在 styles.src.css(sha256 1a9a4d65a03a429be98e75ea75c82e7ec58c199963619620f8b3579b7539add5)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -4857,11 +4857,29 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .dw-say-hit{padding:1px 7px;border-radius:999px;
     background:linear-gradient(135deg,rgba(95,224,138,.20),rgba(95,224,138,.06));
     box-shadow:inset 0 0 0 1px rgba(95,224,138,.35)}
+  .dw-pop-l{position:absolute;left:0;right:0;bottom:7px;z-index:2;pointer-events:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+    gap:4px;padding:0 10px}
+  .dw-pop{max-width:100%;display:flex;align-items:center;gap:6px;
+    padding:4px 11px;border-radius:999px;
+    background:rgba(26,28,38,.84);box-shadow:0 3px 12px rgba(0,0,0,.30);
+    font-size:13.5px;line-height:1.35;
+    animation:dw-popin .3s cubic-bezier(.16,1,.3,1)}
+  .dw-pop-n{font-weight:800;color:rgba(255,255,255,.66);flex:none;
+    max-width:5.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dw-pop-t{font-weight:800;color:#fff;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dw-pop.me .dw-pop-n{color:#ffd166}
+  .dw-pop.hit{background:rgba(18,142,84,.94);box-shadow:0 3px 14px rgba(0,0,0,.34)}
+  .dw-pop.out{animation:dw-popout .38s ease-in forwards}
+  @keyframes dw-popin{0%{opacity:0;transform:translateY(10px) scale(.94)}100%{opacity:1;transform:none}}
+  @keyframes dw-popout{0%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-8px) scale(.97)}}
   @media (prefers-reduced-motion:reduce){
     .dw-banner.go,.dw-flash.go,.dw-cd.bomb,.dw-cd.bomb::after,.dw-stage.dw-hot::after,
     .dw-over.pick .dw-pickbtn,.dw-over.pick .dw-pickbtn.on::after,.dw-over.wait .dw-ov-card,
     .dw-over.show .dw-ov-card,.dw-luv,.dw-say-row,.dw-tool.armed,
-    .dw-input.near .dw-guess,.dw-input.near::before,.dw-len.pop{animation:none}
+    .dw-input.near .dw-guess,.dw-input.near::before,.dw-len.pop,
+    .dw-pop,.dw-pop.out{animation:none}
     .dw-banner.go{opacity:1}
   }
   .dw-win{padding:30px 22px}

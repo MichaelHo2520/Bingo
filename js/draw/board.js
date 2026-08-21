@@ -44,6 +44,7 @@
       猜題列是廣播給全房看的(那是笑點來源),但把猜中的內容播出去 = 第一個猜中的人
       幫所有人報了答案。這裡的 addSay() **只收猜錯的**;猜中一律走 addHit()(只講「誰猜中了」)。
       → 這條與暗棋「不漏牌情」同一型,寫進 adapter 的 guess() 與這裡兩道。
+      ⚠ v2.6.0 的浮字層(popSay / popHit)是同一條規矩的第三道:popHit **連參數都沒有內容**。
 
    ⑤ **復原與直線(v1.163.0)——「手機上畫圖很辛苦」的兩個主因。**
       使用者:「目前畫畫這件事情其實是有一點辛苦的,因為大家都是用手機」。
@@ -1368,9 +1369,61 @@ const DWB = (function () {
     }, Math.max(600, ms | 0) );
     try { showToast("🔥 好接近了!就差一點點", 1900); } catch (e) {}
   }
+  /* ==========================================================================
+     ★★★ 猜題浮字(v2.6.0)—— 猜對 / 猜錯即時浮在畫板底部
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「如果有人猜出答案或是猜錯答案,我們現在只有顯示在下方的顯示框裡,
+       但那裡其實不容易即時去看到,反而沒這麼有趣了,我希望可以類似像 emoji 那樣的,
+       直接在中間顯示出來,大家當下猜的情況」。
+       ★ 資料一個位元組都沒有新增:浮的就是 say 節點與 dw.hits 這兩份既有的東西,
+         只是**多一個出口**(下方的 #dwSay 照舊留著當紀錄 + 分享圖的來源)。
+       ⚠⚠ **猜中的內容一個字都不進來**(紅線 5)—— 浮的是「誰猜中了」,
+         而 addHit 本來就收不到內容,這裡也刻意不去要。
+       ⚠ 三條規矩同上面那三支特效:①絕對定位 ②pointer-events:none
+         ③這一層裡每一則都是**新元素** → 不必「拿掉 class 再加回去」重播動畫。
+       ⚠ 上限 POP_MAX 則:6 人局的猜錯冷卻是 3 秒 → 最壞約 1.7 則/秒,而每則活 2.8 秒
+         → 同時最多 5 則。溢出時**直接砍最舊的那一則**(不等它自己淡出),
+         不然滿版的浮字就從「熱鬧」變成「擋住整張圖」。
+       ⚠⚠ 每一則的 setTimeout 都要判 parentNode:被上面那一刀提前砍掉的那則,
+         timer 照樣會到期(而 el.remove() 對已經拔掉的元素是無害的,這一行純粹是省事) */
+  const POP_MAX = 4, POP_LIVE = 2800, POP_OUT = 380;
+  function popRow(cls, inner) {
+    const box = $("dwPop"); if (!box) return;
+    const el = document.createElement("div");
+    el.className = "dw-pop" + (cls ? " " + cls : "");
+    el.innerHTML = inner;
+    box.appendChild(el);
+    while (box.children.length > POP_MAX) box.removeChild(box.firstChild);
+    setTimeout(() => {
+      el.classList.add("out");
+      setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, POP_OUT + 140);
+    }, POP_LIVE);
+  }
+  // 猜錯的:名字 + 內容(全房本來就看得到,這是笑點)
+  function popSay(name, text, seat, mine) {
+    popRow(mine ? "me" : "", seatDot(seat) +
+           '<span class="dw-pop-n">' + esc(name) + '</span>' +
+           '<span class="dw-pop-t">' + esc(text) + '</span>');
+  }
+  /* 猜中的:★★ **只有「誰」** —— 內容連參數都沒有(同 addHit,紅線 5)。
+     ⚠ 第幾個猜中刻意不寫進來:那是 #dwBanner 的工作(它同一刻會橫過畫布),
+       兩處都寫等於同一件事講兩次,而這一條浮字的位置只夠一行短句。 */
+  function popHit(name, seat) {
+    popRow("hit", seatDot(seat) +
+           '<span class="dw-pop-n">' + esc(name) + '</span>' +
+           '<span class="dw-pop-t">✅ 猜中了</span>');
+  }
+  function seatDot(seat) { return '<span class="dw-seat p' + ((seat | 0) % 6) + '"></span>'; }
+  /* ⚠ 換回合(clearSay)與離開作畫相位都要清:留著的話那幾則會浮在選題卡 / 公布答案卡上面
+     (它的 z-index 比蓋板高 —— 讓開的方式刻意選「清空」而不是調 z-index,
+      因為 #dwBanner 與蓋板的層次關係是既有行為,不值得為這一層去動它)。 */
+  function clearPop() { const b = $("dwPop"); if (b) b.innerHTML = ""; }
+  function popCount() { const b = $("dwPop"); return b ? b.children.length : 0; }
+
   function clearSay() {
     const box = sayBox(); if (box) box.innerHTML = "";
     sayLog = []; hitLog = [];      // ⚠ 兩份一起清:換回合時分享圖不可以帶著上一題的猜測
+    clearPop();                    // ⚠ 浮字也是「這一回合」的
   }
 
   /* ---------- 猜題輸入 ----------
@@ -1687,6 +1740,10 @@ const DWB = (function () {
     hitBanner, snapFlash, nearHint,
     paintPick, paintShow, hideOver, showOver,
     addSay, addHit, sysSay, clearSay, setGuess,
+    /* v2.6.0:猜題浮字(猜對 / 猜錯浮在畫板底部)。⚠ 呼叫端刻意**不是** addSay / addHit ——
+       那兩支重連時會被 child_added 整批重放,而浮字重放一次就是一進房噴滿畫面
+       (擋在 adapter 的 popArm,見那一支的註解)。 */
+    popSay, popHit, clearPop, popCount,
     LW, LH, COLORS, WIDTHS,
     /* 診斷 / 測試用:目前畫了幾筆、共幾個點、畫布現在多大。
        ⚠ n / pts 一律只算**看得見的**(跳過被撤銷的)—— 那才是「畫面上有什麼」;

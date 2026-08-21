@@ -42,6 +42,19 @@ const MP = MPCore.create((function () {
   let seenHits = {};                    // 這一回合已經播報過的猜中者(避免重複跳訊息)
   let seenGv = {};                      // 這一回合已經播報過的放棄者(v1.168.0,同上)
   let seenFin = false;                  // 這一回合「畫家說畫完了」播報過沒有(v1.168.0)
+  /* ★★★ 浮字的「重放閘」(v2.6.0)。掛 say 的 child_added 時 Firebase 會把**已經有的
+     整批重放一次** —— 猜題列要那個重放(中途進來 / 重連的人得看到前面猜了什麼),
+     但浮字重放一次就是**一進房畫面噴滿泡泡**,而那些話是十秒前講的。
+     ⚠ 判準刻意不是「幾毫秒內算重放」:那在慢網路上會把真的新訊息一起吃掉。
+       用的是 Firebase 的順序保證 —— **value 事件一定排在該次同步的所有 child_added 之後**
+       → `once("value")` 回來就代表「歷史那一批放完了」。
+       ★ 這與 mp-core.js 用 `once("value", ()=>{ emotesReady=true; })` 略過歷史表情
+         是**同一個模式**(那邊的註解也寫了),不是這一頁自己發明的。
+     ⚠⚠ 它同時也是 dw.hits 那一半的閘:announceHits 的 seenHits 在 attachRound 就清空,
+       重連時手上已經有的猜中者會**全部**被當成新的播一次(既有行為,彈幕靠 banT 只留最後一個)
+       —— 浮字沒有那道保護,所以一樣要看這個旗標。
+     ⚠ sayRef 拿不到時要**放行**(下面有 else),不然浮字整場都不出現。 */
+  let popArm = false;
   /* ⚠ 這一個是**整場**一次,不是每一回合(v1.170.0)—— 所以它不在 attachRound 裡清,
      只在開新的一場 / 回大廳 / 離開時清。共同作畫是房規,每回合都播就是刷版。 */
   let saidCo = false;
@@ -463,7 +476,15 @@ const MP = MPCore.create((function () {
     inkRef = ctx.ref(inkPath(d));
     if (inkRef) inkRef.on("child_added", s => DWB.applyRec(s.val()));
     sayRef = ctx.ref(sayPath(d));
-    if (sayRef) sayRef.on("child_added", s => onSay(s.val()));
+    /* ★ 浮字的重放閘(v2.6.0,理由在檔頭 popArm 那一段):
+       先關 → 掛 child_added(歷史那一批只進猜題列)→ value 回來就開。
+       ⚠ 順序不可以反:once 排在 on 前面的話,真 Firebase 上兩者是各自的同步,
+         value 可能先回來 → 閘開著,歷史那一批照樣噴成浮字。 */
+    popArm = false;
+    if (sayRef) {
+      sayRef.on("child_added", s => onSay(s.val()));
+      sayRef.once("value", () => { popArm = true; });
+    } else popArm = true;
   }
   function detachRound() {
     if (inkRef) { try { inkRef.off(); } catch (e) {} inkRef = null; }
@@ -472,8 +493,11 @@ const MP = MPCore.create((function () {
   }
   function onSay(v) {
     if (!v || !v.f) return;
-    const seat = seatOf(v.f);
-    DWB.addSay(ctx.dispName(v.f), String(v.t || ""), seat < 0 ? 0 : seat, v.f === ctx.me());
+    const seat = seatOf(v.f), sf = seat < 0 ? 0 : seat, mine = v.f === ctx.me();
+    DWB.addSay(ctx.dispName(v.f), String(v.t || ""), sf, mine);
+    /* ★★★ 浮字(v2.6.0)—— 同一則多一個出口,浮在畫板底部(使用者:下方那個框
+       「不容易即時去看到,反而沒這麼有趣了」)。⚠ 重放的那一批不浮(popArm)。 */
+    if (popArm) DWB.popSay(ctx.dispName(v.f), String(v.t || ""), sf, mine);
   }
   /* 房主順手收垃圾:上一回合的筆劃留著只會一直長(核心的 leave() 只清 host/players/game,
      adapter 自己的節點要自己清 —— 見 CLAUDE.md 紅線 5 那段的延伸)。 */
@@ -631,6 +655,11 @@ const MP = MPCore.create((function () {
       const h = dw.hits[id] || {};
       // ⚠ 第四個參數是**秒數**,只給分享圖用(內容一個字都不傳,見 board.js 的 addHit)
       DWB.addHit(ctx.dispName(id), Math.max(0, seatOf(id)), h.o, Math.max(0, h.t | 0) / 1000);
+      /* ★★★ 浮字(v2.6.0)。⚠ **內容連參數都沒有**(紅線 5):浮的是「誰猜中了」。
+         ⚠ 自己那則也浮 —— 這一條流是「大家當下猜的情況」,自己缺一格反而看不懂;
+           而彈幕那邊刻意不跳自己(那一刻已經有 toast + Sound.win,兩個一起上是自己蓋自己)。
+         ⚠ 重放的那一批不浮(popArm,見那一段的第二半)。 */
+      if (popArm) DWB.popHit(ctx.dispName(id), Math.max(0, seatOf(id)));
       /* ★★ 彩色彈幕(v2.4.1,Gemini 建議書 2.2)。猜題列那一則在 74px 的框裡很容易
          被忽略(尤其手正在打字時),而「有人搶先了」正是這個遊戲最該讓人抬頭的一刻。
          ⚠ 內容照舊只有「誰 + 第幾個」——**猜的字一個都不進來**(同 addHit 的理由)。
@@ -805,7 +834,7 @@ const MP = MPCore.create((function () {
            會把**自己上一回合當猜題者時收到的形狀**套在自己的畫布上(而且他一畫,
            別人收到的座標就全部偏掉)。 */
       DWB.setArtist(iAmDrawer());
-      if (!playing || !dw) { DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]); return; }
+      if (!playing || !dw) { DWB.setEnabled(false); DWB.setGuess({ show: false }); DWB.setMini([]); DWB.clearPop(); return; }
 
       // 換回合 → 重掛筆劃 / 猜題監聽,並請房主把上一回合的資料收掉
       if (dw.n !== curN) {
@@ -819,6 +848,9 @@ const MP = MPCore.create((function () {
       // 換相位 → 蓋板、畫布鎖、音效
       if (dw.ph !== curPh) {
         curPh = dw.ph;
+        /* ★ 浮字只屬於作畫相位(v2.6.0):一離開就清乾淨 —— 它的 z-index 比 #dwOver 高,
+           留著的話最後那兩三則會浮在選題卡 / 公布答案卡上面(而那時候紙上該只有答案)。 */
+        if (dw.ph !== "draw") DWB.clearPop();
         /* ★★ 拍立得的快門閃光(v2.4.1)—— 公布答案那一刻「咔嚓」一下把這張畫拍下來。
            ⚠⚠ 一定要判「這一段**剛剛**才開始」:`curPh` 開頁 / 重連時是空字串,
              不判的話中途重連的人會在一張已經公布了三秒的卡上莫名閃一下白。
