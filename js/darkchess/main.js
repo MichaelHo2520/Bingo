@@ -67,9 +67,15 @@ function paintSoloHint(){
   const el = $("dcSoloHint");
   if(!el) return;
   if(Solo.opponent() === "friend"){
-    el.innerHTML = "👤 跟旁邊的朋友輪流動同一支手機,翻到什麼算什麼。<br>" +
+    /* ★ 擂台(3 人以上)與本機雙人(2 人)講的是兩件不一樣的事 */
+    const head = Solo.isArena()
+      ? ("👥 " + Solo.seats() + " 個人排隊輪流上場,<b>贏的留台、輸的排到隊尾</b>" +
+         "(先翻讓給上來挑戰的那一位)。")
+      : "👤 跟旁邊的朋友輪流動同一支手機,翻到什麼算什麼。";
+    el.innerHTML = head + "<br>" +
       "<b>房規</b>:" + esc(DC.rulesText(Solo.rules())) + "(按上面「📋 改規則」調整)<br>" +
-      '<span class="dc-warn">' + esc(Solo.friendRecText()) + "</span>";
+      '<span class="dc-warn">' +
+        esc(Solo.isArena() ? "開局後上面那一行會顯示擂台戰況" : Solo.friendRecText()) + "</span>";
     return;
   }
   const L = Solo.levelOf(Solo.level());
@@ -85,7 +91,11 @@ function syncOppFields(){
   const lvField = $("dcLvField"), firstField = $("dcFirstField"), sub = $("dcSoloSubtitle");
   if(lvField) lvField.classList.toggle("hidden", friend);
   if(firstField) firstField.classList.toggle("hidden", friend);
-  if(sub) sub.textContent = friend ? "單機遊玩 · 朋友" : "單機遊玩 · 選難度";
+  /* ★ 人數只有朋友模式有(v2.7.1 的本機擂台);電腦對決永遠是一對一 */
+  const seatField = $("dcSeatField");
+  if(seatField) seatField.classList.toggle("hidden", !friend);
+  if(sub) sub.textContent = friend ? (Solo.isArena() ? "單機遊玩 · 擂台" : "單機遊玩 · 朋友")
+                                   : "單機遊玩 · 選難度";
 }
 
 /* ==========================================================================
@@ -228,6 +238,7 @@ function syncSoloSeg(){
   set("dcOppSeg", "opp", Solo.opponent());
   set("dcLvSeg", "lv", Solo.level());
   set("dcFirstSeg", "first", Solo.first());
+  set("dcSeatSeg", "seats", Solo.seats());
   syncOppFields();
 }
 
@@ -246,6 +257,9 @@ $("dcOppSeg").addEventListener("click", e => {
   [...$("dcOppSeg").children].forEach(x => x.classList.toggle("on", x === b));
   syncOppFields(); paintSoloHint();
 });
+/* ★★ 本機擂台的人數(v2.7.1)。⚠ 改人數要重畫「單機遊玩 · 擂台」那個副標與說明,
+   所以走 segPick(它自己會叫 paintSoloHint)+ 一次 syncOppFields。 */
+segPick("dcSeatSeg", "seats", v => { Solo.setSeats(v); syncOppFields(); });
 segPick("dcLvSeg", "lv", v => Solo.setLevel(v));
 segPick("dcFirstSeg", "first", v => Solo.setFirst(v));
 $("dcStartSolo").addEventListener("click", () => Solo.start());
@@ -312,6 +326,10 @@ $("reopenWin").addEventListener("click", showResult);
      (兩份判斷遲早走鐘,而走鐘的方向如果是「對局中也攤得開」就是直接漏牌情)。
    ⚠ 單機 / 連線共用這一顆:攤開是**純本地的檢視**,一個 DB 欄位都不寫。 */
 $("dcRevealBtn").addEventListener("click", () => { if(DCB.toggleReveal()) peekBoard(); });
+/* ★★ 看棋譜(v2.7.1):按下去 → 盤面回到最後一手 + 卡片收起(同攤開,沿用 peekBoard)。
+   ⚠ 回放列上的 ◀ ▶ ✕ 由 board.js 自己綁(它自己建那一列)—— 這裡只有入口。
+   ⚠ 「現在能不能回放」的判斷全在 DCB.canReplay() 裡,這裡不要再判一次。 */
+$("dcReplayBtn").addEventListener("click", () => { if(DCB.replayOpen()) peekBoard(); });
 // 賽後表情列:四顆一鍵送給全部人(結果卡不關,對方也看得到飛出來的表情),😀 開完整面板。
 // 節流 600ms:結果卡是強制回應視窗,手指停在上面很容易連點狂送。
 let reactAt = 0;

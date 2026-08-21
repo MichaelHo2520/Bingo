@@ -30,6 +30,51 @@ const Solo = (function(){
   let friendRec = { [DC.RED]: 0, [DC.BLACK]: 0, d: 0 };   // 朋友模式:這一節的紅黑勝場 —— 不存 localStorage,重開 App 不留
   function isFriend(){ return opponent === "friend"; }
 
+  /* ==========================================================================
+     ★★★ 本機擂台(v2.7.1)—— 一支手機、3~6 個人排隊,贏的留台
+     ──────────────────────────────────────────────────────────────────────────
+       這一頁的 maxPlayers 是 **2**(十四個遊戲裡只有它與五子棋是兩人),所以派對現場
+       四到六個人時,連線那條路只坐得下兩個。而**公園暗棋本來就是這樣玩的**:
+       一群人圍著兩個人下,贏的留著、輸的換人。
+       ★ 這一條的重點是它**完全不碰 js/shared/**(也不碰 DCB / DC / DCAI / adapter):
+         只是在朋友模式上加「一份名單 + 一個輪替規則」。
+
+     ⚠⚠ 它與 friendRec **是兩份值,不可以併**:
+       friendRec 記的是**紅方 / 黑方**各贏幾場(紅線:每局誰紅誰黑是隨機翻出來的),
+       擂台記的是**這個人**贏幾場 —— 兩件事。人數 = 2 時照舊只顯示 friendRec。
+     ⚠ 先翻權給**挑戰者**:先手第一次翻到什麼顏色就是他的(很實在),
+       而擂台上的擂主已經佔了「熟悉盤面」的便宜 —— 把先翻讓給上來的人比較公道。
+     ⚠ 和局 → 兩個人都留台重打(不換人)。
+     ⚠ 不進 localStorage:同 friendRec,「這一節在桌上」的計數,離桌歸零。 */
+  let seats = 2;                      // 朋友模式的人數(2~6);= 2 就是原本的本機雙人
+  let arena = null;                   // { t:[a,b], wait:[…], wins:{} };人數 2 時恆為 null
+  function isArena(){ return isFriend() && seats > 2; }
+  function pName(i){ return "P" + (i + 1); }
+  function arenaReset(){
+    if(!isArena()){ arena = null; return; }
+    const all = [];
+    for(let i = 0; i < seats; i++) all.push(i);
+    arena = { t: [all[0], all[1]], wait: all.slice(2), wins: {} };
+  }
+  /* 一局結束之後輪替。wi = 贏的是座位 0 還是 1(-1 = 和局)。 */
+  function arenaNext(wi){
+    if(!arena) return;
+    if(wi < 0) return;                                   // 和局:兩個都留台
+    const w = arena.t[wi], l = arena.t[1 - wi];
+    arena.wins[w] = (arena.wins[w] || 0) + 1;
+    if(!arena.wait.length){ arena.t = [l, w]; return; }   // 只有兩個人在桌上 → 原班,換先翻
+    const c = arena.wait.shift();
+    arena.wait.push(l);
+    arena.t = [c, w];                                    // ★ 挑戰者先翻(見上面的 ⚠)
+  }
+  function arenaText(){
+    if(!arena) return "";
+    const champ = arena.t[1], n = arena.wins[champ] || 0;
+    return "擂台 " + pName(arena.t[0]) + " vs " + pName(champ) +
+           (n ? ("(連 " + n + " 勝)") : "") +
+           (arena.wait.length ? (" · 待場 " + arena.wait.map(pName).join(" ")) : "");
+  }
+
   const LV = {
     easy: { key: "easy", emoji: "🙂", name: "新手", desc: "只挑眼前最大的子吃,不考慮被吃回去" },
     mid:  { key: "mid",  emoji: "🤔", name: "普通", desc: "會算一步,避開你吃得到的格子,翻棋也挑安全的" },
@@ -48,6 +93,7 @@ const Solo = (function(){
       if(LV[o.level]) level = o.level;
       if(["me", "ai", "random"].indexOf(o.first) >= 0) first = o.first;
       if(["ai", "friend"].indexOf(o.opponent) >= 0) opponent = o.opponent;
+      if(typeof o.seats === "number" && o.seats >= 2 && o.seats <= 6) seats = o.seats | 0;
       /* ⚠ 一律過一次:舊版存的值可能認不得。⚠⚠ 而且走的是 **migRules** ——
          「對手吃子」的預設 v2.5.2 翻成開,舊偏好裡那一欄是明碼的 false(見 rules.js)。 */
       if(o.rules) rules = DC.migRules(o.rules, o.rulesV);
@@ -56,7 +102,7 @@ const Solo = (function(){
     Object.keys(LV).forEach(k => { if(!rec[k]) rec[k] = blank(); });
   }
   function saveOwn(){
-    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, first, opponent,
+    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ level, first, opponent, seats,
       rules: DC.normRules(rules), rulesV: DC.RULES_V, rec })); }catch(e){}
   }
   const recOf = k => rec[k] || blank();
@@ -80,7 +126,13 @@ const Solo = (function(){
     const side = st ? st.col[seat] : -1;
     const left = (st && side >= 0) ? DC.countSide(st, side) : 16;
     const isMe = (seat === mySeat);
-    const nm = isFriend() ? ("P" + (seat + 1)) : (isMe ? "你" : (levelOf(level).emoji + " 電腦"));
+    /* ★ 擂台模式:晶片講的是**這個人是誰**(P3 vs P1),不是座位。
+       擂主加一個 🔥 —— 那是這個模式唯一的戲。 */
+    const champ = arena ? arena.t[1] : -1;
+    const who = arena ? arena.t[seat] : -1;
+    const nm = arena ? (pName(who) + (who === champ && (arena.wins[who] || 0) ? " 🔥" : ""))
+                     : (isFriend() ? pName(seat)
+                                   : (isMe ? "你" : (levelOf(level).emoji + " 電腦")));
     return '<div class="mp-chip' + (st && !st.over && st.turn === seat ? " turn" : "") + '">' +
              '<span class="nm">' + nm + "</span>" +
              (side >= 0 ? ('<span class="dc-chip-side ' + (side === DC.RED ? "dc-red-t" : "dc-blk-t") + '">' +
@@ -91,11 +143,17 @@ const Solo = (function(){
   function paintHud(){
     const lv = levelOf(level);
     const t = $("dcSoloLv");
-    if(t) t.textContent = isFriend() ? "👤 本機雙人" : (lv.emoji + " " + lv.name);
+    if(t) t.textContent = isArena() ? ("👥 擂台 " + seats + " 人")
+                                    : (isFriend() ? "👤 本機雙人" : (lv.emoji + " " + lv.name));
     const r = $("dcSoloRec");
-    if(r) r.textContent = isFriend() ? friendRecText() : recText(level);
+    if(r) r.textContent = arena ? arenaText() : (isFriend() ? friendRecText() : recText(level));
     const p = $("dcSoloPlayers");
     if(p) p.innerHTML = st ? (chip(0) + chip(1)) : "";
+    /* ★ 擂台模式那顆鈕講的是「下一位上場」不是「再來一局」——
+       ⚠ 掛在 paintHud 上(它每一次 paint 都跑)而不是「開結果卡」那個時機:
+         結果卡出現的路徑有好幾條,每一條各補一次遲早會漏(同 board.js 的 syncRevealBtn)。 */
+    const ag = $("dcSoloAgain");
+    if(ag) ag.textContent = arena ? "下一位上場" : "再來一局";
   }
   /* ⚠⚠⚠ **paintHud() 一定要在 DCB.setState() 之前** —— 這不是排版潔癖:
      DCB 那一支會在 setState 裡量舞台高度算格子大小(fitBoard),而 paintHud 會把
@@ -120,13 +178,25 @@ const Solo = (function(){
       key: moves.length,
       // ★ 吃子欄要知道「哪個座位是我」與兩個座位各叫什麼(見 board.js 的 setState)
       mySeat: mySeat,
-      names: friend ? ["P1", "P2"] : (mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"])
+      names: arena ? [pName(arena.t[0]), pName(arena.t[1])]
+                   : (friend ? ["P1", "P2"] : (mySeat === 0 ? ["你", "電腦"] : ["電腦", "你"])),
+      /* ★★ 棋譜回放(v2.7.1)要的整局真相 —— st 身上只有局面,沒有 deal / moves。
+         ⚠ 這一行與 adapter.js 的 paint() 是**同一對雙胞胎**(紅線 12 那一組)。 */
+      src: { deal: deal, moves: moves, rules: rules }
     });
   }
 
   /* ---------- 一局的生命週期 ---------- */
   function start(){
     clearAiT();
+    /* ★ 擂台:第一次進來(或人數改過)才重建名單;之後的每一局由 again() 輪替。
+       ⚠ 判準是 arena 存不存在 / 人數對不對得上,不可以每一局都重建 —— 那會把連勝歸零。 */
+    if(isArena()){
+      const n = arena ? (arena.wait.length + 2) : -1;
+      if(!arena || n !== seats) arenaReset();
+    }else{
+      arena = null;
+    }
     mySeat = isFriend() ? 0 : (first === "me") ? 0 : (first === "ai") ? 1 : (Math.random() < 0.5 ? 0 : 1);
     aiSeat = 1 - mySeat;
     deal = DC.newDeal();
@@ -148,10 +218,20 @@ const Solo = (function(){
     closeWin();
     DCB.reset();
     friendRec = { [DC.RED]: 0, [DC.BLACK]: 0, d: 0 };   // 離桌歸零:戰績只在「這一節本機雙人」裡累積
+    arena = null;                                       // ⚠ 擂台同理(連勝與待場名單都只活在這一節)
     showScreen("home");
     showHomeLayer("solo");             // 回到「本機對戰」那一層,方便換設定再來
   }
-  function again(){ closeWin(); start(); }
+  /* ★ 擂台模式的「下一位上場」就是這一支:先把上一局的結果算進輪替,再開新局。
+     ⚠ 輪替一定要在 start() **之前** —— start() 會把 st 換掉,算不出上一局誰贏。
+     ⚠ 只在**這一局真的結束了**才輪替(over):中途按「再來一局」不算任何人贏。 */
+  function again(){
+    if(arena && over && st){
+      arenaNext(st.winner < 0 ? -1 : st.winner);
+    }
+    closeWin();
+    start();
+  }
 
   /* ---------- 推進一手 ---------- */
   function commit(mv){
@@ -283,17 +363,29 @@ const Solo = (function(){
     const card = $("dcWinCard");
     if(card){ card.classList.remove("win", "lose", "draw"); card.classList.add(draw ? "draw" : "win"); }
     /* 本機雙人沒有「我」的視角 → 印章用中性的那一句(同 endText(st, -1) 的處理) */
-    $("winWord").textContent = draw ? "平手!" : (DC.sideName(st.col[st.winner]) + "方獲勝!");
+    /* ★ 擂台模式講的是**人**(P3 獲勝!),不是顏色 —— 顏色每一局都在換,
+       而擂台上大家要知道的是「誰贏了、誰要下去」。 */
+    $("winWord").textContent = draw ? "平手!"
+      : (arena ? (pName(arena.t[st.winner]) + " 獲勝!")
+               : (DC.sideName(st.col[st.winner]) + "方獲勝!"));
     DCB.setSeal(draw ? "draw" : "side", moves.length + ":" + st.winner);
     const box = $("dcResult");
     if(box){
-      const wins = [0, 1].map(seat => ({ n: friendRec[st.col[seat]] || 0, plus: (!draw && seat === st.winner) ? 1 : 0 }));
-      box.innerHTML = DCB.resultHTML(st, ["P1", "P2"], -1, wins);
+      /* 擂台:那一欄「幾勝」講的是這個**人**在這一節贏過幾場(不是紅方 / 黑方) */
+      const wins = arena
+        ? [0, 1].map(seat => ({ n: arena.wins[arena.t[seat]] || 0, plus: (!draw && seat === st.winner) ? 1 : 0 }))
+        : [0, 1].map(seat => ({ n: friendRec[st.col[seat]] || 0, plus: (!draw && seat === st.winner) ? 1 : 0 }));
+      box.innerHTML = DCB.resultHTML(st,
+        arena ? [pName(arena.t[0]), pName(arena.t[1])] : ["P1", "P2"], -1, wins);
       box.classList.remove("hidden");
     }
     $("winMsg").innerHTML =
       esc(DCB.endText(st, -1)) + (draw ? " 🤝" : " 🎉") +
-      '<span class="dc-solomsg"> · 本機雙人 · ' + esc(friendRecText()) + "</span>";
+      '<span class="dc-solomsg"> · ' +
+        (arena ? ("擂台 " + seats + " 人" + (draw ? " · 平手,兩位留台重打"
+                                                 : (" · 下一位 " + pName(arena.wait.length ? arena.wait[0] : arena.t[1 - st.winner]))))
+               : ("本機雙人 · " + esc(friendRecText()))) +
+      "</span>";
     Sound.win();
     if(!draw) burst();
     showResult();
@@ -302,6 +394,10 @@ const Solo = (function(){
   return {
     start, quit, again, act, resign, loadOwn, paintHud, paint,
     LV, levelOf, recText, recLine, friendRecText,
+    seats: () => seats,
+    setSeats(v){ const n = (+v) | 0; if(n >= 2 && n <= 6){ seats = n; arena = null; saveOwn(); paintHud(); } },
+    isArena, arenaText,
+    arena: () => arena,          // 給 e2e 用
     active: () => active,
     playing: () => active && !over,          // 給更新檢查:局中重載會把整局丟掉
     level: () => level,

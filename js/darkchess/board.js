@@ -74,6 +74,20 @@ const DCB = (function(){
        不然 ResizeObserver(轉向 / 網址列收合)每觸發一次就會把整盤重新翻一遍。 */
   let revealAll = false;              // 現在是不是攤開的檢視
   let revealFx  = false;              // 這一次 paint 要不要播「翻開」動畫(一次性)
+  /* ★★★ 擺盤儀式(v2.7.1):開局那 32 顆錯開落下 —— **開局是這一頁唯一沒有動畫的時刻**
+     (全檔六支 @keyframes dc* 沒有一支管它,32 顆是瞬間出現的)。
+     ⚠⚠ 條件刻意收得很窄:**這一局真的剛開始**(有 src 而且 moves 是空的)。
+       ① 診斷頁 / e2e 直接餵合成局面(沒有 src)→ 一次都不會播,量幾何的那幾支不受影響;
+       ② 回放退到第 0 手時 moves 不是空的 → 也不會播(不然每次退到底都重擺一次)。
+     ⚠ 只准動 opacity 與 translateY(**不要 scale**):v2.3.5 量過,縮放中的祖先底下
+       3D 子樹每一幀都要重新光柵化,而 `.dc-p` 的底是六層漸層 + 九道 box-shadow。
+     ⚠ 掛在 `.dc-sq` 上而不是 `.dc-p`:格子上的浮層(折角 / 圓環 / 跳板 X)要跟著一起動,
+       而 `.dc-p` 身上已經有四個 transform 的寫入者(紅線 27)。 */
+  /* ⚠⚠ 它的「一次性」**不是靠事後歸零**(那一行是死碼,v2.7.1 的突變測試照出來的)——
+     而是靠上面那個 `moves.length === 0`:走了一手之後條件就不成立了。
+     ★ 這是「拿掉一條修正之前先問它還撐著什麼」的又一例:看起來像保險的那一行,
+       其實一次都沒有被讀到。 */
+  let dealFx = false;
 
   /* 還蓋著幾顆(讀的是真相,不是檢視)—— 0 顆就沒有攤開的必要,鈕不出現 */
   function hiddenLeft(){
@@ -102,6 +116,7 @@ const DCB = (function(){
     if(want === revealAll){ syncRevealBtn(); return revealAll; }
     revealAll = want;
     revealFx = want;                  // 只有「翻開」那一次播動畫,蓋回去不播
+    if(want) rpAt = -1;               // ⚠ 與回放互斥(理由見回放那一段的 ⚠⚠⚠)
     paint();
     return revealAll;
   }
@@ -366,10 +381,21 @@ const DCB = (function(){
     /* ⚠⚠ 攤開的守衛②(見檔頭那一段):局還沒結束就無條件把旗標關掉。
        這一行不是保守,它是「就算誰在外面亂設也漏不出去」的那道結構性保證。 */
     if(revealAll && !overNow()){ revealAll = false; revealFx = false; }
-    /* truth = 真相(prevUp / renderActs / syncIdle / 結果卡都讀它)
-       st    = 畫盤面用的**檢視**(攤開時是一份 cells 全部 up:true 的淺複本) */
-    const truth = cur.st;
-    const st = viewSt();
+    /* ⚠ 回放的守衛:局沒結束(或這一份 setState 沒帶 src)就無條件退出回放。
+       同攤開那一道 —— 旗標的生命週期比 over 長,所以每一次 paint 都要複驗。 */
+    if(rpAt >= 0 && !canReplay()) rpAt = -1;
+    /* ★ 回放中畫的是「第 rpAt 手當時的局面」,而那一份 replay 算出來的 up
+       就是**當時看得到的東西** —— 牌情不必特別處理(見上面那一大段)。 */
+    const rpSt = (rpAt >= 0) ? rpStAt(rpAt) : null;
+    /* truth = 真相(prevUp / syncIdle / 結果卡都讀它;renderActs 自己讀 cur.st)
+       st    = 畫盤面用的**檢視**(攤開時是 cells 全部 up:true 的淺複本;回放時是那一手) */
+    const truth = rpSt || cur.st;
+    const st = rpSt || viewSt();
+    /* ⚠ 回放時 key 要跟著手數走,不然 fresh 恆為 false、一格動畫都不會播 */
+    const viewKey = (rpAt >= 0) ? ("r" + rpAt) : cur.key;
+    /* ★ 擺盤儀式:這一局真的剛開始(見宣告處的兩個 ⚠) */
+    const src0 = rpSrc();
+    dealFx = (rpAt < 0) && !!src0 && src0.moves.length === 0 && (viewKey !== lastKey);
     const mySide = (typeof cur.mySide === "number") ? cur.mySide : -1;
     const canAct = !!cur.mine && !cur.over && !st.over;
 
@@ -401,7 +427,7 @@ const DCB = (function(){
       }
     }
 
-    const fresh = (cur.key !== lastKey);
+    const fresh = (viewKey !== lastKey);
     const L = st.last;
     /* ★ 這一手吃 / 翻攻的目標,在這一手**之前**是不是還蓋著 —— 讀的是上一次畫面留下的
        舊值(這一格迴圈裡才會被覆寫成新值),決定 playMoveFx() 要不要播「翻開讓你看清楚」
@@ -437,7 +463,9 @@ const DCB = (function(){
          這樣任何一刻只有三四顆在轉,不是二十幾顆一起 —— 而「兩個貴的東西不要同時動」
          正是這一頁最貴的兩條教訓(v1.137.5 / v2.3.5)。⚠ 55ms 這個數字與 CSS 那條
          `.dc-sq.dc-rv` 的 sheen 關閉是一組:見 styles.src.css 那一段。 */
-      const rvStyle = rvHere ? (";--dc-rvd:" + ((g.row + g.col - 2) * 55) + "ms") : "";
+      let rvStyle = rvHere ? (";--dc-rvd:" + ((g.row + g.col - 2) * 55) + "ms") : "";
+      /* ★ 擺盤:同一條對角線同時落下(45ms 一階)—— 與攤牌那一支同一個語彙 */
+      if(dealFx){ cls.push("dc-deal"); rvStyle += ";--dc-dld:" + ((g.row + g.col - 2) * 45) + "ms"; }
       out.push('<button type="button" class="' + cls.join(" ") + '" data-sq="' + i +
                '" style="grid-row:' + g.row + ';grid-column:' + g.col + rvStyle + '">' +
                (c ? (c.up ? pieceHTML(c.p) : backHTML()) : "") +
@@ -454,7 +482,7 @@ const DCB = (function(){
     pendingFlip = false;           // ⚠ 迴圈外的 pieceHTML() 呼叫(吃子欄、結果卡)一律不套
     board.innerHTML = out.join("");
     board.classList.toggle("dc-mine", canAct);
-    lastKey = cur.key;
+    lastKey = viewKey;
     renderActs(chainOn, canAct);
     /* ⚠⚠ 一定要**再算一次**:動作列的高度會隨內容變(連吃那一列比平常多一行),
        而它變高就把舞台壓矮 —— 上面那次 fitBoard() 是在 renderActs() **之前**算的,
@@ -471,6 +499,15 @@ const DCB = (function(){
          看的 idle / over 兩個欄位在複本裡是一樣的 —— 但傳真相才不必每次回頭想一次。 */
     syncIdle(truth);
     syncTally();
+    /* ★ 擺盤的聲音:三下漸弱的木頭聲(不是 32 下 —— 那會變成一陣噪音)。
+       ⚠ 走既有的 knock(),不另配音色(紅線 24:那一支的旋鈕只有濾波中心頻率一個)。 */
+    if(dealFx){
+      knock({ f: 1900, dur: 0.05, vol: 0.16 });
+      knock({ f: 1500, dur: 0.05, vol: 0.12, delay: 0.16 });
+      knock({ f: 1250, dur: 0.06, vol: 0.09, delay: 0.34 });
+    }
+    syncSideFx(truth, fresh);   // ★ 定色那一拍(v2.7.1)—— 只在 col 剛被填好那一手播
+    syncReplayBar();            // ★ 棋譜回放的那一列(浮層,不佔版面)
     revealFx = false;      // ⚠ 一次性:消費掉,下一次 paint 不再重新翻一遍
     syncRevealBtn();
   }
@@ -1029,9 +1066,137 @@ const DCB = (function(){
   function clearOverlays(){
     tallyOpen = false;
     if(!stage) return;
-    stage.querySelectorAll(".dc-tally,.dc-idle").forEach(el => {
+    /* ⚠ 這裡**刻意不再清 rpAt** —— reset() 已經清了,而 clearOverlays() 唯一的呼叫點
+       就是它。兩份互為多餘的話突變測試抓不到任何一份(notes/19 規則層第 1 條那個
+       「①③ 互為多餘 → 要一起拿掉才測得出來」的同一種形狀)。 */
+    stage.querySelectorAll(".dc-tally,.dc-idle,.dc-rp").forEach(el => {
       if(el.parentNode) el.parentNode.removeChild(el);
     });
+  }
+
+  /* ==========================================================================
+     ★★★ 棋譜回放(v2.7.1)—— 局結束之後一手一手倒回去看
+     ──────────────────────────────────────────────────────────────────────────
+       ★★ 它之所以幾乎是免費的,因為**這一頁的真相本來就是 replay(deal, moves, rules)**:
+         回到第 n 手 = 拿同一份 deal 配前 n 手再 replay 一次,再餵進 setState。
+       ★★★ 而且**暗棋的回放天生就是對的**:replay 算出來的 up 就是「當時看到的畫面」——
+         後面才翻開的子在第 n 手仍然是蓋著的。牌情不必做任何特別處理,
+         這是「真相是 deal + moves」這個架構最漂亮的一次紅利。
+       ★ 另一個「現在做剛好便宜」的理由:拖快的時候「上一顆還在飛就又來一顆」的去重
+         (cutReveals + 凍結再快淡)**v2.3.5 為了連吃已經做完了**。
+
+     ⚠⚠ `st` 身上**沒有** deal / moves(replay 只回局面)→ 一定要由 caller 帶進來:
+       `setState({ …, src:{ deal, moves, rules } })`。兩個 caller 各一行
+       (solo.js 的 paint / adapter.js 的 paint)—— 那是紅線 12 那一組雙胞胎的同一對。
+       ★ 沒帶 src 的呼叫(診斷頁 / e2e 直接餵合成局面)就是「沒有棋譜可回放」,
+         canReplay() 回 false、入口不出現,不會壞。
+
+     ⚠⚠⚠ **回放與終局攤牌互斥。** 兩個同時開的話,回放到第 n 手卻看到全部翻開的樣子 ——
+       資訊上沒問題(局都結束了),但它把回放唯一的價值(當時看到的畫面)毀掉了。
+     ⚠ 回放中一律 canAct = false(cur.over 是 true)→ tapSq 早退,點不動盤面。 */
+  let rpAt = -1;                      // -1 = 沒在回放;否則 = 現在看到第幾手
+  function rpSrc(){
+    const s = cur && cur.src;
+    return (s && typeof s.deal === "string" && Array.isArray(s.moves)) ? s : null;
+  }
+  function rpTotal(){ const s = rpSrc(); return s ? s.moves.length : 0; }
+  function canReplay(){ return !!(overNow() && rpTotal() > 0); }
+  function rpStAt(n){
+    const s = rpSrc();
+    if(!s) return null;
+    return DC.replay(s.deal, s.moves.slice(0, Math.max(0, Math.min(n, s.moves.length))), s.rules);
+  }
+  function setReplay(on){
+    const want = !!on && canReplay();
+    if(want === (rpAt >= 0)){ syncReplayBar(); return rpAt >= 0; }
+    if(want){
+      revealAll = false; revealFx = false;   // ⚠ 與攤開互斥(見上面的 ⚠⚠⚠)
+      rpAt = rpTotal();                      // 從最後一手開始往回看
+    }else{
+      rpAt = -1;
+    }
+    paint();
+    return rpAt >= 0;
+  }
+  function rpStep(d){
+    if(rpAt < 0) return;
+    const n = Math.max(0, Math.min(rpTotal(), rpAt + (d | 0)));
+    if(n === rpAt) return;
+    rpAt = n;
+    paint();
+  }
+  /* 回放列 —— 走 `.dc-stage` 的浮層(紅線 20:忽有忽無的東西不准進 #dcActs)。
+     ★ 鈕與 DOM 都由這裡自己建(同記牌盤 / qr.js 的做法)—— HTML 一個字都不必加。
+     ⚠ 箭頭用**內嵌 SVG**,不用 ◀ ▶:U+25C0 / U+25B6 是「預設文字呈現」的字元,
+       沒帶 U+FE0F 會退回線條字形(紅線 8 的另一面),而帶了又不吃 color。
+       頁面本身的返回鍵就是這一組 chevron,沿用它最一致。 */
+  const RP_ARROW = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"' +
+                   ' stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                   '<path d="M15 18l-6-6 6-6"/></svg>';
+  function replayBarHTML(){
+    return '<button type="button" class="dc-rp-b" data-rp="-1" aria-label="上一手">' + RP_ARROW + "</button>" +
+           '<span class="dc-rp-n">第 <b>' + rpAt + "</b> / " + rpTotal() + " 手</span>" +
+           '<button type="button" class="dc-rp-b dc-rp-next" data-rp="1" aria-label="下一手">' + RP_ARROW + "</button>" +
+           '<button type="button" class="dc-rp-x" data-rp="0" aria-label="結束回放">✕</button>';
+  }
+  function syncReplayBar(){
+    if(!stage) return;
+    let el = stage.querySelector(".dc-rp");
+    if(rpAt < 0){
+      if(el && el.parentNode) el.parentNode.removeChild(el);
+      return;
+    }
+    if(!el){
+      el = document.createElement("div");
+      el.className = "dc-rp";
+      el.addEventListener("click", e => {
+        const b = e.target.closest ? e.target.closest("[data-rp]") : null;
+        if(!b) return;
+        const d = +b.dataset.rp;
+        if(d === 0) setReplay(false);
+        else rpStep(d);
+      });
+      stage.appendChild(el);
+    }
+    el.innerHTML = replayBarHTML();
+    const first = el.querySelector('[data-rp="-1"]'), last = el.querySelector('[data-rp="1"]');
+    if(first) first.classList.toggle("off", rpAt <= 0);
+    if(last)  last.classList.toggle("off", rpAt >= rpTotal());
+  }
+
+  /* ==========================================================================
+     ★★★ 定色那一拍(v2.7.1)—— 這一頁的招牌動作,而在此之前它是靜默的
+     ──────────────────────────────────────────────────────────────────────────
+       暗棋的第一顆翻開**同時決定了兩個人各是哪一方** —— 先手翻出什麼顏色就是他的。
+       這件事重要到 v1.144.0 為它做了一整套「誰先翻」(猜拳 / 隨機 / 房主排,
+       共用核心第一次多長一條相位)。可是那一刻真的到的時候,畫面上只有一次普通的
+       翻牌動畫,晶片上的「?」**靜靜**換成「紅」。
+
+     ⚠⚠ **刻意由 board.js 統一補這個 class,不去 solo.js / adapter.js 各掛一次。**
+       晶片列是那兩支的雙胞胎(畫面紅線 12),而這裡要的只是「畫完之後補一個 class」——
+       沒有理由讓它變成**第三對**會走鐘的東西。
+       ★ 順序上安全:紅線 12 要求「畫玩家晶片列一定要在 setState 之前」,
+         所以 paint() 跑的時候那兩顆晶片一定已經在版面上了。
+
+     ⚠ 判準是 st.col 這一拍**才**從未定變成定了(prevColSet 由 paint 自己記),
+       不是「現在定了沒」—— 後者每一手都成立,會變成整局一直在閃。
+     ⚠ reset() 要清掉 prevColSet:不清的話下一局那一拍會被當成「早就定了」而不播。 */
+  let prevColSet = false;
+  function syncSideFx(st, fresh){
+    const nowSet = !!(st && st.col && st.col[0] >= 0 && st.col[1] >= 0);
+    const just = fresh && nowSet && !prevColSet;
+    prevColSet = nowSet;
+    if(!just) return;
+    /* ⚠ 先移除再加,中間讀一次 offsetWidth 逼瀏覽器重排 —— 不然同一個 class
+       連續兩局重播不會重新觸發動畫(整份專案共用的老招)。 */
+    document.querySelectorAll(".dc-chip-side").forEach(el => {
+      el.classList.remove("dc-side-pop");
+      void el.offsetWidth;
+      el.classList.add("dc-side-pop");
+    });
+    /* ★ 聲音走既有的 knock():清脆小件那一端(定色是「發牌」不是「吃子」)。
+       ⚠ 不另外配一個音色 —— 這一支的旋鈕就只有濾波中心頻率一個(紅線 24)。 */
+    knock({ f: 2600, fTo: 1500, dur: 0.06, vol: 0.16 });
   }
 
   /* ---------- 終局攤牌那顆鈕(v2.7.1)----------
@@ -1045,11 +1210,19 @@ const DCB = (function(){
        「原本看得到的是什麼樣子」。 */
   function syncRevealBtn(){
     const b = $("dcRevealBtn");
-    if(!b) return;
-    const show = revealAll || canReveal();
-    b.classList.toggle("hidden", !show);
-    if(!show) return;
-    b.textContent = revealAll ? "🔒 蓋回去" : ("🔓 攤開沒翻開的 " + hiddenLeft() + " 顆");
+    if(b){
+      const show = (revealAll || canReveal()) && rpAt < 0;   // ⚠ 回放中不給攤(兩者互斥)
+      b.classList.toggle("hidden", !show);
+      if(show) b.textContent = revealAll ? "🔒 蓋回去" : ("🔓 攤開沒翻開的 " + hiddenLeft() + " 顆");
+    }
+    /* ★ 棋譜回放的入口(同一個掛點、同一個理由:結果卡出現的路徑有四條)。
+       ⚠ 文案報**總手數** —— 那是「值不值得看」的答案(三手的局沒有人想回放)。 */
+    const r = $("dcReplayBtn");
+    if(r){
+      const show = canReplay() && rpAt < 0;
+      r.classList.toggle("hidden", !show);
+      if(show) r.textContent = "⏪ 看棋譜(" + rpTotal() + " 手)";
+    }
   }
 
   /* ==========================================================================
@@ -1243,6 +1416,8 @@ const DCB = (function(){
     /* ⚠⚠⚠ 攤開的守衛③ —— **少了這兩行就是「上一局攤開過,下一局開局直接把牌情漏光」**,
        而那是整條攤牌功能唯一真正危險的地方(e2e B 節在守:開局一個棋名都不准出現)。 */
     revealAll = false; revealFx = false;
+    rpAt = -1;                      // ⚠ 同上:換局一定要退出回放
+    prevColSet = false;             // ⚠ 不清的話下一局的定色那一拍會被當成「早就定了」而不播
     syncRevealBtn();
     stopCd();
     clearReveals();                 // ⚠ 它掛在 stage 上,不會被下面那行 board.innerHTML 帶走
@@ -1265,6 +1440,15 @@ const DCB = (function(){
     toggleReveal(){ return setReveal(!revealAll); },
     setReveal, canReveal,
     isRevealed: () => revealAll,
-    hiddenLeft                       // 給 e2e / 診斷頁用
+    hiddenLeft,                      // 給 e2e / 診斷頁用
+    /* 棋譜回放(v2.7.1)。★ 同上:對外只有一顆開關 + 查詢,
+       「現在能不能回放」收在 canReplay() 一支裡(局要結束、而且這一局真的有棋譜)。 */
+    replayOpen(){ return setReplay(true); },
+    replayClose(){ return setReplay(false); },
+    replayStep: rpStep,
+    canReplay,
+    isReplaying: () => rpAt >= 0,
+    replayAt: () => rpAt,
+    replayTotal: rpTotal
   };
 })();

@@ -118,6 +118,22 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-opp="friend">👤 朋友</button>
         </div>
       </div>
+      <!-- ★★★ 本機擂台(v2.7.1):朋友模式開放 3~6 個人排隊,贏的留台。
+           這一頁的 maxPlayers 是 2(十四個遊戲裡只有它與五子棋是兩人)→ 派對現場四到六個人時
+           連線那條路只坐得下兩個。而**公園暗棋本來就是這樣玩的**:一群人圍著兩個下、贏的留著。
+           ★ 它完全不碰 js/shared/(也不碰 DCB / DC / DCAI / adapter)——
+             只是在朋友模式上加「一份名單 + 一個輪替規則」,細節在 js/darkchess/solo.js。
+           ⚠ 只在「對手 = 朋友」時顯示(syncOppFields 管);2 人就是原本的本機雙人。 -->
+      <div class="field hidden" id="dcSeatField">
+        <span class="field-label">幾個人<span class="set-sub">(3 人以上 = 擂台,贏的留台)</span></span>
+        <div class="seg" id="dcSeatSeg" aria-label="幾個人">
+          <button class="on" data-seats="2">2</button>
+          <button data-seats="3">3</button>
+          <button data-seats="4">4</button>
+          <button data-seats="5">5</button>
+          <button data-seats="6">6</button>
+        </div>
+      </div>
       <div class="field" id="dcLvField">
         <span class="field-label">電腦強度</span>
         <div class="seg" id="dcLvSeg" aria-label="電腦強度">
@@ -346,6 +362,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠ 圖示刻意不用 🀫(U+1F02B)—— CLAUDE.md 紅線 8:U+1F000 段的麻將字元
              一個都不准進畫面(只有 🀄 例外)。 -->
       <button class="peek-link dc-revealbtn hidden" id="dcRevealBtn" type="button">🔓 攤開沒翻開的</button>
+      <!-- ★★ 棋譜回放(v2.7.1):一手一手倒回去看這一局。
+           ★ 它幾乎是免費的:這一頁的真相本來就是 replay(deal, moves, rules) ——
+             回到第 n 手就是拿同一份 deal 配前 n 手再算一次。
+           ⚠ 回放列(◀ 第 n / N 手 ▶ ✕)由 board.js 自己建在 .dc-stage 上(浮層、不佔版面),
+             這裡只有入口。文案 / 顯示與否由 syncReplayBtn() 管,hidden 只是初值。 -->
+      <button class="peek-link dc-revealbtn hidden" id="dcReplayBtn" type="button">⏪ 看棋譜</button>
       <button class="peek-link" id="winPeek">先看看棋盤 👀</button>
     </div>
   </div>

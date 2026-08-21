@@ -120,7 +120,12 @@ const MP = MPCore.create((function(){
       names: ctx.order().map(id => ctx.dispName(id)),
       // 倒數環給雙方都看得到(誰還剩幾秒是公開資訊,對手才知道為什麼卡著)
       cdMs: secOn() ? turnSec * 1000 : 0,
-      cdEnd: (secOn() && !st.over) ? (turnAt + turnSec * 1000) : 0
+      cdEnd: (secOn() && !st.over) ? (turnAt + turnSec * 1000) : 0,
+      /* ★★ 棋譜回放(v2.7.1)要的整局真相 —— st 身上只有局面,沒有 deal / moves。
+         ⚠ 一定要用**這一局凍結的** gRules(不是房間欄位 rules):回放要重跑的是
+           這一局真正在用的那份規則,拿下一局的房規去 replay 會算出不一樣的局面。
+         ⚠ 這一行與 solo.js 的 paint() 是**同一對雙胞胎**(紅線 12 那一組)—— 改一邊記得改另一邊。 */
+      src: { deal: deal, moves: moves, rules: gRules }
     });
   }
 

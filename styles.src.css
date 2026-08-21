@@ -8866,6 +8866,23 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     background:rgba(255,255,255,.16);margin-left:3px}
   .dc-chip-n{display:inline-flex;align-items:center;font-size:11px;font-weight:800;
     color:var(--muted);margin-left:3px}
+  /* ★★ 定色那一拍(v2.7.1):第一顆翻開決定兩個人各是哪一方 —— 這一頁的招牌動作,
+     而在此之前它是**靜默的**(晶片上的「?」靜靜換成「紅」)。
+     ⚠⚠ 這一條只動 transform / color,**不動高度也不動 padding** ——
+       上面那條 `.dc-room .mp-chip{height:34px}` 是規格(輪到誰就換誰長高 1px →
+       房間框高 1px → 舞台矮 1px → fitBoard 少一格 → 每走一手盤面跳一下)。
+       ★ 判準:晶片列上的動畫**只准動不佔版面的屬性**。
+     ⚠ `transform` 要配 `display:inline-block` —— 行內元素吃不到 transform。
+     ⚠ 由 board.js 統一補這個 class(不是 solo.js / adapter.js 各補一次),
+       理由見那一支的 syncSideFx()。 */
+  .dc-chip-side{display:inline-block}
+  .dc-side-pop{animation:dcSidePop .52s cubic-bezier(.22,.61,.36,1) both}
+  @keyframes dcSidePop{
+    0%{transform:rotateX(90deg) scale(.86);opacity:.35}
+    46%{transform:rotateX(0deg) scale(1.22)}
+    70%{transform:scale(1.06)}
+    100%{transform:scale(1)}
+  }
 
   /* ---------- 投降鈕(單機列 / 房間橫幅各一顆,同一張確認卡)----------
      ★ 刻意**不做成醒目的紅鈕**:它是一顆「不得已才按」的鈕,長得太搶眼會被誤按,
@@ -9518,6 +9535,23 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        (keyframes 的 0% 才是 opacity:0,不是元素的預設值)。 */
   .dc-sq.dc-rv .dc-flip3d{animation-delay:var(--dc-rvd,0ms)}
   .dc-sq.dc-rv .dc-face-f::after{animation:none;opacity:0}
+
+  /* ---------- 擺盤儀式:開局 32 顆錯開落下(v2.7.1)----------
+     ★ **開局在此之前是這一頁唯一沒有動畫的時刻** —— 全檔六支 @keyframes dc* 沒有一支
+       管它,32 顆是瞬間出現的。而這一頁最會講故事的一刻就是「這副棋剛剛擺好」。
+     ⚠⚠ 只動 `opacity` 與 `translateY`,**刻意不用 scale**:v2.3.5 量過,縮放中的祖先
+       底下 3D 子樹每一幀都要重新光柵化,而 `.dc-p` 的底是六層漸層 + 九道 box-shadow。
+     ⚠ 掛在 `.dc-sq` 上而不是 `.dc-p`:格子上那幾個浮層(四角折角 / 圓環 / 跳板 X)
+       要跟著一起動,而 `.dc-p` 身上已經有四個 transform 的寫入者(紅線 27)。
+     ⚠⚠⚠ fill-mode 只給 `backwards`(**不要 forwards / both**):
+       播完就回到 transform:none —— 留著 forwards 就是 v1.137.6 那個「那顆子一直停在
+       小一號的狀態」的同一種病,而且它會讓每一格的 rect 永遠帶著位移。
+     ⚠ 45ms 這個錯開量與 board.js 的 `--dc-dld` 是同一個數字的兩半(這裡只吃變數)。 */
+  .dc-sq.dc-deal{animation:dcDeal .34s cubic-bezier(.2,.72,.36,1) var(--dc-dld,0ms) backwards}
+  @keyframes dcDeal{
+    from{opacity:0;transform:translateY(-24%)}
+    to{opacity:1;transform:none}
+  }
   /* 結果卡上那顆「攤開 / 蓋回去」與「先看看棋盤 👀」並排(兩顆都是 inline-block 的
      .peek-link)—— 只補一個間距,其餘全部沿用共用樣式。 */
   .dc-win .dc-revealbtn{margin-right:16px}
@@ -9723,6 +9757,38 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
 
   /* 記牌盤:蓋滿舞台的一張卡。⚠ 點哪裡都關掉(board.js 掛在最外層那個節點上),
      所以整塊要吃得到點擊 —— 這裡**不可以**有 pointer-events:none。 */
+  /* ---------- 棋譜回放的那一列(v2.7.1)----------
+     ★ 走 `.dc-stage` 的**浮層**,不進 #dcActs —— 動作列的高度是規格
+       (紅線 5:上下任何一塊高 1px,fitBoard 就算出小一號的格子,每走一手盤面跳一下),
+       而這一列本質上就是忽有忽無的(紅線 20)。
+     ⚠ 貼**底**中央:上緣讓給悶局浮標(它貼盤面上緣),兩個不會撞。
+     ⚠⚠⚠ **它與悶局浮標的規格刻意不同,不要照抄那一條。**
+       悶局浮標的規則是「一顆棋子都不遮」(紅線 21,位置是量出來的);
+       這一列**會壓到最底那一列的下緣約 22px**,而那是刻意的取捨:
+       回放中盤面**不可點**(tapSq 在 st.over 就早退),所以這裡優先保**觸控熱區**
+       (30px 的鈕;v2.5.4 那次的教訓就是熱區不足最貴)。
+       ★ 真正的紅線是**不可以壓到棋子上的字** —— 字是這一頁唯一的辨識點(紅線 9)。
+       ⚠ 守門:`gen-dc-shot.js` 的 `?mode=rp` 印「壓到棋子的**字** N 個」,**必須是 0**;
+         三種差很多的視窗(504x844 / 504x505 / 870x425)量過都是 0
+         (壓進格子分別是 22 / 0 / 23px,而字一個都沒被碰到)。
+     ⚠ `pointer-events` **不可以**關掉:這一列上面有三顆真的要按的鈕。 */
+  .dc-rp{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);z-index:13;
+    display:flex;align-items:center;gap:2px;padding:3px 4px;border-radius:999px;
+    background:rgba(16,10,4,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+    border:1px solid rgba(255,255,255,.14);box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .dc-rp-b,.dc-rp-x{appearance:none;-webkit-appearance:none;border:0;background:none;
+    padding:0;margin:0;cursor:pointer;color:#f4e6cf;display:inline-flex;
+    align-items:center;justify-content:center;width:30px;height:26px;border-radius:999px}
+  .dc-rp-b:hover,.dc-rp-x:hover{background:rgba(255,255,255,.14)}
+  /* 「下一手」是同一個 chevron 轉 180 度 —— 不另外畫一份 path(兩份遲早走鐘) */
+  .dc-rp-next svg{transform:rotate(180deg)}
+  /* 到頭 / 到尾那一顆壓暗。⚠ **刻意不用 disabled**(CLAUDE.md 紅線:
+     不可以用 disabled 讓點擊靜默消失)—— 按下去 rpStep 自己會發現沒得動,不會有事。 */
+  .dc-rp-b.off{opacity:.32}
+  .dc-rp-n{font:800 12px/1 'Nunito';color:#f4e6cf;padding:0 4px;white-space:nowrap}
+  .dc-rp-n b{font-size:13px}
+  .dc-rp-x{font-size:13px;color:#e8cfa8}
+
   .dc-tally{position:absolute;inset:0;z-index:12;display:flex;
     align-items:center;justify-content:center;padding:8px;
     background:rgba(16,10,4,.58);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
@@ -9795,6 +9861,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        只寫 animation:none 的話那顆停在 `from`(rotateY(0))= **背面朝上**,
        攤開等於沒攤開(而且看起來完全像功能壞掉)。 */
     .dc-sq.dc-rv .dc-flip3d{animation:none;transform:rotateY(180deg)}
+    /* 定色那一拍:直接不播(它只是一個宣告,沒有它照樣看得到紅 / 黑) */
+    .dc-side-pop{animation:none}
+    /* 擺盤:直接不播。⚠ 這一條安全是因為 fill-mode 只有 backwards ——
+       animation:none 之後那一格就在它本來的位置上,不會停在半空中。 */
+    .dc-sq.dc-deal{animation:none}
   }
 
   /* ---------- 結果卡 ----------
