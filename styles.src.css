@@ -10664,6 +10664,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        這一顆」= 使用者說的「誤觸」有一半是這條造成的。放大是在製造它要解決的問題。
        → 改成 **底色晶片 + 內描邊的環**:它永遠等於節距,不可能溢出去壓到鄰居。
      ⚠ `:active` 的縮小留著(那是**變小**,不會壓到鄰居),而且縮的是圓、不是熱區。 */
+  /* ⚠ v2.7.0 起**沒有任何元素掛 `.dw-pens`**(五顆色塊收成一顆筆鈕,見下面的筆盤那一段)——
+     這一條刻意留著當**歷史說明的錨點**(上面那整段註解是「熱區怎麼算出來的」的推導,
+     而那套推導在筆鈕與色票上照樣成立)。⚠ 要清死 class 的人請連同上面那段一起搬,不要只刪這一行。 */
   .dw-pens{flex:none;display:flex;align-self:stretch;align-items:stretch;gap:0}
   .dw-sw{width:32px;min-height:30px;flex:none;padding:0;border:none;background:none;cursor:pointer;
     display:grid;place-items:center;border-radius:999px;
