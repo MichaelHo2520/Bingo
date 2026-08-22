@@ -101,6 +101,11 @@ const MP = MPCore.create((function(){
   return {
     ns:{ rooms:"gomoku_rooms", index:"gomoku_index" },
     minPlayers:2, maxPlayers:2,          // 第一版 1v1(擂台觀戰見 notes/06 的「第二版預留」)
+    /* ★★ 原班人馬可以回座(誤按離開 / 關分頁 / 斷線之後回到**還在打的那一場**)。
+       ⚠⚠ 它**不是** joinMidGame:放行的只有 `game.order` 裡本來就有的那個 pid
+         (全新的人照舊擋在外面)—— 完整的理由在 js/shared/mp-core.js 的 REJOIN_MID 那一段。
+       ★ 2 人局 → 對手離開後 8 / 60 秒本局作廢;回座在倒數內回來就把倒數取消了。 */
+    rejoinMidGame: true,
     prefsKey:"gomoku.prefs.v1",
     emoteAnchor:"gmkStage",
     winCardId:"gmkWinCard",

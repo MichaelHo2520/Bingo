@@ -1049,6 +1049,13 @@ const MP = MPCore.create((function(){
   return {
     ns:{ rooms:"mj16_rooms", index:"mj16_index" },
     minPlayers:2, maxPlayers:4,
+    /* ★★ 原班人馬可以回座(誤按離開 / 關分頁 / 斷線之後回到**還在打的那一場**)。
+       ⚠⚠ 它**不是** joinMidGame:放行的只有 `game.order` 裡本來就有的那個 pid
+         (全新的人照舊擋在外面)—— 完整的理由在 js/shared/mp-core.js 的 REJOIN_MID 那一段。
+       ★ 有到期自動摸切 → 缺席的那幾手被代打掉,回來還是同一家。
+       ⚠ 電腦補人是**開局決定**的(bot 自己的 pid 就在 order 裡)——
+         人走了不會臨時補一家電腦,所以回座不會跟 bot 搶位子。 */
+    rejoinMidGame: true,
     prefsKey:"mahjong16.prefs.v1",
     emoteAnchor:"m16Stage",
     winCardId:"m16WinCard",

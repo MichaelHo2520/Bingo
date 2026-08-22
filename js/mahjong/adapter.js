@@ -330,6 +330,11 @@ const MP = MPCore.create((function(){
   return {
     ns:{ rooms:"mahjong_rooms", index:"mahjong_index" },
     minPlayers:2, maxPlayers:6,
+    /* ★★ 原班人馬可以回座(誤按離開 / 關分頁 / 斷線之後回到**還在打的那一場**)。
+       ⚠⚠ 它**不是** joinMidGame:放行的只有 `game.order` 裡本來就有的那個 pid
+         (全新的人照舊擋在外面)—— 完整的理由在 js/shared/mp-core.js 的 REJOIN_MID 那一段。
+       ★ 同數獨:不是回合制,離開只是停止消牌 → 回座就接著消。 */
+    rejoinMidGame: true,
     prefsKey:"mahjong.prefs.v1",
     emoteAnchor:"mjStage",
     winCardId:"mjWinCard",

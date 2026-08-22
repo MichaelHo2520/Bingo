@@ -400,6 +400,11 @@ const MP = MPCore.create((function(){
   return {
     ns: { rooms: "fc_rooms", index: "fc_index" },
     minPlayers: 2, maxPlayers: 4,          // ★ 改這裡要同步改 js/home-live.js 的 GAMES.max
+    /* ★★ 原班人馬可以回座(誤按離開 / 關分頁 / 斷線之後回到**還在打的那一場**)。
+       ⚠⚠ 它**不是** joinMidGame:放行的只有 `game.order` 裡本來就有的那個 pid
+         (全新的人照舊擋在外面)—— 完整的理由在 js/shared/mp-core.js 的 REJOIN_MID 那一段。
+       ★ 有到期代擲 → 缺席的那幾手被代打掉,回來接著擲。 */
+    rejoinMidGame: true,
     prefsKey: "flychess.prefs.v1",
     emoteAnchor: "fcStage",
     winCardId: "fcWinCard",

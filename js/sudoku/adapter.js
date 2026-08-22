@@ -277,6 +277,11 @@ const MP = MPCore.create((function(){
   return {
     ns:{ rooms:"sudoku_rooms", index:"sudoku_index" },
     minPlayers:2, maxPlayers:6,      // v1.47.0 由 4 開到 6(色盤 --sp0~--sp5 與 HUD 兩列版面都跟著到 6)
+    /* ★★ 原班人馬可以回座(誤按離開 / 關分頁 / 斷線之後回到**還在打的那一場**)。
+       ⚠⚠ 它**不是** joinMidGame:放行的只有 `game.order` 裡本來就有的那個 pid
+         (全新的人照舊擋在外面)—— 完整的理由在 js/shared/mp-core.js 的 REJOIN_MID 那一段。
+       ★ 不是回合制(搶格 / 競速),離開只是停止貢獻 → 回座就接著填。 */
+    rejoinMidGame: true,
     prefsKey:"sudoku.prefs.v1",
     emoteAnchor:"sdkStage",
     winCardId:"sdkWinCard",
