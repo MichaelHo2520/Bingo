@@ -150,6 +150,34 @@ const Talk = (function () {
      而症狀正是檔頭紅線 ① 說的「離開房間之後還在收上一間的 SDP」。所以另記一份。 */
   const watched = Object.create(null);  // fromId -> true
   let audioBox = null;         // 裝所有 <audio> 的隱藏容器
+
+  /* ==========================================================================
+     ★★ 對方的音量(v2.8.0+1)—— 設定面板「語音(連線)」多一列
+     ──────────────────────────────────────────────────────────────────────────
+     使用者:「我如果有開啟即時語音的時候,這時候調音量鍵而已變成調即時語音的音量
+     大小嗎」→ 查出來的事實是:**音量鍵一律是「連遊戲聲音一起調」**,而且開麥之後
+     整個音訊被 OS 切到通話路徑(見檔頭 ④ 的 duck),連調的是哪一條音量條都會換。
+     app 這邊在此之前**一顆旋鈕都沒有** —— 那三條(音效 / 背景音樂 / 收到語音)
+     一條都碰不到這裡的 `<audio>`,而它從第一版就是 1.0。
+
+     ⚠⚠⚠ **只做衰減,不做放大 —— 這一條不可以「順手」改掉。**
+       放大要走 WebAudio 的 GainNode,而把一條 **remote** MediaStream 交給
+       `createMediaStreamSource()` 之後,**WebKit 會把原本在播它的 `<audio>` 靜音**
+       (notes/24 的 ③,iPhone 上完全沒聲音)—— 那一版就是為了這件事把「誰在說話」
+       的音量分析整段跳過。**輸出路徑一律不准碰 WebAudio。**
+       → 想更大聲請用手機的音量鍵(那是 OS 那一層,我們調不動也不該調)。
+
+     ⚠ 下限刻意是 20% 而不是 0:靜音已經有 🔊 那顆鈕了(而且它會連收都停掉、省流量),
+       滑桿拉到 0 等於做出第二個靜音入口 —— 而「鈕寫著『聽』卻聽不到」正是這一支
+       檔頭在講的那類最糟的狀態。**這條滑桿的語意是「平衡」,不是開關。**
+
+     ⚠ 偏好存**自己的 key**,不進 `bingo.prefs.v1`:那一份的存 / 讀在 Bingo 與
+       `ui-kit.js` 各有一份(紅線 4 的雙胞胎),為一顆滑桿去動兩邊不值得。
+       這一支本來就是「邏輯 + UI 收在同一支」的示範(紅線 4 的 ★),偏好跟著收進來。
+     ========================================================================== */
+  const VOL_KEY = "bingo.talk.v1";
+  const VOL_MIN = 0.2;                  // 見上:不給 0(靜音走 🔊 那顆鈕)
+  let vol = 1;                          // 0.2~1;預設 1 = 與 v2.8.0 以前逐位元相同
   let meterTimer = null;
   let acx = null;              // 分析用的 AudioContext(與 audio.js 那幾個各自獨立)
   let statDone = false;        // 這一間房的使用統計記過了沒(見下面 bumpStat)
@@ -223,6 +251,28 @@ const Talk = (function () {
       document.body.appendChild(audioBox);
     }
     return audioBox;
+  }
+
+  /* 讀偏好。⚠ 壞掉的 JSON / 舊值一律當沒有(回 1),不要讓一顆滑桿擋住整支載入。 */
+  function loadVol() {
+    try {
+      const o = JSON.parse(localStorage.getItem(VOL_KEY) || "{}");
+      if (typeof o.vol === "number" && isFinite(o.vol)) vol = clampVol(o.vol);
+    } catch (e) { }
+  }
+  function saveVol() {
+    try { localStorage.setItem(VOL_KEY, JSON.stringify({ vol: vol })); } catch (e) { }
+  }
+  function clampVol(v) { return Math.max(VOL_MIN, Math.min(1, +v || 0)); }
+  /* ★ 套用的分母刻意是**容器裡的 `<audio>`**,不是 `peers` ——
+     ① 兩者是同一組(每個 peer 的 el 都掛在 box() 裡,拆線時 `el.remove()`),
+     ② 而 DOM 這一份**測得到**:e2e 可以自己塞一顆 `<audio>` 進去驗它真的被套上
+        (同 board.js 那條「刻意做成真的元素,理由只有一個:可測性」)。 */
+  function applyVol() {
+    const els = box().querySelectorAll("audio");
+    for (let i = 0; i < els.length; i++) {
+      try { els[i].volume = vol; } catch (e) { }
+    }
   }
 
   /* ---------- direction:兩個開關 → 四種狀態 ----------
@@ -472,6 +522,9 @@ const Talk = (function () {
     const el = document.createElement("audio");
     el.autoplay = true;
     el.playsInline = true;
+    /* ⚠ 一定要在這裡也套一次:中途才加入的人如果拿不到目前的音量,症狀是
+       「我調過了,可是後來進來那個人特別大聲」—— 而那看起來像滑桿壞了。 */
+    el.volume = vol;
     box().appendChild(el);
 
     const P = {
@@ -1428,6 +1481,66 @@ const Talk = (function () {
     return true;
   }
 
+  /* ==========================================================================
+     ★★ 那一列 UI 由**這一支自己建**(v2.8.0+1)—— 十四頁的 HTML 一行都不必改
+     ──────────────────────────────────────────────────────────────────────────
+     照 `qr.js` 那條紀律(紅線 4 的 ★★:「連各頁 HTML 的那顆空 button 都不要」)。
+     錨點是設定面板「語音(連線)」那一組裡的 `#voiceVol`(收到語音音量)——
+     **十四頁都有**(app.html 是外殼,沒有設定面板也不需要)。
+     ⚠ 插在**它的 `.set-row` 之後**,不是插在 group 尾端:尾端那一列是「我的語音」
+       (一顆編輯鈕),兩條音量條排在一起才讀得懂。
+     ⚠ 只在**這一頁真的有語音**時才建(bindUi 的兩道 guard 之後才叫)——
+       瀏覽器不支援 / 走 http 的時候兩顆鈕是收起來的,那時多一條調不到東西的滑桿
+       就是「按了沒反應」的另一種形狀。
+     ⚠ 要冪等:bindUi() 被叫兩次(將來某頁自己補叫一次)不可以長出兩列。 */
+  function ensureVolRow() {
+    if (document.getElementById("tkVolRow")) return;          // 已經建過
+    const anchor = document.getElementById("voiceVol");
+    if (!anchor) return;                                      // 這一頁沒有設定面板
+    const after = anchor.closest ? anchor.closest(".set-row") : anchor.parentNode;
+    if (!after || !after.parentNode) return;
+    const row = document.createElement("div");
+    row.className = "set-row";
+    row.id = "tkVolRow";
+    const lbl = document.createElement("span");
+    lbl.className = "set-lbl";
+    lbl.textContent = "即時語音音量";
+    const sub = document.createElement("span");
+    sub.className = "set-sub";
+    /* ⚠ 講清楚「更大聲要用音量鍵」:這條滑桿只能往下調(見 VOL_MIN 那一段的理由),
+       不寫的話使用者會拉到底、發現「最大就是這樣」而以為壞了。 */
+    sub.textContent = "(對方的聲音;要更大聲請用手機音量鍵)";
+    lbl.appendChild(sub);
+    const rng = document.createElement("input");
+    rng.className = "rng";
+    rng.id = "tkVol";
+    rng.type = "range";
+    rng.min = String(Math.round(VOL_MIN * 100));
+    rng.max = "100";
+    rng.step = "5";
+    rng.setAttribute("aria-label", "即時語音的音量(對方的聲音)");
+    rng.addEventListener("input", function (e) { setVol((+e.target.value || 0) / 100); });
+    row.appendChild(lbl);
+    row.appendChild(rng);
+    after.parentNode.insertBefore(row, after.nextSibling);
+    paintVol();
+  }
+  function paintVol() {
+    const el = document.getElementById("tkVol");
+    if (el) el.value = String(Math.round(vol * 100));
+  }
+  /* 對外也走這一支(e2e 直接叫它):存偏好 + 套到現在在播的每一顆 <audio> + 回畫滑桿。 */
+  function setVol(v) {
+    vol = clampVol(v);
+    saveVol();
+    applyVol();
+    paintVol();
+  }
+
+  /* ⚠ 一載入就讀偏好(不是等 bindUi):`peerOf` 會拿 `vol` 當新 `<audio>` 的初值,
+     而哪一頁忘了叫 bindUi 的話,那些人就會全部回到 100% —— 而那看起來像偏好沒存到。 */
+  loadVol();
+
   /* ---------- 對外 API ---------- */
   return {
     supported,
@@ -1442,6 +1555,7 @@ const Talk = (function () {
         if (bS) bS.classList.add("hidden");
         return;
       }
+      ensureVolRow();          // ★ 設定面板那一列(見上面那一段:兩道 guard 之後才建)
       if (bL) bL.addEventListener("click", async () => {
         if (uiBusy) return; uiBusy = true;
         /* 規則 ②:關「聽」的時候麥克風會被一起關掉 —— 那是**會嚇到人的**副作用
@@ -1498,6 +1612,9 @@ const Talk = (function () {
     },
     listening() { return listen; },
     speaking() { return speak; },
+    /* 對方的音量(0.2~1)。★ setVol 是**唯一**的寫入口(存偏好 / 套用 / 回畫都在裡面)。 */
+    vol() { return vol; },
+    setVol(v) { setVol(v); return vol; },
     /* 診斷用:把 ICE 設定攤出來給 tools/t-turn-check.html 與 t-talk-e2e 的 J 節。
        ⚠ 一定要回**複本**:診斷頁拿到的是同一個陣列的話,它隨手改一下就會改到正式連線
          用的設定(而那種錯誤只在特定網路環境下才看得出來)。
