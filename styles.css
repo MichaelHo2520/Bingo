@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 91c92b24384559fde68ef612c238e4190181f5d8c006a8c6efeb2ca01e1b223f)
+    真相在 styles.src.css(sha256 ea59b307ad5351b10fcf5b68c818a90591f4d1fa4bcee4f199e1c693103b33a0)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -2889,6 +2889,15 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     box-shadow:0 8px 14px rgba(0,0,0,.36),0 0 0 2.5px var(--accent-2);
     background:linear-gradient(155deg,#fff,#fff5d8 58%)}
   .b2-hand .b2-card.sel:active{transform:translateY(-14px) scale(.94)}
+  .b2-hand .b2-card.b2-armed{position:relative;z-index:5;
+    box-shadow:0 8px 14px rgba(0,0,0,.36),0 0 0 2.5px var(--accent),
+               0 0 13px rgba(255,138,61,.55)}
+  .b2-hand .b2-card.b2-armed::after{content:"出";position:absolute;
+    left:50%;top:-8px;transform:translateX(-50%);
+    min-width:17px;height:16px;padding:0 4px;border-radius:8px;
+    background:var(--accent);color:#241030;
+    font:800 10.5px/16px 'Nunito',sans-serif;letter-spacing:.5px;
+    box-shadow:0 1px 3px rgba(0,0,0,.35);pointer-events:none}
   .b2-hand .b2-card.b2-drag{transition:none;position:relative;z-index:6;cursor:grabbing;
     box-shadow:0 12px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent)}
   .b2-hand .b2-card.b2-gsep{position:relative}

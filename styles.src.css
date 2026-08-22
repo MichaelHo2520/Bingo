@@ -6422,6 +6422,28 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   /* 「再按一下就跑回去」要按得出手感:選中那張自己也要有 :active
      (少了這條,已選的牌按下去畫面完全沒動,像沒吃到那一下) */
   .b2-hand .b2-card.sel:active{transform:translateY(-14px) scale(.94)}
+  /* ★★★ 「再點一下就出去」的那一張(v2.10.0,見 board.js 第三之三節)。
+     這是**第四個訊號**,而它要回答的問題與前三個不同:
+       站起來 = 我選了它 · 亮框 = 這一組配得上 · 換底色 = 選中
+       而這一顆徽章 = **下一下點它會發生什麼事**。
+     ⚠⚠ 一定要有個看得出來的東西:沒有它的話「再點一次」就變成兩種意思
+       (取消 vs 出牌)而玩家分不出來 —— 那正是使用者擔心的「後悔怎麼辦」。
+     ⚠ 徽章走 ::after **絕對定位**(不佔版面):手牌的格位是固定的(v1.77.0 那條紅線),
+       任何佔版面的東西都會讓一列幾格跟著「這一手選了什麼」變。
+     ⚠ 往上長不會被裁到(手牌是盤面最下面那一塊,上面是中間那塊與 7px 的 gap);
+       兩列時第二列的徽章會蓋到第一列牌的下緣 4px → 給 z-index:5
+       (⚠ 比 .b2-drag 的 6 小:拖著走的那張永遠要在最上面)。
+     ⚠ `position:relative` 不可以省(::after 的定位基準),而 .b2-card 本身是 static。 */
+  .b2-hand .b2-card.b2-armed{position:relative;z-index:5;
+    box-shadow:0 8px 14px rgba(0,0,0,.36),0 0 0 2.5px var(--accent),
+               0 0 13px rgba(255,138,61,.55)}
+  .b2-hand .b2-card.b2-armed::after{content:"出";position:absolute;
+    left:50%;top:-8px;transform:translateX(-50%);
+    min-width:17px;height:16px;padding:0 4px;border-radius:8px;
+    background:var(--accent);color:#241030;
+    font:800 10.5px/16px 'Nunito',sans-serif;letter-spacing:.5px;
+    box-shadow:0 1px 3px rgba(0,0,0,.35);pointer-events:none}
+
   /* ★★ 正在被拖著走的那一張(v1.80.0,見 board.js 第八節)。
      ⚠⚠ 這一條裡面**故意沒有 transform** —— 位移由 board.js 寫成 **inline style**,
         因為上面那四條(:hover / :active / .sel / .sel:active)全都在搶 transform,

@@ -211,6 +211,27 @@ $("b2SecSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); 
 /* ---------- ★★★ 房規面板(一組 DOM,兩個入口)----------
    ⚠ 監聽綁在 #b2RulesBody 上**一次**(委派):那一排「點名」式的鈕沒有,
      但兩顆順子鈕是寫死在 HTML 裡的 —— 委派仍然比逐顆綁安全(以後加項目不必改這裡)。 */
+/* ---------- 設定:點兩下出牌(v2.10.0)----------
+   ★ 個人偏好,單機與連線共用一顆旗標(B2B.tap2On(),偏好存在 localStorage.bingo.b2tap2)。
+     照台灣麻將「聽牌後自動摸切」那一顆的定位:每台裝置各管自己的,不進房間欄位。
+   ⚠ 存在自己一個 key 而**不是** `bingo.prefs.v1` —— 那一份是六頁共用的(寫入要走
+     saveShared 的 read-modify-write),而這是一頁一個遊戲的操作偏好,不值得動共用結構。
+     (同一頁的一鍵理牌檔位 `bingo.b2sort` 也是這樣。)
+   ⚠ 這裡只負責「存偏好 + 同步開關的樣子」——「哪一下算出牌」的判斷整份在
+     board.js 的第三之三節,兩邊都只讀這一顆旗標。 */
+function syncB2Tap2(){
+  const b = $("b2SwTap2");
+  if(b) b.setAttribute("aria-checked", B2B.tap2On() ? "true" : "false");
+}
+$("b2SwTap2").addEventListener("click", () => {
+  B2B.setTap2(!B2B.tap2On());
+  syncB2Tap2();
+  showToast(B2B.tap2On()
+    ? "點兩下出牌:開 —— 牌上有「出」時再點它一下就出牌"
+    : "點兩下出牌:關 —— 一律按「出牌」那顆鈕", 1800);
+});
+syncB2Tap2();
+
 $("b2RulesOpen").addEventListener("click",openRules);
 $("b2RulesClose").addEventListener("click",closeRules);
 $("b2RulesVeil").addEventListener("click",e=>{ if(e.target.id==="b2RulesVeil") closeRules(); });

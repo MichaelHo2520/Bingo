@@ -75,6 +75,8 @@ const B2B = (function(){
   let cdKey = "", cdT = null, cdEnd = 0;   // 倒數環:用 key 去重,不看 timer(見 syncCd)
   let ord = null, ordKey = null;            // ★ 玩家自己拖出來的顯示順序 / 它屬於哪一局(第八節)
   let sortMode = "pow";                     // ★ 一鍵智慧理牌的檔位(v2.10.0,見第九之二節)
+  /* ★★★ 兩段式出牌(v2.10.0,見第三之三節):armed = 「再點一下就出去」的那一張牌 */
+  let armed = -1, armAt = 0, lastTap = -1, tap2On = true, tap2Tip = false;
   let drag = null, noClick = false;         // 拖曳中的狀態 / 這一下的 click 要不要吃掉
   let lastV = null;                         // 最後一次 render 收到的 v(拖曳中延後重畫用)
   /* 動效的 diff 狀態(v2.5.0,見第九節)。⚠ 全部只影響畫面,一個都不進真相。 */
@@ -695,6 +697,80 @@ const B2B = (function(){
     return out;
   }
 
+  /* ==========================================================================
+     三之三、★★★ 兩段式出牌:站起來的牌再點一下就出去(v2.10.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「我也想要像台灣麻將那樣,起來的牌再點一次就出去,但是要幫我考慮一下,
+       如果後悔不想要的話該怎麼辦」。
+
+       ★★ 台灣麻將那一套**不能照抄**,因為兩邊的「再點一次」原本是相反的意思:
+         · 麻將打的是**一張**,第一下舉起、第二下(同一個格位)打出 —— 沒有取消這件事
+           (要換就點別張,選取跟著走)。
+         · 大老二出的是**一手組合**,而「再點一次」現在是**取消整組**
+           (v1.83.0 的智慧選取,notes/16 第六之七節 ③)—— 那是玩家每一局都在用的路。
+       所以這一版的規則是「**加一條路,不搶走原本那條**」:
+
+         ① **只有選取已經湊成一手合法的牌才會武裝**(`selInfo.ok`)——
+            還沒湊齊(要 5 張只選了 3 張)時第二下照舊是取消整組,一個字都沒改。
+         ② **只有「最後點的那一張」會武裝**(照麻將比格位那條)。同一組裡的**其他張**
+            點下去照舊是取消整組 → **多張的那幾手,取消的手勢完全沒有消失**。
+         ③ **武裝有 300ms 的冷卻**(`ARM_MS`)。這一條是「後悔」的第一道路:
+            **手指快速連點兩下 = 選了又取消**(舊肌肉記憶原封不動),
+            只有**刻意分開的第二下**才會出牌。
+         ④ 武裝好的那一張牌**看得出來**:一顆金色的「出」徽章 + 更亮一圈
+            (`.b2-armed`)。沒有那顆徽章就不會出牌。
+
+       ★ 「後悔」總共三條路,而且**沒有一條是新手勢**:
+         1. 快速連點兩下(< 300ms)→ 取消(見③)
+         2. 點別的牌 / 同一組裡的別張 → 選取跟著換或整組取消(pickGroup 一個字都沒改)
+         3. 「清除」那顆鈕 —— 只要選了牌它就在,位置固定在出牌旁邊
+
+       ✗ **明確不做「出牌之後收回」**。`moves` 是 append-only 的真相(replay 從它算出
+         整局),收回等於讓全桌的畫面倒帶,而落桌音、飛牌動畫、「拉」的公告都已經放過了;
+         四個人圍著一支手機時「牌自己飛回去」比誤出更難解釋。
+         → 這一版的力氣放在**不要誤出**,不是**出了再救**。
+
+       ⚠⚠ 決定「出牌」的地方刻意在 **board.js 的 click 委派裡**,不是 solo / adapter 的 tap:
+         那兩支是「逐字一樣的雙胞胎」,而這件事只需要一份;走 `hAct("play")` 之後
+         既有的守衛(whyNot / armFly / commit / 交易)一條都沒有被繞過。
+     ========================================================================== */
+  const ARM_MS = 300;                 // ★ 冷卻:比這個短的第二下一律當成「連點取消」
+  const TAP2_LS = "bingo.b2tap2";
+  try{
+    const v0 = localStorage.getItem(TAP2_LS);
+    if(v0 !== null) tap2On = (v0 !== "0");
+  }catch(e){}                          // 無痕模式 / 關掉 storage → 用預設(開)
+
+  /* 這一次重畫要不要武裝。★ 一定要在**畫動作列之前**跑(徽章與提示都吃它)。 */
+  function armDecide(info){
+    const ok = !!(tap2On && info && info.mine && !info.over &&
+                  info.selInfo && info.selInfo.ok &&
+                  lastTap >= 0 && sel.indexOf(lastTap) >= 0);
+    const next = ok ? lastTap : -1;
+    if(next !== armed){
+      armed = next;
+      if(next >= 0) armAt = Date.now();
+    }
+    return armed >= 0;
+  }
+  /* 徽章只動 class,不重畫手牌 —— 重畫會把手指剛放開的那個節點銷毀(同拖曳那條)。 */
+  function paintArm(){
+    if(!stage) return;
+    const box = stage.querySelector(".b2-hand");
+    if(!box) return;
+    [].forEach.call(box.querySelectorAll(".b2-armed"),
+                    el => el.classList.remove("b2-armed"));
+    if(armed < 0) return;
+    const el = box.querySelector('.b2-card[data-c="' + armed + '"]');
+    if(el) el.classList.add("b2-armed");
+  }
+  /* 這一下點擊是不是「武裝好的那一張」→ 要出牌了。
+     ⚠ 冷卻沒過就回 false,呼叫端會讓它走原本的 pickGroup(= 取消整組)——
+       **刻意不吃掉那一下**(CLAUDE.md 的紅線:不給選可以,靜默不行)。 */
+  function armFire(id){
+    return tap2On && id >= 0 && id === armed && (Date.now() - armAt) >= ARM_MS;
+  }
+
   /* ---------- ★ 觸覺微震(v2.10.0)----------
      建議書:「點選牌面 8ms / 成功出牌 25ms / 無敵牌型 40+60ms / 被壓過 15ms」。
      ⚠⚠ 刻意**不動 js/shared/ui-kit.js** —— 那一支動一行同時影響十三個遊戲(要跑整批
@@ -717,7 +793,7 @@ const B2B = (function(){
          (台灣麻將的 renderActs 有兩份,是因為連線那份要管宣告視窗)。
        ⚠ 想加「只有連線才有」的東西時,先想能不能表達成 info 的一個欄位。
      ========================================================================== */
-  function actsHTML(info){
+  function actsHTML(info, arm){
     if(info.over) return '<span class="b2-atxt">這局結束</span>';
     if(!info.mine) return '<span class="b2-atxt">輪到 <b>' + esc(info.turnName || "對手") + '</b>…</span>';
 
@@ -750,10 +826,16 @@ const B2B = (function(){
          標紅等於每選一張就罵一次。 */
     const lead = !info.canPass ? "這一輪由你開始,一定要出牌(不能 Pass)" : "";
     const mid = !s.ok && s.pending;
+    /* ★ 武裝好的時候那一句改講**下一個動作**(v2.10.0):
+         「選好了:順子(…)」→「順子(…)—— 再點那張牌就出去」。
+       ⚠⚠ 換字而不是**加一行**:動作列的高度是固定的(--b2-acth),多一行就是把手牌推走一次
+         (v1.78.0 那條紅線)。而且新那句**更短**,窄螢幕不會折行。 */
+    const okTxt = (arm && s.ok && s.type)
+      ? (s.type + " —— 再點那張牌就出去")
+      : (s.txt || lead || "點牌選要出的組合(1 張 / 2 張 / 5 張)");
     let h = '<div class="b2-selbar' + (s.ok ? " ok" : (sel.length && !mid ? " bad" : "")) + '">' +
               '<span class="b2-selico">' + (s.ok ? "✅" : (mid ? "👉" : (sel.length ? "🚫" : "☝"))) + '</span>' +
-              '<span class="b2-seltxt">' +
-                esc(s.txt || lead || "點牌選要出的組合(1 張 / 2 張 / 5 張)") + '</span>' +
+              '<span class="b2-seltxt">' + esc(okTxt) + '</span>' +
             '</div>';
     h += '<div class="b2-btns">';
     // ★ 「出牌」永遠按得動 —— 選錯了要說得出原因,不用 disabled 靜默吃掉點擊
@@ -782,11 +864,21 @@ const B2B = (function(){
          不必再為「有沒有那顆環」留位置。 */
     /* ★ 理牌鈕擺在**右端**,與左端的倒數環左右對稱 → 這一行的高度一個 px 都沒多。
        ⚠ 只有「我還在這一局裡而且還有牌」才畫:結束之後那一顆按了沒有意義。 */
+    /* ★★★ 武裝的判斷要在畫之前(徽章與那一句提示都吃它,見第三之三節)。 */
+    const arm = armDecide(info);
     acts.innerHTML = '<div class="b2-actline">' +
                        '<div class="b2-cdwrap" id="b2CdWrap"></div>' +
-                       '<div class="b2-actrow">' + actsHTML(info) + '</div>' +
+                       '<div class="b2-actrow">' + actsHTML(info, arm) + '</div>' +
                        (info.over ? "" : sortBtnHTML()) +
                      '</div>';
+    paintArm();
+    /* ★ 第一次武裝時說一次就好 —— 徽章本身不會解釋「怎麼取消」,而那正是使用者擔心的事。
+       ⚠ 一個頁面生命週期只講一次(不是每一手都講):它是教學,不是狀態。 */
+    if(arm && !tap2Tip){
+      tap2Tip = true;
+      if(typeof showToast === "function")
+        showToast("牌上有「出」= 再點它一下就出去;不想出就按「清除」或改點別的牌", 3200);
+    }
     syncCd(info);
   }
 
@@ -1222,8 +1314,16 @@ const B2B = (function(){
         /* ★ 剛剛那一下是拖曳(而且真的換到別的位置)→ 這一下不算點擊。
            旗標在 pointerdown 一律會被清掉,所以它不可能漏到下一次點擊(第八節)。 */
         if(noClick){ noClick = false; return; }
+        const id = +el.dataset.c;
+        /* ★★★ 兩段式出牌(v2.10.0,見第三之三節):武裝好的那一張再點一下就出去。
+           ⚠ 走 hAct("play") —— 與按「出牌」那顆鈕**完全同一條路**,
+             既有的守衛(whyNot / armFly / commit / 交易)一條都沒有被繞過。
+           ⚠ 這裡**不 buzz** —— 出牌的那一下震動在 moveSfx() 裡(25ms),
+             在這裡再震一次會變成連兩下。 */
+        if(armFire(id)){ armed = -1; if(hAct) hAct("play"); return; }
+        lastTap = id;
         buzz(8);                     // ★ 點選牌面:8ms 輕敲感(建議書;開關在設定裡的「震動」)
-        hCard(+el.dataset.c);
+        hCard(id);
       });
       bindDrag();
     }
@@ -1369,6 +1469,12 @@ const B2B = (function(){
            ⚠ 斷言在單機 e2e D4c ⑤（拖過之後 seps 必須是 0）。 */
         [].forEach.call(d.box.querySelectorAll(".b2-gsep"),
                         el => el.classList.remove("b2-gsep"));
+        /* ★★ 武裝也要當場卸掉(v2.10.0):牌換了位置,而「再點一下就出去」那顆徽章
+           指的是**某一張牌**。拖完手指還停在那張牌上,不卸的話下一下點擊就出牌了 ——
+           而玩家剛剛做的是「整理手牌」,不是「要出牌」。 */
+        armed = -1; lastTap = -1;
+        [].forEach.call(d.box.querySelectorAll(".b2-armed"),
+                        el => el.classList.remove("b2-armed"));
       }
     }
     // 拖曳中被擋掉的那次重畫要補回來 ⚠ 要等 click 發完,所以是 setTimeout 而不是直接呼叫
@@ -1446,6 +1552,15 @@ const B2B = (function(){
     cardHTML,
     // ★ 一鍵智慧理牌(v2.10.0):呼叫端(main.js / solo.js / adapter.js 的 onAct)只碰 cycleSort
     cycleSort, sortNow: () => R.sortKeyOf(sortMode), buzz,
+    /* ★ 兩段式出牌(v2.10.0):設定面板那顆開關走 setTap2,e2e 走 armedNow / _armMs */
+    tap2On: () => tap2On,
+    setTap2(v){
+      tap2On = !!v;
+      try{ localStorage.setItem(TAP2_LS, tap2On ? "1" : "0"); }catch(e){}
+      if(!tap2On){ armed = -1; paintArm(); }
+    },
+    armedNow: () => armed,
+    _armMs: ARM_MS,
     // 「拉」(v1.81.0):公告 · 晶片記號 · 單獨播那一聲(單機與連線共用)
     announceLa, laChipHTML, la, armFly,
     // 一手的聲音(v1.81.1):動作聲 + 喊牌語音,三個呼叫點共用
@@ -1462,6 +1577,11 @@ const B2B = (function(){
     fitTrick,
     _fit: fitOf,
     // 給 e2e 用:玩家自訂的顯示順序(沒拖過 = null)
-    _ord: () => (ord ? ord.slice() : null)
+    _ord: () => (ord ? ord.slice() : null),
+    /* ★ 測試用:把「玩家自訂順序」還原成「沒拖過」。
+       正式流程裡它只會被**換局**清掉(render 的 v.key 那道閘門),而 e2e 有一節
+       (D4d ⑤)為了驗「拖完要卸掉武裝」必須真的拖一次 —— 拖完之後下一節 D5 的前提
+       (「還沒拖過 → 照牌力排」)就不成立了。與 MP._ageTurn 同一類的測試鉤子。 */
+    _resetOrd(){ ord = null; }
   };
 })();

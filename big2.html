@@ -407,6 +407,19 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           </div>
         </div>
 
+        <!-- ★★★ 操作(v2.10.0)—— 這一顆是**個人偏好**(不是房規):每台裝置各管自己的,
+             照台灣麻將「聽牌後自動摸切」那一顆的定位。
+             ⚠ 預設**開**(使用者要的就是這個);嫌危險關掉之後只剩「出牌」那顆鈕,
+               而那是 v1.76.0 起唯一的路 —— 也就是說關掉就是完全的舊行為。
+             ⚠ 副標一定要寫出**怎麼取消**:使用者第一句擔心的就是「後悔不想要怎麼辦」。 -->
+        <div class="set-group">
+          <div class="set-group-title">操作</div>
+          <div class="set-row">
+            <span class="set-lbl">點兩下出牌<span class="set-sub">站起來的牌上有「出」時再點它一下就出牌;不想出就按「清除」或改點別的牌</span></span>
+            <button class="switch" id="b2SwTap2" role="switch" aria-checked="true" aria-label="點兩下出牌"><span class="knob"></span></button>
+          </div>
+        </div>
+
         <div class="set-group">
           <div class="set-group-title">背景音樂</div>
           <div class="set-row">
