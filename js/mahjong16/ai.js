@@ -203,7 +203,16 @@ const MJ16AI = (function(){
     hand.forEach(t=>{ if(t < 34) seen[t]++; });
     st.discards.forEach(d=>{ if(d.t < 34) seen[d.t]++; });
     for(let s=0;s<st.seats;s++){
-      st.melds[s].forEach(m=>meldTiles(m, (t,n)=>{ seen[t] += (n||1); }));
+      st.melds[s].forEach(m=>{
+        /* ★★ 別人的**暗槓**不算進 seen(v2.7.0+1)—— 那四張牌的牌值從頭到尾沒有
+           公開過(牌從手上進明牌區),算進去就是偷看:AI 會精準地避開「已經被槓走
+           的那一張」,而真人只知道「有四張牌被鎖起來」、不知道是哪一張。
+           ⚠ 自己的暗槓照算(自己槓的自己看得見)。
+           ⚠ 代價是 AI 有可能單吊一張其實已經死了的牌 —— 那正是真人的處境,
+             這一支的整個立場是「view 裡只准有看得見的東西」(見檔頭)。 */
+        if(s !== seat && m.k === "kong" && m.c) return;
+        meldTiles(m, (t,n)=>{ seen[t] += (n||1); });
+      });
     }
 
     const foes = [];
@@ -211,7 +220,13 @@ const MJ16AI = (function(){
       if(s === seat) continue;
       foes.push({
         seat: s,
-        melds: st.melds[s].map(m=>({ k:m.k, t:m.t, c:!!m.c })),
+        /* ★★ 暗槓在 view 裡是 `t:-1`(牌值是牌情,同上面的 seen)。
+           ⚠ 為什麼不整組省掉:**組數是公開的**(桌上看得到四張蓋著的牌),
+             tableThreat 要用它算進度,省掉就等於低估對方。
+           ⚠ 下游兩支(tableThreat / flushSuits)要自己擋 `t < 0`。 */
+        melds: st.melds[s].map(m=>(m.k === "kong" && m.c)
+                 ? { k:m.k, t:-1, c:true, hid:true }
+                 : { k:m.k, t:m.t, c:!!m.c }),
         left: st.hands[s].length,                       // 手上幾張(張數,不是牌)
         wind: seatWindOf(s, st.dealer, st.seats),
         pool: st.discards.filter(d=>d.seat === s).map(d=>d.t),
@@ -307,6 +322,7 @@ const MJ16AI = (function(){
       let t = 0.26 * f.melds.length;
       // 明牌裡有三元 / 風刻 = 對方在做台,威脅再加
       f.melds.forEach(m=>{
+        if(m.t < 0) return;                             // 暗槓:看不到牌值(view 裡是 -1)
         if(m.k !== "chow" && (DRAGONS.indexOf(m.t) >= 0 || m.t === f.wind || m.t === v.roundWind)) t += 0.14;
       });
       /* ★ 有人**宣告聽牌**(v1.67.0)→ 那是牌桌上最明確的威脅訊號:他自己說了他只差一張。
@@ -324,10 +340,13 @@ const MJ16AI = (function(){
   function flushSuits(v){
     const hot = {};
     v.foes.forEach(f=>{
-      if(f.melds.length < 2) return;
+      /* ⚠ 暗槓(t < 0)看不到是哪一門 → 不算;而**門檻也要用看得見的組數**:
+         用 f.melds.length 的話「一組暗槓 + 一組筒子」會被當成兩組都指向筒子。 */
+      const vis = f.melds.filter(m=>m.t >= 0);
+      if(vis.length < 2) return;
       const s = {};
       let ok = true;
-      f.melds.forEach(m=>{
+      vis.forEach(m=>{
         if(R.isHonor(m.t)) return;                    // 字牌不破壞一色
         const su = R.suitOf(m.t);
         s[su] = (s[su]||0) + 1;

@@ -401,7 +401,21 @@ const M16B = (function(){
        ①**不再把跟人要來的那張橫放**。真牌桌是靠橫放標「這組是要來的」,但畫成 26~40px
          的小方塊之後,旋轉 90° 的牌面糊成一團,看起來像壞掉的牌而不是資訊。
        ②**吃的那組把要來的那張排到中間**(m.g),位置本身就是記號,不必再轉。 */
-  function meldHTML(m, tw){
+  /* ── ★★ 第三個參數 hide = 「這一組是別人的、而且這一局還沒結束」───────────────
+       暗槓的四張是**牌情**:牌從手上進明牌區,牌值一路都沒有公開過(明槓 / 加槓
+       都是從牌河或已經碰出去的那組來的,攤出來的那一刻就全桌都看到了)。
+       v1.58.2~v2.7.0 這裡一律畫「中間兩張蓋著」,於是對手的暗槓等於**直接報牌**
+       —— 使用者:「如果今天是暗槓,別人好像可以看得到,這樣是不對的」。
+     ★ 三種呼叫點剛好對上三種身分,所以旗標只要傳一個地方(foeShowHTML):
+       ① 我自己那一列(render 的 .m16-mine)→ 不傳:自己槓的自己當然看得見
+       ② 對手那一列(foeShowHTML)→ **傳 true**:四張全蓋
+       ③ 攤牌(revealHTML,結果卡與局終的牌桌)→ 不傳:`st.over` 是牌情紅線
+          唯一的豁免點(第十三節),而暗槓正是那時候要看的東西(暗刻台算不算得對)
+     ⚠ 蓋起來之後**這一組仍然看得出是「四張的暗槓」**(寬度 + `.cc` 底色),那是公開
+       資訊(誰槓的、槓完補一張,全桌都看到)—— 蓋掉的只有「是哪一張」。
+     ⚠ 不可以改成「畫牌面但用 CSS 遮起來」:`tileHTML()` 會寫 `aria-label="五萬"`,
+       而且 DOM 掀開就看得到 —— 這一頁的牌情一律**不生成**,不是遮起來。 */
+  function meldHTML(m, tw, hide){
     let tiles;
     if(m.k==="chow"){
       const seq = [m.t, m.t+1, m.t+2];
@@ -414,8 +428,9 @@ const M16B = (function(){
     const kind = m.c ? "cc" : m.k;                        // 暗槓自成一類(底色不同)
     return '<span class="m16-meld '+kind+'" style="--m16w:'+tw+'px">'+
       tiles.map((t,i)=>{
-        // 暗槓:中間兩張蓋著(真牌桌的擺法 —— 這個記號在小尺寸下依然清楚,保留)
-        if(m.k==="kong" && m.c && (i===1||i===2)) return backTile("m16-mt");
+        /* 暗槓:自己與攤牌時**中間兩張**蓋著(真牌桌的擺法 —— 這個記號在小尺寸下
+           依然清楚,保留);別人的那一份四張全蓋(hide,見上面的檔頭)。 */
+        if(m.k==="kong" && m.c && (hide || i===1 || i===2)) return backTile("m16-mt");
         return tileHTML(codeOf(t), "m16-mt");
       }).join("")+'</span>';
   }
@@ -472,7 +487,9 @@ const M16B = (function(){
   function foeShowHTML(seat, fl, mtw){
     const melds = st.melds[seat] || [];
     if(fl.length || melds.length)
-      return (fl.length ? flowerHTML(fl, mtw) : "") + melds.map(m=>meldHTML(m, mtw)).join("");
+      /* ⚠ 第三個參數 true = 對手的暗槓四張全蓋(牌情,見 meldHTML 的檔頭)。
+         這一支只在對局中畫得到:一局結束後 foeHTML 走的是 revealHTML()。 */
+      return (fl.length ? flowerHTML(fl, mtw) : "") + melds.map(m=>meldHTML(m, mtw, true)).join("");
     return '<span class="m16-meld m16-fslot" style="--m16w:'+mtw+'px" aria-hidden="true">'+
              '<i class="m16-tile m16-mt"></i></span>';
   }
