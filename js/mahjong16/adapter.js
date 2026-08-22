@@ -93,6 +93,97 @@ const MP = MPCore.create((function(){
     return w+"圈 · 第 "+(idx+1)+"/"+rGoal+" 圈";
   }
 
+  /* ==========================================================================
+     ★★ 電腦補人(v2.7.0+2)—— 連線人數不足時,用電腦把牌桌補滿四家
+     ──────────────────────────────────────────────────────────────────────────
+     使用者:「連線對戰可以選擇,要不要有電腦來補齊 4 個人」。
+
+     ★★★ 為什麼這件事在這一頁做得起來,而五子棋那邊被評成「複雜度跳一級」
+       (那份文檔的不做清單寫的是「要決定誰的裝置負責算與斷線接手」)——
+       因為**這一頁的手牌在 DB 上是明碼**(見 notes/11 的架構前提):
+       每一台都算得出電腦該打什麼,所以**不必指定房主**。誰的 timer 先響誰發交易,
+       搶輸的那一筆會在伺服器上的真值重跑一次、發現「這一手已經走過了」而中止 ——
+       這正是「到期補過」(resolveExpired)與「到期自動打牌」(autoDiscard)
+       從 v1.59.0 用到現在的同一招,連 autoDiscard 都早就在借 MJ16AI 挑牌了。
+     ★ 於是**斷線接手完全不必做**:某一台切到 LINE,別台照樣把電腦那一手寫出去。
+
+     ⚠⚠ 四條不知道就會做錯的:
+       ① **電腦不是房間成員** —— `players` 節點裡沒有它,它只住在 `game.order` 裡。
+          所以晶片列走核心的 `extraChips` 掛鉤,而 `ctx.dispName()` 對它一律回「玩家」
+          → **這一頁每一個取名字的地方都要走 `nameOfId()`**(共四處,grep nameOfId)。
+       ② **核心給 newGame 的 `prev` 一定是 null**(它拿 `order.length` 與真人數比,
+          還要求每個 id 都在 players 裡)→ 座位輪替要自己算(seatPrev)。
+          少了它就是「每一局座位重新洗」,連莊看起來會很怪。
+       ③ **`MJ16AI` 可能不在**(混合快取 / 將來拆檔):引用一律 `typeof` 守。
+          少了它就當沒開電腦;而萬一局中才壞,「到期自動打牌」會接手 → 不會卡住全桌。
+       ④ **這裡刻意一句 toast 都不加**。單機那邊有(applyAI 會浮「電腦一 暗槓!」),
+          連線不必:漢字爆發(fx.js 的「槓!」/「聽牌」)與對手列的聽牌記號都已經從
+          state diff 長出來了,對每一家都成立。而**多寫一句就多一個會報出牌名的地方**
+          —— 單機那一句正是這樣錯了 150 個版號(見 notes/11 二之二)。
+     ========================================================================== */
+  const BOT_PRE = "~ai";                     // 虛擬座位的 id 前綴(真人 pid 一律 "p" 開頭)
+  const BOT_NAMES = ["電腦一", "電腦二", "電腦三"];
+  const BOT_LVS = ["easy", "normal", "hard"];   // ⚠ 與 ai.js 的 LEVEL_KEYS 是兩份(那支可能沒載到)
+  const BOT_LV_DEF = "normal";
+  const TABLE_FULL = 4;                      // 補到幾家(= maxPlayers;三人局要打就把開關關掉)
+  /* 電腦「想」多久。★ 一定要有,理由同單機那條紅線:三家在同一個畫格打完牌,
+     玩家根本看不到發生什麼事。⚠ 這裡刻意**不用** MJ16AI.thinkMs() —— 那支帶
+     Math.random(),四台各抽一次的話實際延遲是「四個隨機數的最小值」,一定偏短;
+     這裡改成「固定基準 + 依局面決定的抖動 + 依我自己的座位錯開」,見 botDelay()。 */
+  const BOT_MS = { turn:1150, claim:900, step:230 };
+  let botsOn = false;                        // 房間設定:要不要電腦補人
+  let botLv = BOT_LV_DEF;                    // 房間設定:電腦難度
+  let botT = null, botKey = "";               // 電腦的那顆 timer 與「這一刻該做什麼」的身分
+  const isBot = id => typeof id === "string" && id.slice(0, BOT_PRE.length) === BOT_PRE;
+  const botIdOf = i => BOT_PRE + (i + 1);
+  function botNameOf(id){
+    const i = parseInt(String(id).slice(BOT_PRE.length), 10) - 1;
+    return BOT_NAMES[i] || "電腦";
+  }
+  const aiOn = () => typeof MJ16AI !== "undefined";
+  const botLvOK = v => BOT_LVS.indexOf(v) >= 0;
+  const botLvName = v => (v === "easy" ? "新手" : v === "hard" ? "高手" : "普通");
+  /* 這個座位是電腦嗎。⚠ 一律問 order 而不是「座位 >= 真人數」—— 電腦是**穿插**坐的
+     (見 weaveSeats),不是統一坐在後面幾個位子。 */
+  function isBotSeat(seat){ return isBot(idOfSeat(seat)); }
+  function botCount(){ return (ctx.order() || []).filter(isBot).length; }
+  /* 這一桌**要**補幾台電腦(還沒開局時也答得出來)。★ 單一真相:newGame / 大廳說明 /
+     晶片列三個地方都問它,不要各自算一次 `4 - 人數`。 */
+  function botsFillFor(humans){
+    if(!botsOn || !aiOn()) return 0;
+    return Math.max(0, TABLE_FULL - humans);
+  }
+  /* 電腦坐哪幾個位子 —— **平均鋪開**,不是統一補在最後幾個位子。
+     ★ 理由是「吃」只能吃上家:兩台電腦坐在一起等於固定有一個真人整局被夾住,
+       而座位每局只是整桌一起輪(相對位置永遠不變)→ 第一次排就決定了一整場。
+     ★ 純函式、零 DOM(bn=0 時原樣回傳真人名單,所以沒有電腦的房間走的是同一條路)。 */
+  function weaveSeats(hs, bn){
+    const total = hs.length + bn;
+    const spot = {};
+    for(let i=0;i<bn;i++) spot[Math.floor(i * total / bn)] = i;   // bn=0 → 這個迴圈不跑
+    const out = [];
+    let hi = 0;
+    for(let k=0;k<total;k++){
+      if(spot[k] !== undefined) out.push(botIdOf(spot[k]));
+      else out.push(hs[hi++]);
+    }
+    return out;
+  }
+  /* 座位輪替用的「上一局名單」。★ 有電腦的時候**核心給的 prev 一定是 null** ——
+     它的條件是 `order.length === ids.length && order.every(id=>players[id])`,
+     而電腦既不在 players 裡、又讓 order 比真人多 → 兩個條件同時不成立。
+     少了這一支的下場是「每一局座位重新洗」,連莊與風位看起來會很怪。
+     ⚠ 尺規與核心**同一把**:上一局的真人全都還在、而且人數沒變才輪替。 */
+  function seatPrev(ids, bn){
+    if(!bn) return null;                        // 沒有電腦 → 核心那份就是對的
+    const o = (ctx.order() || []).slice();
+    if(o.length !== ids.length + bn) return null;
+    const hs = o.filter(id=>!isBot(id));
+    if(hs.length !== ids.length) return null;
+    if(!hs.every(id=>ids.indexOf(id) >= 0)) return null;
+    return o;
+  }
+
   let ctx = null;
   let handsGoal = -1;                // 打幾局 / 打幾圈(房間設定,負數 = 圈數)
   let claimSec = SEC_DEF;           // 宣告視窗幾秒(房間設定)
@@ -171,7 +262,11 @@ const MP = MPCore.create((function(){
   function mySeat(){ return seatOf(ctx.me()); }
   function colorOf(s){ return COLORS[s] || "p0"; }
   function idOfSeat(s){ return ctx.order()[s] || ""; }
-  function nameOfSeat(s){ const id = idOfSeat(s); return id ? ctx.dispName(id) : ("座位 "+(s+1)); }
+  /* 名字的**唯一**入口(v2.7.0+2)。⚠ 電腦不是房間成員 → `ctx.dispName()` 對它的 id
+     一律回「玩家」(它讀的是 players 節點)。所以這一頁取名字一律走這一支,
+     **四個呼叫點**:nameOfSeat / finishInto / paintTaiTable / seasonMsg 的冠軍那一行。 */
+  function nameOfId(id){ return isBot(id) ? botNameOf(id) : ctx.dispName(id); }
+  function nameOfSeat(s){ const id = idOfSeat(s); return id ? nameOfId(id) : ("座位 "+(s+1)); }
   const gid = t => MJ16.codeOf(t);
   const face = t => MJFace.info(gid(t));
 
@@ -180,7 +275,7 @@ const MP = MPCore.create((function(){
        ①任何一台都算得出同一份收付表(狀態明碼)→ 誰先到誰寫
        ②_r[roundId] 當冪等記號 → 晚到的交易看到就中止,不會重複記
        ⚠ 各寫各的會在有人斷線時湊不齊,零和不變量就破了。 */
-  function commitTai(roundId, deltas){
+  function commitTai(roundId, deltas, over){
     const r = ctx.ref("tai"); if(!r || !roundId) return;
     r.transaction(cur=>{
       cur = cur || {};
@@ -190,12 +285,26 @@ const MP = MPCore.create((function(){
         const id = ord[s]; if(!id) return;
         cur[id] = (cur[id]||0) + d;
       });
+      /* ★★ 電腦的累積勝場寄生在**同一筆交易**裡(v2.7.0+2)。
+         核心的 scores 節點是「每台裝置寫自己那一份」(見 mp-core 的 showOutcome)——
+         電腦沒有裝置 → 它的勝場永遠是 0,而排名表上「剛剛胡牌的那一家 0 勝」
+         看起來就是壞掉的。
+         ⚠ 一定要寄生在這一筆:`_r` 是現成的冪等記號,四台重複收到同一份結束快照
+           也只會加一次。自己另開一個節點就得再做一份冪等。
+         ⚠ key 前綴 `w_` 撞不到任何人:真人 pid 是 p+base36、電腦是 ~aiN。 */
+      if(over && over.type === "win"){
+        const wid = ord[over.seat];
+        if(wid && isBot(wid)) cur["w_"+wid] = (cur["w_"+wid]||0) + 1;
+      }
       cur._r = cur._r || {};
       cur._r[roundId] = 1;
       return cur;
     });
   }
   function taiOf(id){ return (typeof tai[id]==="number") ? tai[id] : 0; }
+  /* 電腦的累積勝場(v2.7.0+2)。真人走核心的 scores,電腦走 tai 節點裡的 w_ ——
+     同一個欄位兩個來源是刻意的,理由見 commitTai。 */
+  function botWinsOf(id){ return (typeof tai["w_"+id]==="number") ? tai["w_"+id] : 0; }
   function handsDone(){ return tai._r ? Object.keys(tai._r).length : 0; }
   /* 這一局的交易記進去了沒(冪等記號)。★ 結果卡是**結算當下**畫的,而 commitTai 是
      交易 —— 本地樂觀套用通常會搶先一步,但不保證。沒記進去的話台數與局數都要自己補上
@@ -586,7 +695,7 @@ const MP = MPCore.create((function(){
       return;
     }
     const id = idOfSeat(s.over.seat);
-    g.winner = { id:id, name:ctx.dispName(id), by:"hu",
+    g.winner = { id:id, name:nameOfId(id), by:"hu",
                  tai:s.over.tai, total:s.over.total, self:s.over.from===null };
   }
 
@@ -685,6 +794,106 @@ const MP = MPCore.create((function(){
     }, { local:false });
   }
 
+  /* ==========================================================================
+     ★★ 電腦那一手怎麼走出去(v2.7.0+2)
+     ──────────────────────────────────────────────────────────────────────────
+     ★ 骨架與上面兩支(resolveExpired / autoDiscard)**完全一樣**:每一台都 arm timer、
+       都發交易,誰先到誰算,搶輸的那筆在伺服器的真值上重跑一次而中止。所以
+         · 不指定房主 → 房主切到 LINE 不會卡住全桌(那條紅線見 notes/11 第二節)
+         · 沒有「斷線接手」這個問題要解
+     ⚠ **botKey 是「這一刻的局面身分」**:局面一前進 key 就變,飛在半空的 timer
+       自己作廢(同 armClaimT 的 claimKey)。少了它會補出第二手。
+     ⚠⚠ key 裡一定要有 `pos`(牌山位置):電腦在自己的回合可能**連走兩步**
+       (暗槓 → 槓上補摸 → 再打一張),兩步之間 turn 與牌河都沒變,只有 pos 動了。
+       少了 pos,第二步的交易會用第一步的 key 過關 → 兩步擠在同一瞬間出現。
+     ========================================================================== */
+  function clearBotT(){ if(botT){ clearTimeout(botT); botT = null; } botKey = ""; }
+  /* 這一刻電腦該做什麼?回空字串 = 沒它的事(也含「這一頁沒開電腦」)。 */
+  function botSitKey(s){
+    if(!s || s.over || !botsOn || !aiOn() || ctx.winner()) return "";
+    if(s.claim){
+      const wait = Object.keys(s.claim.elig).filter(k=>isBotSeat(+k) && !s.claim.bids[k]);
+      return wait.length ? ("c"+claimIdOf(s)+"#"+wait.join(",")) : "";
+    }
+    if(!isBotSeat(s.turn) || !MJT.toPlay(s, s.turn)) return "";
+    return "t"+s.turn+"@"+s.pos+"#"+s.discards.length+"."+s.melds[s.turn].length;
+  }
+  const claimIdOf = s => s.claim.t + "@" + s.claim.from;
+  /* 電腦「想」多久。★ 抖動由**局面**決定(四台算出同一個數),錯開由**我自己的座位**
+     決定 —— 反過來寫(各抽一個隨機數)的話,實際延遲會是四個隨機數的最小值,一定偏短,
+     而「電腦不可以秒回」是這一頁最老的體驗紅線之一(見 notes/12 第六節)。 */
+  function botDelay(key){
+    const base = (key.charAt(0) === "c") ? BOT_MS.claim : BOT_MS.turn;
+    let h = 0;
+    for(let i=0;i<key.length;i++) h = (h * 31 + key.charCodeAt(i)) % 997;
+    return base + (h % 350) + Math.max(0, mySeat()) * BOT_MS.step;
+  }
+  function armBots(){
+    const key = botSitKey(st);
+    if(!key){ clearBotT(); return; }
+    if(key === botKey && botT) return;          // 同一個局面不重排(重排 = 又多給一份時間)
+    clearBotT();
+    botKey = key;
+    botT = setTimeout(function(){ botT = null; runBots(key); }, botDelay(key));
+  }
+  function runBots(key){
+    if(!st || botSitKey(st) !== key) return;    // 局面已經前進了(別台先寫了)
+    if(st.claim){
+      const ck = claimIdOf(st);
+      Object.keys(st.claim.elig).forEach(function(k){
+        const seat = +k;
+        if(isBotSeat(seat) && !st.claim.bids[k]) botBid(seat, ck);
+      });
+      return;
+    }
+    botTurn(st.turn, key);
+  }
+  /* 電腦的表態。★ 與 sendBid() 同一份交易骨架(含 claimDecided 那一步),
+     差別只有「不設本地那兩個旗標」—— 那兩個是給按鈕的人看的。
+     ⚠ 守衛**不可以**用 botSitKey:同一個宣告視窗裡可能有兩台電腦要表態,
+       第一台寫進去之後 key 就變了 → 第二台會被自己的守衛擋掉、永遠不表態
+       (症狀:視窗卡到倒數到期才被 resolveExpired 補「過」)。
+       所以這裡的尺是**這一家自己**:同一個宣告視窗 + 有資格 + 還沒表態。 */
+  function botBid(seat, ck){
+    ctx.txGame(g=>{
+      if(g.status!=="playing" || g.winner) return false;
+      const s0 = MJT.dec(g);
+      if(!s0 || !s0.claim || claimIdOf(s0) !== ck) return false;
+      if(!s0.claim.elig[seat] || s0.claim.bids[seat]) return false;
+      let d = null;
+      try{ d = MJ16AI.pickClaim(MJ16AI.viewOf(s0, seat), s0.claim.t, s0.claim.elig[seat], botLv); }catch(e){ d = null; }
+      const s1 = (d ? MJT.bid(s0, seat, d.type, d.tiles) : null) || MJT.bid(s0, seat, "pass", null);
+      if(!s1) return false;
+      Object.assign(g, MJT.enc(s1));
+      if(MJT.claimDecided(s1)){
+        const s2 = MJT.resolveClaim(s1);
+        if(s2){ Object.assign(g, MJT.enc(s2)); if(s2.over) finishInto(g, s2); }
+      }
+    }, { local:false });
+  }
+  /* 電腦自己的回合。★ 每一條退路都要有,理由同 solo.js 的 applyAI:AI 出一次非法動作
+     就會卡在那一家。⚠ 但連線比單機多一層保險 —— 倒數到期時 autoDiscard() 會接手。
+     ⚠⚠ pickTurn 將來多一種動作時**這裡也要加一條**(單機那邊的註解列了同樣的清單)。 */
+  function botTurn(seat, key){
+    doAct(s=>{
+      if(botSitKey(s) !== key) return null;     // 局面必須還是我排 timer 時那一份
+      let a = null;
+      try{ a = MJ16AI.pickTurn(MJ16AI.viewOf(s, seat), botLv); }catch(e){ a = null; }
+      if(!a) a = { act:"discard", t:(s.drawn >= 0 ? s.drawn : s.hands[seat][0]) };
+      let nx = null;
+      if(a.act === "win")        nx = MJT.selfDrawWin(s, seat);
+      else if(a.act === "ckong") nx = MJT.concealedKong(s, seat, a.t);
+      else if(a.act === "akong") nx = MJT.addKong(s, seat, a.t);
+      else if(a.act === "ting")  nx = MJT.declareTing(s, seat, a.t);
+      if(!nx && a.act === "discard") nx = MJT.discard(s, seat, a.t);
+      if(!nx){                                  // 真的挑不出來 → 打得掉的第一張(別讓全桌卡死)
+        const all = MJT.allTiles(s, seat);
+        for(let i=0;i<all.length && !nx;i++) nx = MJT.discard(s, seat, all[i]);
+      }
+      return nx;
+    });
+  }
+
   /* ---------- 聽牌後自動摸切(v1.119.0,個人偏好) ----------
      使用者:「宣告聽牌後,可以設計一個選項自動出牌,但是如果有可以槓,也是需要停下來」。
      ★ 與上面 armTurnT() 的到期自動摸切**故意分開**、不共用一顆 timer:
@@ -746,6 +955,10 @@ const MP = MPCore.create((function(){
               有人離開牌桌就真的全桌卡著等。玩家要據此決定要不要設秒數 → 一定要明講。 */
            "<br><span class=\"m16-warn\">⚠ 有人離開牌桌,全桌會一直等他。</span><br>"))+
       "誰在考慮吃碰,其他人看不出來。<br>"+
+      /* ★ 電腦補人:寫「補到幾家」而不是「補幾台」—— 房主在意的是牌桌會不會滿。
+         ⚠ 這一句只在開著的時候寫:大廳說明是版面預算,關掉的人不必看到它。 */
+      (botsOn ? ("<b>電腦補人</b>:人不夠 4 家就用<b>"+botLvName(botLv)+
+                 "</b>電腦補滿,電腦也算台。<br>") : "")+
       (handsGoal === 0
         ? "<b>無限制</b>:一直打下去,台數最高的人暫時領先,想結束時自己離開房間就好。"
         : "打滿 <b>"+goalLabel(handsGoal)+"</b>後結算,台數最高的人贏。")+
@@ -851,8 +1064,27 @@ const MP = MPCore.create((function(){
 
     init(c){ ctx = c; },
 
+    /* ★★ 玩家晶片列要多畫的「虛擬玩家」(v2.7.0+2)—— 核心的通用掛鉤,
+       見 js/shared/mp-core.js 的 renderPlayers。使用者要求:「要出現,晶片列也畫電腦」。
+       ★ 兩種相位的真相刻意**不同一份**:
+         · 對局中 → 問 `game.order`(這一局真的有哪幾台;中途加入的人不會把電腦踢掉,
+           所以「設定會補幾台」與「這一局有幾台」可能不一樣,而畫面要跟著這一局)
+         · 大廳   → 問**設定**(order 還留著上一局的名單,而房主可能剛把開關關掉)
+       ⚠ ready 一律 true:電腦不必按準備,大廳那顆點不亮會看起來像「還在等它」。
+       ⚠ 不回名字以外的東西 —— 莊家記號 / 台數由核心回頭問 chipLead / chipTail。 */
+    extraChips(){
+      if(ctx.phase() === "playing")
+        return (ctx.order() || []).filter(isBot)
+                 .map(id=>({ id:id, name:botNameOf(id), ready:true }));
+      const n = botsFillFor(Object.keys(ctx.players()).length);
+      const out = [];
+      for(let i=0;i<n;i++) out.push({ id:botIdOf(i), name:BOT_NAMES[i], ready:true });
+      return out;
+    },
+
     /* ---------- 房間設定 ---------- */
-    roomFields(){ return { handsGoal:handsGoal, claimSec:claimSec, baseTai:baseTai }; },
+    roomFields(){ return { handsGoal:handsGoal, claimSec:claimSec, baseTai:baseTai,
+                           bots:(botsOn?1:0), botLv:botLv }; },
     onRoomField(k,v){
       const n = +v;
       if(k==="handsGoal"){
@@ -872,6 +1104,25 @@ const MP = MPCore.create((function(){
         if(!baseOK(n) || n===baseTai) return;
         baseTai = n;
         ctx.unreadyOnFieldChange(); ctx.syncSetup(); ruleHint();
+        return;
+      }
+      /* ★★ 電腦補人(v2.7.0+2)。⚠ 存成 0/1 而不是布林:房間欄位在核心那邊一路是
+         「純量 + 一個 onRoomField」,而舊房間根本沒有這個欄位 → readRoom 那邊要看得出
+         「沒有這個欄位」與「明確設成關」的差別(前者要維持關,後者也是關,行為一樣,
+         但別把 undefined 當成 NaN 亂寫回去)。 */
+      if(k==="bots"){
+        const on = (n === 1);
+        if(on === botsOn) return;
+        botsOn = on;
+        ctx.unreadyOnFieldChange(); ctx.syncSetup(); ruleHint(); renderHud();
+        return;
+      }
+      /* 難度是字串 → 不可以用上面那個 +v(NaN)。 */
+      if(k==="botLv"){
+        const lv = String(v == null ? "" : v);    // ⚠ 不可以叫 v:會遮蔽參數 → TDZ ReferenceError
+        if(!botLvOK(lv) || lv === botLv) return;
+        botLv = lv;
+        ctx.unreadyOnFieldChange(); ctx.syncSetup(); ruleHint();
       }
     },
     readRoom(r){
@@ -881,6 +1132,9 @@ const MP = MPCore.create((function(){
          那些人開房時看到的規則說明寫的是「底 1 台」。 */
       if(r.baseTai!==undefined && baseOK(+r.baseTai)) baseTai = +r.baseTai;
       else if(r.baseTai===undefined) baseTai = 1;
+      /* ★ 電腦補人:舊房間沒有這兩個欄位 → 一律當「關 / 普通」(= v2.7.0 以前的行為)。 */
+      botsOn = (+r.bots === 1);
+      botLv = botLvOK(r.botLv) ? r.botLv : BOT_LV_DEF;
     },
 
     listen(){
@@ -890,17 +1144,27 @@ const MP = MPCore.create((function(){
 
     /* ---------- 一局的生命週期 ---------- */
     lobbyGame(){ return { wall:null, turn:0, over:null }; },
-    resetRound(){ clearClaimT(); clearTurnT(); clearAutoTingT(); stopCd(); st=null; curRound=null; myBid=false; handAt=0; },
+    resetRound(){ clearClaimT(); clearTurnT(); clearAutoTingT(); clearBotT(); stopCd(); st=null; curRound=null; myBid=false; handAt=0; },
 
     newGame(ids, prev){
+      /* ★★ 電腦補人(v2.7.0+2):真人不足四家就補到滿。
+         ⚠ 只在**開局這一刻**算一次 —— 中途有人離開不補電腦(那等於重排整局,
+           同下面「牌組不跟著換」的理由);中途有人加入也不會踢掉電腦。
+         ⚠ `aiOn()` 一起問:ai.js 沒載到的話當作沒開(混合快取)。 */
+      const bn = botsFillFor(ids.length);
       // 座位每局輪換,顏色與莊家才不會永遠同一個人
       let ord;
-      if(prev && prev.length===ids.length) ord = prev.slice(1).concat(prev[0]);
-      else { ord = ids.slice(); for(let i=ord.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=ord[i]; ord[i]=ord[j]; ord[j]=t; } }
+      const pv = prev || seatPrev(ids, bn);      // ⚠ 有電腦時核心的 prev 一定是 null,見 seatPrev
+      if(pv && pv.length === ids.length + bn) ord = pv.slice(1).concat(pv[0]);
+      else {
+        const hs = ids.slice();
+        for(let i=hs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=hs[i]; hs[i]=hs[j]; hs[j]=t; }
+        ord = weaveSeats(hs, bn);                // 電腦平均穿插進去(bn=0 時原樣回傳)
+      }
 
-      /* ★ 牌組跟著人數走(2/3 人去萬子)。人數是**開局當下**的 ids.length ——
-         中途有人離開不換牌組(換了等於重排整局)。 */
-      const n = Math.max(2, Math.min(4, ids.length));
+      /* ★ 牌組跟著人數走(2/3 人去萬子)。人數是**開局當下**這一桌的家數
+         (真人 + 電腦)—— 中途有人離開不換牌組(換了等於重排整局)。 */
+      const n = Math.max(2, Math.min(4, ord.length));
       /* ★★★ 新的一場 = **台數與局數整份歸零**(v1.108.0,檔頭那句「打滿了…開新賽季」
          原本沒有實作)。局數的真相是 `tai._r` 的筆數,而 tai 節點只有在房主離開
          (整間房 remove)時才會消失 —— 所以同一間房打完第二場開始:
@@ -1027,11 +1291,12 @@ const MP = MPCore.create((function(){
       if(s.claim && !s.over){ clearTurnT(); armClaimT(); }
       else { clearClaimT(); armTurnT(); }
       armAutoTing();      // 聽牌後自動摸切(個人偏好,獨立於上面兩顆房間倒數,見那支的檔頭註解)
+      armBots();          // ★ 電腦補人:輪到電腦 / 電腦要表態就排一顆 timer(每一台都排,見那支的檔頭)
 
       // 一局結束 → 記台數(交易冪等,誰先到誰寫)
       if(s.over && rid){
         const d = (s.over.type==="win") ? s.over.deltas : new Array(s.seats).fill(0);
-        commitTai(rid, d);
+        commitTai(rid, d, s.over);
         /* 連莊:把「下一局誰坐莊」換算成玩家 id 記下來(v1.102.0)。
            ⚠ 這裡的 ctx.order() 還是**這一局**的座位表 —— 新的一局要等房主寫進 game
              節點才會換,所以這一刻換算才對得上。重算幾次都是同一個答案(冪等)。 */
@@ -1072,6 +1337,7 @@ const MP = MPCore.create((function(){
     },
     onLeave(){
       clearClaimT(); clearTurnT(); clearAutoTingT(); clearNext();
+      clearBotT();                     // ⚠ 飛在半空的電腦回呼要作廢(同單機那條 gen 記號的教訓)
       st=null; curRound=null; tai={}; myBid=false; handAt=0;
       // 離房:連莊與圈數記錄跟著清(換房間就是新牌局)
       baseWins = {}; lastGained = []; lastDeal = null; dealerPass = 0; dealerPassRid = null;
@@ -1102,6 +1368,25 @@ const MP = MPCore.create((function(){
       }
       const L3 = $("m16BaseLabel");
       if(L3) L3.textContent = isHost ? "底幾台" : "底幾台(房主決定)";
+      /* ★★ 電腦補人那兩列(v2.7.0+2) */
+      const seg4 = $("m16BotSeg");
+      if(seg4){
+        seg4.classList.toggle("readonly", !isHost);
+        [...seg4.children].forEach(b=>b.classList.toggle("on", (b.dataset.bots==="1") === botsOn));
+      }
+      const L4 = $("m16BotLabel");
+      if(L4) L4.textContent = isHost ? "電腦補人" : "電腦補人(房主決定)";
+      const seg5 = $("m16BotLvSeg");
+      if(seg5){
+        seg5.classList.toggle("readonly", !isHost);
+        [...seg5.children].forEach(b=>b.classList.toggle("on", b.dataset.botlv===botLv));
+      }
+      const L5 = $("m16BotLvLabel");
+      if(L5) L5.textContent = isHost ? "電腦難度" : "電腦難度(房主決定)";
+      /* ★ 難度那一列在「沒開電腦」時整列收起來 —— 留著會讓人以為關掉之後還有電腦在。
+         ⚠ 用既有的 .hidden(全域),不新增 class。 */
+      const row5 = $("m16BotLvRow");
+      if(row5) row5.classList.toggle("hidden", !botsOn);
       ruleHint();
     },
     /* 房間框那顆徽章(麥克風左邊)。
@@ -1150,13 +1435,22 @@ const MP = MPCore.create((function(){
       return '<span class="m16-pts'+(t<0?" neg":"")+'">'+(t>0?"+":"")+t+'<em>台</em></span>';
     },
     lobbyStatusText(ids){
-      return ids.length<ctx.minPlayers
-        ? "等待其他人加入…(2~"+ctx.maxPlayers+" 人)"
-        : "等待大家準備…("+ids.length+" 人 · "+
-          (ids.length===4?"整副 144 張":"去萬子 108 張")+")";
+      /* ★ 有開電腦補人的話,牌桌一定是四家 → 說明要照**補完**之後講
+         (不然房主看到「2 人 · 去萬子 108 張」會以為電腦沒生效)。 */
+      const bn = botsFillFor(ids.length);
+      if(ids.length < ctx.minPlayers)
+        return "等待其他人加入…(2~"+ctx.maxPlayers+" 人)";
+      const seats = ids.length + bn;
+      return "等待大家準備…("+ids.length+" 人"+
+             (bn ? " + 電腦 "+bn+" 台" : "")+" · "+
+             (seats===4?"整副 144 張":"去萬子 108 張")+")";
     },
     readyHint(ids, ready){
-      if(ids.length<ctx.minPlayers) return "至少要 "+ctx.minPlayers+" 個人才能開始(最多 "+ctx.maxPlayers+" 人)";
+      /* ★ 一個人 + 開著電腦補人 → 還是開不了(核心的門檻是**真人**數)。
+         不講清楚的話會變成「我明明開了電腦,為什麼按不下去」。 */
+      if(ids.length<ctx.minPlayers)
+        return "至少要 "+ctx.minPlayers+" 個人才能開始(最多 "+ctx.maxPlayers+" 人)"+
+               (botsOn ? " —— 電腦只補空位,一個人請改玩單機" : "");
       return ready ? "等其他人按準備…" : "按「準備好了」就開始";
     },
     refresh(){ renderHud(); },
@@ -1231,6 +1525,7 @@ const MP = MPCore.create((function(){
     },
 
     ownPrefs(){ return { handsGoal:handsGoal, claimSec:claimSec, baseTai:baseTai,
+                         bots:(botsOn?1:0), botLv:botLv,
                          voice:M16Sfx.voiceOn(), tileVoice:M16Sfx.tileMode(),
                          autoTing:M16B.autoTingOn(), big:M16B.bigOn(),
                          /* 動畫特效(v2.4.0)。⚠ typeof 守衛同前:混合快取下 fx.js 可能不存在,
@@ -1245,6 +1540,10 @@ const MP = MPCore.create((function(){
       /* ⚠ 舊偏好沒有 baseTai → 用**新預設值 2**(這裡與 readRoom 相反:那邊是別人已經
          開好的房間,規則說明寫的是舊的;這裡是我自己下次開房要用的值)。 */
       if(o.baseTai!==undefined && baseOK(+o.baseTai)) baseTai = +o.baseTai;
+      /* 電腦補人:舊偏好沒有這兩個欄位 → 關 / 普通(不要「貼心」預設開,
+         那會讓老玩家下次開房莫名多出兩台電腦)。 */
+      botsOn = (+o.bots === 1);
+      if(botLvOK(o.botLv)) botLv = o.botLv;
       /* 喊牌語音預設**開**:舊偏好裡沒有這個欄位(undefined),要當成開,
          寫成 `=== true` 的話所有老玩家升上來都會是關的,而他們根本不知道有這個開關。 */
       const call = o.voice !== false;
@@ -1298,6 +1597,20 @@ const MP = MPCore.create((function(){
         if(!ctx.setRoomField("baseTai", v, { lobbyOnly:true, denyMsg:"只有房主能改底台", busyMsg:"對戰中不能改底台" })) return;
         baseTai = v; ctx.syncSetup(); savePrefs();
       },
+      /* ★★ 電腦補人(v2.7.0+2)。lobbyOnly 的理由同底台:座位表是開局那一刻寫進
+         `game.order` 的,對局中改只會讓下一局變,而說明會先變 → 看起來像這一局算錯了。 */
+      setBots(v){
+        const on = (+v === 1);
+        if(!ctx.setRoomField("bots", on?1:0, { lobbyOnly:true, denyMsg:"只有房主能改電腦補人", busyMsg:"對戰中不能改電腦補人" })) return;
+        botsOn = on; ctx.syncSetup(); renderHud(); savePrefs();
+      },
+      setBotLv(v){
+        v = String(v || "");
+        if(!botLvOK(v)) return;
+        if(!ctx.setRoomField("botLv", v, { lobbyOnly:true, denyMsg:"只有房主能改電腦難度", busyMsg:"對戰中不能改電腦難度" })) return;
+        botLv = v; ctx.syncSetup(); savePrefs();
+      },
+      bots:()=>botsOn, botLv:()=>botLv, botFill:botsFillFor, isBotId:isBot,
       /* 結果卡那顆鈕:續局中是「繼續」(回 true),最後一局才是原本的「下一局」。
          ⚠ 判斷放在這裡而不是 main.js —— 「這一局是不是最後一局」只有 adapter 知道。 */
       seeDone,
@@ -1343,12 +1656,15 @@ const MP = MPCore.create((function(){
     const over = (st && st.over) || null;
     const dz = (over && over.type==="win" && over.deltas) || null;
     const counted = taiCounted();
-    const names = ord.map(id=>ctx.dispName(id));
+    const names = ord.map(id=>nameOfId(id));
     const me = ctx.me();
     const rows = ord.map((id, s)=>{
       const d = dz ? (dz[s]||0) : 0;
       const plus = lastGained.indexOf(id) >= 0;
-      const base = (typeof baseWins[id]==="number") ? baseWins[id] : ctx.scoreOf(id);
+      /* ⚠ 電腦不在核心的 scores 裡(那是每台裝置寫自己那一份)→ 走 tai 的 w_,
+         不然「剛剛胡牌的電腦」在表上會是 0 勝。 */
+      const base = isBot(id) ? botWinsOf(id)
+                 : ((typeof baseWins[id]==="number") ? baseWins[id] : ctx.scoreOf(id));
       return { name:names[s], me:id===me,
                total: taiOf(id) + (counted ? 0 : d),
                delta: d,
@@ -1370,7 +1686,7 @@ const MP = MPCore.create((function(){
     if(!ord.length) return "";
     let best = -Infinity, who = [];
     ord.forEach(id=>{ const t=taiOf(id); if(t>best){ best=t; who=[id]; } else if(t===best) who.push(id); });
-    return '<span class="m16-champline">🏆 '+who.map(id=>esc(ctx.dispName(id))).join("、")+
+    return '<span class="m16-champline">🏆 '+who.map(id=>esc(nameOfId(id))).join("、")+
            " 以 "+best+" 台奪冠</span>";
   }
 })());

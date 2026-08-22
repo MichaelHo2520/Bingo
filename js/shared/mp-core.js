@@ -1225,6 +1225,28 @@ const MPCore = (function(){
         }
         box.appendChild(chip);
       });
+      /* ★★ 虛擬玩家的晶片(v2.7.0+2)—— adapter 回 [{id,name,ready}] 就接在真人後面
+         各畫一顆。**通用掛鉤,不認遊戲**(核心裡不可以出現 if (game === …),
+         見 CLAUDE.md 紅線 3);目前只有台灣麻將的「電腦補人」在用。
+         ⚠ 刻意**不吃任何互動**,三個都是「有比沒有更糟」的那種:
+           · 不掛 click —— 表情送不到虛擬玩家身上(點了沒反應比不能點更糟)
+           · 不畫 ✕ —— 踢不掉
+           · 不畫 🏆N —— 核心的 scores 節點只有真人有,一律是 0
+         ⚠ chipLead / chipTail 照樣問 adapter(莊家記號、台數):那兩支收的是 id,
+           而虛擬玩家的 id 在 game.order 裡是真的有座位的。 */
+      const extras = A.extraChips ? (A.extraChips() || []) : [];
+      extras.forEach(ex=>{
+        if(!ex || !ex.id) return;
+        const isTurn=curPhase==="playing" && !winner && turn===ex.id;
+        const chip=document.createElement("div");
+        chip.className="mp-chip"+(ex.ready?" ready":"")+(isTurn?" turn":"");
+        chip.dataset.id=ex.id;
+        const lead=(curPhase==="playing" && A.chipLead) ? A.chipLead(ex.id) : null;
+        const side=lead!=null ? lead : '<span class="dot"></span>';
+        const extra=((curPhase==="playing" || CHIP_TAIL_IN_LOBBY) && A.chipTail) ? (A.chipTail(ex.id)||"") : "";
+        chip.innerHTML=side+'<span class="gmk-nm">'+esc(ex.name||"")+'</span>'+extra;
+        box.appendChild(chip);
+      });
       if(aloneTick){ /* 落單倒數中:狀態列交給倒數,不覆蓋 */ }
       else if(curPhase==="playing") onStatusTxt(winner?"這局結束":"對戰中…");
       // 決定順序中(ORDER_PICK):在等什麼只有狀態列講得出來
@@ -1715,6 +1737,14 @@ const MPCore = (function(){
                           · main.js 把那一列接到 MP.setOrderMethod(b.dataset.order)
                           · newGame() 收第三個參數 picked
                         不帶就是舊行為(status 只會有 lobby / playing)。
+     extraChips()     ★ 玩家晶片列要多畫的「虛擬玩家」(v2.7.0+2 為台灣麻將的電腦補人加)——
+                        回 [{id,name,ready}],接在真人晶片後面。不帶就是舊行為(一顆都不多畫)。
+                        ⚠ 它們**沒有** click / ✕ / 🏆(見 renderPlayers 那一段的理由),
+                          但 chipLead / chipTail 照樣會被問到 —— adapter 要能處理這些 id。
+                        ⚠ 這些 id 會出現在 game.order 裡,而核心有兩處拿 order 與 players
+                          對帳:startGame() 的 prev(座位輪替)與 foesByeOnly()(寬限期長度)。
+                          兩處都是「對不上就走保守那條」,不會壞掉 —— 但 adapter 要知道
+                          **prev 一定拿不到**(見台灣麻將 newGame 的 prevOrd)。
      adoptId(old,now)  ★ 同名接續時,把遊戲自己那份「per-pid 的一場進度」從舊 pid 搬到新 pid
                         (v1.97.0;核心只負責 scores 節點,見 adoptScore)。
                         只有 21 點需要(bj.nets);其他七個遊戲對局中不能加入 → 回大廳才進得來,

@@ -152,6 +152,13 @@ $("m16BaseSeg").addEventListener("click",e=>{
 $("m16SecSeg").addEventListener("click",e=>{
   const b=e.target.closest("button"); if(b) MP.setSec(b.dataset.sec);
 });
+/* ★★ 電腦補人那兩列(v2.7.0+2)—— 兩顆都是房間設定,MP 那邊自己擋「只有房主 / 只有大廳」。 */
+$("m16BotSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(b) MP.setBots(b.dataset.bots);
+});
+$("m16BotLvSeg").addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(b) MP.setBotLv(b.dataset.botlv);
+});
 $("scoreSeg").addEventListener("click",e=>{ const b=e.target.closest("button"); if(b)MP.setScoreMode(b.dataset.score); });
 $("wgMinus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()-1));
 $("wgPlus").addEventListener("click",()=>MP.setWinGoal(MP.winGoal()+1));

@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>台灣 16 張麻將 ｜ 單機對電腦 + 2~4 人連線</title>
 <!-- 台灣 16 張麻將 · v2.7.0 -->
-<meta name="version" content="2.7.0+1">
+<meta name="version" content="2.7.0+2">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -243,6 +243,30 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button class="on" data-base="2">底 2 台</button>
           <button data-base="3">底 3 台</button>
           <button data-base="5">底 5 台</button>
+        </div>
+      </div>
+      <!-- ★★ 電腦補人(v2.7.0+2)。使用者:「連線對戰可以選擇,要不要有電腦來補齊 4 個人」。
+           ★ 一定是**房間設定**:它決定 game.order 有幾個座位,各人一份的話同一局
+             會算出不同的家數(同底台那條)。
+           ⚠ data-bots 的 0/1 與 adapter.js 的 roomFields / onRoomField 是**兩份**。
+           ⚠ 電腦只住在 game.order 裡、不是房間成員 —— 晶片列那幾顆走核心的
+             extraChips 掛鉤(見 js/shared/mp-core.js 的 renderPlayers)。 -->
+      <div class="field">
+        <span class="field-label" id="m16BotLabel">電腦補人</span>
+        <div class="seg" id="m16BotSeg" aria-label="電腦補人">
+          <button class="on" data-bots="0">關</button>
+          <button data-bots="1">補滿 4 家</button>
+        </div>
+      </div>
+      <!-- 電腦難度:三段與單機同一套(js/mahjong16/ai.js 的 LEVEL_KEYS)。
+           ⚠ 這一列在「電腦補人 = 關」時整列掛 .hidden(adapter 的 syncSetup 管)——
+             留著會讓人以為關掉之後還有電腦在。 -->
+      <div class="field hidden" id="m16BotLvRow">
+        <span class="field-label" id="m16BotLvLabel">電腦難度</span>
+        <div class="seg" id="m16BotLvSeg" aria-label="電腦難度">
+          <button data-botlv="easy">新手</button>
+          <button class="on" data-botlv="normal">普通</button>
+          <button data-botlv="hard">高手</button>
         </div>
       </div>
       <!-- 吃碰思考時間(v1.59.0):別人打出的牌你吃得下時,有幾秒可以決定。
