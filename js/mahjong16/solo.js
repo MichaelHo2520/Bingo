@@ -321,8 +321,15 @@ const Solo = (function(){
          ⚠ 不報的話玩家只會看到「電腦忽然不吃碰了」,而那一台是他要付的。 */
       if(a.act === "ting")
         showToast(seatName(seat) + " 聽牌!", 1500);
+      /* ★★ 暗槓**不可以報牌名**(v2.7.0+1)—— 那四張是牌情:牌是從電腦手上直接進明牌區的,
+         牌值一路都沒有公開過(同 board.js 的 meldHTML,對手那一份四張全蓋)。
+         使用者的回報就是這一條與盤面那一條:「如果今天是暗槓,別人好像可以看得到」。
+         ⚠ 加槓**要**報牌名:那一組 pung 早就攤在桌上,牌名是公開資訊 ——
+           不報反而看不懂「他槓的是哪一組」。 */
+      else if(a.act === "ckong")
+        showToast(seatName(seat) + " 暗槓!", 1300);
       else if(a.act !== "win")
-        showToast(seatName(seat) + (a.act === "ckong" ? " 暗槓 " : " 加槓 ") + face(a.t).name, 1300);
+        showToast(seatName(seat) + " 加槓 " + face(a.t).name, 1300);
     }else{
       if(a.act === "discard") nx = MJT.discard(st, seat, a.t);
       if(!nx){
