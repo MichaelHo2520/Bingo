@@ -478,6 +478,29 @@ const TQ = (function(){
     return st;
   }
 
+  /* ★★ 這一局最遠的那一手連跳(結果卡的「本局最遠一跳」用,v2.7.1)。
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 為什麼要自己重跑一次 replay:`st` 只留 `last` **一手**,而「本局最遠」
+         要看整份 moves —— 而 moves 本來就是這一頁的唯一真相(零亂數、零隱藏資訊),
+         所以每一台各自算都是同一個答案,**一個 DB 欄位都不必加**(同 countBorrowed)。
+     ⚠⚠ 平手一定要有 tie-break,這裡取**最早**發生的那一手(嚴格大於才換人)——
+       少了它,「誰的那一手」就取決於迴圈方向,而那正是 AI 那條紅線 8 同一個形狀的坑。
+     ⚠ 門檻是 `jumps >= 2`:單段跳不算「精彩」,中盤是家常便飯。
+     回 null = 這一局沒有任何連跳(3 顆的短局真的會發生)。 */
+  function bestJump(rules, n, moves){
+    if(!seatsOk(n)) return null;
+    const st = blank(n, rules);
+    const list = Array.isArray(moves) ? moves : [];
+    let best = null;
+    for(let i = 0; i < list.length; i++){
+      if(!step(st, list[i])) break;                 // 不合法就停在這裡(同 replay)
+      const mv = st.last;
+      if(mv && mv.jumps > (best ? best.jumps : 1))
+        best = { seat: mv.seat, jumps: mv.jumps, borrowed: mv.borrowed || 0, at: i };
+    }
+    return best;
+  }
+
   /* ==========================================================================
      七、結算
      ──────────────────────────────────────────────────────────────────────────
@@ -541,7 +564,7 @@ const TQ = (function(){
     // 走法
     occOf, movesFrom, allMoves, moveOf, pathOf,
     // 一局
-    blank, step, replay, nextSeat, homeCount, blockedCount, isDone, remain,
+    blank, step, replay, bestJump, nextSeat, homeCount, blockedCount, isDone, remain,
     // 編碼
     encMove, decFrom, decTo,
     // 結算

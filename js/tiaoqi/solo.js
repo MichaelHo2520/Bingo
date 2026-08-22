@@ -111,11 +111,30 @@ const Solo = (function(){
     spots.forEach(s => { if(s.jumps > m) m = s.jumps; });
     return m >= 2 ? ' · <b class="tq-jn">⚡ 最長 ' + m + ' 段</b>' : "";
   }
+  /* ★★★ 新手救星:「這一手最遠能飛幾段」——**刻意不說是哪一顆**(v2.7.1)。
+     ──────────────────────────────────────────────────────────────────────────
+       建議書要的是「透光神級路徑 + 搭橋雷達」:直接把 AI 算出的最佳步法標在盤面上。
+       ⚠ 那條路在這一頁行不通,而且不是技術問題:
+         ① 它自己也承認要限定在單機(連線會變成「比誰抄得快」);
+         ② 而**跳棋新手真正卡住的不是「哪一顆」,是「有沒有」** ——
+            他看不出盤面上存在一條 5 段的路,所以只走一格、玩得很無聊。
+       ★ 所以只給**目標**不給答案:告訴他「這一手最遠能飛 N 段」,自己去找那一顆。
+         這樣它在連線也成立(段數是公開資訊,每一台各自 replay 都算得出同一個數),
+         而且**兩邊的措辭因此可以一模一樣** —— 不必再多一組會走鐘的雙胞胎。
+     ⚠ 提示列是**固定高**的(紅線 18):這一句只能加短的。
+     ⚠ 與另一份是雙胞胎(solo.js / adapter.js),改一邊要改另一邊。 */
+  function reachHint(seat){
+    if(!st || st.over) return "";
+    let m = 0;
+    TQ.allMoves(st, seat).forEach(a => { if(a.jumps > m) m = a.jumps; });
+    return m >= 2 ? ' · <b class="tq-jn">⚡ 最遠 ' + m + ' 段</b>' : "";
+  }
+
   function hintText(){
     if(!st || st.over) return "";
     if(st.turn !== ME) return esc(seatName(st.turn)) + " 正在想…";
     if(sel >= 0) return spots.length ? ("點一個亮起來的洞" + longHint()) : "這一顆走不動 —— 換一顆";
-    return "輪到你了 —— 點一顆自己的棋";
+    return "輪到你了 —— 點一顆自己的棋" + reachHint(ME);
   }
 
   function paint(anim){
@@ -274,8 +293,12 @@ const Solo = (function(){
       : (esc(seatName(sc.winners[0])) + " 先搬完 · 你到家 <b>" + mine.home + "</b> 顆");
     const box = $("tqResult");
     if(box){
+      /* ★ 尾巴多一句「本局最遠一跳」(v2.7.1)—— 措辭在 TQB.bestLine(單機與連線同一支)。
+         ⚠ 這一局沒有連跳時它回空字串,不要硬接一個「· 」上去。 */
+      const bl = TQB.bestLine(st, moves, seatName);
       box.innerHTML = TQB.resultHTML(sc, names, ME,
-        seats + " 人 · 每人 " + pieces + " 顆 · " + lv.emoji + lv.name + " · 戰績 " + recText(level));
+        seats + " 人 · 每人 " + pieces + " 顆 · " + lv.emoji + lv.name + " · 戰績 " + recText(level) +
+        (bl ? (" · " + bl) : ""));
       box.classList.remove("hidden");
     }
     if(iWon){ Sound.win(); burst(); }

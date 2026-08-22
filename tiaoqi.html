@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>跳棋 ｜ 單機對電腦 + 2~6 人連線</title>
 <!-- 跳棋 · v2.7.0 -->
-<meta name="version" content="2.7.0">
+<meta name="version" content="2.7.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -112,6 +112,20 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <span class="tq-legend-i"><i class="tq-hole spot"></i>走一格到得了</span>
           <span class="tq-legend-i"><i class="tq-hole spot far"></i>連跳到得了</span>
         </div>
+        <!-- ★★ 開局怎麼走(v2.7.1)。⚠ 它補的洞與上面那七條不一樣:規則講完了,
+             但「第一手該動哪一顆」在跳棋完全看不出來 —— 新手的第一局幾乎都是
+             一顆一顆往前爬(完全沒有連跳),然後結論是「這遊戲很慢很無聊」。
+             ⚠ 刻意只給三條**原則**、不給定式圖:六個角的方位每一局隨座位變,
+               而「往哪一格走」的圖在 2/3/4/5/6 人局不是同一張。 -->
+        <div class="tq-howto-h2">開局怎麼走(第一次玩就看這三條)</div>
+        <ul class="tq-howto-sub">
+          <li><b>往正中央擠</b> —— 六個角的路都要經過中間那塊六邊形,
+              而中間的棋最多,<b>跳板也最多</b>。</li>
+          <li><b>隔一格排成一條鏈</b> —— 棋子擠成一團誰也跳不過去;
+              <b>一顆隔一格</b>才是橋,後面的就能一路連跳追上來。</li>
+          <li><b>不要留孤子</b> —— 每一手輪流動<b>最後面</b>那幾顆。
+              落單的棋沒有跳板可以踩,最後只能一格一格爬回來,而那正是輸掉的原因。</li>
+        </ul>
         <div class="tq-howto-foot">
           <b>2~6 人</b>,每人 <b>3 / 6 / 10 顆</b>(房主決定)。單機可以先跟電腦練一局。
           ⚠ <b>5 人</b>時六個角坐五個人,會有一家的目標角是空的(略佔便宜)。

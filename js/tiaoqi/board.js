@@ -619,9 +619,39 @@ const TQB = (function(){
      照落點各畫一條的下場是同一段疊三四層:**墨水多好幾倍、資訊一模一樣**,
      而這一頁最怕的就是「看起來太亂了」(暗棋那批砍掉十一條的理由)。
    ⚠ key 用排序過的一對 id:同一段被兩個落點反向走到時也要collapse 成一條。 */
+  /* ★★★ 「最遠那一條」是哪一條(v2.7.1)。
+     ⚠⚠ **平手一定要用洞 id 再排一次** —— 少了它,挑到哪一條取決於 `spots` 陣列的
+       順序,而那個順序是 `movesFrom()` 的 BFS 走訪序、會隨局面變。
+       這與 AI 那條紅線 8 是**同一個形狀的坑**(評估必須是「局面」的函式,
+       不可以是「陣列順序」的函式);差別只在這裡壞掉的是畫面:
+       同一個局面重畫兩次,金色那一條會跳到另一個落點上。
+     回 null = 沒有 2 段以上的落點。 */
+  function bestOf(spots){
+    let b = null;
+    (spots || []).forEach(s => {
+      if(!s || s.jumps < 2) return;
+      if(!b || s.jumps > b.jumps || (s.jumps === b.jumps && s.to < b.to)) b = s;
+    });
+    return b;
+  }
+
   function renderArcs(sel, spots){
     if(!fxArcs) return;
     const far = (spots || []).filter(s => s.jumps >= 2);
+    /* ★★ 最遠那一條加亮(v2.7.1)—— 建議書要的「透光神級路徑」在這一頁的可行版本。
+       ★ 為什麼是「加亮」而不是「只畫最長那一條」:別的落點是**真的資訊**
+         (要不要飛到底是戰術判斷,少飛一段換一個更好的位置很常見),砍掉等於替
+         玩家做決定。加亮只是把「最遠能到哪」從一堆同色的線裡挑出來。
+       ★ 金色與流星尾跡(.tq-tr)同一個色系,而尾跡的意思正是「這一趟飛得很長」——
+         同一件事在這一頁只用一種顏色講。
+       ⚠ **只有兩個以上的連跳落點才加亮**:只有一條的時候「最遠」= 全部,
+         加一個色階只是多一個要解讀的東西。 */
+    const best = (far.length >= 2) ? bestOf(far) : null;
+    const bestSeg = {};
+    if(best)
+      for(let i = 1; i < best.path.length; i++)
+        bestSeg[Math.min(best.path[i - 1], best.path[i]) + ">" +
+                Math.max(best.path[i - 1], best.path[i])] = 1;
     const key = rotK + "|" + sel + "|" + far.map(s => s.to).join(",");
     if(key === arcKey) return;
     arcKey = key;
@@ -634,7 +664,8 @@ const TQB = (function(){
         const k = Math.min(a, b) + ">" + Math.max(a, b);
         if(seen[k]) continue;
         seen[k] = 1;
-        arcs += '<path class="tq-arc" d="' + segD(a, b) + '"/>';
+        arcs += '<path class="tq-arc' + (bestSeg[k] ? " tq-arc-b" : "") +
+                '" d="' + segD(a, b) + '"/>';
         /* ★ 借力點 = 這一段的**中點**(rules.js 的 countBorrowed 用的是同一件事:
              被跳過去的那一格就在中點上)。標出來才回答得了「踩了哪幾顆」。
            ⚠⚠ 半徑一定要**比棋子大**(棋子半徑 0.40 格):畫在中心點的話整個被棋子蓋掉,
@@ -696,7 +727,10 @@ const TQB = (function(){
   }
 
   function stopFlight(){
-    if(flight && flight.el) flight.el.classList.remove("fly");
+    if(flight && flight.el){
+      flight.el.classList.remove("fly");
+      flight.el.style.removeProperty("--tq-lf");
+    }
     flight = null;
     if(rafId){ cancelAnimationFrame(rafId); rafId = 0; }
     if(fxTrail) fxTrail.innerHTML = "";
@@ -744,6 +778,7 @@ const TQB = (function(){
       /* 演完:把它放回終點就好 —— 那本來就是 render() 已經寫進去的位置。
          ⚠ 這裡**不叫任何回呼**(見檔頭):呼叫端要接續就自己算 animMs()。 */
       f.el.classList.remove("fly");
+      f.el.style.removeProperty("--tq-lf");      // ★ 落地了,影子回到貼著盤面那一版
       setHole(f.el, f.path[f.path.length - 1]);
       const segsDone = f.path.length - 1;
       flight = null;
@@ -767,6 +802,15 @@ const TQB = (function(){
     /* 每一段拉一條小拋物線 —— 跳棋是「跳」過去的,直線平移看起來像滑行。
        ⚠ 幅度跟著段長走,單步(只有一段)幾乎不拱。 */
     const lift = (segs === 1 ? 0.18 : 0.38) * Math.sin(Math.PI * frac);
+    /* ★★★ 騰空高度感(v2.7.1):把「現在拱到多高」寫成一個 0~1 的 CSS 變數,
+       讓陰影跟著拋物線往下拉長、變柔 —— 平面上的位移只講「它在移動」,
+       **影子與本體分開**才講得出「它離開盤面了」。
+     ⚠⚠ 紅線 15:棋子上一格 transform 是這一支每一幀在寫的(下面那行 setPos)——
+       所以這一條只准動 `filter`,而 CSS 那邊寫的是 drop-shadow 的 calc()。
+     ⚠ 值除以 0.38 正規化:單步(lift 上限 0.18)因此只到 0.47,
+       它本來就幾乎不拱 —— 高度感要跟真的高度一致,不可以每一種都拉到滿。
+     ★ 它仍然是**純 t 的函式**(紅線 2):rAF 一次都不觸發就只是沒有影子。 */
+    f.el.style.setProperty("--tq-lf", f3(lift / 0.38));
     /* ★★ 每一段各自 ease-in-out(v2.3.4)。在此之前段內是**等速直線** ——
        連跳看起來是一條等速的鋸齒折線(= 滑行),而不是「一顆一顆跳」。
        兩端速度歸零 = 每一段都有起跳與落定,那正是使用者說少掉的「玩跳棋的感覺」。
@@ -832,6 +876,10 @@ const TQB = (function(){
     const spots = view.spots || [];
     const spotSet = {};
     spots.forEach(s => { spotSet[s.to] = s; });
+    /* ★★ 「最遠能飛到哪」那一個洞(v2.7.1)—— 與軌跡的金線是同一條判定
+       (同一支 bestOf + 同一個「兩條以上才標」的門檻),不可以各算一次。 */
+    const bestTo = (function(){ const b = (spots.filter(s => s.jumps >= 2).length >= 2)
+                                          ? bestOf(spots) : null; return b ? b.to : -1; })();
 
     // 洞:目標區的環 + 可以走的落點
     const myGoal = (me >= 0 && me < st.n) ? st.goals[me] : [];
@@ -849,6 +897,7 @@ const TQB = (function(){
          ⚠ 刻意**不放 emoji**:cell 最小 16px,標籤只有 5~6px 高,任何 emoji 在
            那個尺寸都是一團色塊;⚡ 留在提示列的文字裡(那裡讀得到)。 */
       if(sp && sp.jumps >= 2) el.dataset.j = sp.jumps; else el.removeAttribute("data-j");
+      if(sp && id === bestTo) el.dataset.best = "1"; else el.removeAttribute("data-best");
     }
     // 棋子:選中 / 我的 / 到家 / 送出中
     for(let s = 0; s < pieceEls.length; s++)
@@ -1042,6 +1091,25 @@ const TQB = (function(){
        ★ 單機與連線共用同一支 —— 兩邊各寫一份的話,欄位與措辭一定會慢慢走鐘。
        wins 有值 = 連線(顯示累計名次分);沒有 = 單機(顯示這一局拿幾分)。
      ========================================================================== */
+  /* ★★ 「本局最遠一跳」(v2.7.1)—— 建議書要的「賽後精彩神跳重播」在這一頁的可行版本。
+     ──────────────────────────────────────────────────────────────────────────
+       ⚠⚠ **不做動態重播**,而且不是因為做不出來:這一頁的 adapter 每 3 秒
+         **無條件**把畫面重畫回真相(紅線 4),而那條路刻意不看任何旗標 ——
+         盤面上的重播會在最多 3 秒後被它擦掉,而「偶爾演到一半消失」比沒有更糟。
+         要繞過它就得在對帳心跳上開一個例外,那正是紅線 4 存在的理由。
+       ★ 所以改成**一行字**:回味「誰飛了最遠的那一趟」不必動盤面,
+         而它掛在結果卡的 foot —— 那一格連線版本來是空的。
+     ★ 措辭放這一支(不是單機 / 連線各寫一份):drama() 的門檻就是這樣走鐘過的
+       (見第七節),而這一句兩邊都要一模一樣。
+     ⚠ foot 會被 resultHTML 自己 esc() → 這裡回**純文字**,不可以塞標籤。 */
+  function bestLine(st, moves, nameOf){
+    if(!st) return "";
+    const b = R.bestJump(st.rules, st.n, moves);
+    if(!b) return "";
+    return "本局最遠一跳:" + ((nameOf && nameOf(b.seat)) || ("玩家" + (b.seat + 1))) +
+           " " + b.jumps + " 段" + (b.borrowed ? ("(借了 " + b.borrowed + " 顆當跳板)") : "");
+  }
+
   function resultHTML(sc, nameArr, meSeat, foot, wins){
     let h = '<table class="tq-rank"><thead><tr><th>名次</th><th>玩家</th><th>到家</th><th>還差</th>' +
             (wins ? "<th>累計</th>" : "<th>本局</th>") + "</tr></thead><tbody>";
@@ -1107,13 +1175,14 @@ const TQB = (function(){
         el.classList.remove("goal", "spot", "far", "rip");
         el.removeAttribute("data-g");
         el.removeAttribute("data-j");
+        el.removeAttribute("data-best");
         el.removeAttribute("data-rip");
       });
     }
   }
 
   return {
-    mount, render, renderActs, fitBoard, reset, resultHTML, drama,
+    mount, render, renderActs, fitBoard, reset, resultHTML, drama, bestLine,
     animMs, stopCd, SFX,
     zoomReset,
     cell: () => cell,

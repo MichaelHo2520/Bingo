@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 62207139859ea05f21810fe27b9344bbeb5a7d9962d3c7717e29fb53a9ed41ce)
+    真相在 styles.src.css(sha256 29e77d21b6205c430d3ddd3d21e4eddf5c52808f19860500b8fa86a5a74eaf8e)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -5574,6 +5574,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                 animation:tqSpot 1.25s ease-in-out infinite}
   .tq-hole.far{border-color:var(--accent-2);
                box-shadow:0 0 0 3px var(--accent-2),0 0 14px rgba(255,255,255,.7)}
+  .tq-hole.far[data-best]{background:linear-gradient(180deg,#ffe694,#ffc93c);
+               box-shadow:0 0 0 3px var(--accent-2),0 0 16px rgba(255,214,94,.95)}
   @keyframes tqSpot{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
   .tq-hole.far::after{content:attr(data-j);position:absolute;left:50%;bottom:100%;
     transform:translate(-50%,22%);pointer-events:none;white-space:nowrap;
@@ -5598,6 +5600,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .tq-arc{fill:none;stroke:var(--accent-2);stroke-width:.08;stroke-linecap:round;
           stroke-dasharray:.26 .2;opacity:.7;animation:tqArc 1.15s linear infinite}
   @keyframes tqArc{to{stroke-dashoffset:-.46}}
+  .tq-arc.tq-arc-b{stroke:#ffc93c;stroke-width:.105;opacity:1;
+                   stroke-dasharray:none;animation:none}
   .tq-arcdot{fill:none;stroke:rgba(58,42,18,.8);stroke-width:.075;
              stroke-dasharray:.15 .12;opacity:.95}
   .tq-tr{fill:none;stroke:#ffd75e;stroke-width:.135;stroke-linecap:round;
@@ -5700,7 +5704,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   @keyframes tqWait{0%,100%{opacity:.55}50%{opacity:.85}}
   .tq-pc.home{box-shadow:0 3px 5px -1px rgba(58,38,6,.46),
                          0 0 0 1.6px #fff,0 0 0 3.4px #ffc93c,0 0 8px 1px rgba(255,186,50,.55)}
-  .tq-pc.fly{z-index:10;filter:drop-shadow(0 5px 7px rgba(0,0,0,.42))}
+  .tq-pc.fly{z-index:10;
+             filter:drop-shadow(0 calc(4px + var(--tq-lf,0) * 8px)
+                                  calc(5px + var(--tq-lf,0) * 9px) rgba(0,0,0,.42))}
+  .tq-pc.fly .tq-ball{box-shadow:0 0 0 1.4px rgba(255,255,255,.9)}
   .tq-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
            line-height:1.35;text-align:left}
   .tq-cdwrap{display:flex;align-items:center;justify-content:center;flex:none}

@@ -12437,6 +12437,24 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
                 animation:tqSpot 1.25s ease-in-out infinite}
   .tq-hole.far{border-color:var(--accent-2);
                box-shadow:0 0 0 3px var(--accent-2),0 0 14px rgba(255,255,255,.7)}
+  /* ★★ 最遠那一個落點(v2.7.1):洞**本身**填成金色。
+     ★ 為什麼要多這一級:.far 只說「這是連跳落點」、data-j 說「幾段」,但中盤同時有
+       四五個連跳落點是常態 —— 「最遠能飛到哪」得把四五個數字比一遍才讀得出來,
+       而那是這一頁最重要的一眼資訊。
+     ⚠⚠⚠ **不可以用「換一個環的顏色」來做這一級**(第一版就是,放大截圖才發現):
+       `.far` 的環吃 `--accent-2`,而**預設主題的 --accent-2 是 #ffd24a、meadow 是
+       #ffcf47** —— 兩個都是金色,和任何一種金環幾乎一模一樣 → 五個主題裡有兩個
+       完全分不出「最遠那一個」與「普通的連跳落點」。
+       這與紅線 27「借力點的環不可以與 .far 落點環同色」是同一個坑的第二次。
+     ★ 改成動**填色**:`.spot` 把洞填白,這一條把它填金 ——
+       白 vs 金與主題無關,而且與正上方那顆段數標籤(同一組漸層)讀起來是一體的。
+     ⚠ 不可以改成「加一圈外環」:洞是 0.72 格、相鄰的洞差 1 格 → 單邊只剩 0.14 格
+       (cell 30px 時約 4.2px),而 `.far` 的環已經吃掉 3px。
+     ⚠ 條件寫成 [data-best] 而不是一個 class:這裡是共用的 styles.src.css,
+       `.best` 那種通名會跟別的遊戲撞(紅線 6),而 data-* 天然帶著 .tq-hole 的前綴。
+     ⚠ 權重 (0,3,1) 蓋得過 .tq-hole.spot 的 (0,2,1)(那條在填白)。 */
+  .tq-hole.far[data-best]{background:linear-gradient(180deg,#ffe694,#ffc93c);
+               box-shadow:0 0 0 3px var(--accent-2),0 0 16px rgba(255,214,94,.95)}
   @keyframes tqSpot{0%,100%{transform:scale(1)}50%{transform:scale(1.16)}}
 
   /* ---------- 落點的段數標籤(v2.4.3)----------
@@ -12487,6 +12505,20 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .tq-arc{fill:none;stroke:var(--accent-2);stroke-width:.08;stroke-linecap:round;
           stroke-dasharray:.26 .2;opacity:.7;animation:tqArc 1.15s linear infinite}
   @keyframes tqArc{to{stroke-dashoffset:-.46}}
+  /* ★★ 最遠那一條的每一段(v2.7.1):**實線**、粗一階、不透明。
+     ★ 它是「加亮」不是「只畫這一條」—— 其餘的軌跡照樣在(少飛一段換一個更好的
+       位置是真的戰術),這一條只把「飛到底會到哪」從一堆同色的線裡挑出來。
+     ⚠⚠⚠ **分辨的主訊號是「實線 vs 虛線」,不是顏色。** 第一版只換成金色,而
+       **預設主題與 meadow 的 --accent-2 本身就是金色**(#ffd24a / #ffcf47)——
+       那兩個主題下兩種線根本分不出來(同紅線 27 那個坑)。
+       實線 / 虛線與主題無關,而且「一條連起來的路」正好就是它要說的事。
+     ⚠ 同一段被最遠那條與別條共用時算**最遠的**(board.js 以段為單位去重,紅線 27)——
+       所以這裡不必也不可以再判一次「這一段屬於誰」。
+     ⚠ dasharray 一定要蓋成 none 並關掉 animation:不蓋的話它照樣是跑動的虛線
+       (那一條在 .tq-arc 上),而顏色是唯一的差別 = 回到第一版的坑。
+     ⚠ 線寬單位是**格**(見這一節開頭),縮放時會跟著棋子一起變,不必另外調。 */
+  .tq-arc.tq-arc-b{stroke:#ffc93c;stroke-width:.105;opacity:1;
+                   stroke-dasharray:none;animation:none}
   /* 借力點:被當成跳板的那一顆棋。
      ⚠⚠ 半徑一定要**比棋子大**(棋子半徑 0.40 格):畫在中心點的話整個被棋子蓋掉,
        看起來像沒生效 —— 所以畫成一圈套在它外面的環。
@@ -12690,7 +12722,24 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      一眼就分得出哪幾顆已經進門(⚠ 它不是第七家:只出現在環上,不進球體)。 */
   .tq-pc.home{box-shadow:0 3px 5px -1px rgba(58,38,6,.46),
                          0 0 0 1.6px #fff,0 0 0 3.4px #ffc93c,0 0 8px 1px rgba(255,186,50,.55)}
-  .tq-pc.fly{z-index:10;filter:drop-shadow(0 5px 7px rgba(0,0,0,.42))}
+  /* ★★★ 飛行中的那一顆(v2.7.1 改成「影子跟著拋物線走」)。
+     ──────────────────────────────────────────────────────────────────────────
+       在此之前這裡是一個**固定**的 drop-shadow:整趟飛行影子都貼在同一個位置,
+       於是連跳看起來仍然像「在盤面上滑」,只是拱了起來。
+       ★ 真正講出「它離開盤面了」的是**影子與本體分開** —— 所以 board.js 的 frame()
+         每一幀把「現在拱到多高」寫成 --tq-lf(0~1),這裡讓影子跟著往下拉長、變柔。
+     ⚠⚠ 紅線 15:棋子上一格 transform 是 board.js 每一幀在寫的 —— 這一條只准動
+       `filter`。（也因此不可以改成「另外放一個影子元素再 translate 它」。）
+     ⚠ 一段一次歸零:每一跳的起跳與落定都是 --tq-lf = 0,所以連跳會一顆一顆地
+       「彈」而不是整趟浮著 —— 那與段內各自 ease-in-out(見 frame)是同一件事的兩面。
+     ⚠ 落地 / 收掉動畫時 board.js 會把 --tq-lf 移掉,所以 var() 的 fallback 0
+       是「貼著盤面」那一版,不是裝飾。 */
+  .tq-pc.fly{z-index:10;
+             filter:drop-shadow(0 calc(4px + var(--tq-lf,0) * 8px)
+                                  calc(5px + var(--tq-lf,0) * 9px) rgba(0,0,0,.42))}
+  /* ★ 騰空的時候把球自己那圈**接觸陰影**收掉(白描邊留著,它是輪廓不是影子)——
+     不收的話同一顆棋會有兩個影子:一個貼著它、一個在下面遠處。 */
+  .tq-pc.fly .tq-ball{box-shadow:0 0 0 1.4px rgba(255,255,255,.9)}
 
   /* ⚠ 一定要夾在兩行內:.tq-acts 是固定高的(見它的註解),第三行溢出去會蓋到盤面。 */
   .tq-hint{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--muted);
