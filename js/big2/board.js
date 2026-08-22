@@ -72,8 +72,9 @@ const B2B = (function(){
   let stage = null, acts = null;
   let hCard = null, hAct = null;          // 點手牌 / 按動作鈕的回呼
   let sel = [];                            // 目前選了哪幾張(牌 id;順序不重要)
-  let cdKey = "", cdT = null;              // 倒數環:用 key 去重,不看 timer(見 syncCd)
+  let cdKey = "", cdT = null, cdEnd = 0;   // 倒數環:用 key 去重,不看 timer(見 syncCd)
   let ord = null, ordKey = null;            // ★ 玩家自己拖出來的顯示順序 / 它屬於哪一局(第八節)
+  let sortMode = "pow";                     // ★ 一鍵智慧理牌的檔位(v2.10.0,見第九之二節)
   let drag = null, noClick = false;         // 拖曳中的狀態 / 這一下的 click 要不要吃掉
   let lastV = null;                         // 最後一次 render 收到的 v(拖曳中延後重畫用)
   /* 動效的 diff 狀態(v2.5.0,見第九節)。⚠ 全部只影響畫面,一個都不進真相。 */
@@ -436,12 +437,29 @@ const B2B = (function(){
     if(!tr || !seats || !cell || !cs) return;
     /* 還沒排版(大廳 / 蓋板蓋著時盤面是 hidden)→ 什麼都不做,尺寸交給 CSS 的後備值。
        ⚠ 這一條也讓 e2e 那種「直接呼叫 render」的用法拿得到穩定的結果。 */
-    const H = tr.clientHeight, cellW = cell.clientWidth;
-    if(!(H > 0) || !(cellW > 0)) return;
+    const cellW = cell.clientWidth;
+    if(!(tr.clientHeight > 0) || !(cellW > 0)) return;
 
     const px = v => (parseFloat(v) || 0);
     const trs = getComputedStyle(tr), ss = getComputedStyle(seats), cst = getComputedStyle(cell);
     const lbl = tr.querySelector(".b2-tlbl");
+    /* ★★★ v2.10.0：可用高**不可以再問 `tr.clientHeight`**。
+       這一版起 .b2-trick 在窮螢幕會被我們自己算出來的 `--b2-tmax` 夾住（見下），
+       再回頭讀它自己的高度就是「讀上一輪的輸出」—— 算過：335 → 233 → 227 → 221 …
+       **每重畫一次就小一阶**，而症狀是「牌慢慢縮掉」（跟跳棋 / 麻將消消樂那一類
+       互相追著跑的震盪同一個坑）。
+       改成從**盤面**推：盤面高 − gap − 手牌高。兩者在夾不到的情況下**恆等**
+       （桌面 flex:1 1 auto 本來就會把剩下的空間全吃掉）→ 寬螢幕算出來的牌寬
+       與 v2.9.0 逐字相同。
+       ⚠ 下限要用 `--b2-trh`（桌面的 min-height，它永遠不會比這個矮）——
+         讀 computed min-height 也會踩同一個迴圈（窮螢幕那一段的 min-height 本身
+         就是從 --b2-tmax 來的）。
+       ⚠ `tr.clientHeight` 還留著，但只當「排版了沒有」的**活體檢查**（> 0），
+         不拿它的數值做任何計算 —— 兩件事差很多。 */
+    const handEl = stage.querySelector(".b2-hand");
+    const H = Math.max(px(trs.getPropertyValue("--b2-trh")),
+                       stage.clientHeight - px(getComputedStyle(stage).rowGap)
+                         - (handEl ? handEl.offsetHeight : 0));
     /* 可用高 = 桌面的內容高 − 標題那一列 − 標題與格子之間的 gap。
        ⚠ clientHeight **含 padding**(這一塊沒有 border)→ 要自己扣掉。 */
     const availH = H - px(trs.paddingTop) - px(trs.paddingBottom)
@@ -477,6 +495,29 @@ const B2B = (function(){
       cardGap: px(getComputedStyle(cs).columnGap)
     });
     tr.style.setProperty("--b2-tfit", fit + "px");
+
+    /* ★★★ v2.10.0：同時把「這張桌子真正需要多高」寫成 `--b2-tmax`。
+       使用者：「很多空間應該要可以省出來，不然小螢幕的手機，會顯得非常的擁擠」。
+       病因是這樣的：桌上那副牌的大小是 `min(byH, byW)`，而窮螢幕永遠是 **byW 贏**
+       （一格要塞得下五張，而一格只有半張桌子寬）→ 高度那一邊的余裕**永遠用不到**，
+       可是 `.b2-trick{flex:1 1 auto}` 還是把剩下的空間全吃下去 → 360×740 量到桌面 335px、
+       而裡面的内容只用 233px，**空的綿呢就有 102px**（大牌桌模式更多：收採頂列與
+       房間框省下來的 120px 也全部變成空綿呢）。
+       ★ 量法刻意不自己再算一次（clamp 上下限 / 格子裝潢 / 三張 areas 表那一整套），
+         而是直接問 `.b2-tseats` 的 **scrollHeight**：
+           · 它是**內容高**，所以即使外面已經被夾得比它矮（flex-shrink 了、正在捲）
+             量出來也不會跟著縮 → **不會形成迴圈**（與上面 H 那條是同一條紅線）
+           · 三張版型表 / 矮視窗覆寫 / 牌寬的 clamp 全部自動算進來，只有一份真相
+       ⚠ 一定要在 setProperty("--b2-tfit") **之後**讀（牌多大決定内容有多高）。
+       ⚠⚠ 這一格**只有窮螢幕那一段的 CSS 會用**（max-height）—— 桂機 / 高視窗
+         刻意維持 v1.79.0 的行為（空白變成牌桌本身）：那邊空間本來就夠，
+         而「一張大桌子」是使用者當初選的那一案。
+       ⚠ 它不進真相、不進 DB，而且只吃「人數 + 視窗」（同 --b2-tfit 那條界線）→
+         一整局是常數，手牌不會被推。 */
+    const needH = Math.ceil(px(trs.paddingTop) + px(trs.paddingBottom)
+                    + (lbl ? lbl.offsetHeight : 0) + px(trs.rowGap)
+                    + seats.scrollHeight);
+    if(needH > 0) tr.style.setProperty("--b2-tmax", needH + "px");
   }
 
   /* ==========================================================================
@@ -558,10 +599,17 @@ const B2B = (function(){
     const slots = Math.max(v.slots || 0, v.hand.length, 1);
     /* ★ 畫的順序走 applyOrder(玩家沒拖過的話它就是照牌力排;見 rules.js)。
        ⚠ 只有這一行吃 ord —— 送去規則層的一律是原始的集合。 */
-    const hand = R.applyOrder(v.hand, ord);
+    /* ★★★ v2.10.0:沒有自訂順序時走**理牌檔位**(pow / suit / combo,見第九之二節)。
+       ⚠ `applyOrder(hand, null)` 本來就等於 `sortHand(hand, "pow")` → 預設行為一個字都沒變;
+         而拖過之後 ord 一律**贏過**檔位(玩家在手動調整,不要搶控制權)。 */
+    const hand = (ord && ord.length) ? R.applyOrder(v.hand, ord)
+                                     : R.sortHand(v.hand, sortMode);
+    /* ★ 組合序才畫分組線(見 sepSet 的註解):它是「這幾張是一組」的唯一訊號。 */
+    const sep = sepSet(v.hand, hand);
     h += '<div class="b2-hand' + (v.mine ? " mine" : "") + '" style="--b2-slots:' + slots + '">' +
-      hand.map(c => cardHTML(c,
-        sel.indexOf(c) >= 0 ? "sel" : (hot ? (hot[c] ? "hot" : "cold") : ""))).join("") +
+      hand.map((c, i) => cardHTML(c,
+        (sel.indexOf(c) >= 0 ? "sel" : (hot ? (hot[c] ? "hot" : "cold") : "")) +
+        (i > 0 && sep[c] ? " b2-gsep" : ""))).join("") +
       (v.hand.length ? "" : '<span class="b2-empty">手牌出完了 ✨</span>') +
       '</div>';
     stage.innerHTML = h;
@@ -579,6 +627,86 @@ const B2B = (function(){
        格子的位置由座位號碼決定。舊版是「由舊到新的清單」才需要每次把 scrollTop 推到底。
        ⚠ 矮視窗放不下時 .b2-tseats 自己還是捲得動(overflow-y:auto),但**刻意不自動捲**:
          自動捲到底會把前面那幾格推出畫面,而每一格都一樣重要。 */
+  }
+
+  /* ==========================================================================
+     三之二、★★★ 一鍵智慧理牌(v2.10.0)—— 三檔 + 分組線
+     ──────────────────────────────────────────────────────────────────────────
+       建議書:「一鍵智慧理牌分組切換(點數 / 花色 / 組合)」。算式全在規則層
+       (`B2.sortHand` / `B2.comboGroups`,純函式);這裡只有三件事:
+         ① 一顆鈕(住在動作列那一行的右端,與倒數環左右對稱 → 零額外高度)
+         ② 按下去換檔 + **清掉 ord**(讓檔位接手)+ 存起來
+         ③ 組合序時畫分組線
+       ★★ **它不是第二種狀態**:沒有 ord 時走檔位、有 ord 時走 ord。因此拖曳、
+          換局清空、出牌後保留順序那一整套(第八節)一個字都不必改。
+       ★★★ 分組線刻意**不佔版面**(絕對定位的 ::before 畫在既有的 5px gap 裡)——
+          建議書寫的是「各組之間帶有細微 4px 空隙」,而那會把「手牌格位固定」
+          (v1.77.0 那條紅線的地基:一列幾格只跟視窗寬有關)整條打破:
+          出掉一手 → 分組變了 → 空隙位置變了 → **每一張牌的位置都平移**,
+          正是使用者當初抱怨的「位置會一直變來變去」。畫線不佔版面就沒有這個問題。
+       ⚠ 檔位存 `localStorage.bingo.b2sort`(自己一個 key)—— **刻意不併進
+         `bingo.prefs.v1`**:那一份是六頁共用的,寫進去要走 saveShared 的
+         read-modify-write,而這是一頁一個遊戲的顯示偏好,不值得動共用結構。
+     ========================================================================== */
+  const SORT_LS = "bingo.b2sort";
+  try{
+    const v0 = localStorage.getItem(SORT_LS);
+    if(v0) sortMode = R.sortKeyOf(v0);
+  }catch(e){}                                  // 無痕模式 / 關掉 storage → 就用預設
+
+  function sortBtnHTML(){
+    const m = R.sortKeyOf(sortMode);
+    return '<button class="b2-sortbtn" type="button" data-act="sort"' +
+             ' title="理牌:' + esc(R.SORT_NAME[m]) + '(' + esc(R.SORT_HINT[m]) + ')"' +
+             ' aria-label="切換理牌方式,目前是' + esc(R.SORT_NAME[m]) + '">' +
+             R.SORT_ICON[m] + '</button>';
+  }
+  /* 換下一檔。★ 回傳新檔位的名字給呼叫端跳 toast(「換了什麼」要說出來 ——
+     13 張牌重排一次,不說的話玩家不確定剛剛那一下有沒有吃到)。 */
+  function cycleSort(){
+    sortMode = R.nextSort(sortMode);
+    ord = null;                                // ★ 檔位接手(不然拖過的順序會壓過它)
+    try{ localStorage.setItem(SORT_LS, sortMode); }catch(e){}
+    if(lastV) render(lastV);
+    /* ★★ 鈕面的字要**自己改** —— render() 只重畫盤面（手牌），動作列是呼叫端
+       （solo.paint / adapter.paint）叫 renderActs 才重畫的 —— 不补這一段的症狀是
+       「牌真的重排了，但鈕上還寫著舊檔位」（探針當場抓到：mode1=suit 而 btn=數）。
+       ⚠ 刻意不在這裡叫 renderActs：那一支要一整份 info（輪到誰 / 選了幾張 / 倒數），
+         而這裡沒有也不該有那份狀態（它是純顯示動作）。 */
+    const btn = acts && acts.querySelector(".b2-sortbtn");
+    if(btn){
+      const tmp = document.createElement("div");
+      tmp.innerHTML = sortBtnHTML();
+      btn.replaceWith(tmp.firstElementChild);
+    }
+    return { key: sortMode, name: R.SORT_NAME[sortMode], hint: R.SORT_HINT[sortMode] };
+  }
+
+  /* 哪幾張牌是「一組的開頭」。★ 只有**組合序而且沒有自訂順序**時才畫 ——
+     拖過之後分組與畫面上的順序已經對不上,那時畫線就是在騙人。
+     ⚠ 回傳的是 {牌 id: true};呼叫端還會擋掉第一張(整排的開頭不需要分隔線)。 */
+  function sepSet(rawHand, shown){
+    const out = {};
+    if((ord && ord.length) || R.sortKeyOf(sortMode) !== "combo") return out;
+    const gid = {};
+    R.comboGroups(rawHand).forEach((g, i) => { g.cards.forEach(c => { gid[c] = i; }); });
+    for(let i = 1; i < shown.length; i++)
+      if(gid[shown[i]] !== gid[shown[i - 1]]) out[shown[i]] = true;
+    return out;
+  }
+
+  /* ---------- ★ 觸覺微震(v2.10.0)----------
+     建議書:「點選牌面 8ms / 成功出牌 25ms / 無敵牌型 40+60ms / 被壓過 15ms」。
+     ⚠⚠ 刻意**不動 js/shared/ui-kit.js** —— 那一支動一行同時影響十三個遊戲(要跑整批
+       mock 回歸),而這一頁需要的只是「讀那個開關 + 呼叫 navigator.vibrate」。
+       `vibrateOn` 是 ui-kit 的**全域**(這個專案沒有最外層 IIFE),所以這裡直接讀得到。
+       ★ 將來如果每一頁都要,那時再把它升成共用的一支(照 talk.js 那條路)。
+     ⚠ 一律 typeof 檢查 + try:桌機沒有 navigator.vibrate、iOS Safari 也沒有,
+       而「設定裡關掉震動」必須真的關掉(它與音效是兩個開關)。 */
+  function buzz(ms){
+    if(typeof vibrateOn === "undefined" || !vibrateOn) return;
+    if(!navigator.vibrate) return;
+    try{ navigator.vibrate(ms); }catch(e){}
   }
 
   /* ==========================================================================
@@ -604,7 +732,7 @@ const B2B = (function(){
     if(info.noPlay && info.canPass){
       return '<div class="b2-selbar bad">' +
                '<span class="b2-selico">🙅</span>' +
-               '<span class="b2-seltxt">你手上沒有一手壓得過現在桌上這一手 —— 只能 Pass</span>' +
+               '<span class="b2-seltxt">壓不過桌上這一手 —— 只能 Pass</span>' +
              '</div>' +
              '<div class="b2-btns">' +
                (sel.length ? '<button class="btn ghost b2-act" data-act="clear">清除</button>' : "") +
@@ -646,20 +774,44 @@ const B2B = (function(){
   function renderActs(info){
     if(!acts) return;
     acts.classList.remove("hidden");
-    acts.innerHTML = '<div class="b2-actrow">' + actsHTML(info) + '</div>' +
-                     '<div class="b2-cdwrap" id="b2CdWrap"></div>';
+    /* ★★★ v2.10.0:倒數環從「動作列底下自己一行」搬成**與動作列同一行**(左邊)。
+       ⚠ 這不只是外觀:舊版那一行讓 body.b2-mp 必須多預留 32px 的固定高度
+         (--b2-acth 96 → 128,而房主把倒數關掉時那 32px 就是純空白)。
+         併成一行之後**連線與單機的動作列一樣高**,小螢幕直接省下那一塊。
+       ⚠ .b2-cdwrap 空的時候寬度是 0(flex:none)→ 倒數關掉時動作列照樣置中,
+         不必再為「有沒有那顆環」留位置。 */
+    /* ★ 理牌鈕擺在**右端**,與左端的倒數環左右對稱 → 這一行的高度一個 px 都沒多。
+       ⚠ 只有「我還在這一局裡而且還有牌」才畫:結束之後那一顆按了沒有意義。 */
+    acts.innerHTML = '<div class="b2-actline">' +
+                       '<div class="b2-cdwrap" id="b2CdWrap"></div>' +
+                       '<div class="b2-actrow">' + actsHTML(info) + '</div>' +
+                       (info.over ? "" : sortBtnHTML()) +
+                     '</div>';
     syncCd(info);
   }
 
-  /* 倒數環。★ **全桌都看得到**,不是只有當事人 —— 判準同排七 / 台灣麻將的出牌倒數:
-     「輪到誰、還剩幾秒」是公開資訊(晶片上就有 .turn),讓大家知道為什麼卡著。
+  /* ── ★★★ 倒數環(v2.10.0 改成**與台灣麻將同一顆**)────────────────────────────
+     使用者:「倒數秒數這一件事情的顯示,請參考台灣麻將,每個遊戲的倒數秒數都要做成
+     這種樣式」。舊版是一條 56×6 的橫條 + 旁邊一個數字(排七留下來的做法);
+     現在是 34px 的 SVG 環圈 + 中間的秒數,最後 3 秒轉紅並脈動、秒數每跳一次縮放一下。
+
+     ★ 幾何與關鍵影格**逐字沿用 m16**(viewBox 40 · r=17 · dasharray 107 ·
+       `@keyframes m16cd` / `m16beat` / `m16cdhot`)—— 21點 v1.90.0 已經照這條路走過一次,
+       同一件事只有一種畫法,不再定義第二份同名的環。
+
+     ★ **全桌都看得到**,不是只有當事人 —— 判準同排七 / 台灣麻將的出牌倒數:
+       「輪到誰、還剩幾秒」是公開資訊(晶片上就有 .turn),讓大家知道為什麼卡著。
 
      ★ 兩個從台灣麻將繼承的坑(notes/11 第三節):
        ① 用**負的 animation-delay** 接續播放,duration 永遠是那一段的總長
           —— 這樣 e2e 才量得到設定值。
        ② 去重的 key **不可以看 timer 還在不在**:數字走到 0 之後 interval 就停了,
           而 timer 本身還有幾百毫秒沒響;那段空窗裡只要有人再叫一次 renderActs()
-          環就會彈回滿格,而那個彈跳本身就是雜訊。 */
+          環就會彈回滿格,而那個彈跳本身就是雜訊。
+     ⚠ 這一頁的環是**每次 renderActs 都重建的節點**(m16 是刻意留著不動的持久節點)。
+       重建照樣接得上,靠的就是①那個負延遲;但因此「秒數跳動」那個 `.b2-beat`
+       **不可以寫進初始 HTML** —— 寫進去的話每一次重畫(對手一動就一次)都會閃一下。 */
+  const CD_HOT = 3000;                        // 最後 3 秒轉紅 + 脈動(同 m16)
   function syncCd(info){
     const box = $("b2CdWrap");
     if(!box) return;
@@ -667,22 +819,37 @@ const B2B = (function(){
     const key = info.cdMs + ":" + info.cdEnd;
     const left = info.cdEnd - Date.now();
     if(left <= 0){ stopCd(); return; }
+    cdEnd = info.cdEnd;
     box.innerHTML =
-      '<span class="b2-cd" id="b2Cd" style="--cd-dur:' + (info.cdMs / 1000) + 's;--cd-delay:' +
-      (-(info.cdMs - left) / 1000) + 's"><i></i><b id="b2CdN">' + Math.ceil(left / 1000) + '</b></span>';
+      '<span class="b2-cd' + (left <= CD_HOT ? " b2-hot" : "") + '" id="b2Cd" aria-hidden="true"' +
+        ' style="--cd-dur:' + (info.cdMs / 1000) + 's;--cd-delay:' +
+        (-(info.cdMs - left) / 1000) + 's">' +
+        '<svg viewBox="0 0 40 40"><circle class="b2-cdbg" cx="20" cy="20" r="17"/>' +
+        '<circle class="b2-cdfg" cx="20" cy="20" r="17"/></svg>' +
+        '<b class="b2-cdn" id="b2CdN">' + Math.ceil(left / 1000) + '</b>' +
+      '</span>';
     if(key === cdKey && cdT) return;      // 同一段倒數:重畫畫面不重跑動畫
     cdKey = key;
     if(cdT) clearInterval(cdT);
-    cdT = setInterval(() => {
-      const n = $("b2CdN");
-      const ms = info.cdEnd - Date.now();
-      if(!n || ms <= 0){ clearInterval(cdT); cdT = null; return; }
-      n.textContent = Math.ceil(ms / 1000);
-    }, 250);
+    cdT = setInterval(tickCd, 200);
+  }
+  /* 只換中間那個數字與 hot 狀態 —— 環圈本身完全交給 CSS 動畫(理由見上面①)。 */
+  function tickCd(){
+    const el = $("b2Cd");
+    if(!el){ if(cdT){ clearInterval(cdT); cdT = null; } return; }
+    const left = cdEnd - Date.now();
+    const n = el.querySelector(".b2-cdn");
+    const s = String(Math.max(0, Math.ceil(left / 1000)));
+    if(n && n.textContent !== s){
+      n.textContent = s;
+      n.classList.remove("b2-beat"); void n.offsetWidth; n.classList.add("b2-beat");
+    }
+    el.classList.toggle("b2-hot", left <= CD_HOT);
+    if(left <= 0){ clearInterval(cdT); cdT = null; }
   }
   function stopCd(){
     if(cdT){ clearInterval(cdT); cdT = null; }
-    cdKey = "";
+    cdKey = ""; cdEnd = 0;
     const box = $("b2CdWrap");
     if(box) box.innerHTML = "";
   }
@@ -791,6 +958,10 @@ const B2B = (function(){
      ⚠ 收成一份的理由與 announceLa 相同:三個點各寫一份「pass 要不要喊」遲早走鐘,
        而走鐘了三邊各自都不會壞、沒有東西抓得到。守門是三條「呼叫點忘了接」的突變。 */
   function moveSfx(isPass){
+    /* ★ 觸覺微震接在這裡而不是三個呼叫點（v2.10.0）—— 理由與聲音收成一份一樣：
+       三個點各寫一份遲早走鐘。pass 輕一點（它一局響二三十次）、出牌重一點。
+       ⚠ 它吃設定裡的「震動」開關（見 buzz），與音效是兩個開關。 */
+    buzz(isPass ? 15 : 25);
     if(typeof Sound === "undefined") return;
     if(isPass){ Sound.takeback(); passCall(); }
     else Sound.place();
@@ -1051,12 +1222,24 @@ const B2B = (function(){
         /* ★ 剛剛那一下是拖曳(而且真的換到別的位置)→ 這一下不算點擊。
            旗標在 pointerdown 一律會被清掉,所以它不可能漏到下一次點擊(第八節)。 */
         if(noClick){ noClick = false; return; }
+        buzz(8);                     // ★ 點選牌面:8ms 輕敲感(建議書;開關在設定裡的「震動」)
         hCard(+el.dataset.c);
       });
       bindDrag();
     }
     if(acts){
       acts.addEventListener("click", e => {
+        /* ★★★ 理牌鈕(v2.10.0)在**這裡**自己處理,刻意不經過 hAct ——
+           它是 100% 的顯示動作(只換 ord 的來源),而 hAct 那條路通往
+           solo.commit / adapter 的交易。純顯示的東西不該踩進那一條。
+           ⚠ 它的 class 是 .b2-sortbtn 不是 .b2-act,所以一定要**排在前面**先攔下來。 */
+        const sb = e.target.closest(".b2-sortbtn");
+        if(sb){
+          const r = cycleSort();
+          buzz(8);
+          if(typeof showToast === "function") showToast(R.SORT_ICON[r.key] + " " + r.name + " —— " + r.hint, 1400);
+          return;
+        }
         const b = e.target.closest(".b2-act");
         if(b && hAct) hAct(b.dataset.act);
       });
@@ -1175,7 +1358,18 @@ const B2B = (function(){
          click 就不一定發得出來 → noClick 旗標會漏到下一次點擊。 */
     if(!cancel && d.on && stage.contains(d.el)){
       const now = cardsIn(d.box).map(el => +el.dataset.c);
-      if(now.join(",") !== d.was.join(",")){ ord = now; noClick = true; }
+      if(now.join(",") !== d.was.join(",")){
+        ord = now; noClick = true;
+        /* ★★★ v2.10.0：分組線要**當場收掉** —— ord 一設下去，組合序那份分組
+           就與畫面上的順序對不上了（畫了就是騙人）。
+           ⚠ 這裡**不能**靠重畫修：上面那段註解已經講了「刻意不重畫」的理由
+             （重畫會把手指剛放開那個節點销毀 → noClick 漏到下一次點擊），
+             而 sepSet() 在 ord 非空時本來就回空的 —— 差的只是這一次沒重畫。
+             所以直接把 class 拉掉（一行，不動 DOM 結構）。
+           ⚠ 斷言在單機 e2e D4c ⑤（拖過之後 seps 必須是 0）。 */
+        [].forEach.call(d.box.querySelectorAll(".b2-gsep"),
+                        el => el.classList.remove("b2-gsep"));
+      }
     }
     // 拖曳中被擋掉的那次重畫要補回來 ⚠ 要等 click 發完,所以是 setTimeout 而不是直接呼叫
     if(d.dirty && lastV) setTimeout(() => render(lastV), 0);
@@ -1250,6 +1444,8 @@ const B2B = (function(){
   return {
     mount, render, renderActs, resultHTML, stopCd, selInfoOf,
     cardHTML,
+    // ★ 一鍵智慧理牌(v2.10.0):呼叫端(main.js / solo.js / adapter.js 的 onAct)只碰 cycleSort
+    cycleSort, sortNow: () => R.sortKeyOf(sortMode), buzz,
     // 「拉」(v1.81.0):公告 · 晶片記號 · 單獨播那一聲(單機與連線共用)
     announceLa, laChipHTML, la, armFly,
     // 一手的聲音(v1.81.1):動作聲 + 喊牌語音,三個呼叫點共用

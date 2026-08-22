@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 29e77d21b6205c430d3ddd3d21e4eddf5c52808f19860500b8fa86a5a74eaf8e)
+    真相在 styles.src.css(sha256 91c92b24384559fde68ef612c238e4190181f5d8c006a8c6efeb2ca01e1b223f)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -2538,15 +2538,24 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .sv-atxt.mine{color:var(--text)}
   .sv-atip{font:800 12px/1 'Nunito',sans-serif;color:var(--accent)}
   .sv-act{padding:6px 14px;font-size:13px;border-radius:11px}
-  .sv-cdwrap{display:flex;align-items:center}
-  .sv-cd{display:inline-flex;align-items:center;gap:7px}
-  .sv-cd i{position:relative;display:block;width:56px;height:6px;border-radius:3px;
-    background:rgba(255,255,255,.16);overflow:hidden}
-  .sv-cd i::after{content:"";position:absolute;inset:0;transform-origin:left center;
-    background:var(--accent);
-    animation:svCdRun var(--cd-dur,30s) linear var(--cd-delay,0s) 1 forwards}
-  @keyframes svCdRun{ from{transform:scaleX(1)} to{transform:scaleX(0)} }
-  .sv-cd b{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);min-width:1.5em;text-align:right}
+  .sv-actline{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex-wrap:wrap}
+  .sv-actline .sv-actrow{min-width:0}
+  .sv-cdwrap{flex:none;display:flex;align-items:center}
+  .sv-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+  .sv-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .sv-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  .sv-cdbg{stroke:rgba(255,255,255,.16)}
+  .sv-cdfg{stroke:var(--accent);stroke-dasharray:107;stroke-dashoffset:0;
+    animation:m16cd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .sv-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .sv-cdn.sv-beat{animation:m16beat .34s ease-out}
+  .sv-cd.sv-hot .sv-cdfg{stroke:var(--sv-redlit)}
+  .sv-cd.sv-hot .sv-cdn{color:var(--sv-redlit)}
+  .sv-cd.sv-hot{animation:m16cdhot .9s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){
+    .sv-cd.sv-hot{animation:none}
+    .sv-cdn.sv-beat{animation:none}
+  }
   .win-card.sv-win .word{font-size:clamp(28px,7.2vw,40px)}
   .win-card.sv-win{width:min(88vw,520px);max-width:none;padding:26px 24px}
   .sv-win p{margin:7px 0 14px}
@@ -2634,9 +2643,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   :root{ --b2-face:#fdfaf3; --b2-line:#c3ae90; --b2-blk:#22303f; --b2-red:#c92c2c;
          --b2-redlit:#ff7b7b; --b2-bk:#3f5896;
          --b2-tw:min(98vw,700px); --b2-cw:clamp(27px,7.6vw,40px); --b2-hgap:5px;
-         --b2-trh:248px; --b2-acth:96px;
+         --b2-trh:248px; --b2-acth:78px;
            }
-  body.b2-mp{ --b2-acth:128px; }
   .b2-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
     line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
     -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
@@ -2883,6 +2891,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .b2-hand .b2-card.sel:active{transform:translateY(-14px) scale(.94)}
   .b2-hand .b2-card.b2-drag{transition:none;position:relative;z-index:6;cursor:grabbing;
     box-shadow:0 12px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent)}
+  .b2-hand .b2-card.b2-gsep{position:relative}
+  .b2-hand .b2-card.b2-gsep::before{content:"";position:absolute;
+    left:-3.5px;top:14%;bottom:14%;width:2px;border-radius:1px;
+    background:rgba(255,255,255,.42);pointer-events:none}
   .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
   .b2-card.mid{--b2w:var(--b2-tcw,calc(var(--b2-cw) * .66));cursor:default}
   .b2-card.tiny{--b2w:21px;cursor:default;box-shadow:0 1px 1px rgba(0,0,0,.22)}
@@ -2900,14 +2912,30 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .b2-btns{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
   .b2-btns .btn{padding:8px 14px;font-size:13.5px}
   .b2-btns .btn.dim{opacity:.62;pointer-events:auto}
-  .b2-cdwrap{display:flex;align-items:center}
-  .b2-cd{display:inline-flex;align-items:center;gap:7px}
-  .b2-cd i{position:relative;display:block;width:56px;height:6px;border-radius:3px;
-    background:rgba(255,255,255,.16);overflow:hidden}
-  .b2-cd i::after{content:"";position:absolute;inset:0;transform-origin:left center;
-    background:linear-gradient(90deg,var(--accent),var(--accent-2));
-    animation:svCd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
-  .b2-cd b{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);min-width:1.5em;text-align:right}
+  .b2-actline{display:flex;align-items:center;justify-content:center;gap:9px;width:100%}
+  .b2-actline .b2-actrow{min-width:0}
+  .b2-sortbtn{flex:none;width:34px;height:34px;border-radius:11px;
+    display:grid;place-items:center;line-height:1;cursor:pointer;
+    font:800 15px/1 'Fredoka','Nunito',sans-serif;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text)}
+  .b2-sortbtn:hover{background:rgba(255,255,255,.15)}
+  .b2-sortbtn:active{transform:scale(.9)}
+  .b2-cdwrap{flex:none;display:flex;align-items:center}
+  .b2-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+  .b2-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .b2-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  .b2-cdbg{stroke:rgba(255,255,255,.16)}
+  .b2-cdfg{stroke:var(--accent-2);stroke-dasharray:107;stroke-dashoffset:0;
+    animation:m16cd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .b2-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .b2-cdn.b2-beat{animation:m16beat .34s ease-out}
+  .b2-cd.b2-hot .b2-cdfg{stroke:var(--b2-redlit)}
+  .b2-cd.b2-hot .b2-cdn{color:var(--b2-redlit)}
+  .b2-cd.b2-hot{animation:m16cdhot .9s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){
+    .b2-cd.b2-hot{animation:none}
+    .b2-cdn.b2-beat{animation:none}
+  }
   .win-card.b2-win{width:min(88vw,520px);max-width:none;padding:26px 24px}
   .win-card.b2-win .word{font-size:clamp(28px,7.2vw,40px)}
   .b2-win p{margin:7px 0 14px}
@@ -2948,8 +2976,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   body.b2-mp .b2-room,body.b2-solo .b2-room{width:min(92vw,700px)}
   body.b2-mp .topbar,body.b2-solo .topbar{width:min(92vw,700px)}
   @media (max-height:600px){
-    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:172px; --b2-acth:74px}
-    body.b2-mp{--b2-acth:106px}
+    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:172px; --b2-acth:68px}
     .b2-hero{margin:6px 0 2px}
     .b2-art{width:66px;height:66px}
     .b2-play{gap:5px}
@@ -2968,6 +2995,21 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .b2-acts{gap:4px}
     .b2-btns .btn{padding:6px 11px;font-size:12.5px}
     .b2-selbar{padding:4px 8px;font-size:11.5px}
+  }
+  @media (max-width:520px) and (min-height:601px){
+    :root{--b2-cw:clamp(31px,min(12.2vw,6vh),48px); --b2-tmw:24px; --b2-trh:150px}
+    .b2-trick{--b2-tcw:clamp(21px,var(--b2-tfit,0px),var(--b2-cw));padding:6px 8px;gap:5px}
+    .b2-tmid{font-size:16px}
+    body.b2-mp .b2-room,body.b2-solo .b2-room{padding:7px 10px}
+    .b2-room .mp-subrow,.b2-room-foot{margin-top:4px}
+    .b2-room .mp-players.oneline{gap:7px}
+    .b2-room .mp-chip{padding:5px 9px;font-size:12.5px;gap:5px}
+    .b2-room .mp-chip .you-badge{display:none}
+    .b2-play{gap:6px}
+    .b2-stage{gap:5px}
+    @media (max-height:820px){
+      .b2-trick{max-height:calc(var(--b2-tmax,999px) + 8vh)}
+    }
   }
   @media (orientation:landscape) and (max-height:560px) and (pointer:coarse){
     body.b2-mp .topbar,body.b2-solo .topbar{display:none}

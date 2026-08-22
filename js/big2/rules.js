@@ -769,7 +769,7 @@ const B2 = (function(){
     if(hand.indexOf(card) < 0) return "";              // 不是我的手牌 → 不管它
     const po = playable(hand, st, cur);
     if(po.cards.indexOf(card) >= 0) return "";
-    if(!po.can) return "你手上沒有一手壓得過現在桌上這一手 —— 只能 Pass";
+    if(!po.can) return "壓不過桌上這一手 —— 只能 Pass";
     if(cur.length) return "這張配不上你已經選的那幾張(要換一組請先按「清除」)";
     return "這張湊不出壓得過現在桌上這一手的牌型";
   }
@@ -884,6 +884,151 @@ const B2 = (function(){
     return "同樣是" + T_NAME[cls.t] + ",但你這手比較小";
   }
 
+
+  /* ==========================================================================
+     ★★★ 一鍵智慧理牌(v2.10.0)—— 三檔顯示順序
+     ──────────────────────────────────────────────────────────────────────────
+       建議書:「提供一鍵智慧理牌:點一下自動將手牌依照順子 / 葫蘆 / 鐵支預先分組排列」。
+       痛點是真的:13 張裡有沒有一條順子,用眼睛掃要掃好幾遍。
+
+       ★★ 它與 `applyOrder`(玩家自己拖出來的順序)是**同一類東西**:
+          純顯示、**不進 DB、不進 moves、不影響任何判定**。放在規則層只因為它是
+          純函式、要在 node 裡驗(同 sortShow / applyOrder 那條界線)。
+       ★★★ 而且它**不自己成為第二種狀態** —— board.js 那一顆鈕按下去做的事是
+          「算出一個順序 → 交給既有的 ord」,所以拖曳、換局清空、出牌後保留順序
+          那一整套機制一個字都不必改。
+
+       三檔:
+         pow   點數序(預設)= cmpCard,3 最小、2 最大
+         suit  花色序 = ♣ ♦ ♥ ♠ 分群,群內照點數 —— 找同花順 / 大花色單張用
+         combo 組合序 = 貪心拆牌,同花順 → 鐵支 → 葫蘆 → 順子 → 三條 → 對子 → 單張
+
+       ⚠ combo **刻意不吃房規**:房規(str)只決定「哪一條順子比較大」,而這裡問的是
+         「這五張湊不湊得成一條龍」—— 兩派的十種順子完全一樣。
+       ⚠ 貪心的方向是**由小到大**(每一步都先取牌力最小的那一組):把零碎的小牌先吃進
+         順子裡,大牌(2 / A)因此留在後面當單張或對子 —— 那正是玩家想看到的形狀。
+       ⚠⚠ 三條**也給一組**(它自己出不了,但擺在一起看得出來);這一格的 t 用 0,
+         不要拿 T_* 裡任何一個去佔位(那會讓「這一組能不能出」變成看得懂的假話)。
+       ⚠⚠⚠ 最後那道保險不可以拿掉:算出來的張數與進來的不一樣就**整份退回 cmpCard**。
+         「一張牌從畫面上消失」是這一頁最不能發生的事(見 applyOrder 的同一條)。
+     ========================================================================== */
+  const SORT_KEYS = ["pow", "suit", "combo"];
+  const SORT_NAME = { pow: "點數序", suit: "花色序", combo: "組合序" };
+  /* ⚠ 字面刻意用**一個漢字**而不是 emoji(第一版是 🔢 / 🌈 / 🧩):
+     34px 的鈕上那三個縮到看不出是什麼(🔢 讀起來是一團 1234),而這一頁本來就有一顆
+     同尺寸的「大」(.b2-bigbtn)在旁邊 —— 同一種畫法才讀得出來是同一類的鈕。
+     ★ 完整的名字在 title / aria-label / toast 裡(SORT_NAME + SORT_HINT)。 */
+  const SORT_ICON = { pow: "數", suit: "色", combo: "組" };
+  const SORT_HINT = { pow: "照牌力排(3 最小、2 最大)",
+                      suit: "照花色分群(♣ ♦ ♥ ♠)",
+                      combo: "照牌型分組(順子 / 葫蘆 / 鐵支…)" };
+  function sortKeyOf(v){ return SORT_KEYS.indexOf(v) >= 0 ? v : SORT_KEYS[0]; }
+  function nextSort(v){
+    return SORT_KEYS[(SORT_KEYS.indexOf(sortKeyOf(v)) + 1) % SORT_KEYS.length];
+  }
+
+  /* 十種順子,寫成**點數**的陣列(3..K 那八條 + A2345 + 23456)。
+     ⚠ 用 rkFromOrder 生出來而不是手寫十行:順子的「連不連」吃的就是 rkOrder 那個序,
+       手寫等於把同一個序抄第二遍。 */
+  const STRAIGHT_WINS = (function(){
+    const out = [];
+    for(let o = 0; o <= 7; o++){          // 34567(0..4) … 10JQKA(7..11)
+      const w = [];
+      for(let i = 0; i < 5; i++) w.push(rkFromOrder(o + i));
+      out.push(w);
+    }
+    out.push([1, 2, 3, 4, 5]);            // A2345
+    out.push([2, 3, 4, 5, 6]);            // 23456
+    return out;
+  })();
+
+  /* 手牌 → 一組一組的分解(大牌型在前)。回傳 [{ t, cards }, …]。
+     ★ 決定性:每一層都照 rkOrder 由小到大挑,不依賴 Object.keys 的順序。 */
+  function comboGroups(hand){
+    let left = hand.slice().sort(cmpCard);
+    const out = [];
+    const drop = g => { left = left.filter(c => g.indexOf(c) < 0); };
+    const byRank = () => {
+      const m = {};
+      left.forEach(c => { const r = rankOf(c); (m[r] || (m[r] = [])).push(c); });
+      return m;
+    };
+    const ranksAsc = m => Object.keys(m).map(Number).sort((a, b) => rkOrder(a) - rkOrder(b));
+    const pickWin = pool => {
+      for(let i = 0; i < STRAIGHT_WINS.length; i++){
+        const got = [];
+        for(let j = 0; j < 5; j++){
+          const r = STRAIGHT_WINS[i][j];
+          const c = pool.find(x => rankOf(x) === r && got.indexOf(x) < 0);
+          if(c === undefined) break;
+          got.push(c);
+        }
+        if(got.length === 5) return got;
+      }
+      return null;
+    };
+
+    // ① 同花順(一個花色一個花色找)
+    for(;;){
+      let got = null;
+      for(let sIdx = 0; sIdx < NSUIT && !got; sIdx++)
+        got = pickWin(left.filter(c => suitOf(c) === sIdx));
+      if(!got) break;
+      out.push({ t: T_SFLUSH, cards: sortShow(got) }); drop(got);
+    }
+    // ② 鐵支(同點四張)
+    for(;;){
+      const m = byRank(), r = ranksAsc(m).find(k => m[k].length === 4);
+      if(r === undefined) break;
+      out.push({ t: T_QUADS, cards: m[r].slice().sort(cmpCard) }); drop(m[r]);
+    }
+    // ③ 葫蘆(三條 + 一對)
+    for(;;){
+      const m = byRank(), ks = ranksAsc(m);
+      const t3 = ks.find(k => m[k].length === 3);
+      const p2 = t3 === undefined ? undefined : ks.find(k => k !== t3 && m[k].length >= 2);
+      if(t3 === undefined || p2 === undefined) break;
+      const g = m[t3].concat(m[p2].slice(0, 2));
+      out.push({ t: T_FULL, cards: g.slice().sort(cmpCard) }); drop(g);
+    }
+    // ④ 順子(不看花色)
+    for(;;){
+      const got = pickWin(left);
+      if(!got) break;
+      out.push({ t: T_STRAIGHT, cards: sortShow(got) }); drop(got);
+    }
+    // ⑤ 三條(出不了,但擺在一起看得出來 → t 用 0)
+    for(;;){
+      const m = byRank(), r = ranksAsc(m).find(k => m[k].length === 3);
+      if(r === undefined) break;
+      out.push({ t: 0, cards: m[r].slice().sort(cmpCard) }); drop(m[r]);
+    }
+    // ⑥ 對子
+    for(;;){
+      const m = byRank(), r = ranksAsc(m).find(k => m[k].length === 2);
+      if(r === undefined) break;
+      out.push({ t: T_PAIR, cards: m[r].slice().sort(cmpCard) }); drop(m[r]);
+    }
+    // ⑦ 剩下的單張
+    left.slice().sort(cmpCard).forEach(c => out.push({ t: T_SINGLE, cards: [c] }));
+    return out;
+  }
+
+  function sortHand(hand, mode){
+    if(!Array.isArray(hand)) return [];
+    const m = sortKeyOf(mode), cs = hand.slice();
+    if(m === "suit")
+      return cs.sort((a, b) => (suitOf(a) - suitOf(b)) ||
+                              (rkOrder(rankOf(a)) - rkOrder(rankOf(b))));
+    if(m === "combo"){
+      const out = [];
+      comboGroups(cs).forEach(g => { g.cards.forEach(c => out.push(c)); });
+      /* ⚠⚠⚠ 保險:張數對不上就整份退回 cmpCard(寧可排得笨,也不能少一張牌) */
+      if(out.length === hand.length) return out;
+    }
+    return cs.sort(cmpCard);
+  }
+
   return {
     // 常數
     NSUIT, NRANK, NCARD, CLUB3, SUIT_CH, SUIT_KEY, SUIT_NAME, RANK_TXT, VS15,
@@ -892,6 +1037,9 @@ const B2 = (function(){
     // 編碼
     suitOf, rankOf, cardOf, isRed, suitCh, rankTxt, nameOf, longName,
     rkOrder, rkFromOrder, cardKey, cmpCard, sortShow, applyOrder,
+    // ★ 一鍵智慧理牌(v2.10.0):純顯示,不進 DB / 不影響判定(同 applyOrder)
+    SORT_KEYS, SORT_NAME, SORT_ICON, SORT_HINT, sortKeyOf, nextSort,
+    sortHand, comboGroups,
     chr, unchr, encodeDeal, decodeDeal, encMove, decMove, isPass,
     // 發牌
     shuffled, newDeal, handsOf, dealCounts,

@@ -29,7 +29,7 @@ const SVB = (function(){
   let stage = null, acts = null;
   let hCard = null, hAct = null;          // 點手牌 / 按動作鈕的回呼
   let sel = -1;                            // 蓋牌模式選中的那張
-  let cdKey = "", cdT = null;              // 倒數環:用 key 去重,不看 timer(見下)
+  let cdKey = "", cdT = null, cdEnd = 0;   // 倒數環:用 key 去重,不看 timer(見下)
   let lastCover = false;                   // 上一次畫的是不是蓋牌模式(進場那一刻要給提示,見 render)
   let prevT = null;                        // 上一次畫的軌道簽章(動效全部從 diff 推,見第八節)
   let hand0 = [];                          // 最後一次畫的手牌 —— 動作列要算「封死幾張是我自己的」
@@ -269,8 +269,12 @@ const SVB = (function(){
   function renderActs(info){
     if(!acts) return;
     acts.classList.remove("hidden");
-    acts.innerHTML = '<div class="sv-actrow">' + actsHTML(info) + '</div>' +
-                     '<div class="sv-cdwrap" id="svCdWrap"></div>';
+    /* ★★★ v2.10.0：倒數環從「動作列底下自己一行」搬成**與動作列同一行**（左邊）。
+       ⚠ .sv-cdwrap 空的時候寬度是 0（flex:none）→ 倒數關掉時動作列照樣置中。 */
+    acts.innerHTML = '<div class="sv-actline">' +
+                       '<div class="sv-cdwrap" id="svCdWrap"></div>' +
+                       '<div class="sv-actrow">' + actsHTML(info) + '</div>' +
+                     '</div>';
     syncCd(info);
   }
 
@@ -284,7 +288,17 @@ const SVB = (function(){
           —— 這樣 e2e 才量得到設定值。
        ② 去重的 key **不可以看 timer 還在不在**:數字走到 0 之後 interval 就停了,
           而 timer 本身還有幾百毫秒沒響;那段空窗裡只要有人再叫一次 renderActs()
-          (ResizeObserver 就會),環就會彈回滿格,而那個彈跳本身就是雜訊。 */
+          (ResizeObserver 就會),環就會彈回滿格,而那個彈跳本身就是雜訊。
+
+     ★★★ v2.10.0：從 56×6 的橫條改成**與台灣麻將同一顆** SVG 環圈。
+       使用者：「倒數秒數這一件事情的顯示，請参考台灣麻將，每個遊戲的倒數
+       秒數都要做成這種樣式」。幾何與關鍵影格**逐字沿用 m16**（viewBox 40 ·
+       r=17 · dasharray 107 · `@keyframes m16cd` / `m16beat` / `m16cdhot`）——
+       21點 v1.90.0 已經走過這條路，同一件事只有一種畫法。
+       ⚠ 舊版那條橫條的 `@keyframes svCdRun` 跟著抽掉了（再沒有人用）。
+       ⚠ 這一頁的環是**每次 renderActs 都重建的節點**，所以 `.sv-beat`
+         不可以寫進初始 HTML（寫進去的話每一次重畫都閃一下）。 */
+  const CD_HOT = 3000;                        // 最後 3 秒轉紅 + 脈動(同 m16)
   function syncCd(info){
     const box = $("svCdWrap");
     if(!box) return;
@@ -292,22 +306,39 @@ const SVB = (function(){
     const key = info.cdMs + ":" + info.cdEnd;
     const left = info.cdEnd - Date.now();
     if(left <= 0){ stopCd(); return; }
+    cdEnd = info.cdEnd;
     box.innerHTML =
-      '<span class="sv-cd" id="svCd" style="--cd-dur:' + (info.cdMs / 1000) + 's;--cd-delay:' +
-      (-(info.cdMs - left) / 1000) + 's"><i></i><b id="svCdN">' + Math.ceil(left / 1000) + '</b></span>';
+      '<span class="sv-cd' + (left <= CD_HOT ? " sv-hot" : "") + '" id="svCd" aria-hidden="true"' +
+        ' style="--cd-dur:' + (info.cdMs / 1000) + 's;--cd-delay:' +
+        (-(info.cdMs - left) / 1000) + 's">' +
+        '<svg viewBox="0 0 40 40"><circle class="sv-cdbg" cx="20" cy="20" r="17"/>' +
+        '<circle class="sv-cdfg" cx="20" cy="20" r="17"/></svg>' +
+        '<b class="sv-cdn" id="svCdN">' + Math.ceil(left / 1000) + '</b>' +
+      '</span>';
     if(key === cdKey && cdT) return;      // 同一段倒數:重畫畫面不重跑動畫
     cdKey = key;
     if(cdT) clearInterval(cdT);
-    cdT = setInterval(() => {
-      const n = $("svCdN");
-      const ms = info.cdEnd - Date.now();
-      if(!n || ms <= 0){ clearInterval(cdT); cdT = null; return; }
-      n.textContent = Math.ceil(ms / 1000);
-    }, 250);
+    cdT = setInterval(tickCd, 200);
+  }
+  /* 只換中間那個數字與 hot 狀態 —— 環圈本身完全交給 CSS 動畫(理由見上面①)。
+     ⚠ `.sv-beat` 不可以寫進 syncCd 的初始 HTML —— 這一頁的環是每次 renderActs
+       都重建的節點（m16 是持久節點），寫進去的話每一次重畫都會閃一下。 */
+  function tickCd(){
+    const el = $("svCd");
+    if(!el){ if(cdT){ clearInterval(cdT); cdT = null; } return; }
+    const left = cdEnd - Date.now();
+    const n = el.querySelector(".sv-cdn");
+    const s = String(Math.max(0, Math.ceil(left / 1000)));
+    if(n && n.textContent !== s){
+      n.textContent = s;
+      n.classList.remove("sv-beat"); void n.offsetWidth; n.classList.add("sv-beat");
+    }
+    el.classList.toggle("sv-hot", left <= CD_HOT);
+    if(left <= 0){ clearInterval(cdT); cdT = null; }
   }
   function stopCd(){
     if(cdT){ clearInterval(cdT); cdT = null; }
-    cdKey = "";
+    cdKey = ""; cdEnd = 0;
     const box = $("svCdWrap");
     if(box) box.innerHTML = "";
   }

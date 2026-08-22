@@ -5398,15 +5398,37 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      這一列在蓋牌模式只剩「☝ 挑一張」與確認鈕。要再加警語前先想它該不該回到橫幅上。 */
   .sv-atip{font:800 12px/1 'Nunito',sans-serif;color:var(--accent)}
   .sv-act{padding:6px 14px;font-size:13px;border-radius:11px}
-  .sv-cdwrap{display:flex;align-items:center}
-  .sv-cd{display:inline-flex;align-items:center;gap:7px}
-  .sv-cd i{position:relative;display:block;width:56px;height:6px;border-radius:3px;
-    background:rgba(255,255,255,.16);overflow:hidden}
-  .sv-cd i::after{content:"";position:absolute;inset:0;transform-origin:left center;
-    background:var(--accent);
-    animation:svCdRun var(--cd-dur,30s) linear var(--cd-delay,0s) 1 forwards}
-  @keyframes svCdRun{ from{transform:scaleX(1)} to{transform:scaleX(0)} }
-  .sv-cd b{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);min-width:1.5em;text-align:right}
+  /* ★★★ 倒數環(v2.10.0 從 56×6 的橫條換成**與台灣麻將同一顆** SVG 環圈)。
+     使用者:「倒數秒數這一件事情的顯示,請參考台灣麻將,每個遊戲的倒數秒數都要做成
+     這種樣式」。幾何與關鍵影格**逐字沿用 m16**(viewBox 40 · r=17 · dasharray 107 ·
+     `@keyframes m16cd` / `m16beat` / `m16cdhot`)—— 不再定義第二份同名的。
+     ⚠ 舊版那條橫條的 `@keyframes svCdRun` 一併抽掉(這一行是它唯一的使用者)。
+     ⚠ 順帶抓到的事:大老二那一頁抄這條時把名字寫成 `svCd`(不存在)→ 它那條橫條
+       從第一版起就沒排空過。詳見 .b2-cdfg 上面那段。
+     ★ 倒數**全桌都看得到** —— 「輪到誰、還剩幾秒」是公開資訊。
+     ★★ v2.10.0 起這顆環**與動作列同一行**(.sv-actline)。 */
+  /* ⚠ flex-wrap 要留著:這一列本來就可以折行(蓋牌模式的確認鈕很長)——
+     不留的話窄視窗就是橫向溢出,而 .sv-stage 是 overflow-x:hidden(鈕靜靜地被裁掉)。 */
+  .sv-actline{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;flex-wrap:wrap}
+  .sv-actline .sv-actrow{min-width:0}
+  .sv-cdwrap{flex:none;display:flex;align-items:center}
+  .sv-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+  .sv-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .sv-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  .sv-cdbg{stroke:rgba(255,255,255,.16)}
+  /* 107 ≈ 2πr(r=17)。從 0 排到滿 = 環圈整圈消失 */
+  .sv-cdfg{stroke:var(--accent);stroke-dasharray:107;stroke-dashoffset:0;
+    animation:m16cd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .sv-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .sv-cdn.sv-beat{animation:m16beat .34s ease-out}
+  /* hot 那一格用 --sv-redlit(**畫在深色桌面上的紅**,見第六節那兩支紅的界線) */
+  .sv-cd.sv-hot .sv-cdfg{stroke:var(--sv-redlit)}
+  .sv-cd.sv-hot .sv-cdn{color:var(--sv-redlit)}
+  .sv-cd.sv-hot{animation:m16cdhot .9s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){
+    .sv-cd.sv-hot{animation:none}
+    .sv-cdn.sv-beat{animation:none}
+  }
 
   /* ---------- 結果卡的排名表 ----------
      ★ 這裡是唯一會翻開別人蓋牌的地方(對局中一律只顯示張數)。 */
@@ -5655,7 +5677,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
             (上 / 左桌心右 / 下)。⚠ 矮視窗那一組(--b2-trh:172)**沒有跟著回去** ——
             那個尺寸下 4 人局會被壓成兩列(見 @media max-height:600 那段的 .s4),
             兩件事是一組的:改一個就要重算另一個,不然矮視窗會開始捲。 */
-         --b2-trh:248px; --b2-acth:96px;
+         /* ★★ v2.10.0:--b2-acth 96 → 78。量過的內容高是 68(selbar 26 + gap 6
+            + 鈕列 32 + .b2-acts 的 padding 4),舊值白留 28px;而倒數環搬進同一行之後
+            連線也不再需要另一組數字。留 10px 餘裕給「很長的 whyNot 訊息折三行」
+            (那正是用 min-height 而不是 height 的理由)。 */
+         --b2-trh:248px; --b2-acth:78px;
          /* ★★★ 牌桌「一格都不准動」的那幾個數字 **v1.101.0 起定義在 `.b2-trick` 上**
             (舊版在這裡,而且是從 --b2-cw 推的)。
             ⚠⚠ 搬家的理由只有一個、而且是硬的:它們現在要引用 `--b2-tfit`,
@@ -5664,10 +5690,14 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
               --b2-tch 只看得到 :root 的 --b2-tfit(不存在 → 永遠用後備值)。
               症狀會是「JS 算出來的數字完全沒有作用」,而且沒有任何錯誤訊息。
             → 定義與整套算式看 .b2-trick 那一段(--b2-tcw / --b2-tch / --b2-tph / --b2-tsw)。 */ }
-  /* 連線多一圈出牌倒數(.b2-cdwrap 在動作列裡面)→ 預留它的高度。
-     ⚠ 房主把倒數設成 0(關掉)時那一圈不出現,那時會多留 32px 空白 ——
-       **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次。 */
-  body.b2-mp{ --b2-acth:128px; }
+  /* ✗ `body.b2-mp{--b2-acth:128px}` **v2.10.0 抽掉了**。
+     舊版的倒數條自己佔一行(.b2-cdwrap 是 .b2-acts 的第二個子元素),所以連線得多預留
+     32px;而房主把倒數關掉時那 32px 就是純空白(舊註解說「刻意的」)。
+     v2.10.0 把倒數環搬進**同一行**(.b2-actline)→ 連線與單機的動作列一樣高,
+     而「手牌不要跟著設定跳」那條紅線從垂直改成水平的事:倒數開著的話那顆環
+     **整局都在**,不會中途出現 / 消失;關掉時 .b2-cdwrap 寬 0。
+     ⚠ 因此 --b2-acth 只剩**一組數字**(直立 / 矮視窗各一個)—— 日後再加
+       「只有連線才有」的東西到動作列時,先想能不能也塞進同一行。 */
 
   .b2-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
     line-height:1;background:linear-gradient(90deg,var(--accent),var(--accent-2));
@@ -6404,6 +6434,20 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .b2-hand .b2-card.b2-drag{transition:none;position:relative;z-index:6;cursor:grabbing;
     box-shadow:0 12px 20px rgba(0,0,0,.45),0 0 0 2px var(--accent)}
 
+  /* ★★★ 組合序的分組線(v2.10.0)—— 畫在**既有的 5px gap 裡**,絕對定位、不佔版面。
+     ⚠⚠ 建議書寫的是「各組之間帶有細微 4px 空隙」,而那會把「手牌格位固定」
+       (v1.77.0 的紅線)整條打破:一列幾格本來只跟**視窗寬**有關,插了空隙就變成
+       跟「這一手怎麼分組」有關 → 出掉一手 → 分組變了 → **每一張牌的位置都平移**,
+       正是使用者當初抱怨的「位置會一直變來變去」。所以這裡畫線、不留空隙。
+     ⚠ left 是 -3.5px:gap 5px 的正中央(-5/2 再往右半個線寬)。
+     ⚠ 一列的第一張牌拿不到這個 class(board.js 的 sepSet 擋掉 i===0),
+       但**換行之後那一張**還是會掛著 → 線落在盤面左緣外面。那是可以接受的:
+       它只是少畫一條,不會多出東西(而且 .b2-stage 是 overflow-x:hidden)。 */
+  .b2-hand .b2-card.b2-gsep{position:relative}
+  .b2-hand .b2-card.b2-gsep::before{content:"";position:absolute;
+    left:-3.5px;top:14%;bottom:14%;width:2px;border-radius:1px;
+    background:rgba(255,255,255,.42);pointer-events:none}
+
   .b2-card.sm{--b2w:calc(var(--b2-cw) * .82);cursor:default}
   /* 桌上那副牌的尺寸(v1.77.0 是「.sm 再小一級」的固定值)。
      ★★★ v1.101.0 起它**跟著螢幕長大** —— 值由 .b2-trick 的 --b2-tcw 給
@@ -6440,17 +6484,55 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ⚠ 一定要留 pointer-events:auto,否則變暗就等於靜默吃掉點擊。 */
   .b2-btns .btn.dim{opacity:.62;pointer-events:auto}
 
-  /* 倒數環。★ 全桌都看得到(「輪到誰、還剩幾秒」是公開資訊,大家才知道為什麼卡著)。
+  /* ★★★ 倒數環(v2.10.0 從 56×6 的橫條換成**與台灣麻將同一顆** SVG 環圈)。
+     使用者:「倒數秒數這一件事情的顯示,請參考台灣麻將,每個遊戲的倒數秒數都要做成
+     這種樣式」—— 21點 v1.90.0 已經走過這條路,這一頁與排七是最後兩個沒換的。
+     ★ 幾何與關鍵影格**逐字沿用 m16**(viewBox 40 · r=17 · dasharray 107 ·
+       `@keyframes m16cd` / `m16beat` / `m16cdhot`)—— 同一件事只有一種畫法。
+     ★ 全桌都看得到(「輪到誰、還剩幾秒」是公開資訊,大家才知道為什麼卡著)。
      ⚠ 用**負的 animation-delay** 接續播放,duration 永遠是那一段的總長 —— e2e 才量得到設定值。
-     ⚠ 動畫關鍵影格 svCd 是排七那一段定義的,這裡刻意沿用同一個(不再定義一份同名的)。 */
-  .b2-cdwrap{display:flex;align-items:center}
-  .b2-cd{display:inline-flex;align-items:center;gap:7px}
-  .b2-cd i{position:relative;display:block;width:56px;height:6px;border-radius:3px;
-    background:rgba(255,255,255,.16);overflow:hidden}
-  .b2-cd i::after{content:"";position:absolute;inset:0;transform-origin:left center;
-    background:linear-gradient(90deg,var(--accent),var(--accent-2));
-    animation:svCd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
-  .b2-cd b{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);min-width:1.5em;text-align:right}
+     ⚠⚠ 舊版那條橫條寫的是 `animation:svCd …`,**而全專案沒有一個叫 svCd 的 keyframes**
+       (排七定義的那個叫 svCdRun)→ 那條橫條從 v1.76.0 起**從來沒有排空過**,
+       只有旁邊的數字在跳。而 e2e 量的是 animation-duration(keyframes 不存在照樣量得到
+       20s)→ 那一條一直是綠的。
+       ★ 教訓:**量「動畫參數」不等於量「真的在動」** —— 新的這顆環用的是 m16 那組
+         已經有三頁在跑的 keyframes,同類假綠從此不成立。
+     ★★ v2.10.0 起這顆環**與動作列同一行**(.b2-actline)—— 它原本自己一行,
+       而那一行讓 body.b2-mp 必須多預留 32px(見下面 --b2-acth 那一段)。 */
+  .b2-actline{display:flex;align-items:center;justify-content:center;gap:9px;width:100%}
+  .b2-actline .b2-actrow{min-width:0}
+  /* ★★★ 一鍵智慧理牌那顆鈕(v2.10.0)—— 擺在動作列那一行的**右端**,
+     與左端的倒數環左右對稱 → 這一行的高度一個 px 都沒多(--b2-acth 不必動)。
+     ⚠ 尺寸與環一樣 34px:兩端一樣大,中間那一塊才是真的居中。
+     ⚠⚠ 字面刻意是**一個漢字**(數 / 色 / 組)而不是 emoji:第一版用 U+1F522 /
+       U+1F308 / U+1F9E9,而 34px 的鈕上那三個縮到看不出是什麼(U+1F522 讀起來是一團 1234)。
+       旁邊本來就有一顆同尺寸的「大」(.b2-bigbtn)—— 同一種畫法才讀得出來是同一類的鈕。
+     ★ 順帶閃開了 emoji 那一整組稜角(U+FE0F、彩色 emoji 不吃 color)。
+     ★ 完整的名字在 title / aria-label / toast 裡(SORT_NAME + SORT_HINT)。 */
+  .b2-sortbtn{flex:none;width:34px;height:34px;border-radius:11px;
+    display:grid;place-items:center;line-height:1;cursor:pointer;
+    font:800 15px/1 'Fredoka','Nunito',sans-serif;
+    border:1px solid var(--panel-line);background:rgba(255,255,255,.08);color:var(--text)}
+  .b2-sortbtn:hover{background:rgba(255,255,255,.15)}
+  .b2-sortbtn:active{transform:scale(.9)}
+  .b2-cdwrap{flex:none;display:flex;align-items:center}
+  .b2-cd{position:relative;flex:none;width:34px;height:34px;display:grid;place-items:center}
+  .b2-cd svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+  .b2-cd circle{fill:none;stroke-width:4;stroke-linecap:round}
+  .b2-cdbg{stroke:rgba(255,255,255,.16)}
+  /* 107 ≈ 2πr(r=17)。從 0 排到滿 = 環圈整圈消失 */
+  .b2-cdfg{stroke:var(--accent-2);stroke-dasharray:107;stroke-dashoffset:0;
+    animation:m16cd var(--cd-dur,30s) linear var(--cd-delay,0s) forwards}
+  .b2-cdn{position:relative;font:800 14px/1 'Fredoka','Nunito',sans-serif;color:var(--text)}
+  .b2-cdn.b2-beat{animation:m16beat .34s ease-out}
+  /* hot 那一格用 --b2-redlit(**畫在深色底上的紅**,見 :root 那一段兩支紅的界線) */
+  .b2-cd.b2-hot .b2-cdfg{stroke:var(--b2-redlit)}
+  .b2-cd.b2-hot .b2-cdn{color:var(--b2-redlit)}
+  .b2-cd.b2-hot{animation:m16cdhot .9s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){
+    .b2-cd.b2-hot{animation:none}
+    .b2-cdn.b2-beat{animation:none}
+  }
 
   /* ==========================================================================
      結果卡(.win-card.b2-win)
@@ -6558,8 +6640,10 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
            走的是上面那組大牌寬、而且空間夠。
          ⚠ 不可以為了「讓它放得下」把牌桌的格子縮小 —— 算下來牌會小到 15px,
            而 21px 已經是「認得出點數」的下限(見 .b2-card.tiny)。 */
-    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:172px; --b2-acth:74px}
-    body.b2-mp{--b2-acth:106px}
+    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:172px; --b2-acth:68px}
+    /* ✗ `body.b2-mp{--b2-acth:106px}` v2.10.0 抽掉(理由與直立那一份相同:
+       倒數環搬進動作列同一行了)。這一段的內容高:
+       selbar 22 + gap 4 + 鈕列 28 + padding 4 = 58,而環 28 進得去 → 68 留 10 餘裕。 */
     .b2-hero{margin:6px 0 2px}
     .b2-art{width:66px;height:66px}
     .b2-play{gap:5px}
@@ -6600,6 +6684,92 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .b2-acts{gap:4px}
     .b2-btns .btn{padding:6px 11px;font-size:12.5px}
     .b2-selbar{padding:4px 8px;font-size:11.5px}
+  }
+
+  /* ---------- ★★★ 窄螢幕直立手機:把省下來的空間換成「看得清的牌」(v2.10.0) ----------
+     使用者:「我對於這個遊戲目前的整體顯示,沒有很滿意,很多空間應該要可以省出來,
+     不然小螢幕的手機,會顯得非常的擁擠」。360×740 量出來的帳:
+
+         頂列 58 · 房間框 / 單機列 114 · **牌桌 335(裡面的內容只用 233)** ·
+         手牌 92(2 列、一張 27.4px)· 動作列 96(內容 68),連線更是 128
+
+     → 真正被浪費的是兩塊:**空的綠呢 102px** 與 **動作列白留的 28~60px**;
+       而「擁擠」的來源是牌太小(手牌 27px、桌上 21px)。這一段把前者換成後者。
+
+     ★ 三件事:
+       ① `--b2-cw` 27.4 → 38.2px(+39%)—— 13 張**還是兩列**(一列 8 格),
+          只多吃 30px 高度,但點數從 13.7px 長到 19px。
+          ⚠ 改的是 clamp 的**中間那一項(vw 係數)** —— 這一次就是要改手機外觀,
+            與檔尾大螢幕那一段「只准動上限」的規矩方向相反(那一段是 min-width:700px,
+            與這一段永遠不重疊)。
+       ② `--b2-tmw`(桌心那一欄)44 → 26px —— 一格因此寬 9px,而桌上那副牌是
+          **byW 在當家**(一格要塞得下五張)→ 21 → 26px(+24%)。
+          ⚠ 夾寬度的 calc 吃的就是這支變數(`(100% - --b2-tmw - 14px) / 2`),
+            所以「上下兩格與左右兩格同寬」自動跟著變 —— 那條「gap 7 / 桌心 44 /
+            calc 是一組三個數字」的紅線在這一段不會被打破。
+          ⚠ 🎴 跟著收一號(那一欄 overflow:hidden,26px 裝不下 26px 的字)。
+       ③ `.b2-trick` 夾上 **max-height:var(--b2-tmax)** —— 那個值是 board.js 的
+          fitTrick() 量回來的「這張桌子真正需要多高」。
+          ⚠⚠ **只在這一段夾** —— 桌機 / 高視窗刻意維持 v1.79.0 那一案(多出來的
+            空白變成牌桌本身):那邊空間本來就夠,而「一張大桌子」是使用者選的。
+          ⚠ 漏 8vh 的彈性:牌寬是 clamp 出來的小數,完全貼滿的話任何一點誤差都會讓
+            `.b2-tseats` 開始捲(而它一捲就有人看不到自己那一格)。
+          ⚠ `--b2-trh`(min-height)要跟著降到 150 —— min-height 在 CSS 裡**贏過**
+            max-height,不降的話 248 會把上面那一夾整條吃掉,而且不會有任何錯誤訊息。
+
+     ★ 閘門:`tools/shot-big2.ps1` 的 360×740 截圖(斷言量不到「綠呢空不空」)+
+       單機 e2e D3(四種狀態下 .b2-trick 高度必須一樣)—— --b2-tmax 只吃「人數 + 視窗」,
+       所以那一條照樣綠。
+     ⚠⚠ 斷點選 520/601 而不是 480/600:601 是為了與上面那段 `max-height:600px`
+       **永遠不同時命中**(那一段把 4 人局壓成兩列、另一組牌寬,兩組疊在一起永遠算不清);
+       520 是為了把 480~520 那一段(iPhone Plus 直立、摺疊機外屏)也收進來。 */
+  @media (max-width:520px) and (min-height:601px){
+    /* ⚠⚠ 中間那一項是 `min(vw, vh)` 而不是純 vw —— **不可以簡化成 vw**。
+       360×640 那種矮一點的直立手機(舊 Android)算過:純 12.2vw 會讓手牌吃到 139px,
+       而那個尺寸的垂直預算只剩 383px、牌桌自己就要 241px → `.b2-tseats` 開始捲,
+       **而它一捲就有人看不到自己那一格**(比牌小一號嚴重得多)。
+       接了 6vh 之後同一支手機拿到 38.4px(手牌 123px),留 19px 餘裕。
+       ⚠ 上限 48 是給 412×915 那一類大手機的(它會被上限夾住);下限 31 保底。 */
+    :root{--b2-cw:clamp(31px,min(12.2vw,6vh),48px); --b2-tmw:24px; --b2-trh:150px}
+    /* ⚠⚠ 桌上那副牌的 clamp **下限要換掉**。基準那一條寫的是「手牌 × .66」,
+       那是 --b2-cw 還是 27.4px 時代的值(→ 18px);現在 cw 長到 43.9 → 下限變成 29px,
+       而這個寬度的一格只塞得下 25px 的五張 → **下限反過來壓過 fitTrick 量到的答案**,
+       牌會靠 .b2-tcs 的 flex-shrink 被擠窄(而那正是「第五張牌被切掉」那條紅線的邊緣)。
+       換成絕對的 21px(結果卡縮圖用的「認得出點數」下限)→ 量到多少就是多少。
+       ⚠ 只覆寫 --b2-tcw:--b2-tch / --b2-tph / --b2-tsw 都是從它推的,會自動跟著。 */
+    .b2-trick{--b2-tcw:clamp(21px,var(--b2-tfit,0px),var(--b2-cw));padding:6px 8px;gap:5px}
+    .b2-tmid{font-size:16px}
+    /* 固定開銷再收一道(房間框是第二大的一塊)。
+       ⚠ 只收**內距與列間距**,不碰晶片本身(它是十四頁共用的 .mp-chip)。 */
+    body.b2-mp .b2-room,body.b2-solo .b2-room{padding:7px 10px}
+    .b2-room .mp-subrow,.b2-room-foot{margin-top:4px}
+    /* ★★ 晶片列在 360px 放不下四個人:量到 **469px vs 309px** → 第四個人整個看不到
+       (它是 .mp-players.oneline,overflow-x:auto → 捲得到,但沒有人會去捲那一列)。
+       而「誰剩幾張」正是這一頁記牌的一部分,所以這裡把間距與冗餘各收一道:
+         · gap 12 → 7 · padding 13 → 9 · 字 14 → 12.5
+         · `.you-badge` 收掉 —— `.mp-chip.me` 本身已經是整顆橘色高亮,同一件事講兩次
+       ⚠⚠ 選擇器一律限定在 `.b2-room` 裡面(`.mp-chip` / `.you-badge` 是十四頁共用的,
+         而這一段是大老二專屬的取捨)。
+       ⚠ 這只讓四個人**幾乎**放得下(469 → 約 380):名字更長時照樣會溢出,那時還是靠捲。
+         真的要一定放得下只能截名字,而「看不出那是誰」比「要捲一下」糟。 */
+    .b2-room .mp-players.oneline{gap:7px}
+    .b2-room .mp-chip{padding:5px 9px;font-size:12.5px;gap:5px}
+    .b2-room .mp-chip .you-badge{display:none}
+    .b2-play{gap:6px}
+    .b2-stage{gap:5px}
+
+    /* ★★★ 桌面夾上「它真正需要的高度」—— 但**只在 820px 以下的視窗**。
+       ⚠⚠ 這個高度條件是這一夾唯一合理的範圍,理由是硬的:max-height **只會製造空白**,
+         不會把空白變成別的東西(頁面上沒有第二個有彈性的區塊)。所以:
+           · 矮一點的手機(≤820,含 360×740 / 375×667 / 360×640):牌桌的內容用 245px,
+             而 flex:1 會讓它長到 335 → 夾住之後那 ~60px 還給版面,**畫面明顯不擠**。
+           · 高手機(390×844、412×915)剩下的空間有 190px 以上 —— 夾住只會換成
+             一大塊紫色背景,那比「一張大桌子」難看。那邊維持 v1.79.0 的行為。
+       ⚠ 漏 8vh 的彈性:牌寬是 clamp 出來的小數,完全貼滿的話任何一點誤差都會讓
+         `.b2-tseats` 開始捲。 */
+    @media (max-height:820px){
+      .b2-trick{max-height:calc(var(--b2-tmax,999px) + 8vh)}
+    }
   }
 
   /* ---------- ★★ 橫置手機:把頂列讓給牌桌 ----------
