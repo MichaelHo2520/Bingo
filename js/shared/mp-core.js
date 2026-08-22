@@ -66,6 +66,22 @@ const MPCore = (function(){
        ⚠ 一共擋在四處:下面兩處 + join() 的硬擋 + **js/home-live.js 的 joinable()**。
          漏掉 home-live 那一份的症狀是「首頁把對戰中的房間列成不可加入」。 */
     const JOIN_MID = !!A.joinMidGame;
+    /* ★★★ 允許**原班人馬回座**(為你畫我猜加,不帶就是舊行為)。
+       使用者:「如果已經開始遊戲了,不小心按到離開,有沒有辦法這個玩家可以再繼續回來?」
+       ⚠⚠ **它與 JOIN_MID 是兩件不同的事,不可以互相取代**:
+         · JOIN_MID   = 誰都可以進(21 點:新人下一局當閒家)
+         · REJOIN_MID = **只有 `game.order` 裡本來就有的那個 pid** 可以回到還在打的那一場
+       所以「每人當滿 N 次畫家」這種公平性核心不會被破壞 —— 回座的人本來就在座位表裡,
+       他剩下的畫家回合是 adapter 每次推進時**現算**的(見 js/draw/rules.js 的 nextLive)。
+       ⚠⚠⚠ **放行條件絕對不可以放寬成「名字對得上」**(那是 adoptScore 的做法,它只管 scores)。
+         `game.order` 以外的 pid 進到對局中會變成**幽靈玩家**:猜得到、拿得到場內分,
+         卻不會出現在名次也不進 winner.pts(名次一律走 order ∩ players),
+         而核心的 ptsFor() 對沒列到的人會退回「贏家 +1」→ 連累積分數的語意一起壞掉。
+       ⚠ 一共三處:下面的 joinable() / 房間列的 CTA + join() 的硬擋。
+         **js/home-live.js 那一份刻意不跟進** —— 首頁只讀輕量索引(name/status/count/host),
+         拿不到 `game.order`,判不出「這間我回得去」。首頁維持顯示「對戰中」是刻意的,
+         不是漏改(所以 tools/test-twins.js 第四節也只比 joinMid,不比這一支)。 */
+    const REJOIN_MID = !!A.rejoinMidGame;
     /* ★★ 局間續局(v1.103.0 為台灣麻將加,不帶就是舊行為)。
        一場 = 很多個 MP round(打一圈 4 局 / 一將 16 局)時,每一局結束都把大家丟回大廳
        再各按一次「準備好了」,現場的感覺是「沒有連續感」。開了這個旗標之後:
@@ -166,6 +182,50 @@ const MPCore = (function(){
     }
     function youTag(id){ return id===meId ? '<span class="you-badge">你</span>' : ''; }
 
+    /* ---------- 「剛剛那一場」的記憶(只有 REJOIN_MID 的遊戲會寫) ----------
+       回座的門開了還不夠:房間列只讀輕量索引,判不出「這間我回得去」(拿不到 game.order)。
+       ⚠ 所以**判定與入口刻意分兩層**:
+         · 這一支(本地記憶)只負責「要不要在那一列畫成 🔄 回座」—— 猜錯了最多是多顯示一顆鈕
+         · 真正的裁決一律在 join()(它本來就會 once("value") 讀整間房)→ 不是原班人馬就擋掉
+       ⚠ 寫入點在 enterPlaying() 而不是 leave():**斷線 / 關分頁 / 當掉是沒有機會執行程式碼的**
+         (同 scores.nm 那條「寫在得分的那一刻」的道理)—— 只有「開打了」這一刻一定跑得到。
+       ⚠ 一個遊戲一支 key(`bingo.back.<rooms 節點名>`)→ 單一寫入者,**不必 read-modify-write**;
+         也因此絕對不要把它併進 bingo.prefs.v1(那是六頁共用的,紅線 12 要求 merge)。
+       ⚠⚠ 設定頁的「強制更新」刻意碰不到 localStorage(紅線 12)→ 這筆記憶活得過強制更新,
+         所以**一定要有 TTL**,否則隔天開頁還在問「要不要回到剛剛那間房」。 */
+    const BACK_KEY = "bingo.back." + ROOMS;
+    const BACK_TTL = 3 * 3600 * 1000;        // 3 小時:6 人 × 3 次的一場最長約 47 分鐘,留足餘裕
+    function rememberRoom(){
+      if(!REJOIN_MID||!code)return;
+      try{ localStorage.setItem(BACK_KEY, JSON.stringify({ c:code, at:Date.now() })); }catch(e){}
+    }
+    function forgetRoom(){ try{ localStorage.removeItem(BACK_KEY); }catch(e){} }
+    // 我上一場在哪一間房(過期就當沒有);回傳房號字串或 null
+    function lastRoom(){
+      if(!REJOIN_MID)return null;
+      try{
+        const v=JSON.parse(localStorage.getItem(BACK_KEY));
+        if(!v||!v.c||typeof v.at!=="number")return null;
+        if(Date.now()-v.at>BACK_TTL){ forgetRoom(); return null; }
+        return String(v.c);
+      }catch(e){ return null; }
+    }
+    // 這一列是不是「我剛剛那一場,而且還在打」
+    function isBackRoom(r){ return REJOIN_MID && !!r && r.status==="playing" && r.code===lastRoom(); }
+    /* ★★★ 回座的**唯一裁決** —— 這一場的座位表裡本來就有我。
+       ⚠ 吃的是整間房的快照(join() 本來就 once("value") 讀過一次),不是輕量索引:
+         `game.order` 只有那裡拿得到,房間列判不出來(所以才需要上面那層本地記憶當入口)。
+       ⚠ order 一律是密集陣列(adapter 的 newGame 整包寫一次、之後沒有人動它)→ indexOf 就夠;
+         這也是核心其他地方(foesByeOnly / MPOrder)一直以來的假設。
+         拿到非陣列時**回 false**(往嚴格的那一邊倒),不要猜。
+       ⚠⚠ 條件**只有 pid**,絕對不可以再加一條「名字一樣也算」的退路
+         —— 那會生出幽靈玩家,理由完整版在 REJOIN_MID 那一段。 */
+    function mayRejoin(r){
+      if(!REJOIN_MID||!meId||!r||!r.game)return false;
+      const ord=r.game.order;
+      return Array.isArray(ord) && ord.indexOf(meId)>=0;
+    }
+
     /* ---------- 連線畫面 / 大廳 ---------- */
     function openConnect(){
       online=false;
@@ -201,15 +261,22 @@ const MPCore = (function(){
       lastRoomsSig=sig;
       renderRoomList(items);
       const open=items.filter(joinable).length;
+      /* ★★ 回座優先報:誤按離開之後最想知道的就是「那一場還在不在」——
+         夾在「現在有 3 間房間可加入」裡面等於沒說。 */
+      const back=items.some(isBackRoom);
       if(!items.length) setLive("none","目前沒有人開房間,開一間吧！");
+      else if(back) setLive("open","你剛剛那一場還在進行 —— 可以回座 🔄");
       else if(open>0) setLive("open","現在有 "+open+" 間房間可加入"+(items.length>open?" · 另 "+(items.length-open)+" 間不可加入":""));
       else setLive("busy",items.length+" 間房間都在對戰中 / 已滿");
     }
     /* 可加入 = 還在大廳 且 未滿。
        ★ JOIN_MID 的遊戲(21 點)連「對戰中」也算可加入 —— 新人下一局進場。
+       ★★ REJOIN_MID 的遊戲(你畫我猜)多一條:**我剛剛那一場**也算可加入(回座)——
+          而「是不是我剛剛那一場」只看本地記憶,真正的裁決在 join()(見 isBackRoom)。
        ⚠ 這一份與 js/home-live.js 的 joinable() 是**同一條判定的兩份**:改一邊要改另一邊
-         (CLAUDE.md 已有一條同型的紅線在講 max 必須一致)。 */
-    function joinable(r){ return (r.status==="lobby" || (JOIN_MID && r.status==="playing")) && r.count<MAX_PLAYERS; }
+         (CLAUDE.md 已有一條同型的紅線在講 max 必須一致)。
+         ⚠ 但 isBackRoom 那一條**刻意只有這裡有** —— 首頁判不出來(見 REJOIN_MID 的說明)。 */
+    function joinable(r){ return (r.status==="lobby" || (JOIN_MID && r.status==="playing") || isBackRoom(r)) && r.count<MAX_PLAYERS; }
     function startRoomWatch(){
       if(!init()){ setLive("none","連線未啟用"); return; }
       stopRoomWatch();
@@ -242,8 +309,10 @@ const MPCore = (function(){
         const hostTag=r.host?'<span class="host">👑 '+esc(r.host)+'</span> · ':'';
         const nm=r.name||("房間 "+r.code);
         /* ⚠ JOIN_MID 的遊戲進不去只有一個理由(滿了)—— 標「對戰中」會讓人以為
-           等一下就能進,而它其實永遠不會空出來(直到有人離開)。 */
-        const cta=ok ? '<span class="join-cta">加入</span>'
+           等一下就能進,而它其實永遠不會空出來(直到有人離開)。
+           ★★ 回座那一列的字要不一樣:寫「加入」會讓人以為是別人的房、
+              而它其實是自己剛剛那一場(分數與剩下的畫家回合都還在等他)。 */
+        const cta=ok ? '<span class="join-cta">'+(isBackRoom(r)?"🔄 回座":"加入")+'</span>'
                      : '<span class="busy-tag">'+((r.count>=MAX_PLAYERS&&(JOIN_MID||r.status==="lobby"))?"🔒 已滿":"🔒 對戰中")+'</span>';
         it.innerHTML='<span class="room-main"><span class="rn">🏠 '+esc(nm)+'</span>'+
           '<span class="meta">'+hostTag+'👥 '+r.count+' / '+MAX_PLAYERS+' 人</span></span>'+cta;
@@ -335,13 +404,24 @@ const MPCore = (function(){
         const r=snap.val();
         if(!r||!r.host){ setMsg("這個房間已經關閉了,請重新選擇。"); return; }
         // ★ JOIN_MID 的遊戲(21 點)對戰中也進得去 —— 座位表由 adapter 在換局時重建
-        if(!JOIN_MID && r.game && r.game.status && r.game.status!=="lobby"){ setMsg("這間正在對戰中,無法加入。"); return; }
+        // ★★ REJOIN_MID 的遊戲(你畫我猜)多一條出口:原班人馬回座(mayRejoin 是唯一裁決)
+        const back=mayRejoin(r);
+        if(!JOIN_MID && r.game && r.game.status && r.game.status!=="lobby" && !back){
+          /* ⚠ 記憶對不上就順手清掉 + 讓下一份快照重畫房間列(不然那一列會一直寫著「🔄 回座」,
+             按第二次還是同一句話,看起來像壞了)。 */
+          if(REJOIN_MID){ forgetRoom(); lastRoomsSig=null; }
+          setMsg("這間正在對戰中,無法加入。"); return;
+        }
         roomName=inName||r.roomName||("房間 "+code);
         A.readRoom && A.readRoom(r);      // 先把房主的設定套上,免得大廳閃一下預設值
         claimSeat(okSeat=>{
           if(!okSeat){ setMsg("這個房間已經滿了,請選別間。"); roomRef=null; code=null; return; }
-          // ★ 誤按離開的救援(v1.97.0):進大廳之前先把同名的舊成績接回來,免得畫面先閃一次 0
-          adoptScore(r,enterLobby);
+          /* ★ 誤按離開的救援(v1.97.0):進大廳之前先把同名的舊成績接回來,免得畫面先閃一次 0
+             ★★ 回座要**說一聲**(紅線 6:不靈默吃掉)—— 場內分住在 game 節點裡,
+                第一場的 scores 還是 0,adoptScore 那句「已接回你先前的成績」不會跳,
+                沒有這一句的話畫面就只是忽然跳進一場打到一半的對局。
+             ⚠ 排在 enterLobby() 之後:那一支會切畫面,先跳的 toast 看起來像上一頁的殘留。 */
+          adoptScore(r, back ? (()=>{ enterLobby(); showToast("回到剛剛那一場了 🔄",2400); }) : enterLobby);
         });
       }).catch(e=>setMsg("加入失敗:"+e.message));
     }
@@ -539,6 +619,10 @@ const MPCore = (function(){
       A.enterPlaying && A.enterPlaying();
       updateGoal();
       armPlayCount();   // 熱門度計數:從「真的開局」這一刻起算 30 秒(見上面那段)
+      /* ★★ 記下「我在哪一場」,好讓誤按離開之後大廳畫得出「🔄 回座」那一列。
+         ⚠ 寫在這裡而不是 leave():斷線 / 關分頁 / 當掉都沒有機會執行程式碼(見 rememberRoom)。
+         ⚠ 沒開 REJOIN_MID 的遊戲這一行等於不存在(rememberRoom 第一句就 return)。 */
+      rememberRoom();
       Sound.start();
     }
 

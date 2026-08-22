@@ -114,7 +114,14 @@ const HomeLive = (function(){
        ⚠ icon 用 🎨(U+1F3A8 調色盤)—— 與另外十一個都不撞(🎲⚫🔢🀄🀄🎴🎴🌈🔴🧩),
          也不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
        ⚠ **不帶 joinMid** —— 一場就是一場(每人要當滿 N 次畫家),中途進來的人湊不齊次數;
-         這一條要與 adapter 沒有開 joinMidGame 保持一致。 */
+         這一條要與 adapter 沒有開 joinMidGame 保持一致。
+       ⚠⚠ **它的 adapter 有 `rejoinMidGame: true`(原班人馬回座),而這裡刻意不跟進** ——
+         那不是漏改。回座的裁決是「`game.order` 裡有我的 pid」,而這一支只讀輕量索引
+         (name / status / count / host),**拿不到 `game.order`** → 判不出「這間我回得去」。
+         所以首頁對還在打的房間照舊顯示「對戰中」,回座的入口只在**遊戲頁的大廳**
+         (誤按離開之後人一定落在那裡:`leave()` 的最後一行就是 `openConnect()`)。
+         ⚠ 不要為了「兩邊一致」把 rejoinMid 加進這一列 —— 加了就是首頁列出一堆
+           點進去會被 `join()` 擋掉的房間。 */
     { key:"dw", index:"dw_index", rooms:"dw_rooms", name:"你畫我猜", icon:"🎨", badge:"hlBadgeDraw", max:6, href:"draw.html" },
     /* ★ 第十三個遊戲(v1.179.0):飛行棋。
        max 必須與 js/flychess/adapter.js 的 maxPlayers 一致(**4** —— 盤面只有四個機場)。
