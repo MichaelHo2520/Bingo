@@ -5677,11 +5677,16 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
             (上 / 左桌心右 / 下)。⚠ 矮視窗那一組(--b2-trh:172)**沒有跟著回去** ——
             那個尺寸下 4 人局會被壓成兩列(見 @media max-height:600 那段的 .s4),
             兩件事是一組的:改一個就要重算另一個,不然矮視窗會開始捲。 */
-         /* ★★ v2.10.0:--b2-acth 96 → 78。量過的內容高是 68(selbar 26 + gap 6
-            + 鈕列 32 + .b2-acts 的 padding 4),舊值白留 28px;而倒數環搬進同一行之後
-            連線也不再需要另一組數字。留 10px 餘裕給「很長的 whyNot 訊息折三行」
-            (那正是用 min-height 而不是 height 的理由)。 */
-         --b2-trh:248px; --b2-acth:78px;
+         /* ★★★ v2.10.0 動了兩次,而第二次那一刀比第一次大:
+              96 → 78:倒數環從「自己一行」搬進動作列同一行(連線那組 128 一併抽掉)
+              78 → **46**:出牌鈕上面那一行提示(.b2-selbar)**整條拿掉**
+                          (使用者:「那一行也可以拿掉了」)—— 那一行 26 + gap 6 = 32px
+            現在量過的內容高只剩 38(鈕列 32 / 倒數環 34,取大的 + padding 4)→ 46 留 8px。
+            ⚠ 那 8px 是給「鈕列在很窄的螢幕折成兩行」的餘裕(它是 flex-wrap:wrap);
+              min-height 而不是 height 的理由也還在(真的折了寧可撐開)。
+            ⚠⚠ 「還要 N 張」那句話現在寫在**出牌鈕的字面上** —— 動它的字級 / padding
+              就是動這個數字,見 js/big2/board.js 的 actsHTML。 */
+         --b2-trh:248px; --b2-acth:46px;
          /* ★★★ 牌桌「一格都不准動」的那幾個數字 **v1.101.0 起定義在 `.b2-trick` 上**
             (舊版在這裡,而且是從 --b2-cw 推的)。
             ⚠⚠ 搬家的理由只有一個、而且是硬的:它們現在要引用 `--b2-tfit`,
@@ -6404,7 +6409,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .b2-hand .b2-card:hover{transform:translateY(-4px)}
   .b2-hand .b2-card:active{transform:scale(.94)}
   /* ★★ 「亮起來」= 綠框 + 綠光(v1.79.0)。綠色是這一頁既有的「這組可以出」
-     (.b2-selbar.ok 用同一個 129,199,132),沿用同一支顏色才讀得出是同一件事;
+     (v2.10.0 之前 .b2-selbar.ok 用的是同一個 129,199,132;那一行拿掉之後這支綠
+     只剩手牌的 .hot 在用),
      選中用的是 --accent-2(黃),兩種狀態不會混。 */
   .b2-hand .b2-card.hot{box-shadow:0 2px 8px rgba(129,199,132,.45),0 0 0 1.5px rgba(129,199,132,.9)}
   /* 壓暗:灰掉 + 壓低亮度。⚠ 不要用 opacity 一路壓到看不見點數 ——
@@ -6489,15 +6495,15 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .b2-atxt{font:700 13px/1.4 'Nunito',sans-serif;color:var(--muted)}
   .b2-atxt b{color:var(--text)}
   /* ✗ .b2-atip(「這一輪由你開始一定要出牌」獨立一行)v1.78.0 拿掉 ——
-     那句話併進 .b2-selbar 了。多一行就是把手牌推走一次。 */
-  /* 選取狀態列:綠 = 這組出得掉、紅 = 出不掉(而且寫出為什麼)、灰 = 還沒選 */
-  .b2-selbar{display:flex;align-items:center;gap:7px;max-width:100%;
-    padding:5px 10px;border-radius:11px;background:rgba(255,255,255,.08);
-    font:700 12px/1.35 'Nunito',sans-serif;color:var(--muted)}
-  .b2-selbar.ok{background:rgba(129,199,132,.20);color:var(--text)}
-  .b2-selbar.bad{background:rgba(224,83,63,.20);color:var(--text)}
-  .b2-selico{flex:none;font-size:14px;line-height:1}
-  .b2-seltxt{min-width:0}
+     那句話併進 .b2-selbar;而 v2.10.0 連 .b2-selbar 都拿掉了(那一句因此完全沒有了 ——
+     判準是「畫面上只剩一顆出牌鈕」本身就講得清楚)。多一行就是把手牌推走一次,這條沒變。 */
+  /* ✗✗ .b2-selbar / .b2-selico / .b2-seltxt(出牌鈕上面那一行提示)**v2.10.0 整組拿掉**。
+     使用者:「最下方出牌按鈕上面那一行提示字,我覺得那一行也可以拿掉了」。
+     它身上那六件事各自搬去哪裡(或為什麼可以丟),寫在 js/big2/board.js 的 actsHTML;
+     一句話版:**只有「還要再選 N 張」無可取代,而它搬到了出牌鈕的字面上**。
+     ⚠ 省下的是 32px 的**固定**高度(那一行 26 + gap 6)→ --b2-acth 78 → 46。
+     ⚠ 21點的 .bj-selbar 是**另一份**(它那一列還要放賭注,結構不一樣)——
+       不要因為這一頁拿掉了就順手去動它。 */
 
   .b2-btns{display:flex;align-items:center;justify-content:center;gap:7px;flex-wrap:wrap}
   .b2-btns .btn{padding:8px 14px;font-size:13.5px}
@@ -6662,10 +6668,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
            走的是上面那組大牌寬、而且空間夠。
          ⚠ 不可以為了「讓它放得下」把牌桌的格子縮小 —— 算下來牌會小到 15px,
            而 21px 已經是「認得出點數」的下限(見 .b2-card.tiny)。 */
-    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:172px; --b2-acth:68px}
+    :root{--b2-cw:clamp(24px,6.8vw,34px); --b2-hgap:4px; --b2-trh:172px; --b2-acth:42px}
     /* ✗ `body.b2-mp{--b2-acth:106px}` v2.10.0 抽掉(理由與直立那一份相同:
        倒數環搬進動作列同一行了)。這一段的內容高:
-       selbar 22 + gap 4 + 鈕列 28 + padding 4 = 58,而環 28 進得去 → 68 留 10 餘裕。 */
+       ★ 而 68 → **42**:那一行提示(.b2-selbar)也拿掉了 → 這一段的內容高只剩
+       32(鈕列 28 / 環 28,取大的 + padding 4),42 留 10 餘裕。 */
     .b2-hero{margin:6px 0 2px}
     .b2-art{width:66px;height:66px}
     .b2-play{gap:5px}
@@ -6705,7 +6712,6 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        要調矮視窗的動作列高度請改上面 :root 的 --b2-acth。 */
     .b2-acts{gap:4px}
     .b2-btns .btn{padding:6px 11px;font-size:12.5px}
-    .b2-selbar{padding:4px 8px;font-size:11.5px}
   }
 
   /* ---------- ★★★ 窄螢幕直立手機:把省下來的空間換成「看得清的牌」(v2.10.0) ----------

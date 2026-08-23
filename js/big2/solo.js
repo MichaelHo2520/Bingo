@@ -227,6 +227,15 @@ const Solo = (function(){
     if(a !== "play") return;
     const cs = B2B.sel();
     if(!cs.length){ showToast("先點要出的牌"); return; }
+    /* ★★ v2.10.0:出牌鈕上面那一行提示拿掉之後,這個 toast 是「為什麼出不了」唯一的出口。
+       ⚠⚠ 所以「選到一半」**不可以**用 whyNot 那句 —— 它在那個狀態下**會騙人**
+         (湊順子湊到第二張時它說「兩張要同點數才是對子」)。那正是 v1.79.1 當初把
+         「還要再選幾張」放進畫面的理由,現在那句話搬到了鈕的字面上,而這裡要跟著同一套。
+       ⚠ 兩支雙胞胎(solo.js / adapter.js)逐字一樣,少改一邊就是「兩台講不同的話」。 */
+    const si = B2B.selInfoOf(st, st.hands[ME]);
+    if(si && !si.ok && si.pending && si.need){
+      showToast("還要再選 " + si.need + " 張才湊得成一手", 2400); return;
+    }
     const why = B2.whyNot(cs, st);
     if(why){ showToast(why, 2400); return; }
       // ★ 飛牌的出發點只有這一刻量得到（送出去之後手牌就重畫了）—— 見 board.js armFly()

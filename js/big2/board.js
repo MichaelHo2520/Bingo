@@ -22,7 +22,7 @@
        ② `.b2-trick` 固定高度 `--b2-trh`(中間那塊不隨列數變,也不吃滿盤面)
        ③ `.b2-acts` 固定高度 `--b2-acth`(動作列不隨提示 / 按鈕組 / 倒數環變)
      ⚠ ②③ 是 CSS 的事,但**改這支的任何一塊高度都要回頭看它們**
-       (例:牌大小、列的 padding、selbar 多一行 → 兩個數字都要重算)。
+       (例:牌大小、列的 padding、動作列多一行 → 兩個數字都要重算)。
 
    ── ★ 唯一的牌情紅線 ──────────────────────────────────────────────────────
      > **對手手上有什麼,結算前只能顯示張數。**
@@ -793,7 +793,7 @@ const B2B = (function(){
          (台灣麻將的 renderActs 有兩份,是因為連線那份要管宣告視窗)。
        ⚠ 想加「只有連線才有」的東西時,先想能不能表達成 info 的一個欄位。
      ========================================================================== */
-  function actsHTML(info, arm){
+  function actsHTML(info){
     if(info.over) return '<span class="b2-atxt">這局結束</span>';
     if(!info.mine) return '<span class="b2-atxt">輪到 <b>' + esc(info.turnName || "對手") + '</b>…</span>';
 
@@ -806,40 +806,47 @@ const B2B = (function(){
          就會變成「一顆鈕都沒有」的死畫面,所以這裡要求兩個條件同時成立。
        ⚠ 「清除」還是要留:壓暗的牌照樣點得動,玩家有可能已經選了幾張。 */
     if(info.noPlay && info.canPass){
-      return '<div class="b2-selbar bad">' +
-               '<span class="b2-selico">🙅</span>' +
-               '<span class="b2-seltxt">壓不過桌上這一手 —— 只能 Pass</span>' +
-             '</div>' +
-             '<div class="b2-btns">' +
+      /* ✗ v2.10.0:那條「🙅 壓不過桌上這一手 —— 只能 Pass」**拿掉了**(見下面那一整段)。
+         畫面上剩「(清除)+ Pass」一顆鈕,而「為什麼只剩它」由**點任何一張牌跳的 toast**
+         回答(pickGroup 的 why,那條路從 v1.79.1 就在,而且它是紅線的那一半)。 */
+      return '<div class="b2-btns">' +
                (sel.length ? '<button class="btn ghost b2-act" data-act="clear">清除</button>' : "") +
                '<button class="btn primary b2-act" data-act="pass">Pass</button>' +
              '</div>';
     }
 
     const s = info.selInfo || {};
-    /* ★ 領出的人不能 pass(規則)。那句提示 v1.78.0 起**併進這一行**,不再多一行 ——
-       動作列多一行就等於手牌被推走一次(見 .b2-acts 的固定高度)。
-       ⚠ 已經選好牌時就不必再提醒「不能 Pass」了:那顆鈕本來就沒畫出來。 */
-    /* 三種狀態三個樣子(v1.79.1 多了中間那個):
-         ✅ 綠 = 選好了 · 👉 中性 = 選到一半(再選幾張)· 🚫 紅 = 這組不行
-       ⚠ 「選到一半」**不可以**標紅:沒亮的牌點不起來之後,選到一半是**正常過程**,
-         標紅等於每選一張就罵一次。 */
-    const lead = !info.canPass ? "這一輪由你開始,一定要出牌(不能 Pass)" : "";
     const mid = !s.ok && s.pending;
-    /* ★ 武裝好的時候那一句改講**下一個動作**(v2.10.0):
-         「選好了:順子(…)」→「順子(…)—— 再點那張牌就出去」。
-       ⚠⚠ 換字而不是**加一行**:動作列的高度是固定的(--b2-acth),多一行就是把手牌推走一次
-         (v1.78.0 那條紅線)。而且新那句**更短**,窄螢幕不會折行。 */
-    const okTxt = (arm && s.ok && s.type)
-      ? (s.type + " —— 再點那張牌就出去")
-      : (s.txt || lead || "點牌選要出的組合(1 張 / 2 張 / 5 張)");
-    let h = '<div class="b2-selbar' + (s.ok ? " ok" : (sel.length && !mid ? " bad" : "")) + '">' +
-              '<span class="b2-selico">' + (s.ok ? "✅" : (mid ? "👉" : (sel.length ? "🚫" : "☝"))) + '</span>' +
-              '<span class="b2-seltxt">' + esc(okTxt) + '</span>' +
-            '</div>';
-    h += '<div class="b2-btns">';
-    // ★ 「出牌」永遠按得動 —— 選錯了要說得出原因,不用 disabled 靜默吃掉點擊
-    h += '<button class="btn primary b2-act' + (s.ok ? "" : " dim") + '" data-act="play">出牌</button>';
+    let h;
+    /* ==========================================================================
+       ✗✗ v2.10.0:出牌鈕上面那一行提示(.b2-selbar)**整條拿掉了**。
+       使用者:「最下方出牌按鈕上面那一行提示字,我覺得那一行也可以拿掉了」
+       (接著「很多空間應該要可以省出來」那一輪)。
+
+       ★ 拿掉之前先盤過它身上有幾件事,而**只有一件無可取代**:
+         · 「☝ 點牌選要出的組合(1 張 / 2 張 / 5 張)」→ 進場說明與房規面板都有,
+           而且亮起來的牌本身就在教這件事 → 丟掉
+         · 「✅ 選好了:順子(2 3 4 5 6)」→ 牌站起來 + 出牌鈕不再變暗 + v2.10.0 那顆
+           金色「出」徽章,三個訊號都在講同一件事 → 丟掉
+         · 「🙅 壓不過桌上這一手 —— 只能 Pass」→ 出牌鈕整顆不見、只剩一顆 Pass,
+           而點任何一張牌都會跳 toast 說原因 → 丟掉
+         · 「這一輪由你開始,一定要出牌(不能 Pass)」→ Pass 那顆鈕本來就刻意不畫 → 丟掉
+         · 「🚫 這組不行 + 原因」→ **正常操作到不了**(每一次點擊都驗過,sel 永遠是某一手的
+           子集,見 selInfoOf 的註解);真的按下去 dim 的出牌鈕會跳 toast → 丟掉
+         · **「👉 還要再選 N 張」→ 這一件沒有別的地方講得出來**,而且它是 v1.79.1 特地
+           加的:whyNot 那句在「選到一半」時**會騙人**(湊順子湊到第二張時它說
+           「兩張要同點數才是對子」)。所以它**搬到出牌鈕的字面上**:
+               選到一半 → 暗的「還要 2 張」 · 湊成了 → 亮的「出牌」
+           ★ 搬到鈕上是零成本的:那顆鈕本來就在,而且它本來就用「暗 / 亮」講同一件事。
+       ★★ 省下來的是 **32px 的固定高度**(那一行 26 + gap 6)—— 動作列 78 → 46。
+       ⚠⚠ 連帶一條:按下暗的出牌鈕時的 toast 也要講同一句話(不然剛把騙人的那句
+         從畫面上拿掉,又從 toast 冒出來)→ 見 solo.js / adapter.js 的 act("play")。
+       ========================================================================== */
+    h = '<div class="b2-btns">';
+    /* ★ 「出牌」永遠按得動 —— 選錯了要說得出原因,不用 disabled 靜默吃掉點擊。
+       ⚠ 字面吃 mid:暗的時候直接寫「還要 N 張」,那是上面那一整段搬過來的唯一一件事。 */
+    h += '<button class="btn primary b2-act' + (s.ok ? "" : " dim") + '" data-act="play">' +
+         (mid && s.need ? esc("還要 " + s.need + " 張") : "出牌") + '</button>';
     if(sel.length) h += '<button class="btn ghost b2-act" data-act="clear">清除</button>';
     /* ⚠ v1.77.0 拿掉了「💡 幫我挑」(從手牌裡挑一組合法的幫他選上)。使用者:
        「幫我選那個功能拿掉,我覺得很奇怪,如果是要這樣的話,應該要做個電腦托管功能」——
@@ -847,7 +854,8 @@ const B2B = (function(){
        ★ **托管明確先不做**。要補回來的話請整支做成托管,不要把這顆鈕加回來。 */
     /* ★ 領出的人不能 pass(規則)。刻意**不畫**那顆鈕 ——
        畫一顆按了會被拒絕的鈕,比沒有那顆鈕更讓人困惑。
-       原因寫在上面那條 selbar 裡(v1.78.0 從獨立的一行併進去,見上)。 */
+       ⚠ v2.10.0 起連那句說明也沒有了(整行提示拿掉,見上面那一大段)——
+         判準是「畫面上只剩一顆出牌鈕」本身就講得清楚。 */
     if(info.canPass) h += '<button class="btn ghost b2-act" data-act="pass">Pass</button>';
     h += '</div>';
     return h;
@@ -868,7 +876,7 @@ const B2B = (function(){
     const arm = armDecide(info);
     acts.innerHTML = '<div class="b2-actline">' +
                        '<div class="b2-cdwrap" id="b2CdWrap"></div>' +
-                       '<div class="b2-actrow">' + actsHTML(info, arm) + '</div>' +
+                       '<div class="b2-actrow">' + actsHTML(info) + '</div>' +
                        (info.over ? "" : sortBtnHTML()) +
                      '</div>';
     paintArm();
@@ -1291,6 +1299,9 @@ const B2B = (function(){
       const po = R.playable(hand, st, sel);
       if(po.need.length)
         return { ok: false, pending: true,
+                 /* ★ v2.10.0:need 給出牌鈕的字面用(「還要 2 張」)——
+                    那一行提示拿掉之後,它是「選到一半」唯一還看得到的東西。 */
+                 need: po.need.join(" 或 "),
                  txt: "再選 " + po.need.join(" 或 ") + " 張就湊得成一手" };
     }
     /* 走到這裡代表 sel 湊不出任何一手 —— 正常操作**到不了**(每一次點擊都驗過),
