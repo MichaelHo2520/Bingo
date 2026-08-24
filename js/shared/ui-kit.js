@@ -216,7 +216,14 @@ function soloPause(){ if(typeof Solo!=="undefined"&&Solo.togglePause)Solo.toggle
      不存在的自動跳過)。漏登記一張蓋板的下場不是「按返回沒反應」,而是按返回**穿過去**
      做了更下面那一層的事 —— 在房裡是跳「離開房間?」(誤按 = 房主關房、全房重開),
      在單機是把這一局丟掉還留一張蓋板。v1.156.0 一次補了漏掉的四張(見下面)。 */
-const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],["setVeil",()=>closeSettings()],
+const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],
+                   /* ★ 問題回報(js/shared/feedback.js 自己建的,十四頁都有)。
+                      ⚠ 一定要排在 setVeil **前面**:它是從設定面板裡開出來的,
+                        疊在設定上面 —— 反過來的話「正在打回報內容按返回」會把
+                        底下的設定關掉、回報卡留在畫面上。
+                      ★ 元素存在就代表 Feedback 一定在(同 qrVeil 那條)。 */
+                   ["fbVeil",()=>Feedback.close()],
+                   ["setVeil",()=>closeSettings()],
                    /* ★ 三頁單機的暫停蓋板(v1.156.0 補;v1.63.0 就存在,漏登記了九十幾個中碼)。
                       只有 sudoku / mahjong / chengyu 有這三個 id,其他九頁自動跳過。
                       ⚠ 回呼**不可以只移掉 .show** —— 那會讓 paused 旗標與畫面脫節
@@ -1368,6 +1375,12 @@ function bindCommonUI(){
      十四頁(含 Bingo)共用同一份 —— 這裡只有這一行,鈕與蓋板都是它自己建的。
      ⚠ 同樣要 typeof 判斷:qr.js 是選配的。 */
   if (typeof RoomShare !== "undefined" && RoomShare) RoomShare.bindUi();
+  /* 問題回報與建議。同 qr.js:鈕(設定面板最底下那一組)與蓋板都是
+     js/shared/feedback.js 自己建的 —— 十四頁的 HTML 只多一行 <script>。
+     ⚠ 一定要排在這裡而不是更早:它 append 進 #setBody,而那一組要落在
+       所有既有分類的後面(設定的雜項該在最底下)。
+     ⚠ 同樣要 typeof 判斷:feedback.js 是選配的。 */
+  if (typeof Feedback !== "undefined" && Feedback) Feedback.bindUi();
   $("swMute").addEventListener("click",()=>{ Sound.toggle(); savePrefs(); syncSettingsUI(); });
   $("swBgm").addEventListener("click",()=>setBgm(!bgmOn));
   $("bgmTrackSel").addEventListener("change",e=>setBgmTrack(e.target.value));

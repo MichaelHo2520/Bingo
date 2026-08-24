@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "2.10.0";
+const VERSION = "2.11.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -23,6 +23,10 @@ const CORE = [
   "./js/shared/qr.js",         // 房間分享:QR 編碼器 + 邀請蓋板(十四頁全部載入,含 Bingo)
                                // ★ QR 編碼器刻意自己實作、不吃 CDN —— 外部資源這支 SW 不攔截,
                                //   離線就抓不到,而離線正是現場最需要它在的時候
+  "./js/shared/feedback.js",   // 問題回報與建議:錯誤環形緩衝 + 設定面板裡的回報卡(十四頁全部載入,含 Bingo)
+                               // ★ 送出走公開 REST(databaseURL/feedbacks.json),不等 Firebase SDK
+                               //   —— 十三頁的 SDK 是「進連線才動態載入」的,而回報最需要在的
+                               //   時機恰恰是還沒連線 / 連線爛掉的時候
   "./js/shared/mj-faces.js",   // 麻將牌面自繪(消消樂與台灣 16 張共用)
   "./js/shared/pk-faces.js",   // 撲克牌面自繪(排七與大老二共用,v1.76.0 抽出)
   // 台灣 16 張麻將(第五個遊戲,v1.58.0)

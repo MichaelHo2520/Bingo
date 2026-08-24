@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>UNO ｜ 單機對電腦 + 2~6 人連線</title>
-<!-- UNO · v2.10.0 -->
-<meta name="version" content="2.10.0">
+<!-- UNO · v2.11.0 -->
+<meta name="version" content="2.11.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口) -->
 <script>
 if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
@@ -581,6 +581,10 @@ const FIREBASE_CONFIG = {
      → board(盤面;牌面自繪在裡面,UNO 牌只有這一頁用 → 不進 js/shared/)
      → solo(單機,要 board 與 ai)
      → adapter(連線規則,在這裡 const MP = MPCore.create(...))→ main(綁定,必須最後) -->
+<!-- 問題回報與建議(設定面板最底下那一組)。★ 一定要排在**所有 JS 之前**:
+     它的錯誤環形緩衝是載入時就掛上的,要抓的正是後面那幾支炸掉的錯誤。
+     鈕與蓋板都由它自己建,這一頁只有這一行(同 js/shared/qr.js 的做法)。 -->
+<script src="js/shared/feedback.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <!-- 即時語音(WebRTC mesh)。選配模組;要排在連線核心**之前**(核心一進房就 Talk.attach()) -->

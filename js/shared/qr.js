@@ -554,6 +554,14 @@ const RoomShare = (function () {
       if (!room) close();
     },
 
+    /* ★ 「現在在哪一間房」的唯一持有者就是這一支(連線層兩份平行實作
+       —— mp-core.js 與 online.js —— 進房 / 離房時都各叫一次上面那個 setRoom)。
+       `js/shared/feedback.js` 的診斷要附上房號,向這裡借一份唯讀複本,
+       而不是去連線層再加第三對掛載點(那就是又一組要同步的雙胞胎)。
+       ⚠ 回傳**複本**,不是 room 本身:外面拿到後改一個欄位就會靜靜污染 QR 的網址。
+       ⚠ 沒在房裡回 null(不是空物件)—— 呼叫端一律 `(r && r.code)`。 */
+    room() { return room ? { code: room.code, name: room.name } : null; },
+
     open: open,
     close: close,
     /* 診斷用(產品碼不呼叫這兩支,比照 Talk.iceServers() 的先例):
