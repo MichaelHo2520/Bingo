@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 ccbcad9e942fecd68c07b724b8d5d9eee0528978466cbda38a90b71ed8daceb4)
+    真相在 styles.src.css(sha256 4f6e2bb5484deb7ea46480d9f1abc565c8f09cbbebd9e7f3ecb7e9cdc31e75a1)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -830,6 +830,30 @@
   @keyframes svsSlide{ 0%{transform:translateX(-100%)} 100%{transform:translateX(340%)} }
   @media (prefers-reduced-motion:reduce){
     .svs-spin,.svs-bar i{animation:none}
+  }
+  .svs-fb-list{margin-top:8px;max-height:min(52vh,460px);overflow-y:auto}
+  .svs-fb-item{border-top:1px solid var(--panel-line);padding:9px 0}
+  .svs-fb-item:first-child{border-top:0;padding-top:2px}
+  .svs-fb-meta{font-size:12px;color:var(--muted);font-weight:700}
+  .svs-fb-text{margin:3px 0 5px;font-size:14px;font-weight:600;line-height:1.55;
+    white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word}
+  .svs-fb-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .svs-fb-kind{color:var(--text);font-weight:800}
+  .svs-fb-who{font-size:13px;font-weight:800;color:var(--text)}
+  .svs-fb-nick{font-size:11.5px;font-weight:600;color:var(--text)}
+  .svs-fb-done{font-weight:700;color:var(--text);padding:0 6px;border-radius:999px;
+    border:1px solid rgba(128,128,128,.45)}
+  .svs-fb-anon{font-weight:600;color:var(--muted)}
+  .svs-fb-none{margin-top:8px;font-size:13px;font-weight:700;color:var(--muted)}
+  .svs-fb .svs-nums{color:var(--text)}
+  .svs-fb-bad{margin-top:8px;padding:8px 10px;border-radius:10px;
+    border:1px solid rgba(224,49,49,.45);background:rgba(224,49,49,.13);
+    font-size:13px;font-weight:700;line-height:1.6;color:var(--text)}
+  .svs-fb-bad code{font-size:12px;padding:1px 5px;border-radius:6px;background:rgba(128,128,128,.2)}
+  .svs-fb-skel .svs-nums{opacity:.6}
+  .svs-fb-foot .btn.ghost{
+    flex:none;width:auto;min-width:0;margin-top:0;
+    padding:4px 9px;font-size:11px;border-radius:10px;
   }
   :root{ --gmk-wood:#e9c98d; --gmk-line:rgba(66,40,12,.55); --gmk-star:rgba(66,40,12,.75); --gmk-edge:rgba(66,40,12,.28); --gmk-frame:#8a5a24; }
   :root[data-theme="midnight"]{ --gmk-wood:#141c31; --gmk-line:rgba(140,190,255,.34); --gmk-star:rgba(140,190,255,.6); --gmk-edge:rgba(140,190,255,.2); --gmk-frame:#39527f; }

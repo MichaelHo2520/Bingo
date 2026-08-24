@@ -668,9 +668,15 @@ const HomeLive = (function(){
        那一趟本身就可能等一兩秒,而「按下去到畫面有反應」的空窗正是要修掉的東西。
        順帶把上一輪的舊清單換掉 —— 舊數字擺在那裡看起來像是「重新整理沒生效」。 */
     if(body)body.innerHTML=GAMES.map(svSkelHtml).join("");
+    // 回報卡的骨架跟那十四列同時畫上去(它自己那一趟等 game_stats 回來才發,見下面)
+    { const fb=$("svFb"); if(fb)fb.innerHTML=svFbSkelHtml(); }
     const t0=Date.now();
     try{
       const stats=await svGet("game_stats");
+      /* ⚠ 這一趟刻意排在 game_stats **之後**、與十四個遊戲**同時**發(不 await)——
+         排在最前面會讓 t-svstatus-e2e 的「第一顆請求是 game_stats」紅,
+         而那條斷言守的是「場次與語音人次共用同一顆」。 */
+      svFbLoad();
       const ms=Date.now()-t0;
       let doneN=0;
       const progress=()=>{
@@ -707,6 +713,9 @@ const HomeLive = (function(){
     }catch(e){
       if(ping)ping.textContent="⚠️ 讀取失敗,檢查網路或稍後再試";
       if(body)body.innerHTML="";
+      /* ⚠ 回報那一趟還是要發:game_stats 掛掉不代表 feedbacks 讀不到,
+         而且骨架卡在那裡不動比「讀取失敗」更難懂。 */
+      svFbLoad();
     }
     svBusy=false;
   }
@@ -769,6 +778,131 @@ const HomeLive = (function(){
     try{ await fn(); }catch(e){}
   }
 
+  /* ==========================================================================
+     問題回報(v2.12.0)—— 玩家從遊戲裡送出來的那些話
+     ──────────────────────────────────────────────────────────────────────────
+     寫入端是 `js/shared/feedback.js`(十四頁共用),節點 `feedbacks`。
+     這裡是**畫面上唯一的讀取端**;另一個讀取端是終端機的 `tools/fb-read.js`。
+
+     ★ 使用者要的就兩樣:**問題內容**與**是誰反應的**(聯絡方式與遊戲暱稱**兩個都顯示** ——
+       它們不一樣本身就是線索,同一個人也可能換過暱稱)。版號 / 螢幕 / 主題 / UA / pid
+       那些診斷**刻意不上面板**:它們是重現用的參數,擺在這裡只會把每一筆撐成一大塊,
+       而真要查的時候 `fb-read.js` 印得比這裡完整。
+
+     ★★★ 這張卡住在 `#svFb`,**不在 `#svBody` 裡面** —— 後者每次「重新整理」都會被整份
+       換掉(先十四列骨架、再十四列正式的),生命週期跟這張卡不同;塞進去的話它會在
+       中途被抹掉一次。同理刪一筆回報**不重跑整個面板**(那是十四個遊戲幾十趟往返)。
+
+     ⚠⚠⚠ **不可以用 `svTry`**:它把失敗吞成預設值 → 「規則還沒放寬」會被畫成一片
+       正常的空清單,而那跟「真的沒有人回報」**長得一模一樣**,不會有人來提醒你。
+     ⚠⚠ 而且**不可以只看 fetch 有沒有 reject**:RTDB 的 401 是一個**帶 JSON body 的
+       正常回應**(`r.json()` 會成功,拿到 `{error:"Permission denied"}`)——
+       只看 reject 的話那一包會被當成「一筆 key 叫 error 的回報」畫出來。
+       → 一定要自己看 `r.ok`,而且 401/403 要有自己的訊息。
+     ⚠ **刪除同一件事**:REST 的 DELETE 被規則擋掉時一樣是靜靜回 401、fetch 不 reject
+       → 不看 `r.ok` 就會跳出「已刪除」而東西還在(同 svClearAllStats 那條註解)。
+     ========================================================================== */
+  const FB_MAX=20;
+  const FB_TYPE={ bug:"🐞 問題", idea:"💡 建議", other:"💬 其他" };
+
+  /* limitToLast 要搭 `.indexOn:["ts"]`(見 notes/firebase-rules.json)——
+     沒索引 RTDB 還是回得對,但會整包排序,而且在 Console 留一條警告。 */
+  function svFbFetch(){
+    return svRun(()=>fetch(svBase()+'/feedbacks.json?orderBy=%22ts%22&limitToLast='+FB_MAX)
+      .then(r=>r.json().then(j=>({ok:r.ok,status:r.status,data:j}),
+                             ()=>({ok:false,status:r.status,data:null}))));
+  }
+
+  /* ⚠ 名字一律走 --text,**不可以用 --muted** —— bubblegum 是唯一「淺底深字」的主題,
+       它的 --muted 疊在這個半透明面板上幾乎讀不到,而「是誰反應的」是使用者明講要看的
+       兩樣之一。層級靠**字級**分(聯絡方式 13px/800、暱稱 11.5px/600)。 */
+  function svFbWho(r){
+    const a=String(r.contact||"").trim();
+    const b=String((r.diag&&r.diag.nick)||"").trim();
+    if(a&&b&&a!==b) return esc(a)+' <span class="svs-fb-nick">(暱稱 '+esc(b)+')</span>';
+    if(a||b) return esc(a||b);
+    return '<span class="svs-fb-anon">(沒留名字)</span>';
+  }
+
+  function svFbItem(id,r){
+    /* 類別(🐞問題 / 💡建議)獨立包一層走 --text:那一格是「這筆要不要馬上看」的判準,
+       而時間戳留在 --muted 裡沒關係(它跟十四列的 .svs-nums 一樣是背景資訊)。 */
+    return '<div class="svs-fb-item">'+
+      '<div class="svs-fb-meta"><b class="svs-fb-kind">'+(FB_TYPE[r.type]||FB_TYPE.other)+'</b> · '+svTime(r.ts)+
+        (r.done?' · <span class="svs-fb-done">已處理</span>':"")+'</div>'+
+      '<div class="svs-fb-text">'+esc(r.content||"")+'</div>'+
+      '<div class="svs-fb-foot"><span class="svs-fb-who">🙋 '+svFbWho(r)+'</span>'+
+      '<button class="btn ghost svs-fb-del" type="button" data-id="'+esc(id)+'">🗑 刪除</button>'+
+      '</div></div>';
+  }
+
+  function svFbCard(nums,inner,extra){
+    return '<div class="svs-row svs-fb'+(extra||"")+'">'+
+      '<div class="svs-row-head"><span class="svs-name">💬 問題回報</span>'+
+      '<span class="svs-nums">'+nums+'</span></div>'+inner+'</div>';
+  }
+  /* 骨架:跟十四列骨架同一個用意 —— 第一秒就看得到「它在動」。 */
+  function svFbSkelHtml(){ return svFbCard("讀取中…",'<div class="svs-bar"><i></i></div>'," svs-fb-skel"); }
+
+  function svFbHtml(res){
+    if(!res.ok){
+      /* 401 / 403 = 規則還沒放寬。這是唯一一個**畫面上看得出來**的機會 ——
+         畫成空的話,使用者會以為沒有人回報。 */
+      const why=(res.status===401||res.status===403)
+        ? '資料庫還沒開放讀取回報 —— 去 Firebase Console 把 <code>feedbacks</code> 的 <code>.read</code> 改成 <code>true</code>(整段規則在 notes/firebase-rules.json)'
+        : '讀取失敗(HTTP '+(res.status||0)+')—— 檢查網路或稍後再試';
+      return svFbCard("讀不到",'<div class="svs-fb-bad">⚠️ '+why+'</div>');
+    }
+    const d=res.data;
+    const rows=(d&&typeof d==="object")
+      ? Object.keys(d).map(id=>({id,r:d[id]||{}})).sort((a,b)=>(b.r.ts||0)-(a.r.ts||0))
+      : [];
+    if(!rows.length) return svFbCard("0 筆",'<div class="svs-fb-none">還沒有人回報 👍</div>');
+    const undone=rows.filter(x=>!x.r.done).length;
+    /* ⚠ 滿 FB_MAX 筆就要講「只列最近 N 筆」—— 靜靜截斷會被讀成「就這些」
+         (CLAUDE.md 紅線 17,同房間清單那條 `…還有 N 間沒列出來`)。 */
+    return svFbCard(
+      rows.length+' 筆'+(undone?' · 未處理 '+undone:"")+(rows.length>=FB_MAX?' · 只列最近 '+FB_MAX+' 筆':""),
+      '<div class="svs-fb-list">'+rows.map(x=>svFbItem(x.id,x.r)).join("")+'</div>'+
+      '<div class="svs-row-actions"><button class="btn ghost svs-fb-clear" type="button">🗑 清除這 '+rows.length+' 筆</button></div>');
+  }
+
+  async function svFbLoad(){
+    if(!$("svFb"))return;
+    let res;
+    try{ res=await svFbFetch(); }catch(e){ res={ok:false,status:0,data:null}; }
+    const box=$("svFb"); if(box)box.innerHTML=svFbHtml(res);
+  }
+
+  /* ⚠ 不走 svBusyWhile:那一支會鎖住頂上兩顆全域清除鈕,而解鎖是 refreshStatusPanel
+       的收尾在做 —— 刪一筆回報去重跑整個面板不划算。這裡自己在卡片裡顯示忙碌狀態。 */
+  function svFbBusy(msg){
+    const box=$("svFb");
+    if(box)box.innerHTML=svFbCard('<span class="svs-spin"></span>'+esc(msg),"");
+  }
+  function svFbDelete(id){
+    return svRun(()=>fetch(svBase()+"/feedbacks/"+encodeURIComponent(id)+".json",{method:"DELETE"})
+      .then(r=>r.ok,()=>false));
+  }
+  async function svFbDelOne(id){
+    if(!confirm("確定要刪除這一筆回報嗎?那是玩家自己打的一段話,刪掉就沒有了,而且無法復原。"))return;
+    svFbBusy("刪除中…");
+    const done=await svFbDelete(id);
+    await svFbLoad();
+    showToast(done?"已刪除這一筆回報 🗑":"⚠️ 刪不掉:資料庫規則不允許刪除",done?2000:3400);
+  }
+  async function svFbClearAll(){
+    const box=$("svFb"); if(!box)return;
+    const ids=[].slice.call(box.querySelectorAll(".svs-fb-del")).map(b=>b.dataset.id).filter(Boolean);
+    if(!ids.length)return;
+    if(!confirm("確定要刪除這 "+ids.length+" 筆回報嗎?那些是玩家自己打的話,清掉就沒有了,而且無法復原。"))return;
+    svFbBusy("清除中…("+ids.length+" 筆)");
+    const rs=await Promise.all(ids.map(id=>svFbDelete(id)));
+    await svFbLoad();
+    const bad=rs.filter(x=>!x).length;
+    showToast(bad?("⚠️ 有 "+bad+" 筆刪不掉:資料庫規則不允許刪除"):("已清除 "+ids.length+" 筆回報 🗑"),bad?3400:2000);
+  }
+
   // 事件綁定自己管(比照上面 visibilitychange 監聽的自包含風格),元素早就在 DOM 裡(這支 <script> 排在 body 尾端)
   (function(){
     const bh=$("brandHome"); if(bh)bh.addEventListener("click",tapBrand);
@@ -781,6 +915,12 @@ const HomeLive = (function(){
     if(body)body.addEventListener("click",e=>{
       const clearBtn=e.target.closest(".svs-clear"); if(clearBtn){ svClearKey(clearBtn.dataset.key); return; }
       const statsBtn=e.target.closest(".svs-clear-stats"); if(statsBtn){ svClearStatsKey(statsBtn.dataset.key); return; }
+    });
+    // 回報卡自己一個容器(不在 #svBody 裡)→ 自己一個委派監聽
+    const fb=$("svFb");
+    if(fb)fb.addEventListener("click",e=>{
+      const del=e.target.closest(".svs-fb-del"); if(del){ svFbDelOne(del.dataset.id); return; }
+      const clr=e.target.closest(".svs-fb-clear"); if(clr){ svFbClearAll(); return; }
     });
   })();
 

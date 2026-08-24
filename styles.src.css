@@ -1600,6 +1600,66 @@
     .svs-spin,.svs-bar i{animation:none}
   }
 
+  /* ---------- 問題回報那一張卡(v2.12.0)----------
+     玩家從遊戲裡送出來的話,住在 #svFb(刻意不在 #svBody 裡 —— 見 js/home-live.js
+     那一節的 ★★★)。外框沿用 .svs-row,只加內部這幾條。
+     ⚠ 這一段一個 #id 選擇器都沒有(CLAUDE.md 紅線 6 第六類:群組選擇器裡混一個 #id,
+       同一組每個 class 都會拿到 id 權重)。
+     ⚠ 顏色不可以用「--muted 再疊 opacity」:bubblegum 是唯一「淺底深字」的主題,
+       它的 --muted 是 #a76b96,疊一層透明就等於再往白底靠 → 讀不到
+       (notes/27 紅線 9,那是放大截圖才發現的)。層級一律靠字重與大小分。 */
+  /* ⚠ 高度上限量過再定的:三筆(其中一筆長到折兩行、一筆自己帶換行)在 352px 寬的
+     卡片裡是 319px —— 上限訂 300 的話**三筆就開始截**,而且截在「刪除鈕的一半」上,
+     看起來像壞掉而不是「可以往下捲」。內捲本身沿用房間清單的既有語彙(.svs-stale)。 */
+  .svs-fb-list{margin-top:8px;max-height:min(52vh,460px);overflow-y:auto}
+  .svs-fb-item{border-top:1px solid var(--panel-line);padding:9px 0}
+  .svs-fb-item:first-child{border-top:0;padding-top:2px}
+  .svs-fb-meta{font-size:12px;color:var(--muted);font-weight:700}
+  /* 玩家打的字是這張卡的主體 → 字級與字重都要壓得住上下兩行的說明文字。
+     ⚠ pre-wrap + break-word:回報常常是一整段沒有空白的中文,而且可能自己帶換行。 */
+  .svs-fb-text{margin:3px 0 5px;font-size:14px;font-weight:600;line-height:1.55;
+    white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word}
+  .svs-fb-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  /* ★★★ 「是誰反應的」與「類別」一律 --text,**不可以用 --muted** ——
+     bubblegum 是唯一「淺底深字」的主題(--muted 是 #a76b96),疊在這個半透明面板上
+     幾乎讀不到,而這兩樣正是使用者明講要看的東西。放大截圖一眼看得出來,
+     斷言量不到(顏色是「有值」的,只是讀不到)。層級一律靠**字級 + 字重**分。
+     ⚠ 這是 notes/27 紅線 9 的同一個坑第二次:那次是 `--muted` 疊 opacity,
+       這次連 opacity 都沒疊 —— 光是 `--muted` 本身在這個面板上就不夠。 */
+  .svs-fb-kind{color:var(--text);font-weight:800}
+  .svs-fb-who{font-size:13px;font-weight:800;color:var(--text)}
+  .svs-fb-nick{font-size:11.5px;font-weight:600;color:var(--text)}
+  /* 「已處理」是狀態不是裝飾 → 給它一個看得出來的小籤,而不是一段淡字 */
+  .svs-fb-done{font-weight:700;color:var(--text);padding:0 6px;border-radius:999px;
+    border:1px solid rgba(128,128,128,.45)}
+  /* 「沒留名字」是**沒有東西**,淡掉才對(這一個用 --muted 是刻意的) */
+  .svs-fb-anon{font-weight:600;color:var(--muted)}
+  .svs-fb-none{margin-top:8px;font-size:13px;font-weight:700;color:var(--muted)}
+  /* 卡頭那個「3 筆 · 未處理 2」沿用 .svs-nums(與十四列同一個語彙),但**這一張卡**的
+     數字要讀得到 —— 「未處理 N」是唯一告訴你「有沒有新東西」的地方。
+     ⚠ 只縮在 .svs-fb 底下,不動那十四列(那不是這一批的範圍)。 */
+  .svs-fb .svs-nums{color:var(--text)}
+  /* 「規則還沒放寬」那一行:它是這張卡唯一會出現的錯誤,而畫成空清單就等於騙人
+     (js/home-live.js 那一節的 ⚠⚠⚠)→ 要一眼看出是警示,不要跟 .svs-fb-none 一樣。
+     ⚠ **文字一律 --text,警示交給紅色底框** —— 這個專案沒有 --bad 這種變數
+       (`.btn.danger` 是寫死的 #e03131),而**寫死的紅字一定會有一個主題讀不到**:
+       midnight 的深底配 #e03131 太暗、bubblegum 的白底配淺紅太淡。
+       底框是半透明疊在當前主題的卡片上,深淺兩端都成立。 */
+  .svs-fb-bad{margin-top:8px;padding:8px 10px;border-radius:10px;
+    border:1px solid rgba(224,49,49,.45);background:rgba(224,49,49,.13);
+    font-size:13px;font-weight:700;line-height:1.6;color:var(--text)}
+  .svs-fb-bad code{font-size:12px;padding:1px 5px;border-radius:6px;background:rgba(128,128,128,.2)}
+  .svs-fb-skel .svs-nums{opacity:.6}
+  /* 刪除鈕:它是每一筆都掛一顆的**次要**動作,不可以比玩家打的那段話還搶眼。
+     ⚠⚠ **`min-width:0` 不可以省** —— `.btn` 的基底是 `flex:1;min-width:120px`,
+       只寫 `width:auto` 的話它在 352px 寬的卡片裡量到 113px = 整張卡的三分之一。
+       (同一個坑 `.fb-open` 踩過一次、notes/27 已經寫著,這次還是又踩了一遍
+        —— 凡是把 `.btn` 放進 flex 容器裡都要一起壓 `flex` 與 `min-width`。) */
+  .svs-fb-foot .btn.ghost{
+    flex:none;width:auto;min-width:0;margin-top:0;
+    padding:4px 9px;font-size:11px;border-radius:10px;
+  }
+
   /* ==========================================================================
      五子棋(gomoku.html 專用) — v1.37.0
      ★ 這一段只「追加」,不修改上面任何既有規則:Bingo 的 DOM 沒有 .gmk-* / .as-link
