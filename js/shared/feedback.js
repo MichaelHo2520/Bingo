@@ -13,6 +13,9 @@
       十四頁(含 Bingo)只多一行 `<script>` —— 零雙胞胎。
       進入點是**設定面板最底下那一組**:那是十四頁唯一「每一頁都有、位置一樣、
       而且對局中也開得到」的容器(`#setBody`),而且它已經是「⚙️ 裡的雜項」該去的地方。
+   ★ **入口後來變成兩處**:設定面板那一顆之外,**首頁格子的最後一格**也有一張
+     「💬 問題回報」卡(第四之二部分)—— 因為「藏在 ⚙️ 裡而且要捲到底」的下場就是
+     沒有人找得到。⚠ 那一張同樣由這一支自己建,`index.html` 一個字都沒改。
    ⚠ 這裡**不可以**自己宣告 `$` / `showToast`:那兩個在 game.js(Bingo)與
      ui-kit.js(十三頁)各有一份全域定義,重複宣告 const 會整頁 SyntaxError。
 
@@ -342,6 +345,92 @@ const Feedback = (function () {
     el("fbSend").addEventListener("click", send);
 
     built = true;
+
+    /* 首頁那張卡(只有 index.html 建得出來,見下面那一節) */
+    mountHome();
+  }
+
+  /* ==========================================================================
+     第四之二部分:首頁格子裡的第 15 張卡 —— ⚠ 只有 index.html 會建
+     ──────────────────────────────────────────────────────────────────────────
+     ★★★ 這一節解決的事:入口原本只有「⚙️ → 設定面板捲到最底」一處。對親友聚會這個
+         受眾,那等於沒有入口 —— 沒有人會為了回報去翻設定
+         (使用者:「藏在設定裡…應該會蠻容易沒有人知道」)。
+
+     ⚠ `notes/27` 第五節原本寫著「✗ 不做首頁頁尾的第二個入口」,這一節**推翻它**
+       (使用者裁示)。當初那條的兩個理由現在都繞掉了:
+         · 「首頁的 ⚙️ 已經涵蓋」→ 事實是要按 ⚙️ **再捲到底**,涵蓋不到
+           「不知道有這個功能」的人 —— 而那正是這個功能唯一的失敗模式。
+         · 「動首頁 DOM 要重跑 gen-e2e.py」→ **這一節不改 index.html 一個字**:
+           卡片在執行期由這一支自己塞進 `.gc-grid`(照 `qr.js` 那條「鈕自己建」的路,
+           CLAUDE.md 紅線 4 的 ★★)→ `check-e2e-fresh` 維持全新鮮。
+
+     ★★ 為什麼是「格子裡的第 15 張卡」而不是格子底下一條橫幅:
+        首頁是 **14 張卡 / 3 欄** → 最後一列本來就**空一格**
+        (`min-width:700px` 的大螢幕段是 5 欄 → 14 張也剛好空一格,兩種版面都補得剛好)
+        → 補進那個洞是**零額外高度**。而首頁的驗收點正是「最後一張卡的下緣還在視窗裡嗎」
+        (CLAUDE.md 紅線 10)—— 橫幅要多吃約 56px,會把那條邊界推緊一階。
+
+     ── 三條接線上的紅線 ────────────────────────────────────────────────────
+     ① **不帶 `data-gk`、不放 `.gc-rank`。** `js/home-live.js` 的 `applyRank()` 是靠
+        `data-gk` 找卡片的(`cardOf(key)`)→ 沒有這個屬性,它永遠碰不到這張卡,
+        排名徽章與 `style.order` 都不會被改寫。⚠ 順帶一提 `.game-card[data-gk]` 才有
+        `position:relative`,所以這張卡也不會意外變成別人的定位脈絡。
+     ② **`order` 必須由 CSS 寫死一個大數**(`.fb-gcard{order:99}`)。
+        `applyRank()` 會給十四張遊戲卡 `style.order = 0…13`,而 order 的預設值是 **0**
+        → 不寫死的話這張卡會跟第一名同組,被排到**格子中間**去
+        (而且只在「有熱門度統計」時才會發生 —— 全新的資料庫看不出來)。
+     ③ **找不到 `.gc-grid` 就什麼都不做。** 另外十三頁沒有這個容器,於是
+        「加一頁要登記一筆」的問題不存在(同 `collect()` 那一節的紀律)。
+     ========================================================================== */
+
+  /* 前幾次進首頁讓那張卡輕輕脈動一次,之後就安靜下來。
+     ⚠ 次數記在**這一支自己的 key**(`bingo.fb.v1` 的 `hv` 欄位,走既有的 merge 版
+       `put()`)—— 不寄生在 `bingo.prefs.v1`(CLAUDE.md 紅線 12)。
+     ⚠ 動畫本身不必自己處理 `prefers-reduced-motion`:styles.src.css 有一條全域的
+       `*{animation-duration:.001s!important}`,開了就自動不動。 */
+  const HOME_HINT_MAX = 3;
+  let homeMounted = false;
+
+  function mountHome() {
+    if (homeMounted) return;
+    const grid = document.querySelector(".gc-grid");
+    if (!grid) return;                    // 不是首頁 → 另外十三頁一行都不執行(紅線 ③)
+    homeMounted = true;
+
+    const card = document.createElement("button");
+    card.type = "button";
+    card.id = "fbHomeCard";
+    /* 借 `.game-card` 的外觀(格子等高、hover、點下去縮一下),差異全靠 `.fb-gcard`
+       那一條收:虛線邊框 + 淡底,一眼看得出「這不是遊戲」。 */
+    card.className = "game-card fb-gcard";
+    card.setAttribute("aria-label", "問題回報與建議");
+    /* ⚠⚠ 圖示是**自繪 SVG + `currentColor`**,不是 💬 emoji —— CLAUDE.md 紅線 8 的 ⚠⚠:
+       彩色 emoji **不吃 `color`**,而這張卡的底會隨主題整片換掉。
+       💬(U+1F4AC)的彩色字形是**白色的氣球**:深色的四個主題看得很清楚,
+       但 **bubblegum(唯一的淺底主題)上幾乎看不見** —— 放大截圖一眼就看得到,
+       而斷言一條都量不到(那一格的幾何、class、字元完全正常)。
+       ★ 線條風格照頂列那幾顆圖示鈕的做法(viewBox 24、stroke-linecap round)。
+     ⚠ 插圖那一格**不可以掛 `.gc-art`** —— 那條是給 `<img>` 的 46×46 尺寸。 */
+    card.innerHTML =
+      '<span class="fb-gc-art" aria-hidden="true">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"' +
+             ' stroke-linecap="round" stroke-linejoin="round">' +
+          '<path d="M20.5 11.5a8.5 8.5 0 0 1-11.9 7.8L3.5 21l1.7-5.1A8.5 8.5 0 1 1 20.5 11.5z"/>' +
+          '<circle cx="8.6" cy="11.5" r="1.05" fill="currentColor" stroke="none"/>' +
+          '<circle cx="12" cy="11.5" r="1.05" fill="currentColor" stroke="none"/>' +
+          '<circle cx="15.4" cy="11.5" r="1.05" fill="currentColor" stroke="none"/>' +
+        '</svg>' +
+      '</span>' +
+      '<span class="gc-body"><span class="gc-name display">問題回報</span></span>';
+    card.addEventListener("click", open);
+    grid.appendChild(card);
+
+    const seen = Number(store().hv || 0);
+    if (seen < HOME_HINT_MAX) {
+      card.classList.add("fb-hint");
+      put({ hv: seen + 1 });
+    }
   }
 
   function setType(id) {

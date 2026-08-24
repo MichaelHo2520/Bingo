@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 4f6e2bb5484deb7ea46480d9f1abc565c8f09cbbebd9e7f3ecb7e9cdc31e75a1)
+    真相在 styles.src.css(sha256 2137ac8f2c35816a3def0ccacb438524ad20ac9002779a0dec568449c94d54b6)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -5902,6 +5902,21 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .fb-acts{display:flex;gap:10px;margin-top:16px}
   .fb-acts .fb-btn{flex:1;min-width:0;width:auto;margin-top:0}
   .fb-acts .fb-btn:disabled{opacity:.55;cursor:default}
+  .fb-gcard{order:99;border-style:dashed;background:rgba(128,128,128,.10)}
+  .fb-gcard:hover{border-style:dashed}
+  .fb-gc-art{display:flex;align-items:center;justify-content:center;
+    flex:none;width:46px;height:46px}
+  .fb-gc-art svg{width:34px;height:34px;display:block}
+  .fb-gcard .gc-name{font-weight:800}
+  .fb-gcard.fb-hint{animation:fb-nudge 2.2s ease-in-out 3}
+  @keyframes fb-nudge{
+    0%,100%{border-color:var(--panel-line);box-shadow:none}
+    50%{border-color:var(--accent);box-shadow:0 0 0 3px rgba(128,128,128,.14)}
+  }
+  @media (max-height:560px){
+    .fb-gc-art{width:40px;height:40px}
+    .fb-gc-art svg{width:29px;height:29px}
+  }
   @media (min-width:700px) and (min-height:640px){
     .scroll-area,.panel,.mp-panel,.board-wrap,.actions,.status,
     .room-tabs,.primary-bar,.solo-head{width:min(92vw,680px)}
@@ -5945,6 +5960,8 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .un-play{--un-cw:clamp(44px,12.5vw,70px)}
     .gc-art{width:58px;height:58px}
     .gc-name{font-size:17px}
+    .fb-gc-art{width:58px;height:58px}
+    .fb-gc-art svg{width:42px;height:42px}
   }
 body.is-big .topbar{display:none}
 body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room){

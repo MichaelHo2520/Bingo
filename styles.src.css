@@ -13256,6 +13256,58 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .fb-acts .fb-btn{flex:1;min-width:0;width:auto;margin-top:0}
   .fb-acts .fb-btn:disabled{opacity:.55;cursor:default}
 
+  /* --------------------------------------------------------------------------
+     首頁格子裡的第 15 張卡 —— 「💬 問題回報」(index.html 專用)
+     ──────────────────────────────────────────────────────────────────────────
+     ★★ 為什麼放在格子**裡面**:首頁是 14 張卡 / 3 欄 → 最後一列本來就空一格
+        (下面那個大螢幕段是 5 欄 → 14 張也剛好空一格)→ 補進那個洞是**零額外高度**。
+        而首頁的驗收點正是「最後一張卡的下緣還在視窗裡嗎」(notes/13 第八節)——
+        格子底下另開一條橫幅要多吃約 56px,會把那條邊界推緊一階。
+     ⚠⚠ `order:99` **不可以省**:js/home-live.js 的 applyRank() 會給十四張遊戲卡
+        `style.order = 0…13`,而 order 的預設值是 **0** → 不寫死的話這張卡會跟
+        第一名同組、被排到格子中間去。★ 而且那只在「已經有熱門度統計」時才發生 ——
+        全新的資料庫(十四個都 0、applyRank 不點亮前三名)看起來完全正常。
+     ⚠ 這張卡刻意**不帶 `data-gk`**(applyRank 找不到它)也**沒有 `.gc-rank`**,
+        所以它不吃 `.game-card[data-gk]{position:relative}` —— 這裡也不需要定位脈絡。
+     ⚠ 面貌:借 .game-card 的骨架(等高 / hover 抬起 / 點下去縮),差別只有
+        **虛線邊框 + 更淡的底**。一眼要看得出「這一格不是遊戲」,但又不能像 disabled
+        (它是真的按得下去的東西)→ 所以邊框虛線化、底色減半,而**文字維持 --text**
+        (CLAUDE.md 紅線 9 的第二次:--muted 疊在半透明底上會讀不到)。 */
+  .fb-gcard{order:99;border-style:dashed;background:rgba(128,128,128,.10)}
+  .fb-gcard:hover{border-style:dashed}
+  /* 插圖那一格:同樣 46px 佔位讓它與遊戲卡等高,裡面塞一顆自繪 SVG。
+     ⚠ **不掛 .gc-art** —— 那條(46×46 的 block)是給 <img> 的。
+     ⚠⚠ 裡面**不可以**改回 💬 emoji:彩色 emoji 不吃 color,而 💬 的字形是**白色氣球**
+        → bubblegum(唯一的淺底主題)上幾乎看不見(CLAUDE.md 紅線 8 的 ⚠⚠)。
+        SVG 吃 stroke="currentColor" → 五個主題都跟著 --text 走。 */
+  .fb-gc-art{display:flex;align-items:center;justify-content:center;
+    flex:none;width:46px;height:46px}
+  .fb-gc-art svg{width:34px;height:34px;display:block}
+  .fb-gcard .gc-name{font-weight:800}
+
+  /* 前 3 次進首頁輕輕脈動一次就停(次數由 feedback.js 記在自己的 localStorage key)。
+     ⚠ 動畫只碰 border-color 與 box-shadow —— **不碰 transform**,不然會與
+       .game-card:hover 的 translateY 打架(手指還在卡片上時會抖)。
+     ⚠ 跑 3 個週期就自己停,不寫 infinite:首頁是每次都會回來的畫面,
+       永遠在動的東西會變成「一直有東西在閃」而不是提示。
+     ★ prefers-reduced-motion 不必在這裡處理:本檔前面有一條全域的
+       `*{animation-duration:.001s!important}`,開了就自動不動。 */
+  .fb-gcard.fb-hint{animation:fb-nudge 2.2s ease-in-out 3}
+  @keyframes fb-nudge{
+    0%,100%{border-color:var(--panel-line);box-shadow:none}
+    50%{border-color:var(--accent);box-shadow:0 0 0 3px rgba(128,128,128,.14)}
+  }
+  /* 橫置矮視窗:首頁在那裡是**五欄**、插圖縮成 40px(遊戲卡那一段的同名 @media)——
+     這一格要**逐項跟著縮**,不然它會是那一列裡唯一高一階的。
+     ⚠⚠ 這一條非得寫在**這裡**不可:@media **不加權重**,而 .fb-gc-art 的本體就在
+       上面幾行、遠在那一段之後 → 寫進遊戲卡那一段的 @media 會被本體蓋掉、完全不生效
+       (`.hl-badge` 那一條的 ⚠ 講的是同一件事)。★ 五欄 × 3 列 = 15 格,14 張遊戲卡
+       + 這一張剛好填滿,同樣是零額外高度。 */
+  @media (max-height:560px){
+    .fb-gc-art{width:40px;height:40px}
+    .fb-gc-art svg{width:29px;height:29px}
+  }
+
   /* ==========================================================================
      大螢幕 / 摺疊機展開(Galaxy Z Fold 7)—— 第一段:版面放寬
      ──────────────────────────────────────────────────────────────────────────
@@ -13431,6 +13483,11 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          同一個 <img> 上,不是這一條。 */
     .gc-art{width:58px;height:58px}
     .gc-name{font-size:17px}
+    /* 回報卡那一格的 💬 跟著放大(它不是 <img>,所以不吃上面那條 .gc-art)。
+       ⚠ 這一條可以寫在這裡是因為 .fb-gc-art 的本體定義在**這一段之前** ——
+         方向與矮視窗那一條相反,不要照抄。 */
+    .fb-gc-art{width:58px;height:58px}
+    .fb-gc-art svg{width:42px;height:42px}
   }
 
 /* ==========================================================================
