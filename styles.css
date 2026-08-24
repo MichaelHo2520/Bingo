@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 2137ac8f2c35816a3def0ccacb438524ad20ac9002779a0dec568449c94d54b6)
+    真相在 styles.src.css(sha256 69ee05b2e3a3e72318718660dc36e3b162ef4b436412d7f36df8c2a6fa73300f)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -518,6 +518,15 @@
   .room-item.busy:hover{transform:none;border-color:var(--panel-line);background:rgba(255,255,255,.10)}
   .room-item .busy-tag{flex:none;display:inline-flex;align-items:center;gap:4px;padding:8px 13px;border-radius:999px;
     background:rgba(255,255,255,.08);border:1px solid var(--panel-line);color:var(--muted);font-size:13px;font-weight:800;white-space:nowrap}
+  .room-item.mps-able{opacity:.86;cursor:pointer;border-color:rgba(99,102,241,.5);background:rgba(99,102,241,.10)}
+  .room-item.mps-able:hover{transform:translateY(-1px);opacity:1;border-color:#6366f1;background:rgba(99,102,241,.17)}
+  .room-item .join-cta.mps-cta{background:#6366f1;color:#fff}
+  .room-item.mps-able:hover .join-cta.mps-cta{background:#4f46e5}
+  .mps-eye{flex:none;vertical-align:-2px}
+  .room-group-title .gt-sub{margin-left:auto;font-size:11.5px;font-weight:800;color:#818cf8}
+  .mp-chip.mps-chip{border-style:dashed;border-color:rgba(99,102,241,.55);
+    background:linear-gradient(180deg,rgba(99,102,241,.14),rgba(99,102,241,.05))}
+  .mp-chip.mps-chip .mps-eye{color:#818cf8}
   .room-empty{color:var(--muted);font-size:13px;padding:6px 2px}
   .mp-detect-row{display:flex;align-items:center;gap:8px;margin:0 2px}
   .mp-detect-row .mp-live{flex:1;justify-content:flex-start;margin:0}

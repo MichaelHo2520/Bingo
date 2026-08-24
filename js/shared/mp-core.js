@@ -116,11 +116,56 @@ const MPCore = (function(){
     const ORDER_PICK = !!A.orderPick;
     const ORDER_PHASE = { rps:1, reveal:1, ordering:1 };
     const REVEAL_MS = 2600, TIE_MS = 1500;   // 揭曉停留 / 平手停留(房主端的計時器)
+    /* ★★ 第七個能力旗標:**連線觀戰**(v2.13.0 為暗棋加,不帶就是舊行為 →
+       另外十三頁一個字都不受影響)。2026-08-13 就設計好、結論「可行但擱置」,
+       2026-08-24 使用者裁示解禁,**只做純觀戰**(不做擂台遞補上場)。
+
+       ⚠⚠⚠ **觀戰者不進 `players`,住在平行的 `specs/{pid}` 節點。**
+         這是 2026-08-13 評估過並**否決** `players` 加 `spec:true` 之後的結論:
+         那個做法要在核心補十幾處「這個人是不是觀戰者」的判斷(開局人數、
+         全員準備、名次、和局全員得分、斷線寬限、踢人…),**漏一處的症狀是
+         「整房開不了局」或「和局時觀戰者也加一分」**。
+         走獨立節點的話那十幾處**天生就是對的** —— 它們問的都是 `players`。
+       ★ 實測到的四個「天生對」(改的時候不要好心去補,補了反而會壞):
+         · `winnerIds()` 沒有 ids/id 時回 `Object.keys(players)` → 觀戰者不在裡面
+           → `ptsFor()` 回 0 → **計分那一整段對觀戰者不會動作**
+         · `iWasKicked()` 認的是「**曾經**在 players 裡而現在不在」(sawMe),
+           觀戰者從沒進過 → 永遠 false → 不會被誤判成被房主踢掉
+         · `updateRoomIndex()` 的 count 數的是 `players` → 大廳不會顯示「3 / 2 人」
+         · `startGame()` / `updateStartBtn()` 問的都是 `players` → 觀戰者不影響開局
+
+       ⚠⚠ **唯讀閘門只有一道,在 `canWriteGame()`。** 設計稿當年寫的是「txGame
+         第一行」,實作時往上收一格 —— 那一支是 setGame / patchGame / txGame
+         **三支寫入口的共同閘門**,擋在那裡連相位推進與結算都一起擋掉。
+         ⚠ 逐一去 adapter 的十幾個呼叫點補判斷的那種改法,漏一處的症狀是
+           **「觀戰者幫人走了一步棋」**,而那正是這一頁那批「誰先算完誰寫」的
+           自治交易最容易漏的地方。→ notes/07 那一節。 */
+    const SPECTATE = !!A.spectate;
+    /* 觀戰人數上限。⚠ **它不是為了省流量,是為了即時語音** —— mesh 是 N²:
+       暗棋 2 個玩家 + 4 個觀戰 = 6 人 = 15 條 PeerConnection,再往上加手機端會開始掉線
+       (notes/24 量過的那條線)。要調就調這一顆旋鈕,不要去放寬 mesh。 */
+    const MAX_SPECS = A.maxSpecs || 4;
+    /* 觀戰的眼睛圖示。⚠⚠ **自繪 SVG,刻意不用 U+1F441 那顆 emoji**,兩個理由疊在一起
+       (紅線 8 的 ⚠⚠,而它們**都只有桌機 Chrome / Edge 看得出來,手機正常** → 很難驗到):
+         ① U+1F441 是 **Emoji_Presentation=No**(「預設文字呈現」)的那一類 ——
+            不補 U+FE0F 會退回**線條字形**,跟旁邊的 🔒 / 🔄 一比就是缺一角;
+         ② 補了 U+FE0F 變成彩色 emoji 之後**不吃 `color`** —— 而它要出現的兩個地方
+            底色都會變:晶片有 `.me` / `.turn` / `.tk-talking` 三種狀態,
+            大廳那一列是灰底,再乘上五個主題各一套配色。
+       ★ 自繪 + `currentColor` 一次解掉兩件事,而且小尺寸(13px)比彩色眼球清楚。 */
+    const EYE_SVG='<svg class="mps-eye" viewBox="0 0 24 24" width="13" height="13" fill="none" '+
+      'stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+      '<path d="M1.8 12S5.6 5.2 12 5.2 22.2 12 22.2 12 18.4 18.8 12 18.8 1.8 12 1.8 12z"/>'+
+      '<circle cx="12" cy="12" r="2.7"/></svg>';
 
     let db=null, roomRef=null, code=null, meId=null, meName="玩家", isHost=false, roomName="";
     let online=false;
     let roomsWatchRef=null, lastRoomsSig=null, lastIndexSig=null;
     let players={}, scores={}, status="lobby", curPhase="lobby", ready=false;
+    /* 觀戰(只有 SPECTATE 的遊戲會動到):現在有誰在旁邊看 + 我自己是不是觀戰者。
+       ⚠ `spectating` 是**這一整個功能的開關**:唯讀閘門、畫面、離開的字全看它。
+         沒開旗標的十三頁它永遠是 false → 每一處判斷都退回原本那條路。 */
+    let specs={}, spectating=false;
     let order=[], winner=null, roundId=null;
     let gameRev=0;                          // 本地已套用的最新 game 版本(見上 #1)
     let scoreMode="rank", winGoal=GOAL_DEF, scoredThisRound=false, myRoundWin=false;
@@ -175,9 +220,24 @@ const MPCore = (function(){
       return id;
     }
     function setMsg(t){ const el=$("mpConnMsg"); if(el) el.textContent=t||""; }
+    /* 「房裡現在有誰」= 玩家 + 觀戰者(v2.13.0)。
+       ⚠⚠ **只有三種東西該問這一支**:①名字 ②語音 mesh 要跟誰拉線 ③表情送給誰。
+         其餘一律問 `players` —— 開局人數、全員準備、名次、計分、斷線寬限、踢人,
+         每一個都**必須**把觀戰者排除在外(見 SPECTATE 那一段的「四個天生對」)。
+       ★ 沒開旗標的十三頁直接回 `players` 本人:同一個物件、零額外配置、
+         行為與 v2.12.0 逐字相同。 */
+    function everyone(){
+      if(!SPECTATE) return players;
+      const all={};
+      for(const k in players) all[k]=players[k];
+      for(const k in specs) if(!all[k]) all[k]=specs[k];
+      return all;
+    }
+    function isSpec(id){ return SPECTATE && !players[id] && !!specs[id]; }
     function dispName(id){
-      const raw=(players[id]&&players[id].name)||"玩家";
-      const same=Object.keys(players).filter(x=>((players[x]&&players[x].name)||"玩家")===raw);
+      const all=everyone();
+      const raw=(all[id]&&all[id].name)||"玩家";
+      const same=Object.keys(all).filter(x=>((all[x]&&all[x].name)||"玩家")===raw);
       return same.length<=1 ? raw : raw+(same.indexOf(id)+1);
     }
     function youTag(id){ return id===meId ? '<span class="you-badge">你</span>' : ''; }
@@ -277,6 +337,14 @@ const MPCore = (function(){
          (CLAUDE.md 已有一條同型的紅線在講 max 必須一致)。
          ⚠ 但 isBackRoom 那一條**刻意只有這裡有** —— 首頁判不出來(見 REJOIN_MID 的說明)。 */
     function joinable(r){ return (r.status==="lobby" || (JOIN_MID && r.status==="playing") || isBackRoom(r)) && r.count<MAX_PLAYERS; }
+    /* 可觀戰 = 開了旗標 + **這一列本來就進不去**(滿了 / 對戰中 / 正在猜拳)+ 房間還開著。
+       ★ 刻意定義成「joinable 的補集」而不是自己列條件:兩者永遠互斥,
+         不會有一列同時掛「加入」與「觀戰」兩顆鈕,也不必怕以後 joinable 加條件時漏改。
+       ⚠ `r.host` 是**關房訊號**(紅線 5:房主離開只是把 host 欄位拿掉,房間資料留著)——
+         少了它,大廳會把建房那一瞬間、還沒寫進房主名字的房列成可觀戰。
+       ⚠ 這一支**刻意不進 js/home-live.js**:首頁只讀輕量索引,而「這個遊戲支不支援觀戰」
+         是各 adapter 的旗標,首頁拿不到 → 首頁維持顯示「對戰中」是刻意的,不是漏改。 */
+    function specable(r){ return SPECTATE && !joinable(r) && !!r.host; }
     function startRoomWatch(){
       if(!init()){ setLive("none","連線未啟用"); return; }
       stopRoomWatch();
@@ -301,22 +369,36 @@ const MPCore = (function(){
       g.className="room-group"+(ok?" joinable":"");
       const head=document.createElement("div");
       head.className="room-group-title";
-      head.innerHTML='<span class="gt-dot" aria-hidden="true"></span>'+(ok?"可以加入":"無法加入")+' · '+rooms.length+' 間';
+      /* ★ 開了觀戰的遊戲,第二組不再是死的一堆:全部可觀戰就直說「可以觀戰」,
+         只有一部分可觀戰才維持「無法加入」再補一句幾間可看。
+         ⚠ 沒開旗標的十三頁 specN 恆為 0 → 這三行等於 `(ok?"可以加入":"無法加入")`,逐字相同。 */
+      const specN=ok?0:rooms.filter(specable).length;
+      const gLabel=ok?"可以加入":(specN===rooms.length?"可以觀戰":"無法加入");
+      const gTail=(!ok&&specN&&specN<rooms.length)?'<span class="gt-sub">'+specN+' 間可觀戰</span>':'';
+      head.innerHTML='<span class="gt-dot" aria-hidden="true"></span>'+gLabel+' · '+rooms.length+' 間'+gTail;
       g.appendChild(head);
       rooms.forEach(r=>{
         const it=document.createElement("button");
-        it.type="button"; it.className="room-item"+(ok?" joinable":" busy"); it.disabled=!ok;
+        // sp = 這一列進不去,但可以站旁邊看(見 specable)
+        const sp=!ok && specable(r);
+        it.type="button";
+        it.className="room-item"+(ok?" joinable":(sp?" busy mps-able":" busy"));
+        it.disabled=!ok && !sp;
         const hostTag=r.host?'<span class="host">👑 '+esc(r.host)+'</span> · ':'';
         const nm=r.name||("房間 "+r.code);
         /* ⚠ JOIN_MID 的遊戲進不去只有一個理由(滿了)—— 標「對戰中」會讓人以為
            等一下就能進,而它其實永遠不會空出來(直到有人離開)。
            ★★ 回座那一列的字要不一樣:寫「加入」會讓人以為是別人的房、
               而它其實是自己剛剛那一場(分數與剩下的畫家回合都還在等他)。 */
+        /* ★★ 觀戰那一顆刻意**不寫成「🔒 已滿 · 👁 觀戰」** —— 進不去這件事由整列的
+           灰底講完了,鈕上只留「按下去會發生什麼」。 */
         const cta=ok ? '<span class="join-cta">'+(isBackRoom(r)?"🔄 回座":"加入")+'</span>'
+                     : sp ? '<span class="join-cta mps-cta">'+EYE_SVG+'觀戰</span>'
                      : '<span class="busy-tag">'+((r.count>=MAX_PLAYERS&&(JOIN_MID||r.status==="lobby"))?"🔒 已滿":"🔒 對戰中")+'</span>';
         it.innerHTML='<span class="room-main"><span class="rn">🏠 '+esc(nm)+'</span>'+
           '<span class="meta">'+hostTag+'👥 '+r.count+' / '+MAX_PLAYERS+' 人</span></span>'+cta;
         if(ok) it.addEventListener("click",()=>join(r.code,$("mpName").value,r.name));
+        else if(sp) it.addEventListener("click",()=>joinSpec(r.code,$("mpName").value,r.name));
         g.appendChild(it);
       });
       return g;
@@ -410,12 +492,24 @@ const MPCore = (function(){
           /* ⚠ 記憶對不上就順手清掉 + 讓下一份快照重畫房間列(不然那一列會一直寫著「🔄 回座」,
              按第二次還是同一句話,看起來像壞了)。 */
           if(REJOIN_MID){ forgetRoom(); lastRoomsSig=null; }
+          /* ★★ 開了觀戰的遊戲不要在這裡把人擋掉(v2.13.0)。
+             會走到這一行的只剩兩條路 —— **大廳那顆「加入」到不了這裡**
+             (joinable 與 specable 互斥,對戰中的房根本不給那顆鈕):
+               · 首頁「現在有人在玩」帶著 ?join= 進來,而那一間剛好開打了
+               · 兩個人同時按加入的競態
+             兩種的意圖都是「我想參與這件事」,而**站旁邊看比一句『不行』好**。
+             ⚠ 不會迴圈:joinSpec 失敗只會 setMsg,不會再轉回來。 */
+          if(SPECTATE){ roomRef=null; code=null; joinSpec(inCode,nm,inName); return; }
           setMsg("這間正在對戰中,無法加入。"); return;
         }
         roomName=inName||r.roomName||("房間 "+code);
         A.readRoom && A.readRoom(r);      // 先把房主的設定套上,免得大廳閃一下預設值
         claimSeat(okSeat=>{
-          if(!okSeat){ setMsg("這個房間已經滿了,請選別間。"); roomRef=null; code=null; return; }
+          if(!okSeat){
+            // ★ 同上:搶輸座位的那一台(大廳顯示未滿、按下去的瞬間被搶走)也讓他看得到
+            if(SPECTATE){ roomRef=null; code=null; joinSpec(inCode,nm,inName); return; }
+            setMsg("這個房間已經滿了,請選別間。"); roomRef=null; code=null; return;
+          }
           /* ★ 誤按離開的救援(v1.97.0):進大廳之前先把同名的舊成績接回來,免得畫面先閃一次 0
              ★★ 回座要**說一聲**(紅線 6:不靈默吃掉)—— 場內分住在 game 節點裡,
                 第一場的 scores 還是 0,adoptScore 那句「已接回你先前的成績」不會跳,
@@ -424,6 +518,60 @@ const MPCore = (function(){
           adoptScore(r, back ? (()=>{ enterLobby(); showToast("回到剛剛那一場了 🔄",2400); }) : enterLobby);
         });
       }).catch(e=>setMsg("加入失敗:"+e.message));
+    }
+    /* ---------- 觀戰:進房(v2.13.0,只有 SPECTATE 的遊戲有這條路) ----------
+       它與 join() 的差別只有四件事,而每一件都是刻意的:
+         · **不 claimSeat** —— 不進 players,所以開局人數 / 全員準備 / 名次 / 計分 /
+           斷線寬限 / 踢人**全都看不到我**(那正是走獨立節點換來的東西)
+         · **不 adoptScore** —— 觀戰者沒有分數可以接(他從來沒得過分)
+         · **不擋「對戰中」** —— 正在打才是最值得看的時候,這條路就是為它開的
+         · **`spectating=true` 一定要在 `enterLobby()` 之前設**
+           ⚠⚠ 這一條是這一整支唯一會出人命的順序:enterLobby() 會 listen(),
+             而 Firebase 的監聽**掛上就先給一次目前值** → onGame 可能當場
+             enterPlaying() → adapter 在那裡就會想寫東西(推相位 / 排倒數代打)。
+             閘門晚一拍打開 = **觀戰者的第一份快照有機會寫回 DB**。 */
+    function joinSpec(inCode,name,inName){
+      if(!SPECTATE)return;
+      if(!init()){ setMsg("尚未設定 Firebase,無法連線。"); return; }
+      const nm=(name||"").trim();
+      if(!nm){ flagNameNeeded(); return; }
+      const c=(inCode||"").replace(/\D/g,"").trim();
+      if(c.length<4){ setMsg("請從下方清單選擇要觀戰的房間。"); return; }
+      meName=nm.slice(0,8); meId=pid(); isHost=false; code=c; roomName=inName||"";
+      roomRef=db.ref(ROOMS+"/"+code);
+      roomRef.once("value").then(snap=>{
+        const r=snap.val();
+        if(!r||!r.host){ setMsg("這個房間已經關閉了,請重新選擇。"); roomRef=null; code=null; return; }
+        /* ⚠ 已經坐在位子上的人不可以再用觀戰身分進來(同一個 pid 兩種身分,而
+           `everyone()` 會讓他在晶片列上出現兩次、語音也會跟自己拉線)。
+           大廳點不到這條路(joinable 與 specable 互斥),但將來 `?join=` 那種
+           外部入口進得來 —— 擋在寫入端,不要只靠畫面擋(v2.9.0 那條教訓)。 */
+        if(r.players && r.players[meId]){ setMsg("你已經在這間房的座位上了。"); roomRef=null; code=null; return; }
+        roomName=inName||r.roomName||("房間 "+code);
+        A.readRoom && A.readRoom(r);      // 房規要先套上,否則觀戰畫面會拿自己的預設值去畫
+        claimSpec(okSpec=>{
+          if(!okSpec){ setMsg("這間房的觀戰人數已經滿了,請稍後再試。"); roomRef=null; code=null; return; }
+          spectating=true;                // ★★ 一定要在 enterLobby() 之前(見上面第四條)
+          enterLobby();
+          showToast("你正在觀戰 👁 —— 看得到、也講得到話,但不能出手",3000);
+        });
+      }).catch(e=>{ setMsg("觀戰失敗:"+((e&&e.message)||e)); roomRef=null; code=null; });
+    }
+    /* 搶一個觀戰名額。⚠ 用交易而不是 set:同 claimSeat 的道理 ——
+       好幾個人同時點「觀戰」的競態,once+set 是擋不住的。 */
+    function claimSpec(done){
+      if(!roomRef||!meId){ done&&done(false); return; }
+      roomRef.child("specs").transaction(s=>{
+        s=s||{};
+        if(s[meId]){ s[meId].name=meName; return s; }          // 已經在看了(重連)→ 只更新名字
+        if(Object.keys(s).length>=MAX_SPECS) return;           // 滿了 → 中止交易
+        s[meId]={ name:meName };
+        return s;
+      },(err,committed)=>{
+        const ok=!err&&committed;
+        if(ok) roomRef.child("specs/"+meId).onDisconnect().remove();
+        done&&done(ok);
+      });
     }
     /* 從 index.html 主選單的「現在有人在玩」帶著 ?join=<code> 進來(見 autoJoinFromQuery)。
        先切到連線畫面,SDK 就緒後才 join;openConnect() 的 then 註冊在前 → 一定是
@@ -562,6 +710,11 @@ const MPCore = (function(){
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
       gameRev=0; playedRound=null; clearRevHeal();   // ★ 進新房必歸零(見檔頭 #1);對帳表同理
       byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";      // 同上:上一間房「誰按了離開」不可以帶進新房(見四個寬限期)
+      /* ⚠⚠ 只清 `specs`,**絕對不可以在這裡清 `spectating`**:joinSpec() 的順序是
+         「先設 spectating=true,再呼叫這一支」(唯讀閘門必須早於第一份 game 快照,
+         見那一支的第四條)—— 在這裡清等於把觀戰者變回一個寫得動 DB 的人,
+         而且畫面上完全看不出來(閘門是靜靜 return 的)。它的歸零點只有 leave()。 */
+      specs={};
       clearPlayCount(); statDone=false;   // 熱門度計數:一間房記一次 → 進新房要重新起算
       document.body.classList.add("mp-on"); resetQuickVoiceBtn();
       stopRoomWatch();
@@ -576,7 +729,7 @@ const MPCore = (function(){
          ⚠ 這一頁的 online.js 另有一份平行實作,改一邊記得改另一邊。 */
       if(typeof RoomShare!=="undefined" && RoomShare) RoomShare.setRoom(code, roomName);
       A.enterLobby && A.enterLobby();
-      syncSubrow(); syncSetup(); updateReadyBtn(); updateGoal();
+      syncSubrow(); syncSetup(); updateReadyBtn(); updateGoal(); syncSpecUi();
       listen(); watchConn();
       armBackGuard(onBackKey);   // 返回鍵:進房後一律先問(冪等,整段房內生命週期只墊一筆歷史)
     }
@@ -594,8 +747,56 @@ const MPCore = (function(){
       $("primaryBar").classList.remove("hidden");
       $("mpReadyBtn").classList.remove("hidden");
       A.backToLobby && A.backToLobby();
-      syncSubrow(); syncSetup(); updateReadyBtn(); updateGoal(); setActionHint("");
+      syncSubrow(); syncSetup(); updateReadyBtn(); updateGoal(); setActionHint(""); syncSpecUi();
     }
+    /* ---------- 觀戰者的畫面(v2.13.0)----------
+       ⚠ 它只收**出手的入口**(準備鈕 + 那一整條動作列)。盤面、玩家晶片列、結果卡、
+         語音、表情一律照常 —— **那些正是他來看的東西**,收掉就沒有觀戰可言了。
+       ⚠⚠ 一定要在 enterLobby() **與** backToLobby() 兩處都呼叫:後者在每一局結束時
+         都會把 `primaryBar` / `mpReadyBtn` 重新 remove("hidden")(那是給玩家按的)——
+         漏掉 backToLobby 那一處的症狀是**觀戰者每打完一局就長出一顆按不動的
+         「準備好了」**,而第一次進房時完全正常(所以很容易驗不到)。
+       ★ 用 JS 收而不是寫一條 CSS:那兩個都是 `#id`,而紅線 6 的第六類正是
+         「群組選擇器裡混一個 #id,同一組的每個 class 都拿到 id 權重」。
+         `body.mps-on` 這顆 class 留給真的需要選到子元素的樣式用。 */
+    /* 觀戰者按到了「只有玩家能做的事」。
+       ⚠ 一定要**說一句話**(紅線 6:不靈默吃掉)—— 這幾顆鈕在畫面上多半已經收起來了,
+         真的走到這裡代表**對外 API 被直接呼叫**(`MP.toggleReady()`)或某個相位漏收 UI;
+         靜靜 return 的下場是「按了完全沒反應」,那與「壞掉了」在使用者眼裡是同一件事。
+       ⚠⚠ 它擋的**只有那幾支不寫 game 節點的路** —— `toggleReady` / `readyUp` 寫的是
+         `players/{我}`,而那正是觀戰者絕對不可以碰的節點(碰了就變成玩家,
+         還可能擠爆 MAX_PLAYERS)。走 game 的一律由 canWriteGame() 那道閘門擋,不必來這裡。
+       ★ 房規那幾支(setScoreMode / setWinGoal / resetScores / setRoomField)**天生就對**:
+         它們第一行都是 `if(!isHost…)return`,而觀戰者永遠不是房主。 */
+    function specBlocked(){
+      if(!spectating)return false;
+      showToast("你正在觀戰,不能出手",2000);
+      return true;
+    }
+    let specBtnMemo=null;
+    function syncSpecUi(){
+      if(!SPECTATE)return;
+      /* ⚠ 刻意叫 `mps-view` 而不是 `mps-on`:body 上已經有一個 **`mp-on`**(連線中)——
+         兩個狀態 class 掛在同一個元素上而且只差一個字元,是 notes/13 坑 1b 的形狀
+         (「`.btn` 已經存在,只差一個字元的兩個 class 遲早看錯」)。 */
+      document.body.classList.toggle("mps-view", spectating);
+      /* 結果卡那兩顆鈕的字對觀戰者是騙人的:「下一局」他沒有下一局要準備(按下去只是
+         把卡片關掉,見 again());「離開房間」也不精確 —— 他從來不在座位上。
+         ⚠⚠ **原本的字一定要先記下來,不可以寫死「下一局」** —— 那顆鈕的字各遊戲不同,
+           寫死等於「哪一頁開了這個旗標就把哪一頁的字改壞」,而且**只有觀戰過一次
+           再回來建房的人看得到**(症狀:自己開的房,結果卡上寫著「繼續觀戰」)。 */
+      const ag=$("mpAgain"), lw=$("mpLeaveWin");
+      if(specBtnMemo===null) specBtnMemo={ again:(ag&&ag.textContent)||"", leave:(lw&&lw.textContent)||"" };
+      if(ag) ag.textContent = spectating ? "繼續觀戰" : specBtnMemo.again;
+      if(lw) lw.textContent = spectating ? "結束觀戰" : specBtnMemo.leave;
+      /* ⚠ 底下兩顆只在觀戰時**單向**收起來,刻意不做反向的 remove("hidden") ——
+         它們在玩家身上本來就有一套完整的顯隱規則(對局中收、回大廳開),
+         在這裡「還原」等於跟那套規則搶方向盤。 */
+      if(!spectating)return;
+      const rb=$("mpReadyBtn"); if(rb) rb.classList.add("hidden");
+      const pb=$("primaryBar"); if(pb) pb.classList.add("hidden");
+    }
+
     /* ---------- 相位:對戰中 ---------- */
     function enterPlaying(){
       curPhase="playing";
@@ -644,7 +845,12 @@ const MPCore = (function(){
              ⚠ 回 null 是**正常情況**(還沒進房 / 剛離房),talk.js 那邊有防護。 */
           ref:(path)=>roomRef?roomRef.child(path):null,
           me:()=>meId,
-          players:()=>players,
+          /* ★★ 這裡餵的是 everyone()(玩家 + 觀戰者)—— **觀戰者能講話就靠這一行**。
+             talk.js 只在一個地方用這份名單(sync() 算「房裡有誰」),所以整個觀戰功能
+             的語音**在 talk.js 那一支裡一個字都不必改**,而且是雙向的:
+             玩家那台也會從這裡看到觀戰者 → 兩邊各自拉線,mesh 自然對稱。
+             ⚠ 沒開 SPECTATE 的十三頁 everyone() 直接回 players 本人 → 逐字等價。 */
+          players:()=>everyone(),
           nameOf:(id)=>dispName(id),
           /* ⚠ 「誰在說話」是 talk.js **在本地量出來的**(分析收到的音訊),
              不經過 DB —— 寫 DB 的話等於每個人每秒好幾筆,比語音本身還貴。
@@ -700,6 +906,17 @@ const MPCore = (function(){
         if(curPhase==="lobby") syncSetup();
         else if(curPhase==="playing"){ A.refresh && A.refresh(); if(winner) showOutcome(); }
       });
+      /* 觀戰者名單(v2.13.0)。⚠ **只有 SPECTATE 的遊戲才掛** —— 另外十三頁連一次
+         讀取都不會發生,`specs` 那個節點對它們根本不存在。
+         ⚠⚠ 它要做的事與 players 那一份**刻意只重疊兩件**:重畫晶片列 + 讓語音的 mesh
+           跟著動(有人來看就拉線、關掉頁面就拆線)。
+           **開局 / 全員準備 / 計分 / 斷線寬限 / 踢人一個都不看這裡** —— 那些全都問
+           `players`,而那正是走獨立節點的全部意義(見 SPECTATE 那一段)。 */
+      if(SPECTATE) roomRef.child("specs").on("value",s=>{
+        specs=s.val()||{};
+        renderPlayers();
+        { const T=talkOn(); if(T) T.refresh(); }
+      });
       // 一局揮發狀態:單一 game 節點、單一監聽(見檔頭 #3)
       roomRef.child("game").on("value",s=>onGame(s.val()));
       // 房間層級設定(房主可改、全員監聽):欄位由 adapter 宣告,值也由 adapter 保管
@@ -745,6 +962,17 @@ const MPCore = (function(){
        ⚠ connected===null(還沒問到 .info/connected)一律放行 —— 只擋**明確知道斷線**的時候。 */
     let offToastAt=0;
     function canWriteGame(){
+      /* ★★★★ **觀戰者的唯讀閘門 —— 整個觀戰功能就靠這一行**(v2.13.0)。
+         setGame / patchGame / txGame 三支都經過這裡 → 一道閘門一次擋掉
+         走棋 / 認輸 / 逾時代打 / 寫 winner / 結算 / 相位推進**全部**。
+         ⚠⚠ 千萬不要「順手」把它搬到各 adapter 的呼叫點去做:呼叫點的數量會隨
+           遊戲數線性成長,而閘門只有一個 —— 漏一處的症狀是**觀戰者幫人走了一步棋**,
+           而且畫面上完全看不出來(那一手在別人眼裡就是正常的一手)。
+         ⚠ 要排在 `connected===false` **之前**:排在後面的話觀戰者會吃到那句
+           「連線中斷,正在重新連線…」的假 toast(他根本沒有要寫東西)。
+         ★ 它與踩坑 #8(決定勝負要帶 local:false)是同一類:**自治交易的紀律一律
+           寫在這一個收斂點上**。 */
+      if(spectating)return false;
       if(!roomRef)return false;
       if(connected===false){
         const t=Date.now();
@@ -825,8 +1053,14 @@ const MPCore = (function(){
       /* 相位派發(★ 新局的本地狀態要在 enterPlaying 之前清掉,否則會拿上一局的殘留去畫)
          ★ 第二個條件只有 CONT_ROUND 的遊戲成立:局間不回大廳 → curPhase 一直是 playing,
            「新的一局來了」只剩 roundId 這一個記號(它由 startGame() 現配,一局內不會變)。 */
+      /* ★ 第三個條件是給**觀戰者**的(v2.13.0):他的「繼續」只關結果卡、不回大廳
+         (見 again()),所以 curPhase 會一路停在 "playing" —— 少了這一條,
+         下一局開打時 enterPlaying() 一次都不會再被呼叫,而那一支才是收起 scrollArea /
+         公告出手順序 / 重置本地狀態的地方(症狀是「第二局開始了,畫面還停在上一局」)。
+         ⚠ 判準與 CONT_ROUND 共用同一個記號 `playedRound`(在 enterPlaying 裡更新)——
+           那條路已經被台灣麻將與 21 點驗了很久,不要另外發明一個。 */
       if(status==="playing"){
-        if(curPhase!=="playing" || (CONT_ROUND && roundId!==playedRound)){ A.resetRound && A.resetRound(); enterPlaying(); }
+        if(curPhase!=="playing" || ((CONT_ROUND||spectating) && roundId!==playedRound)){ A.resetRound && A.resetRound(); enterPlaying(); }
       }
       /* ★ 第三條相位:決定出手順序(猜拳 / 房主排)。只有 ORDER_PICK 的遊戲進得來 ——
          沒開的遊戲 status 永遠只有 lobby / playing,這一支等於不存在。
@@ -1033,6 +1267,7 @@ const MPCore = (function(){
     // 蓋板上的逃生出口:房主 = 取消回大廳(不離房);訪客 = 真的離開(先問一次)
     function bailOrder(){ if(isHost) cancelOrder(); else askLeave(); }
     function toggleReady(){
+      if(specBlocked())return;     // ★ 觀戰者碰不得 players/{我}(見 specBlocked)
       if(!roomRef||!meId)return;
       ready=!ready;
       roomRef.child("players/"+meId).update({ ready:ready, name:meName });
@@ -1062,6 +1297,7 @@ const MPCore = (function(){
          兩邊一致時(正常情況)行為與舊版逐字相同 —— 只有不一致的那一台會多寫一次,
          而那一次正是把它救回來的那一次。 */
     function readyUp(){
+      if(specBlocked()) return false;     // ★ 同 toggleReady:它也寫 players/{我}
       if(!CONT_ROUND || !roomRef || !meId) return false;
       if(ready && (players[meId]||{}).ready) return false;
       const rid=roundId, wasPlaying=(status!=="lobby");
@@ -1086,6 +1322,9 @@ const MPCore = (function(){
     let resignAsked=false;
     function askResign(){
       if(!A.hasResign)return;
+      /* ★ 擋在**問**這一層而不是等 confirmResign 被閘門吞掉:少了這一行,觀戰者按下去
+         會跳出一張「確定要認輸?」的確認卡,按了確定卻什麼都不會發生。 */
+      if(specBlocked())return;
       if(curPhase!=="playing"||winner||abandoned){ showToast("現在不能認輸"); return; }
       resignAsked=true; $("resignVeil").classList.add("show");
     }
@@ -1269,6 +1508,14 @@ const MPCore = (function(){
     // 「繼續」= 各自回大廳重新準備(不強拉別人);第一個按的人把 status 翻回 lobby
     function again(){
       if(!roomRef)return;
+      /* ★★ 觀戰者的「繼續」= **只把結果卡關掉**,不回大廳(v2.13.0)。
+         走玩家那條路會 backToLobby() 把本地相位改成 lobby,而這時 DB 上的 status
+         多半還是 "playing" —— 玩家自己那台是靠上面那筆交易的**樂觀套用**先翻好的,
+         而觀戰者的交易被唯讀閘門擋掉,他翻不動 → **下一份快照當場又 enterPlaying()
+         把他彈回對局畫面**。按下去閃一下、然後什麼都沒發生,而且沒有任何錯誤。
+         ★ 他本來也不需要「準備下一局」:下一局開打時 onGame 會靠 roundId
+           重新叫一次 enterPlaying()(見那一段的第三個條件)。 */
+      if(spectating){ closeWin(); return; }
       if(status!=="lobby") txGame(g=>{ if(g.status==="lobby")return false; g.status="lobby"; });
       backToLobby();
     }
@@ -1331,11 +1578,38 @@ const MPCore = (function(){
         chip.innerHTML=side+'<span class="gmk-nm">'+esc(ex.name||"")+'</span>'+extra;
         box.appendChild(chip);
       });
+      /* ★★ 觀戰者的晶片(v2.13.0,只有 SPECTATE 的遊戲會有)。
+         ⚠ 它與上面那段「虛擬玩家」的取捨**剛好相反**:虛擬玩家不吃互動是因為
+           點了沒反應;而觀戰者是**真人、有裝置、收得到表情也講得到話** ——
+           所以 click 一定要掛(使用者裁示:能語音、能表情)。
+         ⚠ 但三件事刻意不給,每一件都是「有比沒有更糟」:
+           · 不畫 🏆N —— 他從來沒得過分,那顆徽章一律是 0
+           · 不畫 ✕(踢人)—— 踢不掉的東西不可以給鈕(要給得先做踢觀戰者的機制)
+           · 不問 chipLead / chipTail —— 那兩支問的是「**這個座位**」,而他沒有座位
+             (暗棋的 chipLead 拿 order.indexOf(id) 查顏色 → 觀戰者是 -1)
+         ⚠⚠ `tk-talking` 一定要跟上:觀戰者講話時晶片要亮,否則四個人圍著看的時候
+           「是誰在講」完全看不出來 —— 而那正是他唯一能做的事。 */
+      if(SPECTATE) Object.keys(specs).forEach(id=>{
+        if(players[id])return;             // 保險:同一個 pid 兩種身分時只畫玩家那一顆
+        const chip=document.createElement("div");
+        chip.className="mp-chip clickable mps-chip"+(id===meId?" me":"")
+                      +(talkingIds.indexOf(id)>=0?" tk-talking":"");
+        chip.dataset.id=id;
+        chip.title=id===meId?"你正在觀戰 · 點一下傳送互動表情給全部人":"觀戰中 · 點一下傳送互動表情";
+        chip.addEventListener("click",()=>openEmote(id===meId?"all":id));
+        chip.innerHTML=EYE_SVG+'<span class="gmk-nm">'+esc(dispName(id))+'</span>'+youTag(id);
+        box.appendChild(chip);
+      });
       if(aloneTick){ /* 落單倒數中:狀態列交給倒數,不覆蓋 */ }
       else if(curPhase==="playing") onStatusTxt(winner?"這局結束":"對戰中…");
       // 決定順序中(ORDER_PICK):在等什麼只有狀態列講得出來
       else if(ORDER_PHASE[curPhase]) onStatusTxt(curPhase==="ordering" ? "房主正在排順序…"
                                                 : (curPhase==="reveal" ? "猜拳結果揭曉…" : "猜拳決定順序…"));
+      /* ★ 觀戰者在大廳要看到**他自己的處境**(v2.13.0):底下那句預設是
+         「等待大家準備…」/「按『準備好了』就開始」—— 對一個準備鈕已經被收起來的人來說,
+         那是在叫他去按一顆找不到的鈕。⚠ 對局中刻意不改:「對戰中…」對他一樣成立,
+         而且那一列在對局中本來就是收起來的(syncSubrow)。 */
+      else if(spectating) onStatusTxt(ids.length<MIN_PLAYERS?"觀戰中 · 等人數湊齊…":"觀戰中 · 等他們開始…");
       else onStatusTxt(A.lobbyStatusText ? A.lobbyStatusText(ids)
                        : (ids.length<MIN_PLAYERS?"等待其他人加入…":"等待大家準備…"));
       syncSubrow(); updateGoal();
@@ -1590,6 +1864,7 @@ const MPCore = (function(){
       try{
         if(roomRef){
           ["host","players","game","scoreMode","winGoal","scores","emotes","bye","rtc"]
+            .concat(SPECTATE ? ["specs"] : [])
             .concat(ORDER_PICK ? ["orderMethod"] : [])
             .concat(Object.keys(A.roomFields ? A.roomFields() : {}))
             .concat(A.extraNodes || [])
@@ -1632,6 +1907,15 @@ const MPCore = (function(){
                         hostName:meName||"", closedAt:Date.now() };
             (A.extraNodes||[]).forEach(k=>{ ups[k]=null; });
             roomRef.update(ups);
+          }else if(spectating && meId){
+            /* ★ 觀戰者離開:只把自己從 specs 拿掉,兩行做完。
+               ⚠⚠ **刻意不寫 bye、也不碰 scores**:
+                 · `bye/{pid}` 是「這個人不玩了」的訊號,它唯一的作用是**縮短房主端
+                   等對手回來的寬限期**(見檔頭四個寬限期)。觀戰者根本不在 players 裡,
+                   替他寫一筆等於在那套判斷裡留一個永遠不會被讀到的假記號。
+                 · scores 同理 —— 他從來沒得過分,那個節點裡沒有他。 */
+            const sr=roomRef.child("specs/"+meId);
+            sr.onDisconnect().cancel(); sr.remove();
           }else if(meId){
             const pr=roomRef.child("players/"+meId);
             /* ★ v1.166.0:先留下「我是自己按離開的」記號,再把自己移掉。
@@ -1658,6 +1942,9 @@ const MPCore = (function(){
       stopConn(); clearRecheck(); clearAloneCheck(); clearPlayCount();
       resyncing=false; if(resyncTimer){ clearTimeout(resyncTimer); resyncTimer=null; }
       roomRef=null; code=null; online=false; ready=false; isHost=false;
+      /* ★★ 觀戰身分一定要在這裡放掉:留著的話下一次**建房或加入**會帶著唯讀閘門進去
+         —— 症狀是「開了房卻怎麼樣都走不了棋」,而畫面上沒有任何錯誤(閘門是靜靜 return 的)。 */
+      spectating=false; specs={};
       players={}; scores={}; order=[]; winner=null; status="lobby"; curPhase="lobby";
       byeIds={}; aloneWaitMs=0; talkingIds=[]; talkingSig="";
       sawPlayers=false; sawMe=false; sawHost=false; hostId=null; prevIds=null;
@@ -1669,6 +1956,12 @@ const MPCore = (function(){
       closeLeaveAsk(); closeKick(); closeResign(); closeEmote(); closeWin();
       disarmBackGuard();   // 已經不在房裡:守衛連同它墊的那一筆歷史一起收掉(不然返回鍵要多按一次)
       document.body.classList.remove("mp-on"); resetQuickVoiceBtn();
+      /* ★ 觀戰的痕跡也要收:body 的 `mps-view` 與結果卡那兩顆鈕的字。
+         ⚠ 一定要排在上面 `spectating=false` 之後 —— 這一支是照旗標決定方向的。
+         ⚠⚠ 漏掉這一行的下場很輕但很怪:離開觀戰之後自己開一間房,
+           結果卡上仍然寫著「繼續觀戰 / 結束觀戰」,而所有斷言都是綠的
+           (是這一支 e2e 的 I 節把它抓出來的)。 */
+      syncSpecUi();
       if(typeof RoomShare!=="undefined" && RoomShare) RoomShare.setRoom(null);   // 收掉邀請鈕與 QR 蓋板
       A.onLeave && A.onLeave();
       setActionHint("");
@@ -1676,7 +1969,11 @@ const MPCore = (function(){
     }
 
     /* ---------- 好友互動:表情 / 語音 ---------- */
-    function roster(){ return Object.keys(players).map(id=>({ id:id, name:dispName(id), me:id===meId })); }
+    /* 表情面板的收件人清單。★ 用 everyone() 而不是 players:**觀戰者也收得到表情**
+       (使用者裁示),而他在 DB 上是實實在在的一個 pid,emotes 那個節點本來就是
+       「送給誰」而不是「送給哪個座位」。⚠ 多帶一個 spec 旗標讓 UI 有機會標示,
+       不用它的頁面完全不受影響。 */
+    function roster(){ return Object.keys(everyone()).map(id=>({ id:id, name:dispName(id), me:id===meId, spec:isSpec(id) })); }
     function sendEmote(to,emoji,kind,audio){
       if(!roomRef||!meId)return;
       const isText=kind==="text", isVoice=kind==="voice", isClip=kind==="clip";
@@ -1737,6 +2034,11 @@ const MPCore = (function(){
     const ctx = {
       me:()=>meId, name:()=>meName, players:()=>players, order:()=>order,
       isHost:()=>isHost, phase:()=>curPhase,
+      /* ★★ 我是不是觀戰者(v2.13.0)。⚠ adapter **不需要**拿它去擋任何一筆寫入 ——
+         那些全部由 canWriteGame() 那一道閘門擋掉了。它存在的理由只有一個:
+         **讓 adapter 收掉「按了會沒反應」的互動**(盤面的點擊、拖曳、hover 提示)。
+         判準:會寫 DB 的不要在這裡擋(閘門的事),純畫面的才在這裡擋。 */
+      spectating:()=>spectating,
       winner:()=>winner, roundId:()=>roundId, abandoned:()=>abandoned,
       dispName, youTag, scoreOf,
       txGame, setRoomField, unreadyOnFieldChange, readyUp,
@@ -1764,6 +2066,8 @@ const MPCore = (function(){
     const api = {
       available, openConnect, scanRooms, create, join, joinFromHome, leave,
       toggleReady, again, readyUp,
+      // 觀戰(只有 SPECTATE 的遊戲用得到;沒開的話 joinSpec 是空動作、amSpec 恆為 false)
+      joinSpec, amSpec:()=>spectating,
       isOnline:()=>online, amHost:()=>isHost, amReady:()=>ready,
       setScoreMode, setWinGoal, resetScores,
       winGoal:()=>winGoal, scoreMode:()=>scoreMode,
@@ -1834,6 +2138,17 @@ const MPCore = (function(){
                           對帳:startGame() 的 prev(座位輪替)與 foesByeOnly()(寬限期長度)。
                           兩處都是「對不上就走保守那條」,不會壞掉 —— 但 adapter 要知道
                           **prev 一定拿不到**(見台灣麻將 newGame 的 prevOrd)。
+     spectate         ★ **連線觀戰**(v2.13.0 為暗棋加,第七個能力旗標)——
+                        滿了 / 對戰中的房間在大廳多一顆「👁 觀戰」,進去只能看。
+                        不帶就是舊行為(那些房間照舊是灰的、按不下去)。開了之後:
+                          · 觀戰者住 `specs/{pid}`(與 players 平行 + onDisconnect)
+                          · 唯讀**只有一道閘門**:canWriteGame()(setGame/patchGame/txGame 共用)
+                          · 語音與表情照常 —— 觀戰者是真人(使用者裁示)
+                          · adapter 要做的只有一件事:**用 ctx.spectating() 收掉盤面的互動**
+                            (會寫 DB 的不必管,閘門擋掉了;這裡擋的是「按了沒反應」)
+                        ⚠ 觀戰**不是**擂台遞補:觀戰者永遠不會被排進 order,
+                          要上場得自己離開再等一間空的房(2026-08-24 使用者裁示的範圍)。
+                        ⚠ maxSpecs 預設 4 —— 那個數字是**語音 mesh(N²)** 的上限,不是流量。
      adoptId(old,now)  ★ 同名接續時,把遊戲自己那份「per-pid 的一場進度」從舊 pid 搬到新 pid
                         (v1.97.0;核心只負責 scores 節點,見 adoptScore)。
                         只有 21 點需要(bj.nets);其他七個遊戲對局中不能加入 → 回大廳才進得來,

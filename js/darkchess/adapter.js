@@ -88,6 +88,15 @@ const MP = MPCore.create((function(){
      (輪到誰由玩家晶片的 .turn 高亮講)。要顯示對手名字請走 ctx.dispName(id)。 */
   const secOn = () => turnSec > 0;
   const playing = () => ctx.phase() === "playing" && !ctx.winner() && !ctx.abandoned();
+  /* 我是不是站在旁邊看的人(v2.13.0,核心的第七個旗標 spectate)。
+     ⚠⚠ **它不是用來擋寫入的** —— 走棋 / 代打 / 結算那三筆全部由核心的 canWriteGame()
+       一道閘門擋掉了,在這裡再擋一次只會讓「閘門到底在哪」變成兩個答案。
+     它只用在兩種地方:
+       ① **放行 paint()** —— 觀戰者沒有座位(mySeat() 是 -1),而那一支原本 me<0 就整支
+          return → 盤面一格都不會畫。整個觀戰功能在這一頁就卡在那一行。
+       ② **收掉反正也寫不進去的空轉** —— 倒數代打的計時器、結算的重算。
+          ⚠ 那兩處不收也不會壞(閘門擋著),收是為了不要每 turnSec 秒排一顆沒有用的表。 */
+  const iSpec = () => !!(ctx.spectating && ctx.spectating());
 
   /* ---------- 輪到誰 ----------
      ★ 一律問 replay 出來的 st.turn —— 連吃會讓步數與座位脫鉤。 */
@@ -107,14 +116,28 @@ const MP = MPCore.create((function(){
   function paint(){
     if(!st) return;
     const me = mySeat();
-    if(me < 0) return;
+    /* ★★★ 觀戰者要放行(v2.13.0)。他不在 `order` 裡 → `mySeat()` 是 -1,而這一行
+       原本一律 return —— **盤面一格都不會畫**,整個觀戰在這一頁就卡在這裡。
+       ⚠ 只放行「沒有座位」這一種,`!st` 那條照舊擋(那是真的沒有局面可畫)。
+       ⚠⚠ 放行之後底下四個參數對他的意義要重新讀一次。board.js 那三處**本來就有
+         fallback**(399 / 803 / 400),但這裡刻意把值明確寫出來,不要靠 undefined
+         掉進別人的預設 —— 那種對法在下一次改 board.js 時會靜靜地變成另一個意思:
+           mySide:-1  沒有顏色 → 一顆棋都不會被畫成「我的」(board.js:399/1256/1267)
+           mine:false 動作列與點擊一律關掉(board.js:400 的 canAct)
+           mySeat:-1  吃子欄退回「座位 0 在上」(board.js:803 的 fallback),
+                      而兩邊的名字本來就從 names 帶進去 → 看得出誰是誰
+           spec:true  點擊時要說對的話(board.js 的 tapSq;不傳的話他會看到
+                      「還沒輪到你」—— 而那對一個永遠不會輪到的人是騙人的) */
+    const spec = iSpec();
+    if(me < 0 && !spec) return;
     ctx.renderPlayers();
     DCB.setState({
       st: st,
-      mySide: st.col[me],
+      mySide: me >= 0 ? st.col[me] : -1,
       mine: isMyTurn(),
       over: !!ctx.winner() || st.over,
       key: moves.length,
+      spec: spec,
       // ★ 吃子欄要知道「哪個座位是我」與兩個座位各叫什麼(見 board.js 的 setState)
       mySeat: me,
       names: ctx.order().map(id => ctx.dispName(id)),
@@ -203,6 +226,9 @@ const MP = MPCore.create((function(){
 
   function armTurnT(){
     clearTurnT();
+    /* ★ 觀戰者不排這顆表:代打那一筆走 ctx.txGame,被核心的唯讀閘門擋著 →
+       排了也只是每 turnSec 秒空轉一次。⚠ 這是效率,不是正確性(見 iSpec 的②)。 */
+    if(iSpec()) return;
     if(!secOn() || !st || st.over || !playing()) return;
     const seat = st.turn, me = mySeat();
     const wait = Math.max(1200, turnAt + turnSec * 1000 - Date.now()) + Math.max(0, me) * 150;
@@ -233,6 +259,7 @@ const MP = MPCore.create((function(){
          而 winnerIds() 決定誰加分 → 兩個人各得 1 勝,與畫面講的話一致。
      ========================================================================== */
   function maybeSettle(){
+    if(iSpec()) return;          // ★ 同 armTurnT:結算那一筆也走 txGame,算了也寫不進去
     if(!st || !st.over || ctx.winner() || !playing()) return;
     const ord = ctx.order();
     ctx.txGame(g => {
@@ -287,6 +314,20 @@ const MP = MPCore.create((function(){
        落地見 js/shared/mp-order.js(蓋板 + 猜拳判定)與 darkchess.html 的 #mpOrderRow;
        決定出來的順序從 newGame() 的第三個參數進來。 */
     orderPick: true,
+    /* ★★ 連線觀戰(v2.13.0;核心的第七個能力旗標,暗棋是第一個開的)——
+       「只坐得下兩個人」在親友聚會是硬傷:四個人圍著一支手機,另外兩個只能乾等。
+       開了之後大廳裡**滿了 / 對戰中**的房間會多一顆「👁 觀戰」。
+       ⚠ 這一頁要配合的只有三處,全部在 adapter / board:
+         ① paint() 對「沒有座位」放行(否則盤面一格都不會畫)
+         ② armTurnT / maybeSettle 早退(純粹是不要空轉)
+         ③ board.js 的 tapSq 說對的話(那是唯一一處**使用者看得到**的)
+       ⚠⚠ 一個字都不必去擋寫入 —— 走棋 / 代打 / 結算全部經過 ctx.txGame,
+         而核心的 canWriteGame() 是那三支的共同閘門。
+       ⚠⚠⚠ **暗棋的 `deal` 在 DB 上是明碼**(32 字元),觀戰者開一次 devtools 就
+         報得出全盤 —— 嚴格說它與牌類同構,不是 notes/06 當年寫的「完全資訊遊戲的紅利」。
+         在這個專案裡這不構成否決(CLAUDE.md 開頭:防作弊一律不必做),
+         但**不要照那句舊理由去推別的遊戲**。攤牌鈕倒是安全的:canReveal() 要求終局。 */
+    spectate: true,
 
     init(c){ ctx = c; },
 

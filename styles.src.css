@@ -1108,6 +1108,35 @@
   .room-item.busy:hover{transform:none;border-color:var(--panel-line);background:rgba(255,255,255,.10)}
   .room-item .busy-tag{flex:none;display:inline-flex;align-items:center;gap:4px;padding:8px 13px;border-radius:999px;
     background:rgba(255,255,255,.08);border:1px solid var(--panel-line);color:var(--muted);font-size:13px;font-weight:800;white-space:nowrap}
+  /* ======== 連線觀戰(v2.13.0;核心第七個旗標 spectate,目前只有暗棋開)========
+     ★ 全部掛 `mps-` 前綴。⚠ body 的狀態 class 叫 **`mps-view`** 而不是 `mps-on` ——
+       body 上已經有一個 `mp-on`(連線中),兩個只差一個字元的狀態 class 掛在同一個
+       元素上正是本檔第一節坑 1b 的形狀。
+     ★★ 配色刻意**不用綠色**:綠色在這一頁已經被「可以加入」佔走了(.room-item.joinable
+       整套都是綠的)。觀戰是另一件事,用靛藍 —— 一眼分得出「這一列我進不去,但看得到」。
+     ⚠⚠ 膠囊一律**自帶底色 + 白字**,不吃主題變數:那顆鈕要在五個主題上都讀得出來,
+       而 bubblegum 是唯一「淺底深字」的那一個(紅線 9 兩次都栽在這裡)。 */
+  /* 可觀戰的那一列掛著 `.busy`(opacity .55 + not-allowed),要把那兩件事收回來。
+     ⚠⚠ 權重與 `.room-item.busy` **完全相同**(0,2,0)→ 純靠**順序**壓過它 →
+       這一節必須排在 `.room-item.busy` 後面。搬動它的位置時記得這件事,
+       搬到前面去的症狀是「觀戰那一列還是灰的、滑鼠還是禁止符號」,而顏色是對的。
+     ⚠ opacity 給 .86 而不是 1:它終究不是「可以加入」,與上面那組綠的要留一階層次。 */
+  .room-item.mps-able{opacity:.86;cursor:pointer;border-color:rgba(99,102,241,.5);background:rgba(99,102,241,.10)}
+  .room-item.mps-able:hover{transform:translateY(-1px);opacity:1;border-color:#6366f1;background:rgba(99,102,241,.17)}
+  .room-item .join-cta.mps-cta{background:#6366f1;color:#fff}
+  .room-item.mps-able:hover .join-cta.mps-cta{background:#4f46e5}
+  /* 眼睛是自繪 SVG(見 mp-core.js 的 EYE_SVG,理由寫在那裡:U+1F441 是「預設文字呈現」
+     的那一類,而補了 U+FE0F 之後又不吃 color)—— 它吃 currentColor,
+     所以在鈕裡是白的、在晶片裡是下面那條指定的顏色。 */
+  .mps-eye{flex:none;vertical-align:-2px}
+  /* 分組標題右邊那句「N 間可觀戰」(只有「一部分可觀戰」時才會出現) */
+  .room-group-title .gt-sub{margin-left:auto;font-size:11.5px;font-weight:800;color:#818cf8}
+  /* 觀戰者的晶片:**虛線邊** = 「他在房裡,但不在局裡」。
+     ⚠ 名字本身**不可以**改用 --muted(紅線 9 的第二次教訓:會影響判斷的一律 --text)——
+       「現在有誰在看」是要讀得出來的資訊。層級靠虛線邊框與眼睛圖示分,不是靠把字調淡。 */
+  .mp-chip.mps-chip{border-style:dashed;border-color:rgba(99,102,241,.55);
+    background:linear-gradient(180deg,rgba(99,102,241,.14),rgba(99,102,241,.05))}
+  .mp-chip.mps-chip .mps-eye{color:#818cf8}
   .room-empty{color:var(--muted);font-size:13px;padding:6px 2px}
 
   /* 加入區:即時偵測膠囊 + 重新偵測鈕同一列 */

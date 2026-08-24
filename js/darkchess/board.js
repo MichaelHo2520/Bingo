@@ -1235,6 +1235,10 @@ const DCB = (function(){
     if(!cur || !cur.st) return;
     const st = cur.st;
     if(st.over || cur.over) return;
+    /* ★ 觀戰者(v2.13.0)一定要排在下面那句之前:「還沒輪到你」對一個**永遠不會輪到**
+       的人是騙人的,他會一直等下去。⚠ 照這一節開頭那條紅線:點不了的格一律
+       說得出原因,不可以靜默 return。 */
+    if(cur.spec){ showToast("你正在觀戰,不能出手"); return; }
     if(!cur.mine){ showToast("還沒輪到你"); return; }
 
     // 連吃進行中:只認「續吃」與「停」
@@ -1396,7 +1400,9 @@ const DCB = (function(){
     }
   }
 
-  /* o = { st, mySide, mine, over, key, cdMs, cdEnd, mySeat, names }
+  /* o = { st, mySide, mine, over, key, cdMs, cdEnd, mySeat, names, spec }
+     ★ spec = 看的人是觀戰者(v2.13.0)。他沒有座位,所以 mySide / mySeat 會是 -1 ——
+       那兩個值本來就有 fallback(399 / 803),**唯一真的需要這個旗標的是 tapSq 的訊息**。
      ⚠ v1.146.0 拿掉了 turnName:「輪到誰」那一行沒有了(玩家晶片的 .turn 高亮在講),
        所以兩個 caller 都不必再算它。
      ★ mySeat / names 只給**吃子欄**用(誰吃掉了什麼);沒帶的話退回「你 / 對手」。
