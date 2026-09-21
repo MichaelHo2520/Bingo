@@ -141,7 +141,18 @@ const HomeLive = (function(){
        ⚠ icon 用 ⬢(U+2B22 黑色六邊形)—— 與另外十三個都不撞(🎲⚫🔢🀄🀄🎴🎴🌈🔴🧩🎨✈️),
          也不落在 U+1F000 / U+1F0A0 那兩段禁區(CLAUDE.md 紅線 8)。
        ⚠ **不帶 joinMid** —— 棋子已經在盤上,中途進來的人沒有角可以坐(比照 UNO / 暗棋 / 飛行棋)。 */
-    { key:"tq", index:"tq_index", rooms:"tq_rooms", name:"跳棋", icon:"⬢", badge:"hlBadgeTq", max:6, href:"tiaoqi.html" }
+    { key:"tq", index:"tq_index", rooms:"tq_rooms", name:"跳棋", icon:"⬢", badge:"hlBadgeTq", max:6, href:"tiaoqi.html" },
+    /* ★ 第十五個遊戲(v2.13.0):方塊對戰。
+       max 必須與 js/blocks/adapter.js 的 maxPlayers 一致(**4**)。
+       ⚠ key / index / rooms 用 blocks,CSS 前綴與圖檔用 blk —— 這一頁是**唯一**
+         兩者不同的(blocks 當 CSS 前綴太長、blk 當節點名又看不懂)。
+         key 仍然必須等於 index 去掉 "_index";index.html 那張卡的 data-gk 是 "blocks"。
+       ⚠ icon 用 ⬛(U+2B1B 黑色大方塊)—— 方塊對戰的識別就是方塊,而它與另外
+         十四個都不撞(🎲⚫🔢🀄🀄🎴🎴🌈🔴🧩🎨✈️⬢),也不落在 U+1F000 / U+1F0A0
+         那兩段禁區(CLAUDE.md 紅線 8)。
+       ⚠ **不帶 joinMid** —— 一局就是一局,對戰中不給加入。
+         但**可以觀戰**:那一條走的是 adapter 的 spectate 旗標,與 joinable() 無關。 */
+    { key:"blocks", index:"blocks_index", rooms:"blocks_rooms", name:"方塊對戰", icon:"⬛", badge:"hlBadgeBlocks", max:4, href:"blocks.html" }
   ];
 
   /* ==========================================================================

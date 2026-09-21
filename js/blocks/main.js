@@ -53,12 +53,18 @@ function showHomeLayer(which){
 }
 function paintSoloHint(){
   const el = $("blkSoloHint"); if(!el) return;
+  syncSoloSeg();
   const r = Solo.rec();
+  const lv = BLKAI.levelOf(Solo.level());
   const body = (Solo.mode() === "sprint")
     ? ("<b>" + Solo.SPRINT_LINES + " 行競速</b>:消滿 " + Solo.SPRINT_LINES + " 行,比誰快。" +
        (r.sprint ? "你最快 <b>" + (r.sprint / 1000).toFixed(1) + " 秒</b>。" : "還沒有紀錄。"))
-    : ("<b>練習(無盡)</b>:一路堆到爆為止,重力每 30 秒快一階。" +
-       (r.best ? "你最高 <b>" + r.best + " 行</b>。" : "還沒有紀錄。"));
+    : (Solo.mode() === "vs")
+      ? ("<b>對電腦</b>:互相送垃圾行,先堆爆的輸。" +
+         "<b>" + lv.emoji + " " + lv.name + "</b>:" + esc(lv.desc) + "<br>" +
+         ((r.win + r.lose) ? ("你目前 <b>" + r.win + " 勝 " + r.lose + " 敗</b>。") : "還沒有交手紀錄。"))
+      : ("<b>練習(無盡)</b>:一路堆到爆為止,重力每 30 秒快一階。" +
+         (r.best ? "你最高 <b>" + r.best + " 行</b>。" : "還沒有紀錄。"));
   el.innerHTML = body + "<br>" +
     "手機:底下的按鈕;<b>長按左右</b>會連續移動。電腦:方向鍵移動、<b>空白鍵</b>直接落地、" +
     "<b>↑ / X</b> 順轉、<b>Z</b> 逆轉、<b>C</b> 換牌。<br>" +
@@ -82,6 +88,10 @@ function syncSoloSeg(){
   set("blkFeelSeg", "feel", Solo.feel());
   set("blkCtrlSeg", "ctrl", Solo.ctrl());
   set("blkPadSeg", "pad", Solo.pad());
+  set("blkLvSeg", "lv", Solo.level());
+  /* 電腦強度只有「對電腦」用得到 → 其他玩法收起來(留著只會讓人以為練習也有電腦) */
+  const lvRow = $("blkLvRow");
+  if(lvRow) lvRow.classList.toggle("hidden", Solo.mode() !== "vs");
 }
 
 /* ---------- 盤面 ----------
@@ -94,6 +104,11 @@ BLKB.mount({
   canPlay(){
     if(Solo.active()) return !Solo.paused();
     return (typeof MP !== "undefined") ? MP.canPlay() : false;
+  },
+  /* 每一幀的鉤子:單機對電腦在這裡推進電腦那一份狀態 */
+  onFrame(dt){
+    if(Solo.active()) Solo.onFrame(dt);
+    else if(typeof MP !== "undefined" && MP.onFrame) MP.onFrame(dt);
   }
 });
 
@@ -108,6 +123,7 @@ segPick("blkModeSeg", "mode", v => Solo.setMode(v));
 segPick("blkFeelSeg", "feel", v => Solo.setFeel(+v));
 segPick("blkCtrlSeg", "ctrl", v => Solo.setCtrl(v));
 segPick("blkPadSeg", "pad", v => Solo.setPad(v));
+segPick("blkLvSeg", "lv", v => Solo.setLevel(v));
 $("blkStartSolo").addEventListener("click", () => Solo.start());
 
 /* ---------- 單機的列 / 結果卡 ---------- */
@@ -118,9 +134,27 @@ $("blkPauseBtn").addEventListener("click", () => Solo.togglePause());
 $("winPeek").addEventListener("click", peekBoard);
 $("reopenWin").addEventListener("click", showResult);
 
-/* ---------- 連線(P3 才會有 MP,這裡先全部包起來)---------- */
+/* ---------- 連線 ----------
+   ⚠ 一律 `typeof MP !== "undefined"` 包起來(同 ui-kit 對 Talk / RoomShare 的做法)——
+     將來若把 adapter 拿掉,這一支不會整頁 ReferenceError。 */
 (function bindMP(){
   if(typeof MP === "undefined") return;
+  /* 房規 */
+  $("blkModeSegMp").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setMode(b.dataset.mode); });
+  $("blkSecsSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setSecs(b.dataset.secs); });
+  $("blkShieldSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setShield(b.dataset.shield); });
+  $("blkHcapSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setHcap(+b.dataset.hcap); });
+  $("scoreSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setScoreMode(b.dataset.score); });
+  $("wgMinus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() - 1));
+  $("wgPlus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() + 1));
+  $("resetScoreBtn").addEventListener("click", () => MP.resetScores());
+  /* 點對手的小盤 = 鎖定 / 取消鎖定攻擊目標。
+     ⚠ 小盤的 DOM 是 board.js 執行期建的 → 只能用事件委派掛在容器上。 */
+  $("blkFoes").addEventListener("click", e => {
+    const i = BLKB.foeAt(e.target);
+    if(i >= 0) MP.tapFoe(i);
+  });
+  $("mpNewSeason").addEventListener("click", () => { MP.resetScores(); MP.again(); });
   $("mpCreate").addEventListener("click", () => MP.create($("mpName").value, $("mpRoomName").value));
   $("mpScan").addEventListener("click", () => MP.scanRooms());
   $("mpName").addEventListener("change", savePrefs);

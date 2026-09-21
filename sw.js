@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "2.12.0";
+const VERSION = "2.13.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -151,6 +151,14 @@ const CORE = [
      ★ 它與飛行棋一樣共用 js/shared/*(ui-kit / mp-core / mp-order)—— 上面已經列過,不必再列。
      ★ 這一頁不新增任何 mp3:走子 / 連跳 / 到家的聲音全是 Sound.tone() 的合成音
        (同暗棋 / 成語接龍 / 你畫我猜 / 飛行棋)。 */
+  "./blocks.html",
+  "./js/blocks/rules.js",
+  "./js/blocks/ai.js",
+  "./js/blocks/board.js",
+  "./js/blocks/solo.js",
+  "./js/blocks/adapter.js",
+  "./js/blocks/main.js",
+  "./img/blk-icon.png",
   "./tiaoqi.html",
   "./js/tiaoqi/rules.js",
   "./js/tiaoqi/ai.js",

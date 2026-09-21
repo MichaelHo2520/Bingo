@@ -59,7 +59,7 @@ const BLKB = (function(){
   /* ==========================================================================
      二、狀態
      ========================================================================== */
-  let cfg = { onEvents: function(){}, canPlay: function(){ return true; } };
+  let cfg = { onEvents: function(){}, canPlay: function(){ return true; }, onFrame: null };
   let st = null;                        // 目前在畫的規則狀態
   let mounted = false, running = false, raf = 0, lastT = 0;
   let cell = 24, prev = 15, dpr = 1;
@@ -81,7 +81,8 @@ const BLKB = (function(){
     parts: [],                          // 粒子
     trail: null,                        // { k, r, x, y0, y1, t }
     pops: [],                           // 浮字
-    hit: 0                              // 收到攻擊的邊框閃光
+    hit: 0,                             // 收到攻擊的邊框閃光
+    beams: []                           // 攻擊光束(跨畫布,畫在 .blk-fx 上)
   };
 
   /* 輸入 */
@@ -163,6 +164,8 @@ const BLKB = (function(){
     nextN = isWide() ? 5 : 3;
     sizeCanvas(cvHold, ctxH, box + 4, hudH - 8);
     sizeCanvas(cvNext, ctxN, box * nextN, hudH - 8);
+    fitFoes();
+    fitFx();
     draw();
   }
   function sizeCanvas(cv, ctx, w, h){
@@ -269,6 +272,8 @@ const BLKB = (function(){
     edgeFlash(W, H);
     hud();
     gauge();
+    drawFoes();
+    drawBeams();
   }
 
   function grid(W, H){
@@ -442,6 +447,179 @@ const BLKB = (function(){
     elGaugeFill.style.transform = "scaleY(" + k.toFixed(3) + ")";
     elGauge.classList.toggle("blk-gauge-hot", n >= 4);
     elGauge.classList.toggle("blk-gauge-on", n > 0);
+  }
+
+  /* ==========================================================================
+     六之二、對手的小盤
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 單機對電腦與連線對戰**走同一條路** —— 呼叫端只要把 [{id,name,snap,…}]
+         交給 setFoes(),這裡不在乎那份快照是本機算的還是從 Firebase 收來的。
+       ⚠ 小盤的 DOM 由這裡自己建(數量會變:1 對 1 / 4 人 / 觀戰)。
+       ⚠ setFoes() 會改變 .blk-foes 的高度 → **一定要跟著 fitBoard()**
+         (它不是每幀呼叫的,所以不會變成震盪)。
+     ========================================================================== */
+  let foes = [];                        // [{ id, name, b, c, ko, dead, pend, away }]
+  let foeEls = [];                      // [{ wrap, cv, ctx, name }]
+  let elFoes = null;
+
+  function setFoes(list){
+    foes = list || [];
+    if(!elFoes) return;
+    elFoes.classList.toggle("hidden", !foes.length);
+    if(foeEls.length !== foes.length){
+      elFoes.innerHTML = "";
+      foeEls = foes.map(() => {
+        const wrap = document.createElement("div");
+        wrap.className = "blk-foe";
+        const cv = document.createElement("canvas");
+        cv.className = "blk-foe-cv";
+        const nm = document.createElement("div");
+        nm.className = "blk-foe-name";
+        wrap.appendChild(cv); wrap.appendChild(nm);
+        elFoes.appendChild(wrap);
+        return { wrap: wrap, cv: cv, ctx: cv.getContext("2d"), name: nm };
+      });
+      fitBoard();                       // 高度變了 → 盤面要重算
+      return;
+    }
+    drawFoes();
+  }
+  function fitFoes(){
+    if(!elFoes || !foeEls.length) return;
+    const rect = elFoes.getBoundingClientRect();
+    const h = Math.max(40, rect.height - 18);          // 留給名字那一行
+    const fc = Math.max(2, Math.floor(h / R.VIS));     // 小盤的一格
+    const w = fc * R.COLS;
+    foeEls.forEach(e => sizeCanvas(e.cv, e.ctx, w, fc * R.VIS));
+  }
+  function drawFoes(){
+    for(let i = 0; i < foeEls.length && i < foes.length; i++){
+      const f = foes[i], e = foeEls[i];
+      const W = e.cv.width / dpr, H = e.cv.height / dpr;
+      if(!W || !H) continue;
+      const fc = W / R.COLS;
+      e.ctx.clearRect(0, 0, W, H);
+      /* 兩種來源:本機的電腦對手直接給 st(不必每幀編碼 220 個字元);
+         連線來的給解碼過的 bd(收到快照時解一次就好)。 */
+      const b = f.st ? f.st.board : (f.bd || null);
+      const cur = f.st ? f.st.cur
+                       : (f.c && f.c.length === 4 ? { k: f.c[0], r: f.c[1], x: f.c[2], y: f.c[3] } : null);
+      const pend = f.st ? R.pendCount(f.st) : (f.pend || 0);
+      const dead = f.st ? f.st.dead : !!f.dead;
+      if(b){
+        for(let y = R.TOP; y < R.ROWS; y++)
+          for(let x = 0; x < R.COLS; x++){
+            const v = b[y][x];
+            if(!v) continue;
+            e.ctx.fillStyle = colOf(v);
+            e.ctx.fillRect(x * fc + 0.5, (y - R.TOP) * fc + 0.5, fc - 1, fc - 1);
+          }
+      }
+      /* 落下中的那一顆:對手盤上這一塊是「他在想什麼」的唯一線索,不要省 */
+      if(cur){
+        e.ctx.fillStyle = COL[cur.k] || "#fff";
+        R.cellsOf(cur.k, cur.r, cur.x, cur.y).forEach(p => {
+          if(p[1] >= R.TOP) e.ctx.fillRect(p[0] * fc + 0.5, (p[1] - R.TOP) * fc + 0.5, fc - 1, fc - 1);
+        });
+      }
+      // 待處理垃圾:左緣一條紅
+      if(pend > 0){
+        e.ctx.fillStyle = "#ff5d6c";
+        const gh = Math.min(H, H * Math.min(1, pend / 10));
+        e.ctx.fillRect(0, H - gh, Math.max(2, fc * 0.45), gh);
+      }
+      if(dead){
+        e.ctx.fillStyle = "rgba(0,0,0,.55)";
+        e.ctx.fillRect(0, 0, W, H);
+        e.ctx.fillStyle = "#fff";
+        e.ctx.font = "800 " + Math.round(H * 0.16) + "px Fredoka, Nunito, sans-serif";
+        e.ctx.textAlign = "center"; e.ctx.textBaseline = "middle";
+        e.ctx.fillText("KO", W / 2, H / 2);
+      }
+      e.wrap.classList.toggle("blk-foe-target", !!f.target);
+      e.wrap.classList.toggle("blk-foe-away", !!f.away);
+      const tag = (f.ko ? (" ×" + f.ko) : "");
+      if(e.name.textContent !== (f.name + tag)) e.name.textContent = f.name + tag;
+    }
+  }
+  /* 哪一個小盤被點到(目標鎖定用)。回傳 index 或 -1 */
+  function foeAt(el){
+    for(let i = 0; i < foeEls.length; i++) if(foeEls[i].wrap.contains(el)) return i;
+    return -1;
+  }
+
+  /* ==========================================================================
+     六之三、攻擊光束
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 這是整個設計的靈魂:「垃圾行從誰那裡飛過來」如果只用一個數字表示,
+         這個遊戲在聚會裡就少了一半的情緒。
+       ⚠ 畫在一塊**蓋住整個對局區**的獨立 canvas 上(pointer-events:none)——
+         光束要跨越「我的盤面」與「對手小盤」兩個不同的畫布,只能在上層畫。
+     ========================================================================== */
+  let cvFx = null, ctxF = null, elPlay = null;
+  function fitFx(){
+    if(!cvFx || !elPlay) return;
+    const r = elPlay.getBoundingClientRect();
+    sizeCanvas(cvFx, ctxF, Math.max(1, r.width), Math.max(1, r.height));
+  }
+  /* 兩個元素之間放一道光束。from / to 是 DOM 元素(或 {x,y} 的相對座標) */
+  function beam(fromEl, toEl, col, txt){
+    if(!elPlay || reduced()) return;
+    const base = elPlay.getBoundingClientRect();
+    const pt = el => {
+      if(!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.left - base.left + r.width / 2, y: r.top - base.top + r.height / 2 };
+    };
+    const a = pt(fromEl), b = pt(toEl);
+    if(!a || !b) return;
+    fx.beams.push({ a: a, b: b, c: col || "#ff9f43", t: 0, dur: 420, txt: txt || "" });
+  }
+  function drawBeams(){
+    if(!ctxF || !cvFx) return;
+    const W = cvFx.width / dpr, H = cvFx.height / dpr;
+    ctxF.clearRect(0, 0, W, H);
+    for(let i = 0; i < fx.beams.length; i++){
+      const m = fx.beams[i];
+      const k = m.t / m.dur;
+      if(k >= 1) continue;
+      const head = ease(Math.min(1, k * 1.6));
+      const tail = ease(Math.max(0, (k - 0.28) * 1.6));
+      const hx = m.a.x + (m.b.x - m.a.x) * head, hy = m.a.y + (m.b.y - m.a.y) * head;
+      const tx = m.a.x + (m.b.x - m.a.x) * tail, ty = m.a.y + (m.b.y - m.a.y) * tail;
+      ctxF.save();
+      ctxF.globalAlpha = 1 - k * k;
+      ctxF.strokeStyle = m.c;
+      ctxF.shadowColor = m.c;
+      ctxF.shadowBlur = 14;
+      ctxF.lineWidth = 5;
+      ctxF.lineCap = "round";
+      ctxF.beginPath();
+      ctxF.moveTo(tx, ty);
+      ctxF.lineTo(hx, hy);
+      ctxF.stroke();
+      if(m.txt){
+        ctxF.shadowBlur = 0;
+        ctxF.font = "800 15px Fredoka, Nunito, sans-serif";
+        ctxF.textAlign = "center";
+        ctxF.lineWidth = 4;
+        ctxF.strokeStyle = "rgba(0,0,0,.6)";
+        ctxF.strokeText(m.txt, hx, hy - 10);
+        ctxF.fillStyle = m.c;
+        ctxF.fillText(m.txt, hx, hy - 10);
+      }
+      ctxF.restore();
+    }
+  }
+  /* 對外:我打了第 i 個對手 / 第 i 個對手打了我 */
+  function beamOut(i, n){
+    const e = foeEls[i];
+    if(e) beam(cvMain, e.cv, "#ffd93d", "+" + n);
+  }
+  function beamIn(i, n){
+    const e = foeEls[i];
+    if(e) beam(e.cv, elGauge || cvMain, "#ff5d6c", "+" + n);
+    incoming(n);
   }
 
   /* ==========================================================================
@@ -657,6 +835,9 @@ const BLKB = (function(){
     frameN++;
     dt = Math.min(100, Math.max(0, dt || 0));
     stepFx(dt);
+    /* ★ 每幀的鉤子:單機對電腦在這裡推進電腦那一份狀態。
+       ⚠ 放在自己的 tick **之前**,兩邊的時間軸才不會差一幀。 */
+    if(running && cfg.onFrame) cfg.onFrame(dt);
     if(running && st && !st.dead && cfg.canPlay()){
       stepDas(dt);
       const pre = R.grounded(st) ? snapPre() : null;   // ⚠ 紅線 ③:只有貼地那幾幀才留
@@ -702,6 +883,10 @@ const BLKB = (function(){
       if(p.t >= p.dur){ fx.parts.splice(i, 1); continue; }
       p.x += p.vx * dt / 16; p.y += p.vy * dt / 16; p.vy += 0.030 * cell * dt / 16;
     }
+    for(let i = fx.beams.length - 1; i >= 0; i--){
+      fx.beams[i].t += dt;
+      if(fx.beams[i].t >= fx.beams[i].dur) fx.beams.splice(i, 1);
+    }
     for(let i = fx.pops.length - 1; i >= 0; i--){
       fx.pops[i].t += dt;
       if(fx.pops[i].t >= fx.pops[i].dur) fx.pops.splice(i, 1);
@@ -719,6 +904,10 @@ const BLKB = (function(){
     elGaugeFill = document.getElementById("blkGaugeFill");
     elPad   = document.getElementById("blkPad");
     elHud   = document.querySelector(".blk-hud");
+    elFoes  = document.getElementById("blkFoes");
+    elPlay  = document.getElementById("blkPlay");
+    cvFx    = document.getElementById("blkFx");
+    if(cvFx) ctxF = cvFx.getContext("2d");
     cvMain  = document.getElementById("blkMain");
     cvHold  = document.getElementById("blkHold");
     cvNext  = document.getElementById("blkNext");
@@ -732,6 +921,16 @@ const BLKB = (function(){
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("resize", () => fitBoard());
+    /* ⚠⚠ **一定要有 ResizeObserver,不能只靠 window 的 resize。**
+       切 body class(大 / 小、鈕固定在下方、觀戰)會改變舞台的高度,
+       而**切 class 不會發 resize 事件** → 盤面會被靜靜削掉一截
+       (舞台是 overflow:hidden、內容置中 → 上下各削一半,DOM 與尺寸都還是合法的,
+        所以沒有任何斷言會紅)。你畫我猜 v1.156.0 就是漏了這個。
+       ⚠ 觀察的是**舞台**不是 canvas —— 觀察 canvas 就是「量的對象會被自己的
+         量測結果改變」,那是紅線 ① 那個震盪的另一種寫法。 */
+    if(window.ResizeObserver && elStage){
+      try{ new ResizeObserver(() => fitBoard()).observe(elStage); }catch(e){}
+    }
     /* ⚠ 橫置 / 直立切換時控制簇會搬家、Next 顯示的顆數也會變 → 一定要重量一次。
        有些瀏覽器只發 orientationchange 不發 resize,所以兩個都聽。 */
     window.addEventListener("orientationchange", () => setTimeout(fitBoard, 120));
@@ -748,7 +947,7 @@ const BLKB = (function(){
   function setState(s){
     st = s;
     fx.clear = null; fx.parts.length = 0; fx.pops.length = 0; fx.trail = null;
-    fx.shake = 0; fx.hit = 0;
+    fx.shake = 0; fx.hit = 0; fx.beams.length = 0;
     allUp();
     fitBoard();
   }
@@ -773,6 +972,7 @@ const BLKB = (function(){
   return {
     mount, setState, play, pause, stop, fitBoard, draw,
     act, setFeel, setCtrl, setPad, incoming, pop, shake,
+    setFoes, foeAt, beamOut, beamIn, foes: () => foes,
     /* ★ 測試用的兩個出口(產品程式不會呼叫它們):
        step(dt) 手動推一幀、frames() 是 rAF 迴圈至今推了幾幀。 */
     step: frame,

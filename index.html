@@ -25,8 +25,8 @@
 <!-- 標題與 manifest 的 name 一律只寫「派對遊戲」,不列舉遊戲名 ——
      每加一個遊戲就得回來接一個名字,而且分頁標籤與安裝名會愈來愈長、被截斷得更難看 -->
 <title>派對遊戲</title>
-<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v2.12.0 -->
-<meta name="version" content="2.12.0">
+<!-- 派對遊戲首頁(BINGO / 五子棋 / 數獨 / 麻將消消樂 / 台灣麻將 / 排七)· v2.13.0 -->
+<meta name="version" content="2.13.0">
 <!-- 外殼:三個遊戲跑在 app.html 的滿版 iframe 裡,全螢幕才不會因為換頁被瀏覽器收掉(v1.50.0,理由見 app.html)。
      沒被包住就自己跳進去 —— 舊 QR / 書籤 / 已裝好的 PWA 圖示都會自動落進外殼,不必重發。
      ⚠ file:// 本機開不導向(opaque origin 下 iframe 的訊息通道會變得難預測,本機開發維持原樣最單純);
@@ -281,6 +281,23 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <span class="gc-body">
           <span class="gc-name display">跳棋</span>
           <span class="hl-badge hidden" id="hlBadgeTq"></span>
+        </span>
+      </a>
+      <!-- 第十五個遊戲(v2.13.0):方塊對戰。
+           ⚠⚠ 這一張**佔的是原本「問題回報」那一格** —— 14 張遊戲 + 回報卡 = 15 張、
+             三欄剛好五列;直接再加一張會變成三欄**六列**(最後一列只有一張),
+             而首頁的驗收點是「最後一張卡的下緣還在視窗裡嗎」(紅線 10)。
+             使用者裁示:把回報卡拿掉換成這個遊戲 → 回報的入口剩設定面板那一顆。
+           ⚠ data-gk 是 "blocks"(= home-live 的 GAMES.key,也是 game_stats 的 key);
+             CSS 前綴與圖檔則是 blk —— 這一頁是唯一兩者不同的,理由見 home-live 的註解。
+           ⚠ 圖示同樣是 tools/gen-blk-icon.py 用程式畫的**佔位圖**,
+             現在一共有四張(dw / fc / tq / blk)。 -->
+      <a class="game-card as-link" href="blocks.html" data-gk="blocks">
+        <span class="gc-rank" aria-hidden="true">15</span>
+        <img class="gc-art blk-cart" src="img/blk-icon.png" alt="疊起來的方塊" width="192" height="192">
+        <span class="gc-body">
+          <span class="gc-name display">方塊對戰</span>
+          <span class="hl-badge hidden" id="hlBadgeBlocks"></span>
         </span>
       </a>
       </div><!-- /.gc-grid -->

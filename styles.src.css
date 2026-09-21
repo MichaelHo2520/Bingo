@@ -129,7 +129,7 @@
      ★ v1.182.2 起真正的守門是 tools/test-registry.js(以 js/<game>/ 目錄為單一真相,
        反查每一張清單),它**不會跟著登記表一起漏**。 */
   #home,#gmkHome,#sdkHome,#mjHome,#m16Home,#svHome,#b2Home,#bjHome,#unHome,#dcHome,#cyHome,
-  #fcHome,#tqHome,
+  #fcHome,#tqHome,#blkHome,
   #mpConnect{flex:0 1 auto;min-height:0;
     overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   /* 填號分頁:改回 flex:1 撐滿(內容本來就有整片號碼格,不會空太多),讓準備列固定在最底,右下浮動鈕才有穩定的落點、不會壓到準備鈕 */
@@ -13702,6 +13702,11 @@ body.is-big .cy-timer{margin-left:auto}
 :root[data-theme="arcade"]{ --blk-glass:rgba(0,0,0,.46); --blk-line:rgba(255,230,0,.22);
                             --blk-grid:rgba(255,230,0,.08); }
 
+/* 「大 / 小」那一顆(BigMode)。⚠ class 是 .blk-bigbtn,而狀態掛在 body 上的是
+   .blk-big —— 兩個名字一定要不一樣(不然 body 會吃到按鈕的樣式)。 */
+.blk-bigbtn{font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:15px}
+.blk-bigbtn.on{background:var(--accent);color:#fff}
+
 .blk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
            line-height:1.05;letter-spacing:.5px;
            background:linear-gradient(135deg,var(--accent),var(--accent-2));
@@ -13711,20 +13716,12 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-home{display:flex;flex-direction:column}
 .blk-pick{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
 .blk-hero{text-align:center;margin:14px 0 4px}
-/* 進場插圖:四顆小方塊拼出來的。
-   ⚠ 刻意**不指向 img/blk-icon.png** —— 那張圖還沒畫,指過去就是線上破圖 +
-     P6 把它加進 sw.js CORE 時整批預快取失敗。P6 補圖時再換成 <img>。 */
-.blk-art{width:104px;height:74px;margin:0 auto 10px;position:relative}
-/* ⚠ 四條各自的規則一律寫成 `.blk-art span.blk-art-x` ——
-   只寫 `.blk-art-i` 的話權重是 (0,1,0),**贏不過**上面那條 `.blk-art span` 的 (0,1,1),
-   於是 I 的長條寬度被壓回 26px 變成一顆方塊(第一次截圖就是這樣)。
-   這是 notes/13 第一節那七類裡的「自己撞自己」,前綴一點忙都幫不上。 */
-.blk-art span{position:absolute;width:26px;height:26px;border-radius:5px;
-              box-shadow:inset 0 2px 0 rgba(255,255,255,.42),inset 0 -2px 0 rgba(0,0,0,.30)}
-.blk-art span.blk-art-i{left:0;top:30px;width:104px;background:linear-gradient(180deg,#5ce6f0,#1fb6c4)}
-.blk-art span.blk-art-o{left:78px;top:2px;background:linear-gradient(180deg,#ffe479,#e9bc19)}
-.blk-art span.blk-art-t{left:26px;top:2px;background:linear-gradient(180deg,#c48cff,#8f46e6)}
-.blk-art span.blk-art-s{left:52px;top:2px;background:linear-gradient(180deg,#6ef0a4,#22bd66)}
+/* 進場插圖。⚠ 與首頁卡 .gc-art.blk-cart **指向同一個檔案**(紅線 11)——
+   換檔名要三處一起改:這兩頁的 img + sw.js 的 CORE。
+   ⚠ 首頁那張一律掛 .blk-cart,**不可掛** .blk-art:後者的 96px 定義在 .gc-art
+     後面,首頁的卡會高一截(notes/13 第十四節)。 */
+.blk-art{width:96px;height:96px;display:block;margin:0 auto 8px}
+.blk-cart{}
 .blk-tag{font-family:'Fredoka','Nunito',sans-serif;font-weight:600;font-size:14.5px;color:var(--text)}
 .blk-howto{margin-top:14px;padding:14px 14px 12px;border-radius:14px;
            background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
@@ -13754,11 +13751,39 @@ body.is-big .cy-timer{margin-left:auto}
    body 自己有 16px padding,96vw 在 390px 的視窗上是 374,加上 padding 就是 406
    → 整頁橫向溢出、所有東西往右擠(頂列的 ⚙️ 會被切掉)。 */
 .blk-play{flex:1 1 auto;min-height:0;width:100%;max-width:var(--blk-tw);margin:6px auto 0;
-          display:flex;flex-direction:column;align-items:center;gap:6px}
+          display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
 /* ⚠⚠ 只有舞台可以壓縮,HUD 與控制列一律 flex:none(同排七 / 飛行棋 / 跳棋)。 */
 .blk-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;
            display:flex;align-items:center;justify-content:center;
            overflow:hidden}
+
+/* ---------- 對手的小盤 ----------
+   ⚠ 高度固定(同 HUD 的理由:會變的高度 → 盤面大小 → 又想改高度 = 循環)。
+   ⚠ 沒有對手時整列 .hidden,單機練習不會白白吃掉高度。 */
+.blk-foes{flex:none;width:100%;height:88px;display:flex;gap:8px;
+          align-items:flex-end;justify-content:center}
+.blk-foe{display:flex;flex-direction:column;align-items:center;gap:3px;
+         padding:3px;border-radius:10px;box-shadow:inset 0 0 0 1.5px transparent;
+         transition:box-shadow .15s linear,opacity .2s linear;cursor:pointer}
+.blk-foe-cv{display:block;border-radius:5px;background:rgba(0,0,0,.30);
+            box-shadow:inset 0 0 0 1px var(--blk-line)}
+.blk-foe-name{font-size:10.5px;font-weight:800;color:var(--text);max-width:80px;
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1}
+/* 被鎖定為攻擊目標 */
+.blk-foe-target{box-shadow:inset 0 0 0 1.5px var(--accent-2)}
+.blk-foe-away{opacity:.42}
+
+/* 攻擊光束的畫布:蓋住整個對局區、不吃指標事件 */
+.blk-fx{position:absolute;left:0;top:0;pointer-events:none;z-index:3}
+
+/* ---------- 觀戰:沒有「我的盤面」,整個畫面讓給對手的小盤 ----------
+   ⚠ 唯讀**不靠這幾條 CSS** —— 寫入由 adapter 的 canPublish() 與核心的
+     canWriteGame() 擋掉。這裡收的只是「按了會沒反應」的東西。 */
+body.blk-spec .blk-wrap,
+body.blk-spec .blk-pad,
+body.blk-spec .blk-hud{display:none}
+body.blk-spec .blk-foes{height:auto;flex:1 1 auto;align-items:center;flex-wrap:wrap}
+body.blk-spec .blk-foe-cv{width:auto;height:auto}
 
 /* ⚠⚠ HUD 的高度**一定要是固定的**(不可以隨盤面變)——
    HUD 高 → 舞台矮 → 一格小 → HUD 又想跟著變小…那是一個會震盪的循環。
@@ -13861,6 +13886,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 /* ---------- 很矮的視窗(橫置手機):把周邊壓到最扁,高度全留給盤面 ---------- */
 @media (max-height:480px){
   .blk-hud{height:38px}
+  .blk-foes{height:58px}
   .blk-room{padding:4px 10px}
   .blk-room .icon-btn{width:30px;height:30px;font-size:14px}
   .blk-play{margin-top:2px;gap:3px}
@@ -13876,6 +13902,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-play{gap:4px;margin-top:4px}
   .blk-room{padding:6px 10px}
   .blk-hud{gap:6px;height:46px}
+  .blk-foes{height:70px;gap:6px}
   .blk-key{width:52px;height:46px;font-size:19px}
   .blk-key-wide{width:110px;height:38px;font-size:16px}
   .blk-key-sm{width:52px;height:38px;font-size:14px}

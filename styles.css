@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 2fe419c2b487dce06a6a55a74c6a2a100fa2ce2cf63c16b2fe905eabeeae3f0a)
+    真相在 styles.src.css(sha256 eea6826de882b6d401efcae4c90ea110b206d5b4257b9252fc3610ac88faf502)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -60,7 +60,7 @@
     overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
   .topbar,#mpBar,#soloHead,#roomTabs,.primary-bar{flex:none}
   #home,#gmkHome,#sdkHome,#mjHome,#m16Home,#svHome,#b2Home,#bjHome,#unHome,#dcHome,#cyHome,
-  #fcHome,#tqHome,
+  #fcHome,#tqHome,#blkHome,
   #mpConnect{flex:0 1 auto;min-height:0;
     overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   body.room-tab-fill .scroll-area{flex:1 1 0}
@@ -6015,6 +6015,8 @@ body.is-big .cy-timer{margin-left:auto}
 :root[data-theme="meadow"]{ --blk-glass:rgba(10,26,14,.32); }
 :root[data-theme="arcade"]{ --blk-glass:rgba(0,0,0,.46); --blk-line:rgba(255,230,0,.22);
                             --blk-grid:rgba(255,230,0,.08); }
+.blk-bigbtn{font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:15px}
+.blk-bigbtn.on{background:var(--accent);color:#fff}
 .blk-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
            line-height:1.05;letter-spacing:.5px;
            background:linear-gradient(135deg,var(--accent),var(--accent-2));
@@ -6022,13 +6024,8 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-home{display:flex;flex-direction:column}
 .blk-pick{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
 .blk-hero{text-align:center;margin:14px 0 4px}
-.blk-art{width:104px;height:74px;margin:0 auto 10px;position:relative}
-.blk-art span{position:absolute;width:26px;height:26px;border-radius:5px;
-              box-shadow:inset 0 2px 0 rgba(255,255,255,.42),inset 0 -2px 0 rgba(0,0,0,.30)}
-.blk-art span.blk-art-i{left:0;top:30px;width:104px;background:linear-gradient(180deg,#5ce6f0,#1fb6c4)}
-.blk-art span.blk-art-o{left:78px;top:2px;background:linear-gradient(180deg,#ffe479,#e9bc19)}
-.blk-art span.blk-art-t{left:26px;top:2px;background:linear-gradient(180deg,#c48cff,#8f46e6)}
-.blk-art span.blk-art-s{left:52px;top:2px;background:linear-gradient(180deg,#6ef0a4,#22bd66)}
+.blk-art{width:96px;height:96px;display:block;margin:0 auto 8px}
+.blk-cart{}
 .blk-tag{font-family:'Fredoka','Nunito',sans-serif;font-weight:600;font-size:14.5px;color:var(--text)}
 .blk-howto{margin-top:14px;padding:14px 14px 12px;border-radius:14px;
            background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
@@ -6049,10 +6046,27 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
 .blk-room .mp-goal{color:var(--text);font-size:12px;font-weight:700}
 .blk-play{flex:1 1 auto;min-height:0;width:100%;max-width:var(--blk-tw);margin:6px auto 0;
-          display:flex;flex-direction:column;align-items:center;gap:6px}
+          display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
 .blk-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;
            display:flex;align-items:center;justify-content:center;
            overflow:hidden}
+.blk-foes{flex:none;width:100%;height:88px;display:flex;gap:8px;
+          align-items:flex-end;justify-content:center}
+.blk-foe{display:flex;flex-direction:column;align-items:center;gap:3px;
+         padding:3px;border-radius:10px;box-shadow:inset 0 0 0 1.5px transparent;
+         transition:box-shadow .15s linear,opacity .2s linear;cursor:pointer}
+.blk-foe-cv{display:block;border-radius:5px;background:rgba(0,0,0,.30);
+            box-shadow:inset 0 0 0 1px var(--blk-line)}
+.blk-foe-name{font-size:10.5px;font-weight:800;color:var(--text);max-width:80px;
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1}
+.blk-foe-target{box-shadow:inset 0 0 0 1.5px var(--accent-2)}
+.blk-foe-away{opacity:.42}
+.blk-fx{position:absolute;left:0;top:0;pointer-events:none;z-index:3}
+body.blk-spec .blk-wrap,
+body.blk-spec .blk-pad,
+body.blk-spec .blk-hud{display:none}
+body.blk-spec .blk-foes{height:auto;flex:1 1 auto;align-items:center;flex-wrap:wrap}
+body.blk-spec .blk-foe-cv{width:auto;height:auto}
 .blk-hud{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;
          width:100%;height:54px}
 .blk-stats{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:14px}
@@ -6117,6 +6131,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 }
 @media (max-height:480px){
   .blk-hud{height:38px}
+  .blk-foes{height:58px}
   .blk-room{padding:4px 10px}
   .blk-room .icon-btn{width:30px;height:30px;font-size:14px}
   .blk-play{margin-top:2px;gap:3px}
@@ -6130,6 +6145,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-play{gap:4px;margin-top:4px}
   .blk-room{padding:6px 10px}
   .blk-hud{gap:6px;height:46px}
+  .blk-foes{height:70px;gap:6px}
   .blk-key{width:52px;height:46px;font-size:19px}
   .blk-key-wide{width:110px;height:38px;font-size:16px}
   .blk-key-sm{width:52px;height:38px;font-size:14px}

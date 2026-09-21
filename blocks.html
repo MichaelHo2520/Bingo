@@ -14,8 +14,8 @@
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
-<!-- 方塊對戰 · v2.12.0+1(★ 施工中:P1 單機。`+1` 是 WIP 的驗證推尾碼,封版時清掉) -->
-<meta name="version" content="2.12.0+1">
+<!-- 方塊對戰 · v2.13.0 -->
+<meta name="version" content="2.13.0">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -58,10 +58,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 第一層:選怎麼玩 -->
     <div id="blkPickMode" class="blk-pick">
       <div class="blk-hero">
-        <div class="blk-art" aria-hidden="true">
-          <span class="blk-art-i"></span><span class="blk-art-o"></span>
-          <span class="blk-art-t"></span><span class="blk-art-s"></span>
-        </div>
+        <img class="blk-art" src="img/blk-icon.png" alt="疊起來的方塊" width="192" height="192">
         <div class="blk-tag display">堆起來,消掉,把垃圾行送給對手</div>
       </div>
       <div class="blk-howto">
@@ -87,8 +84,17 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="field">
         <span class="field-label">玩法</span>
         <div class="seg" id="blkModeSeg" aria-label="玩法">
-          <button type="button" data-mode="endless" class="on">練習(無盡)</button>
+          <button type="button" data-mode="endless" class="on">練習</button>
           <button type="button" data-mode="sprint">40 行競速</button>
+          <button type="button" data-mode="vs">對電腦</button>
+        </div>
+      </div>
+      <div class="field hidden" id="blkLvRow">
+        <span class="field-label">電腦強度</span>
+        <div class="seg" id="blkLvSeg" aria-label="電腦強度">
+          <button type="button" data-lv="easy">🙂 新手</button>
+          <button type="button" data-lv="norm" class="on">😎 普通</button>
+          <button type="button" data-lv="hard">🔥 高手</button>
         </div>
       </div>
       <div class="field">
@@ -182,10 +188,91 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     </div>
   </div>
 
+  <!-- ====== 大廳設定 ====== -->
+  <div class="scroll-area blk-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="blkSetup">
+      <div class="subtitle">對戰設定</div>
+      <!-- ★★ 玩法是這一頁最重要的旋鈕。
+           **K.O. 賽是預設**,理由是聚會場合:淘汰賽第一個死的人要乾等一兩分鐘,
+           而 K.O. 賽死了兩秒就復活,沒有人會在旁邊滑手機,時間也可以預期。 -->
+      <div class="field">
+        <span class="field-label">玩法</span>
+        <div class="seg" id="blkModeSegMp" aria-label="玩法">
+          <button class="on" data-mode="ko">💥 K.O. 賽</button>
+          <button data-mode="out">☠️ 淘汰賽</button>
+        </div>
+      </div>
+      <div class="field" id="blkSecsRow">
+        <span class="field-label">一局多久</span>
+        <div class="seg" id="blkSecsSeg" aria-label="一局多久">
+          <button data-secs="120">2 分</button>
+          <button class="on" data-secs="180">3 分</button>
+          <button data-secs="300">5 分</button>
+        </div>
+      </div>
+      <!-- ★ 新手保護:開局前這幾秒不吃垃圾行(照樣排隊、照樣顯示,就是不推上來)。
+           沒有它的話,第一次玩的人開局十五秒就被埋掉,連手感都還沒摸到。 -->
+      <div class="field">
+        <span class="field-label">新手保護<span class="field-sub">(開局幾秒內不吃垃圾行)</span></span>
+        <div class="seg" id="blkShieldSeg" aria-label="新手保護">
+          <button data-shield="0">關</button>
+          <button data-shield="10">10 秒</button>
+          <button class="on" data-shield="20">20 秒</button>
+        </div>
+      </div>
+      <!-- ★★ 讓分是**每個人自己選的**,不是房主指定 ——
+           聚會場合「我不太會玩,我選讓 2」比「房主幫你決定」自然得多。
+           它只影響自己:送出時乘 send、收到時乘 recv。 -->
+      <div class="field">
+        <span class="field-label">我的讓分<span class="field-sub">(只影響你自己)</span></span>
+        <div class="seg" id="blkHcapSeg" aria-label="我的讓分">
+          <button data-hcap="0">讓 2</button>
+          <button data-hcap="1">讓 1</button>
+          <button class="on" data-hcap="2">平</button>
+          <button data-hcap="3">受 1</button>
+          <button data-hcap="4">受 2</button>
+        </div>
+      </div>
+      <div class="field" id="scoreRow">
+        <span class="field-label" id="scoreLabel">連線計分</span>
+        <div class="seg" id="scoreSeg">
+          <button class="on" data-score="rank">🏆 累積排行</button>
+          <button data-score="match">🎯 搶勝</button>
+        </div>
+        <div class="score-extra hidden" id="scoreExtra">
+          <div class="wg-group hidden" id="wgGroup">
+            <span class="wg-lbl">先到</span>
+            <div class="wg-stepper">
+              <button class="mini" id="wgMinus" aria-label="減少目標分數">－</button>
+              <span class="target-val display" id="winGoalVal">3</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標分數">＋</button>
+            </div>
+            <span class="wg-lbl">勝奪冠</span>
+          </div>
+          <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
+          <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
+        </div>
+      </div>
+      <div class="hint" id="blkRuleHint">
+        同一顆種子 → <b>每個人拿到的方塊順序完全一樣</b>,比的是誰堆得好。
+        點對手的小盤可以<b>鎖定攻擊目標</b>,再點一次取消。
+      </div>
+    </section>
+  </div>
+
   <!-- ====== 對局畫面 ======
        ⚠⚠ .blk-stage 一律 overflow:hidden —— 它正是 BLKB.fitBoard() 量的那個容器,
           任何會讓它長出捲軸的東西都會讓盤面**自己震盪**(跳棋 / 飛行棋 / 麻將已經三次)。 -->
   <div class="blk-play hidden" id="blkPlay">
+    <!-- 對手的小盤(1~3 個;單機對電腦與連線對戰共用同一條路)。
+         ⚠ 裡面的每一格都由 js/blocks/board.js 的 setFoes() 自己建 —— 數量會變。
+         ⚠ 沒有對手時整列 .hidden(單機練習就不會白白吃掉高度)。 -->
+    <div class="blk-foes hidden" id="blkFoes"></div>
+
+    <!-- 攻擊光束的畫布:蓋住整個對局區、不吃指標事件。
+         ⚠ 一定要獨立一塊 —— 光束要跨越「我的盤面」與「對手小盤」兩個不同的畫布。 -->
+    <canvas class="blk-fx" id="blkFx" aria-hidden="true"></canvas>
+
     <!-- ⚠⚠ HUD 與控制列是舞台的**兄弟**,不可以放進 .blk-stage 裡面 ——
          舞台是 overflow:hidden(紅線 ①),放進去就會在小螢幕上被**裁掉**
          (第一次截圖時控制列的下半排就是這樣不見的)。
@@ -426,8 +513,8 @@ const FIREBASE_CONFIG = {
 </script>
 
 <!-- 載入順序固定:ui-kit(定義 $)→ talk(要在連線核心之前)→ qr → mp-core
-     → rules(純函式)→ board(盤面)→ solo(單機)→ main(綁定,必須最後)
-     ⚠ P1 還沒有 ai.js / adapter.js —— main.js 對 MP 一律 typeof 判斷,不會炸。 -->
+     → rules(純函式)→ ai(電腦對手,只相依 rules)→ board(盤面)
+     → solo(單機,要 board 與 ai)→ adapter(連線)→ main(綁定,必須最後) -->
 <!-- 問題回報與建議。★ 一定要排在**所有 JS 之前**:它的錯誤環形緩衝是載入時就掛上的,
      要抓的正是後面那幾支炸掉的錯誤。鈕與蓋板都由它自己建。 -->
 <script src="js/shared/feedback.js"></script>
@@ -438,8 +525,10 @@ const FIREBASE_CONFIG = {
 <script src="js/shared/qr.js"></script>
 <script src="js/shared/mp-core.js"></script>
 <script src="js/blocks/rules.js"></script>
+<script src="js/blocks/ai.js"></script>
 <script src="js/blocks/board.js"></script>
 <script src="js/blocks/solo.js"></script>
+<script src="js/blocks/adapter.js"></script>
 <script src="js/blocks/main.js"></script>
 </body>
 </html>
