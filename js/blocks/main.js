@@ -81,6 +81,7 @@ function syncSoloSeg(){
   set("blkModeSeg", "mode", Solo.mode());
   set("blkFeelSeg", "feel", Solo.feel());
   set("blkCtrlSeg", "ctrl", Solo.ctrl());
+  set("blkPadSeg", "pad", Solo.pad());
 }
 
 /* ---------- 盤面 ----------
@@ -106,6 +107,7 @@ $("blkSoloCfgBack").addEventListener("click", () => showHomeLayer("pick"));
 segPick("blkModeSeg", "mode", v => Solo.setMode(v));
 segPick("blkFeelSeg", "feel", v => Solo.setFeel(+v));
 segPick("blkCtrlSeg", "ctrl", v => Solo.setCtrl(v));
+segPick("blkPadSeg", "pad", v => Solo.setPad(v));
 $("blkStartSolo").addEventListener("click", () => Solo.start());
 
 /* ---------- 單機的列 / 結果卡 ---------- */

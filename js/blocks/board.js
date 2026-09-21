@@ -38,8 +38,12 @@ const BLKB = (function(){
   /* 七種方塊 + 垃圾。★ 固定不隨主題變(見紅線 ⑦) */
   const COL = ["#2fd6e4", "#4b7bec", "#ff9f43", "#ffd93d", "#3ddc7f", "#b06bff", "#ff5d6c"];
   const COL_GARB = "#6b7a8f";
-  const MINC = 12, MAXC = 34;           // 一格的 px 上下限
-  const PREV = 0.62;                    // 預覽格 = 主盤格的幾倍
+  /* ⚠ MINC 要夠小,不然**橫置手機放不下** —— 20 列 × 12px = 240px,而橫置時舞台
+     只剩兩百出頭 → 盤面比舞台高,而舞台是 overflow:hidden,底部直接被切掉
+     (而且是「看起來像盤面沒有底」的那種壞法)。橫置本來就不適合玩方塊,
+     這裡只保證「不會破」,想玩得舒服請直立或按「大」。 */
+  const MINC = 9, MAXC = 38;            // 一格的 px 上下限
+  const GAUGE_W = 10;                   // 左緣警示條的寬(與 CSS 的 .blk-gauge 同步)
 
   /* 手感參數。★ 這三個就是「好不好玩」的旋鈕,改之前先想清楚要調誰的體感 */
   const DAS_MS = [180, 133, 95];        // 慢 / 標準 / 快
@@ -60,12 +64,15 @@ const BLKB = (function(){
   let mounted = false, running = false, raf = 0, lastT = 0;
   let cell = 24, prev = 15, dpr = 1;
 
-  let elStage, elWrap, elGauge, elGaugeFill, elPad;
-  let cvMain, ctxM, cvSide, ctxS;
+  let elStage, elWrap, elGauge, elGaugeFill, elPad, elHud;
+  let cvMain, ctxM, cvHold, ctxH, cvNext, ctxN;
+  let nextN = 3;                        // Next 顯示幾顆(寬螢幕 5、手機 3)
   /* 網格線的顏色跟著主題走(定義在 styles.src.css 的 --blk-grid)。
      ⚠ 每幀都去 getComputedStyle 是白工,所以在 fitBoard() 讀一次存著。
      ⚠ 換主題不會自動觸發 fitBoard() → setTheme 之後要再叫一次(main.js 的 showScreen 會)。 */
   let gridCol = "rgba(255,255,255,.055)";
+  /* HUD 的 HOLD / NEXT 標籤色。⚠ 寫死白色的話淺色主題上直接看不見(同 gridCol 的理由) */
+  let inkCol = "rgba(255,255,255,.9)";
 
   /* 特效(全部畫在 canvas 裡,見紅線 ②) */
   const fx = {
@@ -81,6 +88,7 @@ const BLKB = (function(){
   const inp = { dir: 0, dasT: 0, arrT: 0, soft: false, keys: {} };
   let gest = null;                      // 手勢中的指標
   let ctrlMode = "btn";                 // "btn" | "swipe" | "both"
+  let padPos = "float";                 // "float"(浮在盤面上)| "dock"(固定在盤面下方)
 
   /* ==========================================================================
      三、小工具
@@ -109,26 +117,52 @@ const BLKB = (function(){
          不會因為自己畫太大而長出捲軸、再把自己縮小、再放大…(那個震盪已經三次了)。
        算式:可用寬 = 主盤(10 格) + 右側預覽(4 個預覽格) + 警示條 + 間距
      ========================================================================== */
+  /* 寬螢幕 / 橫置:控制簇搬到盤面左右兩側(不再蓋住盤面)。
+     ⚠ 這個條件**必須與 styles.src.css 的 @media 逐字相同** —— 對不起來的症狀是
+       「鈕在旁邊、但盤面還是照蓋住的算法留了空位」(或反過來,盤面被鈕蓋掉一角)。 */
+  const MQ_WIDE = "(min-width:700px),(orientation:landscape)";
+  function isWide(){
+    try{ return window.matchMedia(MQ_WIDE).matches; }catch(e){ return false; }
+  }
+
   function fitBoard(){
     if(!mounted || !elStage) return;
     const rect = elStage.getBoundingClientRect();
-    /* ⚠ 舞台裡**只有盤面** —— HUD 與控制列是它的兄弟(見 blocks.html 的註解),
-       所以這裡不必再去減控制列的高度。減過頭的症狀是盤面永遠小一號。 */
-    const availW = Math.max(120, rect.width - 4);
+    /* ⚠ 舞台裡只有盤面 —— HUD 是它的兄弟,控制鈕是**絕對定位**的浮層。
+       兩者都不會改變這裡量到的尺寸(那正是紅線 ① 要的)。 */
+    let reserve = 0;
+    if(isWide() && elPad && !elPad.classList.contains("hidden")){
+      /* 兩簇在左右兩側時要把寬度讓出來。量絕對定位的元素是安全的:
+         它不參與版面,所以量它不會回頭改變舞台的尺寸。 */
+      const l = elPad.querySelector(".blk-pad-l"), r = elPad.querySelector(".blk-pad-r");
+      reserve = (l ? l.getBoundingClientRect().width : 0) +
+                (r ? r.getBoundingClientRect().width : 0) + 20;
+    }
+    const availW = Math.max(120, rect.width - 4 - reserve);
     const availH = Math.max(120, rect.height - 6);
 
-    const byW = (availW - 26) / (R.COLS + 4 * PREV);    // 26 = 警示條 + 兩道間距
+    const byW = (availW - GAUGE_W - 8) / R.COLS;       // 盤面現在吃滿寬度,只讓開警示條
     const byH = availH / R.VIS;
     cell = Math.round(clamp(Math.min(byW, byH), MINC, MAXC));
-    prev = Math.max(7, Math.round(cell * PREV));
     dpr = Math.min(3, window.devicePixelRatio || 1);
 
     const g = getComputedStyle(cvMain).getPropertyValue("--blk-grid").trim();
     if(g) gridCol = g;
 
     sizeCanvas(cvMain, ctxM, R.COLS * cell, R.VIS * cell);
-    sizeCanvas(cvSide, ctxS, 4 * prev, R.VIS * cell);
     if(elGauge) elGauge.style.height = (R.VIS * cell) + "px";
+
+    /* HUD 的兩塊小畫布。
+       ⚠⚠ prev **不可以由 cell 推算** —— HUD 的高度會跟著變,而 HUD 的高度又決定
+         舞台剩多少高度、舞台的高度又決定 cell…**那就是一個循環**(而且會震盪)。
+         所以 prev 一律由 HUD 自己那條 CSS 固定高度推出來。 */
+    if(elHud) inkCol = getComputedStyle(elHud).color || inkCol;
+    const hudH = elHud ? elHud.getBoundingClientRect().height : 54;
+    prev = Math.round(clamp((hudH - 16) / 2.9, 7, 15));
+    const box = Math.round(prev * 2.6);
+    nextN = isWide() ? 5 : 3;
+    sizeCanvas(cvHold, ctxH, box + 4, hudH - 8);
+    sizeCanvas(cvNext, ctxN, box * nextN, hudH - 8);
     draw();
   }
   function sizeCanvas(cv, ctx, w, h){
@@ -233,7 +267,7 @@ const BLKB = (function(){
     pops();
     ctxM.restore();
     edgeFlash(W, H);
-    side();
+    hud();
     gauge();
   }
 
@@ -358,33 +392,30 @@ const BLKB = (function(){
     ctxM.restore();
   }
 
-  /* ---------- 右側:Hold + Next ---------- */
-  function side(){
-    if(!ctxS) return;
-    const W = 4 * prev, H = R.VIS * cell;
-    ctxS.clearRect(0, 0, W, H);
+  /* ---------- HUD 的兩塊小畫布:Hold(左)+ Next(右),都是橫排 ----------
+     ⚠ 這裡畫的是**在 HUD 那一列裡**,不是盤面旁邊 —— 盤面的寬度要留給盤面。 */
+  function mini(ctx, cv, label, kinds, dim){
+    if(!ctx || !cv) return;
+    const W = cv.width / dpr, H = cv.height / dpr;
+    ctx.clearRect(0, 0, W, H);
+    const lh = Math.max(9, Math.round(H * 0.26));
+    ctx.font = "800 " + lh + "px Nunito, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.globalAlpha = 0.62;
+    ctx.fillStyle = inkCol;
+    ctx.fillText(label, 1, 0);
+    ctx.globalAlpha = 1;
+    const top = lh + 2, bh = H - top;
+    if(!kinds.length) return;
+    const bw = W / kinds.length;
+    for(let i = 0; i < kinds.length; i++)
+      piecePreview(ctx, kinds[i], i * bw, top, bw, bh, (dim && i === 0) ? 0.34 : (i === 0 ? 1 : 0.72));
+  }
+  function hud(){
     if(!st) return;
-    ctxS.font = "700 " + Math.max(9, Math.round(prev * 0.72)) + "px Nunito, system-ui, sans-serif";
-    ctxS.textAlign = "center";
-    ctxS.textBaseline = "top";
-    ctxS.fillStyle = "rgba(255,255,255,.55)";
-
-    let y = 0;
-    ctxS.fillText("HOLD", W / 2, y);
-    y += prev * 1.0;
-    if(st.hold >= 0) piecePreview(ctxS, st.hold, 0, y, W, prev * 2.2, st.canHold ? 1 : 0.35);
-    y += prev * 2.4;
-
-    ctxS.fillStyle = "rgba(255,255,255,.55)";
-    ctxS.fillText("NEXT", W / 2, y);
-    y += prev * 1.0;
-    const nx = R.peek(st.seed, st.idx, 5);
-    for(let i = 0; i < nx.length; i++){
-      const h = (i === 0) ? prev * 2.4 : prev * 2.0;
-      if(y + h > H) break;
-      piecePreview(ctxS, nx[i], 0, y, W, h, i === 0 ? 1 : 0.78);
-      y += h + prev * 0.2;
-    }
+    mini(ctxH, cvHold, "HOLD", st.hold >= 0 ? [st.hold] : [], !st.canHold);
+    mini(ctxN, cvNext, "NEXT", R.peek(st.seed, st.idx, nextN), false);
   }
   /* 把一顆方塊置中畫進一個框裡 */
   function piecePreview(ctx, k, bx, by, bw, bh, alpha){
@@ -687,17 +718,23 @@ const BLKB = (function(){
     elGauge = document.getElementById("blkGauge");
     elGaugeFill = document.getElementById("blkGaugeFill");
     elPad   = document.getElementById("blkPad");
+    elHud   = document.querySelector(".blk-hud");
     cvMain  = document.getElementById("blkMain");
-    cvSide  = document.getElementById("blkSide");
-    if(!cvMain || !cvSide) return;
+    cvHold  = document.getElementById("blkHold");
+    cvNext  = document.getElementById("blkNext");
+    if(!cvMain || !cvHold || !cvNext) return;
     ctxM = cvMain.getContext("2d");
-    ctxS = cvSide.getContext("2d");
+    ctxH = cvHold.getContext("2d");
+    ctxN = cvNext.getContext("2d");
     mounted = true;
     bindPad();
     bindGesture();
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("resize", () => fitBoard());
+    /* ⚠ 橫置 / 直立切換時控制簇會搬家、Next 顯示的顆數也會變 → 一定要重量一次。
+       有些瀏覽器只發 orientationchange 不發 resize,所以兩個都聽。 */
+    window.addEventListener("orientationchange", () => setTimeout(fitBoard, 120));
     /* ⚠ 切到背景一律放開所有鍵:不放的話回來會是「一直往左跑」 */
     document.addEventListener("visibilitychange", () => { if(document.hidden) allUp(); });
     window.addEventListener("blur", allUp);
@@ -719,12 +756,23 @@ const BLKB = (function(){
   function pause(){ running = false; allUp(); }
   function stop(){ running = false; allUp(); }
   function setFeel(i){ feel = clamp(i | 0, 0, DAS_MS.length - 1); }
-  function setCtrl(m){ ctrlMode = (m === "swipe" || m === "both") ? m : "btn";
-    if(elPad) elPad.classList.toggle("hidden", ctrlMode === "swipe"); }
+  function setCtrl(m){
+    ctrlMode = (m === "swipe" || m === "both") ? m : "btn";
+    if(elPad) elPad.classList.toggle("hidden", ctrlMode === "swipe");
+    document.body.classList.toggle("blk-dock", padPos === "dock" && ctrlMode !== "swipe");
+    fitBoard();
+  }
+  /* 控制鈕浮在盤面上(預設,盤面比較大)還是固定在下方(不擋盤面)。
+     ⚠ 切成 dock 之後鈕就**參與版面**了 → 盤面會自動縮一階,那是預期的。 */
+  function setPad(m){
+    padPos = (m === "dock") ? "dock" : "float";
+    document.body.classList.toggle("blk-dock", padPos === "dock" && ctrlMode !== "swipe");
+    fitBoard();
+  }
 
   return {
     mount, setState, play, pause, stop, fitBoard, draw,
-    act, setFeel, setCtrl, incoming, pop, shake,
+    act, setFeel, setCtrl, setPad, incoming, pop, shake,
     /* ★ 測試用的兩個出口(產品程式不會呼叫它們):
        step(dt) 手動推一幀、frames() 是 rAF 迴圈至今推了幾幀。 */
     step: frame,
@@ -732,6 +780,6 @@ const BLKB = (function(){
     state: () => st,
     cell: () => cell,
     COL, COL_GARB, DAS_MS, ARR_MS,
-    feel: () => feel, ctrl: () => ctrlMode
+    feel: () => feel, ctrl: () => ctrlMode, pad: () => padPos, wide: isWide
   };
 })();

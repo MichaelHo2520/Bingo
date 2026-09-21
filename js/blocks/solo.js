@@ -23,6 +23,7 @@ const Solo = (function(){
   let mode = "endless";                 // "endless" | "sprint"
   let feel = 1;                         // 手感(0 慢 / 1 標準 / 2 快)
   let ctrl = "btn";                     // 控制方式
+  let pad  = "float";                   // 控制鈕:浮在盤面上 / 固定在下方
   let rec = { best: 0, sprint: 0 };     // 最高消行 / 最短毫秒(0 = 沒紀錄)
 
   let st = null;
@@ -36,19 +37,22 @@ const Solo = (function(){
       if(o.mode === "sprint" || o.mode === "endless") mode = o.mode;
       if(typeof o.feel === "number") feel = Math.max(0, Math.min(2, o.feel | 0));
       if(o.ctrl === "btn" || o.ctrl === "swipe" || o.ctrl === "both") ctrl = o.ctrl;
+      if(o.pad === "float" || o.pad === "dock") pad = o.pad;
       if(o.rec) rec = { best: o.rec.best | 0, sprint: o.rec.sprint | 0 };
     }catch(e){}
     BLKB.setFeel(feel);
+    BLKB.setPad(pad);
     BLKB.setCtrl(ctrl);
   }
   function saveOwn(){
-    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ mode, feel, ctrl, rec })); }catch(e){}
+    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ mode, feel, ctrl, pad, rec })); }catch(e){}
   }
 
   /* ---------- 設定 ---------- */
   function setMode(m){ if(m === "sprint" || m === "endless"){ mode = m; saveOwn(); } }
   function setFeel(v){ feel = Math.max(0, Math.min(2, v | 0)); BLKB.setFeel(feel); saveOwn(); }
   function setCtrl(v){ ctrl = (v === "swipe" || v === "both") ? v : "btn"; BLKB.setCtrl(ctrl); saveOwn(); }
+  function setPad(v){ pad = (v === "dock") ? "dock" : "float"; BLKB.setPad(pad); saveOwn(); }
 
   /* ---------- 開局 ---------- */
   function start(){
@@ -166,8 +170,8 @@ const Solo = (function(){
 
   return {
     start, again, quit, togglePause, onEvents, loadOwn, paintBar, paintHud,
-    setMode, setFeel, setCtrl,
-    mode: () => mode, feel: () => feel, ctrl: () => ctrl, rec: () => rec,
+    setMode, setFeel, setCtrl, setPad,
+    mode: () => mode, feel: () => feel, ctrl: () => ctrl, pad: () => pad, rec: () => rec,
     /* ★ ui-kit 的返回鍵守衛與更新檢查都會問這兩個 */
     playing: () => on && !ended,
     active: () => on,

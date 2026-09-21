@@ -13760,21 +13760,32 @@ body.is-big .cy-timer{margin-left:auto}
            display:flex;align-items:center;justify-content:center;
            overflow:hidden}
 
-.blk-hud{flex:none;display:flex;align-items:center;justify-content:center;gap:12px;width:100%;
-         padding:2px 0 1px}
+/* ⚠⚠ HUD 的高度**一定要是固定的**(不可以隨盤面變)——
+   HUD 高 → 舞台矮 → 一格小 → HUD 又想跟著變小…那是一個會震盪的循環。
+   board.js 的 prev(預覽格大小)就是反過來由這個高度推出來的。 */
+.blk-hud{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;
+         width:100%;height:54px}
+.blk-stats{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:14px}
+.blk-mini{flex:none;display:block}
 .blk-stat{display:flex;flex-direction:column;align-items:center;line-height:1.12;min-width:50px}
 /* ⚠ 標籤也用 --text(紅線 9 已經在 bubblegum 上中過兩次:--muted 疊在半透明面板上讀不到)——
    層級改用字級 + 字重分。 */
 .blk-stat span{font-size:10px;font-weight:700;letter-spacing:.10em;color:var(--text);opacity:.72}
 .blk-stat b{font-family:'Fredoka','Nunito',sans-serif;font-size:19px;color:var(--text)}
-.blk-goal{font-size:11.5px;font-weight:800;padding:3px 10px;border-radius:999px;
-          background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 1px var(--blk-line);color:var(--text)}
+.blk-goal{margin-left:6px;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;
+          background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px var(--blk-line);
+          color:var(--text);white-space:nowrap}
 
 .blk-wrap{flex:none;display:flex;align-items:stretch;justify-content:center;gap:8px}
 
 /* 待處理垃圾的警示條。⚠ 高度用 transform:scaleY 改,不要改 height(每幀重排) */
+/* ⚠ 沒有待處理垃圾時**整條淡出**,但寬度留著(盤面才不會左右跳)。
+   單機沒有對手 → 它永遠是空的,留在那裡只會變成一條看不懂的線(使用者第一句就問這個)。
+   ⚠ 寬度要與 board.js 的 GAUGE_W 同步。 */
 .blk-gauge{position:relative;width:10px;flex:none;border-radius:6px;overflow:hidden;
-           background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--blk-line)}
+           background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--blk-line);
+           opacity:0;transition:opacity .25s ease}
+.blk-gauge-on{opacity:1}
 .blk-gauge-fill{position:absolute;left:0;right:0;bottom:0;height:100%;
                 transform-origin:bottom;transform:scaleY(0);
                 background:linear-gradient(180deg,#ff9f43,#ff5d6c);
@@ -13788,7 +13799,6 @@ body.is-big .cy-timer{margin-left:auto}
           -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
           box-shadow:inset 0 0 0 1px var(--blk-line),0 12px 30px rgba(0,0,0,.34);
           touch-action:none}
-.blk-side{display:block;flex:none}
 
 .blk-paused{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;
             font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:26px;
@@ -13798,21 +13808,35 @@ body.is-big .cy-timer{margin-left:auto}
    ⚠ 熱區一律 ≥44px(視覺可以更小,熱區不行)。
    ⚠ 不要用 .btn:它的基底是 flex:1;min-width:120px,塞進這一列會把小鈕撐成三分之一
      (v2.11.0 / v2.12.0 同一個坑已經兩次)。這裡一律用自己的 .blk-key。 */
-.blk-pad{flex:none;width:100%;display:flex;flex-direction:column;gap:6px}
-.blk-pad-top{display:flex;gap:6px;justify-content:center}
-.blk-pad-main{display:flex;gap:6px}
-.blk-key{flex:1 1 0;min-width:44px;min-height:58px;border:0;border-radius:14px;
-         background:rgba(255,255,255,.10);box-shadow:inset 0 0 0 1px var(--blk-line);
+/* ⚠⚠ 整層 pointer-events:none、只有兩個拇指簇 auto ——
+   不然這一層會把手勢操作(畫在盤面上的那條路)整個吃掉。 */
+.blk-pad{position:absolute;inset:0;pointer-events:none;z-index:2}
+.blk-pad-l,.blk-pad-r{position:absolute;bottom:6px;display:flex;flex-direction:column;
+                      gap:6px;pointer-events:auto}
+.blk-pad-l{left:2px;align-items:flex-start}
+.blk-pad-r{right:2px;align-items:flex-end}
+.blk-pad-row{display:flex;gap:6px}
+/* ⚠ 熱區一律 ≥44px。⚠ 不要用 .btn(它的基底是 flex:1;min-width:120px,
+   塞進這裡會把小鈕撐成整排)—— 同一個坑已經兩次。 */
+/* ⚠⚠ **不要用 opacity 把整顆鈕淡掉** —— 那會連字一起糊掉,
+   結果是「盤面看得到、但鈕看不清楚」,兩邊都沒做好。
+   正確做法:底色與外框用很低的 alpha(盤面透得過來),**字與外框維持全不透明**。 */
+.blk-key{width:52px;height:50px;border:0;border-radius:16px;
+         background:rgba(125,135,165,.22);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.26);
+         -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
          color:var(--text);font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:22px;
+         text-shadow:0 1px 3px rgba(0,0,0,.45);
          display:grid;place-items:center;cursor:pointer;
          user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
-         touch-action:none}
-.blk-key-sm{flex:0 1 96px;min-height:44px;font-size:15px}
-/* ⚠ 淺色主題(bubblegum)上鈕面與底色都是淺的 → 靠 --blk-line 的外框把它框出來,
-   不要只靠背景的白色疊加(疊在淺底上等於沒疊)。截圖才看得出來。 */
-.blk-key{box-shadow:inset 0 0 0 1.5px var(--blk-line)}
-.blk-key-drop{font-size:17px;background:linear-gradient(180deg,rgba(255,217,61,.30),rgba(255,159,67,.20))}
-.blk-key.blk-on{background:rgba(255,255,255,.24);transform:translateY(1px)}
+         touch-action:none;transition:background .12s linear}
+.blk-key-wide{width:110px;height:38px;font-size:17px}
+.blk-key-sm{width:52px;height:38px;font-size:14px}
+.blk-key-drop{font-size:17px;background:linear-gradient(180deg,rgba(255,217,61,.34),rgba(255,159,67,.24))}
+.blk-key.blk-on{background:rgba(255,255,255,.40);transform:translateY(1px)}
+/* 「鈕固定在下方」:給不想讓鈕蓋住盤面的人(設定裡可切)。
+   ⚠ 這時它就**參與版面**了 → 盤面會自動縮小(fitBoard 量的舞台變矮),那是預期的。 */
+body.blk-dock .blk-stage{padding-bottom:104px}
+body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 
 /* ---------- 結果卡 ---------- */
 .blk-result{display:flex;flex-direction:column;gap:5px;margin:10px 0 4px}
@@ -13824,6 +13848,24 @@ body.is-big .cy-timer{margin-left:auto}
            font-weight:700;font-size:16px;color:var(--accent-2)}
 .blk-react-row{display:flex;justify-content:center;gap:8px;margin:10px 0 2px;flex-wrap:wrap}
 
+/* ---------- 寬螢幕 / 橫置:兩簇移到盤面左右兩側(不再蓋住盤面)----------
+   ⚠⚠ 這個 @media 的條件**必須與 js/blocks/board.js 的 MQ_WIDE 逐字相同** ——
+     對不起來的症狀是「鈕已經在旁邊了,盤面卻還照蓋住的算法留空位」
+     (或反過來,盤面被鈕切掉一角)。 */
+@media (min-width:700px),(orientation:landscape){
+  .blk-pad-l,.blk-pad-r{bottom:auto;top:50%;transform:translateY(-50%)}
+  .blk-key{background:rgba(125,135,165,.34)}
+  .blk-hud{height:58px}
+}
+
+/* ---------- 很矮的視窗(橫置手機):把周邊壓到最扁,高度全留給盤面 ---------- */
+@media (max-height:480px){
+  .blk-hud{height:38px}
+  .blk-room{padding:4px 10px}
+  .blk-room .icon-btn{width:30px;height:30px;font-size:14px}
+  .blk-play{margin-top:2px;gap:3px}
+}
+
 /* ---------- 矮視窗(橫置手機)---------- */
 @media (max-height:620px){
   .blk-home{overflow-y:auto;overscroll-behavior:contain}
@@ -13833,7 +13875,8 @@ body.is-big .cy-timer{margin-left:auto}
   .blk-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
   .blk-play{gap:4px;margin-top:4px}
   .blk-room{padding:6px 10px}
-  .blk-hud{gap:8px}
-  .blk-key{min-height:46px}
-  .blk-key-sm{min-height:44px}
+  .blk-hud{gap:6px;height:46px}
+  .blk-key{width:52px;height:46px;font-size:19px}
+  .blk-key-wide{width:110px;height:38px;font-size:16px}
+  .blk-key-sm{width:52px;height:38px;font-size:14px}
 }

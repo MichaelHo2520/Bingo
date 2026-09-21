@@ -107,6 +107,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button type="button" data-ctrl="both">兩者</button>
         </div>
       </div>
+      <div class="field">
+        <span class="field-label">按鈕位置<span class="field-sub">(浮動時盤面比較大)</span></span>
+        <div class="seg" id="blkPadSeg" aria-label="按鈕位置">
+          <button type="button" data-pad="float" class="on">浮在盤面上</button>
+          <button type="button" data-pad="dock">固定在下方</button>
+        </div>
+      </div>
       <button class="btn primary block-btn home-btn" id="blkStartSolo">開始</button>
       <div class="home-hint" id="blkSoloHint"></div>
     </div>
@@ -168,7 +175,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <button class="icon-btn mp-leave-btn" id="blkSoloExit" title="離開" aria-label="離開">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="label blk-room-title">單機 <b id="blkSoloMode" class="display">練習</b></span>
+      <span class="label blk-room-title">單機 <b id="blkSoloMode" class="display">練習</b><span class="blk-goal" id="blkGoal">無盡</span></span>
       <span class="mp-goal" id="blkSoloRec" aria-label="紀錄"></span>
       <button class="icon-btn" id="blkPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
       <button class="icon-btn blk-bigbtn" id="blkSoloBig" type="button" title="大畫面" aria-label="大畫面">大</button>
@@ -183,35 +190,54 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
          舞台是 overflow:hidden(紅線 ①),放進去就會在小螢幕上被**裁掉**
          (第一次截圖時控制列的下半排就是這樣不見的)。
          .blk-play 底下只能有一個可壓縮的兄弟(= 舞台),其餘一律 flex:none。 -->
+    <!-- HUD:Hold 在左、數字在中、Next 在右,**橫排**。
+         ⚠ v2 從「右側直排」改成這樣的理由只有一個:直排那一欄會吃掉 2.5 格的寬度,
+           而盤面的寬度直接決定一格有多大 —— 搬到上面之後盤面可以吃滿整個寬度。 -->
     <div class="blk-hud">
-      <div class="blk-stat"><span>行</span><b id="blkStatLines">0</b></div>
-      <div class="blk-stat"><span>時間</span><b id="blkStatTime">0.0 秒</b></div>
-      <div class="blk-stat"><span>階</span><b id="blkStatLv">1</b></div>
-      <div class="blk-goal" id="blkGoal">無盡</div>
+      <canvas class="blk-mini" id="blkHold" aria-label="保留的方塊"></canvas>
+      <div class="blk-stats">
+        <div class="blk-stat"><span>行</span><b id="blkStatLines">0</b></div>
+        <div class="blk-stat"><span>時間</span><b id="blkStatTime">0.0 秒</b></div>
+        <div class="blk-stat"><span>階</span><b id="blkStatLv">1</b></div>
+      </div>
+      <canvas class="blk-mini" id="blkNext" aria-label="接下來的方塊"></canvas>
     </div>
 
     <div class="blk-stage" id="blkStage">
       <div class="blk-wrap" id="blkWrap">
-        <!-- 待處理垃圾的警示條。高度用 transform:scaleY 改,不要改 height(每幀重排) -->
+        <!-- 待處理垃圾的警示條。⚠ 高度用 transform:scaleY 改,不要改 height(每幀重排)。
+             ⚠ 沒有待處理垃圾時**整條淡出**(但位置留著,盤面不會跳)——
+               單機沒有對手,它永遠是空的,留在那裡只會變成一條看不懂的線。 -->
         <div class="blk-gauge" id="blkGauge" aria-hidden="true"><i class="blk-gauge-fill" id="blkGaugeFill"></i></div>
         <canvas class="blk-main" id="blkMain" aria-label="遊戲盤面"></canvas>
-        <canvas class="blk-side" id="blkSide" aria-hidden="true"></canvas>
       </div>
       <div class="blk-paused hidden" id="blkPaused">已暫停</div>
-    </div>
 
-    <!-- 控制列。⚠ 熱區一律 ≥44px;旋轉與直接落地**不連發**(board.js 的紅線 ⑤) -->
-    <div class="blk-pad" id="blkPad">
-      <div class="blk-pad-top">
-        <button class="blk-key blk-key-sm" type="button" data-act="hold" aria-label="換牌">換牌</button>
-        <button class="blk-key blk-key-sm" type="button" data-act="ccw" aria-label="逆時針旋轉">↺</button>
-        <button class="blk-key blk-key-sm" type="button" data-act="soft" aria-label="慢慢往下">↓</button>
-      </div>
-      <div class="blk-pad-main">
-        <button class="blk-key" type="button" data-act="left" aria-label="向左">◀</button>
-        <button class="blk-key" type="button" data-act="right" aria-label="向右">▶</button>
-        <button class="blk-key" type="button" data-act="cw" aria-label="順時針旋轉">↻</button>
-        <button class="blk-key blk-key-drop" type="button" data-act="hard" aria-label="直接落地">落地</button>
+      <!-- 控制鈕:**浮在盤面上**(絕對定位),兩個拇指簇分別在左下 / 右下角。
+           ⚠⚠ 絕對定位有兩個理由,少一個都會出事:
+             ① 不參與版面 → 盤面可以吃滿舞台的高度(這就是「畫面大一點」的來源)
+             ② **它不會改變 .blk-stage 量到的尺寸** —— 那一格正是 fitBoard() 量的容器,
+                任何會改變它 clientWidth/Height 的東西都會讓盤面自己震盪(紅線 ①)
+           ⚠ 熱區一律 ≥44px;旋轉與直接落地**不連發**(board.js 的紅線 ⑤)。
+           ⚠ 寬螢幕 / 橫置時這兩簇會移到盤面**左右兩側**(CSS 的 @media),不再蓋住盤面。 -->
+      <div class="blk-pad" id="blkPad">
+        <div class="blk-pad-l">
+          <button class="blk-key blk-key-wide" type="button" data-act="soft" aria-label="慢慢往下">↓</button>
+          <div class="blk-pad-row">
+            <button class="blk-key" type="button" data-act="left" aria-label="向左">◀</button>
+            <button class="blk-key" type="button" data-act="right" aria-label="向右">▶</button>
+          </div>
+        </div>
+        <div class="blk-pad-r">
+          <div class="blk-pad-row">
+            <button class="blk-key blk-key-sm" type="button" data-act="hold" aria-label="換牌">換</button>
+            <button class="blk-key blk-key-sm" type="button" data-act="ccw" aria-label="逆時針旋轉">↺</button>
+          </div>
+          <div class="blk-pad-row">
+            <button class="blk-key" type="button" data-act="cw" aria-label="順時針旋轉">↻</button>
+            <button class="blk-key blk-key-drop" type="button" data-act="hard" aria-label="直接落地">落地</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
