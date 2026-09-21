@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="sunset" class="boot-wait">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="方塊對戰">
+<meta name="theme-color" content="#2a1136">
+<!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
+<meta name="color-scheme" content="only light">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
+<title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
+<!-- 方塊對戰 · v2.12.0+1(★ 施工中:P1 單機。`+1` 是 WIP 的驗證推尾碼,封版時清掉) -->
+<meta name="version" content="2.12.0+1">
+<!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
+     ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
+<script>
+if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
+  location.replace("app.html#blocks");
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<!-- 共用 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
+     id 與 class;盤面是檔尾追加的 .blk-* 段落 -->
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="blk-brand display">方塊對戰</div>
+      <span class="topver" id="topVer" aria-label="版本"></span>
+    </div>
+    <div class="tools">
+      <!-- 即時語音(見 notes/24)。⚠ 兩顆鈕必須留在 .tools 裡面 —— 那一整塊會被 syncTools()
+           在頂列被收掉時整組搬進房間框;挪出去就是「開了大模式再也關不掉麥克風」。 -->
+      <button class="icon-btn tk-btn" id="tkListenBtn" type="button" title="打開語音(聽別人說話)" aria-label="打開語音,聽別人說話" aria-pressed="false"></button>
+      <button class="icon-btn tk-btn" id="tkSpeakBtn" type="button" title="打開麥克風(讓別人聽到你)" aria-label="打開麥克風,讓別人聽到你" aria-pressed="false"></button>
+      <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
+      <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
+    </div>
+  </div>
+
+  <!-- ====== 進場選單(兩層)====== -->
+  <section class="panel blk-home" id="blkHome">
+    <div class="mp-head" id="blkHomeHead">
+      <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+      <div class="subtitle">選擇玩法</div>
+    </div>
+
+    <!-- 第一層:選怎麼玩 -->
+    <div id="blkPickMode" class="blk-pick">
+      <div class="blk-hero">
+        <div class="blk-art" aria-hidden="true">
+          <span class="blk-art-i"></span><span class="blk-art-o"></span>
+          <span class="blk-art-t"></span><span class="blk-art-s"></span>
+        </div>
+        <div class="blk-tag display">堆起來,消掉,把垃圾行送給對手</div>
+      </div>
+      <div class="blk-howto">
+        <b>怎麼玩</b><br>
+        方塊從上面掉下來,填滿一整列就會消掉。<b>一次消越多列,送給對手的垃圾行越多</b> ——
+        消 2 列送 1 行、3 列送 2 行、<b>一次消 4 列(Tetris)送 4 行</b>。
+        連續消行還有<b>連擊加成</b>,所以一列一列慢慢消也有用。<br>
+        自己被送垃圾行時,左邊會出現一條<b>警示條</b>;在它推上來之前消掉自己的行可以<b>抵銷</b>。<br>
+        堆到頂端就輸了。
+      </div>
+      <button class="btn primary block-btn home-btn" id="blkGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="blkGoSolo">🎮 單機練習</button>
+    </div>
+
+    <!-- 第二層:單機設定 -->
+    <div id="blkPickSolo" class="hidden">
+      <div class="mp-head">
+        <button class="icon-btn" id="blkSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="subtitle">單機練習</div>
+      </div>
+      <div class="field">
+        <span class="field-label">玩法</span>
+        <div class="seg" id="blkModeSeg" aria-label="玩法">
+          <button type="button" data-mode="endless" class="on">練習(無盡)</button>
+          <button type="button" data-mode="sprint">40 行競速</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">移動速度<span class="field-sub">(長按左右的連發快慢)</span></span>
+        <div class="seg" id="blkFeelSeg" aria-label="移動速度">
+          <button type="button" data-feel="0">慢</button>
+          <button type="button" data-feel="1" class="on">標準</button>
+          <button type="button" data-feel="2">快</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="field-label">操作方式</span>
+        <div class="seg" id="blkCtrlSeg" aria-label="操作方式">
+          <button type="button" data-ctrl="btn" class="on">按鈕</button>
+          <button type="button" data-ctrl="swipe">手勢</button>
+          <button type="button" data-ctrl="both">兩者</button>
+        </div>
+      </div>
+      <button class="btn primary block-btn home-btn" id="blkStartSolo">開始</button>
+      <div class="home-hint" id="blkSoloHint"></div>
+    </div>
+  </section>
+
+  <!-- ====== 連線畫面(P3 才會接上 adapter;DOM 先放著,共用綁定找得到)====== -->
+  <section class="panel hidden" id="mpConnect">
+    <div class="mp-head">
+      <button class="icon-btn" id="mpConnBack" type="button" title="回上一層" aria-label="回上一層">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="subtitle">連線對戰</div>
+    </div>
+    <div class="field">
+      <span class="field-label">你的暱稱(必填)</span>
+      <input id="mpName" class="mp-input" maxlength="8" placeholder="輸入你的名字">
+    </div>
+    <div class="or-divider"><span>建立新房間</span></div>
+    <div class="field">
+      <input id="mpRoomName" class="mp-input" maxlength="12" placeholder="房間名稱(留空用你的暱稱)">
+    </div>
+    <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
+    <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
+    <div class="mp-detect-row">
+      <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span><span id="mpLiveTxt">偵測目前房間中…</span>
+      </div>
+      <button class="mp-rescan" id="mpScan" title="重新偵測房間" aria-label="重新偵測房間">🔍</button>
+    </div>
+    <div class="room-list" id="mpRoomList"></div>
+    <div class="hint" id="mpConnMsg"></div>
+  </section>
+
+  <!-- ====== 房間橫幅(P3)====== -->
+  <div class="panel blk-room hidden" id="mpBar">
+    <div class="row blk-room-top">
+      <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="label blk-room-title"><b id="mpRoomTitle" class="display">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
+      <div class="mp-actions">
+        <!-- ⚠ class 是 .blk-bigbtn,而狀態掛在 body 上的是 .blk-big —— 兩個名字一定要不一樣 -->
+        <button class="icon-btn blk-bigbtn" id="blkBig" type="button" title="大畫面" aria-label="大畫面">大</button>
+        <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
+      </div>
+    </div>
+    <div class="mp-subrow" id="mpSubrow">
+      <span class="mp-status" id="mpStatusTxt">等待中…</span>
+    </div>
+    <div class="blk-room-foot">
+      <div id="mpPlayers" class="mp-players"></div>
+    </div>
+  </div>
+
+  <!-- ====== 單機的那一列 ====== -->
+  <div class="panel blk-room hidden" id="blkSoloBar">
+    <div class="row blk-room-top">
+      <button class="icon-btn mp-leave-btn" id="blkSoloExit" title="離開" aria-label="離開">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="label blk-room-title">單機 <b id="blkSoloMode" class="display">練習</b></span>
+      <span class="mp-goal" id="blkSoloRec" aria-label="紀錄"></span>
+      <button class="icon-btn" id="blkPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
+      <button class="icon-btn blk-bigbtn" id="blkSoloBig" type="button" title="大畫面" aria-label="大畫面">大</button>
+    </div>
+  </div>
+
+  <!-- ====== 對局畫面 ======
+       ⚠⚠ .blk-stage 一律 overflow:hidden —— 它正是 BLKB.fitBoard() 量的那個容器,
+          任何會讓它長出捲軸的東西都會讓盤面**自己震盪**(跳棋 / 飛行棋 / 麻將已經三次)。 -->
+  <div class="blk-play hidden" id="blkPlay">
+    <!-- ⚠⚠ HUD 與控制列是舞台的**兄弟**,不可以放進 .blk-stage 裡面 ——
+         舞台是 overflow:hidden(紅線 ①),放進去就會在小螢幕上被**裁掉**
+         (第一次截圖時控制列的下半排就是這樣不見的)。
+         .blk-play 底下只能有一個可壓縮的兄弟(= 舞台),其餘一律 flex:none。 -->
+    <div class="blk-hud">
+      <div class="blk-stat"><span>行</span><b id="blkStatLines">0</b></div>
+      <div class="blk-stat"><span>時間</span><b id="blkStatTime">0.0 秒</b></div>
+      <div class="blk-stat"><span>階</span><b id="blkStatLv">1</b></div>
+      <div class="blk-goal" id="blkGoal">無盡</div>
+    </div>
+
+    <div class="blk-stage" id="blkStage">
+      <div class="blk-wrap" id="blkWrap">
+        <!-- 待處理垃圾的警示條。高度用 transform:scaleY 改,不要改 height(每幀重排) -->
+        <div class="blk-gauge" id="blkGauge" aria-hidden="true"><i class="blk-gauge-fill" id="blkGaugeFill"></i></div>
+        <canvas class="blk-main" id="blkMain" aria-label="遊戲盤面"></canvas>
+        <canvas class="blk-side" id="blkSide" aria-hidden="true"></canvas>
+      </div>
+      <div class="blk-paused hidden" id="blkPaused">已暫停</div>
+    </div>
+
+    <!-- 控制列。⚠ 熱區一律 ≥44px;旋轉與直接落地**不連發**(board.js 的紅線 ⑤) -->
+    <div class="blk-pad" id="blkPad">
+      <div class="blk-pad-top">
+        <button class="blk-key blk-key-sm" type="button" data-act="hold" aria-label="換牌">換牌</button>
+        <button class="blk-key blk-key-sm" type="button" data-act="ccw" aria-label="逆時針旋轉">↺</button>
+        <button class="blk-key blk-key-sm" type="button" data-act="soft" aria-label="慢慢往下">↓</button>
+      </div>
+      <div class="blk-pad-main">
+        <button class="blk-key" type="button" data-act="left" aria-label="向左">◀</button>
+        <button class="blk-key" type="button" data-act="right" aria-label="向右">▶</button>
+        <button class="blk-key" type="button" data-act="cw" aria-label="順時針旋轉">↻</button>
+        <button class="blk-key blk-key-drop" type="button" data-act="hard" aria-label="直接落地">落地</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== 主要動作列 ====== -->
+  <div class="primary-bar hidden" id="primaryBar">
+    <div class="action-hint hidden" id="actionHint"></div>
+    <div class="actions" id="primaryActions">
+      <button class="btn primary hidden" id="mpReadyBtn">準備好了</button>
+    </div>
+  </div>
+
+  <!-- ====== 結果卡 ====== -->
+  <div class="veil" id="veil">
+    <div class="win-card blk-win" id="blkWinCard">
+      <div class="word display" id="winWord">本局結束</div>
+      <p id="winMsg"></p>
+      <div class="blk-result hidden" id="blkResult"></div>
+      <div class="win-champ hidden" id="winChamp"></div>
+      <div class="win-scores hidden" id="winScores"></div>
+      <div class="blk-react-row" id="blkReactRow">
+        <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
+        <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
+        <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
+        <button class="gmk-react" type="button" data-em="🤝" aria-label="送出 握手">🤝</button>
+        <button class="gmk-react more" type="button" id="winEmoteBtn" title="更多表情 / 一句話 / 語音" aria-label="開啟互動表情面板">😀</button>
+      </div>
+      <div class="actions" id="mpWinBtns">
+        <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
+        <button class="btn primary" id="mpAgain">下一局</button>
+        <button class="btn ghost" id="mpLeaveWin">離開房間</button>
+      </div>
+      <div class="actions" id="soloWinBtns">
+        <button class="btn primary" id="blkSoloAgain">再來一局</button>
+        <button class="btn ghost" id="blkSoloHome">回選單</button>
+      </div>
+      <button class="peek-link" id="winPeek">先看看盤面 👀</button>
+    </div>
+  </div>
+  <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
+
+  <!-- ====== 設定 ====== -->
+  <div class="veil" id="setVeil">
+    <div class="set-card">
+      <div class="set-head">設定</div>
+      <div class="set-body" id="setBody">
+        <div class="set-group">
+          <div class="set-group-title">外觀</div>
+          <div class="set-row">
+            <span class="set-lbl">主題</span>
+            <div class="swatches" id="swatches"></div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">音效</div>
+          <div class="set-row">
+            <span class="set-lbl">開啟音效</span>
+            <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="開啟音效"><span class="knob"></span></button>
+          </div>
+          <div class="set-row" id="sfxVolRow">
+            <span class="set-lbl">音量</span>
+            <input class="rng" id="sfxVol" type="range" min="0" max="100" value="100" aria-label="音效音量(含勝敗音效)">
+          </div>
+          <div class="set-row" id="vibrateRow">
+            <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
+            <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">背景音樂</div>
+          <div class="set-row">
+            <span class="set-lbl">開啟音樂</span>
+            <button class="switch" id="swBgm" role="switch" aria-checked="false" aria-label="開啟背景音樂"><span class="knob"></span></button>
+          </div>
+          <div class="set-row" id="bgmTrackRow">
+            <span class="set-lbl">曲目</span>
+            <select class="set-select" id="bgmTrackSel" aria-label="背景音樂曲目"></select>
+          </div>
+          <div class="set-row" id="bgmVolRow">
+            <span class="set-lbl">音量</span>
+            <input class="rng" id="bgmVol" type="range" min="0" max="100" value="35" aria-label="背景音樂音量">
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">語音（連線）</div>
+          <div class="set-row">
+            <span class="set-lbl">收到語音音量</span>
+            <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
+          </div>
+          <div class="set-row">
+            <span class="set-lbl">我的語音<span class="set-sub">(自己錄 · 連線可送)</span></span>
+            <button class="btn ghost mvc-open" id="myVoiceBtn" type="button">編輯</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn primary" id="setClose">完成</button>
+      <div class="set-foot">方塊對戰 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+    </div>
+  </div>
+
+  <!-- ====== 表情 / 語音 ====== -->
+  <div class="veil" id="emoteVeil">
+    <div class="set-card emote-card">
+      <button class="card-x" id="emoteClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head" id="emoteHead">傳給全部人</div>
+      <div class="emote-to" id="emoteTo"></div>
+      <div class="emote-grid" id="emoteGrid"></div>
+      <div class="emote-sub">💬 一句話</div>
+      <div class="emote-phrases" id="emotePhrases"></div>
+      <div class="emote-sub">🔊 語音短訊</div>
+      <div class="emote-phrases" id="emoteClips"></div>
+      <div class="emote-sub hidden" id="myClipsSub">⭐ 我的語音</div>
+      <div class="emote-phrases hidden" id="emoteMyClips"></div>
+      <div class="emote-sub">🎤 語音留言</div>
+      <button class="emote-rec" id="quickVoiceBtn" type="button" title="錄一段語音送出(最多 6 秒)" aria-label="錄一段語音送出">
+        <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">錄一段話送出(6 秒)</span>
+      </button>
+      <div class="emote-input">
+        <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
+        <button class="btn" id="emoteSend" type="button">送出</button>
+      </div>
+    </div>
+  </div>
+  <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
+
+  <div class="veil" id="myVoiceVeil">
+    <div class="set-card mvc-card">
+      <button class="card-x" id="mvClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">我的語音</div>
+      <div class="mvc-hint">自己錄 3 秒短語音,連線時可在互動面板當按鈕送給別人。<b>只存在這台裝置</b>,換裝置不會跟著走。</div>
+      <div class="mvc-list" id="mvList"></div>
+      <div class="mvc-save hidden" id="mvSaveRow">
+        <input id="mvName" type="text" maxlength="8" placeholder="取個名字…" autocomplete="off" enterkeyhint="done">
+        <button class="btn primary" id="mvSave" type="button">儲存</button>
+      </div>
+      <button class="btn mvc-rec" id="mvRecBtn" type="button">🎤 錄一段新的(3 秒)</button>
+      <div class="mvc-foot"><span id="mvCount">0 / 6</span></div>
+    </div>
+  </div>
+
+  <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
+
+  <div class="veil" id="leaveVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">🚪</div>
+      <div class="confirm-title" id="leaveTitle">離開房間?</div>
+      <p id="leaveMsg">確定要離開這個房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="leaveCancel">留在房間</button>
+        <button class="btn danger" id="leaveConfirm">離開房間</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="veil" id="kickVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">⚠️</div>
+      <div class="confirm-title">移出玩家?</div>
+      <p id="kickMsg">確定要把這位玩家移出房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="kickCancel">取消</button>
+        <button class="btn danger" id="kickConfirm">移出房間</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas class="confetti" id="confetti"></canvas>
+
+<script>
+/* ============================================================
+   與其他十四個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 blocks_rooms / blocks_index。
+   ⚠ 需在資料庫規則開放那兩段(P3 才會用到)—— 整份規則在 notes/firebase-rules.json。
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBVBN3hRMSFq7KwWmyf3IR01Y82XmfhLQ0",
+  authDomain: "bingo-82e51.firebaseapp.com",
+  databaseURL: "https://bingo-82e51-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bingo-82e51",
+  storageBucket: "bingo-82e51.firebasestorage.app",
+  messagingSenderId: "954833280596",
+  appId: "1:954833280596:web:29c1d2aa434f62db91d7c1"
+};
+</script>
+
+<!-- 載入順序固定:ui-kit(定義 $)→ talk(要在連線核心之前)→ qr → mp-core
+     → rules(純函式)→ board(盤面)→ solo(單機)→ main(綁定,必須最後)
+     ⚠ P1 還沒有 ai.js / adapter.js —— main.js 對 MP 一律 typeof 判斷,不會炸。 -->
+<!-- 問題回報與建議。★ 一定要排在**所有 JS 之前**:它的錯誤環形緩衝是載入時就掛上的,
+     要抓的正是後面那幾支炸掉的錯誤。鈕與蓋板都由它自己建。 -->
+<script src="js/shared/feedback.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/shared/ui-kit.js"></script>
+<!-- 即時語音(WebRTC mesh)。選配模組;要排在連線核心**之前**(核心一進房就 Talk.attach()) -->
+<script src="js/shared/talk.js"></script>
+<script src="js/shared/qr.js"></script>
+<script src="js/shared/mp-core.js"></script>
+<script src="js/blocks/rules.js"></script>
+<script src="js/blocks/board.js"></script>
+<script src="js/blocks/solo.js"></script>
+<script src="js/blocks/main.js"></script>
+</body>
+</html>

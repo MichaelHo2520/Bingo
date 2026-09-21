@@ -1,0 +1,170 @@
+"use strict";
+
+/* ============================================================================
+   方塊對戰 — 畫面切換、事件綁定與啟動(必須最後載入)
+
+   ★ 相位一律走 showScreen(),不要在 solo.js / adapter.js 裡自己 toggle("hidden")——
+     有了選單 + 單機 + 連線三塊之後一定會漏掉某一塊(五子棋 v1.51.0 的教訓)。
+
+   ⚠ **P1 階段沒有 adapter.js** —— 所有 MP 綁定一律 `typeof MP !== "undefined"` 包起來
+     (同 ui-kit 對 Talk / RoomShare / Feedback 的做法)。P3 把 adapter.js 放進來之後,
+     這一支不必改就會自己亮起來。
+   ========================================================================== */
+
+const BLK_SCREENS = ["blkHome", "blkSetup", "blkSoloBar", "blkPlay"];
+function showScreen(which){
+  const on = {
+    home:    ["blkHome"],
+    connect: [],                        // 連線畫面本體由 mp-core 顯示
+    lobby:   ["blkSetup"],
+    play:    ["blkPlay"],               // 連線對戰中
+    solo:    ["blkSoloBar", "blkPlay"]  // 單機
+  }[which] || [];
+  BLK_SCREENS.forEach(id => { const el = $(id); if(el) el.classList.toggle("hidden", on.indexOf(id) < 0); });
+  if(which === "home" || which === "solo"){
+    ["mpConnect", "mpBar", "primaryBar", "scrollArea"].forEach(id => {
+      const el = $(id); if(el) el.classList.add("hidden");
+    });
+  }
+  document.body.classList.toggle("solo-on", which === "solo");
+  document.body.classList.toggle("blk-mp", which === "play");
+  document.body.classList.toggle("blk-solo", which === "solo");
+  if(which === "play") dockTools("mpBar");
+  else if(which === "solo") dockTools("blkSoloBar");
+  else undockTools();
+  BigMode.sync();
+  /* ★ 盤面尺寸靠 JS 算 → 換到有盤面的畫面時要重量一次(剛才它還是 hidden,量不到)。
+     ⚠ 兩次:一次立刻、一次下一幀 —— 版面在同一輪裡還沒穩定下來(控制列的高度會變)。 */
+  if(which === "play" || which === "solo"){
+    setTimeout(() => BLKB.fitBoard(), 0);
+    requestAnimationFrame(() => BLKB.fitBoard());
+  }
+  if(which === "home") showHomeLayer("pick");
+  syncPageBack();
+}
+
+/* ---------- 進場選單的兩層 ---------- */
+function showHomeLayer(which){
+  const pick = $("blkPickMode"), solo = $("blkPickSolo"), head = $("blkHomeHead");
+  if(pick) pick.classList.toggle("hidden", which !== "pick");
+  if(solo) solo.classList.toggle("hidden", which !== "solo");
+  if(head) head.classList.toggle("hidden", which !== "pick");
+  syncPageBack();
+}
+function paintSoloHint(){
+  const el = $("blkSoloHint"); if(!el) return;
+  const r = Solo.rec();
+  const body = (Solo.mode() === "sprint")
+    ? ("<b>" + Solo.SPRINT_LINES + " 行競速</b>:消滿 " + Solo.SPRINT_LINES + " 行,比誰快。" +
+       (r.sprint ? "你最快 <b>" + (r.sprint / 1000).toFixed(1) + " 秒</b>。" : "還沒有紀錄。"))
+    : ("<b>練習(無盡)</b>:一路堆到爆為止,重力每 30 秒快一階。" +
+       (r.best ? "你最高 <b>" + r.best + " 行</b>。" : "還沒有紀錄。"));
+  el.innerHTML = body + "<br>" +
+    "手機:底下的按鈕;<b>長按左右</b>會連續移動。電腦:方向鍵移動、<b>空白鍵</b>直接落地、" +
+    "<b>↑ / X</b> 順轉、<b>Z</b> 逆轉、<b>C</b> 換牌。<br>" +
+    '<span class="blk-warn">◆ 手感不順就調下面那排「移動速度」—— 那是這個遊戲最該先調的東西。</span>';
+}
+function segPick(id, attr, fn){
+  const seg = $(id); if(!seg) return;
+  seg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if(!b) return;
+    fn(b.dataset[attr]);
+    [...seg.children].forEach(x => x.classList.toggle("on", x === b));
+    paintSoloHint();
+  });
+}
+function syncSoloSeg(){
+  const set = (id, attr, val) => {
+    const seg = $(id); if(!seg) return;
+    [...seg.children].forEach(b => b.classList.toggle("on", String(b.dataset[attr]) === String(val)));
+  };
+  set("blkModeSeg", "mode", Solo.mode());
+  set("blkFeelSeg", "feel", Solo.feel());
+  set("blkCtrlSeg", "ctrl", Solo.ctrl());
+}
+
+/* ---------- 盤面 ----------
+   ★ 規則事件要分流到單機 / 連線。盤面自己不知道在哪一種模式(見 board.js 檔頭)。 */
+BLKB.mount({
+  onEvents(evs, st){
+    if(Solo.active()) Solo.onEvents(evs, st);
+    else if(typeof MP !== "undefined") MP.onEvents(evs, st);
+  },
+  canPlay(){
+    if(Solo.active()) return !Solo.paused();
+    return (typeof MP !== "undefined") ? MP.canPlay() : false;
+  }
+});
+
+/* ---------- 進場選單 ---------- */
+$("blkGoOnline").addEventListener("click", () => {
+  if(typeof MP !== "undefined") MP.openConnect();
+  else showToast("連線對戰還在施工中 —— 先玩單機 🙂");
+});
+$("blkGoSolo").addEventListener("click", () => { paintSoloHint(); showHomeLayer("solo"); });
+$("blkSoloCfgBack").addEventListener("click", () => showHomeLayer("pick"));
+segPick("blkModeSeg", "mode", v => Solo.setMode(v));
+segPick("blkFeelSeg", "feel", v => Solo.setFeel(+v));
+segPick("blkCtrlSeg", "ctrl", v => Solo.setCtrl(v));
+$("blkStartSolo").addEventListener("click", () => Solo.start());
+
+/* ---------- 單機的列 / 結果卡 ---------- */
+$("blkSoloExit").addEventListener("click", () => Solo.quit());
+$("blkSoloAgain").addEventListener("click", () => Solo.again());
+$("blkSoloHome").addEventListener("click", () => Solo.quit());
+$("blkPauseBtn").addEventListener("click", () => Solo.togglePause());
+$("winPeek").addEventListener("click", peekBoard);
+$("reopenWin").addEventListener("click", showResult);
+
+/* ---------- 連線(P3 才會有 MP,這裡先全部包起來)---------- */
+(function bindMP(){
+  if(typeof MP === "undefined") return;
+  $("mpCreate").addEventListener("click", () => MP.create($("mpName").value, $("mpRoomName").value));
+  $("mpScan").addEventListener("click", () => MP.scanRooms());
+  $("mpName").addEventListener("change", savePrefs);
+  $("mpName").addEventListener("input", () => $("mpName").classList.remove("needs-name"));
+  $("mpRoomName").addEventListener("keydown", e => { if(e.key === "Enter") MP.create($("mpName").value, $("mpRoomName").value); });
+  $("mpReadyBtn").addEventListener("click", () => MP.toggleReady());
+  $("mpLeaveBtn").addEventListener("click", () => MP.askLeave());
+  $("mpConnBack").addEventListener("click", () => showScreen("home"));
+  $("leaveConfirm").addEventListener("click", () => MP.confirmLeave());
+  $("leaveCancel").addEventListener("click", () => MP.cancelLeave());
+  $("leaveVeil").addEventListener("click", e => { if(e.target === $("leaveVeil")) MP.cancelLeave(); });
+  $("kickConfirm").addEventListener("click", () => MP.confirmKick());
+  $("kickCancel").addEventListener("click", () => MP.cancelKick());
+  $("kickVeil").addEventListener("click", e => { if(e.target === $("kickVeil")) MP.cancelKick(); });
+  $("mpAgain").addEventListener("click", () => MP.again());
+  $("mpLeaveWin").addEventListener("click", () => MP.askLeave());
+})();
+
+/* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */
+bindCommonUI();
+bindPageBack({ sub: "blkPickSolo" });
+bindAudioLifecycle();
+registerSW();
+paintVersion();
+initUpdateCheck(() => !Solo.playing() && (typeof MP === "undefined" || !MP.isOnline()));
+initFullscreenKeep();
+
+/* ---------- 啟動 ---------- */
+buildSwatches();
+/* 大畫面:⚠ 一定要排在 loadPrefs() **之前** —— 偏好會回頭叫 BigMode.set()。
+   ⚠ 名字用「大 / 小」,不准沾「全螢幕」(那是 ⛶ 那一顆的事)。 */
+BigMode.init({
+  cls: "blk-big", btn: "blk-bigbtn", name: "大畫面",
+  live: () => { const el = $("blkPlay"); return !!el && !el.classList.contains("hidden"); },
+  save: savePrefs,
+  /* 盤面是 JS 量出來的 → 切大 / 小之後一定要重量一次 */
+  after: () => BLKB.fitBoard()
+});
+loadPrefs();
+Solo.loadOwn();
+syncSettingsUI();
+syncSoloSeg();
+Solo.paintBar();
+paintSoloHint();
+showScreen("home");
+setTimeout(maybeShowInstallTip, 1500);
+/* ★ 一定要是最後一行:同步啟動都跑完了,按鈕才真的能按(見 bootReady 的註解)。
+   ⚠ 漏掉這一行的下場是「這一頁的按鈕永遠灰著」—— tools/test-boot.js 在守。 */
+bootReady();

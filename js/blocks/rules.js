@@ -422,11 +422,17 @@ const BLK = (function(){
      ========================================================================== */
   function lock(st){
     const c = st.cur;
-    const ev = { t: "lock", k: c ? c.k : -1, rows: [], atk: 0, out: 0, pc: false,
+    /* ★ 事件帶著「這一顆鎖在哪裡、佔了哪四格」——
+       board.js 的消行動畫需要「**寫進去之後、消掉之前**」的盤面,而那一瞬間
+       只存在於這個函式裡面。讓呼叫端自己推算的話,它得知道重力在這一幀有沒有
+       多掉一格 —— 那是第二份真相。 */
+    const ev = { t: "lock", k: c ? c.k : -1, r: c ? c.r : 0, x: c ? c.x : 0, y: c ? c.y : 0,
+                 cells: [], rows: [], atk: 0, out: 0, pc: false,
                  garb: [], combo: 0, dead: false, drop: 0 };
     if(!c) return ev;
 
     const cs = cellsOf(c.k, c.r, c.x, c.y);
+    ev.cells = cs;
     let allHidden = true;
     for(let i = 0; i < 4; i++){
       const p = cs[i];
