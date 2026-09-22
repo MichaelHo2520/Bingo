@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.14.0 -->
-<meta name="version" content="2.14.0+2">
+<meta name="version" content="2.14.0+3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -188,12 +188,19 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- ★★ 玩法是這一頁最重要的旋鈕。
            **K.O. 賽是預設**,理由是聚會場合:淘汰賽第一個死的人要乾等一兩分鐘,
            而 K.O. 賽死了兩秒就復活,沒有人會在旁邊滑手機,時間也可以預期。 -->
+      <!-- ⚠⚠ 每一格底下那條 .blk-fnote 是**隨選隨變**的白話後果,不是固定說明
+           (v2.15.3;使用者:「設定規則那裡我看不太懂,不是很直覺」)。
+           ★ 判準是「講現場會發生什麼事」,不是「講這個欄位叫什麼」——
+             「K.O. 賽」四個字本身不帶任何資訊,「死了 2 秒就復活」才是。
+           ⚠ 文案的單一真相在 js/blocks/adapter.js 的 NOTE_MODE / NOTE_SHIELD,
+             **不要在這裡寫死一份**(寫死 = 改了規則之後靜靜對不上)。 -->
       <div class="field">
         <span class="field-label">玩法</span>
         <div class="seg" id="blkModeSegMp" aria-label="玩法">
           <button class="on" data-mode="ko">💥 K.O. 賽</button>
           <button data-mode="out">☠️ 淘汰賽</button>
         </div>
+        <div class="blk-fnote" id="blkNoteMode"></div>
       </div>
       <div class="field" id="blkSecsRow">
         <span class="field-label">一局多久</span>
@@ -206,12 +213,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <!-- ★ 新手保護:開局前這幾秒不吃垃圾行(照樣排隊、照樣顯示,就是不推上來)。
            沒有它的話,第一次玩的人開局十五秒就被埋掉,連手感都還沒摸到。 -->
       <div class="field">
-        <span class="field-label">新手保護<span class="field-sub">(開局幾秒內不吃垃圾行)</span></span>
-        <div class="seg" id="blkShieldSeg" aria-label="新手保護">
+        <span class="field-label">開局暖身<span class="field-sub">(前幾秒沒有人會被頂高)</span></span>
+        <div class="seg" id="blkShieldSeg" aria-label="開局暖身">
           <button data-shield="0">關</button>
           <button data-shield="10">10 秒</button>
           <button class="on" data-shield="20">20 秒</button>
         </div>
+        <div class="blk-fnote" id="blkNoteShield"></div>
       </div>
       <!-- ★ 這裡本來有「我的讓分」那一格與底下那一行「這一局的讓分」——
            v2.15.2 整套拿掉了(使用者:「做不出可以讓人看得懂跟實際上有的功能,
@@ -237,9 +245,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
         </div>
       </div>
+      <!-- ⚠ 這裡原本寫「同一顆**種子**」——「種子」是程式術語,玩家不可能懂(v2.15.3 換掉)。
+           ★ 第二句在回答使用者親口問的那個問題:「三個人玩,我消掉方塊是每個人都會增加嗎?」
+             答案(只打其中一個人)以前只寫在程式裡,畫面上完全看不出來。 -->
       <div class="hint" id="blkRuleHint">
-        同一顆種子 → <b>每個人拿到的方塊順序完全一樣</b>,比的是誰堆得好。
-        點對手的小盤可以<b>鎖定攻擊目標</b>,再點一次取消。
+        每個人拿到的<b>方塊順序完全一樣</b> —— 比的是誰堆得好,不是誰運氣好。<br>
+        三個人以上時,你消行送出的垃圾行<b>只會打給其中一個人</b>,不是每個人都吃到;
+        點對手的小盤可以<b>指定只打他</b>,再點一次改回隨機。
       </div>
     </section>
   </div>
@@ -267,6 +279,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="blk-stat"><span>行</span><b id="blkStatLines">0</b></div>
         <div class="blk-stat"><span>時間</span><b id="blkStatTime">0.0 秒</b></div>
         <div class="blk-stat"><span>階</span><b id="blkStatLv">1</b></div>
+        <!-- ★ 「我現在打誰」。⚠ **只在對手 ≥ 2 個時才出現**(v2.15.3)——
+             1 對 1 時只有一個人可以打,寫出來是噪音,而 HUD 這一列在 360px 上寬度很緊。
+             三個人以上時它是這一頁最重要的一個資訊:垃圾行只打一個人,而預設是隨機。 -->
+        <div class="blk-stat blk-stat-tgt hidden" id="blkStatTgtBox"><span>目標</span><b id="blkStatTgt">隨機</b></div>
       </div>
       <canvas class="blk-mini" id="blkNext" aria-label="接下來的方塊"></canvas>
     </div>

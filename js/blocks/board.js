@@ -759,9 +759,13 @@ const BLKB = (function(){
     const e = foeEls[i];
     if(e) beam(cvMain, e.cv, "#ffd93d", "+" + n);
   }
-  function beamIn(i, n){
+  /* ⚠ 進來的那一道要帶**攻擊者的名字**(v2.15.3)—— 出去那一道不必:
+     它的箭頭尖端就落在對方的小盤上,名字就在正下方,寫了是重複;
+     而進來這一道的尖端落在**我的警示條**上,「是誰打我」在畫面上本來完全沒有答案
+     (三個人以上時光束太快,看不清楚是從哪一塊飛過來的)。 */
+  function beamIn(i, n, who){
     const e = foeEls[i];
-    if(e) beam(e.cv, elGauge || cvMain, "#ff5d6c", "+" + n);
+    if(e) beam(e.cv, elGauge || cvMain, "#ff5d6c", (who ? who + " " : "") + "+" + n);
     incoming(n);
   }
 

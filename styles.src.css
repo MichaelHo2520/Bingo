@@ -13740,6 +13740,17 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
 .field-sub{font-size:11px;font-weight:600;opacity:.85;margin-left:4px}
 
+/* ---------- 設定選項底下那一行「隨選隨變」的後果(v2.15.3)----------
+   ★ 使用者回報「設定規則那裡我看不太懂,不是很直覺」。這一頁與另外十四個不一樣:
+     棋類的規則是靜態的(「連五顆」一句話講完),而這一頁的規則是**一串因果**
+     (消掉 → 飛到某個人那裡 → 把他頂高 → 他快爆了),欄位名稱本身完全不帶資訊。
+   ⚠ 文案住在 js/blocks/adapter.js 的 NOTE_MODE / NOTE_SHIELD(單一真相)。
+   ⚠ 這一條**不可以**是 position:absolute 或負 margin —— 它就是要佔版面把那一格推高,
+     大廳在 .scroll-area 裡,捲得動;藏起來才是白做。 */
+.blk-fnote{margin-top:6px;font-size:12px;line-height:1.5;color:var(--text);opacity:.82;
+           text-align:left}
+.blk-fnote b{opacity:1;font-weight:800;color:var(--accent)}
+
 /* ---------- 手勢說明(v2.14.0)----------
    同一份 HTML 印在兩個地方:進場的第一層(連線與單機都會經過)與房間框「?」的蓋板。
    ★ 外框只有進場頁那一張有(.blk-gest);蓋板裡是直接放在卡片上,不必再包一層框。
@@ -13811,7 +13822,7 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-foes-over{bottom:auto;justify-content:flex-start;padding-top:2px}
 .blk-foes-over .blk-foe{background:rgba(12,10,22,.42);
                         -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-.blk-foe{display:flex;flex-direction:column;align-items:center;gap:2px;
+.blk-foe{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;
          padding:3px;border-radius:10px;box-shadow:inset 0 0 0 1.5px transparent;
          transition:box-shadow .15s linear,opacity .2s linear;cursor:pointer;
          pointer-events:auto}
@@ -13820,7 +13831,16 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-foe-name{font-size:10.5px;font-weight:800;color:var(--text);max-width:100%;
               overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1}
 /* 被鎖定為攻擊目標 */
-.blk-foe-target{box-shadow:inset 0 0 0 1.5px var(--accent-2)}
+/* 鎖定的目標(v2.15.3 加粗 + 常駐標記)。⚠ 原本只有一條 1.5px 的內框 ——
+   在對局中那塊小盤只有三、四十像素寬,框線那一點差別**根本看不出來**,
+   於是「我到底有沒有鎖定」變成一個要靠記憶的事(而這是三人局最重要的一個決定)。
+   ⚠ 標記用 ::after 疊上去,**不可以**改 .blk-foe 的 padding / border-width ——
+     那會改變小盤那一條量出來的尺寸 → fitFoes() 跟著變 = 震盪那一族。 */
+.blk-foe-target{box-shadow:inset 0 0 0 2.5px var(--accent-2)}
+.blk-foe-target .blk-foe-name{color:var(--accent-2);font-weight:900}
+.blk-foe-target::after{content:"🎯";position:absolute;right:-2px;top:-4px;font-size:13px;
+                       line-height:1;pointer-events:none;
+                       text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .blk-foe-away{opacity:.42}
 
 /* 攻擊光束的畫布:蓋住整個對局區、不吃指標事件 */
@@ -13854,6 +13874,17 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
    層級改用字級 + 字重分。 */
 .blk-stat span{font-size:10px;font-weight:700;letter-spacing:.10em;color:var(--text);opacity:.72}
 .blk-stat b{font-family:'Fredoka','Nunito',sans-serif;font-size:19px;color:var(--text)}
+/* ---------- 「我現在打誰」(v2.15.3)----------
+   ⚠ 名字可能有 8 個字 → 這一格**一定要能縮**(其餘三格是數字,寬度固定)。
+     不夾住的話三個人以上時 HUD 會在 360px 上擠成兩行,而 .blk-hud 的高度是寫死的
+     → 第二行直接被裁掉(同紅線「舞台裡只能有盤面」那一族的病)。
+   ⚠ 它預設是 .hidden(1 對 1 不出現),所以這幾條只在三個人以上時生效。 */
+.blk-stat-tgt{max-width:88px;min-width:0}
+.blk-stat-tgt b{font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+                white-space:nowrap;display:block}
+/* 鎖定了就讓這一格自己發亮 —— 「隨機」與「指定某個人」是兩種完全不同的打法,
+   光看文字換掉在對局中根本注意不到。 */
+.blk-stat-lock b{color:var(--accent-2)}
 .blk-goal{margin-left:6px;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;
           background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px var(--blk-line);
           color:var(--text);white-space:nowrap}

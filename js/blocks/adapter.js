@@ -269,7 +269,7 @@ const MP = MPCore.create((function(){
       R.queueGarbage(st, a.lines, a.hole, a.from);
       lastHitBy = a.from;
       const i = foeIndex(a.from);
-      if(i >= 0) BLKB.beamIn(i, a.lines);
+      if(i >= 0) BLKB.beamIn(i, a.lines, ctx.dispName(a.from));
       pubFull(false);                                        // 把 ack 寫進快照(重整後才去得掉重)
     });
   }
@@ -448,8 +448,9 @@ const MP = MPCore.create((function(){
     const id = list[i];
     if(!id) return;
     lockTarget = (lockTarget === id) ? null : id;
-    showToast(lockTarget ? ("鎖定 " + ctx.dispName(id)) : "改回隨機攻擊");
+    showToast(lockTarget ? ("只打 " + ctx.dispName(id)) : "改回隨機攻擊");
     rebuildFoes();
+    paintTargetStat();                   // ⚠ HUD 那一格要立刻跟上,不能等下一次 250ms 的 paintHud
   }
 
   function banner(txt){
@@ -469,15 +470,48 @@ const MP = MPCore.create((function(){
     }else set("blkStatTime", "—");
     const goal = $("blkGoal");
     if(goal) goal.textContent = (gRules && gRules.mode === "ko") ? ("K.O. ×" + koOf(ctx.me())) : "淘汰賽";
+    paintTargetStat();
   }
+  /* ★★ 「我現在打誰」(v2.15.3)。使用者親口問過「三個人玩是每個人都會增加嗎」——
+     答案(只打一個人、預設隨機)以前**畫面上完全看不出來**,只有一行灰字寫在大廳。
+     ⚠ 只在對手 ≥ 2 個時出現:1 對 1 時沒有可選的東西,而 HUD 這一列在 360px 上很緊。 */
+  function paintTargetStat(){
+    const box = $("blkStatTgtBox"), val = $("blkStatTgt");
+    if(!box || !val) return;
+    const foeN = order.filter(id => id !== ctx.me()).length;
+    box.classList.toggle("hidden", foeN < 2 || ctx.spectating());
+    if(foeN < 2) return;
+    const txt = (lockTarget && foes[lockTarget]) ? ctx.dispName(lockTarget) : "隨機";
+    if(val.textContent !== txt) val.textContent = txt;
+    box.classList.toggle("blk-stat-lock", !!lockTarget);
+  }
+  /* ★★ 設定畫面的「隨選隨變」文案(v2.15.3)。
+     ⚠⚠ 判準:**講現場會發生什麼事,不要講這個欄位叫什麼。**
+       「K.O. 賽」三個字本身不帶任何資訊 —— 玩家要知道的是「死了會不會復活」
+       與「先死的人要不要在旁邊乾等」。這兩件事以前只寫在 blocks.html 的
+       HTML 註解裡(給開發者看的),玩家看不到 → 使用者回報「看不太懂」。
+     ⚠ 單一真相在這裡,`blocks.html` 那兩個 div 是空的 ——
+       兩邊各寫一份就是改了規則之後靜靜對不上的雙胞胎。 */
+  const NOTE_MODE = {
+    ko:  "死了 <b>2 秒就復活</b>,一直打到時間結束。把別人打爆最多次的人贏 —— 沒有人要在旁邊乾等。",
+    out: "<b>死了就出局</b>,只能看別人打完。最後還活著的人贏。⚠ 人多的時候,先死的人要等一兩分鐘。"
+  };
+  const NOTE_SHIELD = {
+    0:  "一開局就能互相攻擊。⚠ <b>第一次玩的人通常撐不過 15 秒</b>。",
+    10: "開局 10 秒內<b>大家都不會被頂高</b>(警示條照樣會亮,先學會怎麼抵銷)。",
+    20: "開局 20 秒內<b>大家都不會被頂高</b>(警示條照樣會亮,先學會怎麼抵銷)。"
+  };
   function paintSetup(){
     const seg = (id, attr, val) => {
       const el = $(id); if(!el) return;
       [...el.children].forEach(b => b.classList.toggle("on", String(b.dataset[attr]) === String(val)));
     };
+    const note = (id, html) => { const el = $(id); if(el) el.innerHTML = html || ""; };
     seg("blkModeSegMp", "mode", rules.mode);
     seg("blkSecsSeg", "secs", rules.secs);
     seg("blkShieldSeg", "shield", rules.shield);
+    note("blkNoteMode", NOTE_MODE[rules.mode]);
+    note("blkNoteShield", NOTE_SHIELD[rules.shield]);
     const row = $("blkSecsRow");
     if(row) row.classList.toggle("hidden", rules.mode !== "ko");
   }

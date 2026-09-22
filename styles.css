@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 f7e3a31f66ece013f4fd4f570ca9667d89eecec6d2baf7a3bcf71a71f3f6e992)
+    真相在 styles.src.css(sha256 b9215c9c668b8a4ed2b188b24d94361274bcfb40fddff0cf73b90ba39c5f2b05)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6036,6 +6036,9 @@ body.is-big .cy-timer{margin-left:auto}
            box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
 .blk-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
 .field-sub{font-size:11px;font-weight:600;opacity:.85;margin-left:4px}
+.blk-fnote{margin-top:6px;font-size:12px;line-height:1.5;color:var(--text);opacity:.82;
+           text-align:left}
+.blk-fnote b{opacity:1;font-weight:800;color:var(--accent)}
 .blk-gest{margin-top:10px;padding:10px 12px 11px;border-radius:14px;
           background:rgba(255,255,255,.05);border:1px solid var(--panel-line);text-align:left}
 .blk-gest-head{font-size:12px;font-weight:700;color:var(--text);opacity:.88;
@@ -6071,7 +6074,7 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-foes-over{bottom:auto;justify-content:flex-start;padding-top:2px}
 .blk-foes-over .blk-foe{background:rgba(12,10,22,.42);
                         -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
-.blk-foe{display:flex;flex-direction:column;align-items:center;gap:2px;
+.blk-foe{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;
          padding:3px;border-radius:10px;box-shadow:inset 0 0 0 1.5px transparent;
          transition:box-shadow .15s linear,opacity .2s linear;cursor:pointer;
          pointer-events:auto}
@@ -6079,7 +6082,11 @@ body.is-big .cy-timer{margin-left:auto}
             box-shadow:inset 0 0 0 1px var(--blk-line)}
 .blk-foe-name{font-size:10.5px;font-weight:800;color:var(--text);max-width:100%;
               overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1}
-.blk-foe-target{box-shadow:inset 0 0 0 1.5px var(--accent-2)}
+.blk-foe-target{box-shadow:inset 0 0 0 2.5px var(--accent-2)}
+.blk-foe-target .blk-foe-name{color:var(--accent-2);font-weight:900}
+.blk-foe-target::after{content:"🎯";position:absolute;right:-2px;top:-4px;font-size:13px;
+                       line-height:1;pointer-events:none;
+                       text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .blk-foe-away{opacity:.42}
 .blk-fx{position:absolute;left:0;top:0;pointer-events:none;z-index:3}
 body.blk-spec .blk-wrap,
@@ -6096,6 +6103,10 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 .blk-stat{display:flex;flex-direction:column;align-items:center;line-height:1.12;min-width:50px}
 .blk-stat span{font-size:10px;font-weight:700;letter-spacing:.10em;color:var(--text);opacity:.72}
 .blk-stat b{font-family:'Fredoka','Nunito',sans-serif;font-size:19px;color:var(--text)}
+.blk-stat-tgt{max-width:88px;min-width:0}
+.blk-stat-tgt b{font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+                white-space:nowrap;display:block}
+.blk-stat-lock b{color:var(--accent-2)}
 .blk-goal{margin-left:6px;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;
           background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px var(--blk-line);
           color:var(--text);white-space:nowrap}
