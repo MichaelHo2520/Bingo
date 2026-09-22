@@ -30,7 +30,15 @@ const Solo = (function(){
   let st = null;                        // 我的狀態
   let foe = null, foeMem = null, foeLv = null;   // 電腦那一份
   let on = false, paused = false, ended = false;
-  let t0 = 0, took = 0;
+  let took = 0;                         // 這一局花了幾 ms(結果卡與紀錄用)
+  let hudT = 0;                         // HUD 的重畫節流
+
+  /* ★★ 計時一律讀 `st.time`,**不要用 performance.now() - t0**。
+     `st.time` 是規則層在 tick() 裡累積的 dt,而 tick() 只有在 canPlay() 成立時才會被推
+     → **暫停、開著設定蓋板、切到背景那幾段天然就不算**。
+     用 wall clock 的話三件事會一起錯:暫停時間被算進 40 行競速的紀錄、
+     暫停中那一欄顯示 `took || 0`(還沒結束 → 「0.0 秒」)、切背景回來時間直接跳一大段。 */
+  function ms(){ return st ? st.time : 0; }
 
   /* ---------- 存檔 ---------- */
   function loadOwn(){
@@ -77,7 +85,7 @@ const Solo = (function(){
       BLKB.setFoes([]);
     }
     on = true; paused = false; ended = false;
-    t0 = performance.now(); took = 0;
+    took = 0; hudT = 0;
     BLKB.setState(st);
     BLKB.play();
     showScreen("solo");
@@ -108,8 +116,15 @@ const Solo = (function(){
      ⚠ 電腦的重力也要走 —— 只推 AI 不 tick 的話它永遠不會被自己的重力壓死,
        而且垃圾行推上來的時機會與我這邊差一整顆。 */
   function onFrame(dt){
-    if(!on || ended || paused || !foe) return;
-    if(foe.dead) return;
+    if(!on || ended || paused) return;
+    /* ⚠⚠ HUD 一定要在「有沒有電腦對手」**之前** —— 這裡本來第一行就是
+       `… || !foe) return`,而練習與 40 行競速的 foe 是 null → 那條路每幀都早退,
+       整局只剩 lock 事件會重畫一次 HUD。症狀:**計時器與「階」整局凍住**
+       (實測停在 18.7 秒,2.5 秒後還是 18.7 秒),而 40 行競速比的正是時間。
+       ★ 連線那一份一直是對的(adapter.js 的 onFrame 開頭那段),單機漏掉了。 */
+    hudT += dt;
+    if(hudT >= 250){ hudT = 0; paintHud(); }
+    if(!foe || foe.dead) return;
     const evs = BLKAI.step(foe, foeMem, dt, foeLv).concat(BLK.tick(foe, dt));
     for(let i = 0; i < evs.length; i++){
       const ev = evs[i];
@@ -143,7 +158,7 @@ const Solo = (function(){
   function finish(win){
     if(ended) return;
     ended = true; on = false;
-    took = Math.round(performance.now() - t0);
+    took = Math.round(ms());
     BLKB.stop();
 
     let fresh = false;
@@ -157,10 +172,14 @@ const Solo = (function(){
     saveOwn();
     paintBar();
     paintResult(win, fresh);
+    /* ★ 練習(無盡)沒有「贏」這回事 —— 它永遠走 finish(false),所以只看 win 的話
+       **破紀錄那一局放的是失敗音效**,而結果卡上同時寫著「🎉 新紀錄!」。
+       兩個訊號互相打架,而且聲音那一個比較大聲。破了紀錄就是好事。 */
+    const good = win || fresh;
     if(typeof Sound !== "undefined"){
-      if(win && Sound.win) Sound.win(); else if(Sound.lose) Sound.lose();
+      if(good && Sound.win) Sound.win(); else if(Sound.lose) Sound.lose();
     }
-    if(win && typeof burst === "function") burst();
+    if(good && typeof burst === "function") burst();
     setTimeout(showResult, 260);
   }
 
@@ -174,7 +193,7 @@ const Solo = (function(){
     if(!st) return;
     const set = (id, v) => { const el = $(id); if(el) el.textContent = v; };
     set("blkStatLines", st.lines);
-    set("blkStatTime", on && !paused ? timeTxt(performance.now() - t0) : timeTxt(took || 0));
+    set("blkStatTime", timeTxt(ended ? took : ms()));
     set("blkStatLv", BLK.level(st));
     const goal = $("blkGoal");
     if(goal) goal.textContent = (mode === "sprint") ? ("目標 " + SPRINT_LINES + " 行")

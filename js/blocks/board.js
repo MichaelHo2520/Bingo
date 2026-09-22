@@ -723,7 +723,22 @@ const BLKB = (function(){
     " ": "hard", Spacebar: "hard", x: "cw", X: "cw", z: "ccw", Z: "ccw",
     c: "hold", C: "hold", Shift: "hold"
   };
+  /* ⚠⚠ **正在打字就一個鍵都不要碰。**
+     這一頁是十五頁裡**唯一**在 window 上掛 keydown 的(其他頁要嘛綁在特定元素上、
+     要嘛只認 Enter),而 KEYMAP 吃掉的正好是 `x z c` / 空白鍵 / 方向鍵 / Shift ——
+     少了這一道,暱稱打「Max Zoe cat」會變成「Maoeat」、問題回報打
+     「box crash zoom exit」會變成「borashoomeit」(兩個都是實測)。
+     ⚠⚠⚠ 最要命的是空白鍵:**注音是用空白鍵選字的** → 這一頁的中文輸入整個是壞的。
+       而受害名單裡就有**問題回報框本身** —— 玩家想告訴你哪裡怪,打出來的字是殘缺的,
+       所以這個坑沒有任何人會來提醒你。
+     ★ 做法照 js/chengyu/main.js(那一頁也有全域 keydown,它一直是對的)。 */
+  function typing(e){
+    const t = e.target;
+    if(!t) return false;
+    return /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || !!t.isContentEditable;
+  }
   function onKeyDown(e){
+    if(typing(e)) return;               // ⚠ 一定要在 preventDefault **之前**
     const a = KEYMAP[e.key];
     if(!a) return;
     e.preventDefault();
@@ -732,6 +747,7 @@ const BLKB = (function(){
     press(a);
   }
   function onKeyUp(e){
+    if(typing(e)) return;
     const a = KEYMAP[e.key];
     if(!a) return;
     delete inp.keys[e.key];
@@ -937,7 +953,23 @@ const BLKB = (function(){
     /* ⚠ 切到背景一律放開所有鍵:不放的話回來會是「一直往左跑」 */
     document.addEventListener("visibilitychange", () => { if(document.hidden) allUp(); });
     window.addEventListener("blur", allUp);
-    if(!raf){ lastT = performance.now(); raf = requestAnimationFrame(loop); }
+    wake();
+  }
+  /* rAF 從 mount() 起是無條件自遞迴的 —— 在進場選單 / 大廳也照樣每秒畫六十次
+     一塊看不見的 canvas(手機上就是白燒電)。對局畫面收起來時就停掉它。
+     ⚠⚠ 停的條件只能是「對局畫面收起來了」,**不可以用 running** ——
+       觀戰者永遠不 play()(running 一直是 false),但他的對手小盤與攻擊光束要照畫。
+     ⚠ 醒過來一定要重設 lastT:不然第一幀的 dt 會是「睡了多久」,雖然 frame() 夾在
+       100ms,那還是憑空多掉的一格。 */
+  function wake(){
+    if(!mounted || raf) return;
+    lastT = performance.now();
+    raf = requestAnimationFrame(loop);
+  }
+  function sleep(){
+    if(!raf) return;
+    cancelAnimationFrame(raf);
+    raf = 0;
   }
   function allUp(){
     inp.dir = 0; inp.soft = false; inp.keys = {};
@@ -970,13 +1002,18 @@ const BLKB = (function(){
   }
 
   return {
-    mount, setState, play, pause, stop, fitBoard, draw,
+    mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,
     act, setFeel, setCtrl, setPad, incoming, pop, shake,
     setFoes, foeAt, beamOut, beamIn, foes: () => foes,
-    /* ★ 測試用的兩個出口(產品程式不會呼叫它們):
-       step(dt) 手動推一幀、frames() 是 rAF 迴圈至今推了幾幀。 */
+    /* ★ 測試用的三個出口(產品程式不會呼叫它們):
+       step(dt) 手動推一幀、frames() 是至今推了幾幀、awake() 是 rAF 現在排著沒有。
+       ⚠ frames() 不再適合拿來守「rAF 有沒有啟動」:rAF 現在只在對局畫面才跑
+         (wake / sleep),而 step() 也會讓它 +1 → 推過幀之後那個數字就沒有意義了。
+         要守「現在到底在不在跑」一律問 awake()(而且它不受 headless 虛擬時間影響,
+         不必賭 rAF 在這段虛擬時間裡醒過沒有)。 */
     step: frame,
     frames: () => frameN,
+    awake: () => !!raf,
     state: () => st,
     cell: () => cell,
     COL, COL_GARB, DAS_MS, ARR_MS,

@@ -35,10 +35,14 @@ function showScreen(which){
   BigMode.sync();
   /* ★ 盤面尺寸靠 JS 算 → 換到有盤面的畫面時要重量一次(剛才它還是 hidden,量不到)。
      ⚠ 兩次:一次立刻、一次下一幀 —— 版面在同一輪裡還沒穩定下來(控制列的高度會變)。 */
+  /* ★ rAF 只在對局畫面開著的時候跑(BLKB.wake / sleep)——
+     它從 mount() 起是無條件自遞迴的,在選單與大廳也照樣每秒畫六十次一塊看不見的
+     canvas。⚠ 判斷只能用「哪一個畫面」,不可以用 running:觀戰者永遠不 play()。 */
   if(which === "play" || which === "solo"){
+    BLKB.wake();
     setTimeout(() => BLKB.fitBoard(), 0);
     requestAnimationFrame(() => BLKB.fitBoard());
-  }
+  }else BLKB.sleep();
   if(which === "home") showHomeLayer("pick");
   syncPageBack();
 }
@@ -94,6 +98,23 @@ function syncSoloSeg(){
   if(lvRow) lvRow.classList.toggle("hidden", Solo.mode() !== "vs");
 }
 
+/* 蓋板(設定 / 表情 / 自訂語音 / 問題回報 / 房間分享)開著的時候,單機不要繼續掉方塊。
+   ⚠ 另外十四頁是回合制,蓋板開著頂多是「輪到你但你沒動」;**這一頁是即時的** ——
+     不擋的話就是「你去調個音量,回來人就沒了」(實測:設定蓋板開著的 3 秒內盤面一直在變)。
+   ★ 判斷用 `.show` —— 十五頁的蓋板統一靠這個 class 開關(見 ui-kit 的 BACK_LAYERS)。
+   ★ **不必另外做「恢復」**:canPlay() 一回 false 規則層就不再 tick,
+     而計時讀的是 st.time(solo.js 的 ms())→ 蓋板那幾秒天然不算,關掉就原地接上。
+   ⚠ 結果卡(#veil)刻意不列 —— 它出現時 ended 已經是 true,遊戲早就停了。
+   ⚠⚠ **連線刻意不吃這一條** —— 別人還在玩,自己開設定不能讓全場等你。 */
+const BLK_VEILS = ["setVeil", "fbVeil", "emoteVeil", "myVoiceVeil", "qrVeil"];
+function blkVeilOpen(){
+  for(let i = 0; i < BLK_VEILS.length; i++){
+    const el = $(BLK_VEILS[i]);
+    if(el && el.classList.contains("show")) return true;
+  }
+  return false;
+}
+
 /* ---------- 盤面 ----------
    ★ 規則事件要分流到單機 / 連線。盤面自己不知道在哪一種模式(見 board.js 檔頭)。 */
 BLKB.mount({
@@ -102,7 +123,7 @@ BLKB.mount({
     else if(typeof MP !== "undefined") MP.onEvents(evs, st);
   },
   canPlay(){
-    if(Solo.active()) return !Solo.paused();
+    if(Solo.active()) return !Solo.paused() && !blkVeilOpen();
     return (typeof MP !== "undefined") ? MP.canPlay() : false;
   },
   /* 每一幀的鉤子:單機對電腦在這裡推進電腦那一份狀態 */

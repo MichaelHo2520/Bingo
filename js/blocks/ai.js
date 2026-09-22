@@ -53,8 +53,11 @@ const BLKAI = (function(){
       desc: "放得慢,偶爾會把自己埋起來 —— 第一次玩的人也贏得了" },
     { key: "norm", name: "普通", emoji: "😎", ppm: 40, noise: 1.0, blunder: 0.10,
       desc: "穩穩地堆,會消行也會還手,但不會刻意留四格的洞" },
+    /* ⚠ 這一句原本寫「一直挖四格的洞打 Tetris」,但那不是它真正在做的事:
+       El-Tetris 的 wells 是**負**權重(-3.38)→ 它其實是盡量不留深縫的打法,
+       難度來自 ppm(出手快)。說明與行為對不上,玩家會等一個永遠不來的 Tetris。 */
     { key: "hard", name: "高手", emoji: "🔥", ppm: 72, noise: 0.15, blunder: 0.0,
-      desc: "一直挖四格的洞打 Tetris —— 不先學會抵銷會被埋掉" }
+      desc: "手很快、幾乎不留洞,穩穩地一直還手 —— 不先學會抵銷會被埋掉" }
   ];
   function levelOf(k){
     for(let i = 0; i < LEVELS.length; i++) if(LEVELS[i].key === k) return LEVELS[i];
@@ -190,7 +193,10 @@ const BLKAI = (function(){
   function newMem(){ return { target: null, t: 0, k: -1 }; }
 
   function step(st, mem, dt, lv, rnd){
-    if(!st || st.dead || !st.cur) return;
+    /* ⚠ 早退也要回**陣列** —— 呼叫端是 `BLKAI.step(…).concat(BLK.tick(…))`,
+       回 undefined 就是一個 TypeError,而它會發生在對電腦那一局的中途。
+       現在被呼叫端的 dead 守衛擋著,但那是兩支檔案之間的默契,不是保證。 */
+    if(!st || st.dead || !st.cur) return [];
     lv = lv || LEVELS[1];
     /* 紅線 ④:換了一顆才重新決定。**不要每一幀重算** ——
        盤面被垃圾行推上來的那一瞬間目標會整個換掉,方塊會在原地左右鬼打牆。 */

@@ -48,6 +48,7 @@ const MP = MPCore.create((function(){
   const SHIELDS = [0, 10, 20];
   let rules = { mode: "ko", secs: 180, shield: 20 };
   let myHcap = R.HCAP_EVEN;
+  let hcapAll = {};                     // pid → 讓分等級(全房的,大廳那一行要畫)
 
   /* ---------- 一局 ---------- */
   let st = null;                        // 我的狀態(本機權威)
@@ -104,6 +105,13 @@ const MP = MPCore.create((function(){
      三、一局的生命週期
      ========================================================================== */
   function newGame(ids){
+    /* ⚠ 順手把**上一局**的攻擊事件清掉。不清的話它們會一直留在這間房裡:
+       `child_added` 每次掛上去都會把現存的整批重播一次(靠 rid 守衛擋得掉,但那個
+       成本隨著局數一路長),而**房主離開時房間資料是刻意不刪的**(全專案紅線 5)
+       → 這間房只要還在,攻擊事件就只進不出。
+       ★ 這是純粹的清理,動不到正確性:新局的 roundId 不一樣,沒刪乾淨的也會被
+         `a.rid !== curRound` 擋掉。只有房主會走到這裡。 */
+    if(atkRef) atkRef.remove();
     /* 房主開局。⚠ startAt 用**伺服器時間**換算(見 nowSrv)—— 各台的系統時鐘差幾秒
        是常態,用本機時間的話有人會早開好幾秒。 */
     return {
@@ -279,8 +287,9 @@ const MP = MPCore.create((function(){
     });
 
     hcapRef && hcapRef.on("value", s => {
-      const v = s.val() || {};
-      if(ctx.me() && typeof v[ctx.me()] === "number") myHcap = v[ctx.me()];
+      /* ⚠ 整份留著,不要只挑自己那一個 —— 大廳要畫「誰讓了幾分」那一行。 */
+      hcapAll = s.val() || {};
+      if(ctx.me() && typeof hcapAll[ctx.me()] === "number") myHcap = hcapAll[ctx.me()];
       paintSetup();
     });
   }
@@ -382,19 +391,25 @@ const MP = MPCore.create((function(){
       return true;
     }, { local: false });                /* ★ 紅線 ⑧ */
   }
-  /* KO 賽:時間到 → KO 最多的人贏(同分看總消行,再同分就平手) */
+  /* K.O. 賽:時間到 → K.O. 最多的人贏,同分平手。
+     ⚠⚠ **統計一定要在交易裡面用 `g.ko` 算,不可以在外面用本機的 lastGame。**
+       時間到那一刻,若別人剛 K.O. 了誰、而那一筆 game 還沒傳到我這,我算出來的贏家
+       就是錯的 —— 而 `if(g.winner) return false` 會讓**先到的那一筆成為定局**:
+       幾台同時到時間、各自算各自的,變成誰的網路快誰說了算。
+       交易回呼拿到的 g 是伺服器上最新的那一份,這才是唯一對得起「同時」的算法。
+     ⚠ 這裡不拿總消行當 tie-break:消行數只活在 live 快照裡、`game` 上沒有
+       → 交易裡根本拿不到。同分就是平手(舊註解寫了「同分看總消行」,從來沒有實作)。 */
   function resolveTime(){
     if(over || !gRules || gRules.mode !== "ko") return;
     over = true;                         // 先擋住自己重複進來;真正的結果等 game 回來
-    const tally = {};
-    order.forEach(id => { tally[id] = koOf(id); });
-    let best = -1, win = "draw";
-    order.forEach(id => { if(tally[id] > best){ best = tally[id]; win = id; } });
-    let ties = order.filter(id => tally[id] === best);
-    if(ties.length > 1) win = "draw";
+    const ids = order.slice();
     ctx.txGame(g => {
       if(g.winner) return false;
-      g.winner = win;
+      const ko = g.ko || {};
+      let best = -1;
+      ids.forEach(id => { const n = ko[id] || 0; if(n > best) best = n; });
+      const top = ids.filter(id => (ko[id] || 0) === best);
+      g.winner = (top.length === 1) ? top[0] : "draw";
       return true;
     }, { local: false });
   }
@@ -486,6 +501,21 @@ const MP = MPCore.create((function(){
     seg("blkHcapSeg", "hcap", myHcap);
     const row = $("blkSecsRow");
     if(row) row.classList.toggle("hidden", rules.mode !== "ko");
+    paintHcaps();
+  }
+  /* 「誰讓了幾分」那一行。★ 只列不是「平」的人 —— 全房都平的時候整行收起來。
+     ⚠ 名單用 ctx.players()(座位上的人),不是 hcapAll 的 key:
+       離開的人那一筆還留在節點上,照著畫會列出已經不在房裡的名字。 */
+  function paintHcaps(){
+    const el = $("blkHcaps");
+    if(!el || !ctx) return;
+    const ids = Object.keys(ctx.players() || {});
+    const list = ids.filter(id => {
+      const v = hcapAll[id];
+      return typeof v === "number" && (v | 0) !== R.HCAP_EVEN;
+    }).map(id => esc(ctx.dispName(id)) + " <b>" + esc(R.hcapOf(hcapAll[id]).name) + "</b>");
+    el.innerHTML = list.length ? ("這一局的讓分:" + list.join(" · ")) : "";
+    el.classList.toggle("hidden", !list.length);
   }
 
   /* ==========================================================================
@@ -563,7 +593,9 @@ const MP = MPCore.create((function(){
         : ("最後站著的是你 —— 消了 " + (st ? st.lines : 0) + " 行") };
       return { word: "輸了", msg: "<b>" + esc(ctx.dispName(winner)) + "</b> 贏了這一局" };
     },
-    refresh(){ if(order.length) rebuildFoes(); },
+    /* ⚠ 讓分那一行也要跟著重畫 —— 它列的是「座位上的人」,而這個鉤子正是
+       玩家名單變動時被呼叫的(有人離開時不重畫就會留著已經不在房裡的名字)。 */
+    refresh(){ paintHcaps(); if(order.length) rebuildFoes(); },
 
     ownPrefs(){ return { blkHcap: myHcap }; },
     usePrefs(o){

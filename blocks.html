@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.13.1 -->
-<meta name="version" content="2.13.1">
+<meta name="version" content="2.13.1+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -233,6 +233,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-hcap="4">受 2</button>
         </div>
       </div>
+      <!-- ★ 讓分是每個人自己選的 → 這一行讓大廳看得到**別人選了什麼**。
+           少了它,「他怎麼打我這麼痛」在畫面上完全沒有線索(adapter 一直有把自己的
+           寫進 hcap 節點、也一直有訂閱回來,只是從來沒有畫出去)。
+           ⚠ 只列不是「平」的人 —— 全房都平的時候整行收起來(預設沒有資訊量)。 -->
+      <div class="hint hidden" id="blkHcaps"></div>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">

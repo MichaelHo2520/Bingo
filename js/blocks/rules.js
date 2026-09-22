@@ -138,6 +138,11 @@ const BLK = (function(){
   const SOFT_MULT   = 20;               // 軟降是重力的幾倍
   const MAX_DT      = 100;              // ★ tick 的 dt 上限(紅線 ⑥)
   const GARB_CAP    = 8;                // 一次鎖定最多推上來幾行
+  /* 新手保護期間最多幫你存幾行。★ 這個數字的用途是「不要讓保護變成延後處決」——
+     保護期照樣排隊(看得到警示條、學得會抵銷)是刻意的,但沒有天花板的話,
+     20 秒的量會在解除那一刻一次灌下來,而每次鎖定推 GARB_CAP 行
+     → 新手第一顆都還沒放好就被埋掉了。12 = 一次半的 GARB_CAP,還救得回來。 */
+  const SHIELD_CAP  = 12;
 
   /* 消行的基礎攻擊量(index = 消掉幾行) */
   const ATK = [0, 0, 1, 2, 4];
@@ -512,6 +517,9 @@ const BLK = (function(){
   function queueGarbage(st, n, hole, from){
     n = Math.max(0, Math.round(Number(n) || 0));
     if(!n) return 0;
+    /* ⚠ 保護期間的天花板(SHIELD_CAP)。滿了就**直接丟掉**,不排進去 ——
+       「保護」不可以只是把帳延後到解除那一秒一次算。 */
+    if(st.shield > 0 && pendCount(st) >= SHIELD_CAP) return 0;
     const raw = n * st.recv + st.rcarry;
     const m = Math.floor(raw);
     st.rcarry = raw - m;
@@ -737,7 +745,7 @@ const BLK = (function(){
     // 常數
     COLS, ROWS, VIS, TOP, NKIND, KINDS, GARB,
     I, J, L, O, S, T, Z,
-    GRAV, LV_MS, LOCK_MS, LOCK_RESETS, SOFT_MULT, MAX_DT, GARB_CAP,
+    GRAV, LV_MS, LOCK_MS, LOCK_RESETS, SOFT_MULT, MAX_DT, GARB_CAP, SHIELD_CAP,
     ATK, PC_ATK, DEF_RULES, HCAP, HCAP_EVEN,
     // 形狀與 kick(純資料,board.js 查表用)
     CELLS, BOXN, BASE, SPAWN_X, SPAWN_Y, KICK_JLSTZ, KICK_I, kicksOf, cellsOf,
