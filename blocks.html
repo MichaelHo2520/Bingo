@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.14.0 -->
-<meta name="version" content="2.14.0+4">
+<meta name="version" content="2.14.0+6">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -192,6 +192,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   <div class="scroll-area blk-scroll hidden" id="scrollArea">
     <section class="panel hidden" id="blkSetup">
       <div class="subtitle">對戰設定</div>
+      <!-- ★★ 等人的時候跑一段電腦自動對打(v2.15.3)。
+           這一頁的規則是**一串因果**(消掉 → 飛過去 → 把他頂高),文字寫三行還是不懂,
+           看一次就懂 —— 而大廳等人那 30 秒本來就是空的。**零操作、零強迫。**
+           ⚠ 只在大廳跑(showScreen 開關),離開就停 —— 它是 setInterval,不是 rAF。
+           ⚠ 兩塊畫布由 js/blocks/main.js 自己畫,**不要接到 board.js 的 foeEls** ——
+             那一套是跟著對局的 rAF 與 fitFoes() 走的,借過來就會在大廳裡改到盤面尺寸。 -->
+      <div class="blk-demo" id="blkDemo" aria-hidden="true">
+        <canvas class="blk-demo-cv" id="blkDemoA"></canvas>
+        <div class="blk-demo-mid" id="blkDemoMid"></div>
+        <canvas class="blk-demo-cv" id="blkDemoB"></canvas>
+      </div>
+      <div class="blk-demo-cap">上面是示範:<b>左邊消掉幾列</b>,右邊就<b>從底下被頂高幾行</b>。</div>
       <!-- ★★ 玩法是這一頁最重要的旋鈕。
            **K.O. 賽是預設**,理由是聚會場合:淘汰賽第一個死的人要乾等一兩分鐘,
            而 K.O. 賽死了兩秒就復活,沒有人會在旁邊滑手機,時間也可以預期。 -->
@@ -227,6 +239,29 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button class="on" data-shield="20">20 秒</button>
         </div>
         <div class="blk-fnote" id="blkNoteShield"></div>
+      </div>
+      <!-- ★★ 攻擊目標(v2.15.3)。這一格回答的正是使用者親口問的那個問題:
+           「三個人一起玩,我消掉方塊會怎麼讓對方增加?是每個人都會增加還是要怎麼樣?」
+           ⚠ `rules.js` 的 `target` 欄位從第一版就在,但 `pickTarget()` 一直沒讀它 ——
+             這一版才真的接上。「打第一名」是給聚會用的自動平衡:強的人會被全場追打。
+           ⚠ 手動鎖定(點對手的小盤)**在兩種模式下都還能用**,而且優先於這個房規。 -->
+      <div class="field">
+        <span class="field-label">攻擊目標<span class="field-sub">(三個人以上才有差)</span></span>
+        <div class="seg" id="blkTargetSeg" aria-label="攻擊目標">
+          <button class="on" data-target="rand">🎲 隨機</button>
+          <button data-target="high">👑 打第一名</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteTarget"></div>
+      </div>
+      <!-- 最後 30 秒加倍。⚠ 預設**關**:它會讓結尾更刺激,但領先的人也一樣加倍
+           → 有滾雪球的風險,先讓使用者自己在現場試。只在 K.O. 賽出現。 -->
+      <div class="field" id="blkRushRow">
+        <span class="field-label">最後 30 秒<span class="field-sub">(結尾加速)</span></span>
+        <div class="seg" id="blkRushSeg" aria-label="最後 30 秒加倍">
+          <button class="on" data-rush="0">一般</button>
+          <button data-rush="1">⏱️ 攻擊加倍</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteRush"></div>
       </div>
       <!-- ★ 這裡本來有「我的讓分」那一格與底下那一行「這一局的讓分」——
            v2.15.2 整套拿掉了(使用者:「做不出可以讓人看得懂跟實際上有的功能,

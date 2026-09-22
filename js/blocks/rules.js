@@ -153,6 +153,12 @@ const BLK = (function(){
   /* 消行的基礎攻擊量(index = 消掉幾行) */
   const ATK = [0, 0, 1, 2, 4];
   const PC_ATK = 4;                     // 全消(Perfect Clear)額外
+  /* ★ 反擊窗(v2.15.3):被打之後這麼久之內消行,送出去的行數加倍、而且**打回去給他**。
+     ⚠ 數字的用途是「幫被打的人」,不是加難度 —— 3.5 秒大約是一顆半的時間,
+       足夠清掉一波垃圾行,但短到不可能靠它累積優勢。
+     ⚠ 用 `st.time`(遊戲時間)量,不可以用 wall clock:暫停時不該算,
+       而 headless 的虛擬時間下 performance.now() 也量不到(v2.15.2 連撞兩次)。 */
+  const REVENGE_MS = 3500;
 
   /* Combo 的額外攻擊(n = 這是連續第幾次消行,第一次是 1)。
      ★ 這張表存在的唯一理由:**只會消單行的人也要有輸出**。
@@ -171,7 +177,8 @@ const BLK = (function(){
     respawn: 2000,                      // KO 賽死後幾毫秒復活
     shield:  20000,                     // 新手保護:開局前幾毫秒不吃垃圾(0 = 關)
     combo:   true,                      // Combo 攻擊
-    target:  "rand"                     // 4 人的預設攻擊目標
+    target:  "rand",                    // 攻擊目標:"rand" 隨機 · "high" 打第一名
+    rush:    false                      // 最後 30 秒攻擊加倍(只在 K.O. 賽有意義)
   };
   function normRules(r){
     r = r || {};
@@ -181,7 +188,12 @@ const BLK = (function(){
     out.respawn = clampInt(r.respawn, 0, 10000, DEF_RULES.respawn);
     out.shield  = clampInt(r.shield, 0, 60000, DEF_RULES.shield);
     out.combo   = (r.combo === undefined) ? true : !!r.combo;
-    out.target  = (r.target === "high" || r.target === "pick") ? r.target : "rand";
+    /* ★ 攻擊目標(v2.15.3 才真的接上 adapter 的 pickTarget())。
+       ⚠ 只有兩個值:"rand" = 在還活著的對手裡隨機 · "high" = 一律打目前最領先的。
+         舊的 "pick"(自己挑)拿掉了 —— **手動鎖定在兩種模式下本來就都能用**,
+         多一個值只是讓設定畫面多一顆看不懂的鈕,而這一版的主題正好相反。 */
+    out.target  = (r.target === "high") ? "high" : "rand";
+    out.rush    = !!r.rush;             // 最後 30 秒攻擊加倍(只在 K.O. 賽有意義)
     return out;
   }
   function clampInt(v, lo, hi, dft){
@@ -294,7 +306,12 @@ const BLK = (function(){
       resets: 0,
       soft:   false,
       dead:   false,
-      deadT:  0                         // 死了多久(KO 賽用來算復活)
+      deadT:  0,                        // 死了多久(KO 賽用來算復活)
+      /* 反擊(v2.15.3):最後打我的人 + 那一刻的遊戲時間。
+         ⚠ revT 的初值是 -1e9 而不是 0 —— 0 會讓「開局第一顆」落在反擊窗裡面。 */
+      revBy:  "",
+      revT:   -1e9,
+      rush:   false                     // 最後 30 秒加倍(由 adapter 在對局中寫進來)
     };
     st.shield = st.rules.shield;
     spawn(st);
@@ -450,7 +467,19 @@ const BLK = (function(){
       ev.pc = boardEmpty(st.board);
       if(ev.pc) atk += PC_ATK;
       ev.atk = atk;
-      ev.out = cancel(st, atk);         // 先抵銷自己的,剩下的才送出去
+      let out = cancel(st, atk);        // 先抵銷自己的,剩下的才送出去
+      /* ★★ 加倍的兩條,**一律在抵銷之後**(v2.15.3)。
+         放在抵銷之前的話,加倍的那一半會先被拿去消自己的垃圾 —— 畫面上完全看不出來,
+         而玩家看到的就是「說好的加倍呢」。加倍是**送出去的**行數加倍,不是攻擊力加倍。
+         ⚠ 兩條會疊(最後 30 秒剛好反擊 = ×4),這是刻意的:那正是最戲劇性的一刻。 */
+      if(st.rush) out *= 2;             // 最後 30 秒(由 adapter 在對局中寫進來)
+      if(out > 0 && st.revBy && (st.time - st.revT) <= REVENGE_MS){
+        out *= 2;
+        ev.to = st.revBy;               // ⚠ 反擊一定要打回**打我的那個人**,不可以隨機
+        ev.revenge = true;
+        st.revBy = "";                  // 用掉就沒了 —— 一次挨打換一次反擊,不是持續加成
+      }
+      ev.out = out;
       st.sent += ev.out;
     }
 
@@ -486,6 +515,10 @@ const BLK = (function(){
        「保護」不可以只是把帳延後到解除那一秒一次算。 */
     if(st.shield > 0 && pendCount(st) >= SHIELD_CAP) return 0;
     st.pend.push({ n: n, hole: ((hole | 0) % COLS + COLS) % COLS, from: from || "" });
+    /* ★ 反擊窗從「真的排進佇列」那一刻起算(v2.15.3)。
+       ⚠ 不是從「收到攻擊」那一刻 —— 被上面那道保護期上限丟掉的那幾筆根本沒有進來,
+         給它反擊等於憑空多一次加倍。 */
+    if(from){ st.revBy = from; st.revT = st.time; }
     return n;
   }
   /* 把佇列推上來。一次鎖定最多 GARB_CAP 行,剩下的留著下一次 ——
@@ -571,6 +604,9 @@ const BLK = (function(){
     st.deadT = 0;
     st.deaths++;
     st.fall = 0; st.lockT = 0; st.resets = 0; st.soft = false;
+    /* ⚠ 復活要把反擊窗清掉:被打死的人一活過來就帶著一次加倍太超過
+       (而且 K.O. 賽死兩秒就活,等於每次被打死都送一次反擊)。 */
+    st.revBy = ""; st.revT = -1e9;
     spawn(st);
     return st;
   }
@@ -614,7 +650,10 @@ const BLK = (function(){
       shield: st.shield, combo: st.combo, lines: st.lines, sent: st.sent,
       ko: st.ko, deaths: st.deaths, pieces: st.pieces,
       time: st.time, fall: st.fall, lockT: st.lockT, resets: st.resets,
-      soft: st.soft ? 1 : 0, dead: st.dead ? 1 : 0, deadT: st.deadT
+      soft: st.soft ? 1 : 0, dead: st.dead ? 1 : 0, deadT: st.deadT,
+      /* ⚠ 反擊的兩個欄位一定要存:漏了就是「回座之後那一次反擊憑空不見」,
+         而那是 save 這一支踩過兩次的那種 bug —— 不報錯、看起來全對。 */
+      revBy: st.revBy, revT: st.revT, rush: st.rush ? 1 : 0
     };
   }
   function load(o){
@@ -629,6 +668,9 @@ const BLK = (function(){
     st.time = o.time || 0; st.fall = o.fall || 0;
     st.lockT = o.lockT || 0; st.resets = o.resets | 0;
     st.soft = !!o.soft; st.dead = !!o.dead; st.deadT = o.deadT || 0;
+    st.revBy = o.revBy || "";
+    st.revT = (typeof o.revT === "number") ? o.revT : -1e9;   /* ⚠ 不可以 `|| 0`:0 落在反擊窗裡 */
+    st.rush = !!o.rush;
     return st;
   }
 
@@ -698,7 +740,7 @@ const BLK = (function(){
     COLS, ROWS, VIS, TOP, NKIND, KINDS, GARB,
     I, J, L, O, S, T, Z,
     GRAV, LV_MS, LOCK_MS, LOCK_RESETS, SOFT_MULT, MAX_DT, GARB_CAP, SHIELD_CAP,
-    ATK, PC_ATK, DEF_RULES,
+    ATK, PC_ATK, REVENGE_MS, DEF_RULES,
     // 形狀與 kick(純資料,board.js 查表用)
     CELLS, BOXN, BASE, SPAWN_X, SPAWN_Y, KICK_JLSTZ, KICK_I, kicksOf, cellsOf,
     // 出塊

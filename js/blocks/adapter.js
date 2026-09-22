@@ -44,7 +44,9 @@ const MP = MPCore.create((function(){
   /* ---------- 大廳裡「下一局要用」的房規 ---------- */
   const SECS = [120, 180, 300];
   const SHIELDS = [0, 10, 20];
-  let rules = { mode: "ko", secs: 180, shield: 20 };
+  const TARGETS = ["rand", "high"];
+  let rules = { mode: "ko", secs: 180, shield: 20, target: "rand", rush: false };
+  const RUSH_MS = 30000;                // 「最後 30 秒」是最後幾毫秒
 
   /* ---------- 一局 ---------- */
   let st = null;                        // 我的狀態(本機權威)
@@ -84,11 +86,15 @@ const MP = MPCore.create((function(){
   const FIELDS = {
     mode:   { ok: v => v === "ko" || v === "out", get: () => rules.mode,   set: v => rules.mode = v },
     secs:   { ok: v => SECS.indexOf(v) >= 0,      get: () => rules.secs,   set: v => rules.secs = v },
-    shield: { ok: v => SHIELDS.indexOf(v) >= 0,   get: () => rules.shield, set: v => rules.shield = v }
+    shield: { ok: v => SHIELDS.indexOf(v) >= 0,   get: () => rules.shield, set: v => rules.shield = v },
+    target: { ok: v => TARGETS.indexOf(v) >= 0,   get: () => rules.target, set: v => rules.target = v },
+    rush:   { ok: v => typeof v === "boolean",    get: () => rules.rush,   set: v => rules.rush = v }
   };
   function setMode(v){ if(FIELDS.mode.ok(v)) ctx.setRoomField("mode", v); }
   function setSecs(v){ v = +v; if(FIELDS.secs.ok(v)) ctx.setRoomField("secs", v); }
   function setShield(v){ v = +v; if(FIELDS.shield.ok(v)) ctx.setRoomField("shield", v); }
+  function setTarget(v){ if(FIELDS.target.ok(v)) ctx.setRoomField("target", v); }
+  function setRush(v){ v = !!v; if(FIELDS.rush.ok(v)) ctx.setRoomField("rush", v); }
 
   /* ★ 這裡本來有 setHcap()(每個人自己選的讓分)—— v2.15.2 整套拿掉了,見 rules.js 紅線 ⑤。 */
 
@@ -108,7 +114,8 @@ const MP = MPCore.create((function(){
     return {
       seed: (Math.random() * 0xffffffff) >>> 0,
       startAt: nowSrv() + LEAD_MS,
-      rules: { mode: rules.mode, secs: rules.secs, shield: rules.shield * 1000 },
+      rules: { mode: rules.mode, secs: rules.secs, shield: rules.shield * 1000,
+               target: rules.target, rush: !!rules.rush },
       order: ids.slice(),
       topouts: {}, ko: {}, deaths: {}
     };
@@ -123,7 +130,7 @@ const MP = MPCore.create((function(){
     Object.keys(ackd).forEach(k => delete ackd[k]);
     BLKB.setFoes([]);
     BLKB.clearCast();
-    document.body.classList.remove("blk-spec");
+    document.body.classList.remove("blk-spec", "blk-rush");
     banner("");
   }
   function lobbyGame(){ return { topouts: {}, ko: {}, deaths: {} }; }
@@ -145,7 +152,11 @@ const MP = MPCore.create((function(){
     clearSettle();
     curRound = g.roundId;
     seed = g.seed >>> 0;
+    /* ⚠ 舊版本開的房間沒有 target / rush 這兩個欄位 → 一定要有預設值,
+       不然 pickTarget() 會讀到 undefined(退回隨機,剛好是對的)而 rush 變 NaN 判斷。 */
     gRules = g.rules || { mode: "ko", secs: 180, shield: 0 };
+    if(gRules.target !== "high") gRules.target = "rand";
+    gRules.rush = !!gRules.rush;
     startAt = g.startAt || nowSrv();
     endAt = (gRules.mode === "ko") ? startAt + gRules.secs * 1000 : 0;
     order = g.order || [];
@@ -153,6 +164,7 @@ const MP = MPCore.create((function(){
     myKiller = ""; streak = null;
     Object.keys(ackd).forEach(k => delete ackd[k]);
     BLKB.clearCast();
+    document.body.classList.remove("blk-rush");   // 上一局的加倍狀態不可以帶進新的一局
 
     st = R.blank({
       seed: seed,
@@ -208,6 +220,18 @@ const MP = MPCore.create((function(){
     /* ⚠ HUD 要在閘門**之前** —— 觀戰者一個 byte 都不寫,但時間還是要跳 */
     hudT += dt;
     if(hudT >= 250){ hudT = 0; paintHud(); }
+    /* ★ 最後 30 秒加倍(v2.15.3)。⚠ 它寫在 `st` 上讓**規則層**去乘 ——
+       在 adapter 這裡乘的話單機與規則測試都碰不到它,而 e2e 看得到的只有結果。
+       ⚠ 每一幀寫一次是刻意的:比「進入那一刻設一次」耐斷線 / 耐回座,
+         而且它只是一個布林,沒有累積誤差可言。 */
+    if(st && endAt && gRules && gRules.rush){
+      const wasRush = st.rush;
+      st.rush = (endAt - nowSrv()) <= RUSH_MS;
+      if(st.rush && !wasRush){
+        document.body.classList.add("blk-rush");
+        BLKB.cast("⏱️ 最後 30 秒 —— 攻擊加倍!", "streak");
+      }
+    }
     if(!canPublish() || counting) return;
     pubT += dt; fullT += dt;
     if(fullT >= FULL_MS){ fullT = 0; pubFull(true); return; }
@@ -259,6 +283,7 @@ const MP = MPCore.create((function(){
       if(typeof v.b === "string"){ f.bd = R.decBoard(v.b); }
       f.c = v.c || null;
       f.p = v.p || 0;
+      if(typeof v.l === "number") f.l = v.l;   // 總消行 —— 淘汰賽的「第一名」看它
       /* ★ 死亡的**轉換**才播報(v2.15.3)。
          ⚠⚠ 不可以只看 `v.d` 為真就播 —— 快照每 2 秒就對帳一次,死著的那 2 秒會被
            播報好幾十次;而且 `child_added` 一掛上去就會把現存的整批重放一次(紅線 ④)。
@@ -301,7 +326,9 @@ const MP = MPCore.create((function(){
     for(let i = 0; i < evs.length; i++){
       const ev = evs[i];
       if(ev.t !== "lock") continue;
-      if(ev.out > 0) sendAttack(ev.out);
+      /* ⚠ ev.to 是**反擊**指名的對象(規則層決定的),它比房規與手動鎖定都優先 ——
+         「打回去給剛打我的那個人」這件事一旦被隨機改掉,反擊就完全不成立了。 */
+      if(ev.out > 0) sendAttack(ev.out, ev.to, ev.revenge);
       if(ev.dead || st.dead) dead = true;
       pubFull(true);
     }
@@ -309,9 +336,10 @@ const MP = MPCore.create((function(){
     if(dead) onDead();
   }
 
-  function sendAttack(n){
+  function sendAttack(n, forced, revenge){
     if(!canPublish() || !atkRef) return;
-    const to = pickTarget();
+    /* 指名的目標要還活著;死了就退回一般的挑法(不然反擊會打進空氣裡) */
+    const to = (forced && aliveFoes().indexOf(forced) >= 0) ? forced : pickTarget();
     if(!to) return;
     atkN++;
     /* 紅線 ⑤:key 是決定性的 → 重送 = 覆蓋 = 天然冪等。
@@ -322,13 +350,30 @@ const MP = MPCore.create((function(){
       lines: n, hole: Math.floor(Math.random() * R.COLS), at: Date.now()
     });
     const i = foeIndex(to);
-    if(i >= 0) BLKB.beamOut(i, n);
+    if(i >= 0) BLKB.beamOut(i, n, revenge);
+    if(revenge) BLKB.pop("反擊 ×2", "#ff5d6c", 0.86);
   }
-  /* 目標:鎖定的優先,否則在還活著的對手裡隨機挑一個 */
+  function aliveFoes(){
+    return order.filter(id => id !== ctx.me() && !(foes[id] && foes[id].dead));
+  }
+  /* ★★ 打誰(v2.15.3 起真的看房規)。優先序:**手動鎖定 > 房規 > 隨機**。
+     ⚠ 手動鎖定要排在房規前面 —— 玩家親手點下去的那一下,不可以被房規蓋掉。
+     ⚠ 「打第一名」的排名基準要跟著玩法走:K.O. 賽比 K.O. 數、淘汰賽比消行數
+       (`live` 快照的 `l`)。用錯基準的話淘汰賽會變成「一律打第一個人」——
+       因為那時每個人的 K.O. 數都是 0,最大值相同 → 全部同分 → tie 的處理說了算。
+     ⚠⚠ 同分一律**隨機挑一個**,不可以 `[0]`:固定取第一個的話三人局會變成
+       兩個人同時猛打同一個倒楣鬼,而那看起來完全像是「隨機壞掉了」。 */
   function pickTarget(){
-    const alive = order.filter(id => id !== ctx.me() && !(foes[id] && foes[id].dead));
+    const alive = aliveFoes();
     if(!alive.length) return null;
     if(lockTarget && alive.indexOf(lockTarget) >= 0) return lockTarget;
+    if(gRules && gRules.target === "high"){
+      const score = id => (gRules.mode === "ko") ? koOf(id) : ((foes[id] && foes[id].l) || 0);
+      let best = -1;
+      alive.forEach(id => { const v = score(id); if(v > best) best = v; });
+      const top = alive.filter(id => score(id) === best);
+      return top[Math.floor(Math.random() * top.length)];
+    }
     return alive[Math.floor(Math.random() * alive.length)];
   }
 
@@ -553,6 +598,18 @@ const MP = MPCore.create((function(){
     10: "開局 10 秒內<b>大家都不會被頂高</b>(警示條照樣會亮,先學會怎麼抵銷)。",
     20: "開局 20 秒內<b>大家都不會被頂高</b>(警示條照樣會亮,先學會怎麼抵銷)。"
   };
+  /* ⚠ 兩段文案都要講「三個人以上才有差」—— 1 對 1 時這一格完全沒有作用,
+     而沒講的話房主會以為自己設了一個沒生效的東西。 */
+  const NOTE_TARGET = {
+    rand: "三個人以上時,你的垃圾行<b>隨機挑一個對手</b>送過去(1 對 1 沒差)。",
+    high: "三個人以上時<b>一律打目前的第一名</b> —— 強的人會被全場追著打," +
+          "<b>實力差很多的時候特別好玩</b>。"
+  };
+  const NOTE_RUSH = {
+    on:  "最後 30 秒<b>所有人的攻擊加倍</b>,畫面會變色。落後的人有機會翻盤," +
+         "⚠ 但領先的人也一樣加倍。",
+    off: "全程一樣的攻擊量。"
+  };
   function paintSetup(){
     const seg = (id, attr, val) => {
       const el = $(id); if(!el) return;
@@ -562,10 +619,18 @@ const MP = MPCore.create((function(){
     seg("blkModeSegMp", "mode", rules.mode);
     seg("blkSecsSeg", "secs", rules.secs);
     seg("blkShieldSeg", "shield", rules.shield);
+    seg("blkTargetSeg", "target", rules.target);
+    seg("blkRushSeg", "rush", rules.rush ? "1" : "0");
     note("blkNoteMode", NOTE_MODE[rules.mode]);
     note("blkNoteShield", NOTE_SHIELD[rules.shield]);
+    note("blkNoteTarget", NOTE_TARGET[rules.target]);
+    note("blkNoteRush", rules.rush ? NOTE_RUSH.on : NOTE_RUSH.off);
     const row = $("blkSecsRow");
     if(row) row.classList.toggle("hidden", rules.mode !== "ko");
+    /* ⚠ 「最後 30 秒加倍」只有 K.O. 賽有意義(淘汰賽沒有時間限制)——
+       跟著一局多久那一格一起收掉,不然它會是一顆按了沒反應的鈕。 */
+    const rr = $("blkRushRow");
+    if(rr) rr.classList.toggle("hidden", rules.mode !== "ko");
   }
   /* ==========================================================================
      九、伺服器時間
@@ -599,7 +664,8 @@ const MP = MPCore.create((function(){
     init(c){ ctx = c; armClock(); },
     listen: listen,
 
-    roomFields(){ return { mode: rules.mode, secs: rules.secs, shield: rules.shield }; },
+    roomFields(){ return { mode: rules.mode, secs: rules.secs, shield: rules.shield,
+                           target: rules.target, rush: !!rules.rush }; },
     onRoomField(k, v){
       const f = FIELDS[k];
       if(!f || !f.ok(v) || v === f.get()) return;
@@ -647,10 +713,14 @@ const MP = MPCore.create((function(){
       onEvents: onEvents,
       onFrame: onFrame,
       canPlay: canPlay,
-      setMode, setSecs, setShield,
+      setMode, setSecs, setShield, setTarget, setRush,
       tapFoe: tapFoe,
       rules: () => rules,
-      state: () => st
+      state: () => st,
+      /* ★ 只給截圖頁 / e2e 用的出口(產品程式一律走核心的 syncSetup)——
+         設定畫面那幾行「隨選隨變」的文案是**斷言測不到好不好懂**的,只能看圖,
+         而截圖頁沒有 firebase → 走不到核心那條路。同 board.js 的三個測試出口。 */
+      syncSetupNow: paintSetup
     }
   };
 })());

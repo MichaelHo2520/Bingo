@@ -52,6 +52,8 @@ function showScreen(which){
     setTimeout(() => BLKB.fitBoard(), 0);
     requestAnimationFrame(() => BLKB.fitBoard());
   }else BLKB.sleep();
+  /* 大廳的示範局:只在大廳跑(⚠ 離開一定要停,不然就是在別的畫面裡白燒電池) */
+  if(which === "lobby") demoStart(); else demoStop();
   if(which === "home") showHomeLayer("pick");
   syncPageBack();
 }
@@ -140,6 +142,95 @@ function blkAtkHtml(){
    —— 別人還在玩,自己看說明不能讓全場等你(同設定蓋板那一條)。 */
 function openBlkGuide(){ const el = $("blkGuideVeil"); if(el) el.classList.add("show"); }
 function closeBlkGuide(){ const el = $("blkGuideVeil"); if(el) el.classList.remove("show"); }
+
+/* ==========================================================================
+   大廳的示範局(v2.15.3)—— 兩台電腦互打,等人的時候自己跑
+   ──────────────────────────────────────────────────────────────────────────
+     ★ 為什麼是動的:這一頁的規則是**一串因果**(消掉 → 飛過去 → 把對方頂高),
+       不是一條定義。文字寫三行還是不懂,看一次就懂 —— 而大廳等人那 30 秒
+       本來就是空的。**零操作、零強迫,不想看的人也不會被擋住。**
+     ⚠ 走 setInterval **不是 rAF**:rAF 在非對局畫面是睡著的(BLKB.sleep()),
+       而這裡刻意不吵醒它 —— 大廳不需要 60 FPS,一秒十幾幀就夠看。
+     ⚠ 自己畫兩塊小畫布,**不要接到 board.js 的 foeEls** —— 那一套跟著對局的
+       fitFoes() 走,借過來就會在大廳裡改到盤面的尺寸(震盪那一族)。
+     ⚠ 離開大廳一定要 stop():留著跑就是在別的畫面裡白燒電池。
+   ========================================================================== */
+const DEMO_MS = 70;                     // 一步多久(不是 60 FPS,夠看就好)
+const DEMO_CELL = 4;                    // 一格幾 px
+let demoT = null, demoA = null, demoB = null, demoMemA = null, demoMemB = null;
+let demoHit = 0;                        // 攻擊的閃動剩幾步
+function demoBlank(seed){
+  /* ⚠ 暖身一定要關(shield:0):開著的話示範局前 20 秒**看不到任何垃圾行被頂上來**,
+     而那正是這段示範唯一要講的事。 */
+  return BLK.blank({ seed: seed, rules: { mode: "ko", secs: 180, shield: 0, combo: true } });
+}
+function demoStart(){
+  if(demoT) return;
+  const cvA = $("blkDemoA"), cvB = $("blkDemoB");
+  if(!cvA || !cvB) return;
+  [cvA, cvB].forEach(cv => {
+    cv.width = BLK.COLS * DEMO_CELL;
+    cv.height = BLK.VIS * DEMO_CELL;
+  });
+  demoA = demoBlank(20260922);
+  demoB = demoBlank(731157);
+  demoMemA = BLKAI.newMem();
+  demoMemB = BLKAI.newMem();
+  demoHit = 0;
+  demoT = setInterval(demoStep, DEMO_MS);
+}
+function demoStop(){
+  if(demoT){ clearInterval(demoT); demoT = null; }
+}
+function demoStep(){
+  const lv = BLKAI.levelOf("norm");
+  /* A 打 B、B 打 A。⚠ `BLKAI.step()` 回的事件裡就住著「這一手送出幾行」——
+     吞掉它的話畫面上會是「兩邊都在消行,但誰都不會被頂高」(ai.js 的紅線)。 */
+  demoSide(demoA, demoMemA, demoB, lv, true);
+  demoSide(demoB, demoMemB, demoA, lv, false);
+  demoDraw($("blkDemoA"), demoA);
+  demoDraw($("blkDemoB"), demoB);
+  const mid = $("blkDemoMid");
+  if(mid){
+    if(demoHit > 0){ demoHit--; mid.textContent = "垃圾行 →"; mid.classList.add("blk-demo-fire"); }
+    else { mid.textContent = "→"; mid.classList.remove("blk-demo-fire"); }
+  }
+}
+function demoSide(st, mem, foe, lv, isA){
+  if(st.dead){ demoRevive(st, mem); return; }
+  const evs = BLKAI.step(st, mem, DEMO_MS, lv, Math.random).concat(BLK.tick(st, DEMO_MS));
+  evs.forEach(ev => {
+    if(ev && ev.t === "lock" && ev.out > 0){
+      BLK.queueGarbage(foe, ev.out, Math.floor(Math.random() * BLK.COLS), isA ? "a" : "b");
+      demoHit = 6;
+    }
+  });
+}
+function demoRevive(st, mem){
+  BLK.revive(st);
+  mem.target = null; mem.k = -1;
+}
+function demoDraw(cv, st){
+  if(!cv || !st) return;
+  const c = cv.getContext("2d");
+  const W = cv.width, H = cv.height;
+  c.clearRect(0, 0, W, H);
+  for(let y = BLK.TOP; y < BLK.ROWS; y++)
+    for(let x = 0; x < BLK.COLS; x++){
+      const v = st.board[y][x];
+      if(!v) continue;
+      c.fillStyle = (v === BLK.GARB) ? BLKB.COL_GARB : (BLKB.COL[v - 1] || "#fff");
+      c.fillRect(x * DEMO_CELL, (y - BLK.TOP) * DEMO_CELL, DEMO_CELL - 0.6, DEMO_CELL - 0.6);
+    }
+  const cur = st.cur;
+  if(cur){
+    c.fillStyle = BLKB.COL[cur.k] || "#fff";
+    BLK.cellsOf(cur.k, cur.r, cur.x, cur.y).forEach(p => {
+      if(p[1] >= BLK.TOP)
+        c.fillRect(p[0] * DEMO_CELL, (p[1] - BLK.TOP) * DEMO_CELL, DEMO_CELL - 0.6, DEMO_CELL - 0.6);
+    });
+  }
+}
 
 /* ---------- 進場選單的兩層 ---------- */
 function showHomeLayer(which){
@@ -261,6 +352,9 @@ $("reopenWin").addEventListener("click", showResult);
   $("blkModeSegMp").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setMode(b.dataset.mode); });
   $("blkSecsSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setSecs(b.dataset.secs); });
   $("blkShieldSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setShield(b.dataset.shield); });
+  $("blkTargetSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setTarget(b.dataset.target); });
+  /* ⚠ rush 在房規裡是布林 —— dataset 拿到的是字串 "0" / "1",不轉的話 "0" 是 truthy。 */
+  $("blkRushSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setRush(b.dataset.rush === "1"); });
   $("scoreSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setScoreMode(b.dataset.score); });
   $("wgMinus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() - 1));
   $("wgPlus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() + 1));

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 1d2737957173e807dcdb841a73cd7f60b7627df50f01db358fd4cf58fced5d19)
+    真相在 styles.src.css(sha256 f2acefed9c8fd27aa9833c9921da9718bb0585603ac8848ebcf1337da1700118)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6048,6 +6048,16 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-atk-dim{fill:rgba(255,255,255,.11)}
 .blk-atk-garb{fill:#8b8fa8}
 .field-sub{font-size:11px;font-weight:600;opacity:.85;margin-left:4px}
+.blk-demo{display:flex;align-items:center;justify-content:center;gap:10px;
+          margin:2px 0 6px;padding:8px 10px;border-radius:12px;
+          background:rgba(0,0,0,.20);border:1px solid var(--panel-line)}
+.blk-demo-cv{display:block;border-radius:4px;background:rgba(0,0,0,.30);
+             box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.blk-demo-mid{min-width:62px;text-align:center;font-size:10.5px;font-weight:800;
+              color:var(--text);opacity:.45;transition:opacity .12s linear,color .12s linear}
+.blk-demo-fire{opacity:1;color:#ff5d6c}
+.blk-demo-cap{margin:0 0 10px;font-size:11.5px;line-height:1.5;opacity:.8;text-align:center}
+.blk-demo-cap b{font-weight:800;color:var(--accent);opacity:1}
 .blk-fnote{margin-top:6px;font-size:12px;line-height:1.5;color:var(--text);opacity:.82;
            text-align:left}
 .blk-fnote b{opacity:1;font-weight:800;color:var(--accent)}
@@ -6080,6 +6090,15 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;
            display:flex;align-items:center;justify-content:center;
            overflow:hidden}
+body.blk-rush .blk-stage{animation:blk-rush-pulse 1.1s ease-in-out infinite}
+@keyframes blk-rush-pulse{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(255,93,108,.30),inset 0 0 26px rgba(255,93,108,.14)}
+  50%    {box-shadow:inset 0 0 0 2px rgba(255,93,108,.72),inset 0 0 30px rgba(255,93,108,.34)}
+}
+body.blk-rush #blkStatTime{color:#ff5d6c}
+@media (prefers-reduced-motion:reduce){
+  body.blk-rush .blk-stage{animation:none;box-shadow:inset 0 0 0 2px rgba(255,93,108,.55)}
+}
 .blk-foes{position:absolute;right:0;top:0;bottom:0;width:78px;z-index:2;
           display:flex;flex-direction:column;gap:8px;
           align-items:center;justify-content:center;pointer-events:none}

@@ -757,9 +757,11 @@ const BLKB = (function(){
     }
   }
   /* 對外:我打了第 i 個對手 / 第 i 個對手打了我 */
-  function beamOut(i, n){
+  /* 反擊那一道畫成紅的、字也不一樣 —— 「我打回去了」與「我剛好打到他」
+     在聚會現場是兩件完全不同的事,長一樣就等於沒做。 */
+  function beamOut(i, n, revenge){
     const e = foeEls[i];
-    if(e) beam(cvMain, e.cv, "#ffd93d", "+" + n);
+    if(e) beam(cvMain, e.cv, revenge ? "#ff5d6c" : "#ffd93d", (revenge ? "反擊 +" : "+") + n);
   }
   /* ⚠ 進來的那一道要帶**攻擊者的名字**(v2.15.3)—— 出去那一道不必:
      它的箭頭尖端就落在對方的小盤上,名字就在正下方,寫了是重複;

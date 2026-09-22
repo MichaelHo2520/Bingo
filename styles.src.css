@@ -13761,6 +13761,21 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-atk-garb{fill:#8b8fa8}
 .field-sub{font-size:11px;font-weight:600;opacity:.85;margin-left:4px}
 
+/* ---------- 大廳等人時的示範局(v2.15.3)----------
+   ★ 兩塊小盤 + 中間一個箭頭。消行 → 箭頭亮起「垃圾行 →」→ 右邊從底下被頂高。
+   ⚠ 畫布的寬高由 js/blocks/main.js 設(BLK.COLS × 4px),CSS 只排版 ——
+     在這裡再寫一次尺寸就是兩份真相,而畫布被 CSS 拉伸的樣子非常糊。 */
+.blk-demo{display:flex;align-items:center;justify-content:center;gap:10px;
+          margin:2px 0 6px;padding:8px 10px;border-radius:12px;
+          background:rgba(0,0,0,.20);border:1px solid var(--panel-line)}
+.blk-demo-cv{display:block;border-radius:4px;background:rgba(0,0,0,.30);
+             box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.blk-demo-mid{min-width:62px;text-align:center;font-size:10.5px;font-weight:800;
+              color:var(--text);opacity:.45;transition:opacity .12s linear,color .12s linear}
+.blk-demo-fire{opacity:1;color:#ff5d6c}
+.blk-demo-cap{margin:0 0 10px;font-size:11.5px;line-height:1.5;opacity:.8;text-align:center}
+.blk-demo-cap b{font-weight:800;color:var(--accent);opacity:1}
+
 /* ---------- 設定選項底下那一行「隨選隨變」的後果(v2.15.3)----------
    ★ 使用者回報「設定規則那裡我看不太懂,不是很直覺」。這一頁與另外十四個不一樣:
      棋類的規則是靜態的(「連五顆」一句話講完),而這一頁的規則是**一串因果**
@@ -13824,6 +13839,22 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;
            display:flex;align-items:center;justify-content:center;
            overflow:hidden}
+
+/* ---------- 最後 30 秒攻擊加倍(v2.15.3,房規,預設關)----------
+   ⚠⚠ 一律用 box-shadow / color 表示,**不可以動 padding · border · 任何會改尺寸的東西**:
+     .blk-stage 正是 fitBoard() 量的那個容器 —— 改到它的尺寸就是盤面自己震盪(紅線 ⑬)。
+   ⚠ 時間那一格跟著變紅是刻意的:畫面整體變色很容易被當成「特效」而不是「規則變了」,
+     而時間本來就是這個規則的觸發條件。 */
+body.blk-rush .blk-stage{animation:blk-rush-pulse 1.1s ease-in-out infinite}
+@keyframes blk-rush-pulse{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(255,93,108,.30),inset 0 0 26px rgba(255,93,108,.14)}
+  50%    {box-shadow:inset 0 0 0 2px rgba(255,93,108,.72),inset 0 0 30px rgba(255,93,108,.34)}
+}
+body.blk-rush #blkStatTime{color:#ff5d6c}
+/* ⚠ 同 .blk-foe-danger:全域那條 animation-duration:.001s 碰到 infinite 會變成狂閃 */
+@media (prefers-reduced-motion:reduce){
+  body.blk-rush .blk-stage{animation:none;box-shadow:inset 0 0 0 2px rgba(255,93,108,.55)}
+}
 
 /* ---------- 對手的小盤:住在**盤面右側的空白帶**(v2.14.0)----------
    在那之前是盤面上方一整條固定 88px 的橫列 —— 而 fitBoard() 是被**高度**卡住的:
