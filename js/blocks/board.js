@@ -869,20 +869,41 @@ const BLKB = (function(){
     }
     return best;
   }
+  /* ★★ 「drop」是**一顆鈕兩種用法**:短按 = 直接落地、按住 = 慢慢降(軟降)。
+     使用者:「我又不想要右手邊那個有落下又有下的按鈕,這樣會搞不太清楚是做什麼」。
+     ⚠ 按下去**立刻**開始軟降 —— 不可以等 150ms 才決定要做什麼,那會讓短按有延遲感
+       (而「按了沒反應」正是這一頁修了兩輪的東西)。放開得快的話再補一個落地,
+       那時方塊只降了一兩格,看起來就是「加速墜落」,很自然。
+     ⚠ 落地是唯一不可逆的動作 → 這一顆與旋轉之間刻意拉開(CSS 的 .blk-pad-r gap)。 */
+  const DROP_MS = 150;                  // 按住超過這麼久就只是軟降,放開不補落地
+
   function padDown(b, e, host){
     padUp();                            // 保險:上一顆還按著的話先放掉
-    padHold = { id: e.pointerId, btn: b, act: b.dataset.act };
+    /* ⚠⚠ 「按多久」量的是**遊戲時間 `st.time`**,不是 wall clock、也不是 setTimeout。
+       ① 語意上這才對:蓋板開著 / 暫停的時候按住不該算(同 HUD 計時那條紅線 ㉒);
+       ② headless 的虛擬時間下 `performance.now()` **不跟著 setTimeout 推進**,
+          兩者都試過都在 e2e 裡永遠判成「短按」(E11 實測:按住 360ms 還是落地了)——
+          而 `st.time` 是規則層在 tick() 裡累積的,e2e 用 BLKB.step() 推得動。
+       ★ 一個判定同時滿足「真機行為對」與「測得到」的時候,就選它。 */
+    padHold = { id: e.pointerId, btn: b, act: b.dataset.act, t0: st ? st.time : 0 };
     b.classList.add("blk-on");
     buzz(b.dataset.act);
     /* ⚠ setPointerCapture 會丟例外(合成事件沒有真的 pointerId),而未捕捉的錯誤
        會被 feedback.js 的環形緩衝當成一筆 JS 錯誤記下來 → 一律包起來。 */
     try{ host.setPointerCapture && host.setPointerCapture(e.pointerId); }catch(_){}
-    press(b.dataset.act);
+    press(b.dataset.act === "drop" ? "soft" : b.dataset.act);
   }
   function padUp(e){
     if(!padHold) return;
     if(e && e.pointerId != null && e.pointerId !== padHold.id) return;
     padHold.btn.classList.remove("blk-on");
+    if(padHold.act === "drop"){
+      release("soft");
+      const quick = ((st ? st.time : 0) - padHold.t0) < DROP_MS;
+      padHold = null;                   // ⚠ 要在 act("hard") **之前**清掉:
+      if(quick) act("hard");            //   落地會走 onLock → 有可能回頭叫 allUp()
+      return;
+    }
     release(padHold.act);
     padHold = null;
   }

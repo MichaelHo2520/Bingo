@@ -332,11 +332,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="blk-pad" id="blkPad">
         <!-- ⚠ 圖示一律**自繪 SVG**(v2.14.0;在那之前是 ◀ ▶ ↻ 那幾個字元)——
              理由與說明卡那六格同一條:字元的字形每台機器不一樣、而且 U+25C0 那一段
-             實心三角在盤面上又重又鈍。stroke 吃 currentColor,按下去跟著一起亮。 -->
+             實心三角在盤面上又重又鈍。stroke 吃 currentColor,按下去跟著一起亮。
+             ⚠⚠ **左簇只有左右兩顆**(v2.14.0 第五輪)。軟降那顆本來在它們上面,
+               而使用者實機回報「很容易會不小心按到」—— 拇指在左右之間移動時會掃到它,
+               而誤觸軟降的代價特別高(方塊突然衝下去)。⚠ 上一輪的**吸附讓它更嚴重**:
+               只隔 10px,按 ◀ 偏上一點就被吸到軟降去。
+             ★ 現在左手只管左右(誤觸也只是左右,可逆),下降全部收進右簇那一顆。 -->
         <div class="blk-pad-l">
-          <button class="blk-key blk-key-wide" type="button" data-act="soft" aria-label="慢慢往下">
-            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v9.5m-4.2-3.4L12 14.6l4.2-4M6.6 19h10.8"/></svg>
-          </button>
           <div class="blk-pad-row">
             <button class="blk-key" type="button" data-act="left" aria-label="向左">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.4 5.4L7.2 12l7.2 6.6"/></svg>
@@ -346,17 +348,23 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             </button>
           </div>
         </div>
-        <!-- ⚠ **旋轉只有一顆,固定順時針**(v2.14.0;在那之前是 ↻ / ↺ 兩顆)。
-             轉四次回到原位,所以少那一顆不會有轉不到的角度 —— 換來的是少一顆要認的鈕、
-             以及每一顆都可以放大熱區。逆轉還在:鍵盤 Z、手勢兩指點一下。 -->
         <div class="blk-pad-r">
           <div class="blk-pad-row">
             <button class="blk-key" type="button" data-act="cw" aria-label="旋轉">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12a7 7 0 10-2.4 5.3"/><path d="M19.4 6.6v4.8h-4.8"/></svg>
             </button>
-            <!-- 落地那一顆刻意留**文字** —— 它是最重的一個動作(不可逆),
-                 而文字比任何圖示都不會被誤認。 -->
-            <button class="blk-key blk-key-drop" type="button" data-act="hard" aria-label="直接落地">落地</button>
+          </div>
+          <!-- ★★ **一顆鈕兩種用法**:短按 = 直接落地、按住 = 慢慢降(軟降)。
+               使用者:「我又不想要右手邊那個有落下又有下的按鈕,這樣會搞不太清楚是做什麼」
+               —— 下降本來就只需要一個概念,分成兩顆才是問題的來源。
+               ⚠ 按下去**立刻**開始降(不等 150ms 判斷),不然短按會有延遲感;
+                 放開得快才補一個落地。判定在 board.js 的 padUp()。
+               ⚠ 它是唯一**不可逆**的動作 → 與旋轉之間刻意拉開(.blk-pad-r 的 gap 18px)。 -->
+          <div class="blk-pad-row">
+            <button class="blk-key blk-key-drop" type="button" data-act="drop"
+                    aria-label="落地(按住就慢慢降)">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10m-4.4-3.6L12 14.8l4.4-4.4M5.6 19.4h12.8"/></svg>
+            </button>
           </div>
         </div>
       </div>

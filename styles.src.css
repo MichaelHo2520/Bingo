@@ -13889,7 +13889,9 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 .blk-pad-l,.blk-pad-r{position:absolute;bottom:10px;display:flex;flex-direction:column;
                       gap:10px;pointer-events:auto}
 .blk-pad-l{left:8px;align-items:flex-start}
-.blk-pad-r{right:8px;align-items:flex-end}
+/* ⚠ 右簇的 gap 比左簇大:下面那顆是**落地**(唯一不可逆的動作),
+   與旋轉擠在一起的話誤觸的代價完全不對等。 */
+.blk-pad-r{right:8px;align-items:flex-end;gap:18px}
 .blk-pad-row{display:flex;gap:10px}
 /* ---------- 按鈕本體 ----------
    ⚠⚠ **不要用 opacity 把整顆鈕淡掉** —— 那會連字一起糊掉,結果是「盤面看得到、
@@ -13918,8 +13920,7 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 /* SVG 圖示:stroke 吃 currentColor → 按下去 .blk-on 把字色提亮時它跟著一起亮 */
 .blk-key svg{display:block;pointer-events:none;
              filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
-.blk-key-wide svg{width:22px;height:22px}
-.blk-key-wide{width:100px;height:40px;border-radius:20px;font-size:17px}
+
 .blk-key-drop{width:74px;height:50px;border-radius:25px;font-size:16px;
               background:radial-gradient(120% 120% at 50% 16%,
                          rgba(255,236,170,.34), rgba(255,159,67,.26) 60%, rgba(120,60,10,.24))}
@@ -13977,6 +13978,5 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-foes{gap:6px}
   /* ⚠ 矮視窗只壓視覺 —— 按得到與否由吸附半徑決定(SNAP_R),不受這裡影響 */
   .blk-key{width:44px;height:44px;font-size:18px}
-  .blk-key-wide{width:88px;height:34px;font-size:15px}
-  .blk-key-drop{width:66px;height:44px;font-size:14px}
+  .blk-key-drop{width:66px;height:44px}
 }

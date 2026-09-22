@@ -84,7 +84,8 @@ function blkGestHtml(){
   return '<div class="blk-gest-head">手指在畫面上<b>任何地方</b>都可以 —— 不必壓在盤面上</div>' +
          '<div class="blk-gest-grid">' + cells + '</div>' +
          '<div class="blk-gest-kb">電腦鍵盤:方向鍵移動 · <b>空白鍵</b>直接落地 · ' +
-         '<b>↑ / X</b> 順轉 · <b>Z</b> 逆轉</div>';
+         '<b>↑ / X</b> 順轉 · <b>Z</b> 逆轉<br>' +
+         '改用按鈕的話:右下那一顆<b>短按 = 直接落地</b>、<b>按住 = 慢慢降</b></div>';
 }
 function paintGestCards(){
   const html = blkGestHtml();

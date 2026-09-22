@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 e02ebc625195481f1507451f2718b8b4a51dcecf1b2d1261d42066063f37db80)
+    真相在 styles.src.css(sha256 ac73c6e66f5b46c49a6e9d0c7dc80acbc0c05ff5d470c7b597ec16c0f2373571)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6120,7 +6120,7 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 .blk-pad-l,.blk-pad-r{position:absolute;bottom:10px;display:flex;flex-direction:column;
                       gap:10px;pointer-events:auto}
 .blk-pad-l{left:8px;align-items:flex-start}
-.blk-pad-r{right:8px;align-items:flex-end}
+.blk-pad-r{right:8px;align-items:flex-end;gap:18px}
 .blk-pad-row{display:flex;gap:10px}
 .blk-key{position:relative;width:50px;height:50px;border:0;border-radius:50%;
          background:radial-gradient(120% 120% at 50% 16%,
@@ -6138,8 +6138,6 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
          transition:transform .09s ease-out,box-shadow .12s linear,background .12s linear}
 .blk-key svg{display:block;pointer-events:none;
              filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
-.blk-key-wide svg{width:22px;height:22px}
-.blk-key-wide{width:100px;height:40px;border-radius:20px;font-size:17px}
 .blk-key-drop{width:74px;height:50px;border-radius:25px;font-size:16px;
               background:radial-gradient(120% 120% at 50% 16%,
                          rgba(255,236,170,.34), rgba(255,159,67,.26) 60%, rgba(120,60,10,.24))}
@@ -6182,6 +6180,5 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-hud{gap:6px;height:42px}
   .blk-foes{gap:6px}
   .blk-key{width:44px;height:44px;font-size:18px}
-  .blk-key-wide{width:88px;height:34px;font-size:15px}
-  .blk-key-drop{width:66px;height:44px;font-size:14px}
+  .blk-key-drop{width:66px;height:44px}
 }
