@@ -846,10 +846,19 @@
     if(!req)return null;
     try{ return req.call(de); }catch(e){ return null; }
   }
-  // 這一頁是哪一個遊戲(外殼用它更新 hash,做深層連結)。從檔名判斷,測試頁也認得。
+  /* 這一頁是哪一個遊戲(外殼用它更新 hash,做深層連結)。從檔名判斷,測試頁也認得
+     —— 所以是 indexOf 而不是完全比對。
+     ⚠⚠ 這是雙胞胎(js/shared/ui-kit.js 有另一份,紅線 4)**兩邊要一起改**。
+       Bingo 自己其實永遠走 "bingo" 這條(它就是 index.html),留整張表是為了
+       與另一份逐字相同 —— 兩份長得不一樣的話,下一個人只會改到他先看到的那一份。
+       理由與症狀寫在 ui-kit 那一份的註解裡,守門是 tools/test-registry.js 的 1-5 節。
+     ⚠ 順序有講究:**mahjong16 一定要排在 mahjong 前面**(後者是前者的子字串)。 */
+  const FS_PAGES=["mahjong16","mahjong","gomoku","sudoku","sevens","big2","blackjack",
+                  "uno","darkchess","chengyu","draw","flychess","tiaoqi","blocks"];
   function fsPageKey(){
     const f=(location.pathname.split("/").pop()||"").toLowerCase();
-    return f.indexOf("gomoku")>=0 ? "gomoku" : (f.indexOf("sudoku")>=0 ? "sudoku" : "bingo");
+    for(let i=0;i<FS_PAGES.length;i++) if(f.indexOf(FS_PAGES[i])>=0) return FS_PAGES[i];
+    return "bingo";
   }
   function shellMsg(act){
     try{ parent.postMessage({ t:"bingo.fs", act:act, page:fsPageKey() }, SHELL_TO); }catch(e){}

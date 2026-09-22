@@ -379,10 +379,22 @@ function fsRequest(){
   if(!req)return null;
   try{ return req.call(de); }catch(e){ return null; }
 }
-// 這一頁是哪一個遊戲(外殼用它更新 hash,做深層連結)。從檔名判斷,測試頁 t-gomoku-*.html 也認得。
+/* 這一頁是哪一個遊戲(外殼用它更新 hash,做深層連結)。從檔名判斷,
+   測試頁 t-<遊戲>-*.html 也認得 —— 所以是 indexOf 而不是完全比對。
+   ⚠⚠ **加新遊戲一定要補進這張表**,而且它是雙胞胎(js/game.js 有另一份,紅線 4)。
+     v2.13.1 之前這裡只列 gomoku / sudoku,**其餘十三頁一律回 "bingo"** ——
+     而症狀不出現在這一頁身上:外殼收到 hello 之後把網址列的 hash replaceState
+     成 #bingo、把 cur 設成 index.html(**錯的那一頁**)→ app.html#<遊戲> 這種
+     深層連結與 iOS「加到主畫面」對那十三頁通通記不住;而 app.html 自己註解裡
+     擔心的「按上一頁的行為會錯亂」實際情況更糟 —— 它以為 iframe 裡是 Bingo。
+     ★ 守門在 tools/test-registry.js 的 1-5 節(以 js/<game>/ 目錄反查)。
+   ⚠ 順序有講究:**mahjong16 一定要排在 mahjong 前面**(後者是前者的子字串)。 */
+const FS_PAGES=["mahjong16","mahjong","gomoku","sudoku","sevens","big2","blackjack",
+                "uno","darkchess","chengyu","draw","flychess","tiaoqi","blocks"];
 function fsPageKey(){
   const f=(location.pathname.split("/").pop()||"").toLowerCase();
-  return f.indexOf("gomoku")>=0 ? "gomoku" : (f.indexOf("sudoku")>=0 ? "sudoku" : "bingo");
+  for(let i=0;i<FS_PAGES.length;i++) if(f.indexOf(FS_PAGES[i])>=0) return FS_PAGES[i];
+  return "bingo";
 }
 function shellMsg(act){
   try{ parent.postMessage({ t:"bingo.fs", act:act, page:fsPageKey() }, SHELL_TO); }catch(e){}
