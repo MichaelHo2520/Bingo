@@ -13689,6 +13689,15 @@ body.is-big .cy-timer{margin-left:auto}
    ========================================================================== */
 :root{
   --blk-tw:560px;
+  /* ★ 控制鈕的直徑與那條底部橫列的高。**兩個都只跟斷點走**(見控制列那一節的紅線):
+     board.js 的 pickPad() 讀 --blk-bar 來決定鈕要擺哪一種,所以它不可以反過來
+     跟著擺法變。
+     ⚠⚠ 兩個值是一對(橫列的高 ≈ 一顆鈕 + 上下各 12px),**每一個斷點要兩個一起改**。
+       刻意不寫成 calc(var(--blk-key) + 24px):自訂屬性裡的 calc **不會先算完**
+       (到被用的那一刻才算) → JS 讀到的是字串 "calc(54px + 24px)"、parseFloat 是 NaN,
+       而症狀是「默默掉回 fallback、寬螢幕挑錯擺法」。守門在 t-blk-solo-e2e 的 H 節。 */
+  --blk-key:54px;
+  --blk-bar:78px;
   --blk-glass:rgba(10,12,26,.34);
   --blk-line:rgba(255,255,255,.12);
   /* ★ 盤面網格線的顏色。**board.js 每次 fitBoard() 會把它讀進去畫**(不是 CSS 在畫)——
@@ -13772,8 +13781,8 @@ body.is-big .cy-timer{margin-left:auto}
 /* ⚠⚠ touch-action:none 是**手勢操作的前提**(v2.14.0 起手勢是預設):少了它,
    往下拖會先被瀏覽器當成捲動 / 下拉重新整理吃掉,而症狀是「有時候有反應有時候沒有」。
    ⚠ 對局區本來就不捲動(舞台是 overflow:hidden),所以這裡沒有副作用。
-   ★ --blk-foe-w:對手小盤那一條的寬。board.js 的 fitBoard() **量**這個元素的實際寬度
-     (不是讀這個變數)—— 量絕對定位的元素不會回頭改變舞台尺寸,所以沒有震盪。 */
+   ★ 對手小盤那一條的寬是 board.js 的 fitBoard() **量出來寫成行內 style** 的
+     (不是 CSS 變數)—— 量絕對定位的元素不會回頭改變舞台尺寸,所以沒有震盪。 */
 .blk-play{flex:1 1 auto;min-height:0;width:100%;max-width:var(--blk-tw);margin:6px auto 0;
           display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;
           touch-action:none;
@@ -13876,23 +13885,52 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
             font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:26px;
             color:var(--text);text-shadow:0 2px 12px rgba(0,0,0,.65)}
 
-/* ---------- 控制列 ----------
+/* ---------- 控制列:**一律在最下面,兩種擺法自動選**(v2.15.0)----------
+   使用者第六輪實機回報:「按鈕全部改到最下面,不要有那個浮在上面的選項」
+   「比較寬大的螢幕比例時,按鈕的位置相當的不合理,而且也很小」。
+   → 「浮在盤面上 / 固定在下方」那個設定整格拿掉了,剩下兩種**量出來自動選**的擺法
+     (決定在 js/blocks/board.js 的 pickPad(),它挑「哪一種盤面比較大」):
+
+     · 預設(沒有 body.blk-side)= 盤面**正下方**一條真的橫列。它參與版面
+       → 盤面會縮一階,那是預期的代價,換來的是「鈕一格都不蓋到盤面」。
+     · body.blk-side = 兩簇貼在盤面**左右兩側的底角**。寬螢幕 / 橫置時盤面是被
+       **高度**卡住的(左右各空兩成多),那兩塊空白本來就沒人用 → 鈕放進去
+       **盤面一格都不用縮**,而且可以做得更大。⚠ 這時它才是絕對定位的浮層,
+       但它落在盤面**外面**,不是浮在盤面上。
+
+   ⚠⚠ --blk-bar(那條橫列的高)**只跟斷點走,絕對不可以跟擺法走** ——
+     pickPad() 讀的就是它:讓它跟著 body.blk-side 變,兩種擺法就會互相翻來翻去
+     (A 擺法算出來 B 比較好 → 換成 B 之後又算出 A 比較好…)。所以它一律由
+     --blk-key 推出來,而 --blk-key 只由 @media 決定。守門是 t-blk-solo-e2e 的 H 節。
    ⚠ 熱區一律 ≥44px(視覺可以更小,熱區不行)。
    ⚠ 不要用 .btn:它的基底是 flex:1;min-width:120px,塞進這一列會把小鈕撐成三分之一
      (v2.11.0 / v2.12.0 同一個坑已經兩次)。這裡一律用自己的 .blk-key。 */
 /* ⚠⚠ 整層 pointer-events:none、只有兩個拇指簇 auto ——
-   不然這一層會把手勢操作(畫在盤面上的那條路)整個吃掉。 */
-.blk-pad{position:absolute;inset:0;pointer-events:none;z-index:2}
+   ① 側邊那一種擺法時它蓋在對局區上,不然會把手勢整個吃掉;
+   ② 橫列那一種擺法時中間那一段空白也還是手勢感應區(「兩者」模式下有人會在那裡拖)。 */
+.blk-pad{flex:none;width:100%;height:var(--blk-bar);padding:0 8px;
+         display:flex;align-items:center;justify-content:space-between;
+         pointer-events:none;z-index:2}
 /* ⚠ gap 10px。v2.14.0 中途曾經是 14px(= 熱區外擴 7 的兩倍,為了「相接而不重疊」)——
    命中改成**吸附最近的那一顆**之後那個理由就沒了:重疊區的歸屬由「誰比較近」決定,
    永遠是唯一解。→ 兩套規則只留一套,間距可以收回來讓拇指簇更緊湊。 */
-.blk-pad-l,.blk-pad-r{position:absolute;bottom:10px;display:flex;flex-direction:column;
+.blk-pad-l,.blk-pad-r{display:flex;flex-direction:row;align-items:center;
                       gap:10px;pointer-events:auto}
-.blk-pad-l{left:8px;align-items:flex-start}
-/* ⚠ 右簇的 gap 比左簇大:下面那顆是**落地**(唯一不可逆的動作),
+/* ⚠ 右簇的 gap 比左簇大:那顆是**落地**(唯一不可逆的動作),
    與旋轉擠在一起的話誤觸的代價完全不對等。 */
-.blk-pad-r{right:8px;align-items:flex-end;gap:18px}
-.blk-pad-row{display:flex;gap:10px}
+.blk-pad-r{gap:18px}
+.blk-pad-row{display:flex;align-items:center;gap:10px}
+
+/* 側邊那一種擺法:兩簇落在盤面左右兩側的**底角**。
+   ⚠⚠ 右簇與對手小盤是「**上下分層**共用右邊那一條帶子」:小盤在上(board.js 寫
+     elFoes.style.bottom 讓開右簇的高度)、右簇在下,兩者都靠右對齊。
+     所以帶子的寬度取兩者的**大者**(board.js 的 sideRes),不是相加 ——
+     相加的話盤面白白少掉一大塊,而那正是 v2.14.0 已經修過一次的錯(紅線 ㉗)。 */
+body.blk-side .blk-pad{position:absolute;inset:0;height:auto;padding:0;display:block}
+body.blk-side .blk-pad-l,
+body.blk-side .blk-pad-r{position:absolute;bottom:8px}
+body.blk-side .blk-pad-l{left:4px}
+body.blk-side .blk-pad-r{right:4px}
 /* ---------- 按鈕本體 ----------
    ⚠⚠ **不要用 opacity 把整顆鈕淡掉** —— 那會連字一起糊掉,結果是「盤面看得到、
      但鈕看不清楚」,兩邊都沒做好。正確做法:底色與外框用很低的 alpha(盤面透得過來),
@@ -13903,7 +13941,7 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
      兩套規則會在重疊區給出不同答案。現在只有一條:最近的贏。
    ⚠ 按下去的回饋要**看得見**:iOS Safari 一律沒有 navigator.vibrate,
      震動只能當加分 —— 「按到了」這件事每一台都要看得出來(見 .blk-on)。 */
-.blk-key{position:relative;width:50px;height:50px;border:0;border-radius:50%;
+.blk-key{position:relative;width:var(--blk-key);height:var(--blk-key);border:0;border-radius:50%;
          background:radial-gradient(120% 120% at 50% 16%,
                     rgba(255,255,255,.22), rgba(122,132,163,.20) 58%, rgba(26,28,44,.26));
          box-shadow:inset 0 1.5px 0 rgba(255,255,255,.34),
@@ -13921,7 +13959,8 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 .blk-key svg{display:block;pointer-events:none;
              filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
 
-.blk-key-drop{width:74px;height:50px;border-radius:25px;font-size:16px;
+.blk-key-drop{width:calc(var(--blk-key) * 1.5);height:var(--blk-key);
+              border-radius:calc(var(--blk-key) / 2);font-size:16px;
               background:radial-gradient(120% 120% at 50% 16%,
                          rgba(255,236,170,.34), rgba(255,159,67,.26) 60%, rgba(120,60,10,.24))}
 /* 按下去:縮一下 + 亮起來 + 外圈發光。★ 這是「我按到了」唯一每一台都有的證據。 */
@@ -13932,10 +13971,6 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
                            0 0 0 2.5px rgba(255,255,255,.30),
                            0 0 18px 2px var(--accent-2),
                            0 2px 8px rgba(0,0,0,.30)}
-/* 「鈕固定在下方」:給不想讓鈕蓋住盤面的人(設定裡可切)。
-   ⚠ 這時它就**參與版面**了 → 盤面會自動縮小(fitBoard 量的舞台變矮),那是預期的。 */
-body.blk-dock .blk-stage{padding-bottom:116px}
-body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 
 /* ---------- 結果卡 ---------- */
 .blk-result{display:flex;flex-direction:column;gap:5px;margin:10px 0 4px}
@@ -13947,12 +13982,16 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
            font-weight:700;font-size:16px;color:var(--accent-2)}
 .blk-react-row{display:flex;justify-content:center;gap:8px;margin:10px 0 2px;flex-wrap:wrap}
 
-/* ---------- 寬螢幕 / 橫置:兩簇移到盤面左右兩側(不再蓋住盤面)----------
-   ⚠⚠ 這個 @media 的條件**必須與 js/blocks/board.js 的 MQ_WIDE 逐字相同** ——
-     對不起來的症狀是「鈕已經在旁邊了,盤面卻還照蓋住的算法留空位」
-     (或反過來,盤面被鈕切掉一角)。 */
+/* ---------- 寬螢幕 / 橫置:對局區放寬 + 鈕做大 ----------
+   ⚠⚠ v2.15.0 起這裡**不再決定鈕擺哪裡** —— 擺法改由 board.js 量出來自己挑
+     (pickPad(),挑「哪一種盤面比較大」),所以那條「@media 必須與 MQ_WIDE 逐字相同」
+     的紅線跟著消失了(對不起來就會盤面留錯空位的那一個)。這裡只剩「多大」。
+   ★ 對局區在寬螢幕放寬到 min(96vw, 880px):使用者裁示兩簇要**靠螢幕左右邊緣**
+     (平板 / 摺疊機雙手握持時拇指自然落在那裡)。盤面本來就是被高度卡住的,
+     放寬一格都不會變 —— 多出來的寬度全部用在「鈕離得開」。
+   ⚠ 放寬的是 .blk-play 自己,不是 body:頂列與房間框有自己的上限(紅線 7 的兩份)。 */
 @media (min-width:700px),(orientation:landscape){
-  .blk-pad-l,.blk-pad-r{bottom:auto;top:50%;transform:translateY(-50%)}
+  :root{ --blk-tw:min(96vw, 880px); --blk-key:64px; --blk-bar:88px; }
   .blk-key{background:rgba(125,135,165,.34)}
   .blk-hud{height:50px}
 }
@@ -13976,7 +14015,9 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-room{padding:6px 10px}
   .blk-hud{gap:6px;height:42px}
   .blk-foes{gap:6px}
-  /* ⚠ 矮視窗只壓視覺 —— 按得到與否由吸附半徑決定(SNAP_R),不受這裡影響 */
-  .blk-key{width:44px;height:44px;font-size:18px}
-  .blk-key-drop{width:66px;height:44px}
+  /* ⚠ 矮視窗只壓視覺 —— 按得到與否由吸附半徑決定(SNAP_R),不受這裡影響。
+     ⚠⚠ 一律改 --blk-key(不要直接寫 width/height),而且 --blk-bar 要跟著改:
+       兩者是一對(見 :root 那一段),只改一個的話底部那條橫列會留一大塊空白。 */
+  :root{ --blk-key:44px; --blk-bar:66px; }
+  .blk-key{font-size:18px}
 }

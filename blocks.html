@@ -117,14 +117,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button type="button" data-ctrl="btn">按鈕</button>
         </div>
       </div>
-      <!-- ⚠ 「按鈕位置」只有按鈕出現時才有意義 → 手勢模式下整格收起來(main.js 的 syncSoloSeg) -->
-      <div class="field" id="blkPadRow">
-        <span class="field-label">按鈕位置<span class="field-sub">(浮動時盤面比較大)</span></span>
-        <div class="seg" id="blkPadSeg" aria-label="按鈕位置">
-          <button type="button" data-pad="float" class="on">浮在盤面上</button>
-          <button type="button" data-pad="dock">固定在下方</button>
-        </div>
-      </div>
       <button class="btn primary block-btn home-btn" id="blkStartSolo">開始</button>
       <div class="home-hint" id="blkSoloHint"></div>
     </div>
@@ -322,50 +314,55 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠ 裡面的每一格都由 js/blocks/board.js 的 setFoes() 自己建 —— 數量會變。 -->
       <div class="blk-foes hidden" id="blkFoes"></div>
 
-      <!-- 控制鈕:**浮在盤面上**(絕對定位),兩個拇指簇分別在左下 / 右下角。
-           ⚠⚠ 絕對定位有兩個理由,少一個都會出事:
-             ① 不參與版面 → 盤面可以吃滿舞台的高度(這就是「畫面大一點」的來源)
-             ② **它不會改變 .blk-stage 量到的尺寸** —— 那一格正是 fitBoard() 量的容器,
-                任何會改變它 clientWidth/Height 的東西都會讓盤面自己震盪(紅線 ①)
-           ⚠ 熱區一律 ≥44px;旋轉與直接落地**不連發**(board.js 的紅線 ⑤)。
-           ⚠ 寬螢幕 / 橫置時這兩簇會移到盤面**左右兩側**(CSS 的 @media),不再蓋住盤面。 -->
-      <div class="blk-pad" id="blkPad">
-        <!-- ⚠ 圖示一律**自繪 SVG**(v2.14.0;在那之前是 ◀ ▶ ↻ 那幾個字元)——
-             理由與說明卡那六格同一條:字元的字形每台機器不一樣、而且 U+25C0 那一段
-             實心三角在盤面上又重又鈍。stroke 吃 currentColor,按下去跟著一起亮。
-             ⚠⚠ **左簇只有左右兩顆**(v2.14.0 第五輪)。軟降那顆本來在它們上面,
-               而使用者實機回報「很容易會不小心按到」—— 拇指在左右之間移動時會掃到它,
-               而誤觸軟降的代價特別高(方塊突然衝下去)。⚠ 上一輪的**吸附讓它更嚴重**:
-               只隔 10px,按 ◀ 偏上一點就被吸到軟降去。
-             ★ 現在左手只管左右(誤觸也只是左右,可逆),下降全部收進右簇那一顆。 -->
-        <div class="blk-pad-l">
-          <div class="blk-pad-row">
-            <button class="blk-key" type="button" data-act="left" aria-label="向左">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.4 5.4L7.2 12l7.2 6.6"/></svg>
-            </button>
-            <button class="blk-key" type="button" data-act="right" aria-label="向右">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 5.4L16.8 12l-7.2 6.6"/></svg>
-            </button>
-          </div>
+    </div>
+
+    <!-- 控制鈕:**一律在最下面**(v2.15.0)。使用者第六輪實機回報:
+         「按鈕全部改到最下面,不要有那個浮在上面的選項」。
+         ⚠⚠ 所以它從舞台**裡面**搬到舞台**外面**來了(現在是 .blk-stage 的兄弟)——
+           兩件事一起成立才算做到:
+           ① 預設那一種擺法是盤面正下方一條**真的橫列**,它參與版面 → 盤面跟著縮一階;
+              而 fitBoard() 量的正是 .blk-stage,鈕留在裡面的話就是「量的對象被自己
+              的量測結果改變」(紅線 ⑬ 那個震盪)。
+           ② 寬螢幕 / 橫置時改用**側邊擺法**(body.blk-side,board.js 量出來自己挑):
+              兩簇落在盤面左右兩側的**底角** —— 那兩塊空白盤面本來就用不到,
+              所以盤面一格都不用縮,鈕還可以做更大。**它落在盤面外面,不是浮在上面。**
+         ⚠ 熱區一律 ≥44px;旋轉與直接落地**不連發**(board.js 的紅線 ⑤)。 -->
+    <div class="blk-pad" id="blkPad">
+      <!-- ⚠ 圖示一律**自繪 SVG**(v2.14.0;在那之前是 ◀ ▶ ↻ 那幾個字元)——
+           理由與說明卡那六格同一條:字元的字形每台機器不一樣、而且 U+25C0 那一段
+           實心三角在盤面上又重又鈍。stroke 吃 currentColor,按下去跟著一起亮。
+           ⚠⚠ **左簇只有左右兩顆**(v2.14.0 第五輪)。軟降那顆本來在它們上面,
+             而使用者實機回報「很容易會不小心按到」—— 拇指在左右之間移動時會掃到它,
+             而誤觸軟降的代價特別高(方塊突然衝下去)。⚠ 上一輪的**吸附讓它更嚴重**:
+             只隔 10px,按 ◀ 偏上一點就被吸到軟降去。
+           ★ 現在左手只管左右(誤觸也只是左右,可逆),下降全部收進右簇那一顆。 -->
+      <div class="blk-pad-l">
+        <div class="blk-pad-row">
+          <button class="blk-key" type="button" data-act="left" aria-label="向左">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.4 5.4L7.2 12l7.2 6.6"/></svg>
+          </button>
+          <button class="blk-key" type="button" data-act="right" aria-label="向右">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 5.4L16.8 12l-7.2 6.6"/></svg>
+          </button>
         </div>
-        <div class="blk-pad-r">
-          <div class="blk-pad-row">
-            <button class="blk-key" type="button" data-act="cw" aria-label="旋轉">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12a7 7 0 10-2.4 5.3"/><path d="M19.4 6.6v4.8h-4.8"/></svg>
-            </button>
-          </div>
-          <!-- ★★ **一顆鈕兩種用法**:短按 = 直接落地、按住 = 慢慢降(軟降)。
-               使用者:「我又不想要右手邊那個有落下又有下的按鈕,這樣會搞不太清楚是做什麼」
-               —— 下降本來就只需要一個概念,分成兩顆才是問題的來源。
-               ⚠ 按下去**立刻**開始降(不等 150ms 判斷),不然短按會有延遲感;
-                 放開得快才補一個落地。判定在 board.js 的 padUp()。
-               ⚠ 它是唯一**不可逆**的動作 → 與旋轉之間刻意拉開(.blk-pad-r 的 gap 18px)。 -->
-          <div class="blk-pad-row">
-            <button class="blk-key blk-key-drop" type="button" data-act="drop"
-                    aria-label="落地(按住就慢慢降)">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10m-4.4-3.6L12 14.8l4.4-4.4M5.6 19.4h12.8"/></svg>
-            </button>
-          </div>
+      </div>
+      <div class="blk-pad-r">
+        <div class="blk-pad-row">
+          <button class="blk-key" type="button" data-act="cw" aria-label="旋轉">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12a7 7 0 10-2.4 5.3"/><path d="M19.4 6.6v4.8h-4.8"/></svg>
+          </button>
+        </div>
+        <!-- ★★ **一顆鈕兩種用法**:短按 = 直接落地、按住 = 慢慢降(軟降)。
+             使用者:「我又不想要右手邊那個有落下又有下的按鈕,這樣會搞不太清楚是做什麼」
+             —— 下降本來就只需要一個概念,分成兩顆才是問題的來源。
+             ⚠ 按下去**立刻**開始降(不等 150ms 判斷),不然短按會有延遲感;
+               放開得快才補一個落地。判定在 board.js 的 padUp()。
+             ⚠ 它是唯一**不可逆**的動作 → 與旋轉之間刻意拉開(.blk-pad-r 的 gap 18px)。 -->
+        <div class="blk-pad-row">
+          <button class="blk-key blk-key-drop" type="button" data-act="drop"
+                  aria-label="落地(按住就慢慢降)">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v10m-4.4-3.6L12 14.8l4.4-4.4M5.6 19.4h12.8"/></svg>
+          </button>
         </div>
       </div>
     </div>

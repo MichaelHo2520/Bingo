@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 ac73c6e66f5b46c49a6e9d0c7dc80acbc0c05ff5d470c7b597ec16c0f2373571)
+    真相在 styles.src.css(sha256 63e139abee8f247de968b91fb88479a926e10a8c4ea1b12dcda0d55855ea39b1)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6006,6 +6006,8 @@ body.is-big .mj-timer,
 body.is-big .cy-timer{margin-left:auto}
 :root{
   --blk-tw:560px;
+  --blk-key:54px;
+  --blk-bar:78px;
   --blk-glass:rgba(10,12,26,.34);
   --blk-line:rgba(255,255,255,.12);
   --blk-grid:rgba(255,255,255,.055);
@@ -6116,13 +6118,19 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 .blk-paused{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;
             font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:26px;
             color:var(--text);text-shadow:0 2px 12px rgba(0,0,0,.65)}
-.blk-pad{position:absolute;inset:0;pointer-events:none;z-index:2}
-.blk-pad-l,.blk-pad-r{position:absolute;bottom:10px;display:flex;flex-direction:column;
+.blk-pad{flex:none;width:100%;height:var(--blk-bar);padding:0 8px;
+         display:flex;align-items:center;justify-content:space-between;
+         pointer-events:none;z-index:2}
+.blk-pad-l,.blk-pad-r{display:flex;flex-direction:row;align-items:center;
                       gap:10px;pointer-events:auto}
-.blk-pad-l{left:8px;align-items:flex-start}
-.blk-pad-r{right:8px;align-items:flex-end;gap:18px}
-.blk-pad-row{display:flex;gap:10px}
-.blk-key{position:relative;width:50px;height:50px;border:0;border-radius:50%;
+.blk-pad-r{gap:18px}
+.blk-pad-row{display:flex;align-items:center;gap:10px}
+body.blk-side .blk-pad{position:absolute;inset:0;height:auto;padding:0;display:block}
+body.blk-side .blk-pad-l,
+body.blk-side .blk-pad-r{position:absolute;bottom:8px}
+body.blk-side .blk-pad-l{left:4px}
+body.blk-side .blk-pad-r{right:4px}
+.blk-key{position:relative;width:var(--blk-key);height:var(--blk-key);border:0;border-radius:50%;
          background:radial-gradient(120% 120% at 50% 16%,
                     rgba(255,255,255,.22), rgba(122,132,163,.20) 58%, rgba(26,28,44,.26));
          box-shadow:inset 0 1.5px 0 rgba(255,255,255,.34),
@@ -6138,7 +6146,8 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
          transition:transform .09s ease-out,box-shadow .12s linear,background .12s linear}
 .blk-key svg{display:block;pointer-events:none;
              filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
-.blk-key-drop{width:74px;height:50px;border-radius:25px;font-size:16px;
+.blk-key-drop{width:calc(var(--blk-key) * 1.5);height:var(--blk-key);
+              border-radius:calc(var(--blk-key) / 2);font-size:16px;
               background:radial-gradient(120% 120% at 50% 16%,
                          rgba(255,236,170,.34), rgba(255,159,67,.26) 60%, rgba(120,60,10,.24))}
 .blk-key.blk-on{transform:scale(.90);
@@ -6148,8 +6157,6 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
                            0 0 0 2.5px rgba(255,255,255,.30),
                            0 0 18px 2px var(--accent-2),
                            0 2px 8px rgba(0,0,0,.30)}
-body.blk-dock .blk-stage{padding-bottom:116px}
-body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 .blk-result{display:flex;flex-direction:column;gap:5px;margin:10px 0 4px}
 .blk-rrow{display:flex;justify-content:space-between;align-items:center;
           font-size:13.5px;color:var(--text);padding:6px 11px;border-radius:10px;
@@ -6159,7 +6166,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
            font-weight:700;font-size:16px;color:var(--accent-2)}
 .blk-react-row{display:flex;justify-content:center;gap:8px;margin:10px 0 2px;flex-wrap:wrap}
 @media (min-width:700px),(orientation:landscape){
-  .blk-pad-l,.blk-pad-r{bottom:auto;top:50%;transform:translateY(-50%)}
+  :root{ --blk-tw:min(96vw, 880px); --blk-key:64px; --blk-bar:88px; }
   .blk-key{background:rgba(125,135,165,.34)}
   .blk-hud{height:50px}
 }
@@ -6179,6 +6186,6 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-room{padding:6px 10px}
   .blk-hud{gap:6px;height:42px}
   .blk-foes{gap:6px}
-  .blk-key{width:44px;height:44px;font-size:18px}
-  .blk-key-drop{width:66px;height:44px}
+  :root{ --blk-key:44px; --blk-bar:66px; }
+  .blk-key{font-size:18px}
 }

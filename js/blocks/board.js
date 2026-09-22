@@ -107,7 +107,11 @@ const BLKB = (function(){
      那裡是堆得最高、最需要看清楚的一塊(使用者實機回報)。
      ★ 想切回按鈕的人走設定裡的「操作方式」,solo.js 會把它存起來。 */
   let ctrlMode = "swipe";               // "btn" | "swipe" | "both"
-  let padPos = "float";                 // "float"(浮在盤面上)| "dock"(固定在盤面下方)
+  /* 鈕現在擺哪一種(v2.15.0)。false = 盤面**正下方**一條真的橫列(預設)、
+     true = 兩簇貼在盤面**左右兩側的底角**(body.blk-side)。
+     ★ 這不是設定、也不是 @media 決定的 —— 是 pickPad() **量出來的**(誰讓盤面大誰贏)。
+     使用者第六輪回報之後,「浮在盤面上 / 固定在下方」那一格設定整個拿掉了。 */
+  let padSide = false;
 
   /* ==========================================================================
      三、小工具
@@ -136,28 +140,104 @@ const BLKB = (function(){
          不會因為自己畫太大而長出捲軸、再把自己縮小、再放大…(那個震盪已經三次了)。
        算式:可用寬 = 主盤(10 格) + 右側預覽(4 個預覽格) + 警示條 + 間距
      ========================================================================== */
-  /* 寬螢幕 / 橫置:控制簇搬到盤面左右兩側(不再蓋住盤面)。
-     ⚠ 這個條件**必須與 styles.src.css 的 @media 逐字相同** —— 對不起來的症狀是
-       「鈕在旁邊、但盤面還是照蓋住的算法留了空位」(或反過來,盤面被鈕蓋掉一角)。 */
+  /* 寬螢幕 / 橫置。⚠⚠ v2.15.0 起它**不再決定控制鈕擺哪裡**(那件事改成量的,
+     見下面的 pickPad())—— 所以「這一行要與 CSS 的 @media 逐字相同」那條紅線
+     也跟著消失了。現在它只剩一個用途:NEXT 要預告幾顆(寬螢幕放得下五顆)。 */
   const MQ_WIDE = "(min-width:700px),(orientation:landscape)";
   function isWide(){
     try{ return window.matchMedia(MQ_WIDE).matches; }catch(e){ return false; }
   }
 
+  /* ==========================================================================
+     四之二、控制鈕擺哪裡 —— **量出來的,不是設定也不是 @media**(v2.15.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「按鈕全部改到最下面,不要有那個浮在上面的選項」
+                「比較寬大的螢幕比例時,按鈕的位置相當的不合理。而且也很小」
+
+       兩種擺法,兩種都在**最下面**、都不蓋到盤面:
+         · 橫列(預設)—— 盤面正下方一條真的列,它**參與版面** → 盤面縮一階。
+         · 側邊(body.blk-side)—— 兩簇貼在盤面左右兩側的底角。寬螢幕 / 橫置時
+           盤面是被**高度**卡住的(左右各空兩成多),那兩塊空白盤面本來就用不到
+           → 鈕放進去**盤面一格都不用縮**,而且可以做得更大。
+           (與紅線 ㉗ 讓對手小盤「只吃盤面用不到的空間」是同一個思路。)
+
+       ★ 挑法:兩種都算一次「一格會有多大」,誰大誰贏;平手 → 橫列
+         (使用者要的是「在最下面」,側邊那一種只在真的划算時才用)。
+
+       ⚠⚠⚠ 兩個輸入都必須**與目前的擺法無關**,否則兩種擺法會自己翻來翻去
+         (A 算出 B 比較好 → 換成 B 之後又算出 A 比較好…,而 ResizeObserver 會一直還魂):
+         · fullH = 舞台現在的高 **+ 目前是橫列的話把那一條與 gap 加回去**
+           → 不管現在是哪一種,算出來都是同一個數字。
+         · 橫列的高一律讀 CSS 的 --blk-bar(單一真相在 styles.src.css),
+           **不可以量 .blk-pad 自己** —— 側邊擺法時它是 inset:0 的浮層,
+           量到的會是整個對局區。
+     ========================================================================== */
+  const PAD_GAP = 14;                   // 側邊擺法時,拇指簇與盤面之間至少要留的空隙
+
+  /* 兩個拇指簇的尺寸。⚠ 量它們是安全的:鈕的大小只由 CSS 決定,不會反過來
+     被盤面的尺寸影響(不像量 .blk-foes 自己 = 量自己畫出來的結果)。 */
+  function padBox(){
+    const l = elPad && elPad.querySelector(".blk-pad-l");
+    const r = elPad && elPad.querySelector(".blk-pad-r");
+    const lr = l ? l.getBoundingClientRect() : null;
+    const rr = r ? r.getBoundingClientRect() : null;
+    return { l: lr ? lr.width : 0, r: rr ? rr.width : 0,
+             h: Math.max(lr ? lr.height : 0, rr ? rr.height : 0) };
+  }
+  /* 底部那條橫列的高:讀 CSS 的 --blk-bar。
+     ⚠ 它在 CSS 裡是**寫死的 px**,不是 calc() —— 自訂屬性裡的 calc 不會先算完,
+       讀回來會是 "calc(54px + 24px)" 這種字串(parseFloat 出來是 NaN)。 */
+  function barH(){
+    const el = elPlay || document.documentElement;
+    const v = parseFloat(getComputedStyle(el).getPropertyValue("--blk-bar"));
+    return (isFinite(v) && v > 0) ? v : 78;
+  }
+  /* 側邊擺法要讓出的左 / 右兩條帶子。
+     ★ 右邊那一條是**右簇與對手小盤上下分層共用**的 → 寬度取兩者的**大者**,
+       不是相加(相加的話盤面白白少掉一大塊)。 */
+  function sideRes(foesOn){
+    const pb = padBox();
+    return { l: pb.l + PAD_GAP,
+             r: Math.max(pb.r, foesOn ? FOE_MAX : 0) + PAD_GAP };
+  }
+  /* 給定可用寬高,一格會是幾 px(與 fitBoard() 裡那一行必須一致) */
+  function cellFor(w, h){
+    return Math.round(clamp(Math.min((w - GAUGE_W - 8) / R.COLS, h / R.VIS), MINC, MAXC));
+  }
+  function pickPad(foesOn){
+    if(!elStage || !elPlay) return false;
+    const rect = elStage.getBoundingClientRect();
+    const gap = parseFloat(getComputedStyle(elPlay).rowGap) || 0;
+    const bar = barH();
+    const fullH = rect.height + (padSide ? 0 : bar + gap);
+    const availW = Math.max(120, rect.width - 4);
+    const res = sideRes(foesOn);
+    const cDock = cellFor(availW, Math.max(120, fullH - bar - gap - 6));
+    const cSide = cellFor(Math.max(120, availW - res.l - res.r), Math.max(120, fullH - 6));
+    return cSide > cDock;
+  }
+  function applyPadMode(side){
+    side = !!side;
+    if(side === padSide) return;
+    padSide = side;
+    document.body.classList.toggle("blk-side", side);
+  }
+
   function fitBoard(){
     if(!mounted || !elStage) return;
+    const spec = document.body.classList.contains("blk-spec");
+    const padOn = !!elPad && !elPad.classList.contains("hidden") && !spec;
+    const foesOn = !!elFoes && !elFoes.classList.contains("hidden") && !spec;
+    /* ★ 先決定鈕擺哪一種(它會切 body 的 class → 舞台的高度跟著變),再量最後的尺寸。
+       ⚠ pickPad() 的兩個輸入都與目前的擺法無關 → 不會翻來翻去(見它的檔頭)。 */
+    applyPadMode(padOn && pickPad(foesOn));
+
     const rect = elStage.getBoundingClientRect();
-    /* ⚠ 舞台裡只有盤面 —— HUD 是它的兄弟,控制鈕是**絕對定位**的浮層。
-       兩者都不會改變這裡量到的尺寸(那正是紅線 ① 要的)。 */
-    let reserve = 0;
-    if(isWide() && elPad && !elPad.classList.contains("hidden")){
-      /* 兩簇在左右兩側時要把寬度讓出來。量絕對定位的元素是安全的:
-         它不參與版面,所以量它不會回頭改變舞台的尺寸。 */
-      const l = elPad.querySelector(".blk-pad-l"), r = elPad.querySelector(".blk-pad-r");
-      reserve = (l ? l.getBoundingClientRect().width : 0) +
-                (r ? r.getBoundingClientRect().width : 0) + 20;
-    }
-    const availW = Math.max(120, rect.width - 4 - reserve);
+    /* ⚠ 舞台裡只有盤面 —— HUD 與控制列都是它的**兄弟**(v2.15.0 起控制列也搬出去了)。
+       側邊擺法時控制列是絕對定位的浮層,同樣不會改變這裡量到的尺寸(紅線 ① / ⑬)。 */
+    const useSide = padOn && padSide;
+    const res = useSide ? sideRes(foesOn) : { l: 0, r: 0 };
+    const availW = Math.max(120, rect.width - 4 - res.l - res.r);
     const availH = Math.max(120, rect.height - 6);
 
     const byW = (availW - GAUGE_W - 8) / R.COLS;       // 盤面吃滿寬度,只讓開警示條
@@ -177,16 +257,26 @@ const BLKB = (function(){
          · 剩不下 → 疊在盤面**右上角**(那裡幾乎永遠是空的;堆到那個高度時這一局
            也快結束了)。兩條路盤面都維持最大,小盤一律只用免費的空間。
        ⚠ 沒有回饋迴圈:cell 在這一行之前就算完了,小盤的尺寸不參與(紅線 ①)。 */
+    /* ⚠ v2.15.0:側邊擺法時右邊那一條帶子**已經在上面讓好了**(sideRes 取
+       「右簇」與「小盤」的大者)—— 所以這裡直接給它 FOE_MAX,不必再看剩多少,
+       也不會走「疊在右上角」那條路(那是給沒有帶子可用的情況)。 */
     let foeW = 0, foeOver = false;
-    if(elFoes && !elFoes.classList.contains("hidden") &&
-       !document.body.classList.contains("blk-spec")){
-      const restW = availW - (R.COLS * cell + GAUGE_W + 8);
-      foeOver = (restW < FOE_MIN);
-      foeW = foeOver ? FOE_OVER : Math.min(FOE_MAX, Math.floor(restW));
+    if(foesOn){
+      if(useSide){
+        foeW = FOE_MAX;
+      }else{
+        const restW = availW - (R.COLS * cell + GAUGE_W + 8);
+        foeOver = (restW < FOE_MIN);
+        foeW = foeOver ? FOE_OVER : Math.min(FOE_MAX, Math.floor(restW));
+      }
     }
     if(elFoes){
       elFoes.classList.toggle("blk-foes-over", foeOver);
       elFoes.style.width = foeW ? (foeW + "px") : "";
+      /* 側邊擺法:小盤要**讓開右簇的高度**(兩者上下分層共用右邊那一條帶子)。
+         ⚠ 量的是拇指簇(CSS 定死的尺寸),不是 .blk-foes 自己 —— 量自己就是震盪(紅線 ㉗)。 */
+      foeBottom = useSide ? Math.round(padBox().h + 12) : 0;
+      elFoes.style.bottom = foeBottom ? (foeBottom + "px") : "";
     }
 
     const g = getComputedStyle(cvMain).getPropertyValue("--blk-grid").trim();
@@ -194,9 +284,18 @@ const BLKB = (function(){
 
     sizeCanvas(cvMain, ctxM, R.COLS * cell, R.VIS * cell);
     if(elGauge) elGauge.style.height = (R.VIS * cell) + "px";
-    /* 貼右側那一條時盤面要**自己往左讓開**(舞台是置中的)——
-       疊在右上角那一條路刻意不推:那時候本來就沒有多的寬可以讓。 */
-    if(elWrap) elWrap.style.marginRight = (foeW && !foeOver) ? (foeW + "px") : "";
+    /* 盤面要**自己讓開**兩邊佔掉的東西(舞台是置中的,只縮小的話它照樣置中,
+       右半仍然會壓在小盤底下)。
+       · 橫列擺法:只有右邊的小盤要讓(疊在右上角那一條路刻意不讓 —— 那時候
+         本來就沒有多的寬可以讓)。
+       · 側邊擺法:左右兩條帶子各自讓開,盤面落在**兩條帶子之間**的正中央。
+       ⚠ 兩邊相減之後只設一邊:同時設 marginLeft/Right 在 flex 置中下等於沒讓。 */
+    const ml = useSide ? res.l : 0;
+    const mr = useSide ? res.r : ((foeW && !foeOver) ? foeW : 0);
+    if(elWrap){
+      elWrap.style.marginLeft  = (ml > mr) ? ((ml - mr) + "px") : "";
+      elWrap.style.marginRight = (mr > ml) ? ((mr - ml) + "px") : "";
+    }
 
     /* HUD 的兩塊小畫布。
        ⚠⚠ prev **不可以由 cell 推算** —— HUD 的高度會跟著變,而 HUD 的高度又決定
@@ -507,6 +606,9 @@ const BLKB = (function(){
   let foes = [];                        // [{ id, name, b, c, ko, dead, pend, away }]
   let foeEls = [];                      // [{ wrap, cv, ctx, name }]
   let elFoes = null;
+  /* 側邊擺法時小盤要往上讓開右簇的高度(fitBoard 算好寫進來,fitFoes 要跟著扣)。
+     ⚠ 它是「舞台高度扣掉的一個量」,不是量 .blk-foes 自己 —— 後者就是震盪(紅線 ㉗)。 */
+  let foeBottom = 0;
 
   function setFoes(list){
     foes = list || [];
@@ -543,7 +645,9 @@ const BLKB = (function(){
     const spec = document.body.classList.contains("blk-spec");
     const box = (elStage || elFoes).getBoundingClientRect();
     const w = spec ? (box.width / n - 18) : (elFoes.getBoundingClientRect().width - 8);
-    const availH = Math.max(60, box.height) - (n - 1) * 8;
+    /* ⚠ 側邊擺法時右簇就在這一條的正下方 → 要扣掉它讓出來的那一段(foeBottom),
+       不然小盤會算得比看得見的空間還高,最底下那一塊被右簇蓋住。 */
+    const availH = Math.max(60, box.height - (spec ? 0 : foeBottom)) - (n - 1) * 8;
     const byH = Math.floor((availH / (spec ? 1 : n) - 16) / R.VIS);
     const byW = Math.floor(w / R.COLS);
     const fc = Math.max(2, Math.min(byW, byH));
@@ -1190,23 +1294,17 @@ const BLKB = (function(){
   function pause(){ running = false; allUp(); }
   function stop(){ running = false; allUp(); }
   function setFeel(i){ feel = clamp(i | 0, 0, DAS_MS.length - 1); }
+  /* ⚠ 切成手勢就整層收起來(.hidden = display:none)→ 那條橫列不再佔版面,
+     盤面自己長回去;fitBoard() 會重新挑擺法。 */
   function setCtrl(m){
     ctrlMode = (m === "swipe" || m === "both") ? m : "btn";
     if(elPad) elPad.classList.toggle("hidden", ctrlMode === "swipe");
-    document.body.classList.toggle("blk-dock", padPos === "dock" && ctrlMode !== "swipe");
-    fitBoard();
-  }
-  /* 控制鈕浮在盤面上(預設,盤面比較大)還是固定在下方(不擋盤面)。
-     ⚠ 切成 dock 之後鈕就**參與版面**了 → 盤面會自動縮一階,那是預期的。 */
-  function setPad(m){
-    padPos = (m === "dock") ? "dock" : "float";
-    document.body.classList.toggle("blk-dock", padPos === "dock" && ctrlMode !== "swipe");
     fitBoard();
   }
 
   return {
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,
-    act, setFeel, setCtrl, setPad, incoming, pop, shake,
+    act, setFeel, setCtrl, incoming, pop, shake,
     setFoes, foeAt, beamOut, beamIn, foes: () => foes,
     /* ★ 測試用的三個出口(產品程式不會呼叫它們):
        step(dt) 手動推一幀、frames() 是至今推了幾幀、awake() 是 rAF 現在排著沒有。
@@ -1220,6 +1318,9 @@ const BLKB = (function(){
     state: () => st,
     cell: () => cell,
     COL, COL_GARB, DAS_MS, ARR_MS,
-    feel: () => feel, ctrl: () => ctrlMode, pad: () => padPos, wide: isWide
+    /* ★ pad() 回的是**量出來的擺法**("bar" = 盤面正下方那條橫列 / "side" = 左右底角),
+       不是設定值 —— 那個設定 v2.15.0 已經整格拿掉了。e2e 靠它驗兩種擺法都真的會出現。 */
+    feel: () => feel, ctrl: () => ctrlMode, pad: () => (padSide ? "side" : "bar"),
+    bar: barH, wide: isWide
   };
 })();

@@ -138,7 +138,6 @@ function syncSoloSeg(){
   };
   set("blkModeSeg", "mode", Solo.mode());
   set("blkFeelSeg", "feel", Solo.feel());
-  set("blkPadSeg", "pad", Solo.pad());
   set("blkLvSeg", "lv", Solo.level());
   syncCtrlSeg();
   /* 電腦強度只有「對電腦」用得到 → 其他玩法收起來(留著只會讓人以為練習也有電腦) */
@@ -147,15 +146,14 @@ function syncSoloSeg(){
 }
 /* 操作方式有**兩個**入口:單機設定頁一個、說明蓋板一個(連線那條路只有後者 ——
    它是連線玩家唯一能改操作方式的地方)。⚠ 兩邊都要跟著同一個值走。
-   ⚠ 「按鈕位置」只有按鈕會出現時才有意義 → 純手勢時整格收起來。 */
+   ⚠ v2.15.0 拿掉了「按鈕位置」那一格(浮在盤面上 / 固定在下方)——
+     鈕一律在最下面,兩種擺法由 board.js 的 pickPad() 量出來自己挑,沒有旋鈕了。 */
 function syncCtrlSeg(){
   const v = Solo.ctrl();
   ["blkCtrlSeg", "blkCtrlSeg2"].forEach(id => {
     const seg = $(id); if(!seg) return;
     [...seg.children].forEach(b => b.classList.toggle("on", String(b.dataset.ctrl) === String(v)));
   });
-  const padRow = $("blkPadRow");
-  if(padRow) padRow.classList.toggle("hidden", v === "swipe");
 }
 
 /* 蓋板(設定 / 表情 / 自訂語音 / 問題回報 / 房間分享)開著的時候,單機不要繼續掉方塊。
@@ -214,7 +212,6 @@ $("blkHelpBtn").addEventListener("click", openBlkGuide);
 $("blkSoloHelpBtn").addEventListener("click", openBlkGuide);
 $("blkGuideClose").addEventListener("click", closeBlkGuide);
 $("blkGuideVeil").addEventListener("click", e => { if(e.target === $("blkGuideVeil")) closeBlkGuide(); });
-segPick("blkPadSeg", "pad", v => Solo.setPad(v));
 segPick("blkLvSeg", "lv", v => Solo.setLevel(v));
 $("blkStartSolo").addEventListener("click", () => Solo.start());
 
