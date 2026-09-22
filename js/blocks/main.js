@@ -92,6 +92,49 @@ function blkGestHtml(){
 function paintGestCards(){
   const html = blkGestHtml();
   ["blkGestCard", "blkGuideBody"].forEach(id => { const el = $(id); if(el) el.innerHTML = html; });
+  const atk = $("blkAtkCard");
+  if(atk) atk.innerHTML = blkAtkHtml();
+}
+
+/* ---------- 攻擊表:四格圖(v2.15.3)----------
+   ★ 它取代的是進場頁那一串數字(「消 2 列送 1 行、3 列送 2 行、消 4 列送 4 行」)——
+     數字要在腦子裡對起來,而且看完不會記得。圖是**一眼可比**的:
+     左邊那疊亮幾條、右邊就掉出幾塊,四格並排,差別自己跳出來。
+   ⚠⚠ 「消 1 列送 0 行」**一定要畫進去**,而且要畫成空的。
+     它才是這張表真正要講的事 —— 只會消單行的人送出 0,這正是 Combo 加成存在的理由
+     (見 rules.js 的 comboAtk 註解)。少了這一格,新手看完只會覺得「消行就會攻擊」。
+   ⚠ 一律自繪 SVG,不用字元 / emoji 箭頭(紅線 8:U+25B6 那一段在各機台字形不一,
+     而彩色 emoji 不吃 color → 換主題就跟著醜)。
+   ⚠ 這裡**不重複定義攻擊量** —— 數字要與 rules.js 的 ATK 對得起來,所以直接讀它。
+     寫死一份就是「規則改了、說明沒改」的雙胞胎。 */
+/* ⚠⚠ 兩根柱子**都固定畫四格**(空的畫暗色),不可以只畫有的那幾格 ——
+     四格一律等高才比得出來「消 2 送 1」與「消 4 送 4」差多少;
+     只畫實心的話每一格的柱子高度不一樣,眼睛沒有基準線可以對。
+   ⚠ 一列四格是硬需求,不是美感:這張圖住在 .blk-howto 裡,而那個框在小螢幕上是
+     **會縮、會捲**的唯一一塊(其餘都是 flex:none)。排成兩列就會被攔腰切掉
+     —— 第一版正是這樣,截圖才看得出來。 */
+function blkAtkCell(n){
+  const out = BLK.ATK[n] || 0;
+  const col = (x, k, cls) => {
+    let s = "";
+    for(let i = 0; i < 4; i++)
+      s += '<rect x="' + x + '" y="' + (23 - i * 7) + '" width="10" height="6" rx="1.4" class="' +
+           (i < k ? cls : "blk-atk-dim") + '"/>';
+    return s;
+  };
+  return '<div class="blk-atk-it' + (n === 4 ? " blk-atk-hot" : "") + '">' +
+    '<svg viewBox="0 0 30 30" width="38" height="38" aria-hidden="true">' +
+      col(2, n, "blk-atk-lit") + col(18, out, "blk-atk-garb") +
+    '</svg>' +
+    /* ⚠ 標籤**只能一行**:這張圖住在一個 120px 高、會捲的框裡,兩行的第二行
+       (也就是「送幾行」—— 整張表的重點)會剛好被切掉。截圖量過兩次。 */
+    '<span>消 ' + n + ' <b>→ 送 ' + out + '</b></span>' +
+  '</div>';
+}
+/* ⚠ 這裡**只回那張圖**,說明文字留在 blocks.html 的內文裡 ——
+   卡片自己再帶一段 foot 的話它會高到被那個捲動框切掉(這一頁沒有多餘的垂直空間)。 */
+function blkAtkHtml(){
+  return '<div class="blk-atk-grid">' + [1, 2, 3, 4].map(blkAtkCell).join("") + '</div>';
 }
 /* 說明蓋板。⚠ 單機時它開著方塊要停住(BLK_VEILS 有登記),而**連線刻意不停**
    —— 別人還在玩,自己看說明不能讓全場等你(同設定蓋板那一條)。 */

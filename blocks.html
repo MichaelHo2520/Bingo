@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.14.0 -->
-<meta name="version" content="2.14.0+3">
+<meta name="version" content="2.14.0+4">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -61,13 +61,20 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <img class="blk-art" src="img/blk-icon.png" alt="疊起來的方塊" width="192" height="192">
         <div class="blk-tag display">堆起來,消掉,把垃圾行送給對手</div>
       </div>
+      <!-- ⚠⚠ 這一塊是小螢幕上**唯一會縮、會捲**的(其餘全是 flex:none)——
+           所以順序就是優先順序:**最重要的那個東西要排第一**,後面的可以被捲到看不見。
+           攻擊表排在文字之前正是這個理由(第一版排在文字後面,截圖看到它被攔腰切掉)。 -->
       <div class="blk-howto">
-        <b>怎麼玩</b><br>
-        方塊從上面掉下來,填滿一整列就會消掉。<b>一次消越多列,送給對手的垃圾行越多</b> ——
-        消 2 列送 1 行、3 列送 2 行、<b>一次消 4 列(Tetris)送 4 行</b>。
-        連續消行還有<b>連擊加成</b>,所以一列一列慢慢消也有用。<br>
-        自己被送垃圾行時,左邊會出現一條<b>警示條</b>;在它推上來之前消掉自己的行可以<b>抵銷</b>。<br>
-        堆到頂端就輸了。
+        <b>怎麼玩</b>:填滿一整列就會消掉。<b>一次消越多列,送給對手的垃圾行越多。</b>
+        <!-- ⚠⚠ 攻擊表由 js/blocks/main.js 的 blkAtkHtml() 注入,**這裡不要寫死一份**。
+             ★ 它原本是一串數字(「消 2 列送 1 行、3 列送 2 行…」)—— 數字要在腦子裡
+               對起來,而且看完不會記得。四格圖是**一眼可比**的。
+               使用者:「不是只是單純寫一堆文字」。 -->
+        <div class="blk-atk" id="blkAtkCard"></div>
+        左邊是你消掉的,右邊是對手會被頂上來的;<b>連續消行還有連擊加成</b>,
+        所以一列一列慢慢消的人也打得到人。<br>
+        被送垃圾行時左邊會亮起<b>警示條</b>,在它推上來之前消掉自己的行可以<b>抵銷</b>。
+        <b>三個人以上時,垃圾行只會打給其中一個人</b>(預設隨機)。堆到頂端就輸了。
       </div>
       <!-- 操作說明。⚠ 內容由 js/blocks/main.js 的 BLK_GEST_HTML 注入 ——
            房間框那顆「?」打開的蓋板印的是**同一份**,寫死兩份就是遲早分岔的雙胞胎。
@@ -263,6 +270,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <!-- 攻擊光束的畫布:蓋住整個對局區、不吃指標事件。
          ⚠ 一定要獨立一塊 —— 光束要跨越「我的盤面」與「對手小盤」兩個不同的畫布。 -->
     <canvas class="blk-fx" id="blkFx" aria-hidden="true"></canvas>
+
+    <!-- 現場播報(v2.15.3):誰快爆了 · 誰 K.O. 了誰 · 連殺。
+         ★ 這三件事**一直都在發生**,只是以前只有一個 K.O. 數字在默默變,沒有人會注意到。
+           聚會現場真正會讓人笑出來的就是這種東西,而且它不改任何規則。
+         ⚠⚠ 絕對定位 + pointer-events:none,而且是 .blk-play 的直接子元素 ——
+           **不可以放進 .blk-stage**:舞台是 fitBoard() 量的那個容器,
+           任何會改變它尺寸的東西都會讓盤面自己震盪(紅線 ⑬,跳棋 / 飛行棋 / 麻將三次)。 -->
+    <div class="blk-cast" id="blkCast" aria-live="polite" aria-atomic="true"></div>
 
     <!-- ⚠⚠ HUD 與控制列是舞台的**兄弟**,不可以放進 .blk-stage 裡面 ——
          舞台是 overflow:hidden(紅線 ①),放進去就會在小螢幕上被**裁掉**

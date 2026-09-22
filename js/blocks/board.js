@@ -63,7 +63,7 @@ const BLKB = (function(){
   let mounted = false, running = false, raf = 0, lastT = 0;
   let cell = 24, prev = 15, dpr = 1;
 
-  let elStage, elWrap, elGauge, elGaugeFill, elPad, elHud;
+  let elStage, elWrap, elGauge, elGaugeFill, elPad, elHud, elCast;
   let cvMain, ctxM, cvNext, ctxN;
   let nextN = 3;                        // Next 顯示幾顆(寬螢幕 5、手機 3)
   /* 網格線的顏色跟著主題走(定義在 styles.src.css 的 --blk-grid)。
@@ -597,6 +597,7 @@ const BLKB = (function(){
     if(!elFoes) return;
     elFoes.classList.toggle("hidden", !foes.length);
     if(foeEls.length !== foes.length){
+      foeDanger = [];                   // ⚠ 人數變了 → index 的意思跟著變,舊的遲滯狀態要丟掉
       elFoes.innerHTML = "";
       foeEls = foes.map(() => {
         const wrap = document.createElement("div");
@@ -681,6 +682,7 @@ const BLKB = (function(){
       }
       e.wrap.classList.toggle("blk-foe-target", !!f.target);
       e.wrap.classList.toggle("blk-foe-away", !!f.away);
+      e.wrap.classList.toggle("blk-foe-danger", checkDanger(i, b, f.name, dead));
       const tag = (f.ko ? (" ×" + f.ko) : "");
       if(e.name.textContent !== (f.name + tag)) e.name.textContent = f.name + tag;
     }
@@ -767,6 +769,47 @@ const BLKB = (function(){
     const e = foeEls[i];
     if(e) beam(e.cv, elGauge || cvMain, "#ff5d6c", (who ? who + " " : "") + "+" + n);
     incoming(n);
+  }
+
+  /* ==========================================================================
+     六之四、現場播報(v2.15.3)
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 「誰快爆了」「誰打爆了誰」這兩件事**一直都在發生**,但在這之前畫面上
+         只有一個 K.O. 數字在默默變 —— 聚會現場沒有人會注意到。
+         這一段不改任何規則,純粹是把已經發生的事講出來。
+       ⚠⚠ **一律 textContent,不可以用 innerHTML** —— 這裡印的是玩家自己取的暱稱。
+       ⚠ 播報層是 .blk-play 的子元素、絕對定位、pointer-events:none:
+         **放進 .blk-stage 就是讓盤面自己震盪**(紅線 ⑬)。
+     ========================================================================== */
+  function cast(txt, kind){
+    if(!elCast || !txt) return;
+    const li = document.createElement("div");
+    li.className = "blk-cast-it" + (kind ? " blk-cast-" + kind : "");
+    li.textContent = txt;                 /* ⚠ 暱稱是玩家輸入的,不進 innerHTML */
+    elCast.appendChild(li);
+    while(elCast.childElementCount > 3) elCast.removeChild(elCast.firstChild);
+    setTimeout(() => { if(li.parentNode) li.parentNode.removeChild(li); },
+               kind === "ko" ? 2400 : 1700);
+    if(kind === "ko")          T(320, { type: "square",   dur: 0.15, vol: 0.17, slideTo: 170 });
+    else if(kind === "streak") T(520, { type: "triangle", dur: 0.20, vol: 0.18, slideTo: 1060 });
+    else                       T(900, { type: "triangle", dur: 0.09, vol: 0.10, slideTo: 1240 });
+  }
+  function clearCast(){ if(elCast) elCast.innerHTML = ""; }
+
+  /* 「快爆了」的門檻:堆到只剩 4 排就算。
+     ⚠ 用 `<=` 而且要有**遲滯**(降回 6 排才解除)—— 沒有遲滯的話堆在門檻上下抖動的人
+       會被連續播報幾十次。這與跳棋那條「量到什麼就改什麼 → 自己震盪」是同一族的病,
+       只是這裡震的是播報不是版面。 */
+  const DANGER_IN = 4, DANGER_OUT = 6;
+  let foeDanger = [];
+  function checkDanger(i, b, name, dead){
+    const was = !!foeDanger[i];
+    if(!b || dead){ foeDanger[i] = false; return false; }
+    const free = R.stackTop(b) - R.TOP;   // 可見區還空著幾排
+    const now = was ? (free <= DANGER_OUT) : (free <= DANGER_IN);
+    foeDanger[i] = now;
+    if(now && !was && name) cast("⚠️ " + name + " 快爆了!", "warn");
+    return now;
   }
 
   /* ==========================================================================
@@ -1186,6 +1229,7 @@ const BLKB = (function(){
     elPad   = document.getElementById("blkPad");
     elHud   = document.querySelector(".blk-hud");
     elFoes  = document.getElementById("blkFoes");
+    elCast  = document.getElementById("blkCast");
     elPlay  = document.getElementById("blkPlay");
     cvFx    = document.getElementById("blkFx");
     if(cvFx) ctxF = cvFx.getContext("2d");
@@ -1258,6 +1302,7 @@ const BLKB = (function(){
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,
     act, setFeel, incoming, pop, shake,
     setFoes, foeAt, beamOut, beamIn, foes: () => foes,
+    cast, clearCast,
     /* ★ 測試用的三個出口(產品程式不會呼叫它們):
        step(dt) 手動推一幀、frames() 是至今推了幾幀、awake() 是 rAF 現在排著沒有。
        ⚠ frames() 不再適合拿來守「rAF 有沒有啟動」:rAF 現在只在對局畫面才跑

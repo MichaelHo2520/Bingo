@@ -13738,6 +13738,27 @@ body.is-big .cy-timer{margin-left:auto}
            flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
            box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
 .blk-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
+
+/* ---------- 攻擊表:四格圖(v2.15.3)----------
+   ★ 取代的是一串數字(「消 2 列送 1 行、3 列送 2 行…」)—— 圖是一眼可比的,
+     左邊亮幾條、右邊就掉出幾塊。使用者:「不是只是單純寫一堆文字」。
+   ⚠ 內容由 js/blocks/main.js 的 blkAtkHtml() 注入,數字直接讀 rules.js 的 ATK。
+   ⚠⚠ **一列四格是硬需求,不是美感。** 這張圖住在 .blk-howto 裡,而那一塊是小螢幕上
+     唯一會縮、會捲的(其餘 flex:none)—— 排成兩列就會被攔腰切掉,而且切點剛好在
+     第一列中間,看起來完全像壞掉。第一版就是這樣,截圖才看得出來。 */
+.blk-atk{margin:7px 0 8px;padding:6px 4px 5px;border-radius:12px;
+         background:rgba(0,0,0,.16);border:1px solid var(--panel-line)}
+.blk-atk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.blk-atk-it{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
+.blk-atk-it svg{flex:none}
+.blk-atk-it span{font-size:10.5px;font-weight:700;line-height:1.3;color:var(--text);
+                 opacity:.86;text-align:center;white-space:nowrap}
+.blk-atk-it b{font-weight:800;opacity:1;color:var(--muted)}
+/* 一次消 4 列(Tetris)是這張表的重點 —— 它的送出量是消 2 列的四倍 */
+.blk-atk-hot b{color:#ffd93d}
+.blk-atk-lit{fill:var(--accent)}
+.blk-atk-dim{fill:rgba(255,255,255,.11)}
+.blk-atk-garb{fill:#8b8fa8}
 .field-sub{font-size:11px;font-weight:600;opacity:.85;margin-left:4px}
 
 /* ---------- 設定選項底下那一行「隨選隨變」的後果(v2.15.3)----------
@@ -13843,8 +13864,43 @@ body.is-big .cy-timer{margin-left:auto}
                        text-shadow:0 1px 3px rgba(0,0,0,.6)}
 .blk-foe-away{opacity:.42}
 
+/* 快爆了(v2.15.3):堆到只剩 4 排就開始跳。★ 這是聚會現場的笑點來源 ——
+   「小明快爆了」大家一起轉頭看,而在這之前那件事只有小明自己知道。
+   ⚠ 遲滯與播報的節流在 board.js 的 checkDanger(),CSS 這邊只負責看起來危險。 */
+.blk-foe-danger{animation:blk-foe-pulse .68s ease-in-out infinite}
+@keyframes blk-foe-pulse{
+  0%,100%{box-shadow:inset 0 0 0 2.5px rgba(255,93,108,.55)}
+  50%    {box-shadow:inset 0 0 0 2.5px rgba(255,93,108,1)}
+}
+/* ⚠⚠ 減少動態時**一定要整個關掉**,不可以靠檔案上方那條全域的
+   `animation-duration:.001s` —— 那條碰到 infinite 的動畫會變成一秒閃一千次。 */
+@media (prefers-reduced-motion:reduce){
+  .blk-foe-danger{animation:none;box-shadow:inset 0 0 0 2.5px rgba(255,93,108,.9)}
+}
+
 /* 攻擊光束的畫布:蓋住整個對局區、不吃指標事件 */
 .blk-fx{position:absolute;left:0;top:0;pointer-events:none;z-index:3}
+
+/* ---------- 現場播報(v2.15.3)----------
+   ⚠⚠ 絕對定位 + pointer-events:none,而且掛在 .blk-play 上(不是 .blk-stage)——
+     舞台是 fitBoard() 量的那個容器,放進去就是盤面自己震盪(紅線 ⑬)。
+   ⚠ z-index 要比光束那塊畫布(3)高:大字報被光束蓋住就白做了。
+   ⚠ 寬度夾住 + 自動換行:暱稱最長 8 個字 ×2 加上「💥 K.O.」在 360px 上放不下一行。 */
+.blk-cast{position:absolute;left:0;right:0;top:15%;z-index:4;pointer-events:none;
+          display:flex;flex-direction:column;align-items:center;gap:5px;padding:0 12px}
+.blk-cast-it{max-width:100%;padding:5px 13px;border-radius:999px;text-align:center;
+             font-weight:800;font-size:13px;line-height:1.35;color:#fff;
+             background:rgba(12,10,22,.78);box-shadow:0 3px 14px rgba(0,0,0,.4);
+             -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+             animation:blk-cast-in .22s ease-out both}
+@keyframes blk-cast-in{from{opacity:0;transform:translateY(7px) scale(.94)}
+                         to{opacity:1;transform:none}}
+.blk-cast-ko{font-size:17px;font-family:'Fredoka','Nunito',sans-serif;
+             padding:7px 17px;color:#ffd93d;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.blk-cast-streak{font-size:18px;font-family:'Fredoka','Nunito',sans-serif;
+                 padding:7px 18px;color:#0c0a16;background:#ffd93d;
+                 box-shadow:0 4px 20px rgba(255,217,61,.45)}
+.blk-cast-warn{color:#ff9aa4}
 
 /* ---------- 觀戰:沒有「我的盤面」,整個畫面讓給對手的小盤 ----------
    ⚠ 唯讀**不靠這幾條 CSS** —— 寫入由 adapter 的 canPublish() 與核心的

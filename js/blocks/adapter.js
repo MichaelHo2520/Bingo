@@ -56,6 +56,8 @@ const MP = MPCore.create((function(){
   const ackd = {};                      // from → 已經消費到第幾號
   let seq = 0, pubT = 0, fullT = 0, lastBoard = "";
   let myDeaths = 0, lastHitBy = "", deadAt = 0, settleT = null;
+  let myKiller = "";                    // 我這一次是被誰打死的(要跟著快照送出去,見 announceKO)
+  let streak = null;                    // 連殺:{ id, n, t }
   let liveRef = null, atkRef = null;
   let lastGame = null;                  // 最後一次收到的 game 快照(koOf / 結算查它)
 
@@ -117,8 +119,10 @@ const MP = MPCore.create((function(){
     playing = false; counting = false; over = false;
     foes = {}; lockTarget = null; atkN = 0; seq = 0;
     myDeaths = 0; lastHitBy = ""; deadAt = 0; lastBoard = "";
+    myKiller = ""; streak = null;
     Object.keys(ackd).forEach(k => delete ackd[k]);
     BLKB.setFoes([]);
+    BLKB.clearCast();
     document.body.classList.remove("blk-spec");
     banner("");
   }
@@ -146,7 +150,9 @@ const MP = MPCore.create((function(){
     endAt = (gRules.mode === "ko") ? startAt + gRules.secs * 1000 : 0;
     order = g.order || [];
     over = false; atkN = 0; seq = 0; myDeaths = 0; lastHitBy = ""; lastBoard = "";
+    myKiller = ""; streak = null;
     Object.keys(ackd).forEach(k => delete ackd[k]);
+    BLKB.clearCast();
 
     st = R.blank({
       seed: seed,
@@ -227,6 +233,10 @@ const MP = MPCore.create((function(){
       rid: curRound, seq: ++seq, b: b, i: st.idx,
       c: c ? [c.k, c.r, c.x, c.y] : null,
       p: R.pendCount(st), l: st.lines, ko: koOf(ctx.me()), d: st.dead ? 1 : 0,
+      /* ★ 「我是被誰打死的」——**只有我自己知道**(垃圾行是誰送的只寫在我收到的那筆
+         攻擊事件裡,別台看不到)。要讓全場都能播報「A 💥 K.O. B」就得跟著快照送出去。
+         ⚠ 空字串不可以寫成 null:RTDB 的 update 遇到 null 是**刪掉那個 key**。 */
+      k: myKiller || "",
       ack: ackd, at: Date.now()
     });
   }
@@ -249,7 +259,15 @@ const MP = MPCore.create((function(){
       if(typeof v.b === "string"){ f.bd = R.decBoard(v.b); }
       f.c = v.c || null;
       f.p = v.p || 0;
+      /* ★ 死亡的**轉換**才播報(v2.15.3)。
+         ⚠⚠ 不可以只看 `v.d` 為真就播 —— 快照每 2 秒就對帳一次,死著的那 2 秒會被
+           播報好幾十次;而且 `child_added` 一掛上去就會把現存的整批重放一次(紅線 ④)。
+         ⚠ `f.seen` 是「我這一局看過他活著」:中途加入時對方已經死了就不要播,
+           不然一進房就被一串「某某被 K.O.」洗版,而那些都是我沒看到的事。 */
+      const wasDead = !!f.dead;
       f.dead = !!v.d;
+      if(!f.dead) f.seen = true;
+      else if(f.seen && !wasDead) announceKO(v.k || "", id);
       f.at = v.at || f.at;
       drawFoesSoon();
     };
@@ -317,6 +335,8 @@ const MP = MPCore.create((function(){
   function onDead(){
     myDeaths++;
     deadAt = nowSrv();
+    myKiller = lastHitBy;                /* ⚠ 一定要在 pubFull **之前**,不然這一份快照少了 k */
+    announceKO(myKiller, ctx.me());      /* 自己這一台立刻播,不必等快照繞一圈回來 */
     pubFull(true);
     /* 死亡宣告 + KO 記給最後打我的人。
        ⚠ 用 deaths[me] 當冪等鍵:同一次死亡重送不會被算第二次。 */
@@ -451,6 +471,38 @@ const MP = MPCore.create((function(){
     showToast(lockTarget ? ("只打 " + ctx.dispName(id)) : "改回隨機攻擊");
     rebuildFoes();
     paintTargetStat();                   // ⚠ HUD 那一格要立刻跟上,不能等下一次 250ms 的 paintHud
+  }
+
+  /* ==========================================================================
+     八之一、現場播報(v2.15.3)
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 「誰打爆了誰」以前只有一個 K.O. 數字在默默變 —— 聚會現場沒有人會注意到,
+         而這正是這個遊戲最有戲的一刻。這一段**不改任何規則**。
+       ⚠ 每一台各自從同一串事件算,所以看到的播報一致;算錯了也只是少一句話,
+         不影響任何勝負判定(K.O. 數的真相一律在 `game.ko`,由交易寫)。
+     ========================================================================== */
+  const STREAK_MS = 12000;               // 連殺的時間窗
+  const STREAK_WORD = ["", "", "雙殺!", "三殺!", "四殺!!", "大殺特殺!!!"];
+  function announceKO(killer, victim){
+    const vn = ctx.dispName(victim);
+    if(killer && killer !== victim){
+      const kn = ctx.dispName(killer);
+      BLKB.cast(kn + " 💥 K.O. " + vn, "ko");
+      noteStreak(killer, kn);
+    }else{
+      /* 沒有人打他 —— 自己堆爆的。這一句要講出來,不然旁邊的人會以為是誰的功勞。 */
+      BLKB.cast(vn + " 自己堆爆了 😵", "ko");
+      streak = null;
+    }
+  }
+  function noteStreak(id, name){
+    const t = nowSrv();
+    if(streak && streak.id === id && (t - streak.t) <= STREAK_MS) streak.n++;
+    else streak = { id: id, n: 1, t: t };
+    streak.t = t;
+    const w = STREAK_WORD[Math.min(streak.n, STREAK_WORD.length - 1)];
+    /* ⚠ 慢半拍再播:跟 K.O. 那一句同時出現的話兩句會擠在一起,反而兩句都沒看到。 */
+    if(w) setTimeout(() => BLKB.cast(name + " " + w, "streak"), 460);
   }
 
   function banner(txt){
