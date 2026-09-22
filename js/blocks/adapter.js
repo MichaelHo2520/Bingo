@@ -236,7 +236,7 @@ const MP = MPCore.create((function(){
     lastBoard = b;
     const c = st.cur;
     liveRef.child(ctx.me()).update({
-      rid: curRound, seq: ++seq, b: b, i: st.idx, h: st.hold,
+      rid: curRound, seq: ++seq, b: b, i: st.idx,
       c: c ? [c.k, c.r, c.x, c.y] : null,
       p: R.pendCount(st), l: st.lines, ko: koOf(ctx.me()), d: st.dead ? 1 : 0,
       ack: ackd, at: Date.now()

@@ -10,7 +10,7 @@
      • 七種方塊的四個方向(由基準矩陣旋轉產生,不手列 28 份)
      • SRS wall kick(官方表逐項照抄,I 與其他分表,O 不轉)
      • 決定性 7-bag:pieceAt(seed, i) 是**查詢函式**,不是產生器
-     • 移動 / 旋轉 / 軟降 / 硬降 / Hold / Ghost
+     • 移動 / 旋轉 / 軟降 / 硬降 / Ghost(**沒有 Hold** —— v2.14.0 拿掉了,見下面)
      • 鎖定 · 消行 · 攻擊量(含 Combo 與全消)· 讓分倍率
      • 垃圾行:排隊 → 抵銷 → 推上來;洞位由送出端決定
      • tick(st, dt):時間推進(重力、鎖定延遲),回傳事件陣列
@@ -24,9 +24,10 @@
      ② **7-bag 一定要寫成 pieceAt(seed, i) 這種 O(1) 查詢。**
         寫成「產生器 + 目前 bag 狀態」的話,快照就得序列化 PRNG 內部狀態,
         那是第二份真相 → 重整回座遲早分岔。有了查詢函式,**idx 一個整數就夠**。
-     ③ **spawn() 會把 canHold 設成 true** —— holdSwap() 必須在 spawn() **之後**
-        才把它設回 false,順序寫反就變成可以無限換牌。
-     ④ **垃圾行只在「鎖定之後、下一顆生出來之前」推上來。**
+     ③ **這個遊戲沒有 Hold(換牌)。** v2.14.0 拿掉的 —— 使用者:「那個換也不要了,
+        刪掉換這個功能,這樣才刺激」。連帶消失的有 `st.hold` / `st.canHold` /
+        `holdSwap()` / 快照的 `h` 欄位 / HUD 左邊那一格 / 鍵盤 `C`·`Shift` / 那顆「換」鈕。
+        ⚠ **不要「順手」把它加回來** —— 它不是漏掉的功能,是刻意砍掉的難度旋鈕。
         落下中推盤會讓方塊卡進牆裡,而且對手看到的位置一定對不上。
      ⑤ **攻擊量的讓分倍率要用累積器(carry)保留小數。**
         直接四捨五入的話 ×1.25 的 Double 永遠還是 1 行,讓分等於沒有作用。
@@ -289,8 +290,6 @@ const BLK = (function(){
       idx:    0,                        // 已經抽到第幾顆(下一顆的序號)
       board:  emptyBoard(),
       cur:    null,                     // { k, r, x, y }
-      hold:   -1,
-      canHold: true,
       pend:   [],                       // 待處理垃圾 [{ n, hole, from }]
       shield: 0,                        // 新手保護剩餘 ms
       combo:  0,                        // 連續消行次數(0 = 沒在連)
@@ -327,12 +326,13 @@ const BLK = (function(){
     return GRAV[level(st) - 1];
   }
 
-  /* 生出下一顆。k 有給就用指定的那一顆(Hold 換牌走這條,**不動 idx**)。
+  /* 生出下一顆。k 有給就用指定的那一顆(**不動 idx**)。
+     ⚠ 那個參數目前**沒有人用** —— v2.14.0 把 Hold 拿掉之後唯一的呼叫端就沒了。
+       留著是因為它零成本,而且「指定一顆生出來」是測試用得到的出口。
      回傳 false = 生不出來(超頂)。 */
   function spawn(st, k){
     const kind = (k === undefined) ? pieceAt(st.seed, st.idx++) : k;
     st.cur = { k: kind, r: 0, x: SPAWN_X[kind], y: SPAWN_Y[kind] };
-    st.canHold = true;                  // ⚠ 紅線 ③:holdSwap() 要在這之後才設回 false
     st.fall = 0; st.lockT = 0; st.resets = 0; st.soft = false;
     st.pieces++;
     if(!fits(st.board, kind, 0, st.cur.x, st.cur.y)){
@@ -408,15 +408,6 @@ const BLK = (function(){
     ev.drop = n;
     return ev;
   }
-  function holdSwap(st){
-    if(!st.cur || !st.canHold || st.dead) return false;
-    const cur = st.cur.k, h = st.hold;
-    st.hold = cur;
-    if(h < 0) spawn(st); else spawn(st, h);
-    st.canHold = false;                 // ⚠ 紅線 ③:一定在 spawn() 之後
-    return true;
-  }
-
   /* ==========================================================================
      七、鎖定 · 消行 · 攻擊
      ──────────────────────────────────────────────────────────────────────────
@@ -604,8 +595,6 @@ const BLK = (function(){
   function revive(st){
     st.board = emptyBoard();
     st.cur = null;
-    st.hold = -1;
-    st.canHold = true;
     st.pend = [];
     st.combo = 0;
     st.dead = false;
@@ -651,7 +640,6 @@ const BLK = (function(){
       seed: st.seed, rules: st.rules, idx: st.idx,
       b: encBoard(st.board),
       cur: st.cur ? [st.cur.k, st.cur.r, st.cur.x, st.cur.y] : null,
-      hold: st.hold, canHold: st.canHold ? 1 : 0,
       pend: st.pend.map(p => [p.n, p.hole, p.from]),
       shield: st.shield, combo: st.combo, lines: st.lines, sent: st.sent,
       ko: st.ko, deaths: st.deaths, pieces: st.pieces,
@@ -665,8 +653,6 @@ const BLK = (function(){
     st.idx = o.idx | 0;
     st.board = decBoard(o.b);
     st.cur = o.cur ? { k: o.cur[0], r: o.cur[1], x: o.cur[2], y: o.cur[3] } : null;
-    st.hold = (o.hold === undefined) ? -1 : o.hold;
-    st.canHold = !!o.canHold;
     st.pend = (o.pend || []).map(p => ({ n: p[0], hole: p[1], from: p[2] || "" }));
     st.shield = o.shield || 0;
     st.combo = o.combo | 0; st.lines = o.lines | 0; st.sent = o.sent | 0;
@@ -685,7 +671,7 @@ const BLK = (function(){
     return {
       b: encBoard(st.board),
       c: st.cur ? [st.cur.k, st.cur.r, st.cur.x, st.cur.y] : null,
-      h: st.hold, i: st.idx,
+      i: st.idx,
       p: pendCount(st),
       l: st.lines, ko: st.ko,
       d: st.dead ? 1 : 0
@@ -757,7 +743,7 @@ const BLK = (function(){
     normRules, hcapOf, comboAtk,
     // 一局
     blank, spawn, level, gravMs, grounded, move, rotate, down, ghostY,
-    hardDrop, holdSwap, lock, tick, revive,
+    hardDrop, lock, tick, revive,
     // 垃圾行
     queueGarbage, applyPending, pushGarbage, cancel, pendCount, scale,
     // 編碼

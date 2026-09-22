@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 49df9cbd7c1acf8a59c0dc3974fb4d5d3dc9186568d1d0da5128bf73f03cf682)
+    真相在 styles.src.css(sha256 72f2d546c3f9e5f51caceb14890bb4271f9f183296bd501a3662a24adefc542d)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6088,7 +6088,7 @@ body.blk-spec .blk-foes{position:static;width:auto!important;flex:1 1 auto;align
                         justify-content:center;pointer-events:auto}
 body.blk-spec .blk-foe-cv{width:auto;height:auto}
 .blk-hud{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;
-         width:100%;height:54px}
+         width:100%;height:46px}
 .blk-stats{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:14px}
 .blk-mini{flex:none;display:block}
 .blk-stat{display:flex;flex-direction:column;align-items:center;line-height:1.12;min-width:50px}
@@ -6148,10 +6148,10 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 @media (min-width:700px),(orientation:landscape){
   .blk-pad-l,.blk-pad-r{bottom:auto;top:50%;transform:translateY(-50%)}
   .blk-key{background:rgba(125,135,165,.34)}
-  .blk-hud{height:58px}
+  .blk-hud{height:50px}
 }
 @media (max-height:480px){
-  .blk-hud{height:38px}
+  .blk-hud{height:34px}
   .blk-room{padding:4px 10px}
   .blk-room .icon-btn{width:30px;height:30px;font-size:14px}
   .blk-play{margin-top:2px;gap:3px}
@@ -6164,7 +6164,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
   .blk-play{gap:4px;margin-top:4px}
   .blk-room{padding:6px 10px}
-  .blk-hud{gap:6px;height:46px}
+  .blk-hud{gap:6px;height:42px}
   .blk-foes{gap:6px}
   .blk-key{width:48px;height:38px;font-size:18px}
   .blk-key-wide{width:96px;height:32px;font-size:15px}

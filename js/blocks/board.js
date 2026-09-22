@@ -59,9 +59,13 @@ const BLKB = (function(){
      ⚠ 橫拖的步距**一定要跟著格子走**,不可以寫死 px —— 寫死的話「拖一公分走幾格」
        會隨盤面大小飄:按「大」之後格子變大、方塊卻跑得比手指快(實測差一倍)。 */
   const G_SOFT = 30;                    // 下拖幾 px 開始軟降
-  const G_FLICK = 480;                  // 下滑速度超過這個(px/s)算硬降
   const G_TAP = 12;                     // 位移小於這個才算點擊(旋轉)
-  const G_UP = 40;                      // 上滑幾 px 算換牌(Hold)
+  /* ⚠⚠ 往上滑 = **直接落地**(v2.14.0;在那之前上滑是換牌、而落地是「往下快甩」)。
+     換過來的理由:落地是**不可逆**的,而「往下拖」與「往下快甩」同在一個方向、
+     只差在速度 —— 拖到底抬手時速度一大就變成落地,那是整套手勢最容易誤觸的一處。
+     一個方向一件事之後就沒有這個歧義了,而「不可逆的動作放在不可能誤觸的方向」
+     這筆交換很划算。⚠ 門檻比原本的換牌高一點(48 > 40),同樣是因為它不可逆。 */
+  const G_UP = 48;                      // 上滑幾 px 算直接落地
   const G_AXIS = 12;                    // 超過這個位移才決定主軸(見下面的軸鎖)
   const G_BREAK = 3;                    // 橫軸鎖定後,下拖要超過 G_SOFT 的幾倍才准轉去軟降
   const G_TWO = 420;                    // 第二根手指在這段時間內落下才算「兩指點」(逆轉)
@@ -76,13 +80,13 @@ const BLKB = (function(){
   let cell = 24, prev = 15, dpr = 1;
 
   let elStage, elWrap, elGauge, elGaugeFill, elPad, elHud;
-  let cvMain, ctxM, cvHold, ctxH, cvNext, ctxN;
+  let cvMain, ctxM, cvNext, ctxN;
   let nextN = 3;                        // Next 顯示幾顆(寬螢幕 5、手機 3)
   /* 網格線的顏色跟著主題走(定義在 styles.src.css 的 --blk-grid)。
      ⚠ 每幀都去 getComputedStyle 是白工,所以在 fitBoard() 讀一次存著。
      ⚠ 換主題不會自動觸發 fitBoard() → setTheme 之後要再叫一次(main.js 的 showScreen 會)。 */
   let gridCol = "rgba(255,255,255,.055)";
-  /* HUD 的 HOLD / NEXT 標籤色。⚠ 寫死白色的話淺色主題上直接看不見(同 gridCol 的理由) */
+  /* HUD 的 NEXT 標籤色。⚠ 寫死白色的話淺色主題上直接看不見(同 gridCol 的理由) */
   let inkCol = "rgba(255,255,255,.9)";
 
   /* 特效(全部畫在 canvas 裡,見紅線 ②) */
@@ -200,10 +204,11 @@ const BLKB = (function(){
          所以 prev 一律由 HUD 自己那條 CSS 固定高度推出來。 */
     if(elHud) inkCol = getComputedStyle(elHud).color || inkCol;
     const hudH = elHud ? elHud.getBoundingClientRect().height : 54;
-    prev = Math.round(clamp((hudH - 16) / 2.9, 7, 15));
+    /* ⚠ 係數在 v2.14.0 跟著 HUD 高度(54 → 46)一起調 —— 照舊的算式 NEXT 會跟著縮水,
+       而那一格是**唯一**還看得到未來的地方(Hold 拿掉之後)。46px 下要算得出 13。 */
+    prev = Math.round(clamp((hudH - 14) / 2.5, 7, 15));
     const box = Math.round(prev * 2.6);
     nextN = isWide() ? 5 : 3;
-    sizeCanvas(cvHold, ctxH, box + 4, hudH - 8);
     sizeCanvas(cvNext, ctxN, box * nextN, hudH - 8);
     fitFoes();
     fitFx();
@@ -438,7 +443,8 @@ const BLKB = (function(){
     ctxM.restore();
   }
 
-  /* ---------- HUD 的兩塊小畫布:Hold(左)+ Next(右),都是橫排 ----------
+  /* ---------- HUD 的小畫布:Next(右),橫排 ----------
+     ⚠ v2.14.0 之前左邊還有一塊 HOLD —— 整個功能拿掉了(見 rules.js 的紅線 ③)。
      ⚠ 這裡畫的是**在 HUD 那一列裡**,不是盤面旁邊 —— 盤面的寬度要留給盤面。 */
   function mini(ctx, cv, label, kinds, dim){
     if(!ctx || !cv) return;
@@ -460,7 +466,6 @@ const BLKB = (function(){
   }
   function hud(){
     if(!st) return;
-    mini(ctxH, cvHold, "HOLD", st.hold >= 0 ? [st.hold] : [], !st.canHold);
     mini(ctxN, cvNext, "NEXT", R.peek(st.seed, st.idx, nextN), false);
   }
   /* 把一顆方塊置中畫進一個框裡 */
@@ -746,8 +751,6 @@ const BLKB = (function(){
       if(R.move(st, name === "left" ? -1 : 1)) T(420, { type: "sine", dur: 0.03, vol: 0.06 });
     }else if(name === "cw" || name === "ccw"){
       if(R.rotate(st, name === "cw" ? 1 : -1)) T(620, { type: "sine", dur: 0.04, vol: 0.08, slideTo: 760 });
-    }else if(name === "hold"){
-      if(R.holdSwap(st)) T(500, { type: "triangle", dur: 0.06, vol: 0.10, slideTo: 380 });
     }else if(name === "hard"){
       if(!st.cur) return;
       const pre = snapPre();            // ★ 一定要在 hardDrop **之前**(紅線 ③)
@@ -770,10 +773,11 @@ const BLKB = (function(){
   }
 
   /* ---------- 鍵盤 ---------- */
+  /* ⚠ 沒有 Hold(v2.14.0 拿掉了整個功能)→ `C` 與 `Shift` 不再是遊戲鍵。
+     ⚠ 這也是**唯一**還會吃到打字用鍵的地方變少的一次,但 typing() 那道守衛照樣不能省。 */
   const KEYMAP = {
     ArrowLeft: "left", ArrowRight: "right", ArrowDown: "soft", ArrowUp: "cw",
-    " ": "hard", Spacebar: "hard", x: "cw", X: "cw", z: "ccw", Z: "ccw",
-    c: "hold", C: "hold", Shift: "hold"
+    " ": "hard", Spacebar: "hard", x: "cw", X: "cw", z: "ccw", Z: "ccw"
   };
   /* ⚠⚠ **正在打字就一個鍵都不要碰。**
      這一頁是十五頁裡**唯一**在 window 上掛 keydown 的(其他頁要嘛綁在特定元素上、
@@ -815,7 +819,7 @@ const BLKB = (function(){
     }else if(a === "soft"){
       inp.soft = true; if(st) st.soft = true;
     }else{
-      act(a);                           // 旋轉 / 硬降 / Hold 一律不連發(紅線 ⑤)
+      act(a);                           // 旋轉 / 硬降一律不連發(紅線 ⑤)
     }
   }
   function release(a){
@@ -853,11 +857,11 @@ const BLKB = (function(){
   }
 
   /* ---------- 手勢(v2.14.0 起是**預設**的操作方式)----------
-     六個動作每一個都要有自己的一條路 —— 少了 Hold 與逆轉,「改成手勢」就等於「砍功能」。
+     五個動作每一個都要有自己的一條路,而且**一個方向只做一件事**。
 
-       左右拖 → 一格一格移動      往下拖   → 軟降(放開就停)
-       往下快甩 → 直接落地        點一下   → 順時針轉
-       往上滑 → 換牌(Hold)      兩指點一下 → 逆時針轉
+       左右拖 → 一格一格移動      往下拖 → 軟降(放開就停)
+       往上滑 → 直接落地          點一下 → 順時針轉
+       兩指點一下 → 逆時針轉
 
      ⚠⚠ 三件不知道就會做錯的事:
      ① **感應區是整個對局區,不是盤面那塊 canvas。** fitBoard() 是被**高度**卡住的
@@ -867,8 +871,9 @@ const BLKB = (function(){
      ② **一定要有軸鎖。** 沒有的話橫拖時手指難免往下偏 30px → 方塊自己掉下去,
         而使用者只會覺得「這遊戲很滑、很難控」。鎖定之後仍留一條退路(G_BREAK 倍)
         給「先橫移、再軟降」那個連續動作。
-     ③ **硬降要看「最後那一下」的速度,不是整段的平均。** 先慢慢拖再往下甩的話,
-        平均速度會被前半段稀釋掉 → 甩了沒反應,而那正是最常用的收尾動作。 */
+     ③ **不要再用「速度」去分辨兩個同方向的手勢。** v2.14.0 之前往下拖是軟降、
+        往下快甩是硬降 —— 而使用者拖到底抬手時速度往往就超過門檻,等於隨機落地。
+        現在落地改走「往上滑」,下方向專心做軟降,速度那一整套判定跟著刪掉了。 */
   /* 這幾塊自己有事要做:小盤是「鎖定攻擊目標」、按鈕是按鈕模式的本體。
      ⚠ HUD 列進來是為了「拖過 HUD」不會被當成新的一筆手勢。 */
   const G_SKIP = ".blk-foe,.blk-key,.blk-hud";
@@ -893,17 +898,11 @@ const BLKB = (function(){
          而未捕捉的錯誤會被 feedback.js 的環形緩衝當成一筆 JS 錯誤記下來。 */
       try{ host.setPointerCapture && host.setPointerCapture(e.pointerId); }catch(_){}
       gest = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
-               t0: now, lt: now, ly: e.clientY, vy: 0,
-               moved: 0, axis: "", soft: false, held: false, done: false };
+               t0: now, moved: 0, axis: "", soft: false, done: false };
     });
     host.addEventListener("pointermove", e => {
       if(!gest || gest.done || e.pointerId !== gest.id) return;
-      const now = performance.now();
       gest.moved += Math.abs(e.clientX - gest.x) + Math.abs(e.clientY - gest.y);
-      /* 瞬時速度(硬降用):0.6 新 + 0.4 舊 —— 單一次抖動不會自己決定結果(紅線 ③) */
-      const dt = Math.max(1, now - gest.lt);
-      gest.vy = gest.vy * 0.4 + ((e.clientY - gest.ly) / dt * 1000) * 0.6;
-      gest.lt = now; gest.ly = e.clientY;
       /* 軸鎖(紅線 ②) */
       const adx = Math.abs(e.clientX - gest.x0), ady = Math.abs(e.clientY - gest.y0);
       if(!gest.axis && Math.max(adx, ady) >= G_AXIS) gest.axis = (adx > ady) ? "x" : "y";
@@ -915,10 +914,11 @@ const BLKB = (function(){
         gest.x += d * step;
       }
       gest.y = e.clientY;
-      /* 往上滑 = 換牌。⚠ 只做一次,而且做完這一輪就結束(不然抬手還會補一個點擊) */
-      if(gest.axis === "y" && !gest.held && !gest.soft && (e.clientY - gest.y0) < -G_UP){
-        gest.held = true; gest.done = true;
-        act("hold");
+      /* 往上滑 = 直接落地。⚠ 做完這一輪就結束(不然抬手還會補一個點擊 = 多轉一下)。
+         ⚠ 軟降中不接受:那表示手指是先往下再往回拉,不是「往上滑」。 */
+      if(gest.axis === "y" && !gest.soft && (e.clientY - gest.y0) < -G_UP){
+        gest.done = true;
+        act("hard");
         return;
       }
       /* 往下拖 = 軟降。⚠ 橫軸鎖定時要拖得更遠才准轉過來(紅線 ②的退路) */
@@ -931,13 +931,9 @@ const BLKB = (function(){
     const end = e => {
       if(!gest || (e.pointerId != null && e.pointerId !== gest.id)) return;
       if(gest.soft){ inp.soft = false; if(st) st.soft = false; }
-      if(!gest.done && !gest.held){
-        const dy = e.clientY - gest.y0;
-        /* ⚠ 「最後一次移動還熱著」才准當甩:手指停在下面不動兩秒再抬起來不是甩 */
-        const fresh = (performance.now() - gest.lt) < 140;
-        if(gest.axis !== "x" && dy > G_SOFT && fresh && gest.vy > G_FLICK) act("hard");
-        else if(gest.moved < G_TAP && !gest.axis) act("cw");
-      }
+      /* 抬手只判一件事:**幾乎沒動過就是點一下**(= 順時針轉)。
+         ⚠ v2.14.0 之前這裡還要判「是不是往下甩」,那正是誤觸落地的來源(紅線 ③)。 */
+      if(!gest.done && gest.moved < G_TAP && !gest.axis) act("cw");
       gest = null;
     };
     host.addEventListener("pointerup", end);
@@ -1036,11 +1032,9 @@ const BLKB = (function(){
     cvFx    = document.getElementById("blkFx");
     if(cvFx) ctxF = cvFx.getContext("2d");
     cvMain  = document.getElementById("blkMain");
-    cvHold  = document.getElementById("blkHold");
     cvNext  = document.getElementById("blkNext");
-    if(!cvMain || !cvHold || !cvNext) return;
+    if(!cvMain || !cvNext) return;
     ctxM = cvMain.getContext("2d");
-    ctxH = cvHold.getContext("2d");
     ctxN = cvNext.getContext("2d");
     mounted = true;
     bindPad();

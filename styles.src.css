@@ -13832,8 +13832,11 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 /* ⚠⚠ HUD 的高度**一定要是固定的**(不可以隨盤面變)——
    HUD 高 → 舞台矮 → 一格小 → HUD 又想跟著變小…那是一個會震盪的循環。
    board.js 的 prev(預覽格大小)就是反過來由這個高度推出來的。 */
+/* ⚠ v2.14.0 從 54px 降到 46px:最左邊那一塊 HOLD 沒了(整個換牌功能拿掉),
+   省下來的高度直接還給盤面。⚠ 高度仍然是**固定的**(紅線 ⑮):它一動,
+   預覽格的大小(board.js 的 prev)就跟著動,而那是由 HUD 反推出來的。 */
 .blk-hud{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;
-         width:100%;height:54px}
+         width:100%;height:46px}
 .blk-stats{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:14px}
 .blk-mini{flex:none;display:block}
 .blk-stat{display:flex;flex-direction:column;align-items:center;line-height:1.12;min-width:50px}
@@ -13935,12 +13938,12 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 @media (min-width:700px),(orientation:landscape){
   .blk-pad-l,.blk-pad-r{bottom:auto;top:50%;transform:translateY(-50%)}
   .blk-key{background:rgba(125,135,165,.34)}
-  .blk-hud{height:58px}
+  .blk-hud{height:50px}
 }
 
 /* ---------- 很矮的視窗(橫置手機):把周邊壓到最扁,高度全留給盤面 ---------- */
 @media (max-height:480px){
-  .blk-hud{height:38px}
+  .blk-hud{height:34px}
   .blk-room{padding:4px 10px}
   .blk-room .icon-btn{width:30px;height:30px;font-size:14px}
   .blk-play{margin-top:2px;gap:3px}
@@ -13955,7 +13958,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
   .blk-play{gap:4px;margin-top:4px}
   .blk-room{padding:6px 10px}
-  .blk-hud{gap:6px;height:46px}
+  .blk-hud{gap:6px;height:42px}
   .blk-foes{gap:6px}
   /* ⚠ 矮視窗只壓**視覺**,熱區那條 ::before 不動(紅線:熱區一律 ≥44px) */
   .blk-key{width:48px;height:38px;font-size:18px}

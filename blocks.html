@@ -284,11 +284,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
          舞台是 overflow:hidden(紅線 ①),放進去就會在小螢幕上被**裁掉**
          (第一次截圖時控制列的下半排就是這樣不見的)。
          .blk-play 底下只能有一個可壓縮的兄弟(= 舞台),其餘一律 flex:none。 -->
-    <!-- HUD:Hold 在左、數字在中、Next 在右,**橫排**。
+    <!-- HUD:數字在左、Next 在右,**橫排**。
          ⚠ v2 從「右側直排」改成這樣的理由只有一個:直排那一欄會吃掉 2.5 格的寬度,
-           而盤面的寬度直接決定一格有多大 —— 搬到上面之後盤面可以吃滿整個寬度。 -->
+           而盤面的寬度直接決定一格有多大 —— 搬到上面之後盤面可以吃滿整個寬度。
+         ⚠⚠ v2.14.0 之前最左邊還有一塊 HOLD —— **整個換牌功能拿掉了**
+           (使用者:「刪掉換這個功能,這樣才刺激」),那一格的高度直接還給盤面。
+           不要「順手」加回來,它不是漏掉的,是刻意砍掉的難度旋鈕。 -->
     <div class="blk-hud">
-      <canvas class="blk-mini" id="blkHold" aria-label="保留的方塊"></canvas>
       <div class="blk-stats">
         <div class="blk-stat"><span>行</span><b id="blkStatLines">0</b></div>
         <div class="blk-stat"><span>時間</span><b id="blkStatTime">0.0 秒</b></div>
@@ -339,9 +341,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
              轉四次回到原位,所以少那一顆不會有轉不到的角度 —— 換來的是少一顆要認的鈕、
              以及每一顆都可以放大熱區。逆轉還在:鍵盤 Z、手勢兩指點一下。 -->
         <div class="blk-pad-r">
-          <div class="blk-pad-row">
-            <button class="blk-key blk-key-sm" type="button" data-act="hold" aria-label="換牌">換</button>
-          </div>
           <div class="blk-pad-row">
             <button class="blk-key" type="button" data-act="cw" aria-label="旋轉">↻</button>
             <button class="blk-key blk-key-drop" type="button" data-act="hard" aria-label="直接落地">落地</button>

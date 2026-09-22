@@ -66,12 +66,10 @@ const BLK_GEST = [
    "左右拖", "移動"],
   ['<circle cx="12" cy="7" r="3"/><path d="M12 12.4v7.2m-3.2-3.2l3.2 3.2 3.2-3.2"/>',
    "往下拖", "慢慢降"],
-  ['<circle cx="12" cy="4.6" r="2.4"/><path d="M12 8.6v3.6m-3 -1.4l3 3 3-3M12 15.4v4m-3-1.6l3 3 3-3"/>',
-   "往下快甩", "直接落地"],
   ['<circle cx="12" cy="12" r="3"/><path d="M6.6 6.6a7.6 7.6 0 000 10.8M17.4 6.6a7.6 7.6 0 010 10.8"/>',
    "點一下", "順時針轉"],
   ['<circle cx="12" cy="17" r="3"/><path d="M12 11.6V4.4m-3.2 3.2L12 4.4l3.2 3.2"/>',
-   "往上滑", "換牌"],
+   "往上滑", "直接落地"],
   ['<circle cx="7.6" cy="12" r="3"/><circle cx="16.4" cy="12" r="3"/>',
    "兩指點一下", "逆時針轉"]
 ];
@@ -86,7 +84,7 @@ function blkGestHtml(){
   return '<div class="blk-gest-head">手指在畫面上<b>任何地方</b>都可以 —— 不必壓在盤面上</div>' +
          '<div class="blk-gest-grid">' + cells + '</div>' +
          '<div class="blk-gest-kb">電腦鍵盤:方向鍵移動 · <b>空白鍵</b>直接落地 · ' +
-         '<b>↑ / X</b> 順轉 · <b>Z</b> 逆轉 · <b>C</b> 換牌</div>';
+         '<b>↑ / X</b> 順轉 · <b>Z</b> 逆轉</div>';
 }
 function paintGestCards(){
   const html = blkGestHtml();
