@@ -69,6 +69,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         自己被送垃圾行時,左邊會出現一條<b>警示條</b>;在它推上來之前消掉自己的行可以<b>抵銷</b>。<br>
         堆到頂端就輸了。
       </div>
+      <!-- 手勢說明。⚠ 內容由 js/blocks/main.js 的 BLK_GEST_HTML 注入 ——
+           房間框那顆「?」打開的蓋板印的是**同一份**,寫死兩份就是遲早分岔的雙胞胎。
+           ★ 這一格在進場的第一層 → 連線與單機**兩條路都會經過**。 -->
+      <div class="blk-gest" id="blkGestCard"></div>
       <button class="btn primary block-btn home-btn" id="blkGoOnline">🌐 連線對戰</button>
       <button class="btn ghost block-btn home-btn" id="blkGoSolo">🎮 單機練習</button>
     </div>
@@ -106,14 +110,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
       <div class="field">
-        <span class="field-label">操作方式</span>
+        <span class="field-label">操作方式<span class="field-sub">(預設手勢;不習慣可以切回按鈕)</span></span>
         <div class="seg" id="blkCtrlSeg" aria-label="操作方式">
-          <button type="button" data-ctrl="btn" class="on">按鈕</button>
-          <button type="button" data-ctrl="swipe">手勢</button>
+          <button type="button" data-ctrl="swipe" class="on">手勢</button>
           <button type="button" data-ctrl="both">兩者</button>
+          <button type="button" data-ctrl="btn">按鈕</button>
         </div>
       </div>
-      <div class="field">
+      <!-- ⚠ 「按鈕位置」只有按鈕出現時才有意義 → 手勢模式下整格收起來(main.js 的 syncSoloSeg) -->
+      <div class="field" id="blkPadRow">
         <span class="field-label">按鈕位置<span class="field-sub">(浮動時盤面比較大)</span></span>
         <div class="seg" id="blkPadSeg" aria-label="按鈕位置">
           <button type="button" data-pad="float" class="on">浮在盤面上</button>
@@ -163,6 +168,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
       <div class="mp-actions">
         <!-- ⚠ class 是 .blk-bigbtn,而狀態掛在 body 上的是 .blk-big —— 兩個名字一定要不一樣 -->
+        <button class="icon-btn blk-helpbtn" id="blkHelpBtn" type="button" title="怎麼操作" aria-label="怎麼操作">?</button>
         <button class="icon-btn blk-bigbtn" id="blkBig" type="button" title="大畫面" aria-label="大畫面">大</button>
         <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
       </div>
@@ -184,6 +190,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <span class="label blk-room-title">單機 <b id="blkSoloMode" class="display">練習</b><span class="blk-goal" id="blkGoal">無盡</span></span>
       <span class="mp-goal" id="blkSoloRec" aria-label="紀錄"></span>
       <button class="icon-btn" id="blkPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
+      <button class="icon-btn blk-helpbtn" id="blkSoloHelpBtn" type="button" title="怎麼操作" aria-label="怎麼操作">?</button>
       <button class="icon-btn blk-bigbtn" id="blkSoloBig" type="button" title="大畫面" aria-label="大畫面">大</button>
     </div>
   </div>
@@ -269,11 +276,6 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
        ⚠⚠ .blk-stage 一律 overflow:hidden —— 它正是 BLKB.fitBoard() 量的那個容器,
           任何會讓它長出捲軸的東西都會讓盤面**自己震盪**(跳棋 / 飛行棋 / 麻將已經三次)。 -->
   <div class="blk-play hidden" id="blkPlay">
-    <!-- 對手的小盤(1~3 個;單機對電腦與連線對戰共用同一條路)。
-         ⚠ 裡面的每一格都由 js/blocks/board.js 的 setFoes() 自己建 —— 數量會變。
-         ⚠ 沒有對手時整列 .hidden(單機練習就不會白白吃掉高度)。 -->
-    <div class="blk-foes hidden" id="blkFoes"></div>
-
     <!-- 攻擊光束的畫布:蓋住整個對局區、不吃指標事件。
          ⚠ 一定要獨立一塊 —— 光束要跨越「我的盤面」與「對手小盤」兩個不同的畫布。 -->
     <canvas class="blk-fx" id="blkFx" aria-hidden="true"></canvas>
@@ -304,6 +306,19 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <canvas class="blk-main" id="blkMain" aria-label="遊戲盤面"></canvas>
       </div>
       <div class="blk-paused hidden" id="blkPaused">已暫停</div>
+
+      <!-- 對手的小盤(1~3 個;單機對電腦與連線對戰共用同一條路)。
+           ⚠⚠ v2.14.0 起它住在**盤面右側的空白帶**(絕對定位),在那之前是盤面上方
+             一整條固定 88px 的橫列 —— 而 fitBoard() 是被**高度**卡住的:左右本來就
+             各空著兩成多,垂直空間卻是這一頁最貴的東西(1 對 1 時那一條裡只有一塊
+             36×60 的小盤,兩側全是空白)。
+           ⚠ 絕對定位的兩個理由同控制鈕:不參與版面、不會改變舞台量到的尺寸。
+           ⚠ 盤面要**自己往左讓開**同樣的寬度(board.js 的 fitBoard)——
+             只縮小盤面的話它照樣置中,右半仍然壓在小盤底下。
+           ⚠ 容器本身 pointer-events:none、只有每一塊小盤 auto ——
+             不然右側那一條會把手勢吃掉(那正是它現在最有用的操作區)。
+           ⚠ 裡面的每一格都由 js/blocks/board.js 的 setFoes() 自己建 —— 數量會變。 -->
+      <div class="blk-foes hidden" id="blkFoes"></div>
 
       <!-- 控制鈕:**浮在盤面上**(絕對定位),兩個拇指簇分別在左下 / 右下角。
            ⚠⚠ 絕對定位有兩個理由,少一個都會出事:
@@ -474,6 +489,28 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   </div>
 
   <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
+
+  <!-- ====== 手勢說明(房間框那顆「?」打開)======
+       ⚠ 內容與進場頁那一張是**同一份**(main.js 的 BLK_GEST_HTML 注入兩處)。
+       ⚠⚠ 新增蓋板要登記兩個地方,漏一邊都會出事:
+         ① js/shared/ui-kit.js 的 BACK_LAYERS(**雙胞胎**,js/game.js 也有一份)——
+            漏了的話手機返回鍵會**穿過去**跳「離開房間?」(房主誤按 = 全房重開);
+         ② js/blocks/main.js 的 BLK_VEILS —— 漏了的話單機在看說明時方塊繼續掉。 -->
+  <div class="veil" id="blkGuideVeil">
+    <div class="set-card">
+      <button class="card-x" id="blkGuideClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">怎麼操作</div>
+      <div id="blkGuideBody"></div>
+      <div class="field">
+        <span class="field-label">操作方式<span class="field-sub">(改了立刻生效,下次也記得)</span></span>
+        <div class="seg" id="blkCtrlSeg2" aria-label="操作方式">
+          <button type="button" data-ctrl="swipe" class="on">手勢</button>
+          <button type="button" data-ctrl="both">兩者</button>
+          <button type="button" data-ctrl="btn">按鈕</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div class="veil" id="leaveVeil">
     <div class="win-card confirm-card">

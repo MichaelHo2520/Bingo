@@ -784,6 +784,12 @@
                    // ★ 大老二的房規蓋板(v1.156.0 補;v1.100.0 就存在,漏登記了 55 個中碼)。
                    //   只有 big2.html 有這個 id —— 漏掉的話按返回會跳成「離開房間?」
                    ["b2RulesVeil",()=>closeRules()],
+                   /* ★ 方塊對戰的手勢說明蓋板(v2.14.0)。只有 blocks.html 有這個 id,
+                      其他十四頁自動跳過 —— 症狀與上面那幾條房規蓋板逐字相同
+                      (對局中按「?」看一眼操作、按返回想關掉,跳出來的是「離開房間?」)。
+                      ⚠ 回呼刻意**自足**(直接移 class),不叫任何函式:
+                        closeBlkGuide() 只定義在 js/blocks/main.js 裡,而這個陣列是雙胞胎。 */
+                   ["blkGuideVeil",()=>{const el=$("blkGuideVeil");if(el)el.classList.remove("show");}],
                    /* ★ 房間分享的 QR 蓋板(js/shared/qr.js 自己建的,十四頁都有)。
                       ⚠ 一定要排在 leaveVeil **前面**:兩者都可能開著,而先關的應該是
                         比較輕的那一層 —— 反過來的話「看著 QR 按返回」會直接跳離開確認。

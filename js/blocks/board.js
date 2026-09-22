@@ -44,17 +44,28 @@ const BLKB = (function(){
      這裡只保證「不會破」,想玩得舒服請直立或按「大」。 */
   const MINC = 9, MAXC = 38;            // 一格的 px 上下限
   const GAUGE_W = 10;                   // 左緣警示條的寬(與 CSS 的 .blk-gauge 同步)
+  /* 對手小盤那一條(v2.14.0)。★ 它只吃**盤面用不到的空間**,絕不回頭縮小盤面 ——
+     理由見 fitBoard() 裡那一大段。 */
+  const FOE_MIN = 52;                   // 右側要有這麼寬才放得下一條(不然改用疊的)
+  const FOE_MAX = 104;                  // 再寬就只是在搶注意力
+  const FOE_OVER = 62;                  // 疊在盤面右上角時的寬
 
   /* 手感參數。★ 這三個就是「好不好玩」的旋鈕,改之前先想清楚要調誰的體感 */
   const DAS_MS = [180, 133, 95];        // 慢 / 標準 / 快
   const ARR_MS = [55, 33, 18];
   let feel = 1;                         // 0..2,對應上面兩張表
 
-  /* 手勢參數 */
-  const G_STEP = 26;                    // 橫拖幾 px 走一格
+  /* 手勢參數(v2.14.0 起這是**預設**的操作方式,不再是選配)。
+     ⚠ 橫拖的步距**一定要跟著格子走**,不可以寫死 px —— 寫死的話「拖一公分走幾格」
+       會隨盤面大小飄:按「大」之後格子變大、方塊卻跑得比手指快(實測差一倍)。 */
   const G_SOFT = 30;                    // 下拖幾 px 開始軟降
   const G_FLICK = 480;                  // 下滑速度超過這個(px/s)算硬降
   const G_TAP = 12;                     // 位移小於這個才算點擊(旋轉)
+  const G_UP = 40;                      // 上滑幾 px 算換牌(Hold)
+  const G_AXIS = 12;                    // 超過這個位移才決定主軸(見下面的軸鎖)
+  const G_BREAK = 3;                    // 橫軸鎖定後,下拖要超過 G_SOFT 的幾倍才准轉去軟降
+  const G_TWO = 420;                    // 第二根手指在這段時間內落下才算「兩指點」(逆轉)
+  function gStep(){ return Math.max(16, cell); }
 
   /* ==========================================================================
      二、狀態
@@ -88,7 +99,10 @@ const BLKB = (function(){
   /* 輸入 */
   const inp = { dir: 0, dasT: 0, arrT: 0, soft: false, keys: {} };
   let gest = null;                      // 手勢中的指標
-  let ctrlMode = "btn";                 // "btn" | "swipe" | "both"
+  /* ⚠ 預設是**手勢**(v2.14.0)。在那之前是 "btn",而六顆浮動鈕正好蓋住盤面下緣 ——
+     那裡是堆得最高、最需要看清楚的一塊(使用者實機回報)。
+     ★ 想切回按鈕的人走設定裡的「操作方式」,solo.js 會把它存起來。 */
+  let ctrlMode = "swipe";               // "btn" | "swipe" | "both"
   let padPos = "float";                 // "float"(浮在盤面上)| "dock"(固定在盤面下方)
 
   /* ==========================================================================
@@ -142,16 +156,43 @@ const BLKB = (function(){
     const availW = Math.max(120, rect.width - 4 - reserve);
     const availH = Math.max(120, rect.height - 6);
 
-    const byW = (availW - GAUGE_W - 8) / R.COLS;       // 盤面現在吃滿寬度,只讓開警示條
+    const byW = (availW - GAUGE_W - 8) / R.COLS;       // 盤面吃滿寬度,只讓開警示條
     const byH = availH / R.VIS;
     cell = Math.round(clamp(Math.min(byW, byH), MINC, MAXC));
     dpr = Math.min(3, window.devicePixelRatio || 1);
+
+    /* ★★★ 對手的小盤:**只吃盤面用不到的空間**(v2.14.0)。
+       在那之前它是盤面上方一整條固定 88px 的橫列 —— 而 1 對 1 時那一條裡只有一塊
+       36×60 的小盤,兩側全是空白(使用者:「那裡浪費太多空間了」)。
+       ⚠⚠ 第一版改成「右側固定讓出 78px」是**錯的**,而且只有看圖才看得出來:
+         這一頁的瓶頸會換邊 —— 周邊 UI 都在時是**高度**卡住(左右各空兩成多),
+         收掉周邊(大畫面)之後換成**寬度**卡住(盤面吃滿寬、上下反而空一大片)。
+         固定讓出寬度的話,後者會把一格從 33px 縮到 25px,整個「大畫面」白按了。
+       ★ 正解是先照「沒有小盤」算出一格多大,再看**剩下多少寬**:
+         · 剩得下(≥ FOE_MIN)→ 貼右側那一條(盤面往左推同樣的距離,不縮小);
+         · 剩不下 → 疊在盤面**右上角**(那裡幾乎永遠是空的;堆到那個高度時這一局
+           也快結束了)。兩條路盤面都維持最大,小盤一律只用免費的空間。
+       ⚠ 沒有回饋迴圈:cell 在這一行之前就算完了,小盤的尺寸不參與(紅線 ①)。 */
+    let foeW = 0, foeOver = false;
+    if(elFoes && !elFoes.classList.contains("hidden") &&
+       !document.body.classList.contains("blk-spec")){
+      const restW = availW - (R.COLS * cell + GAUGE_W + 8);
+      foeOver = (restW < FOE_MIN);
+      foeW = foeOver ? FOE_OVER : Math.min(FOE_MAX, Math.floor(restW));
+    }
+    if(elFoes){
+      elFoes.classList.toggle("blk-foes-over", foeOver);
+      elFoes.style.width = foeW ? (foeW + "px") : "";
+    }
 
     const g = getComputedStyle(cvMain).getPropertyValue("--blk-grid").trim();
     if(g) gridCol = g;
 
     sizeCanvas(cvMain, ctxM, R.COLS * cell, R.VIS * cell);
     if(elGauge) elGauge.style.height = (R.VIS * cell) + "px";
+    /* 貼右側那一條時盤面要**自己往左讓開**(舞台是置中的)——
+       疊在右上角那一條路刻意不推:那時候本來就沒有多的寬可以讓。 */
+    if(elWrap) elWrap.style.marginRight = (foeW && !foeOver) ? (foeW + "px") : "";
 
     /* HUD 的兩塊小畫布。
        ⚠⚠ prev **不可以由 cell 推算** —— HUD 的高度會跟著變,而 HUD 的高度又決定
@@ -484,13 +525,24 @@ const BLKB = (function(){
     }
     drawFoes();
   }
+  /* 小盤的一格由「那一條有多寬」與「要塞幾個人」一起決定。
+     ⚠ 兩邊都要看:只看寬 → 四個人時縱向排不下(被 overflow 切掉最後一個);
+       只看高 → 一個對手時會長得比那一條還寬,直接壓到盤面上。
+     ⚠⚠ **高度一律量舞台,不可以量 .blk-foes 自己** —— 疊在右上角那一條路是
+       `bottom:auto`(高度由內容決定)→ 量它就是「量自己畫出來的結果」= 震盪。
+       寬度量它是安全的:那是 fitBoard() 算完寫進 inline style 的確定值。
+     ★ 觀戰是另一套版面(整個畫面讓給小盤,橫向排)→ 那時寬度改由舞台均分。 */
   function fitFoes(){
     if(!elFoes || !foeEls.length) return;
-    const rect = elFoes.getBoundingClientRect();
-    const h = Math.max(40, rect.height - 18);          // 留給名字那一行
-    const fc = Math.max(2, Math.floor(h / R.VIS));     // 小盤的一格
-    const w = fc * R.COLS;
-    foeEls.forEach(e => sizeCanvas(e.cv, e.ctx, w, fc * R.VIS));
+    const n = foeEls.length;
+    const spec = document.body.classList.contains("blk-spec");
+    const box = (elStage || elFoes).getBoundingClientRect();
+    const w = spec ? (box.width / n - 18) : (elFoes.getBoundingClientRect().width - 8);
+    const availH = Math.max(60, box.height) - (n - 1) * 8;
+    const byH = Math.floor((availH / (spec ? 1 : n) - 16) / R.VIS);
+    const byW = Math.floor(w / R.COLS);
+    const fc = Math.max(2, Math.min(byW, byH));
+    foeEls.forEach(e => sizeCanvas(e.cv, e.ctx, fc * R.COLS, fc * R.VIS));
   }
   function drawFoes(){
     for(let i = 0; i < foeEls.length && i < foes.length; i++){
@@ -800,42 +852,101 @@ const BLKB = (function(){
     elPad.addEventListener("contextmenu", e => e.preventDefault());
   }
 
-  /* ---------- 手勢(選配)---------- */
+  /* ---------- 手勢(v2.14.0 起是**預設**的操作方式)----------
+     六個動作每一個都要有自己的一條路 —— 少了 Hold 與逆轉,「改成手勢」就等於「砍功能」。
+
+       左右拖 → 一格一格移動      往下拖   → 軟降(放開就停)
+       往下快甩 → 直接落地        點一下   → 順時針轉
+       往上滑 → 換牌(Hold)      兩指點一下 → 逆時針轉
+
+     ⚠⚠ 三件不知道就會做錯的事:
+     ① **感應區是整個對局區,不是盤面那塊 canvas。** fitBoard() 是被**高度**卡住的
+        → 盤面只用掉螢幕寬的一半,左右各留兩成多。手勢綁在 canvas 上的話手指非得
+        壓在盤面上不可,等於自己擋住自己要看的東西(而那正是浮動鈕被換掉的原因)。
+        → 綁在 #blkPlay 上,對手小盤 / 按鈕那幾塊**先讓開**(它們自己有事要做)。
+     ② **一定要有軸鎖。** 沒有的話橫拖時手指難免往下偏 30px → 方塊自己掉下去,
+        而使用者只會覺得「這遊戲很滑、很難控」。鎖定之後仍留一條退路(G_BREAK 倍)
+        給「先橫移、再軟降」那個連續動作。
+     ③ **硬降要看「最後那一下」的速度,不是整段的平均。** 先慢慢拖再往下甩的話,
+        平均速度會被前半段稀釋掉 → 甩了沒反應,而那正是最常用的收尾動作。 */
+  /* 這幾塊自己有事要做:小盤是「鎖定攻擊目標」、按鈕是按鈕模式的本體。
+     ⚠ HUD 列進來是為了「拖過 HUD」不會被當成新的一筆手勢。 */
+  const G_SKIP = ".blk-foe,.blk-key,.blk-hud";
   function bindGesture(){
-    if(!cvMain) return;
-    cvMain.addEventListener("pointerdown", e => {
+    const host = elPlay || cvMain;
+    if(!host) return;
+    host.addEventListener("pointerdown", e => {
       if(ctrlMode === "btn") return;
-      try{ cvMain.setPointerCapture && cvMain.setPointerCapture(e.pointerId); }catch(_){}
-      gest = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
-               t0: performance.now(), moved: 0, soft: false, done: false };
+      if(e.target && e.target.closest && e.target.closest(G_SKIP)) return;
+      const now = performance.now();
+      /* 第二根手指 = 逆時針轉。
+         ⚠ 只在「第一根還沒真的拖起來」時才算,不然橫移到一半換手扶手機就會莫名轉一下。 */
+      if(gest && !gest.done){
+        if(gest.moved < 24 && (now - gest.t0) < G_TWO){
+          act("ccw");
+          gest.done = true;                       // 這一輪不再判點擊 / 硬降
+          if(gest.soft){ gest.soft = false; inp.soft = false; if(st) st.soft = false; }
+        }
+        return;
+      }
+      /* ⚠ setPointerCapture 會丟例外(合成事件沒有真的 pointerId)——
+         而未捕捉的錯誤會被 feedback.js 的環形緩衝當成一筆 JS 錯誤記下來。 */
+      try{ host.setPointerCapture && host.setPointerCapture(e.pointerId); }catch(_){}
+      gest = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
+               t0: now, lt: now, ly: e.clientY, vy: 0,
+               moved: 0, axis: "", soft: false, held: false, done: false };
     });
-    cvMain.addEventListener("pointermove", e => {
-      if(!gest || gest.done) return;
-      const dx = e.clientX - gest.x, dy = e.clientY - gest.y;
-      gest.moved += Math.abs(dx) + Math.abs(dy);
-      while(Math.abs(e.clientX - gest.x) >= G_STEP){
+    host.addEventListener("pointermove", e => {
+      if(!gest || gest.done || e.pointerId !== gest.id) return;
+      const now = performance.now();
+      gest.moved += Math.abs(e.clientX - gest.x) + Math.abs(e.clientY - gest.y);
+      /* 瞬時速度(硬降用):0.6 新 + 0.4 舊 —— 單一次抖動不會自己決定結果(紅線 ③) */
+      const dt = Math.max(1, now - gest.lt);
+      gest.vy = gest.vy * 0.4 + ((e.clientY - gest.ly) / dt * 1000) * 0.6;
+      gest.lt = now; gest.ly = e.clientY;
+      /* 軸鎖(紅線 ②) */
+      const adx = Math.abs(e.clientX - gest.x0), ady = Math.abs(e.clientY - gest.y0);
+      if(!gest.axis && Math.max(adx, ady) >= G_AXIS) gest.axis = (adx > ady) ? "x" : "y";
+      /* 左右:一格一格走,步距跟著格子(不可以寫死 px) */
+      const step = gStep();
+      while(gest.axis !== "y" && Math.abs(e.clientX - gest.x) >= step){
         const d = (e.clientX > gest.x) ? 1 : -1;
         act(d > 0 ? "right" : "left");
-        gest.x += d * G_STEP;
+        gest.x += d * step;
       }
-      if(dy > 0 && (e.clientY - gest.y0) > G_SOFT && !gest.soft){
-        gest.soft = true; inp.soft = true; if(st) st.soft = true;
+      gest.y = e.clientY;
+      /* 往上滑 = 換牌。⚠ 只做一次,而且做完這一輪就結束(不然抬手還會補一個點擊) */
+      if(gest.axis === "y" && !gest.held && !gest.soft && (e.clientY - gest.y0) < -G_UP){
+        gest.held = true; gest.done = true;
+        act("hold");
+        return;
+      }
+      /* 往下拖 = 軟降。⚠ 橫軸鎖定時要拖得更遠才准轉過來(紅線 ②的退路) */
+      const need = (gest.axis === "x") ? G_SOFT * G_BREAK : G_SOFT;
+      if(!gest.soft && (e.clientY - gest.y0) > need){
+        gest.soft = true; gest.axis = "y";
+        inp.soft = true; if(st) st.soft = true;
       }
     });
     const end = e => {
-      if(!gest) return;
-      const dt = Math.max(1, performance.now() - gest.t0);
-      const dy = e.clientY - gest.y0;
-      const vy = dy / dt * 1000;
+      if(!gest || (e.pointerId != null && e.pointerId !== gest.id)) return;
       if(gest.soft){ inp.soft = false; if(st) st.soft = false; }
-      if(!gest.done){
-        if(vy > G_FLICK && dy > G_SOFT) act("hard");
-        else if(gest.moved < G_TAP) act("cw");
+      if(!gest.done && !gest.held){
+        const dy = e.clientY - gest.y0;
+        /* ⚠ 「最後一次移動還熱著」才准當甩:手指停在下面不動兩秒再抬起來不是甩 */
+        const fresh = (performance.now() - gest.lt) < 140;
+        if(gest.axis !== "x" && dy > G_SOFT && fresh && gest.vy > G_FLICK) act("hard");
+        else if(gest.moved < G_TAP && !gest.axis) act("cw");
       }
       gest = null;
     };
-    cvMain.addEventListener("pointerup", end);
-    cvMain.addEventListener("pointercancel", () => { if(gest && gest.soft){ inp.soft = false; if(st) st.soft = false; } gest = null; });
+    host.addEventListener("pointerup", end);
+    host.addEventListener("pointercancel", () => {
+      if(gest && gest.soft){ inp.soft = false; if(st) st.soft = false; }
+      gest = null;
+    });
+    // ⚠ 長按選單與雙擊縮放在手機上會把操作整個吃掉
+    host.addEventListener("contextmenu", e => { if(ctrlMode !== "btn") e.preventDefault(); });
   }
 
   /* ==========================================================================
@@ -973,6 +1084,7 @@ const BLKB = (function(){
   }
   function allUp(){
     inp.dir = 0; inp.soft = false; inp.keys = {};
+    gest = null;                        // ⚠ 手勢也要清:切背景時手指還壓著的話回來就卡住了
     if(st) st.soft = false;
     if(elPad) elPad.querySelectorAll(".blk-on").forEach(b => b.classList.remove("blk-on"));
   }

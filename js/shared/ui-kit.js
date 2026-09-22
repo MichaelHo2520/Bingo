@@ -253,6 +253,12 @@ const BACK_LAYERS=[["myVoiceVeil",()=>closeMyVoice()],
                       那條註解逐字相同 —— 房主開局前看一眼房規、按返回想關掉,跳出來的是
                       「離開房間?」;而同型的 21 點 / UNO / 暗棋三頁一直都是對的。 */
                    ["b2RulesVeil",()=>closeRules()],
+                   /* ★ 方塊對戰的手勢說明蓋板(v2.14.0)。只有 blocks.html 有這個 id,
+                      其他十四頁自動跳過 —— 症狀與上面那幾條房規蓋板逐字相同
+                      (對局中按「?」看一眼操作、按返回想關掉,跳出來的是「離開房間?」)。
+                      ⚠ 回呼刻意**自足**(直接移 class),不叫任何函式:
+                        closeBlkGuide() 只定義在 js/blocks/main.js 裡,而這個陣列是雙胞胎。 */
+                   ["blkGuideVeil",()=>{const el=$("blkGuideVeil");if(el)el.classList.remove("show");}],
                    /* ★ 房間分享的 QR 蓋板(js/shared/qr.js 自己建的,十四頁都有)。
                       ⚠ 一定要排在 leaveVeil **前面**:兩者都可能開著,而先關的應該是
                         比較輕的那一層 —— 反過來的話「看著 QR 按返回」會直接跳離開確認。
