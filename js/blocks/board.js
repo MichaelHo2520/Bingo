@@ -1106,6 +1106,16 @@ const BLKB = (function(){
        ⚠ 放在自己的 tick **之前**,兩邊的時間軸才不會差一幀。 */
     if(running && cfg.onFrame) cfg.onFrame(dt);
     if(running && st && !st.dead && cfg.canPlay()){
+      /* ⚠⚠ **手指還按著就要一路撐過鎖定**(v2.15.2 的修正)。
+         使用者實機回報:「長按慢速移動,蠻容易沒有成功觸發」。
+         根因不在輸入層:`spawn()` 每生一顆就把 `st.soft` 跟 fall / lockT 一起歸零,
+         而這裡只在**按下 / 放開那一瞬間**寫過它 → 按住不放時,方塊一鎖定,
+         下一顆就靜靜退回正常重力。而軟降是 20 倍重力,幾乎每次按住都會撞到一次鎖定
+         → 命中率低得就像「按住沒反應」(鍵盤的 ↓ 中的是同一條)。
+         ★ 真相的歸屬:**按鍵狀態住在輸入層的 `inp.soft`**,規則層只是照它算重力
+           → 所以修在這裡每幀同步回去,而不是去 spawn() 拿掉那一行
+           (那會讓 revive / decode 接回來的狀態多一個沒有人管的欄位)。 */
+      st.soft = inp.soft;
       stepDas(dt);
       const pre = R.grounded(st) ? snapPre() : null;   // ⚠ 紅線 ③:只有貼地那幾幀才留
       const evs = R.tick(st, dt);
