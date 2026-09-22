@@ -828,30 +828,95 @@ const BLKB = (function(){
     else if(a === "soft"){ inp.soft = false; if(st) st.soft = false; }
   }
 
-  /* ---------- 螢幕按鈕 ---------- */
+  /* ==========================================================================
+     螢幕按鈕:**按最近的那一顆,不必按準**(v2.14.0)
+     ──────────────────────────────────────────────────────────────────────────
+       使用者:「我現在還是很容易按了沒反應,因為在玩的時候,不可能有辦法按的很準」。
+       ★★ 那不是熱區大小的問題,是**形式**的問題:固定位置的鈕要求你用餘光瞄準,
+         而玩的時候眼睛在盤面上,手指是盲按的。把鈕再放大只是把同一個問題往後推。
+       ★ 解法:**命中改成「離最近的那一顆」**(SNAP_R 以內就算)。
+         按在兩顆中間 → 選比較近的那一顆;按在整簇外面一點 → 照樣按得到。
+       ⚠ 因此**熱區矩形那一套整個拿掉了**(原本的 .blk-key::before):
+         兩套規則會在重疊區給出不同答案(矩形是「DOM 後面那顆贏」、吸附是「最近的贏」),
+         留著就是自己跟自己打架。現在只有一條規則:**最近的贏**。
+       ⚠⚠ 入口在 **#blkPlay**(手勢那一層)而不是 .blk-pad —— .blk-pad 整層是
+         pointer-events:none,簇外面的按壓它根本收不到,而那正是要吸附的情況。
+       ⚠ 半徑要有上限:按在盤面正中央不可以被吸到某顆鈕上去(「兩者」模式下那是手勢)。
+     ========================================================================== */
+  const SNAP_R = 46;                    // 從按鈕**邊緣**算起,幾 px 以內算按到它
+  let padHold = null;                   // { id, btn, act } —— 目前按著的那一顆
+
+  /* 直接命中:e.target 就在某顆鈕上(或它的 SVG 裡)。⚠ 按鈕 .hidden 時不算。 */
+  function padBtn(t){
+    if(!elPad || elPad.classList.contains("hidden")) return null;
+    if(!t || !t.closest) return null;
+    const b = t.closest("button[data-act]");
+    return (b && elPad.contains(b)) ? b : null;
+  }
+  /* 離 (x,y) 最近的按鈕;超過 SNAP_R 回 null。⚠ 距離是點到**矩形**的距離,
+     不是點到中心 —— 用中心的話大顆的鈕(落地)會吃虧。 */
+  function nearestKey(x, y){
+    if(!elPad || elPad.classList.contains("hidden")) return null;
+    let best = null, bestD = SNAP_R;
+    const list = elPad.querySelectorAll("button[data-act]");
+    for(let i = 0; i < list.length; i++){
+      const r = list[i].getBoundingClientRect();
+      if(!r.width) continue;
+      const dx = Math.max(r.left - x, 0, x - r.right);
+      const dy = Math.max(r.top - y, 0, y - r.bottom);
+      const d = Math.sqrt(dx * dx + dy * dy);
+      if(d < bestD){ bestD = d; best = list[i]; }
+    }
+    return best;
+  }
+  function padDown(b, e, host){
+    padUp();                            // 保險:上一顆還按著的話先放掉
+    padHold = { id: e.pointerId, btn: b, act: b.dataset.act };
+    b.classList.add("blk-on");
+    buzz(b.dataset.act);
+    /* ⚠ setPointerCapture 會丟例外(合成事件沒有真的 pointerId),而未捕捉的錯誤
+       會被 feedback.js 的環形緩衝當成一筆 JS 錯誤記下來 → 一律包起來。 */
+    try{ host.setPointerCapture && host.setPointerCapture(e.pointerId); }catch(_){}
+    press(b.dataset.act);
+  }
+  function padUp(e){
+    if(!padHold) return;
+    if(e && e.pointerId != null && e.pointerId !== padHold.id) return;
+    padHold.btn.classList.remove("blk-on");
+    release(padHold.act);
+    padHold = null;
+  }
+
+  /* ---------- 觸覺回饋 ----------
+     ⚠⚠ **iOS Safari 一律沒有 navigator.vibrate** —— Apple 從來沒有實作過,
+       而且沒有打算(不是「還沒支援」)。iOS 17.4+ 唯一的路是
+       `<input type="checkbox" switch>` 切換時系統自己給的觸覺,這是社群挖出來的偏方:
+       它**只在真的使用者手勢裡**有效,而且只有真機驗得了(headless 一定測不到)。
+     ★ 所以震動一律當成**加分**,不可以當成「按到了」的唯一證據 ——
+       那一半由看得見的回饋(.blk-on 的發光與縮放)負責,它每一台都有。 */
+  let hapEl = null;
+  function iosHaptic(){
+    try{
+      if(!hapEl){
+        hapEl = document.createElement("input");
+        hapEl.type = "checkbox";
+        hapEl.setAttribute("switch", "");
+        hapEl.style.cssText = "position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0";
+        document.body.appendChild(hapEl);
+      }
+      hapEl.checked = !hapEl.checked;
+    }catch(_){}
+  }
+  function buzz(act){
+    const ms = (act === "hard") ? 16 : 7;     // 落地重一點,移動 / 旋轉只是輕輕一下
+    try{
+      if(navigator.vibrate){ navigator.vibrate(ms); return; }
+    }catch(_){}
+    iosHaptic();
+  }
+
   function bindPad(){
     if(!elPad) return;
-    elPad.addEventListener("pointerdown", e => {
-      const b = e.target.closest("button[data-act]");
-      if(!b) return;
-      e.preventDefault();
-      /* ⚠ setPointerCapture 會丟例外(指標已經抬起來、或是合成出來的事件沒有真的 pointerId)——
-         而它丟出來的是**未捕捉的錯誤**,會被 feedback.js 的環形緩衝當成一筆 JS 錯誤記下來。
-         捕捉不到就退回「沒有 capture」,按鈕照樣能用(只是拖出按鈕外放開時收不到 up ——
-         下面的 pointercancel / lostpointercapture 兩條就是為了這個)。 */
-      try{ b.setPointerCapture && b.setPointerCapture(e.pointerId); }catch(_){}
-      b.classList.add("blk-on");
-      press(b.dataset.act);
-    });
-    const up = e => {
-      const b = e.target.closest ? e.target.closest("button[data-act]") : null;
-      if(!b) return;
-      b.classList.remove("blk-on");
-      release(b.dataset.act);
-    };
-    elPad.addEventListener("pointerup", up);
-    elPad.addEventListener("pointercancel", up);
-    elPad.addEventListener("lostpointercapture", up);
     // ⚠ 阻止長按選單與雙擊縮放(手機上這兩個會把操作吃掉)
     elPad.addEventListener("contextmenu", e => e.preventDefault());
   }
@@ -881,6 +946,13 @@ const BLKB = (function(){
     const host = elPlay || cvMain;
     if(!host) return;
     host.addEventListener("pointerdown", e => {
+      /* ★ 按鈕先看:**直接按在鈕上**優先,其次才是「離最近的那一顆在 SNAP_R 以內」。
+         ⚠ 兩條都要有:真實觸控兩條都會過,而**合成事件常常沒有座標**
+           (e2e 的 dispatchEvent 預設 clientX/Y 是 0)—— 只留吸附那一條的話,
+           那些測試會靜靜地量到「按了沒反應」,而那正是這一版要修的症狀本身。
+         ⚠ 手勢模式下 elPad 是 .hidden → 兩條都回 null,不必另外判。 */
+      const key = padBtn(e.target) || nearestKey(e.clientX, e.clientY);
+      if(key){ e.preventDefault(); padDown(key, e, host); return; }
       if(ctrlMode === "btn") return;
       if(e.target && e.target.closest && e.target.closest(G_SKIP)) return;
       const now = performance.now();
@@ -929,6 +1001,7 @@ const BLKB = (function(){
       }
     });
     const end = e => {
+      padUp(e);                          // 按鈕那一條路(吸附)的釋放
       if(!gest || (e.pointerId != null && e.pointerId !== gest.id)) return;
       if(gest.soft){ inp.soft = false; if(st) st.soft = false; }
       /* 抬手只判一件事:**幾乎沒動過就是點一下**(= 順時針轉)。
@@ -937,7 +1010,9 @@ const BLKB = (function(){
       gest = null;
     };
     host.addEventListener("pointerup", end);
-    host.addEventListener("pointercancel", () => {
+    host.addEventListener("lostpointercapture", padUp);
+    host.addEventListener("pointercancel", e => {
+      padUp(e);
       if(gest && gest.soft){ inp.soft = false; if(st) st.soft = false; }
       gest = null;
     });
@@ -1079,6 +1154,7 @@ const BLKB = (function(){
   function allUp(){
     inp.dir = 0; inp.soft = false; inp.keys = {};
     gest = null;                        // ⚠ 手勢也要清:切背景時手指還壓著的話回來就卡住了
+    padHold = null;                     // ⚠ 同理:按著的那一顆(release 由下面那行統一做)
     if(st) st.soft = false;
     if(elPad) elPad.querySelectorAll(".blk-on").forEach(b => b.classList.remove("blk-on"));
   }

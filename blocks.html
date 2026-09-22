@@ -330,11 +330,20 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠ 熱區一律 ≥44px;旋轉與直接落地**不連發**(board.js 的紅線 ⑤)。
            ⚠ 寬螢幕 / 橫置時這兩簇會移到盤面**左右兩側**(CSS 的 @media),不再蓋住盤面。 -->
       <div class="blk-pad" id="blkPad">
+        <!-- ⚠ 圖示一律**自繪 SVG**(v2.14.0;在那之前是 ◀ ▶ ↻ 那幾個字元)——
+             理由與說明卡那六格同一條:字元的字形每台機器不一樣、而且 U+25C0 那一段
+             實心三角在盤面上又重又鈍。stroke 吃 currentColor,按下去跟著一起亮。 -->
         <div class="blk-pad-l">
-          <button class="blk-key blk-key-wide" type="button" data-act="soft" aria-label="慢慢往下">↓</button>
+          <button class="blk-key blk-key-wide" type="button" data-act="soft" aria-label="慢慢往下">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5v9.5m-4.2-3.4L12 14.6l4.2-4M6.6 19h10.8"/></svg>
+          </button>
           <div class="blk-pad-row">
-            <button class="blk-key" type="button" data-act="left" aria-label="向左">◀</button>
-            <button class="blk-key" type="button" data-act="right" aria-label="向右">▶</button>
+            <button class="blk-key" type="button" data-act="left" aria-label="向左">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.4 5.4L7.2 12l7.2 6.6"/></svg>
+            </button>
+            <button class="blk-key" type="button" data-act="right" aria-label="向右">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.6 5.4L16.8 12l-7.2 6.6"/></svg>
+            </button>
           </div>
         </div>
         <!-- ⚠ **旋轉只有一顆,固定順時針**(v2.14.0;在那之前是 ↻ / ↺ 兩顆)。
@@ -342,7 +351,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
              以及每一顆都可以放大熱區。逆轉還在:鍵盤 Z、手勢兩指點一下。 -->
         <div class="blk-pad-r">
           <div class="blk-pad-row">
-            <button class="blk-key" type="button" data-act="cw" aria-label="旋轉">↻</button>
+            <button class="blk-key" type="button" data-act="cw" aria-label="旋轉">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12a7 7 0 10-2.4 5.3"/><path d="M19.4 6.6v4.8h-4.8"/></svg>
+            </button>
+            <!-- 落地那一顆刻意留**文字** —— 它是最重的一個動作(不可逆),
+                 而文字比任何圖示都不會被誤認。 -->
             <button class="blk-key blk-key-drop" type="button" data-act="hard" aria-label="直接落地">落地</button>
           </div>
         </div>

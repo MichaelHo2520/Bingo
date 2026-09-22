@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 72f2d546c3f9e5f51caceb14890bb4271f9f183296bd501a3662a24adefc542d)
+    真相在 styles.src.css(sha256 e02ebc625195481f1507451f2718b8b4a51dcecf1b2d1261d42066063f37db80)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6117,25 +6117,40 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
             font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:26px;
             color:var(--text);text-shadow:0 2px 12px rgba(0,0,0,.65)}
 .blk-pad{position:absolute;inset:0;pointer-events:none;z-index:2}
-.blk-pad-l,.blk-pad-r{position:absolute;bottom:8px;display:flex;flex-direction:column;
-                      gap:14px;pointer-events:auto}
-.blk-pad-l{left:6px;align-items:flex-start}
-.blk-pad-r{right:6px;align-items:flex-end}
-.blk-pad-row{display:flex;gap:14px}
-.blk-key{position:relative;width:48px;height:44px;border:0;border-radius:15px;
-         background:rgba(125,135,165,.22);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.26);
-         -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+.blk-pad-l,.blk-pad-r{position:absolute;bottom:10px;display:flex;flex-direction:column;
+                      gap:10px;pointer-events:auto}
+.blk-pad-l{left:8px;align-items:flex-start}
+.blk-pad-r{right:8px;align-items:flex-end}
+.blk-pad-row{display:flex;gap:10px}
+.blk-key{position:relative;width:50px;height:50px;border:0;border-radius:50%;
+         background:radial-gradient(120% 120% at 50% 16%,
+                    rgba(255,255,255,.22), rgba(122,132,163,.20) 58%, rgba(26,28,44,.26));
+         box-shadow:inset 0 1.5px 0 rgba(255,255,255,.34),
+                    inset 0 -3px 7px rgba(0,0,0,.30),
+                    0 0 0 1px rgba(255,255,255,.16),
+                    0 3px 10px rgba(0,0,0,.30);
+         -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
          color:var(--text);font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:21px;
-         text-shadow:0 1px 3px rgba(0,0,0,.45);
+         text-shadow:0 1px 3px rgba(0,0,0,.5);
          display:grid;place-items:center;cursor:pointer;
          user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
-         touch-action:none;transition:background .12s linear}
-.blk-key::before{content:"";position:absolute;inset:-7px;border-radius:21px}
-.blk-key-wide{width:96px;height:36px;font-size:16px}
-.blk-key-sm{width:48px;height:36px;font-size:13.5px}
-.blk-key-drop{font-size:17px;background:linear-gradient(180deg,rgba(255,217,61,.34),rgba(255,159,67,.24))}
-.blk-key.blk-on{background:rgba(255,255,255,.40);transform:translateY(1px)}
-body.blk-dock .blk-stage{padding-bottom:110px}
+         touch-action:none;
+         transition:transform .09s ease-out,box-shadow .12s linear,background .12s linear}
+.blk-key svg{display:block;pointer-events:none;
+             filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
+.blk-key-wide svg{width:22px;height:22px}
+.blk-key-wide{width:100px;height:40px;border-radius:20px;font-size:17px}
+.blk-key-drop{width:74px;height:50px;border-radius:25px;font-size:16px;
+              background:radial-gradient(120% 120% at 50% 16%,
+                         rgba(255,236,170,.34), rgba(255,159,67,.26) 60%, rgba(120,60,10,.24))}
+.blk-key.blk-on{transform:scale(.90);
+                background:radial-gradient(120% 120% at 50% 16%,
+                           rgba(255,255,255,.52), rgba(255,255,255,.26) 62%, rgba(255,255,255,.14));
+                box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5),
+                           0 0 0 2.5px rgba(255,255,255,.30),
+                           0 0 18px 2px var(--accent-2),
+                           0 2px 8px rgba(0,0,0,.30)}
+body.blk-dock .blk-stage{padding-bottom:116px}
 body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 .blk-result{display:flex;flex-direction:column;gap:5px;margin:10px 0 4px}
 .blk-rrow{display:flex;justify-content:space-between;align-items:center;
@@ -6166,7 +6181,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-room{padding:6px 10px}
   .blk-hud{gap:6px;height:42px}
   .blk-foes{gap:6px}
-  .blk-key{width:48px;height:38px;font-size:18px}
-  .blk-key-wide{width:96px;height:32px;font-size:15px}
-  .blk-key-sm{width:48px;height:32px;font-size:13px}
+  .blk-key{width:44px;height:44px;font-size:18px}
+  .blk-key-wide{width:88px;height:34px;font-size:15px}
+  .blk-key-drop{width:66px;height:44px;font-size:14px}
 }

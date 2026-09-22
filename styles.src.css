@@ -13883,42 +13883,57 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 /* ⚠⚠ 整層 pointer-events:none、只有兩個拇指簇 auto ——
    不然這一層會把手勢操作(畫在盤面上的那條路)整個吃掉。 */
 .blk-pad{position:absolute;inset:0;pointer-events:none;z-index:2}
-/* ⚠⚠ gap 是 **14px 而不是 6px**,而那不是為了好看 —— 每一顆鈕的熱區都往外擴了 7px
-   (見下面的 .blk-key::before),14 = 7 × 2 正好讓相鄰兩顆的熱區**相接而不重疊**。
-   改小就是「按右邊緣的左鍵結果按到右鍵」(重疊區永遠是 DOM 後面那顆贏)。 */
-.blk-pad-l,.blk-pad-r{position:absolute;bottom:8px;display:flex;flex-direction:column;
-                      gap:14px;pointer-events:auto}
-.blk-pad-l{left:6px;align-items:flex-start}
-.blk-pad-r{right:6px;align-items:flex-end}
-.blk-pad-row{display:flex;gap:14px}
-/* ⚠ 熱區一律 ≥44px。⚠ 不要用 .btn(它的基底是 flex:1;min-width:120px,
-   塞進這裡會把小鈕撐成整排)—— 同一個坑已經兩次。 */
-/* ⚠⚠ **不要用 opacity 把整顆鈕淡掉** —— 那會連字一起糊掉,
-   結果是「盤面看得到、但鈕看不清楚」,兩邊都沒做好。
-   正確做法:底色與外框用很低的 alpha(盤面透得過來),**字與外框維持全不透明**。 */
-/* ⚠⚠⚠ **看得到的那一塊比按得到的那一塊小**(v2.14.0,使用者:「按鈕可以換小一點
-   沒關係,但實際觸控的範圍要大一點點,才不會有按不到的問題」)。
-   視覺 48×44、熱區 62×58 —— 靠下面那條 ::before 往外擴,**不是**靠加大 width/height
-   (那會讓鈕本身更擋盤面,正好是這一版要解決的事)。
-   ⚠ 偽元素接到的事件**歸屬宿主 button**,所以 bindPad() 的 closest("button[data-act]")
-     照樣認得出來(不必改一行 JS)。 */
-.blk-key{position:relative;width:48px;height:44px;border:0;border-radius:15px;
-         background:rgba(125,135,165,.22);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.26);
-         -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+/* ⚠ gap 10px。v2.14.0 中途曾經是 14px(= 熱區外擴 7 的兩倍,為了「相接而不重疊」)——
+   命中改成**吸附最近的那一顆**之後那個理由就沒了:重疊區的歸屬由「誰比較近」決定,
+   永遠是唯一解。→ 兩套規則只留一套,間距可以收回來讓拇指簇更緊湊。 */
+.blk-pad-l,.blk-pad-r{position:absolute;bottom:10px;display:flex;flex-direction:column;
+                      gap:10px;pointer-events:auto}
+.blk-pad-l{left:8px;align-items:flex-start}
+.blk-pad-r{right:8px;align-items:flex-end}
+.blk-pad-row{display:flex;gap:10px}
+/* ---------- 按鈕本體 ----------
+   ⚠⚠ **不要用 opacity 把整顆鈕淡掉** —— 那會連字一起糊掉,結果是「盤面看得到、
+     但鈕看不清楚」,兩邊都沒做好。正確做法:底色與外框用很低的 alpha(盤面透得過來),
+     **字與外框維持全不透明**。
+   ⚠ 圓形是刻意的(v2.14.0):拇指按的東西圓形比較好瞄,而且一排圓比一排方塊
+     在盤面上「安靜」得多(使用者:「控制的按鈕,說實在的,有點難看啊」)。
+   ⚠⚠ **熱區那條 ::before 拿掉了** —— 命中改由 board.js 的 nearestKey() 吸附,
+     兩套規則會在重疊區給出不同答案。現在只有一條:最近的贏。
+   ⚠ 按下去的回饋要**看得見**:iOS Safari 一律沒有 navigator.vibrate,
+     震動只能當加分 —— 「按到了」這件事每一台都要看得出來(見 .blk-on)。 */
+.blk-key{position:relative;width:50px;height:50px;border:0;border-radius:50%;
+         background:radial-gradient(120% 120% at 50% 16%,
+                    rgba(255,255,255,.22), rgba(122,132,163,.20) 58%, rgba(26,28,44,.26));
+         box-shadow:inset 0 1.5px 0 rgba(255,255,255,.34),
+                    inset 0 -3px 7px rgba(0,0,0,.30),
+                    0 0 0 1px rgba(255,255,255,.16),
+                    0 3px 10px rgba(0,0,0,.30);
+         -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
          color:var(--text);font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:21px;
-         text-shadow:0 1px 3px rgba(0,0,0,.45);
+         text-shadow:0 1px 3px rgba(0,0,0,.5);
          display:grid;place-items:center;cursor:pointer;
          user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
-         touch-action:none;transition:background .12s linear}
-/* 熱區:透明、只負責收指頭。⚠ 外擴量要與兩處 gap 對齊(見上面那條註解) */
-.blk-key::before{content:"";position:absolute;inset:-7px;border-radius:21px}
-.blk-key-wide{width:96px;height:36px;font-size:16px}
-.blk-key-sm{width:48px;height:36px;font-size:13.5px}
-.blk-key-drop{font-size:17px;background:linear-gradient(180deg,rgba(255,217,61,.34),rgba(255,159,67,.24))}
-.blk-key.blk-on{background:rgba(255,255,255,.40);transform:translateY(1px)}
+         touch-action:none;
+         transition:transform .09s ease-out,box-shadow .12s linear,background .12s linear}
+/* SVG 圖示:stroke 吃 currentColor → 按下去 .blk-on 把字色提亮時它跟著一起亮 */
+.blk-key svg{display:block;pointer-events:none;
+             filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))}
+.blk-key-wide svg{width:22px;height:22px}
+.blk-key-wide{width:100px;height:40px;border-radius:20px;font-size:17px}
+.blk-key-drop{width:74px;height:50px;border-radius:25px;font-size:16px;
+              background:radial-gradient(120% 120% at 50% 16%,
+                         rgba(255,236,170,.34), rgba(255,159,67,.26) 60%, rgba(120,60,10,.24))}
+/* 按下去:縮一下 + 亮起來 + 外圈發光。★ 這是「我按到了」唯一每一台都有的證據。 */
+.blk-key.blk-on{transform:scale(.90);
+                background:radial-gradient(120% 120% at 50% 16%,
+                           rgba(255,255,255,.52), rgba(255,255,255,.26) 62%, rgba(255,255,255,.14));
+                box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5),
+                           0 0 0 2.5px rgba(255,255,255,.30),
+                           0 0 18px 2px var(--accent-2),
+                           0 2px 8px rgba(0,0,0,.30)}
 /* 「鈕固定在下方」:給不想讓鈕蓋住盤面的人(設定裡可切)。
    ⚠ 這時它就**參與版面**了 → 盤面會自動縮小(fitBoard 量的舞台變矮),那是預期的。 */
-body.blk-dock .blk-stage{padding-bottom:110px}
+body.blk-dock .blk-stage{padding-bottom:116px}
 body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 
 /* ---------- 結果卡 ---------- */
@@ -13960,8 +13975,8 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-room{padding:6px 10px}
   .blk-hud{gap:6px;height:42px}
   .blk-foes{gap:6px}
-  /* ⚠ 矮視窗只壓**視覺**,熱區那條 ::before 不動(紅線:熱區一律 ≥44px) */
-  .blk-key{width:48px;height:38px;font-size:18px}
-  .blk-key-wide{width:96px;height:32px;font-size:15px}
-  .blk-key-sm{width:48px;height:32px;font-size:13px}
+  /* ⚠ 矮視窗只壓視覺 —— 按得到與否由吸附半徑決定(SNAP_R),不受這裡影響 */
+  .blk-key{width:44px;height:44px;font-size:18px}
+  .blk-key-wide{width:88px;height:34px;font-size:15px}
+  .blk-key-drop{width:66px;height:44px;font-size:14px}
 }
