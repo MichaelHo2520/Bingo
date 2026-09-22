@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 933913d50d29940aa90241b9f8dae78cf1d17e059bf83bd56110fc5d50e33691)
+    真相在 styles.src.css(sha256 49df9cbd7c1acf8a59c0dc3974fb4d5d3dc9186568d1d0da5128bf73f03cf682)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6117,24 +6117,25 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
             font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:26px;
             color:var(--text);text-shadow:0 2px 12px rgba(0,0,0,.65)}
 .blk-pad{position:absolute;inset:0;pointer-events:none;z-index:2}
-.blk-pad-l,.blk-pad-r{position:absolute;bottom:6px;display:flex;flex-direction:column;
-                      gap:6px;pointer-events:auto}
-.blk-pad-l{left:2px;align-items:flex-start}
-.blk-pad-r{right:2px;align-items:flex-end}
-.blk-pad-row{display:flex;gap:6px}
-.blk-key{width:52px;height:50px;border:0;border-radius:16px;
+.blk-pad-l,.blk-pad-r{position:absolute;bottom:8px;display:flex;flex-direction:column;
+                      gap:14px;pointer-events:auto}
+.blk-pad-l{left:6px;align-items:flex-start}
+.blk-pad-r{right:6px;align-items:flex-end}
+.blk-pad-row{display:flex;gap:14px}
+.blk-key{position:relative;width:48px;height:44px;border:0;border-radius:15px;
          background:rgba(125,135,165,.22);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.26);
          -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-         color:var(--text);font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:22px;
+         color:var(--text);font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:21px;
          text-shadow:0 1px 3px rgba(0,0,0,.45);
          display:grid;place-items:center;cursor:pointer;
          user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
          touch-action:none;transition:background .12s linear}
-.blk-key-wide{width:110px;height:38px;font-size:17px}
-.blk-key-sm{width:52px;height:38px;font-size:14px}
+.blk-key::before{content:"";position:absolute;inset:-7px;border-radius:21px}
+.blk-key-wide{width:96px;height:36px;font-size:16px}
+.blk-key-sm{width:48px;height:36px;font-size:13.5px}
 .blk-key-drop{font-size:17px;background:linear-gradient(180deg,rgba(255,217,61,.34),rgba(255,159,67,.24))}
 .blk-key.blk-on{background:rgba(255,255,255,.40);transform:translateY(1px)}
-body.blk-dock .blk-stage{padding-bottom:104px}
+body.blk-dock .blk-stage{padding-bottom:110px}
 body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 .blk-result{display:flex;flex-direction:column;gap:5px;margin:10px 0 4px}
 .blk-rrow{display:flex;justify-content:space-between;align-items:center;
@@ -6165,7 +6166,7 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-room{padding:6px 10px}
   .blk-hud{gap:6px;height:46px}
   .blk-foes{gap:6px}
-  .blk-key{width:52px;height:46px;font-size:19px}
-  .blk-key-wide{width:110px;height:38px;font-size:16px}
-  .blk-key-sm{width:52px;height:38px;font-size:14px}
+  .blk-key{width:48px;height:38px;font-size:18px}
+  .blk-key-wide{width:96px;height:32px;font-size:15px}
+  .blk-key-sm{width:48px;height:32px;font-size:13px}
 }

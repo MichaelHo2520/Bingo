@@ -13880,31 +13880,42 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 /* ⚠⚠ 整層 pointer-events:none、只有兩個拇指簇 auto ——
    不然這一層會把手勢操作(畫在盤面上的那條路)整個吃掉。 */
 .blk-pad{position:absolute;inset:0;pointer-events:none;z-index:2}
-.blk-pad-l,.blk-pad-r{position:absolute;bottom:6px;display:flex;flex-direction:column;
-                      gap:6px;pointer-events:auto}
-.blk-pad-l{left:2px;align-items:flex-start}
-.blk-pad-r{right:2px;align-items:flex-end}
-.blk-pad-row{display:flex;gap:6px}
+/* ⚠⚠ gap 是 **14px 而不是 6px**,而那不是為了好看 —— 每一顆鈕的熱區都往外擴了 7px
+   (見下面的 .blk-key::before),14 = 7 × 2 正好讓相鄰兩顆的熱區**相接而不重疊**。
+   改小就是「按右邊緣的左鍵結果按到右鍵」(重疊區永遠是 DOM 後面那顆贏)。 */
+.blk-pad-l,.blk-pad-r{position:absolute;bottom:8px;display:flex;flex-direction:column;
+                      gap:14px;pointer-events:auto}
+.blk-pad-l{left:6px;align-items:flex-start}
+.blk-pad-r{right:6px;align-items:flex-end}
+.blk-pad-row{display:flex;gap:14px}
 /* ⚠ 熱區一律 ≥44px。⚠ 不要用 .btn(它的基底是 flex:1;min-width:120px,
    塞進這裡會把小鈕撐成整排)—— 同一個坑已經兩次。 */
 /* ⚠⚠ **不要用 opacity 把整顆鈕淡掉** —— 那會連字一起糊掉,
    結果是「盤面看得到、但鈕看不清楚」,兩邊都沒做好。
    正確做法:底色與外框用很低的 alpha(盤面透得過來),**字與外框維持全不透明**。 */
-.blk-key{width:52px;height:50px;border:0;border-radius:16px;
+/* ⚠⚠⚠ **看得到的那一塊比按得到的那一塊小**(v2.14.0,使用者:「按鈕可以換小一點
+   沒關係,但實際觸控的範圍要大一點點,才不會有按不到的問題」)。
+   視覺 48×44、熱區 62×58 —— 靠下面那條 ::before 往外擴,**不是**靠加大 width/height
+   (那會讓鈕本身更擋盤面,正好是這一版要解決的事)。
+   ⚠ 偽元素接到的事件**歸屬宿主 button**,所以 bindPad() 的 closest("button[data-act]")
+     照樣認得出來(不必改一行 JS)。 */
+.blk-key{position:relative;width:48px;height:44px;border:0;border-radius:15px;
          background:rgba(125,135,165,.22);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.26);
          -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
-         color:var(--text);font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:22px;
+         color:var(--text);font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:21px;
          text-shadow:0 1px 3px rgba(0,0,0,.45);
          display:grid;place-items:center;cursor:pointer;
          user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;
          touch-action:none;transition:background .12s linear}
-.blk-key-wide{width:110px;height:38px;font-size:17px}
-.blk-key-sm{width:52px;height:38px;font-size:14px}
+/* 熱區:透明、只負責收指頭。⚠ 外擴量要與兩處 gap 對齊(見上面那條註解) */
+.blk-key::before{content:"";position:absolute;inset:-7px;border-radius:21px}
+.blk-key-wide{width:96px;height:36px;font-size:16px}
+.blk-key-sm{width:48px;height:36px;font-size:13.5px}
 .blk-key-drop{font-size:17px;background:linear-gradient(180deg,rgba(255,217,61,.34),rgba(255,159,67,.24))}
 .blk-key.blk-on{background:rgba(255,255,255,.40);transform:translateY(1px)}
 /* 「鈕固定在下方」:給不想讓鈕蓋住盤面的人(設定裡可切)。
    ⚠ 這時它就**參與版面**了 → 盤面會自動縮小(fitBoard 量的舞台變矮),那是預期的。 */
-body.blk-dock .blk-stage{padding-bottom:104px}
+body.blk-dock .blk-stage{padding-bottom:110px}
 body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
 
 /* ---------- 結果卡 ---------- */
@@ -13946,7 +13957,8 @@ body.blk-dock .blk-key{background:rgba(255,255,255,.14)}
   .blk-room{padding:6px 10px}
   .blk-hud{gap:6px;height:46px}
   .blk-foes{gap:6px}
-  .blk-key{width:52px;height:46px;font-size:19px}
-  .blk-key-wide{width:110px;height:38px;font-size:16px}
-  .blk-key-sm{width:52px;height:38px;font-size:14px}
+  /* ⚠ 矮視窗只壓**視覺**,熱區那條 ::before 不動(紅線:熱區一律 ≥44px) */
+  .blk-key{width:48px;height:38px;font-size:18px}
+  .blk-key-wide{width:96px;height:32px;font-size:15px}
+  .blk-key-sm{width:48px;height:32px;font-size:13px}
 }

@@ -335,13 +335,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <button class="blk-key" type="button" data-act="right" aria-label="向右">▶</button>
           </div>
         </div>
+        <!-- ⚠ **旋轉只有一顆,固定順時針**(v2.14.0;在那之前是 ↻ / ↺ 兩顆)。
+             轉四次回到原位,所以少那一顆不會有轉不到的角度 —— 換來的是少一顆要認的鈕、
+             以及每一顆都可以放大熱區。逆轉還在:鍵盤 Z、手勢兩指點一下。 -->
         <div class="blk-pad-r">
           <div class="blk-pad-row">
             <button class="blk-key blk-key-sm" type="button" data-act="hold" aria-label="換牌">換</button>
-            <button class="blk-key blk-key-sm" type="button" data-act="ccw" aria-label="逆時針旋轉">↺</button>
           </div>
           <div class="blk-pad-row">
-            <button class="blk-key" type="button" data-act="cw" aria-label="順時針旋轉">↻</button>
+            <button class="blk-key" type="button" data-act="cw" aria-label="旋轉">↻</button>
             <button class="blk-key blk-key-drop" type="button" data-act="hard" aria-label="直接落地">落地</button>
           </div>
         </div>
