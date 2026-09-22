@@ -272,12 +272,40 @@ function syncSoloSeg(){
     const seg = $(id); if(!seg) return;
     [...seg.children].forEach(b => b.classList.toggle("on", String(b.dataset[attr]) === String(val)));
   };
+  const note = (id, html) => { const el = $(id); if(el) el.innerHTML = html || ""; };
+  const v = Solo.vs();
   set("blkModeSeg", "mode", Solo.mode());
   set("blkFeelSeg", "feel", Solo.feel());
   set("blkLvSeg", "lv", Solo.level());
-  /* 電腦強度只有「對電腦」用得到 → 其他玩法收起來(留著只會讓人以為練習也有電腦) */
-  const lvRow = $("blkLvRow");
-  if(lvRow) lvRow.classList.toggle("hidden", Solo.mode() !== "vs");
+  set("blkFoeNSeg", "foen", Solo.foeN());
+  set("blkVsModeSeg", "vsmode", v.mode);
+  set("blkVsSecsSeg", "vssecs", v.secs);
+  set("blkVsShieldSeg", "vsshield", v.shield);
+  set("blkVsTargetSeg", "vstarget", v.target);
+  set("blkVsRushSeg", "vsrush", v.rush ? "1" : "0");
+  /* ★ 文案共用 BLK.NOTES —— 與大廳同一份,單機不另外抄一次(見 rules.js 的 NOTES) */
+  note("blkNoteVsMode", BLK.noteOf("mode", v.mode));
+  note("blkNoteVsShield", BLK.noteOf("shield", v.shield));
+  note("blkNoteVsTarget", BLK.noteOf("target", v.target));
+  note("blkNoteVsRush", BLK.noteOf("rush", v.rush));
+  /* ★★ 「對手」與「強度」這兩格的文案是**算出來的**,不是查表的 ——
+     它要回答的是「我選這個會配到誰」,而混搭的名單只有 Solo.lineup() 知道。
+     ⚠ 這一行存在的理由與大廳那幾行一樣:欄位名稱本身不帶資訊。 */
+  const names = Solo.lineup().map(l => l.emoji + " " + l.name);
+  note("blkNoteFoeN", (names.length > 1)
+    ? ("場上會有 <b>" + (names.length + 1) + " 個人</b>(你 + " + names.length + " 台電腦)," +
+       "而且<b>電腦之間也會互打</b>。")
+    : "1 對 1。想試三個人以上的感覺就選 2 台或 3 台。");
+  note("blkNoteLv", "這一局會配到:<b>" + names.join("</b> · <b>") + "</b>");
+  /* 對電腦那一整組只有「對電腦」用得到 → 其他玩法整批收起來
+     (留著只會讓人以為練習也有電腦)。 */
+  const isVs = Solo.mode() === "vs";
+  document.querySelectorAll(".blk-vs-row").forEach(el => el.classList.toggle("hidden", !isVs));
+  /* 這兩格只有 K.O. 賽有意義(淘汰賽沒有時間限制)—— 同大廳那一條。 */
+  const koOnly = isVs && v.mode === "ko";
+  ["blkVsSecsRow", "blkVsRushRow"].forEach(id => {
+    const el = $(id); if(el) el.classList.toggle("hidden", !koOnly);
+  });
 }
 /* ⚠ 操作方式那兩格設定(手勢 / 兩者 / 按鈕)v2.15.1 **整個拿掉了** ——
    只剩按鍵,沒有旋鈕可以調;「?」蓋板現在純粹是說明。
@@ -333,9 +361,28 @@ $("blkSoloHelpBtn").addEventListener("click", openBlkGuide);
 $("blkGuideClose").addEventListener("click", closeBlkGuide);
 $("blkGuideVeil").addEventListener("click", e => { if(e.target === $("blkGuideVeil")) closeBlkGuide(); });
 segPick("blkLvSeg", "lv", v => Solo.setLevel(v));
+/* 對電腦的那一整組(v2.15.4)。⚠ segPick 會在選完之後叫 paintSoloHint() →
+   而它會 syncSoloSeg() → 那幾行「隨選隨變」的文案跟著更新,不必各自再叫一次。 */
+segPick("blkFoeNSeg", "foen", v => Solo.setFoeN(+v));
+segPick("blkVsModeSeg", "vsmode", v => Solo.setVs("mode", v));
+segPick("blkVsSecsSeg", "vssecs", v => Solo.setVs("secs", +v));
+segPick("blkVsShieldSeg", "vsshield", v => Solo.setVs("shield", +v));
+segPick("blkVsTargetSeg", "vstarget", v => Solo.setVs("target", v));
+/* ⚠ rush 在房規裡是布林 —— dataset 拿到的是字串 "0" / "1",不轉的話 "0" 是 truthy。 */
+segPick("blkVsRushSeg", "vsrush", v => Solo.setVs("rush", v === "1"));
 $("blkStartSolo").addEventListener("click", () => Solo.start());
 
 /* ---------- 單機的列 / 結果卡 ---------- */
+/* 點對手的小盤 = 指定只打他 / 改回隨機。
+   ⚠ 小盤的 DOM 是 board.js 執行期建的 → 只能用事件委派掛在容器上。
+   ⚠⚠ **這一條不可以只掛在連線那一區裡**(v2.15.4 之前是)—— 單機多台電腦之後
+     它兩邊都要能用,而那一區整段包在 `typeof MP !== "undefined"` 裡面。 */
+if($("blkFoes")) $("blkFoes").addEventListener("click", e => {
+  const i = BLKB.foeAt(e.target);
+  if(i < 0) return;
+  if(Solo.active()) Solo.tapFoe(i);
+  else if(typeof MP !== "undefined") MP.tapFoe(i);
+});
 $("blkSoloExit").addEventListener("click", () => Solo.quit());
 $("blkSoloAgain").addEventListener("click", () => Solo.again());
 $("blkSoloHome").addEventListener("click", () => Solo.quit());
@@ -359,12 +406,6 @@ $("reopenWin").addEventListener("click", showResult);
   $("wgMinus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() - 1));
   $("wgPlus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() + 1));
   $("resetScoreBtn").addEventListener("click", () => MP.resetScores());
-  /* 點對手的小盤 = 鎖定 / 取消鎖定攻擊目標。
-     ⚠ 小盤的 DOM 是 board.js 執行期建的 → 只能用事件委派掛在容器上。 */
-  $("blkFoes").addEventListener("click", e => {
-    const i = BLKB.foeAt(e.target);
-    if(i >= 0) MP.tapFoe(i);
-  });
   $("mpNewSeason").addEventListener("click", () => { MP.resetScores(); MP.again(); });
   $("mpCreate").addEventListener("click", () => MP.create($("mpName").value, $("mpRoomName").value));
   $("mpScan").addEventListener("click", () => MP.scanRooms());

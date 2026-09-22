@@ -772,6 +772,14 @@ const BLKB = (function(){
     if(e) beam(e.cv, elGauge || cvMain, "#ff5d6c", (who ? who + " " : "") + "+" + n);
     incoming(n);
   }
+  /* 對手打對手(單機多台電腦才會用到,v2.15.4)。
+     ★ 這一道是刻意要畫的 —— 沒有它,三台電腦看起來只是三個各玩各的沙包,
+       而「場上正在互打」正是多台電腦要營造的東西。
+     ⚠ 顏色刻意比進出那兩道淡、也不震動:場上的重點永遠是「跟我有關的那一道」。 */
+  function beamFoe(i, j, n){
+    const a = foeEls[i], b = foeEls[j];
+    if(a && b) beam(a.cv, b.cv, "#8b8fa8", "+" + n);
+  }
 
   /* ==========================================================================
      六之四、現場播報(v2.15.3)
@@ -1303,7 +1311,7 @@ const BLKB = (function(){
   return {
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,
     act, setFeel, incoming, pop, shake,
-    setFoes, foeAt, beamOut, beamIn, foes: () => foes,
+    setFoes, foeAt, beamOut, beamIn, beamFoe, foes: () => foes,
     cast, clearCast,
     /* ★ 測試用的三個出口(產品程式不會呼叫它們):
        step(dt) 手動推一幀、frames() 是至今推了幾幀、awake() 是 rAF 現在排著沒有。

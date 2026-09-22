@@ -582,34 +582,9 @@ const MP = MPCore.create((function(){
     if(val.textContent !== txt) val.textContent = txt;
     box.classList.toggle("blk-stat-lock", !!lockTarget);
   }
-  /* ★★ 設定畫面的「隨選隨變」文案(v2.15.3)。
-     ⚠⚠ 判準:**講現場會發生什麼事,不要講這個欄位叫什麼。**
-       「K.O. 賽」三個字本身不帶任何資訊 —— 玩家要知道的是「死了會不會復活」
-       與「先死的人要不要在旁邊乾等」。這兩件事以前只寫在 blocks.html 的
-       HTML 註解裡(給開發者看的),玩家看不到 → 使用者回報「看不太懂」。
-     ⚠ 單一真相在這裡,`blocks.html` 那兩個 div 是空的 ——
-       兩邊各寫一份就是改了規則之後靜靜對不上的雙胞胎。 */
-  const NOTE_MODE = {
-    ko:  "死了 <b>2 秒就復活</b>,一直打到時間結束。把別人打爆最多次的人贏 —— 沒有人要在旁邊乾等。",
-    out: "<b>死了就出局</b>,只能看別人打完。最後還活著的人贏。⚠ 人多的時候,先死的人要等一兩分鐘。"
-  };
-  const NOTE_SHIELD = {
-    0:  "一開局就能互相攻擊。⚠ <b>第一次玩的人通常撐不過 15 秒</b>。",
-    10: "開局 10 秒內<b>大家都不會被頂高</b>(警示條照樣會亮,先學會怎麼抵銷)。",
-    20: "開局 20 秒內<b>大家都不會被頂高</b>(警示條照樣會亮,先學會怎麼抵銷)。"
-  };
-  /* ⚠ 兩段文案都要講「三個人以上才有差」—— 1 對 1 時這一格完全沒有作用,
-     而沒講的話房主會以為自己設了一個沒生效的東西。 */
-  const NOTE_TARGET = {
-    rand: "三個人以上時,你的垃圾行<b>隨機挑一個對手</b>送過去(1 對 1 沒差)。",
-    high: "三個人以上時<b>一律打目前的第一名</b> —— 強的人會被全場追著打," +
-          "<b>實力差很多的時候特別好玩</b>。"
-  };
-  const NOTE_RUSH = {
-    on:  "最後 30 秒<b>所有人的攻擊加倍</b>,畫面會變色。落後的人有機會翻盤," +
-         "⚠ 但領先的人也一樣加倍。",
-    off: "全程一樣的攻擊量。"
-  };
+  /* ★★ 設定畫面的「隨選隨變」文案 —— **單一真相在 `rules.js` 的 `NOTES`**
+     (v2.15.3 原本放在這裡,v2.15.4 因為單機也用同一組房規而搬過去)。
+     ⚠ `blocks.html` 那幾個 div 是空的,兩邊各寫一份就是靜靜過期的雙胞胎。 */
   function paintSetup(){
     const seg = (id, attr, val) => {
       const el = $(id); if(!el) return;
@@ -621,10 +596,10 @@ const MP = MPCore.create((function(){
     seg("blkShieldSeg", "shield", rules.shield);
     seg("blkTargetSeg", "target", rules.target);
     seg("blkRushSeg", "rush", rules.rush ? "1" : "0");
-    note("blkNoteMode", NOTE_MODE[rules.mode]);
-    note("blkNoteShield", NOTE_SHIELD[rules.shield]);
-    note("blkNoteTarget", NOTE_TARGET[rules.target]);
-    note("blkNoteRush", rules.rush ? NOTE_RUSH.on : NOTE_RUSH.off);
+    note("blkNoteMode", R.noteOf("mode", rules.mode));
+    note("blkNoteShield", R.noteOf("shield", rules.shield));
+    note("blkNoteTarget", R.noteOf("target", rules.target));
+    note("blkNoteRush", R.noteOf("rush", rules.rush));
     const row = $("blkSecsRow");
     if(row) row.classList.toggle("hidden", rules.mode !== "ko");
     /* ⚠ 「最後 30 秒加倍」只有 K.O. 賽有意義(淘汰賽沒有時間限制)——

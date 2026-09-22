@@ -180,6 +180,44 @@ const BLK = (function(){
     target:  "rand",                    // 攻擊目標:"rand" 隨機 · "high" 打第一名
     rush:    false                      // 最後 30 秒攻擊加倍(只在 K.O. 賽有意義)
   };
+  /* ★★ 房規的「隨選隨變」文案(v2.15.3 進 adapter,v2.15.4 搬來這裡)。
+     ⚠⚠ 搬來的理由:**單機也用同一組房規了** —— 文案留在 `adapter.js` 的話
+       `solo.js` 就得再抄一份,而那正是這個專案一路在躲的雙胞胎(而且它是那種
+       「改了一邊,另一邊靜靜過期」的雙胞胎:兩邊的字不一樣沒有任何測試會紅)。
+     ⚠ 這裡是**純資料**(字串),沒有碰 DOM —— 檔頭那條「零 DOM」仍然成立。
+     ★ 判準:**講現場會發生什麼事,不要講這個欄位叫什麼。**
+       「K.O. 賽」三個字本身不帶任何資訊,「死了 2 秒就復活」才是。 */
+  const NOTES = {
+    mode: {
+      ko:  "死了 <b>2 秒就復活</b>,一直打到時間結束。把別人打爆最多次的人贏 —— 沒有人要在旁邊乾等。",
+      out: "<b>死了就出局</b>,只能看別人打完。最後還活著的人贏。⚠ 人多的時候,先死的人要等一兩分鐘。"
+    },
+    shield: {
+      0:  "一開局就能互相攻擊。⚠ <b>第一次玩的人通常撐不過 15 秒</b>。",
+      10: "開局 10 秒內<b>大家都不會被頂高</b>(警示條照樣會亮,先學會怎麼抵銷)。",
+      20: "開局 20 秒內<b>大家都不會被頂高</b>(警示條照樣會亮,先學會怎麼抵銷)。"
+    },
+    /* ⚠ 兩段都要講「三個人以上才有差」—— 1 對 1 時這一格完全沒有作用,
+       沒講的話房主會以為自己設了一個沒生效的東西。 */
+    target: {
+      rand: "三個人以上時,垃圾行<b>隨機挑一個對手</b>送過去(1 對 1 沒差)。",
+      high: "三個人以上時<b>一律打目前的第一名</b> —— 強的人會被全場追著打," +
+            "<b>實力差很多的時候特別好玩</b>。"
+    },
+    rush: {
+      on:  "最後 30 秒<b>所有人的攻擊加倍</b>,畫面會變色。落後的人有機會翻盤," +
+           "⚠ 但領先的人也一樣加倍。",
+      off: "全程一樣的攻擊量。"
+    }
+  };
+  /* 查一段文案。⚠ 查不到一律回空字串 —— 寧可那一行不見,也不要印出 "undefined"。 */
+  function noteOf(field, value){
+    const t = NOTES[field];
+    if(!t) return "";
+    if(field === "rush") return t[value ? "on" : "off"] || "";
+    return t[value] || "";
+  }
+
   function normRules(r){
     r = r || {};
     const out = {};
@@ -748,7 +786,7 @@ const BLK = (function(){
     // 盤面
     emptyBoard, fits, boardEmpty, stackTop, placements,
     // 房規
-    normRules, comboAtk,
+    normRules, comboAtk, NOTES, noteOf,
     // 一局
     blank, spawn, level, gravMs, grounded, move, rotate, down, ghostY,
     hardDrop, lock, tick, revive,

@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.14.0 -->
-<meta name="version" content="2.14.0+6">
+<meta name="version" content="2.14.0+7">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -100,13 +100,69 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button type="button" data-mode="vs">對電腦</button>
         </div>
       </div>
-      <div class="field hidden" id="blkLvRow">
-        <span class="field-label">電腦強度</span>
-        <div class="seg" id="blkLvSeg" aria-label="電腦強度">
-          <button type="button" data-lv="easy">🙂 新手</button>
-          <button type="button" data-lv="norm" class="on">😎 普通</button>
-          <button type="button" data-lv="hard">🔥 高手</button>
+      <!-- ★★ 對電腦那一整組(v2.15.4)。使用者:「我希望可以像連線那樣的感覺,
+           讓我可以選幾個電腦,這樣就可以順便測試對戰的刺激感。」
+           → **房規整組照搬連線**,文案也共用同一份(`BLK.NOTES`)。
+           ⚠ 這幾格只有「對電腦」用得到 → 其他玩法整批收起來(`.blk-vs-row`),
+             留著只會讓人以為練習也有電腦。 -->
+      <div class="field hidden blk-vs-row" id="blkFoeNRow">
+        <span class="field-label">對手<span class="field-sub">(幾台電腦)</span></span>
+        <div class="seg" id="blkFoeNSeg" aria-label="幾台電腦">
+          <button type="button" data-foen="1" class="on">1 台</button>
+          <button type="button" data-foen="2">2 台</button>
+          <button type="button" data-foen="3">3 台</button>
         </div>
+        <div class="blk-fnote" id="blkNoteFoeN"></div>
+      </div>
+      <div class="field hidden blk-vs-row" id="blkLvRow">
+        <span class="field-label">電腦強度<span class="field-sub">(多台時自動配出高低不同的)</span></span>
+        <div class="seg" id="blkLvSeg" aria-label="電腦強度">
+          <button type="button" data-lv="easy">🙂 輕鬆</button>
+          <button type="button" data-lv="norm" class="on">😎 普通</button>
+          <button type="button" data-lv="hard">🔥 硬仗</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteLv"></div>
+      </div>
+      <div class="field hidden blk-vs-row">
+        <span class="field-label">賽制</span>
+        <div class="seg" id="blkVsModeSeg" aria-label="賽制">
+          <button type="button" data-vsmode="ko" class="on">💥 K.O. 賽</button>
+          <button type="button" data-vsmode="out">☠️ 淘汰賽</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteVsMode"></div>
+      </div>
+      <div class="field hidden blk-vs-row" id="blkVsSecsRow">
+        <span class="field-label">一局多久</span>
+        <div class="seg" id="blkVsSecsSeg" aria-label="一局多久">
+          <button type="button" data-vssecs="120">2 分</button>
+          <button type="button" data-vssecs="180" class="on">3 分</button>
+          <button type="button" data-vssecs="300">5 分</button>
+        </div>
+      </div>
+      <div class="field hidden blk-vs-row">
+        <span class="field-label">開局暖身<span class="field-sub">(前幾秒沒有人會被頂高)</span></span>
+        <div class="seg" id="blkVsShieldSeg" aria-label="開局暖身">
+          <button type="button" data-vsshield="0">關</button>
+          <button type="button" data-vsshield="10">10 秒</button>
+          <button type="button" data-vsshield="20" class="on">20 秒</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteVsShield"></div>
+      </div>
+      <div class="field hidden blk-vs-row">
+        <span class="field-label">攻擊目標<span class="field-sub">(兩台以上才有差)</span></span>
+        <div class="seg" id="blkVsTargetSeg" aria-label="攻擊目標">
+          <button type="button" data-vstarget="rand" class="on">🎲 隨機</button>
+          <button type="button" data-vstarget="high">👑 打第一名</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteVsTarget"></div>
+      </div>
+      <div class="field hidden blk-vs-row" id="blkVsRushRow">
+        <span class="field-label">最後 30 秒<span class="field-sub">(結尾加速)</span></span>
+        <div class="seg" id="blkVsRushSeg" aria-label="最後 30 秒加倍">
+          <button type="button" data-vsrush="0" class="on">一般</button>
+          <button type="button" data-vsrush="1">⏱️ 攻擊加倍</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteVsRush"></div>
       </div>
       <div class="field">
         <span class="field-label">移動速度<span class="field-sub">(長按左右的連發快慢)</span></span>
