@@ -69,7 +69,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         自己被送垃圾行時,左邊會出現一條<b>警示條</b>;在它推上來之前消掉自己的行可以<b>抵銷</b>。<br>
         堆到頂端就輸了。
       </div>
-      <!-- 手勢說明。⚠ 內容由 js/blocks/main.js 的 BLK_GEST_HTML 注入 ——
+      <!-- 操作說明。⚠ 內容由 js/blocks/main.js 的 BLK_GEST_HTML 注入 ——
            房間框那顆「?」打開的蓋板印的是**同一份**,寫死兩份就是遲早分岔的雙胞胎。
            ★ 這一格在進場的第一層 → 連線與單機**兩條路都會經過**。 -->
       <div class="blk-gest" id="blkGestCard"></div>
@@ -109,14 +109,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button type="button" data-feel="2">快</button>
         </div>
       </div>
-      <div class="field">
-        <span class="field-label">操作方式<span class="field-sub">(預設手勢;不習慣可以切回按鈕)</span></span>
-        <div class="seg" id="blkCtrlSeg" aria-label="操作方式">
-          <button type="button" data-ctrl="swipe" class="on">手勢</button>
-          <button type="button" data-ctrl="both">兩者</button>
-          <button type="button" data-ctrl="btn">按鈕</button>
-        </div>
-      </div>
+      <!-- ⚠ 「操作方式(手勢 / 兩者 / 按鈕)」那一格 v2.15.1 拿掉了 ——
+           手勢整套刪除,只剩畫面最下面那四顆鈕,沒有旋鈕可以調。 -->
       <button class="btn primary block-btn home-btn" id="blkStartSolo">開始</button>
       <div class="home-hint" id="blkSoloHint"></div>
     </div>
@@ -310,7 +304,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            ⚠ 盤面要**自己往左讓開**同樣的寬度(board.js 的 fitBoard)——
              只縮小盤面的話它照樣置中,右半仍然壓在小盤底下。
            ⚠ 容器本身 pointer-events:none、只有每一塊小盤 auto ——
-             不然右側那一條會把手勢吃掉(那正是它現在最有用的操作區)。
+             整條都吃指標事件的話,側邊擺法時右簇附近的「吸附」就會被它擋掉。
            ⚠ 裡面的每一格都由 js/blocks/board.js 的 setFoes() 自己建 —— 數量會變。 -->
       <div class="blk-foes hidden" id="blkFoes"></div>
 
@@ -509,7 +503,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
   <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
 
-  <!-- ====== 手勢說明(房間框那顆「?」打開)======
+  <!-- ====== 操作說明(房間框那顆「?」打開)======
        ⚠ 內容與進場頁那一張是**同一份**(main.js 的 BLK_GEST_HTML 注入兩處)。
        ⚠⚠ 新增蓋板要登記兩個地方,漏一邊都會出事:
          ① js/shared/ui-kit.js 的 BACK_LAYERS(**雙胞胎**,js/game.js 也有一份)——
@@ -519,15 +513,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="set-card">
       <button class="card-x" id="blkGuideClose" type="button" aria-label="關閉">✕</button>
       <div class="set-head">怎麼操作</div>
+      <!-- ⚠ 這裡原本還有一格「操作方式」(手勢 / 兩者 / 按鈕),v2.15.1 拿掉了 ——
+           只剩按鍵,沒有旋鈕可以調,所以這個蓋板現在純粹是說明。 -->
       <div id="blkGuideBody"></div>
-      <div class="field">
-        <span class="field-label">操作方式<span class="field-sub">(改了立刻生效,下次也記得)</span></span>
-        <div class="seg" id="blkCtrlSeg2" aria-label="操作方式">
-          <button type="button" data-ctrl="swipe" class="on">手勢</button>
-          <button type="button" data-ctrl="both">兩者</button>
-          <button type="button" data-ctrl="btn">按鈕</button>
-        </div>
-      </div>
     </div>
   </div>
 

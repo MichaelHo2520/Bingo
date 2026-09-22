@@ -22,11 +22,6 @@ const Solo = (function(){
 
   let mode = "endless";                 // "endless" | "sprint" | "vs"
   let feel = 1;                         // 手感(0 慢 / 1 標準 / 2 快)
-  /* ⚠ 預設是**手勢**(v2.14.0);在那之前是 "btn"。
-     ⚠⚠ 存檔的欄位也跟著改名成 `ctrl2` —— 舊欄位 `ctrl` 存的幾乎都是那時的預設值
-       "btn",照讀的話「改成手勢」對**所有玩過的人**都不會生效(而他們正是回報
-       「按鈕擋住盤面」的那些人)。改名 = 那一次的選擇作廢,大家重新從新預設開始。 */
-  let ctrl = "swipe";                   // 控制方式
   let lvKey = "norm";                   // 電腦強度
   let rec = { best: 0, sprint: 0, win: 0, lose: 0 };
 
@@ -49,22 +44,19 @@ const Solo = (function(){
       const o = JSON.parse(localStorage.getItem(OWN_KEY)) || {};
       if(o.mode === "sprint" || o.mode === "endless" || o.mode === "vs") mode = o.mode;
       if(typeof o.feel === "number") feel = Math.max(0, Math.min(2, o.feel | 0));
-      if(o.ctrl2 === "btn" || o.ctrl2 === "swipe" || o.ctrl2 === "both") ctrl = o.ctrl2;
       if(o.lv) lvKey = BLKAI.levelOf(o.lv).key;
       if(o.rec) rec = { best: o.rec.best | 0, sprint: o.rec.sprint | 0,
                         win: o.rec.win | 0, lose: o.rec.lose | 0 };
     }catch(e){}
     BLKB.setFeel(feel);
-    BLKB.setCtrl(ctrl);
   }
   function saveOwn(){
-    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ mode, feel, ctrl2: ctrl, lv: lvKey, rec })); }catch(e){}
+    try{ localStorage.setItem(OWN_KEY, JSON.stringify({ mode, feel, lv: lvKey, rec })); }catch(e){}
   }
 
   /* ---------- 設定 ---------- */
   function setMode(m){ if(m === "sprint" || m === "endless" || m === "vs"){ mode = m; saveOwn(); } }
   function setFeel(v){ feel = Math.max(0, Math.min(2, v | 0)); BLKB.setFeel(feel); saveOwn(); }
-  function setCtrl(v){ ctrl = (v === "swipe" || v === "both") ? v : "btn"; BLKB.setCtrl(ctrl); saveOwn(); }
   function setLevel(v){ lvKey = BLKAI.levelOf(v).key; saveOwn(); }
 
   /* ---------- 開局 ---------- */
@@ -236,8 +228,8 @@ const Solo = (function(){
 
   return {
     start, again, quit, togglePause, onEvents, onFrame, loadOwn, paintBar, paintHud,
-    setMode, setFeel, setCtrl, setLevel,
-    mode: () => mode, feel: () => feel, ctrl: () => ctrl,
+    setMode, setFeel, setLevel,
+    mode: () => mode, feel: () => feel,
     level: () => lvKey, rec: () => rec,
     /* ★ ui-kit 的返回鍵守衛與更新檢查都會問這兩個 */
     playing: () => on && !ended,

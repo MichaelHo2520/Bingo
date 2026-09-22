@@ -55,22 +55,6 @@ const BLKB = (function(){
   const ARR_MS = [55, 33, 18];
   let feel = 1;                         // 0..2,對應上面兩張表
 
-  /* 手勢參數(v2.14.0 起這是**預設**的操作方式,不再是選配)。
-     ⚠ 橫拖的步距**一定要跟著格子走**,不可以寫死 px —— 寫死的話「拖一公分走幾格」
-       會隨盤面大小飄:按「大」之後格子變大、方塊卻跑得比手指快(實測差一倍)。 */
-  const G_SOFT = 30;                    // 下拖幾 px 開始軟降
-  const G_TAP = 12;                     // 位移小於這個才算點擊(旋轉)
-  /* ⚠⚠ 往上滑 = **直接落地**(v2.14.0;在那之前上滑是換牌、而落地是「往下快甩」)。
-     換過來的理由:落地是**不可逆**的,而「往下拖」與「往下快甩」同在一個方向、
-     只差在速度 —— 拖到底抬手時速度一大就變成落地,那是整套手勢最容易誤觸的一處。
-     一個方向一件事之後就沒有這個歧義了,而「不可逆的動作放在不可能誤觸的方向」
-     這筆交換很划算。⚠ 門檻比原本的換牌高一點(48 > 40),同樣是因為它不可逆。 */
-  const G_UP = 48;                      // 上滑幾 px 算直接落地
-  const G_AXIS = 12;                    // 超過這個位移才決定主軸(見下面的軸鎖)
-  const G_BREAK = 3;                    // 橫軸鎖定後,下拖要超過 G_SOFT 的幾倍才准轉去軟降
-  const G_TWO = 420;                    // 第二根手指在這段時間內落下才算「兩指點」(逆轉)
-  function gStep(){ return Math.max(16, cell); }
-
   /* ==========================================================================
      二、狀態
      ========================================================================== */
@@ -102,11 +86,9 @@ const BLKB = (function(){
 
   /* 輸入 */
   const inp = { dir: 0, dasT: 0, arrT: 0, soft: false, keys: {} };
-  let gest = null;                      // 手勢中的指標
-  /* ⚠ 預設是**手勢**(v2.14.0)。在那之前是 "btn",而六顆浮動鈕正好蓋住盤面下緣 ——
-     那裡是堆得最高、最需要看清楚的一塊(使用者實機回報)。
-     ★ 想切回按鈕的人走設定裡的「操作方式」,solo.js 會把它存起來。 */
-  let ctrlMode = "swipe";               // "btn" | "swipe" | "both"
+  /* ⚠⚠ v2.15.1 起**只有按鈕**。手勢那一套(手勢 / 兩者 / 按鈕 三選一)整個拿掉了 ——
+     使用者:「我們現在正確來說應該是只剩按鍵,不要用手勢控制」。
+     ★ 不要「順手」把它加回來(同換牌那一條,紅線 ⑨):它不是漏掉的東西,是砍掉的。 */
   /* 鈕現在擺哪一種(v2.15.0)。false = 盤面**正下方**一條真的橫列(預設)、
      true = 兩簇貼在盤面**左右兩側的底角**(body.blk-side)。
      ★ 這不是設定、也不是 @media 決定的 —— 是 pickPad() **量出來的**(誰讓盤面大誰贏)。
@@ -846,7 +828,7 @@ const BLKB = (function(){
   /* ==========================================================================
      八、輸入
      ──────────────────────────────────────────────────────────────────────────
-       一個收斂點:act(name)。鍵盤、按鈕、手勢三條路全部走它,
+       一個收斂點:act(name)。鍵盤與螢幕按鈕兩條路全部走它,
        所以「這個動作現在能不能做」只有一個地方要判(紅線:不要散在各個 handler)。
      ========================================================================== */
   function act(name){
@@ -943,12 +925,12 @@ const BLKB = (function(){
        ⚠ 因此**熱區矩形那一套整個拿掉了**(原本的 .blk-key::before):
          兩套規則會在重疊區給出不同答案(矩形是「DOM 後面那顆贏」、吸附是「最近的贏」),
          留著就是自己跟自己打架。現在只有一條規則:**最近的贏**。
-       ⚠⚠ 入口在 **#blkPlay**(手勢那一層)而不是 .blk-pad —— .blk-pad 整層是
+       ⚠⚠ 入口在 **#blkPlay**(整個對局區)而不是 .blk-pad —— .blk-pad 整層是
          pointer-events:none,簇外面的按壓它根本收不到,而那正是要吸附的情況。
-       ⚠ 半徑要有上限:按在盤面正中央不可以被吸到某顆鈕上去(「兩者」模式下那是手勢)。
+       ⚠ 半徑要有上限:按在盤面正中央不可以被吸到某顆鈕上去(不然「想看清楚點一下盤面」
+         會變成方塊自己動了一下,而且那種誤觸完全看不出原因)。
      ========================================================================== */
   const SNAP_R = 46;                    // 從按鈕**邊緣**算起,幾 px 以內算按到它
-  let padHold = null;                   // { id, btn, act } —— 目前按著的那一顆
 
   /* 直接命中:e.target 就在某顆鈕上(或它的 SVG 裡)。⚠ 按鈕 .hidden 時不算。 */
   function padBtn(t){
@@ -981,35 +963,71 @@ const BLKB = (function(){
      ⚠ 落地是唯一不可逆的動作 → 這一顆與旋轉之間刻意拉開(CSS 的 .blk-pad-r gap)。 */
   const DROP_MS = 150;                  // 按住超過這麼久就只是軟降,放開不補落地
 
+  /* ⚠⚠⚠ **一根手指一筆,不可以只記「目前按著的那一顆」**(v2.15.1 的修正)。
+     使用者:「如果長按左右按鈕時,這個時候去按旋轉,左、右就沒辦法繼續執行」。
+     原本 padDown() 第一行是 `padUp()`(「保險:上一顆還按著的話先放掉」)——
+     而在手機上**同時按兩顆是常態**(左手壓著 ◀ 連發、右手點 ↻),那一行等於
+     「按旋轉就把左右鬆開」,而且手指還壓在螢幕上、放開時也不會再接回去。
+     → 改成 Map:key 是 pointerId,每一根手指各自按下 / 放開,互不干擾。
+     ⚠ 放開方向鍵時要 resumeDir():另一根手指還壓著反方向的話要接回去。 */
+  const padHold = new Map();            // pointerId → { btn, act, t0 }
+
   function padDown(b, e, host){
-    padUp();                            // 保險:上一顆還按著的話先放掉
+    const id = (e && e.pointerId != null) ? e.pointerId : 0;
+    if(padHold.has(id)) padUp(e);       // 同一根手指沒放開又按下:先收乾淨
     /* ⚠⚠ 「按多久」量的是**遊戲時間 `st.time`**,不是 wall clock、也不是 setTimeout。
        ① 語意上這才對:蓋板開著 / 暫停的時候按住不該算(同 HUD 計時那條紅線 ㉒);
        ② headless 的虛擬時間下 `performance.now()` **不跟著 setTimeout 推進**,
           兩者都試過都在 e2e 裡永遠判成「短按」(E11 實測:按住 360ms 還是落地了)——
           而 `st.time` 是規則層在 tick() 裡累積的,e2e 用 BLKB.step() 推得動。
        ★ 一個判定同時滿足「真機行為對」與「測得到」的時候,就選它。 */
-    padHold = { id: e.pointerId, btn: b, act: b.dataset.act, t0: st ? st.time : 0 };
+    padHold.set(id, { btn: b, act: b.dataset.act, t0: st ? st.time : 0 });
     b.classList.add("blk-on");
     buzz(b.dataset.act);
     /* ⚠ setPointerCapture 會丟例外(合成事件沒有真的 pointerId),而未捕捉的錯誤
        會被 feedback.js 的環形緩衝當成一筆 JS 錯誤記下來 → 一律包起來。 */
-    try{ host.setPointerCapture && host.setPointerCapture(e.pointerId); }catch(_){}
+    try{ host.setPointerCapture && host.setPointerCapture(id); }catch(_){}
     press(b.dataset.act === "drop" ? "soft" : b.dataset.act);
   }
+  /* 放開:`e` 帶得出 pointerId 就只放那一根,不帶(allUp 那條路)就全部放掉。 */
   function padUp(e){
-    if(!padHold) return;
-    if(e && e.pointerId != null && e.pointerId !== padHold.id) return;
-    padHold.btn.classList.remove("blk-on");
-    if(padHold.act === "drop"){
-      release("soft");
-      const quick = ((st ? st.time : 0) - padHold.t0) < DROP_MS;
-      padHold = null;                   // ⚠ 要在 act("hard") **之前**清掉:
-      if(quick) act("hard");            //   落地會走 onLock → 有可能回頭叫 allUp()
+    if(!padHold.size) return;
+    const id = (e && e.pointerId != null) ? e.pointerId : null;
+    if(id == null){
+      /* ⚠ 先整份取出來再清空:endHold() 可能走 act("hard") → onLock → 回頭叫 allUp(),
+         邊迭代邊被別人清掉的話會漏放。 */
+      const all = Array.from(padHold.values());
+      padHold.clear();
+      all.forEach(endHold);
       return;
     }
-    release(padHold.act);
-    padHold = null;
+    const h = padHold.get(id);
+    if(!h) return;
+    padHold.delete(id);                 // ⚠ 同理:要在 endHold 之前就移掉
+    endHold(h);
+  }
+  function endHold(h){
+    h.btn.classList.remove("blk-on");
+    if(h.act === "drop"){
+      release("soft");
+      if(((st ? st.time : 0) - h.t0) < DROP_MS) act("hard");
+      return;
+    }
+    release(h.act);
+    resumeDir();
+  }
+  /* 放開一邊的方向鍵之後,另一根手指還壓著另一邊的話要接回去 ——
+     不然「左右一起按、放掉其中一顆」會兩邊都停,而手指還在螢幕上。
+     ⚠ 這裡**刻意不補一次立即移動**(不走 press):手指沒有重新按下去,
+     補一格會變成「放開反而動了一下」。 */
+  function resumeDir(){
+    if(inp.dir) return;
+    let d = 0;
+    padHold.forEach(h => {
+      if(h.act === "left") d = -1;
+      else if(h.act === "right") d = 1;
+    });
+    if(d){ inp.dir = d; inp.dasT = 0; inp.arrT = 0; }
   }
 
   /* ---------- 觸覺回饋 ----------
@@ -1046,103 +1064,29 @@ const BLKB = (function(){
     elPad.addEventListener("contextmenu", e => e.preventDefault());
   }
 
-  /* ---------- 手勢(v2.14.0 起是**預設**的操作方式)----------
-     五個動作每一個都要有自己的一條路,而且**一個方向只做一件事**。
-
-       左右拖 → 一格一格移動      往下拖 → 軟降(放開就停)
-       往上滑 → 直接落地          點一下 → 順時針轉
-       兩指點一下 → 逆時針轉
-
-     ⚠⚠ 三件不知道就會做錯的事:
-     ① **感應區是整個對局區,不是盤面那塊 canvas。** fitBoard() 是被**高度**卡住的
-        → 盤面只用掉螢幕寬的一半,左右各留兩成多。手勢綁在 canvas 上的話手指非得
-        壓在盤面上不可,等於自己擋住自己要看的東西(而那正是浮動鈕被換掉的原因)。
-        → 綁在 #blkPlay 上,對手小盤 / 按鈕那幾塊**先讓開**(它們自己有事要做)。
-     ② **一定要有軸鎖。** 沒有的話橫拖時手指難免往下偏 30px → 方塊自己掉下去,
-        而使用者只會覺得「這遊戲很滑、很難控」。鎖定之後仍留一條退路(G_BREAK 倍)
-        給「先橫移、再軟降」那個連續動作。
-     ③ **不要再用「速度」去分辨兩個同方向的手勢。** v2.14.0 之前往下拖是軟降、
-        往下快甩是硬降 —— 而使用者拖到底抬手時速度往往就超過門檻,等於隨機落地。
-        現在落地改走「往上滑」,下方向專心做軟降,速度那一整套判定跟著刪掉了。 */
-  /* 這幾塊自己有事要做:小盤是「鎖定攻擊目標」、按鈕是按鈕模式的本體。
-     ⚠ HUD 列進來是為了「拖過 HUD」不會被當成新的一筆手勢。 */
-  const G_SKIP = ".blk-foe,.blk-key,.blk-hud";
-  function bindGesture(){
+  /* ---------- 輸入層:**只有按鈕**(v2.15.1 起手勢整套拿掉了)----------
+     使用者:「我們現在正確來說應該是只剩按鍵,不要用手勢控制」。
+     ★ 跟著消失的:`ctrlMode`(手勢 / 兩者 / 按鈕那一格設定)、`gest` 與
+       G_SOFT / G_TAP / G_UP / G_AXIS / G_BREAK / G_TWO / G_SKIP / `gStep()`。
+     ⚠⚠ 剩下的這一小段看起來簡單,但三件事一件都不能少:
+       ① 感應區仍然是整個對局區 **#blkPlay**,不是 `.blk-pad` ——
+          後者整層 `pointer-events:none`,而吸附(nearestKey)要收的正是
+          **按在簇外面**的那些壓。
+       ② `padBtn(e.target) || nearestKey(x, y)` 兩條都要留(紅線 ㉖之二)。
+       ③ `contextmenu` 要擋掉:手機上長按選單會把「按住連發」吃掉。 */
+  function bindInput(){
     const host = elPlay || cvMain;
     if(!host) return;
     host.addEventListener("pointerdown", e => {
-      /* ★ 按鈕先看:**直接按在鈕上**優先,其次才是「離最近的那一顆在 SNAP_R 以內」。
-         ⚠ 兩條都要有:真實觸控兩條都會過,而**合成事件常常沒有座標**
-           (e2e 的 dispatchEvent 預設 clientX/Y 是 0)—— 只留吸附那一條的話,
-           那些測試會靜靜地量到「按了沒反應」,而那正是這一版要修的症狀本身。
-         ⚠ 手勢模式下 elPad 是 .hidden → 兩條都回 null,不必另外判。 */
       const key = padBtn(e.target) || nearestKey(e.clientX, e.clientY);
-      if(key){ e.preventDefault(); padDown(key, e, host); return; }
-      if(ctrlMode === "btn") return;
-      if(e.target && e.target.closest && e.target.closest(G_SKIP)) return;
-      const now = performance.now();
-      /* 第二根手指 = 逆時針轉。
-         ⚠ 只在「第一根還沒真的拖起來」時才算,不然橫移到一半換手扶手機就會莫名轉一下。 */
-      if(gest && !gest.done){
-        if(gest.moved < 24 && (now - gest.t0) < G_TWO){
-          act("ccw");
-          gest.done = true;                       // 這一輪不再判點擊 / 硬降
-          if(gest.soft){ gest.soft = false; inp.soft = false; if(st) st.soft = false; }
-        }
-        return;
-      }
-      /* ⚠ setPointerCapture 會丟例外(合成事件沒有真的 pointerId)——
-         而未捕捉的錯誤會被 feedback.js 的環形緩衝當成一筆 JS 錯誤記下來。 */
-      try{ host.setPointerCapture && host.setPointerCapture(e.pointerId); }catch(_){}
-      gest = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
-               t0: now, moved: 0, axis: "", soft: false, done: false };
+      if(!key) return;
+      e.preventDefault();
+      padDown(key, e, host);
     });
-    host.addEventListener("pointermove", e => {
-      if(!gest || gest.done || e.pointerId !== gest.id) return;
-      gest.moved += Math.abs(e.clientX - gest.x) + Math.abs(e.clientY - gest.y);
-      /* 軸鎖(紅線 ②) */
-      const adx = Math.abs(e.clientX - gest.x0), ady = Math.abs(e.clientY - gest.y0);
-      if(!gest.axis && Math.max(adx, ady) >= G_AXIS) gest.axis = (adx > ady) ? "x" : "y";
-      /* 左右:一格一格走,步距跟著格子(不可以寫死 px) */
-      const step = gStep();
-      while(gest.axis !== "y" && Math.abs(e.clientX - gest.x) >= step){
-        const d = (e.clientX > gest.x) ? 1 : -1;
-        act(d > 0 ? "right" : "left");
-        gest.x += d * step;
-      }
-      gest.y = e.clientY;
-      /* 往上滑 = 直接落地。⚠ 做完這一輪就結束(不然抬手還會補一個點擊 = 多轉一下)。
-         ⚠ 軟降中不接受:那表示手指是先往下再往回拉,不是「往上滑」。 */
-      if(gest.axis === "y" && !gest.soft && (e.clientY - gest.y0) < -G_UP){
-        gest.done = true;
-        act("hard");
-        return;
-      }
-      /* 往下拖 = 軟降。⚠ 橫軸鎖定時要拖得更遠才准轉過來(紅線 ②的退路) */
-      const need = (gest.axis === "x") ? G_SOFT * G_BREAK : G_SOFT;
-      if(!gest.soft && (e.clientY - gest.y0) > need){
-        gest.soft = true; gest.axis = "y";
-        inp.soft = true; if(st) st.soft = true;
-      }
-    });
-    const end = e => {
-      padUp(e);                          // 按鈕那一條路(吸附)的釋放
-      if(!gest || (e.pointerId != null && e.pointerId !== gest.id)) return;
-      if(gest.soft){ inp.soft = false; if(st) st.soft = false; }
-      /* 抬手只判一件事:**幾乎沒動過就是點一下**(= 順時針轉)。
-         ⚠ v2.14.0 之前這裡還要判「是不是往下甩」,那正是誤觸落地的來源(紅線 ③)。 */
-      if(!gest.done && gest.moved < G_TAP && !gest.axis) act("cw");
-      gest = null;
-    };
-    host.addEventListener("pointerup", end);
+    host.addEventListener("pointerup", padUp);
     host.addEventListener("lostpointercapture", padUp);
-    host.addEventListener("pointercancel", e => {
-      padUp(e);
-      if(gest && gest.soft){ inp.soft = false; if(st) st.soft = false; }
-      gest = null;
-    });
-    // ⚠ 長按選單與雙擊縮放在手機上會把操作整個吃掉
-    host.addEventListener("contextmenu", e => { if(ctrlMode !== "btn") e.preventDefault(); });
+    host.addEventListener("pointercancel", padUp);
+    host.addEventListener("contextmenu", e => e.preventDefault());
   }
 
   /* ==========================================================================
@@ -1238,7 +1182,7 @@ const BLKB = (function(){
     ctxN = cvNext.getContext("2d");
     mounted = true;
     bindPad();
-    bindGesture();
+    bindInput();
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("resize", () => fitBoard());
@@ -1278,8 +1222,9 @@ const BLKB = (function(){
   }
   function allUp(){
     inp.dir = 0; inp.soft = false; inp.keys = {};
-    gest = null;                        // ⚠ 手勢也要清:切背景時手指還壓著的話回來就卡住了
-    padHold = null;                     // ⚠ 同理:按著的那一顆(release 由下面那行統一做)
+    /* ⚠ 按著的那幾顆也要清 —— 切背景時手指還壓著的話,回來就卡在「一直往左跑」。
+       (release 由上下那兩行統一做,所以這裡只要把帳清掉。) */
+    padHold.clear();
     if(st) st.soft = false;
     if(elPad) elPad.querySelectorAll(".blk-on").forEach(b => b.classList.remove("blk-on"));
   }
@@ -1294,17 +1239,10 @@ const BLKB = (function(){
   function pause(){ running = false; allUp(); }
   function stop(){ running = false; allUp(); }
   function setFeel(i){ feel = clamp(i | 0, 0, DAS_MS.length - 1); }
-  /* ⚠ 切成手勢就整層收起來(.hidden = display:none)→ 那條橫列不再佔版面,
-     盤面自己長回去;fitBoard() 會重新挑擺法。 */
-  function setCtrl(m){
-    ctrlMode = (m === "swipe" || m === "both") ? m : "btn";
-    if(elPad) elPad.classList.toggle("hidden", ctrlMode === "swipe");
-    fitBoard();
-  }
 
   return {
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,
-    act, setFeel, setCtrl, incoming, pop, shake,
+    act, setFeel, incoming, pop, shake,
     setFoes, foeAt, beamOut, beamIn, foes: () => foes,
     /* ★ 測試用的三個出口(產品程式不會呼叫它們):
        step(dt) 手動推一幀、frames() 是至今推了幾幀、awake() 是 rAF 現在排著沒有。
@@ -1320,7 +1258,7 @@ const BLKB = (function(){
     COL, COL_GARB, DAS_MS, ARR_MS,
     /* ★ pad() 回的是**量出來的擺法**("bar" = 盤面正下方那條橫列 / "side" = 左右底角),
        不是設定值 —— 那個設定 v2.15.0 已經整格拿掉了。e2e 靠它驗兩種擺法都真的會出現。 */
-    feel: () => feel, ctrl: () => ctrlMode, pad: () => (padSide ? "side" : "bar"),
+    feel: () => feel, pad: () => (padSide ? "side" : "bar"),
     bar: barH, wide: isWide
   };
 })();

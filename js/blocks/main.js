@@ -56,22 +56,23 @@ function showScreen(which){
   syncPageBack();
 }
 
-/* ---------- 手勢說明(單一真相)----------
+/* ---------- 操作說明(單一真相)----------
    ★ 進場頁那一張(#blkGestCard)與房間框「?」打開的蓋板(#blkGuideBody)印的是**同一份** ——
      寫死兩份 HTML 就是遲早會分岔的雙胞胎(而說明與實際操作對不上比沒有說明更糟)。
-   ⚠ 圖示一律自繪 SVG,不用 emoji:U+2194 那一段的箭頭在桌機 Chrome / Edge 上會退回
-     線條字形、在手機上又是另一個樣子(紅線 8 的另一面),而且彩色 emoji 不吃 color。 */
+   ⚠⚠ v2.15.1 起這裡講的是**四顆按鈕**,不是手勢 —— 手勢那一整套已經拿掉了
+     (使用者:「只剩按鍵,不要用手勢控制」)。四格的圖示與實際按鈕**刻意畫成同一組線條**。
+   ⚠ 圖示一律自繪 SVG,不用 emoji:U+25C0 那一段的箭頭在桌機 Chrome / Edge 上會退回
+     線條字形、在手機上又是另一個樣子(紅線 8 的另一面),而且彩色 emoji 不吃 color。
+   ⚠ class 仍然是 .blk-gest-*(版面共用同一套)—— 名字留著,內容換掉。 */
+/* ⚠ 文字裡**不要出現 ◀ ▶ ↻ 那幾個字元** —— 圖示已經畫出來了,而那些字元的字形
+   每台機器不一樣(U+25C0 那一段在桌機上又重又鈍,紅線 8 的另一面)。
+   ⚠ 每一格的兩行都要短:字一長就換行,整張卡變高 → 上面那張「怎麼玩」被擠掉一半。 */
 const BLK_GEST = [
-  ['<circle cx="12" cy="12" r="3.2"/><path d="M5.6 12H2.4m3.2-2.6L2.6 12l3 2.6M18.4 12h3.2m-3.2-2.6L21.4 12l-3 2.6"/>',
-   "左右拖", "移動"],
-  ['<circle cx="12" cy="7" r="3"/><path d="M12 12.4v7.2m-3.2-3.2l3.2 3.2 3.2-3.2"/>',
-   "往下拖", "慢慢降"],
-  ['<circle cx="12" cy="12" r="3"/><path d="M6.6 6.6a7.6 7.6 0 000 10.8M17.4 6.6a7.6 7.6 0 010 10.8"/>',
-   "點一下", "順時針轉"],
-  ['<circle cx="12" cy="17" r="3"/><path d="M12 11.6V4.4m-3.2 3.2L12 4.4l3.2 3.2"/>',
-   "往上滑", "直接落地"],
-  ['<circle cx="7.6" cy="12" r="3"/><circle cx="16.4" cy="12" r="3"/>',
-   "兩指點一下", "逆時針轉"]
+  ['<path d="M14.4 5.4L7.2 12l7.2 6.6"/>', "左邊", "往左 · 按住連發"],
+  ['<path d="M9.6 5.4L16.8 12l-7.2 6.6"/>', "右邊", "往右 · 按住連發"],
+  ['<path d="M19 12a7 7 0 10-2.4 5.3"/><path d="M19.4 6.6v4.8h-4.8"/>', "旋轉", "順時針"],
+  ['<path d="M12 4v10m-4.4-3.6L12 14.8l4.4-4.4M5.6 19.4h12.8"/>', "短按", "直接落地"],
+  ['<path d="M12 4v10m-4.4-3.6L12 14.8l4.4-4.4M5.6 19.4h12.8"/>', "按住", "慢慢降"]
 ];
 function blkGestHtml(){
   const cells = BLK_GEST.map(g =>
@@ -81,11 +82,12 @@ function blkGestHtml(){
         g[0] + '</svg>' +
       '<span>' + g[1] + '<b>' + g[2] + '</b></span>' +
     '</div>').join("");
-  return '<div class="blk-gest-head">手指在畫面上<b>任何地方</b>都可以 —— 不必壓在盤面上</div>' +
+  return '<div class="blk-gest-head">四顆鈕在畫面<b>最下面</b>:左邊兩顆移動、' +
+         '右邊是旋轉與落地(同一顆<b>短按落地、按住慢慢降</b>)。不必按得很準,' +
+         '按在附近就算那一顆。</div>' +
          '<div class="blk-gest-grid">' + cells + '</div>' +
          '<div class="blk-gest-kb">電腦鍵盤:方向鍵移動 · <b>空白鍵</b>直接落地 · ' +
-         '<b>↑ / X</b> 順轉 · <b>Z</b> 逆轉<br>' +
-         '改用按鈕的話:右下那一顆<b>短按 = 直接落地</b>、<b>按住 = 慢慢降</b></div>';
+         '<b>↑ / X</b> 順轉 · <b>Z</b> 逆轉</div>';
 }
 function paintGestCards(){
   const html = blkGestHtml();
@@ -93,7 +95,7 @@ function paintGestCards(){
 }
 /* 說明蓋板。⚠ 單機時它開著方塊要停住(BLK_VEILS 有登記),而**連線刻意不停**
    —— 別人還在玩,自己看說明不能讓全場等你(同設定蓋板那一條)。 */
-function openBlkGuide(){ syncCtrlSeg(); const el = $("blkGuideVeil"); if(el) el.classList.add("show"); }
+function openBlkGuide(){ const el = $("blkGuideVeil"); if(el) el.classList.add("show"); }
 function closeBlkGuide(){ const el = $("blkGuideVeil"); if(el) el.classList.remove("show"); }
 
 /* ---------- 進場選單的兩層 ---------- */
@@ -119,7 +121,7 @@ function paintSoloHint(){
       : ("<b>練習(無盡)</b>:一路堆到爆為止,重力每 30 秒快一階。" +
          (r.best ? "你最高 <b>" + r.best + " 行</b>。" : "還沒有紀錄。"));
   el.innerHTML = body + "<br>" +
-    "操作預設是<b>手勢</b>(上一層有圖解;對局中按房間框的「<b>?</b>」也看得到)。<br>" +
+    "操作是畫面<b>最下面那四顆鈕</b>(上一層有圖解;對局中按房間框的「<b>?</b>」也看得到)。<br>" +
     '<span class="blk-warn">◆ 手感不順就調下面那排「移動速度」—— 那是這個遊戲最該先調的東西。</span>';
 }
 function segPick(id, attr, fn){
@@ -139,22 +141,14 @@ function syncSoloSeg(){
   set("blkModeSeg", "mode", Solo.mode());
   set("blkFeelSeg", "feel", Solo.feel());
   set("blkLvSeg", "lv", Solo.level());
-  syncCtrlSeg();
   /* 電腦強度只有「對電腦」用得到 → 其他玩法收起來(留著只會讓人以為練習也有電腦) */
   const lvRow = $("blkLvRow");
   if(lvRow) lvRow.classList.toggle("hidden", Solo.mode() !== "vs");
 }
-/* 操作方式有**兩個**入口:單機設定頁一個、說明蓋板一個(連線那條路只有後者 ——
-   它是連線玩家唯一能改操作方式的地方)。⚠ 兩邊都要跟著同一個值走。
-   ⚠ v2.15.0 拿掉了「按鈕位置」那一格(浮在盤面上 / 固定在下方)——
-     鈕一律在最下面,兩種擺法由 board.js 的 pickPad() 量出來自己挑,沒有旋鈕了。 */
-function syncCtrlSeg(){
-  const v = Solo.ctrl();
-  ["blkCtrlSeg", "blkCtrlSeg2"].forEach(id => {
-    const seg = $(id); if(!seg) return;
-    [...seg.children].forEach(b => b.classList.toggle("on", String(b.dataset.ctrl) === String(v)));
-  });
-}
+/* ⚠ 操作方式那兩格設定(手勢 / 兩者 / 按鈕)v2.15.1 **整個拿掉了** ——
+   只剩按鍵,沒有旋鈕可以調;「?」蓋板現在純粹是說明。
+   ⚠ v2.15.0 也已經拿掉「按鈕位置」那一格 —— 鈕一律在最下面,
+     兩種擺法由 board.js 的 pickPad() 量出來自己挑。 */
 
 /* 蓋板(設定 / 表情 / 自訂語音 / 問題回報 / 房間分享)開著的時候,單機不要繼續掉方塊。
    ⚠ 另外十四頁是回合制,蓋板開著頂多是「輪到你但你沒動」;**這一頁是即時的** ——
@@ -200,14 +194,6 @@ $("blkGoSolo").addEventListener("click", () => { paintSoloHint(); showHomeLayer(
 $("blkSoloCfgBack").addEventListener("click", () => showHomeLayer("pick"));
 segPick("blkModeSeg", "mode", v => Solo.setMode(v));
 segPick("blkFeelSeg", "feel", v => Solo.setFeel(+v));
-segPick("blkCtrlSeg", "ctrl", v => Solo.setCtrl(v));
-/* 說明蓋板裡那一份(連線玩家唯一的入口)。⚠ 它不在單機設定頁裡 → 不可以走 segPick
-   (那支做完會叫 paintSoloHint,而連線時那一段 DOM 根本沒顯示) */
-$("blkCtrlSeg2").addEventListener("click", e => {
-  const b = e.target.closest("button"); if(!b) return;
-  Solo.setCtrl(b.dataset.ctrl);
-  syncCtrlSeg();
-});
 $("blkHelpBtn").addEventListener("click", openBlkGuide);
 $("blkSoloHelpBtn").addEventListener("click", openBlkGuide);
 $("blkGuideClose").addEventListener("click", closeBlkGuide);
