@@ -29,8 +29,6 @@
         否則搶輸的那台會先樂觀看到「我贏」而多記一分,game 回退時分數不跟著退。
 
    ⚠ 洞位由**送出端**決定並寫進事件,接收端不得自行重抽(兩邊看到的洞必須一樣)。
-   ⚠ 讓分是**每個人自己選的**(hcap/{pid}),而倍率只在本機生效:
-     送出時乘自己的 send、收到時乘自己的 recv —— 所以只要讀自己那一個值。
    ========================================================================== */
 
 const MP = MPCore.create((function(){
@@ -47,8 +45,6 @@ const MP = MPCore.create((function(){
   const SECS = [120, 180, 300];
   const SHIELDS = [0, 10, 20];
   let rules = { mode: "ko", secs: 180, shield: 20 };
-  let myHcap = R.HCAP_EVEN;
-  let hcapAll = {};                     // pid → 讓分等級(全房的,大廳那一行要畫)
 
   /* ---------- 一局 ---------- */
   let st = null;                        // 我的狀態(本機權威)
@@ -60,7 +56,7 @@ const MP = MPCore.create((function(){
   const ackd = {};                      // from → 已經消費到第幾號
   let seq = 0, pubT = 0, fullT = 0, lastBoard = "";
   let myDeaths = 0, lastHitBy = "", deadAt = 0, settleT = null;
-  let liveRef = null, atkRef = null, hcapRef = null;
+  let liveRef = null, atkRef = null;
   let lastGame = null;                  // 最後一次收到的 game 快照(koOf / 結算查它)
 
   /* ==========================================================================
@@ -92,14 +88,7 @@ const MP = MPCore.create((function(){
   function setSecs(v){ v = +v; if(FIELDS.secs.ok(v)) ctx.setRoomField("secs", v); }
   function setShield(v){ v = +v; if(FIELDS.shield.ok(v)) ctx.setRoomField("shield", v); }
 
-  /* 讓分:**每個人自己選**(不是房主指定)——
-     聚會場合「我不太會玩,我選讓 2」比「房主幫你決定」自然得多,而且零 UI 衝突。 */
-  function setHcap(v){
-    const i = v | 0;
-    myHcap = (i >= 0 && i < R.HCAP.length) ? i : R.HCAP_EVEN;
-    if(hcapRef && ctx.me()) hcapRef.child(ctx.me()).set(myHcap);
-    paintSetup();
-  }
+  /* ★ 這裡本來有 setHcap()(每個人自己選的讓分)—— v2.15.2 整套拿掉了,見 rules.js 紅線 ⑤。 */
 
   /* ==========================================================================
      三、一局的生命週期
@@ -161,8 +150,7 @@ const MP = MPCore.create((function(){
 
     st = R.blank({
       seed: seed,
-      rules: { mode: gRules.mode, secs: gRules.secs, shield: gRules.shield, combo: true },
-      hcap: myHcap                      // ★ blank() 會照這個把 send / recv 設好
+      rules: { mode: gRules.mode, secs: gRules.secs, shield: gRules.shield, combo: true }
     });
 
     foes = {};
@@ -249,7 +237,6 @@ const MP = MPCore.create((function(){
   function listen(){
     liveRef = ctx.ref("live");
     atkRef  = ctx.ref("attacks");
-    hcapRef = ctx.ref("hcap");
     if(!liveRef) return;
 
     const onLive = s => {
@@ -284,13 +271,6 @@ const MP = MPCore.create((function(){
       const i = foeIndex(a.from);
       if(i >= 0) BLKB.beamIn(i, a.lines);
       pubFull(false);                                        // 把 ack 寫進快照(重整後才去得掉重)
-    });
-
-    hcapRef && hcapRef.on("value", s => {
-      /* ⚠ 整份留著,不要只挑自己那一個 —— 大廳要畫「誰讓了幾分」那一行。 */
-      hcapAll = s.val() || {};
-      if(ctx.me() && typeof hcapAll[ctx.me()] === "number") myHcap = hcapAll[ctx.me()];
-      paintSetup();
     });
   }
 
@@ -498,26 +478,9 @@ const MP = MPCore.create((function(){
     seg("blkModeSegMp", "mode", rules.mode);
     seg("blkSecsSeg", "secs", rules.secs);
     seg("blkShieldSeg", "shield", rules.shield);
-    seg("blkHcapSeg", "hcap", myHcap);
     const row = $("blkSecsRow");
     if(row) row.classList.toggle("hidden", rules.mode !== "ko");
-    paintHcaps();
   }
-  /* 「誰讓了幾分」那一行。★ 只列不是「平」的人 —— 全房都平的時候整行收起來。
-     ⚠ 名單用 ctx.players()(座位上的人),不是 hcapAll 的 key:
-       離開的人那一筆還留在節點上,照著畫會列出已經不在房裡的名字。 */
-  function paintHcaps(){
-    const el = $("blkHcaps");
-    if(!el || !ctx) return;
-    const ids = Object.keys(ctx.players() || {});
-    const list = ids.filter(id => {
-      const v = hcapAll[id];
-      return typeof v === "number" && (v | 0) !== R.HCAP_EVEN;
-    }).map(id => esc(ctx.dispName(id)) + " <b>" + esc(R.hcapOf(hcapAll[id]).name) + "</b>");
-    el.innerHTML = list.length ? ("這一局的讓分:" + list.join(" · ")) : "";
-    el.classList.toggle("hidden", !list.length);
-  }
-
   /* ==========================================================================
      九、伺服器時間
      ──────────────────────────────────────────────────────────────────────────
@@ -544,7 +507,7 @@ const MP = MPCore.create((function(){
     winCardId: "blkWinCard",
     minPlayers: 2, maxPlayers: 4,
     spectate: true,
-    extraNodes: ["live", "attacks", "hcap"],
+    extraNodes: ["live", "attacks"],
     scoreUnit: "勝", goalDefault: 3, goalMax: 10,
 
     init(c){ ctx = c; armClock(); },
@@ -569,8 +532,6 @@ const MP = MPCore.create((function(){
     enterLobby(){
       showScreen("lobby");
       resetRound();
-      /* 讓分是每個人自己的 → 進大廳就把本機記著的那一個寫上去(別人看得到) */
-      if(hcapRef && ctx.me() && !ctx.spectating()) hcapRef.child(ctx.me()).set(myHcap);
       paintSetup();
     },
     backToLobby(){ showScreen("lobby"); resetRound(); },
@@ -593,24 +554,16 @@ const MP = MPCore.create((function(){
         : ("最後站著的是你 —— 消了 " + (st ? st.lines : 0) + " 行") };
       return { word: "輸了", msg: "<b>" + esc(ctx.dispName(winner)) + "</b> 贏了這一局" };
     },
-    /* ⚠ 讓分那一行也要跟著重畫 —— 它列的是「座位上的人」,而這個鉤子正是
-       玩家名單變動時被呼叫的(有人離開時不重畫就會留著已經不在房裡的名字)。 */
-    refresh(){ paintHcaps(); if(order.length) rebuildFoes(); },
-
-    ownPrefs(){ return { blkHcap: myHcap }; },
-    usePrefs(o){
-      const i = o && typeof o.blkHcap === "number" ? (o.blkHcap | 0) : -1;
-      myHcap = (i >= 0 && i < R.HCAP.length) ? i : R.HCAP_EVEN;
-    },
+    /* 玩家名單變動時被呼叫 —— 對手小盤那一排要跟著重建。 */
+    refresh(){ if(order.length) rebuildFoes(); },
 
     api: {
       onEvents: onEvents,
       onFrame: onFrame,
       canPlay: canPlay,
-      setMode, setSecs, setShield, setHcap,
+      setMode, setSecs, setShield,
       tapFoe: tapFoe,
       rules: () => rules,
-      myHcap: () => myHcap,
       state: () => st
     }
   };

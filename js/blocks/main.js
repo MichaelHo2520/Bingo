@@ -218,7 +218,6 @@ $("reopenWin").addEventListener("click", showResult);
   $("blkModeSegMp").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setMode(b.dataset.mode); });
   $("blkSecsSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setSecs(b.dataset.secs); });
   $("blkShieldSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setShield(b.dataset.shield); });
-  $("blkHcapSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setHcap(+b.dataset.hcap); });
   $("scoreSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setScoreMode(b.dataset.score); });
   $("wgMinus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() - 1));
   $("wgPlus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() + 1));

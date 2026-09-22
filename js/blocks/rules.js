@@ -11,7 +11,7 @@
      • SRS wall kick(官方表逐項照抄,I 與其他分表,O 不轉)
      • 決定性 7-bag:pieceAt(seed, i) 是**查詢函式**,不是產生器
      • 移動 / 旋轉 / 軟降 / 硬降 / Ghost(**沒有 Hold** —— v2.14.0 拿掉了,見下面)
-     • 鎖定 · 消行 · 攻擊量(含 Combo 與全消)· 讓分倍率
+     • 鎖定 · 消行 · 攻擊量(含 Combo 與全消)—— **沒有讓分倍率**,v2.15.2 拿掉了
      • 垃圾行:排隊 → 抵銷 → 推上來;洞位由送出端決定
      • tick(st, dt):時間推進(重力、鎖定延遲),回傳事件陣列
      • save/load(無損還原,回座用)與 snap(給對手小盤看的精簡快照)
@@ -29,8 +29,13 @@
         `holdSwap()` / 快照的 `h` 欄位 / HUD 左邊那一格 / 鍵盤 `C`·`Shift` / 那顆「換」鈕。
         ⚠ **不要「順手」把它加回來** —— 它不是漏掉的功能,是刻意砍掉的難度旋鈕。
         落下中推盤會讓方塊卡進牆裡,而且對手看到的位置一定對不上。
-     ⑤ **攻擊量的讓分倍率要用累積器(carry)保留小數。**
-        直接四捨五入的話 ×1.25 的 Double 永遠還是 1 行,讓分等於沒有作用。
+     ⑤ **(已不適用)** 讓分(handicap)在 v2.15.2 整個拿掉了 —— 使用者:「把讓分拿掉好了,
+        因為如果做不出可以讓人看得懂跟實際上有的功能,還不如不寫,別讓人誤會了」。
+        連帶消失的有 `HCAP` / `hcapOf()` / `scale()` / 狀態的 `send`·`recv`·`carry`·`rcarry`
+        四個欄位 / 大廳那一格與那一行 / `hcap` 這個 Firebase 節點。
+        ⚠ **不要「順手」把倍率加回來** —— 它不是漏掉的功能,是刻意砍掉的。
+        真的要做強弱平衡,旋鈕是**新手保護秒數**(看得懂、而且每個人都知道它在做什麼)。
+        ★ 編號留著不重排:⑥ 底下那幾條的「紅線 ⑥」在程式裡是寫死的字串。
      ⑥ **tick() 的 dt 必須有上限。** 分頁凍結回來時 dt 可能是好幾萬毫秒,
         不夾住就會在一幀裡補算幾百次重力 → 整頁卡死(plan 5.2)。
    ========================================================================== */
@@ -185,23 +190,8 @@ const BLK = (function(){
     return Math.max(lo, Math.min(hi, v));
   }
 
-  /* 讓分等級 → 送出 / 收到倍率。index 0..4 對應「讓 2 / 讓 1 / 平 / 受 1 / 受 2」 */
-  const HCAP = [
-    { key: "give2", name: "讓 2", send: 1.5,  recv: 0.5  },
-    { key: "give1", name: "讓 1", send: 1.25, recv: 0.75 },
-    { key: "even",  name: "平",   send: 1,    recv: 1    },
-    { key: "take1", name: "受 1", send: 0.8,  recv: 1.25 },
-    { key: "take2", name: "受 2", send: 0.66, recv: 1.5  }
-  ];
-  const HCAP_EVEN = 2;
-  /* ⚠ 超出範圍一律回「平」,**不是夾到邊界** ——
-     讓分等級是從別台傳過來的數字,壞掉的值夾到 0 就變成「讓 2」,
-     等於一個亂碼欄位可以默默把某個人變強。不認得的值只能是「平」。 */
-  function hcapOf(lv){
-    const i = Math.round(Number(lv));
-    if(!isFinite(i) || i < 0 || i >= HCAP.length) return HCAP[HCAP_EVEN];
-    return HCAP[i];
-  }
+  /* ★ 這裡本來有一張讓分倍率表(`HCAP` / `hcapOf()`)—— v2.15.2 整個拿掉了,
+     理由與連帶消失的東西見檔頭紅線 ⑤。**攻擊量現在每個人都是 1:1。** */
 
   /* ==========================================================================
      四、7-bag —— 寫成 O(1) 查詢函式(紅線 ②)
@@ -298,10 +288,6 @@ const BLK = (function(){
       ko:     0,                        // KO 幾個人(KO 賽計分)
       deaths: 0,
       pieces: 0,
-      carry:  0,                        // 送出倍率的小數累積(紅線 ⑤)
-      rcarry: 0,                        // 收到倍率的小數累積
-      send:   1,
-      recv:   1,
       time:   0,                        // 這一局已經過幾 ms
       fall:   0,                        // 重力累積
       lockT:  0,                        // 貼地後累積
@@ -310,9 +296,6 @@ const BLK = (function(){
       dead:   false,
       deadT:  0                         // 死了多久(KO 賽用來算復活)
     };
-    const h = hcapOf(o.hcap === undefined ? HCAP_EVEN : o.hcap);
-    st.send = h.send;
-    st.recv = h.recv;
     st.shield = st.rules.shield;
     spawn(st);
     return st;
@@ -467,8 +450,7 @@ const BLK = (function(){
       ev.pc = boardEmpty(st.board);
       if(ev.pc) atk += PC_ATK;
       ev.atk = atk;
-      const scaled = scale(st, atk);
-      ev.out = cancel(st, scaled);      // 先抵銷自己的,剩下的才送出去
+      ev.out = cancel(st, atk);         // 先抵銷自己的,剩下的才送出去
       st.sent += ev.out;
     }
 
@@ -480,14 +462,6 @@ const BLK = (function(){
     return ev;
   }
 
-  /* 送出量 × 讓分倍率,小數用 carry 留著(紅線 ⑤) */
-  function scale(st, n){
-    if(n <= 0) return 0;
-    const raw = n * st.send + st.carry;
-    const out = Math.floor(raw);
-    st.carry = raw - out;
-    return out;
-  }
   /* 用 atk 行抵銷自己的待處理垃圾,回傳抵銷不完、要送出去的行數 */
   function cancel(st, atk){
     while(atk > 0 && st.pend.length){
@@ -511,12 +485,8 @@ const BLK = (function(){
     /* ⚠ 保護期間的天花板(SHIELD_CAP)。滿了就**直接丟掉**,不排進去 ——
        「保護」不可以只是把帳延後到解除那一秒一次算。 */
     if(st.shield > 0 && pendCount(st) >= SHIELD_CAP) return 0;
-    const raw = n * st.recv + st.rcarry;
-    const m = Math.floor(raw);
-    st.rcarry = raw - m;
-    if(m <= 0) return 0;
-    st.pend.push({ n: m, hole: ((hole | 0) % COLS + COLS) % COLS, from: from || "" });
-    return m;
+    st.pend.push({ n: n, hole: ((hole | 0) % COLS + COLS) % COLS, from: from || "" });
+    return n;
   }
   /* 把佇列推上來。一次鎖定最多 GARB_CAP 行,剩下的留著下一次 ——
      沒有這個上限的話,一波大攻擊可以讓人「一顆都還沒放就死了」。 */
@@ -643,7 +613,6 @@ const BLK = (function(){
       pend: st.pend.map(p => [p.n, p.hole, p.from]),
       shield: st.shield, combo: st.combo, lines: st.lines, sent: st.sent,
       ko: st.ko, deaths: st.deaths, pieces: st.pieces,
-      carry: st.carry, rcarry: st.rcarry, send: st.send, recv: st.recv,
       time: st.time, fall: st.fall, lockT: st.lockT, resets: st.resets,
       soft: st.soft ? 1 : 0, dead: st.dead ? 1 : 0, deadT: st.deadT
     };
@@ -657,9 +626,6 @@ const BLK = (function(){
     st.shield = o.shield || 0;
     st.combo = o.combo | 0; st.lines = o.lines | 0; st.sent = o.sent | 0;
     st.ko = o.ko | 0; st.deaths = o.deaths | 0; st.pieces = o.pieces | 0;
-    st.carry = o.carry || 0; st.rcarry = o.rcarry || 0;
-    st.send = (o.send === undefined) ? 1 : o.send;
-    st.recv = (o.recv === undefined) ? 1 : o.recv;
     st.time = o.time || 0; st.fall = o.fall || 0;
     st.lockT = o.lockT || 0; st.resets = o.resets | 0;
     st.soft = !!o.soft; st.dead = !!o.dead; st.deadT = o.deadT || 0;
@@ -732,20 +698,20 @@ const BLK = (function(){
     COLS, ROWS, VIS, TOP, NKIND, KINDS, GARB,
     I, J, L, O, S, T, Z,
     GRAV, LV_MS, LOCK_MS, LOCK_RESETS, SOFT_MULT, MAX_DT, GARB_CAP, SHIELD_CAP,
-    ATK, PC_ATK, DEF_RULES, HCAP, HCAP_EVEN,
+    ATK, PC_ATK, DEF_RULES,
     // 形狀與 kick(純資料,board.js 查表用)
     CELLS, BOXN, BASE, SPAWN_X, SPAWN_Y, KICK_JLSTZ, KICK_I, kicksOf, cellsOf,
     // 出塊
     bagOf, pieceAt, peek,
     // 盤面
     emptyBoard, fits, boardEmpty, stackTop, placements,
-    // 房規 / 讓分
-    normRules, hcapOf, comboAtk,
+    // 房規
+    normRules, comboAtk,
     // 一局
     blank, spawn, level, gravMs, grounded, move, rotate, down, ghostY,
     hardDrop, lock, tick, revive,
     // 垃圾行
-    queueGarbage, applyPending, pushGarbage, cancel, pendCount, scale,
+    queueGarbage, applyPending, pushGarbage, cancel, pendCount,
     // 編碼
     encBoard, decBoard, save, load, snap,
     // 小工具
