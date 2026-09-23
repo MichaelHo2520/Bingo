@@ -17,7 +17,7 @@
        · 垃圾攻擊(整排插入)走**獨立事件節點**,不塞進快照、也不走整包 game 交易
        · `game` 只放低頻資料:roundId / seed / startAt / 房規 / 死亡宣告 / winner
 
-   ── ★★★ 八條會直接做錯的事 ───────────────────────────────────────────────
+   ── ★★★ 十條會直接做錯的事 ───────────────────────────────────────────────
      ① **本機操作不等網路。** 任何按鍵要等 Firebase 往返才動 = 架構錯了。
      ② **高頻資料不進 `game`。** 每幀 / 每格移動 / 重力 tick 一律禁止 txGame。
      ③ **快照可以覆蓋,攻擊不可以。** 快照晚到就丟掉(看 seq);垃圾是事件,
@@ -31,6 +31,10 @@
      ⑦ **同時死亡不可以比誰網路快。** 先進一段裁決窗,再用冪等交易結算。
      ⑧ **winner 的交易一定要 `{ local:false }`**(notes/07 踩坑 #8)——
         否則搶輸的那台會先樂觀看到「我贏」而多記一分,game 回退時分數不跟著退。
+     ⑨ **winner 一律寫物件 `{ id }` / `{ ids, by:"draw" }`**,不可以寫字串 ——
+        核心讀不到 `.id` 就當成「全員都贏」(輸家也顯示你贏了、也加分)。見 winOf()。
+     ⑩ **結算不可以「送一次就算數」**:死亡宣告 / winner 任何一筆被擋掉,
+        這一局就永遠結束不了。每一台都跑看門狗重送(見七之一)。
 
    ⚠ 垃圾的顏色種子(gs)由**送出端**決定並寫進事件,接收端不得自行重抽。
    ========================================================================== */
@@ -42,6 +46,8 @@ const MP = MPCore.create((function(){
   const FULL_MS  = 2000;                // 盤面的無條件對帳間隔
   const SETTLE_MS = 450;                // 同時死亡的裁決窗
   const LEAD_MS  = 3200;                // 開局倒數(要大於一次往返)
+  const DOG_MS   = 1500;                // 結算看門狗的間隔(見七之一)
+  const GONE_MS  = 10000;               // 3 人以上的淘汰賽:離開房間多久就當他出局
 
   let ctx = null;
 
@@ -66,6 +72,8 @@ const MP = MPCore.create((function(){
   let streak = null;                    // 連殺:{ id, n, t }
   let liveRef = null, atkRef = null;
   let lastGame = null;                  // 最後一次收到的 game 快照(koOf / 結算查它)
+  let pendKills = [];                   // 還沒確認寫進 game 的死亡:[{ n, killer }](見 declareDeaths)
+  let dogT = 0, endSince = 0;           // 結算看門狗(見七之一)
 
   /* ==========================================================================
      一、唯一的發布閘門(紅線 ⑥)
@@ -130,7 +138,8 @@ const MP = MPCore.create((function(){
     playing = false; counting = false; over = false;
     foes = {}; lockTarget = null; atkN = 0; seq = 0;
     myDeaths = 0; lastHitBy = ""; deadAt = 0; lastBoard = "";
-    myKiller = ""; streak = null;
+    myKiller = ""; streak = null; lastGame = null;
+    pendKills = []; dogT = 0; endSince = 0;
     Object.keys(ackd).forEach(k => delete ackd[k]);
     BUBB.setFoes([]);
     BUBB.clearCast();
@@ -150,7 +159,10 @@ const MP = MPCore.create((function(){
 
     /* 別人的死亡宣告 / KO 數 → 只是拿來畫小盤與結算,不影響我的本機模擬 */
     paintFoes(g);
-    if(g.winner && !over) finishRound(g);
+    /* ⚠ 有 winner 就收尾,不看 over —— K.O. 賽時間到那一刻 resolveTime() 已經先把
+       over 設起來了,以前寫成 `g.winner && !over` 的結果是 finishRound() 從來沒被叫到
+       (盤面的 rAF 一路空轉到下一局)。 */
+    if(g.winner){ if(playing) finishRound(g); }
     else if(!over) checkEnd(g);
   }
 
@@ -167,7 +179,8 @@ const MP = MPCore.create((function(){
     endAt = (gRules.mode === "ko") ? startAt + gRules.secs * 1000 : 0;
     order = g.order || [];
     over = false; atkN = 0; seq = 0; myDeaths = 0; lastHitBy = ""; lastBoard = "";
-    myKiller = ""; streak = null;
+    myKiller = ""; streak = null; lastGame = null;
+    pendKills = []; dogT = 0; endSince = 0;
     Object.keys(ackd).forEach(k => delete ackd[k]);
     BUBB.clearCast();
     const res = $("bubResult");
@@ -243,6 +256,9 @@ const MP = MPCore.create((function(){
       }
     }
     if(!canPublish() || counting) return;
+    /* ★ 看門狗排在對帳之前:對帳那一幀會 return,排在後面的話每 2 秒就少跑一次 */
+    dogT += dt;
+    if(dogT >= DOG_MS){ dogT = 0; watchdog(); }
     pubT += dt; fullT += dt;
     if(fullT >= FULL_MS){ fullT = 0; pubFull(true); return; }
     if(pubT >= PUB_MS){ pubT = 0; pubActive(); }
@@ -258,6 +274,9 @@ const MP = MPCore.create((function(){
       const f = foes[id];
       if(!f) return;
       const isPresenceAway = !!(pl && !pl[id]);
+      /* 離開房間的起點(deadOf 的「3 人以上離線視為出局」看它)。回來了就歸零。 */
+      if(isPresenceAway){ if(!f.goneSince) f.goneSince = now; }
+      else f.goneSince = 0;
       const age = f.lastHeardAt ? (now - f.lastHeardAt) : 0;
       let state = "good";
       if(isPresenceAway || age >= 4000){
@@ -340,7 +359,15 @@ const MP = MPCore.create((function(){
       if(!f.dead){
         f.seen = true;
         if(lockTarget === id) paintTargetStat();
-      }else if(f.seen && !wasDead){
+      }else if(!wasDead && gRules && gRules.mode === "out" && !over){
+        /* ★★★ 存活端自己收尾(2026-09-23 實機卡死)。以前淘汰賽的結算**只靠死掉的
+           那一台**送出一筆 game 交易 —— 那一筆只要沒送到(網路抖一下,而斷線時
+           canWriteGame() 會把它靜靜丟掉、不重試),這裡看得到他 KO 了,卻永遠
+           不會結束這一局;淘汰賽又沒有時間上限 → 全房卡死。
+           ⚠ 一樣要進裁決窗(紅線 ⑦),不可以看到就當場判。 */
+        armSettle();
+      }
+      if(f.dead && f.seen && !wasDead){
         announceKO(v.k || "", id);
         if(lockTarget === id){
           if(gRules && gRules.mode === "out"){
@@ -444,17 +471,8 @@ const MP = MPCore.create((function(){
     myKiller = lastHitBy;                /* ⚠ 一定要在 pubFull **之前**,不然這一份快照少了 k */
     announceKO(myKiller, ctx.me());      /* 自己這一台立刻播,不必等快照繞一圈回來 */
     pubFull(true);
-    /* 死亡宣告 + KO 記給最後打我的人。
-       ⚠ 用 deaths[me] 當冪等鍵:同一次死亡重送不會被算第二次。 */
-    const me = ctx.me(), killer = lastHitBy, n = myDeaths;
-    ctx.txGame(g => {
-      g.deaths = g.deaths || {};
-      if((g.deaths[me] || 0) >= n) return false;
-      g.deaths[me] = n;
-      if(killer && killer !== me){ g.ko = g.ko || {}; g.ko[killer] = (g.ko[killer] || 0) + 1; }
-      if(gRules && gRules.mode === "out"){ g.topouts = g.topouts || {}; g.topouts[me] = true; }
-      return true;
-    });
+    pendKills.push({ n: myDeaths, killer: lastHitBy });
+    declareDeaths();
     lastHitBy = "";
 
     if(gRules && gRules.mode === "ko"){
@@ -474,12 +492,33 @@ const MP = MPCore.create((function(){
     }
   }
 
+  /* 死亡宣告 + KO 記給最後打我的人。
+     ⚠ 用 deaths[me] 當冪等鍵:同一次死亡重送不會被算第二次 —— 所以看門狗可以放心一直重送,
+       直到 game 上的 deaths[me] 追上 myDeaths 為止(見七之一)。
+     ⚠ KO 要逐筆記:兩次死亡都沒送出去時,一次補上兩筆(k.n > 伺服器上已有的次數才算)。 */
+  function declareDeaths(){
+    if(!pendKills.length) return;
+    const me = ctx.me(), n = myDeaths, list = pendKills.slice();
+    const out = !!(gRules && gRules.mode === "out");
+    ctx.txGame(g => {
+      g.deaths = g.deaths || {};
+      const have = g.deaths[me] || 0;
+      if(have >= n) return false;
+      list.forEach(k => {
+        if(k.n > have && k.killer && k.killer !== me){ g.ko = g.ko || {}; g.ko[k.killer] = (g.ko[k.killer] || 0) + 1; }
+      });
+      g.deaths[me] = n;
+      if(out){ g.topouts = g.topouts || {}; g.topouts[me] = true; }
+      return true;
+    });
+  }
+
   /* ==========================================================================
      七、結算
      ========================================================================== */
   function armSettle(){
     clearSettle();
-    settleT = setTimeout(() => { settleT = null; checkEnd(null); }, SETTLE_MS);
+    settleT = setTimeout(() => { settleT = null; checkEnd(lastGame); }, SETTLE_MS);
   }
   function clearSettle(){ if(settleT){ clearTimeout(settleT); settleT = null; } }
 
@@ -488,7 +527,7 @@ const MP = MPCore.create((function(){
     if(over || !gRules || gRules.mode !== "out" || !order.length) return;
     const alive = order.filter(id => !deadOf(id, snap));
     if(alive.length > 1) return;
-    const win = alive.length === 1 ? alive[0] : "draw";
+    const win = alive.length === 1 ? winOf(alive[0], "out") : drawOf(order);
     /* ⚠ 交易的參數一律叫 g(與另外十三支 adapter 一致)——
        tools/test-pages.js 的 K 節是靠 `g.winner=` 這個字面找「寫 winner 的交易」的。 */
     ctx.txGame(g => {
@@ -506,8 +545,12 @@ const MP = MPCore.create((function(){
      ⚠ 這裡不拿打掉的顆數當 tie-break:那個數字只活在 live 快照裡、`game` 上沒有
        → 交易裡根本拿不到。同分就是平手。 */
   function resolveTime(){
-    if(over || !gRules || gRules.mode !== "ko") return;
-    over = true;                         // 先擋住自己重複進來;真正的結果等 game 回來
+    if(!gRules || gRules.mode !== "ko") return;
+    /* 先擋住操作;真正的結果等 game 回來。
+       ⚠ 以前這裡還有一條 `if(over) return` —— 於是交易只要被擋一次(斷線時
+         canWriteGame() 靜靜丟掉)就**再也不會重送**,整台停在時間 0:00。
+         現在重送交給看門狗(七之一),這一支自己不設防重:交易本身 `if(g.winner)` 冪等。 */
+    over = true;
     const ids = order.slice();
     ctx.txGame(g => {
       if(g.winner) return false;
@@ -515,21 +558,76 @@ const MP = MPCore.create((function(){
       let best = -1;
       ids.forEach(id => { const n = ko[id] || 0; if(n > best) best = n; });
       const top = ids.filter(id => (ko[id] || 0) === best);
-      g.winner = (top.length === 1) ? top[0] : "draw";
+      g.winner = (top.length === 1) ? winOf(top[0], "ko") : drawOf(top);
       return true;
     }, { local: false });
   }
   function finishRound(g){
     over = true;
     playing = false;
+    clearSettle();
     BUBB.stop();
     banner("");
   }
   function deadOf(id, g){
     if(id === ctx.me()) return !!(st && st.dead);
     if(g && g.topouts && g.topouts[id]) return true;
-    return !!(foes[id] && foes[id].dead);
+    const f = foes[id];
+    if(!f) return false;
+    if(f.dead) return true;
+    /* ★ 3 人以上的淘汰賽:中途離開房間超過 GONE_MS 就當他出局 —— 否則剩下的人打完了,
+       「還活著」的名單裡永遠有一個不會再動的人,這一局永遠結束不了。
+       ⚠ 只限 3 人以上:1 對 1 的斷線由核心的「只剩自己 → 回大廳」接手,
+         在這裡判的話對方手機只是鎖屏十秒,回來就發現自己輸了。 */
+    return order.length >= 3 && !!f.goneSince && (Date.now() - f.goneSince) >= GONE_MS;
   }
+
+  /* ==========================================================================
+     七之一、結算看門狗(2026-09-23 實機卡死之後補的)
+     ──────────────────────────────────────────────────────────────────────────
+       ★★★ 結算的每一步以前都是「送一次就算數」:死亡宣告、淘汰賽的 winner、
+         K.O. 賽時間到的 winner。任何一筆被擋掉(斷線時 canWriteGame() 會靜靜丟掉、
+         不重試)這一局就永遠結束不了 —— 而且**畫面上什麼錯都沒有**。
+       這裡每 DOG_MS 看一次「該結束了卻還沒有 winner」就重送;三筆交易全都是冪等的
+       (deaths[me] 當鍵 / `if(g.winner) return false`),重送幾次都不會多算。
+       ⚠ 每一台都跑(不只死掉的那一台)—— 死掉的那一台可能已經收起手機了。
+       ⚠ 淘汰賽要「只剩一個活的」**持續超過裁決窗**才判(紅線 ⑦):
+         兩個人差 0.2 秒一起爆的時候,不可以讓看門狗剛好在中間那一瞬間判掉。
+     ========================================================================== */
+  function watchdog(){
+    if(!st || !gRules || !playing) return;
+    const g = lastGame;
+    if(g && g.winner) return;                          // 結果已經在路上了
+    const me = ctx.me();
+    if(myDeaths > 0 && ((g && g.deaths && g.deaths[me]) || 0) < myDeaths) declareDeaths();
+    if(gRules.mode === "out"){
+      if(over) return;
+      const alive = order.filter(id => !deadOf(id, g));
+      if(alive.length > 1){ endSince = 0; return; }
+      const now = Date.now();
+      if(!endSince){ endSince = now; return; }
+      if(now - endSince >= SETTLE_MS) checkEnd(g);
+    }else if(endAt && nowSrv() >= endAt){
+      resolveTime();
+    }
+  }
+
+  /* ★★★ winner 一律寫成**物件**(2026-09-23 修)。
+     以前這兩個遊戲寫的是字串(pid 或 "draw"),而核心的 winnerIds() 讀的是
+     `.id` / `.ids` —— 字串兩個都沒有,於是走到「兩者皆無 → 全員」那一條:
+     **輸家那台也顯示「你贏了!」、也加一分**(線上實測:兩個人各 3 分、記在同一局)。
+     另外十四個遊戲從來都是物件,只有照抄方塊對戰的這兩頁錯。
+     ⚠ 平手用 `ids` 列出並列的人(只有他們得分);淘汰賽同歸於盡 = 全員並列。 */
+  function winOf(id, by){ return { id: id, name: ctx.dispName(id), by: by }; }
+  function drawOf(ids){ return { ids: ids.slice(), by: "draw" }; }
+  /* 讀的那一邊要認得舊格式 —— 還沒重整的舊裝置寫進來的仍是字串 */
+  function winIdsOf(w){
+    if(!w) return [];
+    if(typeof w === "string") return w === "draw" ? [] : [w];
+    if(Array.isArray(w.ids)) return w.ids;
+    return w.id ? [w.id] : [];
+  }
+  function isDrawW(w){ return w === "draw" || !!(w && typeof w === "object" && w.by === "draw"); }
   function koOf(id){
     const g = lastGame;
     return (g && g.ko && g.ko[id]) || 0;
@@ -749,15 +847,16 @@ const MP = MPCore.create((function(){
     if(!box || !order.length) return;
     box.classList.remove("hidden");
     const isKoMode = (gRules && gRules.mode === "ko");
+    const wids = winIdsOf(winner), draw = isDrawW(winner);
     let rowsHtml = "";
     order.forEach(id => {
       const isMe = (id === ctx.me());
       const name = ctx.dispName(id) + (isMe ? " (你)" : "");
-      const isWin = (winner === id);
+      const isWin = !draw && wids.indexOf(id) >= 0;
       const ko = koOf(id);
       const pops = isMe ? (st ? st.popped : 0) : ((foes[id] && foes[id].l) || 0);
       const isDead = deadOf(id, lastGame);
-      const tag = isWin ? "👑 " : "";
+      const tag = isWin ? "👑 " : ((draw && wids.indexOf(id) >= 0) ? "🤝 " : "");
       let detail = "";
       if(isKoMode){
         detail = "K.O. " + ko + " · " + pops + " 顆";
@@ -819,11 +918,22 @@ const MP = MPCore.create((function(){
     outcome(winner, o){
       paintBattleReport(winner);
       const ko = koOf(ctx.me());
-      if(winner === "draw") return { word: "平手", msg: "誰都沒有被壓爆 🤝" };
-      if(o.iWon) return { word: "你贏了!", msg: (gRules && gRules.mode === "ko")
+      const wids = winIdsOf(winner);
+      const isKo = !!(gRules && gRules.mode === "ko");
+      if(isDrawW(winner)){
+        const names = wids.filter(id => id !== ctx.me()).map(id => "<b>" + esc(ctx.dispName(id)) + "</b>").join("、");
+        if(wids.indexOf(ctx.me()) >= 0) return { word: "平手", msg: isKo
+          ? ("K.O. 數一樣多" + (names ? "(和 " + names + ")" : "") + " 🤝")
+          : "一起被壓爆了 🤝" };
+        return { word: "輸了", msg: (names || "別人") + " 並列第一" };
+      }
+      /* ⚠ 輸贏一律看**名單**,不看 o.iWon —— 舊裝置寫進來的字串 winner 在核心那邊
+         仍然會被算成「全員」,這裡至少不要跟著說錯。 */
+      if(wids.indexOf(ctx.me()) >= 0) return { word: "你贏了!", msg: isKo
         ? ("K.O. <b>" + ko + "</b> 次,打掉 " + (st ? st.popped : 0) + " 顆")
         : ("最後站著的是你 —— 打掉 " + (st ? st.popped : 0) + " 顆") };
-      return { word: "輸了", msg: "<b>" + esc(ctx.dispName(winner)) + "</b> 贏了這一局" };
+      const wn = wids.length ? esc(ctx.dispName(wids[0])) : "對手";
+      return { word: "輸了", msg: "<b>" + wn + "</b> 贏了這一局" };
     },
     /* 玩家名單變動時被呼叫 —— 對手小盤那一排要跟著重建。 */
     refresh(){ if(order.length) rebuildFoes(); },
