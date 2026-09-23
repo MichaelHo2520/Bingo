@@ -35,9 +35,15 @@ const BUBB = (function(){
   /* 1..6。★ 固定不隨主題變(紅線 ⑦)—— 刻意避開「紅 / 橘」「藍 / 紫」這種近色對 */
   const COL = ["#ff5d6c", "#ffd93d", "#3ddc7f", "#4b7bec", "#b06bff", "#2fd6e4"];
   const MIND = 16, MAXD = 58;           // 一顆泡泡直徑的 px 上下限
-  const GAUGE_W = 10;                   // 左緣警示條的寬(與 CSS 的 .bub-gauge 同步)
-  const FOE_MIN = 52, FOE_MAX = 104, FOE_OVER = 62;   // 對手小盤那一條(同方塊對戰)
-  const FOE_SHRINK_MIN = 26;            // 為了讓出小盤,盤面最多縮到一顆這麼大(見 fitBoard)
+  /* ★ 天花板(2026-09-23 畫面改版):盤面最上面那一條,新插進來的一排從它**底下**滑出來,
+     待處理的垃圾也畫在它上面(取代原本左緣那條警示條 → 盤面多出 18px 寬)。
+     ⚠ 它**不是規則的一部分**:規則層的座標(cy / LY / H)一個字都沒動,
+       只有畫面與輸入換算多一個 CEIL*D 的位移(draw 的 translate、aimFromPoint、onNext)。 */
+  const CEIL = 0.36;
+  const BH = R.H + CEIL;                // canvas 的總高(直徑為單位)
+  const GAP = 8;                        // 盤面與小盤之間
+  const FOE_MIN = 52, FOE_MAX = 170, FOE_OVER = 62;   // 右側那一欄:最窄 / 最寬 / 疊上去時的寬
+  const STRIP_MIN = 84, STRIP_MAX = 150, STRIP_PAD = 22;   // 上方那一條:最矮 / 最高 / 名字 + 內距
   const TURN = 0.0024;                  // 鍵盤 ←→ 每毫秒轉幾弧度
 
   /* ==========================================================================
@@ -47,19 +53,23 @@ const BUBB = (function(){
   let st = null;
   let mounted = false, running = false, raf = 0, lastT = 0;
   let D = 32, dpr = 1;
-  let elStage, elWrap, elGauge, elGaugeFill, elGaugeNum, elHud, elCast, elPlay;
+  let elStage, elWrap, elHud, elCast, elPlay;
   let cvMain, ctxM;
-  let guideCache = null;
+  let guideCache = null, gridCache = null;
   const bubbleSprites = new Map();
   const foeSprites = new Map();
   let foeSpriteFd = 0;
   let inkCol = "rgba(255,255,255,.9)";
   let lineCol = "rgba(255,255,255,.14)";
+  let ceilCol = "rgba(255,255,255,.10)", ceilEdge = "rgba(255,255,255,.30)";
+  let gunCol = "rgba(255,255,255,.46)", guideCol = "rgba(255,255,255,.55)";
 
   const fx = {
     shake: 0, hit: 0,
     pops: [],                           // 消掉的:{ x, y, c, t }(盤面座標,單位 = 直徑)
     drops: [],                          // 掉落的:{ x, y, c, vy, t }
+    sparks: [],                         // 爆開的碎片:{ x, y, vx, vy, c, t, life }
+    floats: [],                         // 落點冒出來的「+N」:{ txt, x, y, c, t, dur }
     words: [],                          // 浮字
     push: null,                         // 插排的滑入:{ n, t, dur }
     impact: null,
@@ -91,48 +101,87 @@ const BUBB = (function(){
      四、量尺寸
      ──────────────────────────────────────────────────────────────────────────
        ⚠ 紅線 ①:舞台是 overflow:hidden,這裡量到的永遠是「真的可用的空間」。
-       ★ 對手小盤只吃盤面用不到的空間(同方塊對戰 v2.14.0 的做法):
-         先照「沒有小盤」算出一顆多大,剩下的寬夠就貼右側,不夠就疊在右上角。
+       ★★ 對手小盤擺哪裡:**兩種擺法都算一次,誰讓主盤面的泡泡比較大就用誰**
+         (2026-09-23 畫面改版,取代「先縮盤面讓位」那一版的紅線 ⑫):
+           · right —— 小盤一欄貼在盤面右邊(寬螢幕 / 橫置:盤面被**高度**卡住,右邊本來就空)
+           · top   —— 小盤一整條排在盤面上方(手機直向:盤面被**寬度**卡住,上下反而有空)
+         舊版手機直向一律走 right → 盤面只剩螢幕寬的七成、上方空一大片(使用者:「畫面最重要」)。
+       ⚠ 兩種擺法都**不可以疊在盤面上**(疊上去蓋住的正好是要瞄準的地方)——
+         over 只剩「兩種都塞不下」的極端尺寸會走到。
+       ⚠ 盤面與小盤是**一組置中**(以前小盤貼在舞台最右邊,桌機上跟盤面隔了一大段)。
      ========================================================================== */
   let foes = [], foeEls = [], elFoes = null;
+  let foeLayout = "none", foeColW = 0, stripH = 0;
   function fitBoard(){
     if(!mounted || !elStage) return;
     const prevD = D, prevDpr = dpr;
     const spec = document.body.classList.contains("bub-spec");
-    const foesOn = !!elFoes && !elFoes.classList.contains("hidden") && !spec;
+    const foesOn = !!elFoes && !elFoes.classList.contains("hidden") && !spec && foes.length > 0;
     const rect = elStage.getBoundingClientRect();
     const availW = Math.max(120, rect.width - 4);
     const availH = Math.max(120, rect.height - 6);
-    D = Math.round(clamp(Math.min((availW - GAUGE_W - 8) / R.COLS, availH / R.H), MIND, MAXD));
     dpr = Math.min(3, window.devicePixelRatio || 1);
+    const fit = d => Math.floor(clamp(d, MIND, MAXD));
 
-    /* ⚠⚠ 與方塊對戰**不一樣**的一點:剩下的寬放不下小盤時,**先把盤面縮一階讓出來**,
-       只有縮到太小(< FOE_SHRINK_MIN)才退回「疊在右上角」。
-       方塊對戰的盤面是被**高度**卡住的(右側本來就空),而泡泡的盤面在手機直向是被
-       **寬度**卡住的 —— 疊上去就是蓋住盤面的右上角,而那裡正是要瞄準的地方
-       (第一張截圖就是這樣:兩塊小盤蓋掉最右邊一整欄)。 */
-    let foeW = 0, foeOver = false;
+    let layout = "none", d = Math.min(availW / R.COLS, availH / BH);
+    foeColW = 0; stripH = 0;
     if(foesOn){
-      let restW = availW - (R.COLS * D + GAUGE_W + 8);
-      if(restW < FOE_MIN){
-        const d2 = Math.floor((availW - GAUGE_W - 8 - FOE_MIN) / R.COLS);
-        if(d2 >= FOE_SHRINK_MIN){ D = Math.min(D, d2); restW = availW - (R.COLS * D + GAUGE_W + 8); }
+      const dR = Math.min((availW - GAP - FOE_MIN) / R.COLS, availH / BH);
+      const dT = Math.min(availW / R.COLS, (availH - GAP - STRIP_MIN) / BH);
+      if(dT > dR + 0.5){
+        layout = "top"; d = dT;
+        /* 盤面吃剩的高度全部給小盤(上限 STRIP_MAX)—— 小盤越大越看得出對手快不快爆 */
+        stripH = Math.round(clamp(availH - GAP - BH * fit(d), STRIP_MIN, STRIP_MAX));
+      }else{
+        layout = "right"; d = dR;
+        const restW = availW - R.COLS * fit(d) - GAP;
+        if(restW < FOE_MIN){ layout = "over"; foeColW = FOE_OVER; }
+        else{
+          /* ⚠ 欄寬收到小盤實際要的寬:橫置手機時小盤是被**高度**卡住的,
+             欄寬給滿的話小盤置中在一條寬欄裡,跟盤面中間空出一大段(截圖量到 50px) */
+          const n = foes.length;
+          const fdH = ((availH - (n - 1) * 8) / n - 16) / R.H;
+          const need = Math.ceil(Math.max(3, fdH) * R.COLS + 8);
+          foeColW = Math.floor(Math.max(FOE_MIN, Math.min(FOE_MAX, restW, need)));
+        }
       }
-      foeOver = restW < FOE_MIN;
-      foeW = foeOver ? FOE_OVER : Math.min(FOE_MAX, Math.floor(restW));
     }
-    if(D !== prevD || dpr !== prevDpr){ bubbleSprites.clear(); foeSprites.clear(); }
-    if(elFoes){
-      elFoes.classList.toggle("bub-foes-over", foeOver);
-      elFoes.style.width = foeW ? (foeW + "px") : "";
-    }
-    if(elWrap) elWrap.style.marginRight = (foeW && !foeOver) ? (foeW + "px") : "";
-    if(elHud) inkCol = getComputedStyle(elHud).color || inkCol;
-    const g = getComputedStyle(cvMain).getPropertyValue("--bub-grid").trim();
-    if(g) lineCol = g;
+    D = fit(d);
+    foeLayout = layout;
+    if(D !== prevD || dpr !== prevDpr){ bubbleSprites.clear(); foeSprites.clear(); gridCache = null; }
 
-    sizeCanvas(cvMain, ctxM, R.COLS * D, Math.round(R.H * D));
-    if(elGauge) elGauge.style.height = Math.round(R.H * D) + "px";
+    const wrapW = R.COLS * D, wrapH = Math.round(BH * D);
+    if(elFoes){
+      elFoes.classList.toggle("bub-foes-over", layout === "over");
+      elFoes.classList.toggle("bub-foes-top", layout === "top");
+      const s = elFoes.style;
+      s.width = ""; s.height = ""; s.right = ""; s.top = "";
+      if(layout === "right"){
+        s.width = foeColW + "px";
+        s.right = Math.max(0, Math.floor((rect.width - (wrapW + GAP + foeColW)) / 2)) + "px";
+      }else if(layout === "top"){
+        s.height = stripH + "px";
+        s.top = Math.max(0, Math.floor((rect.height - (stripH + GAP + wrapH)) / 2)) + "px";
+      }else if(layout === "over"){
+        s.width = foeColW + "px";
+      }
+    }
+    if(elWrap){
+      elWrap.style.marginRight = (layout === "right") ? ((foeColW + GAP) + "px") : "";
+      elWrap.style.marginTop = (layout === "top") ? ((stripH + GAP) + "px") : "";
+    }
+    if(elHud) inkCol = getComputedStyle(elHud).color || inkCol;
+    const cs = getComputedStyle(cvMain);
+    const g = cs.getPropertyValue("--bub-grid").trim();
+    if(g) lineCol = g;
+    const c1 = cs.getPropertyValue("--bub-ceil").trim(), c2 = cs.getPropertyValue("--bub-ceil-edge").trim();
+    if(c1) ceilCol = c1;
+    if(c2) ceilEdge = c2;
+    const c3 = cs.getPropertyValue("--bub-gun").trim(), c4 = cs.getPropertyValue("--bub-guide").trim();
+    if(c3) gunCol = c3;
+    if(c4) guideCol = c4;
+
+    sizeCanvas(cvMain, ctxM, wrapW, wrapH);
     fitFoes();
     fitFx();
     draw();
@@ -250,13 +299,19 @@ const BUBB = (function(){
   }
   function draw(){
     if(!ctxM) return;
-    const W = R.COLS * D, Hh = Math.round(R.H * D);
+    const W = R.COLS * D, Hh = Math.round(BH * D), OY = CEIL * D;
+    const now = performance.now();
     ctxM.clearRect(0, 0, W, Hh);        // ⚠ 紅線 ⑥
     ctxM.save();
     if(fx.shake > 0.3){
       const a = Math.random() * Math.PI * 2;
       ctxM.translate(Math.cos(a) * fx.shake, Math.sin(a) * fx.shake);
     }
+    /* ★ 天花板底下才是規則層的座標系(cy / LY 一個字都沒動)—— 整段往下推 CEIL 顆 */
+    ctxM.save();
+    ctxM.translate(0, OY);
+    gridDots(W);
+    if(st) dangerZone(W, now);
     deadLine(W);
     if(st){
       const off = pushOff();
@@ -269,14 +324,54 @@ const BUBB = (function(){
       popsFx();
       aimGuide();
       shotFx();
-      launcher();
+      launcher(now);
     }
+    floatsFx();
     words();
     ctxM.restore();
+    /* ⚠ 天花板畫在泡泡**之後**:插排滑入時,新的那一排看起來是從天花板底下被推出來的 */
+    ceiling(W, OY, now);
+    ctxM.restore();
     edgeFlash(W, Hh);
-    gauge();
     drawFoes();
     drawBeams();
+  }
+  /* 空格的淡點:看得出「那裡可以黏」,盤面也不再是一片空白的深色。
+     ⚠ 快取成一張圖(每一幀畫 100 個點不值得);par 一翻面、D 一變、主題一換就重畫。 */
+  function gridDots(W){
+    const key = D + ":" + dpr + ":" + (st ? st.par : 0) + ":" + lineCol;
+    if(!gridCache || gridCache.key !== key){
+      const cv = document.createElement("canvas");
+      cv.width = Math.ceil(W * dpr); cv.height = Math.ceil(R.cy(R.DEAD) * D * dpr);
+      const c = cv.getContext("2d");
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      c.fillStyle = lineCol;
+      c.globalAlpha = 0.55;
+      const par = st ? st.par : 0, r = Math.max(1, D * 0.055);
+      for(let y = 0; y < R.DEAD; y++){
+        const w = R.isOdd(par, y) ? R.COLS - 1 : R.COLS;
+        for(let x = 0; x < w; x++){
+          c.beginPath(); c.arc(R.cx(par, x, y) * D, R.cy(y) * D, r, 0, Math.PI * 2); c.fill();
+        }
+      }
+      gridCache = { key: key, cv: cv };
+    }
+    const cv = gridCache.cv;
+    ctxM.drawImage(cv, 0, 0, cv.width / dpr, cv.height / dpr);
+  }
+  /* 危險區:最低那一列離死亡線 ≤ 3 列就從死亡線往上泛紅,越近越紅、會呼吸。
+     ★ 「快爆了」以前只有一條虛線變紅 —— 在手機上根本沒人看得到那條線。 */
+  function dangerZone(W, now){
+    const low = R.lowest(st.board);
+    if(low < R.DEAD - 3) return;
+    const k = clamp((low - (R.DEAD - 4)) / 3, 0, 1);
+    const pulse = reduced() ? 1 : (0.72 + 0.28 * Math.sin(now / 170));
+    const y1 = (R.cy(R.DEAD) - 0.5) * D, y0 = y1 - D * 2.6;
+    const g = ctxM.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, "rgba(255,93,108,0)");
+    g.addColorStop(1, "rgba(255,93,108," + ((0.10 + 0.22 * k) * pulse).toFixed(3) + ")");
+    ctxM.fillStyle = g;
+    ctxM.fillRect(0, y0, W, y1 - y0);
   }
   /* 死亡線:第 DEAD 列的上緣。快碰到的時候變紅(那一列是唯一真的要看的東西) */
   function deadLine(W){
@@ -288,6 +383,87 @@ const BUBB = (function(){
     ctxM.lineWidth = danger ? 2.5 : 1.5;
     ctxM.beginPath(); ctxM.moveTo(0, y); ctxM.lineTo(W, y); ctxM.stroke();
     ctxM.restore();
+  }
+  /* 天花板 + 待處理垃圾。
+     ★ 被塞的排數以前是左緣一條 10px 的細條(手機上幾乎看不到,而且吃掉盤面寬度)——
+       現在直接畫在天花板上:一格 = 一排,紅色越多越危險;暖身保護中是藍色(擋著、還沒插)。
+     ★ 下一發就會插排的時候,天花板下緣閃橘色 —— 那一發要先想好。 */
+  function ceiling(W, OY, now){
+    ctxM.save();
+    const g = ctxM.createLinearGradient(0, 0, 0, OY);
+    g.addColorStop(0, ceilEdge);
+    g.addColorStop(1, ceilCol);
+    ctxM.fillStyle = g;
+    ctxM.fillRect(0, 0, W, OY);
+    // 下緣的陰影壓在第一排泡泡上,天花板才有「蓋著」的厚度
+    const sh = ctxM.createLinearGradient(0, OY, 0, OY + D * 0.22);
+    sh.addColorStop(0, "rgba(0,0,0,.30)");
+    sh.addColorStop(1, "rgba(0,0,0,0)");
+    ctxM.fillStyle = sh;
+    ctxM.fillRect(0, OY, W, D * 0.22);
+    // 鉚釘:每一欄一顆,純裝飾(讓天花板看起來是一塊「板」而不是一條色帶)。
+    // ⚠ 垃圾格與「+N 排」那一段不畫(疊在字上很髒)—— 那一段的右緣由下面算出來
+    let busyTo = 0;
+    const pend = st ? R.pendCount(st) : 0;
+    if(pend > 0) busyTo = D * 0.22 + Math.min(pend, 6) * D * 0.76 + D * 1.9;
+    ctxM.fillStyle = ceilEdge;
+    for(let x = 0; x < R.COLS; x++){
+      const rx = (x + 0.5) * D;
+      if(rx < busyTo) continue;
+      ctxM.beginPath(); ctxM.arc(rx, OY * 0.5, Math.max(1, D * 0.045), 0, Math.PI * 2); ctxM.fill();
+    }
+    if(st){
+      const pressLeft = R.pressN(st) - st.since;
+      let edge = ceilEdge, lw = Math.max(1, D * 0.04);
+      if(pressLeft <= 1 && !st.dead){
+        const p = reduced() ? 1 : (0.55 + 0.45 * Math.sin(now / 110));
+        edge = "rgba(255,159,67," + (0.55 + 0.45 * p).toFixed(3) + ")";
+        lw = Math.max(2, D * 0.08);
+      }
+      ctxM.strokeStyle = edge; ctxM.lineWidth = lw;
+      ctxM.beginPath(); ctxM.moveTo(0, OY - lw / 2); ctxM.lineTo(W, OY - lw / 2); ctxM.stroke();
+      const n = R.pendCount(st);
+      if(n > 0){
+        const held = st.shield > 0;
+        const hot = n >= 3 && !held;
+        const a = (hot && !reduced()) ? (0.7 + 0.3 * Math.sin(now / 90)) : 1;
+        const show = Math.min(n, 6);
+        const pw = D * 0.62, ph = OY * 0.52, gap = D * 0.14;
+        const x0 = D * 0.22, y0 = (OY - ph) / 2;
+        ctxM.globalAlpha = a;
+        for(let i = 0; i < show; i++){
+          const px = x0 + i * (pw + gap);
+          const pg = ctxM.createLinearGradient(0, y0, 0, y0 + ph);
+          pg.addColorStop(0, held ? "#9be7ff" : "#ff9aa4");
+          pg.addColorStop(1, held ? "#2fb3e4" : "#ff2d55");
+          ctxM.fillStyle = pg;
+          roundRect(ctxM, px, y0, pw, ph, ph / 2);
+          ctxM.fill();
+        }
+        ctxM.globalAlpha = 1;
+        ctxM.font = "800 " + Math.max(10, Math.round(OY * 0.72)) + "px Fredoka, Nunito, system-ui, sans-serif";
+        ctxM.textAlign = "left"; ctxM.textBaseline = "middle";
+        ctxM.lineWidth = 3; ctxM.strokeStyle = "rgba(0,0,0,.55)";
+        const txt = (held ? "🛡️ " : "") + "+" + n + " 排";
+        const tx = x0 + show * (pw + gap) + D * 0.05;
+        ctxM.strokeText(txt, tx, OY / 2 + 1);
+        ctxM.fillStyle = held ? "#9be7ff" : (hot ? "#ff5d6c" : "#ffb3b9");
+        ctxM.fillText(txt, tx, OY / 2 + 1);
+      }
+    }
+    ctxM.restore();
+  }
+  function roundRect(c, x, y, w, h, r){
+    c.beginPath();
+    c.moveTo(x + r, y); c.lineTo(x + w - r, y);
+    c.arc(x + w - r, y + r, r, -Math.PI / 2, 0);
+    c.lineTo(x + w, y + h - r);
+    c.arc(x + w - r, y + h - r, r, 0, Math.PI / 2);
+    c.lineTo(x + r, y + h);
+    c.arc(x + r, y + h - r, r, Math.PI / 2, Math.PI);
+    c.lineTo(x, y + r);
+    c.arc(x + r, y + r, r, Math.PI, Math.PI * 1.5);
+    c.closePath();
   }
   function popsFx(){
     if(fx.impact && fx.impact.t < 170 && !reduced()){
@@ -316,6 +492,33 @@ const BUBB = (function(){
       if(k >= 1) continue;
       bubble(ctxM, p.x * D, p.y * D, D, p.c, { alpha: 1 - k * k });
     }
+    /* 爆開的碎片(同色小光點,往外噴、受重力) */
+    for(let i = 0; i < fx.sparks.length; i++){
+      const p = fx.sparks[i], k = p.t / p.life;
+      if(k >= 1) continue;
+      ctxM.globalAlpha = 1 - k;
+      ctxM.fillStyle = k < 0.25 ? "#fff" : colOf(p.c);
+      ctxM.beginPath(); ctxM.arc(p.x * D, p.y * D, Math.max(1, D * 0.1 * (1 - k * 0.7)), 0, Math.PI * 2); ctxM.fill();
+    }
+    ctxM.globalAlpha = 1;
+  }
+  /* 落點冒出來的「+N」(打掉幾顆就是幾分) */
+  function floatsFx(){
+    for(let i = 0; i < fx.floats.length; i++){
+      const p = fx.floats[i], k = p.t / p.dur;
+      if(k >= 1) continue;
+      const s = k < 0.15 ? (0.5 + 0.5 * k / 0.15) : 1;
+      ctxM.save();
+      ctxM.globalAlpha = k > 0.6 ? 1 - (k - 0.6) / 0.4 : 1;
+      ctxM.translate(p.x * D, (p.y - k * 0.9) * D);
+      ctxM.scale(s, s);
+      ctxM.font = "800 " + Math.round(D * p.size) + "px Fredoka, Nunito, system-ui, sans-serif";
+      ctxM.textAlign = "center"; ctxM.textBaseline = "middle";
+      ctxM.lineWidth = Math.max(3, D * 0.14); ctxM.strokeStyle = "rgba(0,0,0,.55)";
+      ctxM.strokeText(p.txt, 0, 0);
+      ctxM.fillStyle = p.c; ctxM.fillText(p.txt, 0, 0);
+      ctxM.restore();
+    }
   }
   /* 預瞄線。⚠ 紅線 ③:一律走 trace()。
      ★ 只畫到「第一次反彈之後再 3 顆」—— 整條畫到底就等於告訴你落點,
@@ -332,7 +535,7 @@ const BUBB = (function(){
     const pts = t.path;
     let budget = 999, bounced = false;
     ctxM.save();
-    ctxM.strokeStyle = "rgba(255,255,255,.55)";
+    ctxM.strokeStyle = guideCol;
     ctxM.lineWidth = Math.max(1.5, D * 0.07);
     ctxM.setLineDash([D * 0.12, D * 0.22]);
     ctxM.lineCap = "round";
@@ -363,31 +566,73 @@ const BUBB = (function(){
     }
     bubble(ctxM, s.x * D, s.y * D, D, s.c, { glow: !reduced() });
   }
-  /* 發射器:底座 + 箭頭 + 目前這顆 + 左下角的「下一顆」(點它 = 交換) */
-  function launcher(){
+  /* 發射器:圓頂底座 + 會轉的砲管 + 目前這顆 + 左邊的「下一顆」(點它 = 交換)
+     + 右邊的「插排倒數」小點(一點 = 一發;最後兩發變紅)。
+     ★ 以前是一個空心三角形箭頭飄在一個淡圈上,看不出是「砲台」;插排倒數只在 HUD 上有個數字。 */
+  function launcher(now){
     const x = R.LX * D, y = R.LY * D;
+    const lw = Math.max(1.2, D * 0.05);
     ctxM.save();
+    // 底座(圓頂)
+    const by = y + D * 0.3, br = D * 1.0;
+    ctxM.fillStyle = gunCol;
+    ctxM.globalAlpha = 0.34;
+    ctxM.beginPath(); ctxM.arc(x, by, br, Math.PI, 0); ctxM.closePath(); ctxM.fill();
+    ctxM.globalAlpha = 0.8;
+    ctxM.strokeStyle = gunCol; ctxM.lineWidth = lw;
+    ctxM.beginPath(); ctxM.arc(x, by, br, Math.PI, 0); ctxM.stroke();
+    // 砲管
     ctxM.translate(x, y);
     ctxM.rotate(st.aim);
-    ctxM.fillStyle = "rgba(255,255,255,.22)";
-    ctxM.strokeStyle = "rgba(255,255,255,.55)";
-    ctxM.lineWidth = Math.max(1.5, D * 0.06);
-    ctxM.beginPath();
-    ctxM.moveTo(-D * 0.16, -D * 0.55); ctxM.lineTo(0, -D * 1.1); ctxM.lineTo(D * 0.16, -D * 0.55);
-    ctxM.closePath(); ctxM.fill(); ctxM.stroke();
+    const tw = D * 0.34, tl = D * 1.22;
+    ctxM.globalAlpha = 0.62;
+    ctxM.fillStyle = gunCol;
+    roundRect(ctxM, -tw / 2, -tl, tw, tl, tw * 0.3);
+    ctxM.fill();
+    // 砲管中央的一條亮面(不論主題都是白的:那是反光)
+    ctxM.globalAlpha = 0.35;
+    ctxM.fillStyle = "#fff";
+    ctxM.fillRect(-tw * 0.12, -tl + D * 0.1, tw * 0.16, tl - D * 0.2);
+    ctxM.globalAlpha = 1;
+    ctxM.strokeStyle = gunCol; ctxM.lineWidth = lw;
+    ctxM.stroke();
+    // 砲口的一圈(顏色 = 目前這顆,打出去的就是它)
+    ctxM.strokeStyle = colOf(st.cur); ctxM.lineWidth = Math.max(1.5, D * 0.08);
+    ctxM.beginPath(); ctxM.moveTo(-tw / 2, -tl + D * 0.06); ctxM.lineTo(tw / 2, -tl + D * 0.06); ctxM.stroke();
     ctxM.restore();
-    ctxM.fillStyle = "rgba(255,255,255,.08)";
-    ctxM.beginPath(); ctxM.arc(x, y, D * 0.62, 0, Math.PI * 2); ctxM.fill();
     if(!st.shot && !st.dead) bubble(ctxM, x, y, D, st.cur);
     else if(!st.dead) bubble(ctxM, x, y, D * 0.8, st.cur, { alpha: 0.35 });
     // 下一顆
     const n = nextPos();
+    ctxM.fillStyle = "rgba(255,255,255,.07)";
+    ctxM.beginPath(); ctxM.arc(n.x, n.y, D * 0.5, 0, Math.PI * 2); ctxM.fill();
     bubble(ctxM, n.x, n.y, D * 0.72, st.next);
     ctxM.save();
-    ctxM.font = "800 " + Math.max(9, Math.round(D * 0.3)) + "px Nunito, system-ui, sans-serif";
+    ctxM.font = "800 " + Math.max(9, Math.round(D * 0.28)) + "px Nunito, system-ui, sans-serif";
     ctxM.textAlign = "center"; ctxM.textBaseline = "middle";
     ctxM.fillStyle = inkCol; ctxM.globalAlpha = 0.72;
     ctxM.fillText("⇄ 換", n.x + D * 0.95, n.y);
+    ctxM.restore();
+    pressDots(x, y, now);
+  }
+  function pressDots(x, y, now){
+    const N = R.pressN(st), left = Math.max(0, N - st.since);
+    const x0 = x + D * 1.25, xMax = R.COLS * D - D * 0.25;
+    const step = Math.min(D * 0.3, (xMax - x0) / Math.max(1, N - 1));
+    const r = Math.max(1.5, Math.min(D * 0.09, step * 0.36));
+    const hot = left <= 2 && !st.dead;
+    const a = (hot && !reduced()) ? (0.65 + 0.35 * Math.sin(now / 120)) : 1;
+    ctxM.save();
+    ctxM.font = "800 " + Math.max(8, Math.round(D * 0.22)) + "px Nunito, system-ui, sans-serif";
+    ctxM.textAlign = "left"; ctxM.textBaseline = "alphabetic";
+    ctxM.fillStyle = hot ? "#ff5d6c" : inkCol; ctxM.globalAlpha = hot ? 1 : 0.62;
+    ctxM.fillText(hot ? ("再 " + left + " 發插排") : "插排", x0 - r, y - D * 0.14);
+    for(let i = 0; i < N; i++){
+      const on = i < left;
+      ctxM.globalAlpha = on ? a : 0.28;
+      ctxM.fillStyle = on ? (hot ? "#ff5d6c" : inkCol) : inkCol;
+      ctxM.beginPath(); ctxM.arc(x0 + i * step, y + D * 0.14, r, 0, Math.PI * 2); ctxM.fill();
+    }
     ctxM.restore();
   }
   function nextPos(){ return { x: (R.LX - 2.2) * D, y: (R.LY + 0.1) * D }; }
@@ -422,15 +667,7 @@ const BUBB = (function(){
     ctxM.strokeRect(1, 1, W - 2, H - 2);
     ctxM.restore();
   }
-  /* 待處理垃圾的警示條(⚠ transform:scaleY,不要改 height —— 每幀重排) */
-  function gauge(){
-    if(!elGaugeFill || !st) return;
-    const n = R.pendCount(st);
-    elGaugeFill.style.transform = "scaleY(" + Math.min(1, n / 6).toFixed(3) + ")";
-    elGauge.classList.toggle("bub-gauge-hot", n >= 3);
-    elGauge.classList.toggle("bub-gauge-on", n > 0);
-    if(elGaugeNum) elGaugeNum.textContent = n > 0 ? String(n) : "";
-  }
+  /* ★ 待處理垃圾以前是左緣一條 DOM 警示條(.bub-gauge)—— 2026-09-23 改畫在天花板上(見 ceiling()) */
 
   /* ==========================================================================
      六之二、對手的小盤(單機電腦與連線走同一條路,同方塊對戰)
@@ -470,10 +707,19 @@ const BUBB = (function(){
     const n = foeEls.length;
     const spec = document.body.classList.contains("bub-spec");
     const box = (elStage || elFoes).getBoundingClientRect();
-    const w = spec ? (box.width / n - 18) : (elFoes.getBoundingClientRect().width - 8);
-    const availH = Math.max(60, box.height) - (n - 1) * 8;
-    const byH = (availH / (spec ? 1 : n) - 16) / R.H;
-    const byW = w / R.COLS;
+    let byW, byH;
+    if(spec){
+      byW = (box.width / n - 18) / R.COLS;
+      byH = (Math.max(60, box.height) - 16) / R.H;
+    }else if(foeLayout === "top"){
+      /* 上方那一條:高度由 fitBoard 給(stripH),寬度 n 塊平分 */
+      byW = ((box.width - 4 - (n - 1) * 10) / n - 6) / R.COLS;
+      byH = (stripH - STRIP_PAD) / R.H;
+    }else{
+      /* ⚠ 寬用 fitBoard 算好的欄寬,不量 .bub-foes 自己(量自己 = 震盪) */
+      byW = ((foeColW || FOE_OVER) - 8) / R.COLS;
+      byH = ((Math.max(60, box.height) - (n - 1) * 8) / n - 16) / R.H;
+    }
     const fd = Math.max(3, Math.floor(Math.min(byW, byH) * 2) / 2);
     if(fd !== foeSpriteFd){ foeSprites.clear(); foeSpriteFd = fd; }
     foeEls.forEach(e => sizeCanvas(e.cv, e.ctx, Math.round(fd * R.COLS), Math.round(fd * R.H)));
@@ -606,17 +852,26 @@ const BUBB = (function(){
     const r = elPlay.getBoundingClientRect();
     sizeCanvas(cvFx, ctxF, Math.max(1, r.width), Math.max(1, r.height));
   }
-  function beam(fromEl, toEl, col, txt){
+  /* 端點可以是元素(對手小盤的 canvas)或 "ceil" / "gun"(我自己盤面的天花板 / 砲口)。
+     ⚠ txtAt = 文字貼在哪一端:**一律貼在對手那一端** —— 以前跟著光束頭走,
+       進攻的那一道會把「+2 排」整行壓在我自己的盤面正中央。 */
+  function beam(fromEl, toEl, col, txt, txtAt){
     if(!elPlay || reduced()) return;
     const base = elPlay.getBoundingClientRect();
     const pt = el => {
       if(!el) return null;
+      if(el === "ceil" || el === "gun"){
+        if(!cvMain) return null;
+        const r = cvMain.getBoundingClientRect(), k = r.width / (R.COLS * D) || 1;
+        const y = (el === "ceil") ? CEIL * D * 0.5 : (CEIL + R.LY - 0.6) * D;
+        return { x: r.left - base.left + r.width / 2, y: r.top - base.top + y * k };
+      }
       const r = el.getBoundingClientRect();
       return { x: r.left - base.left + r.width / 2, y: r.top - base.top + r.height / 2 };
     };
     const a = pt(fromEl), b = pt(toEl);
     if(!a || !b) return;
-    fx.beams.push({ a: a, b: b, c: col || "#ff9f43", t: 0, dur: 420, txt: txt || "" });
+    fx.beams.push({ a: a, b: b, c: col || "#ff9f43", t: 0, dur: 420, txt: txt || "", at: txtAt || "b" });
   }
   function drawBeams(){
     if(!ctxF || !cvFx) return;
@@ -634,28 +889,32 @@ const BUBB = (function(){
       ctxF.lineWidth = 5; ctxF.lineCap = "round";
       ctxF.beginPath(); ctxF.moveTo(tx, ty); ctxF.lineTo(hx, hy); ctxF.stroke();
       if(m.txt){
+        const p = (m.at === "a") ? m.a : m.b;
+        /* 貼在端點旁邊,但不可以超出對局區(右側小盤那一端的字會被切掉一半) */
         ctxF.shadowBlur = 0;
-        ctxF.font = "800 15px Fredoka, Nunito, sans-serif";
+        ctxF.font = "800 14px Fredoka, Nunito, sans-serif";
+        const half = ctxF.measureText(m.txt).width / 2 + 4;
+        const x = clamp(p.x, half, W - half), y = Math.max(14, p.y - 14);
         ctxF.textAlign = "center";
         ctxF.lineWidth = 4; ctxF.strokeStyle = "rgba(0,0,0,.6)";
-        ctxF.strokeText(m.txt, hx, hy - 10);
-        ctxF.fillStyle = m.c; ctxF.fillText(m.txt, hx, hy - 10);
+        ctxF.strokeText(m.txt, x, y);
+        ctxF.fillStyle = m.c; ctxF.fillText(m.txt, x, y);
       }
       ctxF.restore();
     }
   }
   function beamOut(i, n, revenge){
     const e = foeEls[i];
-    if(e) beam(cvMain, e.cv, revenge ? "#ff5d6c" : "#ffd93d", (revenge ? "反擊 +" : "+") + n + " 排");
+    if(e) beam("gun", e.cv, revenge ? "#ff5d6c" : "#ffd93d", (revenge ? "反擊 +" : "+") + n + " 排", "b");
   }
   function beamIn(i, n, who){
     const e = foeEls[i];
-    if(e) beam(e.cv, elGauge || cvMain, "#ff5d6c", (who ? who + " " : "") + "+" + n + " 排");
+    if(e) beam(e.cv, "ceil", "#ff5d6c", (who ? who + " " : "") + "+" + n + " 排", "a");
     incoming(n);
   }
   function beamShield(i, who){
     const e = foeEls[i];
-    if(e) beam(e.cv, elGauge || cvMain, "#48dbfb", (who ? who + " " : "") + "🛡️ 抵擋");
+    if(e) beam(e.cv, "ceil", "#48dbfb", (who ? who + " " : "") + "🛡️ 抵擋", "a");
     word("🛡️ 暖身保護抵擋", "#48dbfb", 0.62);
     T(600, { type: "sine", dur: 0.12, vol: 0.12, slideTo: 850 });
   }
@@ -696,6 +955,23 @@ const BUBB = (function(){
       ev.drops.forEach(p => fx.drops.push({ x: R.cx(parBefore, p[0], p[1]), y: R.cy(p[1]), c: p[2],
                                             vy: -0.002 - Math.random() * 0.004, vx: (Math.random() - 0.5) * 0.004, t: 0 }));
       const n = ev.pops.length + ev.drops.length;
+      /* 碎片:每顆 5 片,整批上限 90(一次消一大串時不要把手機的幀數拖垮) */
+      if(!reduced()){
+        ev.pops.forEach(p => {
+          const px = R.cx(parBefore, p[0], p[1]), py = R.cy(p[1]);
+          for(let j = 0; j < 5 && fx.sparks.length < 90; j++){
+            const a = Math.random() * Math.PI * 2, v = 0.0022 + Math.random() * 0.003;
+            fx.sparks.push({ x: px, y: py, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.0012,
+                             c: p[2], t: 0, life: 360 + Math.random() * 220 });
+          }
+        });
+      }
+      /* 落點冒一個「+N」—— 打掉幾顆一眼看得到(掉落的顆數也算在裡面) */
+      if(ev.x >= 0){
+        fx.floats.push({ txt: "+" + n, x: R.cx(parBefore, ev.x, ev.y), y: R.cy(ev.y) - 0.3,
+                         c: ev.drops.length ? "#ffd93d" : "#fff", size: n >= 8 ? 0.62 : 0.46, t: 0, dur: 820 });
+        if(fx.floats.length > 4) fx.floats.shift();
+      }
       T(560 + Math.min(8, n) * 70, { type: "triangle", dur: 0.12, vol: 0.18, slideTo: 900 + Math.min(8, n) * 120 });
       if(ev.drops.length >= 4){ shake(5); word("掉了 " + ev.drops.length + " 顆!", "#ffd93d", 0.78); }
       else shake(1.5);
@@ -745,7 +1021,8 @@ const BUBB = (function(){
   function aimFromPoint(cx, cy){
     const r = cvMain.getBoundingClientRect();
     const k = r.width / (R.COLS * D) || 1;           // CSS 縮放(大 / 小切換的瞬間)
-    const lx = r.left + R.LX * D * k, ly = r.top + R.LY * D * k;
+    /* ⚠ 天花板那 CEIL 顆要加回來(畫面往下推了,規則座標沒動) */
+    const lx = r.left + R.LX * D * k, ly = r.top + (CEIL + R.LY) * D * k;
     const dx = cx - lx, dy = ly - cy;
     return { a: Math.atan2(dx, Math.max(0.001, dy)), cancel: dy < D * 0.35 * k };
   }
@@ -753,7 +1030,7 @@ const BUBB = (function(){
     const r = cvMain.getBoundingClientRect();
     const k = r.width / (R.COLS * D) || 1;
     const n = nextPos();
-    const dx = cx - (r.left + n.x * k), dy = cy - (r.top + n.y * k);
+    const dx = cx - (r.left + n.x * k), dy = cy - (r.top + (n.y + CEIL * D) * k);
     return Math.hypot(dx, dy) <= D * 0.95 * k;
   }
   function onDown(e){
@@ -857,6 +1134,13 @@ const BUBB = (function(){
       if(p.t >= 700){ fx.drops.splice(i, 1); continue; }
       p.vy += 0.00004 * dt; p.y += p.vy * dt; p.x += p.vx * dt;
     }
+    for(let i = fx.sparks.length - 1; i >= 0; i--){
+      const p = fx.sparks[i];
+      p.t += dt;
+      if(p.t >= p.life){ fx.sparks.splice(i, 1); continue; }
+      p.vy += 0.000012 * dt; p.x += p.vx * dt; p.y += p.vy * dt;
+    }
+    for(let i = fx.floats.length - 1; i >= 0; i--){ fx.floats[i].t += dt; if(fx.floats[i].t >= fx.floats[i].dur) fx.floats.splice(i, 1); }
     for(let i = fx.beams.length - 1; i >= 0; i--){ fx.beams[i].t += dt; if(fx.beams[i].t >= fx.beams[i].dur) fx.beams.splice(i, 1); }
     for(let i = fx.words.length - 1; i >= 0; i--){ fx.words[i].t += dt; if(fx.words[i].t >= fx.words[i].dur) fx.words.splice(i, 1); }
   }
@@ -868,9 +1152,6 @@ const BUBB = (function(){
     if(c) cfg = Object.assign(cfg, c);
     elStage = document.getElementById("bubStage");
     elWrap  = document.getElementById("bubWrap");
-    elGauge = document.getElementById("bubGauge");
-    elGaugeFill = document.getElementById("bubGaugeFill");
-    elGaugeNum  = document.getElementById("bubGaugeNum");
     elHud   = document.querySelector(".bub-hud");
     elFoes  = document.getElementById("bubFoes");
     elCast  = document.getElementById("bubCast");
@@ -910,6 +1191,7 @@ const BUBB = (function(){
     st = s;
     guideCache = null;
     fx.pops.length = 0; fx.drops.length = 0; fx.words.length = 0; fx.beams.length = 0;
+    fx.sparks.length = 0; fx.floats.length = 0;
     fx.push = null; fx.shake = 0; fx.hit = 0;
     fx.impact = null;
     allUp();
@@ -931,6 +1213,9 @@ const BUBB = (function(){
     awake: () => !!raf,
     state: () => st,
     cell: () => D,
+    /* 天花板那一條佔幾顆高(畫面座標 = 規則座標往下推 CEIL*D)、小盤現在擺在哪裡 */
+    ceil: () => CEIL,
+    foeLayout: () => foeLayout,
     aimPoint: (cx, cy) => aimFromPoint(cx, cy),
     COL
   };

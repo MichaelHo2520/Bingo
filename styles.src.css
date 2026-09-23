@@ -14210,14 +14210,23 @@ body.solo-on .blk-react-row{display:none}
   --bub-tw:560px;
   --bub-glass:rgba(10,12,26,.34);
   --bub-line:rgba(255,255,255,.12);
-  /* 死亡線的顏色。★ board.js 每次 fitBoard() 讀進去畫 —— 放在這裡是為了跟著主題走 */
+  /* 死亡線 / 空格淡點的顏色。★ board.js 每次 fitBoard() 讀進去畫 —— 放在這裡是為了跟著主題走 */
   --bub-grid:rgba(255,255,255,.22);
+  /* 天花板(board.js 的 ceiling() 讀):下緣 / 上緣。⚠ 同上,只在 fitBoard() 讀一次 */
+  --bub-ceil:rgba(255,255,255,.08);
+  --bub-ceil-edge:rgba(255,255,255,.26);
+  /* 砲台 / 預瞄線(同上,board.js 讀)。淺色主題要換成深色,不然白色半透明在粉底上等於看不到 */
+  --bub-gun:rgba(255,255,255,.46);
+  --bub-guide:rgba(255,255,255,.55);
 }
 :root[data-theme="bubblegum"]{ --bub-glass:rgba(48,14,38,.20); --bub-line:rgba(120,50,100,.22);
-                               --bub-grid:rgba(96,40,84,.34); }
+                               --bub-grid:rgba(96,40,84,.34);
+                               --bub-ceil:rgba(96,40,84,.16); --bub-ceil-edge:rgba(96,40,84,.42);
+                               --bub-gun:rgba(96,40,84,.50); --bub-guide:rgba(96,40,84,.55); }
 :root[data-theme="meadow"]{ --bub-glass:rgba(10,26,14,.32); }
 :root[data-theme="arcade"]{ --bub-glass:rgba(0,0,0,.46); --bub-line:rgba(255,230,0,.22);
-                            --bub-grid:rgba(255,230,0,.30); }
+                            --bub-grid:rgba(255,230,0,.30);
+                            --bub-ceil:rgba(255,230,0,.10); --bub-ceil-edge:rgba(255,230,0,.40); }
 
 /* 「大 / 小」那一顆(BigMode)。⚠ class 是 .bub-bigbtn,而狀態掛在 body 上的是 .bub-big */
 .bub-bigbtn{font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:15px}
@@ -14354,12 +14363,17 @@ body.bub-rush #bubStatTime{color:#ff5d6c}
   body.bub-rush .bub-stage{animation:none;box-shadow:inset 0 0 0 2px rgba(255,93,108,.55)}
 }
 
-/* ---------- 對手的小盤:住在盤面右側的空白帶(同方塊對戰 v2.14.0)----------
-   ⚠ 寬度由 board.js 的 fitBoard() 量出來寫成行內 style;高度一律由外面決定(量自己 = 震盪)。
-   ⚠⚠ 容器 pointer-events:none、只有每一塊小盤 auto —— 右側那一條也是瞄準的拖曳區。 */
+/* ---------- 對手的小盤:盤面右邊一欄,或(手機直向)盤面上方一整條 ----------
+   ★ 擺哪裡由 board.js 的 fitBoard() 決定(兩種都算,誰讓主盤面比較大就用誰),
+     位置 / 寬 / 高都寫成行內 style —— 盤面與小盤是**一組置中**的。
+   ⚠ 高度一律由外面決定(量自己 = 震盪)。
+   ⚠⚠ 容器 pointer-events:none、只有每一塊小盤 auto —— 小盤旁邊的空白也是瞄準的拖曳區。 */
 .bub-foes{position:absolute;right:0;top:0;bottom:0;width:78px;z-index:2;
           display:flex;flex-direction:column;gap:8px;
           align-items:center;justify-content:center;pointer-events:none}
+/* 上方那一條:橫排置中(高度 = fitBoard 算的 stripH,小盤底下照樣是名字) */
+.bub-foes-top{left:0;right:0;bottom:auto;width:auto;flex-direction:row;gap:10px;
+              align-items:flex-end;justify-content:center}
 .bub-foes-over{bottom:auto;justify-content:flex-start;padding-top:2px}
 .bub-foes-over .bub-foe{background:rgba(12,10,22,.42);
                         -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
@@ -14418,38 +14432,28 @@ body.bub-spec .bub-foes{position:static;width:auto!important;flex:1 1 auto;align
 body.bub-spec .bub-foe-cv{width:auto;height:auto}
 body.bub-spec .bub-foe{cursor:default;pointer-events:none}
 
-/* ⚠⚠ HUD 的高度一定要是固定的(會震盪的循環,同方塊對戰紅線 ⑮) */
+/* ⚠⚠ HUD 的高度一定要是固定的(會震盪的循環,同方塊對戰紅線 ⑮)
+   ★ 2026-09-23 收成一條膠囊:以前五組「上標籤 + 下大字」浮在空中,「目標」那一格還對不齊。
+   ★ 插排倒數**不在 HUD 上了** —— 改成發射器右邊的一排小點(board.js 的 pressDots()),
+     元素留著是因為 solo.js / adapter.js 還在寫它(不想為了隱藏動兩支),只是不顯示。 */
 .bub-hud{flex:none;display:flex;align-items:center;justify-content:center;gap:8px;
-         width:100%;height:42px}
-.bub-stats{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:14px}
-.bub-stat{display:flex;flex-direction:column;align-items:center;line-height:1.12;min-width:50px}
-.bub-stat span{font-size:10px;font-weight:700;letter-spacing:.10em;color:var(--text);opacity:.72}
-.bub-stat b{font-family:'Fredoka','Nunito',sans-serif;font-size:19px;color:var(--text)}
-.bub-stat-press-hot b{color:#ff5d6c}
-.bub-stat-press-hot span{color:#ff5d6c;opacity:1}
-.bub-stat-tgt{max-width:88px;min-width:0}
-.bub-stat-tgt b{font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+         width:100%;height:40px}
+.bub-stats{flex:0 1 auto;min-width:0;display:flex;align-items:center;justify-content:center;
+           gap:0;padding:4px 4px;border-radius:999px;
+           background:var(--bub-glass);box-shadow:inset 0 0 0 1px var(--bub-line);
+           -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.bub-stat{display:flex;flex-direction:row;align-items:baseline;gap:5px;line-height:1;
+          padding:3px 11px;min-width:0;white-space:nowrap}
+.bub-stat + .bub-stat{box-shadow:-1px 0 0 0 var(--bub-line)}
+.bub-stat span{font-size:10.5px;font-weight:700;letter-spacing:.04em;color:var(--text);opacity:.7}
+.bub-stat b{font-family:'Fredoka','Nunito',sans-serif;font-size:17px;color:var(--text)}
+.bub-stat-press{display:none}
+.bub-stat-tgt{max-width:120px;min-width:0}
+.bub-stat-tgt b{font-size:13.5px;max-width:78px;overflow:hidden;text-overflow:ellipsis;
                 white-space:nowrap;display:block}
 .bub-stat-lock b{color:var(--accent-2)}
 
-.bub-wrap{flex:none;display:flex;align-items:stretch;justify-content:center;gap:8px}
-/* 待處理垃圾的警示條。⚠ 高度用 transform:scaleY;寬度要與 board.js 的 GAUGE_W 同步 */
-.bub-gauge{position:relative;width:10px;flex:none;border-radius:6px;
-           background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--bub-line);
-           opacity:0;transition:opacity .25s ease}
-.bub-gauge-num{position:absolute;bottom:100%;left:50%;transform:translate(-50%,-3px);
-               font-family:'Fredoka','Nunito',sans-serif;font-size:11px;font-weight:800;
-               line-height:1;color:#ff9f43;text-shadow:0 1px 3px rgba(0,0,0,.7);
-               pointer-events:none;white-space:nowrap}
-.bub-gauge-hot .bub-gauge-num{color:#ff5d6c;font-size:12px}
-.bub-gauge-on{opacity:1}
-.bub-gauge-fill{position:absolute;left:0;right:0;bottom:0;height:100%;border-radius:5px;
-                transform-origin:bottom;transform:scaleY(0);
-                background:linear-gradient(180deg,#ff9f43,#ff5d6c);
-                transition:transform .12s linear}
-.bub-gauge-hot .bub-gauge-fill{background:linear-gradient(180deg,#ff5d6c,#ff2d55);
-                               animation:bub-pulse .62s ease-in-out infinite}
-@keyframes bub-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.bub-wrap{flex:none;display:flex;align-items:stretch;justify-content:center}
 
 /* 盤面:玻璃。⚠ canvas 本身一律 clearRect,底色靠這裡 —— 主題才透得過來 */
 .bub-main{display:block;border-radius:14px;background:var(--bub-glass);
@@ -14485,11 +14489,14 @@ body.solo-on .bub-react-row{display:none}
   .bub-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
   .bub-play{gap:4px;margin-top:4px}
   .bub-room{padding:6px 10px}
-  .bub-hud{gap:6px;height:36px}
+  .bub-hud{gap:6px;height:34px}
+  .bub-stats{padding:2px 3px}
   .bub-foes{gap:6px}
 }
 @media (max-height:480px){
   .bub-hud{height:30px}
+  .bub-stat{padding:2px 8px}
+  .bub-stat b{font-size:15px}
   .bub-room{padding:4px 10px}
   .bub-room .icon-btn{width:30px;height:30px;font-size:14px}
   .bub-play{margin-top:2px;gap:3px}
