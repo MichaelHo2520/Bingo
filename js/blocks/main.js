@@ -53,7 +53,7 @@ function showScreen(which){
     requestAnimationFrame(() => BLKB.fitBoard());
   }else BLKB.sleep();
   /* 大廳的示範局:只在大廳跑(⚠ 離開一定要停,不然就是在別的畫面裡白燒電池) */
-  if(which === "lobby") demoStart(); else demoStop();
+  if(which === "lobby" && $("blkSetupHelp").open) demoStart(); else demoStop();
   if(which === "home") showHomeLayer("pick");
   syncPageBack();
 }
@@ -179,6 +179,10 @@ function demoStart(){
   demoHit = 0;
   demoT = setInterval(demoStep, DEMO_MS);
 }
+$("blkSetupHelp").addEventListener("toggle", e => {
+  if(!$("blkSetup").classList.contains("hidden") && e.target.open) demoStart();
+  else demoStop();
+});
 function demoStop(){
   if(demoT){ clearInterval(demoT); demoT = null; }
 }

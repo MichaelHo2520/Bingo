@@ -695,6 +695,13 @@ const MP = MPCore.create((function(){
        跟著一局多久那一格一起收掉,不然它會是一顆按了沒反應的鈕。 */
     const rr = $("blkRushRow");
     if(rr) rr.classList.toggle("hidden", rules.mode !== "ko");
+    queueMicrotask(() => {
+      const summary = $("blkSetupSummary"); if(!summary) return;
+      const mode = rules.mode === "ko" ? "K.O. 賽" : "淘汰賽";
+      const duration = rules.mode === "ko" ? ` · ${Math.round(rules.secs / 60)} 分鐘` : "";
+      const scoring = $("scoreSeg").querySelector(".on")?.dataset.score === "match" ? "搶勝" : "累積排行";
+      summary.textContent = mode + duration + " · " + scoring;
+    });
   }
   /* ==========================================================================
      九、伺服器時間

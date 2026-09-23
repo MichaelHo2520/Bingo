@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.15.0 -->
-<meta name="version" content="2.15.0">
+<meta name="version" content="2.15.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -29,7 +29,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
      id 與 class;盤面是檔尾追加的 .blk-* 段落 -->
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="blk-page">
 
   <div class="topbar">
     <div class="brand">
@@ -247,9 +247,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
   <div class="scroll-area blk-scroll hidden" id="scrollArea">
     <section class="panel hidden" id="blkSetup">
       <div class="subtitle">對戰設定</div>
-      <!-- ★★ 等人的時候跑一段電腦自動對打(v2.15.3)。
+      <div class="blk-setup-summary" id="blkSetupSummary" aria-live="polite">K.O. 賽 · 3 分鐘 · 累積排行</div>
+      <details class="blk-setup-help" id="blkSetupHelp">
+        <summary>看玩法示範與攻擊說明</summary>
+      <!-- 展開說明時跑一段電腦自動對打(v2.15.3)。
            這一頁的規則是**一串因果**(消掉 → 飛過去 → 把他頂高),文字寫三行還是不懂,
-           看一次就懂 —— 而大廳等人那 30 秒本來就是空的。**零操作、零強迫。**
+           看一次就懂;平常收起,讓設定選項先被看見。
            ⚠ 只在大廳跑(showScreen 開關),離開就停 —— 它是 setInterval,不是 rAF。
            ⚠ 兩塊畫布由 js/blocks/main.js 自己畫,**不要接到 board.js 的 foeEls** ——
              那一套是跟著對局的 rAF 與 fitFoes() 走的,借過來就會在大廳裡改到盤面尺寸。 -->
@@ -259,6 +262,12 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <canvas class="blk-demo-cv" id="blkDemoB"></canvas>
       </div>
       <div class="blk-demo-cap">上面是示範:<b>左邊消掉幾列</b>,右邊就<b>從底下被頂高幾行</b>。</div>
+      <div class="hint" id="blkRuleHint">
+        每個人拿到的<b>方塊順序完全一樣</b> —— 比的是誰堆得好,不是誰運氣好。<br>
+        三個人以上時,你消行送出的垃圾行<b>只會打給其中一個人</b>,不是每個人都吃到;
+        點對手的小盤可以<b>指定只打他</b>,再點一次改回隨機。
+      </div>
+      </details>
       <!-- ★★ 玩法是這一頁最重要的旋鈕。
            **K.O. 賽是預設**,理由是聚會場合:淘汰賽第一個死的人要乾等一兩分鐘,
            而 K.O. 賽死了兩秒就復活,沒有人會在旁邊滑手機,時間也可以預期。 -->
@@ -284,6 +293,28 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-secs="300">5 分</button>
         </div>
       </div>
+      <div class="field" id="scoreRow">
+        <span class="field-label" id="scoreLabel">連線計分</span>
+        <div class="seg" id="scoreSeg">
+          <button class="on" data-score="rank">🏆 累積排行</button>
+          <button data-score="match">🎯 搶勝</button>
+        </div>
+        <div class="score-extra hidden" id="scoreExtra">
+          <div class="wg-group hidden" id="wgGroup">
+            <span class="wg-lbl">先到</span>
+            <div class="wg-stepper">
+              <button class="mini" id="wgMinus" aria-label="減少目標分數">－</button>
+              <span class="target-val display" id="winGoalVal">3</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標分數">＋</button>
+            </div>
+            <span class="wg-lbl">勝奪冠</span>
+          </div>
+          <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
+          <div class="blk-score-actions"><button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button></div>
+        </div>
+      </div>
+      <details class="blk-setup-more" id="blkSetupMore">
+        <summary>更多規則 <span>開局暖身、攻擊目標、結尾加速</span></summary>
       <!-- ★ 新手保護:開局前這幾秒不吃垃圾行(照樣排隊、照樣顯示,就是不推上來)。
            沒有它的話,第一次玩的人開局十五秒就被埋掉,連手感都還沒摸到。 -->
       <div class="field">
@@ -318,38 +349,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
         <div class="blk-fnote" id="blkNoteRush"></div>
       </div>
+      </details>
       <!-- ★ 這裡本來有「我的讓分」那一格與底下那一行「這一局的讓分」——
            v2.15.2 整套拿掉了(使用者:「做不出可以讓人看得懂跟實際上有的功能,
            還不如不寫,別讓人誤會了」)。⚠ 不要加回來,理由見 js/blocks/rules.js 紅線 ⑤;
            強弱平衡的旋鈕是上面那格**新手保護**。 -->
-      <div class="field" id="scoreRow">
-        <span class="field-label" id="scoreLabel">連線計分</span>
-        <div class="seg" id="scoreSeg">
-          <button class="on" data-score="rank">🏆 累積排行</button>
-          <button data-score="match">🎯 搶勝</button>
-        </div>
-        <div class="score-extra hidden" id="scoreExtra">
-          <div class="wg-group hidden" id="wgGroup">
-            <span class="wg-lbl">先到</span>
-            <div class="wg-stepper">
-              <button class="mini" id="wgMinus" aria-label="減少目標分數">－</button>
-              <span class="target-val display" id="winGoalVal">3</span>
-              <button class="mini" id="wgPlus" aria-label="增加目標分數">＋</button>
-            </div>
-            <span class="wg-lbl">勝奪冠</span>
-          </div>
-          <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
-          <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
-        </div>
-      </div>
-      <!-- ⚠ 這裡原本寫「同一顆**種子**」——「種子」是程式術語,玩家不可能懂(v2.15.3 換掉)。
-           ★ 第二句在回答使用者親口問的那個問題:「三個人玩,我消掉方塊是每個人都會增加嗎?」
-             答案(只打其中一個人)以前只寫在程式裡,畫面上完全看不出來。 -->
-      <div class="hint" id="blkRuleHint">
-        每個人拿到的<b>方塊順序完全一樣</b> —— 比的是誰堆得好,不是誰運氣好。<br>
-        三個人以上時,你消行送出的垃圾行<b>只會打給其中一個人</b>,不是每個人都吃到;
-        點對手的小盤可以<b>指定只打他</b>,再點一次改回隨機。
-      </div>
     </section>
   </div>
 
@@ -520,9 +524,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
 
         <div class="set-group">
-          <div class="set-group-title">音效</div>
+          <div class="set-group-title">聲音與震動</div>
           <div class="set-row">
-            <span class="set-lbl">開啟音效</span>
+            <span class="set-lbl">遊戲音效</span>
             <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="開啟音效"><span class="knob"></span></button>
           </div>
           <div class="set-row" id="sfxVolRow">
@@ -533,12 +537,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
             <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
           </div>
-        </div>
-
-        <div class="set-group">
-          <div class="set-group-title">背景音樂</div>
           <div class="set-row">
-            <span class="set-lbl">開啟音樂</span>
+            <span class="set-lbl">背景音樂</span>
             <button class="switch" id="swBgm" role="switch" aria-checked="false" aria-label="開啟背景音樂"><span class="knob"></span></button>
           </div>
           <div class="set-row" id="bgmTrackRow">
@@ -551,8 +551,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           </div>
         </div>
 
-        <div class="set-group">
-          <div class="set-group-title">語音（連線）</div>
+        <details class="set-group blk-voice-group">
+          <summary class="set-group-title">連線語音 <span>音量與我的語音</span></summary>
           <div class="set-row">
             <span class="set-lbl">收到語音音量</span>
             <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
@@ -561,7 +561,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
             <span class="set-lbl">我的語音<span class="set-sub">(自己錄 · 連線可送)</span></span>
             <button class="btn ghost mvc-open" id="myVoiceBtn" type="button">編輯</button>
           </div>
-        </div>
+        </details>
       </div>
       <button class="btn primary" id="setClose">完成</button>
       <div class="set-foot">方塊對戰 · <span id="setVer"></span> · 開發者 Michael Ho</div>
