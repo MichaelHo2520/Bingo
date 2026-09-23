@@ -130,6 +130,8 @@ const MP = MPCore.create((function(){
     Object.keys(ackd).forEach(k => delete ackd[k]);
     BLKB.setFoes([]);
     BLKB.clearCast();
+    const res = $("blkResult");
+    if(res){ res.classList.add("hidden"); res.innerHTML = ""; }
     document.body.classList.remove("blk-spec", "blk-rush");
     banner("");
   }
@@ -164,6 +166,8 @@ const MP = MPCore.create((function(){
     myKiller = ""; streak = null;
     Object.keys(ackd).forEach(k => delete ackd[k]);
     BLKB.clearCast();
+    const res = $("blkResult");
+    if(res){ res.classList.add("hidden"); res.innerHTML = ""; }
     document.body.classList.remove("blk-rush");   // 上一局的加倍狀態不可以帶進新的一局
 
     st = R.blank({
@@ -172,7 +176,9 @@ const MP = MPCore.create((function(){
     });
 
     foes = {};
-    order.forEach(id => { if(id !== ctx.me()) foes[id] = { name: ctx.dispName(id), ko: 0 }; });
+    order.forEach(id => {
+      if(id !== ctx.me()) foes[id] = { name: ctx.dispName(id), ko: 0, lastHeardAt: Date.now(), connState: "good" };
+    });
     rebuildFoes();
 
     BLKB.setState(st);
@@ -238,6 +244,30 @@ const MP = MPCore.create((function(){
     if(pubT >= PUB_MS){ pubT = 0; pubActive(); }
     if(endAt && nowSrv() >= endAt && !over) resolveTime();
   }
+  function checkFoeFreshness(){
+    if(!playing || over) return;
+    const now = Date.now();
+    const pl = (ctx && ctx.players) ? (ctx.players() || {}) : {};
+    let changed = false;
+    order.forEach(id => {
+      if(id === ctx.me()) return;
+      const f = foes[id];
+      if(!f) return;
+      const isPresenceAway = !!(pl && !pl[id]);
+      const age = f.lastHeardAt ? (now - f.lastHeardAt) : 0;
+      let state = "good";
+      if(isPresenceAway || age >= 4000){
+        state = "away";
+      }else if(age >= 1800){
+        state = "lag";
+      }
+      if(f.connState !== state){
+        f.connState = state;
+        changed = true;
+      }
+    });
+    if(changed) rebuildFoes();
+  }
   function pubActive(){
     if(!liveRef || !st) return;
     const c = st.cur;
@@ -278,6 +308,8 @@ const MP = MPCore.create((function(){
       if(id === ctx.me() && !ctx.spectating()) return;      // 自己的不必收回來
       if(!curRound || v.rid !== curRound) return;           // 紅線 ④:上一局的一律忽略
       const f = foes[id] || (foes[id] = { name: ctx.dispName(id), ko: 0 });
+      f.lastHeardAt = Date.now();
+      if(f.connState && f.connState !== "good") f.connState = "good";
       if(typeof v.seq === "number" && typeof f.seq === "number" && v.seq <= f.seq) return;  // 亂序不倒退
       f.seq = v.seq;
       if(typeof v.b === "string"){ f.bd = R.decBoard(v.b); }
@@ -291,8 +323,20 @@ const MP = MPCore.create((function(){
            不然一進房就被一串「某某被 K.O.」洗版,而那些都是我沒看到的事。 */
       const wasDead = !!f.dead;
       f.dead = !!v.d;
-      if(!f.dead) f.seen = true;
-      else if(f.seen && !wasDead) announceKO(v.k || "", id);
+      if(!f.dead){
+        f.seen = true;
+        if(lockTarget === id) paintTargetStat();
+      }else if(f.seen && !wasDead){
+        announceKO(v.k || "", id);
+        if(lockTarget === id){
+          if(gRules && gRules.mode === "out"){
+            lockTarget = null;
+            const fallback = (gRules && gRules.target === "high") ? "打第一名" : "隨機攻擊";
+            showToast(ctx.dispName(id) + " 已淘汰，改回" + fallback);
+          }
+          paintTargetStat();
+        }
+      }
       f.at = v.at || f.at;
       drawFoesSoon();
     };
@@ -309,10 +353,13 @@ const MP = MPCore.create((function(){
       const last = ackd[a.from] || 0;
       if(a.n <= last) return;                               // 已經吃過了
       ackd[a.from] = a.n;
-      R.queueGarbage(st, a.lines, a.hole, a.from);
-      lastHitBy = a.from;
+      const accepted = R.queueGarbage(st, a.lines, a.hole, a.from);
+      if(accepted > 0) lastHitBy = a.from;
       const i = foeIndex(a.from);
-      if(i >= 0) BLKB.beamIn(i, a.lines, ctx.dispName(a.from));
+      if(i >= 0){
+        if(accepted === 0) BLKB.beamShield(i, ctx.dispName(a.from));
+        else BLKB.beamIn(i, accepted, ctx.dispName(a.from));
+      }
       pubFull(false);                                        // 把 ack 寫進快照(重整後才去得掉重)
     });
   }
@@ -482,8 +529,17 @@ const MP = MPCore.create((function(){
     Object.keys(foes).forEach(id => {
       foes[id].name = ctx.dispName(id);
       foes[id].ko = (g && g.ko && g.ko[id]) || 0;
-      if(g && g.topouts && g.topouts[id]) foes[id].dead = true;
-      foes[id].target = (lockTarget === id);
+      if(g && g.topouts && g.topouts[id]){
+        const wasDead = !!foes[id].dead;
+        foes[id].dead = true;
+        if(!wasDead && lockTarget === id && gRules && gRules.mode === "out"){
+          lockTarget = null;
+          const fallback = (gRules && gRules.target === "high") ? "打第一名" : "隨機攻擊";
+          showToast(ctx.dispName(id) + " 已淘汰，改回" + fallback);
+          paintTargetStat();
+        }
+      }
+      foes[id].target = (lockTarget === id) && !foes[id].dead;
     });
     rebuildFoes();
   }
@@ -498,8 +554,13 @@ const MP = MPCore.create((function(){
   function rebuildFoes(){
     const list = order.filter(id => id !== ctx.me()).map(id => {
       const f = foes[id] || {};
+      const dead = !!f.dead;
+      const connState = f.connState || "good";
       return { id: id, name: f.name || ctx.dispName(id), bd: f.bd, c: f.c,
-               pend: f.p || 0, ko: f.ko || 0, dead: !!f.dead, target: lockTarget === id };
+               pend: f.p || 0, ko: f.ko || 0, dead: dead,
+               target: (lockTarget === id) && !dead,
+               away: connState === "away", lag: connState === "lag",
+               connState: connState };
     });
     BLKB.setFoes(list);
   }
@@ -512,8 +573,10 @@ const MP = MPCore.create((function(){
     const list = order.filter(x => x !== ctx.me());
     const id = list[i];
     if(!id) return;
-    lockTarget = (lockTarget === id) ? null : id;
-    showToast(lockTarget ? ("只打 " + ctx.dispName(id)) : "改回隨機攻擊");
+    const wasLocked = (lockTarget === id);
+    lockTarget = wasLocked ? null : id;
+    const fallback = (gRules && gRules.target === "high") ? "打第一名" : "隨機攻擊";
+    showToast(lockTarget ? ("只打 " + ctx.dispName(id)) : ("改回" + fallback));
     rebuildFoes();
     paintTargetStat();                   // ⚠ HUD 那一格要立刻跟上,不能等下一次 250ms 的 paintHud
   }
@@ -568,6 +631,32 @@ const MP = MPCore.create((function(){
     const goal = $("blkGoal");
     if(goal) goal.textContent = (gRules && gRules.mode === "ko") ? ("K.O. ×" + koOf(ctx.me())) : "淘汰賽";
     paintTargetStat();
+    checkFoeFreshness();
+  }
+  function targetRuleName(rule){
+    return rule === "high" ? "打第一名" : "隨機攻擊";
+  }
+  function targetRuleShort(rule){
+    return rule === "high" ? "👑第一" : "隨機";
+  }
+  function currentTargetInfo(){
+    const alive = aliveFoes();
+    const isLocked = !!(lockTarget && alive.indexOf(lockTarget) >= 0);
+    const rule = (gRules && gRules.target === "high") ? "high" : "rand";
+    if(isLocked){
+      return {
+        isLock: true,
+        targetId: lockTarget,
+        name: ctx.dispName(lockTarget),
+        short: ctx.dispName(lockTarget)
+      };
+    }
+    return {
+      isLock: false,
+      targetId: null,
+      name: targetRuleName(rule),
+      short: targetRuleShort(rule)
+    };
   }
   /* ★★ 「我現在打誰」(v2.15.3)。使用者親口問過「三個人玩是每個人都會增加嗎」——
      答案(只打一個人、預設隨機)以前**畫面上完全看不出來**,只有一行灰字寫在大廳。
@@ -578,9 +667,9 @@ const MP = MPCore.create((function(){
     const foeN = order.filter(id => id !== ctx.me()).length;
     box.classList.toggle("hidden", foeN < 2 || ctx.spectating());
     if(foeN < 2) return;
-    const txt = (lockTarget && foes[lockTarget]) ? ctx.dispName(lockTarget) : "隨機";
-    if(val.textContent !== txt) val.textContent = txt;
-    box.classList.toggle("blk-stat-lock", !!lockTarget);
+    const info = currentTargetInfo();
+    if(val.textContent !== info.short) val.textContent = info.short;
+    box.classList.toggle("blk-stat-lock", info.isLock);
   }
   /* ★★ 設定畫面的「隨選隨變」文案 —— **單一真相在 `rules.js` 的 `NOTES`**
      (v2.15.3 原本放在這裡,v2.15.4 因為單機也用同一組房規而搬過去)。
@@ -626,6 +715,35 @@ const MP = MPCore.create((function(){
   /* ==========================================================================
      十、adapter 介面
      ========================================================================== */
+  function escapeHtml(s){
+    if(typeof esc === "function") return esc(s);
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  function paintBattleReport(winner){
+    const box = $("blkResult");
+    if(!box || !order.length) return;
+    box.classList.remove("hidden");
+    const isKoMode = (gRules && gRules.mode === "ko");
+    let rowsHtml = "";
+    order.forEach(id => {
+      const isMe = (id === ctx.me());
+      const name = ctx.dispName(id) + (isMe ? " (你)" : "");
+      const isWin = (winner === id);
+      const ko = koOf(id);
+      const lines = isMe ? (st ? st.lines : 0) : ((foes[id] && foes[id].l) || 0);
+      const isDead = deadOf(id, lastGame);
+      const tag = isWin ? "👑 " : "";
+      let detail = "";
+      if(isKoMode){
+        detail = "K.O. " + ko + " · " + lines + " 行";
+      }else{
+        detail = lines + " 行 · " + (isDead ? "淘汰" : "存活");
+      }
+      rowsHtml += '<div class="blk-rrow"><span>' + tag + escapeHtml(name) + '</span><b>' + escapeHtml(detail) + '</b></div>';
+    });
+    box.innerHTML = rowsHtml;
+  }
+
   return {
     ns: { rooms: "blocks_rooms", index: "blocks_index" },
     prefsKey: "blk",
@@ -674,6 +792,7 @@ const MP = MPCore.create((function(){
       return ids.length < 2 ? "等人進來…(至少 2 個人)" : "都準備好就開始";
     },
     outcome(winner, o){
+      paintBattleReport(winner);
       const ko = koOf(ctx.me());
       if(winner === "draw") return { word: "平手", msg: "誰都沒有被埋掉 🤝" };
       if(o.iWon) return { word: "你贏了!", msg: (gRules && gRules.mode === "ko")

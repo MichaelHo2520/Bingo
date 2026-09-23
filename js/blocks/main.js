@@ -244,13 +244,16 @@ function paintSoloHint(){
   const el = $("blkSoloHint"); if(!el) return;
   syncSoloSeg();
   const r = Solo.rec();
-  const lv = BLKAI.levelOf(Solo.level());
+  const isCustom = Solo.level() === "custom";
+  const lv = isCustom ? null : BLKAI.levelOf(Solo.level());
   const body = (Solo.mode() === "sprint")
     ? ("<b>" + Solo.SPRINT_LINES + " 行競速</b>:消滿 " + Solo.SPRINT_LINES + " 行,比誰快。" +
        (r.sprint ? "你最快 <b>" + (r.sprint / 1000).toFixed(1) + " 秒</b>。" : "還沒有紀錄。"))
     : (Solo.mode() === "vs")
       ? ("<b>對電腦</b>:互相送垃圾行,先堆爆的輸。" +
-         "<b>" + lv.emoji + " " + lv.name + "</b>:" + esc(lv.desc) + "<br>" +
+         (isCustom
+           ? "<b>🛠️ 自訂強度</b>:自選每台電腦個別難度。<br>"
+           : ("<b>" + lv.emoji + " " + lv.name + "</b>:" + esc(lv.desc) + "<br>")) +
          ((r.win + r.lose) ? ("你目前 <b>" + r.win + " 勝 " + r.lose + " 敗</b>。") : "還沒有交手紀錄。"))
       : ("<b>練習(無盡)</b>:一路堆到爆為止,重力每 30 秒快一階。" +
          (r.best ? "你最高 <b>" + r.best + " 行</b>。" : "還沒有紀錄。"));
@@ -267,6 +270,37 @@ function segPick(id, attr, fn){
     paintSoloHint();
   });
 }
+function paintCustomLineup(){
+  const box = $("blkCustomLineup"); if(!box) return;
+  const n = Solo.foeN();
+  const lvs = Solo.customLvs();
+  const tiers = [
+    { key: "easy", label: "🙂 輕鬆" },
+    { key: "norm", label: "😎 普通" },
+    { key: "hard", label: "🔥 硬仗" }
+  ];
+  const items = box.querySelectorAll(".blk-custom-item");
+  if(items.length === n){
+    items.forEach((item, i) => {
+      const curLv = lvs[i] || "norm";
+      const seg = item.querySelector(".seg");
+      if(seg){
+        [...seg.children].forEach(b => b.classList.toggle("on", b.dataset.lv === curLv));
+      }
+    });
+    return;
+  }
+  let html = "";
+  for(let i = 0; i < n; i++){
+    const curLv = lvs[i] || "norm";
+    html += '<div class="blk-custom-item" data-foe-idx="' + i + '">' +
+      '<span class="blk-custom-lbl">🤖 電腦 ' + (i + 1) + '</span>' +
+      '<div class="seg" data-foe-idx="' + i + '" aria-label="電腦 ' + (i + 1) + ' 強度">' +
+      tiers.map(t => '<button type="button" data-lv="' + t.key + '" class="' + (curLv === t.key ? "on" : "") + '">' + t.label + '</button>').join("") +
+      '</div></div>';
+  }
+  box.innerHTML = html;
+}
 function syncSoloSeg(){
   const set = (id, attr, val) => {
     const seg = $(id); if(!seg) return;
@@ -275,7 +309,6 @@ function syncSoloSeg(){
   const note = (id, html) => { const el = $(id); if(el) el.innerHTML = html || ""; };
   const v = Solo.vs();
   set("blkModeSeg", "mode", Solo.mode());
-  set("blkFeelSeg", "feel", Solo.feel());
   set("blkLvSeg", "lv", Solo.level());
   set("blkFoeNSeg", "foen", Solo.foeN());
   set("blkVsModeSeg", "vsmode", v.mode);
@@ -306,6 +339,13 @@ function syncSoloSeg(){
   ["blkVsSecsRow", "blkVsRushRow"].forEach(id => {
     const el = $(id); if(el) el.classList.toggle("hidden", !koOnly);
   });
+  /* 自訂電腦強度：只有在對電腦且強度選「自訂」時才展開 */
+  const isCustom = isVs && Solo.level() === "custom";
+  const elCustom = $("blkCustomLvsRow");
+  if(elCustom){
+    elCustom.classList.toggle("hidden", !isCustom);
+    if(isCustom) paintCustomLineup();
+  }
 }
 /* ⚠ 操作方式那兩格設定(手勢 / 兩者 / 按鈕)v2.15.1 **整個拿掉了** ——
    只剩按鍵,沒有旋鈕可以調;「?」蓋板現在純粹是說明。
@@ -355,12 +395,22 @@ $("blkGoOnline").addEventListener("click", () => {
 $("blkGoSolo").addEventListener("click", () => { paintSoloHint(); showHomeLayer("solo"); });
 $("blkSoloCfgBack").addEventListener("click", () => showHomeLayer("pick"));
 segPick("blkModeSeg", "mode", v => Solo.setMode(v));
-segPick("blkFeelSeg", "feel", v => Solo.setFeel(+v));
 $("blkHelpBtn").addEventListener("click", openBlkGuide);
 $("blkSoloHelpBtn").addEventListener("click", openBlkGuide);
 $("blkGuideClose").addEventListener("click", closeBlkGuide);
 $("blkGuideVeil").addEventListener("click", e => { if(e.target === $("blkGuideVeil")) closeBlkGuide(); });
 segPick("blkLvSeg", "lv", v => Solo.setLevel(v));
+const boxCustom = $("blkCustomLineup");
+if(boxCustom){
+  boxCustom.addEventListener("click", e => {
+    const btn = e.target.closest("button[data-lv]"); if(!btn) return;
+    const seg = btn.closest(".seg[data-foe-idx]"); if(!seg) return;
+    const idx = parseInt(seg.dataset.foeIdx, 10);
+    const lv = btn.dataset.lv;
+    Solo.setCustomLevel(idx, lv);
+    paintSoloHint();
+  });
+}
 /* 對電腦的那一整組(v2.15.4)。⚠ segPick 會在選完之後叫 paintSoloHint() →
    而它會 syncSoloSeg() → 那幾行「隨選隨變」的文案跟著更新,不必各自再叫一次。 */
 segPick("blkFoeNSeg", "foen", v => Solo.setFoeN(+v));
@@ -423,6 +473,21 @@ $("reopenWin").addEventListener("click", showResult);
   $("kickVeil").addEventListener("click", e => { if(e.target === $("kickVeil")) MP.cancelKick(); });
   $("mpAgain").addEventListener("click", () => MP.again());
   $("mpLeaveWin").addEventListener("click", () => MP.askLeave());
+  /* 賽後表情列:四顆一鍵送給全部人;😀 開完整面板。節流 600ms(結果卡是強制回應視窗,很容易連點)
+     ⚠ v2.13.0 ~ v2.14.0 這一段漏了 —— HTML 照抄了別頁的那排鈕,事件卻沒綁,按了毫無反應。
+     單機時整排由 CSS 藏起來(body.solo-on .blk-react-row),所以這裡不必再判斷。 */
+  let reactAt = 0;
+  $("blkReactRow").addEventListener("click", e => {
+    const b = e.target.closest("button"); if(!b) return;
+    if(b.id === "winEmoteBtn"){ openEmote("all"); return; }
+    const em = b.dataset.em; if(!em) return;
+    const now = performance.now();
+    if(now - reactAt < 600) return;
+    reactAt = now;
+    markAudioArmed(); Sound.wake();
+    MP.sendEmote("all", em);
+    b.classList.remove("sent"); void b.offsetWidth; b.classList.add("sent");
+  });
 })();
 
 /* ---------- 共用綁定(設定 / 表情 / 音訊 / SW / 版號) ---------- */

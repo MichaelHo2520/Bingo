@@ -50,10 +50,11 @@ const BLKB = (function(){
   const FOE_MAX = 104;                  // 再寬就只是在搶注意力
   const FOE_OVER = 62;                  // 疊在盤面右上角時的寬
 
-  /* 手感參數。★ 這三個就是「好不好玩」的旋鈕,改之前先想清楚要調誰的體感 */
-  const DAS_MS = [180, 133, 95];        // 慢 / 標準 / 快
-  const ARR_MS = [55, 33, 18];
-  let feel = 1;                         // 0..2,對應上面兩張表
+  /* 手感參數。★ 這兩個就是「好不好玩」的旋鈕,改之前先想清楚要調誰的體感
+     ⚠ v2.15.6 起只剩「標準」這一組 —— 單機那格「移動速度(慢 / 標準 / 快)」拿掉了
+       (使用者裁示),連線本來就一律標準。 */
+  const DAS_MS = 133;                   // 按住多久開始連發
+  const ARR_MS = 33;                    // 連發的間隔
 
   /* ==========================================================================
      二、狀態
@@ -63,7 +64,7 @@ const BLKB = (function(){
   let mounted = false, running = false, raf = 0, lastT = 0;
   let cell = 24, prev = 15, dpr = 1;
 
-  let elStage, elWrap, elGauge, elGaugeFill, elPad, elHud, elCast;
+  let elStage, elWrap, elGauge, elGaugeFill, elGaugeNum, elPad, elHud, elCast;
   let cvMain, ctxM, cvNext, ctxN;
   let nextN = 3;                        // Next 顯示幾顆(寬螢幕 5、手機 3)
   /* 網格線的顏色跟著主題走(定義在 styles.src.css 的 --blk-grid)。
@@ -574,6 +575,9 @@ const BLKB = (function(){
     elGaugeFill.style.transform = "scaleY(" + k.toFixed(3) + ")";
     elGauge.classList.toggle("blk-gauge-hot", n >= 4);
     elGauge.classList.toggle("blk-gauge-on", n > 0);
+    if(elGaugeNum){
+      elGaugeNum.textContent = n > 0 ? String(n) : "";
+    }
   }
 
   /* ==========================================================================
@@ -599,9 +603,22 @@ const BLKB = (function(){
     if(foeEls.length !== foes.length){
       foeDanger = [];                   // ⚠ 人數變了 → index 的意思跟著變,舊的遲滯狀態要丟掉
       elFoes.innerHTML = "";
+      const spec = document.body.classList.contains("blk-spec");
       foeEls = foes.map(() => {
         const wrap = document.createElement("div");
         wrap.className = "blk-foe";
+        if(!spec){
+          wrap.setAttribute("role", "button");
+          wrap.setAttribute("tabindex", "0");
+        }else{
+          wrap.setAttribute("tabindex", "-1");
+        }
+        wrap.addEventListener("keydown", e => {
+          if(e.key === "Enter" || e.key === " " || e.key === "Spacebar"){
+            e.preventDefault();
+            wrap.click();
+          }
+        });
         const cv = document.createElement("canvas");
         cv.className = "blk-foe-cv";
         const nm = document.createElement("div");
@@ -679,12 +696,47 @@ const BLKB = (function(){
         e.ctx.font = "800 " + Math.round(H * 0.16) + "px Fredoka, Nunito, sans-serif";
         e.ctx.textAlign = "center"; e.ctx.textBaseline = "middle";
         e.ctx.fillText("KO", W / 2, H / 2);
+      } else if(f.connState === "away"){
+        e.ctx.fillStyle = "rgba(0,0,0,.60)";
+        e.ctx.fillRect(0, 0, W, H);
+        e.ctx.fillStyle = "#ffaa00";
+        e.ctx.font = "800 " + Math.max(10, Math.round(H * 0.13)) + "px Fredoka, Nunito, sans-serif";
+        e.ctx.textAlign = "center"; e.ctx.textBaseline = "middle";
+        e.ctx.fillText("中斷", W / 2, H / 2);
+      } else if(f.connState === "lag"){
+        e.ctx.fillStyle = "rgba(0,0,0,.35)";
+        e.ctx.fillRect(0, 0, W, H);
+        e.ctx.fillStyle = "#ffd166";
+        e.ctx.font = "800 " + Math.max(10, Math.round(H * 0.13)) + "px Fredoka, Nunito, sans-serif";
+        e.ctx.textAlign = "center"; e.ctx.textBaseline = "middle";
+        e.ctx.fillText("延遲", W / 2, H / 2);
       }
       e.wrap.classList.toggle("blk-foe-target", !!f.target);
       e.wrap.classList.toggle("blk-foe-away", !!f.away);
+      e.wrap.classList.toggle("blk-foe-lag", !!f.lag);
       e.wrap.classList.toggle("blk-foe-danger", checkDanger(i, b, f.name, dead));
       const tag = (f.ko ? (" ×" + f.ko) : "");
-      if(e.name.textContent !== (f.name + tag)) e.name.textContent = f.name + tag;
+      let stateTag = "";
+      if(f.connState === "away") stateTag = " [離線]";
+      else if(f.connState === "lag") stateTag = " [延遲]";
+      const fullTag = tag + stateTag;
+      if(e.name.textContent !== (f.name + fullTag)) e.name.textContent = f.name + fullTag;
+
+      const spec = document.body.classList.contains("blk-spec");
+      if(spec){
+        if(e.wrap.hasAttribute("role")) e.wrap.removeAttribute("role");
+        e.wrap.setAttribute("tabindex", "-1");
+        e.wrap.removeAttribute("aria-pressed");
+        e.wrap.removeAttribute("aria-label");
+      }else{
+        if(e.wrap.getAttribute("role") !== "button") e.wrap.setAttribute("role", "button");
+        if(e.wrap.getAttribute("tabindex") !== "0") e.wrap.setAttribute("tabindex", "0");
+        const isTarget = !!f.target;
+        e.wrap.setAttribute("aria-pressed", isTarget ? "true" : "false");
+        const statusText = isTarget ? "，目前鎖定目標" : "，未鎖定";
+        const label = f.name + statusText;
+        if(e.wrap.getAttribute("aria-label") !== label) e.wrap.setAttribute("aria-label", label);
+      }
     }
   }
   /* 哪一個小盤被點到(目標鎖定用)。回傳 index 或 -1 */
@@ -772,6 +824,12 @@ const BLKB = (function(){
     if(e) beam(e.cv, elGauge || cvMain, "#ff5d6c", (who ? who + " " : "") + "+" + n);
     incoming(n);
   }
+  function beamShield(i, who){
+    const e = foeEls[i];
+    if(e) beam(e.cv, elGauge || cvMain, "#48dbfb", (who ? who + " " : "") + "🛡️ 抵擋");
+    pop("🛡️ 暖身保護抵擋", "#48dbfb", 0.82);
+    T(600, { type: "sine", dur: 0.12, vol: 0.12, slideTo: 850 });
+  }
   /* 對手打對手(單機多台電腦才會用到,v2.15.4)。
      ★ 這一道是刻意要畫的 —— 沒有它,三台電腦看起來只是三個各玩各的沙包,
        而「場上正在互打」正是多台電腦要營造的東西。
@@ -848,7 +906,11 @@ const BLKB = (function(){
     });
   }
   function pop(txt, col, size){
-    fx.pops.push({ txt: txt, c: col, size: size || 0.92, y: R.VIS * cell * 0.34, t: 0, dur: 900 });
+    if(fx.pops.length >= 3) fx.pops.shift();
+    for(let i = 0; i < fx.pops.length; i++){
+      fx.pops[i].y -= cell * 0.85;
+    }
+    fx.pops.push({ txt: txt, c: col, size: size || 0.92, y: R.VIS * cell * 0.38, t: 0, dur: 900 });
   }
   function shake(px){ if(!reduced()) fx.shake = Math.max(fx.shake, px); }
 
@@ -867,10 +929,14 @@ const BLKB = (function(){
       T(300, { type: "sine", dur: 0.05, vol: 0.10, slideTo: 210 });
       if(ev.drop > 4) shake(2);
     }
+    if(ev.cancelled > 0){
+      pop("抵銷 " + ev.cancelled + " 行", "#1dd1a1", 0.78);
+    }
     if(ev.garb && ev.garb.length){
       let n = 0; ev.garb.forEach(g => { n += g.n; });
       shake(Math.min(7, 1.5 + n));
       fx.hit = 1;
+      pop("+" + n + " 垃圾行", "#ff5d6c", 0.82);
       T(180, { type: "sawtooth", dur: 0.16, vol: 0.14, slideTo: 110 });
     }
   }
@@ -937,7 +1003,7 @@ const BLKB = (function(){
     return /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || !!t.isContentEditable;
   }
   function onKeyDown(e){
-    if(typing(e)) return;               // ⚠ 一定要在 preventDefault **之前**
+    if(typing(e) || (e.target && e.target.closest && e.target.closest(".blk-foe"))) return; // ⚠ 一定要在 preventDefault **之前**
     const a = KEYMAP[e.key];
     if(!a) return;
     e.preventDefault();
@@ -946,7 +1012,7 @@ const BLKB = (function(){
     press(a);
   }
   function onKeyUp(e){
-    if(typing(e)) return;
+    if(typing(e) || (e.target && e.target.closest && e.target.closest(".blk-foe"))) return;
     const a = KEYMAP[e.key];
     if(!a) return;
     delete inp.keys[e.key];
@@ -1191,7 +1257,7 @@ const BLKB = (function(){
   }
   function stepDas(dt){
     if(!inp.dir) return;
-    const das = DAS_MS[feel], arr = ARR_MS[feel];
+    const das = DAS_MS, arr = ARR_MS;
     inp.dasT += dt;
     if(inp.dasT < das) return;
     inp.arrT += dt;
@@ -1236,6 +1302,7 @@ const BLKB = (function(){
     elWrap  = document.getElementById("blkWrap");
     elGauge = document.getElementById("blkGauge");
     elGaugeFill = document.getElementById("blkGaugeFill");
+    elGaugeNum  = document.getElementById("blkGaugeNum");
     elPad   = document.getElementById("blkPad");
     elHud   = document.querySelector(".blk-hud");
     elFoes  = document.getElementById("blkFoes");
@@ -1306,12 +1373,11 @@ const BLKB = (function(){
   function play(){ running = true; lastT = performance.now(); allUp(); }
   function pause(){ running = false; allUp(); }
   function stop(){ running = false; allUp(); }
-  function setFeel(i){ feel = clamp(i | 0, 0, DAS_MS.length - 1); }
 
   return {
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,
-    act, setFeel, incoming, pop, shake,
-    setFoes, foeAt, beamOut, beamIn, beamFoe, foes: () => foes,
+    act, incoming, pop, shake,
+    setFoes, foeAt, beamOut, beamIn, beamShield, beamFoe, foes: () => foes,
     cast, clearCast,
     /* ★ 測試用的三個出口(產品程式不會呼叫它們):
        step(dt) 手動推一幀、frames() 是至今推了幾幀、awake() 是 rAF 現在排著沒有。
@@ -1327,7 +1393,7 @@ const BLKB = (function(){
     COL, COL_GARB, DAS_MS, ARR_MS,
     /* ★ pad() 回的是**量出來的擺法**("bar" = 盤面正下方那條橫列 / "side" = 左右底角),
        不是設定值 —— 那個設定 v2.15.0 已經整格拿掉了。e2e 靠它驗兩種擺法都真的會出現。 */
-    feel: () => feel, pad: () => (padSide ? "side" : "bar"),
+    pad: () => (padSide ? "side" : "bar"),
     bar: barH, wide: isWide
   };
 })();

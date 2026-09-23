@@ -45,16 +45,19 @@ const Solo = (function(){
        一定要是 `norm`。排序寫錯的話「選普通卻配到高手」,而畫面上完全看不出來
        (名單有印出來,但沒有人會去對)。
      ★ 混搭的用意:三台一樣強的電腦只是同一個對手複製三份 —— 而要測的正是
-       「實力參差時好不好玩」與「👑 打第一名」這條房規有沒有用。 */
+       「實力參差時好不好玩」與「👑 打第一名」這條房規有沒有用。
+     ⚠⚠ **天花板原則**(使用者裁示):混搭只能往下配,**絕不可以配出比所選更強的電腦**
+       (輕鬆 = 全部輕鬆、普通最高普通、硬仗最高硬仗)。要指定每一台就選「🛠️ 自訂」(customLvs)。
+       守門在 test-blocks-rules / t-blk-solo-e2e。 */
   const MIX = {
-    easy: ["easy", "easy", "norm"],
-    norm: ["norm", "hard", "easy"],
-    hard: ["hard", "hard", "norm"]
+    easy: ["easy", "easy", "easy"],
+    norm: ["norm", "easy", "norm"],
+    hard: ["hard", "norm", "hard"]
   };
+  let customLvs = ["norm", "easy", "hard"]; // 自訂名單時每台電腦的強度
 
   let mode = "endless";                 // "endless" | "sprint" | "vs"
-  let feel = 1;                         // 手感(0 慢 / 1 標準 / 2 快)
-  let lvKey = "norm";                   // 電腦強度(band,見 MIX)
+  let lvKey = "norm";                   // 電腦強度(band,見 MIX,或 "custom")
   let foeN = 1;                         // 幾台電腦
   /* 對戰房規 —— **與連線同一組欄位、同一組文案**(BLK.NOTES)。
      ⚠ 預設值刻意跟連線一樣(K.O. 賽 / 3 分 / 暖身 20 秒)—— 使用者要的是
@@ -93,8 +96,9 @@ const Solo = (function(){
     try{
       const o = JSON.parse(localStorage.getItem(OWN_KEY)) || {};
       if(o.mode === "sprint" || o.mode === "endless" || o.mode === "vs") mode = o.mode;
-      if(typeof o.feel === "number") feel = Math.max(0, Math.min(2, o.feel | 0));
-      if(o.lv) lvKey = BLKAI.levelOf(o.lv).key;
+      if(o.lv === "custom" || o.lv === "easy" || o.lv === "norm" || o.lv === "hard") lvKey = o.lv;
+      else if(o.lv) lvKey = BLKAI.levelOf(o.lv).key;
+      if(Array.isArray(o.customLvs)) customLvs = o.customLvs.map(k => BLKAI.levelOf(k).key);
       if(typeof o.foeN === "number") foeN = Math.max(1, Math.min(FOE_MAX, o.foeN | 0));
       /* ⚠ 存下來的房規一律過一次 normRules() —— 它是使用者的 localStorage,
          可能是舊版本寫的、也可能被手動改壞。壞值退回預設是規則層的事。 */
@@ -102,17 +106,24 @@ const Solo = (function(){
       if(o.rec) rec = { best: o.rec.best | 0, sprint: o.rec.sprint | 0,
                         win: o.rec.win | 0, lose: o.rec.lose | 0 };
     }catch(e){}
-    BLKB.setFeel(feel);
   }
   function saveOwn(){
     try{ localStorage.setItem(OWN_KEY,
-      JSON.stringify({ mode, feel, lv: lvKey, foeN, vs, rec })); }catch(e){}
+      JSON.stringify({ mode, lv: lvKey, customLvs, foeN, vs, rec })); }catch(e){}
   }
 
   /* ---------- 設定 ---------- */
   function setMode(m){ if(m === "sprint" || m === "endless" || m === "vs"){ mode = m; saveOwn(); } }
-  function setFeel(v){ feel = Math.max(0, Math.min(2, v | 0)); BLKB.setFeel(feel); saveOwn(); }
-  function setLevel(v){ lvKey = BLKAI.levelOf(v).key; saveOwn(); }
+  function setLevel(v){
+    if(v === "custom") lvKey = "custom";
+    else lvKey = BLKAI.levelOf(v).key;
+    saveOwn();
+  }
+  function setCustomLevel(idx, v){
+    idx = Math.max(0, Math.min(FOE_MAX - 1, idx | 0));
+    customLvs[idx] = BLKAI.levelOf(v).key;
+    saveOwn();
+  }
   function setFoeN(v){ foeN = Math.max(1, Math.min(FOE_MAX, v | 0)); saveOwn(); }
   /* 一格房規。⚠ 一律走 normRules() 再寫回去 —— 不要各欄位自己驗一次
      (那就是第二份驗證邏輯,而它遲早會跟規則層分岔)。 */
@@ -124,6 +135,14 @@ const Solo = (function(){
   }
   /* 這一局會配出哪幾台電腦(設定頁的那一行文案與開局都讀它)。 */
   function lineup(){
+    if(lvKey === "custom"){
+      const out = [];
+      for(let i = 0; i < foeN; i++){
+        const k = customLvs[i] || "norm";
+        out.push(BLKAI.levelOf(k));
+      }
+      return out;
+    }
     const list = MIX[lvKey] || MIX.norm;
     const out = [];
     for(let i = 0; i < foeN; i++) out.push(BLKAI.levelOf(list[i % list.length]));
@@ -291,6 +310,10 @@ const Solo = (function(){
       p.st.rush = rushOn;               // ⚠ revive 不碰 rush,但新的一條命也要跟著加倍
       p.deadT = 0;
       if(p.mem){ p.mem.target = null; p.mem.k = -1; }
+      if(p.id === lockTarget){
+        foes.forEach(x => { x.target = (lockTarget === x.id && !x.st.dead); });
+        paintTargetStat();
+      }
     });
   }
 
@@ -306,9 +329,11 @@ const Solo = (function(){
     const t = partOf(toId);
     if(!t) return;
     const hole = Math.floor(Math.random() * BLK.COLS);
-    BLK.queueGarbage(t.st, n, hole, fromId);
-    t.lastBy = fromId;
-    t.got = (t.got || 0) + n;           // 被打了幾行(結果卡那一欄)
+    const accepted = BLK.queueGarbage(t.st, n, hole, fromId);
+    if(accepted > 0){
+      t.lastBy = fromId;
+      t.got = (t.got || 0) + accepted;           // 被打了幾行(結果卡那一欄)
+    }
     /* ★★ 「電腦之間也會互打」這句話**寫在設定頁上**,所以它要守得住。
        ⚠ 光看「電腦有沒有送出攻擊」是抓不到「電腦只打我」那個改壞法的
        —— 送出量照樣會長。要抓得到就得數「兩端都是電腦」的那幾筆。 */
@@ -320,7 +345,8 @@ const Solo = (function(){
       BLKB.beamOut(j, n, revenge);
       if(revenge) BLKB.pop("反擊 ×2", "#ff5d6c", 0.86);
     }else if(toId === "me" && i >= 0){
-      BLKB.beamIn(i, n, nameOf(fromId));
+      if(accepted === 0) BLKB.beamShield(i, nameOf(fromId));
+      else BLKB.beamIn(i, accepted, nameOf(fromId));
     }else if(i >= 0 && j >= 0){
       BLKB.beamFoe(i, j, n);
     }
@@ -343,6 +369,15 @@ const Solo = (function(){
     }
     p.lastBy = "";
     p.deadT = 0;
+    if(lockTarget === id){
+      if(vs.mode === "out"){
+        lockTarget = null;
+        const fallback = (vs.target === "high") ? "打第一名" : "隨機攻擊";
+        showToast(nameOf(id) + " 已淘汰，改回" + fallback);
+      }
+      foes.forEach(x => { x.target = (lockTarget === x.id && !x.st.dead); });
+      paintTargetStat();
+    }
   }
   function noteStreak(id){
     if(streak && streak.id === id && (clock - streak.t) <= STREAK_MS) streak.n++;
@@ -457,17 +492,26 @@ const Solo = (function(){
     const show = (mode === "vs") && foes.length >= 2;
     box.classList.toggle("hidden", !show);
     if(!show) return;
-    const txt = (lockTarget && partOf(lockTarget)) ? nameOf(lockTarget) : "隨機";
+    const lockedAlive = !!(lockTarget && partOf(lockTarget) && !partOf(lockTarget).st.dead);
+    let txt = "";
+    if(lockedAlive){
+      txt = nameOf(lockTarget);
+    }else{
+      txt = (vs.target === "high") ? "👑第一" : "隨機";
+    }
     if(val.textContent !== txt) val.textContent = txt;
-    box.classList.toggle("blk-stat-lock", !!lockTarget);
+    box.classList.toggle("blk-stat-lock", lockedAlive);
   }
   /* 點對手的小盤 = 指定只打他 / 改回隨機(與連線同一個動作) */
   function tapFoe(i){
     const f = foes[i];
     if(!f || mode !== "vs") return;
-    lockTarget = (lockTarget === f.id) ? null : f.id;
-    showToast(lockTarget ? ("只打 " + f.name) : "改回隨機攻擊");
-    foes.forEach(x => { x.target = (lockTarget === x.id); });
+    const wasLocked = (lockTarget === f.id);
+    lockTarget = wasLocked ? null : f.id;
+    const fallback = (vs.target === "high") ? "打第一名" : "隨機攻擊";
+    showToast(lockTarget ? ("只打 " + f.name) : ("改回" + fallback));
+    foes.forEach(x => { x.target = (lockTarget === x.id && !x.st.dead); });
+    BLKB.setFoes(foes);
     paintTargetStat();
   }
   function paintBar(){
@@ -517,9 +561,9 @@ const Solo = (function(){
 
   return {
     start, again, quit, togglePause, onEvents, onFrame, loadOwn, paintBar, paintHud,
-    setMode, setFeel, setLevel, setFoeN, setVs, tapFoe,
-    mode: () => mode, feel: () => feel,
-    level: () => lvKey, rec: () => rec,
+    setMode, setLevel, setCustomLevel, setFoeN, setVs, tapFoe,
+    mode: () => mode,
+    level: () => lvKey, customLvs: () => customLvs.slice(), rec: () => rec,
     foeN: () => foeN, vs: () => vs, lineup: lineup,
     /* ★ 給測試 / 截圖頁看的:這一局場上有誰、各自幾 K.O.。 */
     parts: () => parts(),

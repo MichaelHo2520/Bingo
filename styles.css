@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 f2acefed9c8fd27aa9833c9921da9718bb0585603ac8848ebcf1337da1700118)
+    真相在 styles.src.css(sha256 439dd4b75b3c6455a46b21fd642c8d841e5d83a2f3f05ed358b96362b9ac691b)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6061,6 +6061,11 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-fnote{margin-top:6px;font-size:12px;line-height:1.5;color:var(--text);opacity:.82;
            text-align:left}
 .blk-fnote b{opacity:1;font-weight:800;color:var(--accent)}
+.blk-custom-lineup{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.blk-custom-item{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.blk-custom-lbl{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;min-width:58px;opacity:.9}
+.blk-custom-item .seg{flex:1;min-width:0}
+.blk-custom-item .seg button{font-size:12px;padding:6px 2px}
 .blk-gest{margin-top:10px;padding:10px 12px 11px;border-radius:14px;
           background:rgba(255,255,255,.05);border:1px solid var(--panel-line);text-align:left}
 .blk-gest-head{font-size:12px;font-weight:700;color:var(--text);opacity:.88;
@@ -6118,7 +6123,10 @@ body.blk-rush #blkStatTime{color:#ff5d6c}
 .blk-foe-target::after{content:"🎯";position:absolute;right:-2px;top:-4px;font-size:13px;
                        line-height:1;pointer-events:none;
                        text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.blk-foe:focus-visible{outline:none;box-shadow:inset 0 0 0 2.5px var(--accent-1, #ffd93d)}
+.blk-foe-target:focus-visible{box-shadow:inset 0 0 0 2.5px var(--accent-2), inset 0 0 0 4.5px var(--accent-1, #ffd93d)}
 .blk-foe-away{opacity:.42}
+.blk-foe-lag{opacity:.72}
 .blk-foe-danger{animation:blk-foe-pulse .68s ease-in-out infinite}
 @keyframes blk-foe-pulse{
   0%,100%{box-shadow:inset 0 0 0 2.5px rgba(255,93,108,.55)}
@@ -6150,6 +6158,7 @@ body.blk-spec .blk-foes{position:static;width:auto!important;flex:1 1 auto;align
                         flex-direction:row;flex-wrap:wrap;align-items:center;
                         justify-content:center;pointer-events:auto}
 body.blk-spec .blk-foe-cv{width:auto;height:auto}
+body.blk-spec .blk-foe{cursor:default;pointer-events:none}
 .blk-hud{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;
          width:100%;height:46px}
 .blk-stats{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:14px}
@@ -6165,11 +6174,16 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
           background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px var(--blk-line);
           color:var(--text);white-space:nowrap}
 .blk-wrap{flex:none;display:flex;align-items:stretch;justify-content:center;gap:8px}
-.blk-gauge{position:relative;width:10px;flex:none;border-radius:6px;overflow:hidden;
+.blk-gauge{position:relative;width:10px;flex:none;border-radius:6px;
            background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--blk-line);
            opacity:0;transition:opacity .25s ease}
+.blk-gauge-num{position:absolute;bottom:100%;left:50%;transform:translate(-50%,-3px);
+               font-family:'Fredoka','Nunito',sans-serif;font-size:11px;font-weight:800;
+               line-height:1;color:#ff9f43;text-shadow:0 1px 3px rgba(0,0,0,.7);
+               pointer-events:none;white-space:nowrap}
+.blk-gauge-hot .blk-gauge-num{color:#ff5d6c;font-size:12px}
 .blk-gauge-on{opacity:1}
-.blk-gauge-fill{position:absolute;left:0;right:0;bottom:0;height:100%;
+.blk-gauge-fill{position:absolute;left:0;right:0;bottom:0;height:100%;border-radius:5px;
                 transform-origin:bottom;transform:scaleY(0);
                 background:linear-gradient(180deg,#ff9f43,#ff5d6c);
                 transition:transform .12s linear}
@@ -6230,6 +6244,7 @@ body.blk-side .blk-pad-r{right:4px}
 .blk-fresh{margin-top:8px;text-align:center;font-family:'Fredoka','Nunito',sans-serif;
            font-weight:700;font-size:16px;color:var(--accent-2)}
 .blk-react-row{display:flex;justify-content:center;gap:8px;margin:10px 0 2px;flex-wrap:wrap}
+body.solo-on .blk-react-row{display:none}
 @media (min-width:700px),(orientation:landscape){
   :root{ --blk-tw:min(96vw, 880px); --blk-key:64px; --blk-bar:88px; }
   .blk-key{background:rgba(125,135,165,.34)}

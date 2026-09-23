@@ -13786,6 +13786,12 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-fnote{margin-top:6px;font-size:12px;line-height:1.5;color:var(--text);opacity:.82;
            text-align:left}
 .blk-fnote b{opacity:1;font-weight:800;color:var(--accent)}
+/* 自訂電腦強度名單(v2.15.5) */
+.blk-custom-lineup{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.blk-custom-item{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.blk-custom-lbl{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;min-width:58px;opacity:.9}
+.blk-custom-item .seg{flex:1;min-width:0}
+.blk-custom-item .seg button{font-size:12px;padding:6px 2px}
 
 /* ---------- 手勢說明(v2.14.0)----------
    同一份 HTML 印在兩個地方:進場的第一層(連線與單機都會經過)與房間框「?」的蓋板。
@@ -13893,7 +13899,10 @@ body.blk-rush #blkStatTime{color:#ff5d6c}
 .blk-foe-target::after{content:"🎯";position:absolute;right:-2px;top:-4px;font-size:13px;
                        line-height:1;pointer-events:none;
                        text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.blk-foe:focus-visible{outline:none;box-shadow:inset 0 0 0 2.5px var(--accent-1, #ffd93d)}
+.blk-foe-target:focus-visible{box-shadow:inset 0 0 0 2.5px var(--accent-2), inset 0 0 0 4.5px var(--accent-1, #ffd93d)}
 .blk-foe-away{opacity:.42}
+.blk-foe-lag{opacity:.72}
 
 /* 快爆了(v2.15.3):堆到只剩 4 排就開始跳。★ 這是聚會現場的笑點來源 ——
    「小明快爆了」大家一起轉頭看,而在這之前那件事只有小明自己知道。
@@ -13945,6 +13954,7 @@ body.blk-spec .blk-foes{position:static;width:auto!important;flex:1 1 auto;align
                         flex-direction:row;flex-wrap:wrap;align-items:center;
                         justify-content:center;pointer-events:auto}
 body.blk-spec .blk-foe-cv{width:auto;height:auto}
+body.blk-spec .blk-foe{cursor:default;pointer-events:none}
 
 /* ⚠⚠ HUD 的高度**一定要是固定的**(不可以隨盤面變)——
    HUD 高 → 舞台矮 → 一格小 → HUD 又想跟著變小…那是一個會震盪的循環。
@@ -13982,11 +13992,16 @@ body.blk-spec .blk-foe-cv{width:auto;height:auto}
 /* ⚠ 沒有待處理垃圾時**整條淡出**,但寬度留著(盤面才不會左右跳)。
    單機沒有對手 → 它永遠是空的,留在那裡只會變成一條看不懂的線(使用者第一句就問這個)。
    ⚠ 寬度要與 board.js 的 GAUGE_W 同步。 */
-.blk-gauge{position:relative;width:10px;flex:none;border-radius:6px;overflow:hidden;
+.blk-gauge{position:relative;width:10px;flex:none;border-radius:6px;
            background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--blk-line);
            opacity:0;transition:opacity .25s ease}
+.blk-gauge-num{position:absolute;bottom:100%;left:50%;transform:translate(-50%,-3px);
+               font-family:'Fredoka','Nunito',sans-serif;font-size:11px;font-weight:800;
+               line-height:1;color:#ff9f43;text-shadow:0 1px 3px rgba(0,0,0,.7);
+               pointer-events:none;white-space:nowrap}
+.blk-gauge-hot .blk-gauge-num{color:#ff5d6c;font-size:12px}
 .blk-gauge-on{opacity:1}
-.blk-gauge-fill{position:absolute;left:0;right:0;bottom:0;height:100%;
+.blk-gauge-fill{position:absolute;left:0;right:0;bottom:0;height:100%;border-radius:5px;
                 transform-origin:bottom;transform:scaleY(0);
                 background:linear-gradient(180deg,#ff9f43,#ff5d6c);
                 transition:transform .12s linear}
@@ -14100,6 +14115,8 @@ body.blk-side .blk-pad-r{right:4px}
 .blk-fresh{margin-top:8px;text-align:center;font-family:'Fredoka','Nunito',sans-serif;
            font-weight:700;font-size:16px;color:var(--accent-2)}
 .blk-react-row{display:flex;justify-content:center;gap:8px;margin:10px 0 2px;flex-wrap:wrap}
+/* 單機沒有人收得到表情 → 整排收起來(同別頁的 body.solo-on .xx-react-row) */
+body.solo-on .blk-react-row{display:none}
 
 /* ---------- 寬螢幕 / 橫置:對局區放寬 + 鈕做大 ----------
    ⚠⚠ v2.15.0 起這裡**不再決定鈕擺哪裡** —— 擺法改由 board.js 量出來自己挑
