@@ -112,7 +112,7 @@ const Solo = (function(){
           id: "cpu" + (i + 1),
           name: (lv.length > 1) ? (lv[i].emoji + " 電腦" + (i + 1)) : (lv[i].emoji + " " + lv[i].name),
           st: BUB.blank({ seed: seed, rules: rules }),
-          mem: BUBAI.newMem(), lv: lv[i], ko: 0, lastBy: "", deadT: 0, got: 0
+          mem: BUBAI.newMem(), lv: lv[i], ko: 0, lastBy: "", deadT: 0, got: 0, fx: null
         });
       }
       endMs = (vs.mode === "ko") ? vs.secs * 1000 : 0;
@@ -194,10 +194,14 @@ const Solo = (function(){
     for(let i = 0; i < foes.length; i++){
       const f = foes[i];
       if(f.st.dead) continue;
+      if(f.fx) f.fx.t += dt;
+      const parBefore = f.st.par;
       const evs = BUBAI.step(f.st, f.mem, dt, f.lv).concat(BUB.tick(f.st, dt));
       for(let j = 0; j < evs.length; j++){
         const ev = evs[j];
         if(!ev || ev.t !== "land") continue;
+        if(ev.pops && ev.pops.length)
+          f.fx = { pops: ev.pops, par: parBefore, t: 0 };
         if(ev.out > 0) sendFrom(f.id, ev);
         if(ev.dead || f.st.dead){ onDeath(f.id); break; }
       }
@@ -361,6 +365,10 @@ const Solo = (function(){
       set("bubStatTime", timeTxt(ended ? took : (mode === "vs" ? clock : ms())));
     }
     set("bubStatLv", BUB.level(st));
+    const pressLeft = Math.max(1, BUB.pressN(st) - st.since);
+    set("bubStatPress", pressLeft);
+    const pressBox = $("bubStatPressBox");
+    if(pressBox) pressBox.classList.toggle("bub-stat-press-hot", pressLeft <= 2);
     const goal = $("bubGoal");
     if(goal) goal.textContent = (mode !== "vs") ? "無盡"
                               : (vs.mode === "ko") ? ("K.O. ×" + (me ? me.ko : 0)) : "淘汰賽";

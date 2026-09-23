@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>泡泡對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 泡泡對戰 · v2.15.0 -->
-<meta name="version" content="2.15.0+1">
+<meta name="version" content="2.15.0+2">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 bubble 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -57,7 +57,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
 
     <div id="bubPickMode" class="bub-pick">
       <div class="bub-hero">
-        <img class="bub-art" src="img/bub-icon.png" alt="彩色的泡泡" width="192" height="192">
+        <img class="bub-art" src="img/bub2-icon.png" alt="泡泡對戰圖示" width="192" height="192">
         <div class="bub-tag display">射泡泡,三顆同色就消掉,把泡泡塞給對手</div>
       </div>
       <!-- ⚠ 這一塊是小螢幕上唯一會縮、會捲的(其餘 flex:none)—— 最重要的東西排第一。 -->
@@ -132,6 +132,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button type="button" data-vssecs="300">5 分</button>
         </div>
       </div>
+      <details class="bub-solo-more bub-vs-row hidden" id="bubSoloMore">
+        <summary>更多對戰規則 <span>暖身、攻擊目標、最後加速</span></summary>
       <div class="field hidden bub-vs-row">
         <span class="field-label">開局暖身<span class="field-sub">(前幾秒沒有人會被塞)</span></span>
         <div class="seg" id="bubVsShieldSeg" aria-label="開局暖身">
@@ -157,6 +159,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
         <div class="bub-fnote" id="bubNoteVsRush"></div>
       </div>
+      </details>
       <button class="btn primary block-btn home-btn" id="bubStartSolo">開始</button>
       <div class="home-hint" id="bubSoloHint"></div>
     </div>
@@ -221,9 +224,10 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       </button>
       <span class="label bub-room-title">單機 <b id="bubSoloMode" class="display">練習</b><span class="bub-goal" id="bubGoal">無盡</span></span>
       <span class="mp-goal" id="bubSoloRec" aria-label="紀錄"></span>
-      <button class="icon-btn" id="bubPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
-      <button class="icon-btn bub-helpbtn" id="bubSoloHelpBtn" type="button" title="怎麼操作" aria-label="怎麼操作">?</button>
-      <button class="icon-btn bub-bigbtn" id="bubSoloBig" type="button" title="大畫面" aria-label="大畫面">大</button>
+       <button class="icon-btn" id="bubPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
+       <button class="icon-btn bub-helpbtn" id="bubSoloHelpBtn" type="button" title="怎麼操作" aria-label="怎麼操作">?</button>
+       <button class="icon-btn" id="bubSoloSettingsBtn" type="button" title="設定" aria-label="設定">⚙</button>
+       <button class="icon-btn bub-bigbtn" id="bubSoloBig" type="button" title="大畫面" aria-label="大畫面">大</button>
     </div>
   </div>
 
@@ -329,6 +333,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="bub-stat"><span>打掉</span><b id="bubStatPop">0</b></div>
         <div class="bub-stat"><span>時間</span><b id="bubStatTime">0.0 秒</b></div>
         <div class="bub-stat"><span>階</span><b id="bubStatLv">1</b></div>
+        <div class="bub-stat bub-stat-press" id="bubStatPressBox"><span>插排倒數</span><b id="bubStatPress">9</b></div>
         <div class="bub-stat bub-stat-tgt hidden" id="bubStatTgtBox"><span>目標</span><b id="bubStatTgt">隨機</b></div>
       </div>
     </div>

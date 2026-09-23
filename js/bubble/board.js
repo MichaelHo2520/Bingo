@@ -49,6 +49,8 @@ const BUBB = (function(){
   let D = 32, dpr = 1;
   let elStage, elWrap, elGauge, elGaugeFill, elGaugeNum, elHud, elCast, elPlay;
   let cvMain, ctxM;
+  let guideCache = null;
+  const bubbleSprites = new Map();
   let inkCol = "rgba(255,255,255,.9)";
   let lineCol = "rgba(255,255,255,.14)";
 
@@ -58,6 +60,7 @@ const BUBB = (function(){
     drops: [],                          // 掉落的:{ x, y, c, vy, t }
     words: [],                          // 浮字
     push: null,                         // 插排的滑入:{ n, t, dur }
+    impact: null,
     beams: []
   };
   /* 輸入。★ aiming = 手指 / 滑鼠正壓著在瞄;keys = 鍵盤方向鍵 */
@@ -92,6 +95,7 @@ const BUBB = (function(){
   let foes = [], foeEls = [], elFoes = null;
   function fitBoard(){
     if(!mounted || !elStage) return;
+    const prevD = D, prevDpr = dpr;
     const spec = document.body.classList.contains("bub-spec");
     const foesOn = !!elFoes && !elFoes.classList.contains("hidden") && !spec;
     const rect = elStage.getBoundingClientRect();
@@ -115,6 +119,7 @@ const BUBB = (function(){
       foeOver = restW < FOE_MIN;
       foeW = foeOver ? FOE_OVER : Math.min(FOE_MAX, Math.floor(restW));
     }
+    if(D !== prevD || dpr !== prevDpr) bubbleSprites.clear();
     if(elFoes){
       elFoes.classList.toggle("bub-foes-over", foeOver);
       elFoes.style.width = foeW ? (foeW + "px") : "";
@@ -164,9 +169,22 @@ const BUBB = (function(){
     if(d >= 14) mark(ctx, px, py, r * 0.36, c);
     ctx.globalAlpha = 1;
   }
-  function mark(ctx, x, y, s, c){
+  /* 靜止珠子每幀最多數十顆；六色各畫一次後重用，保留原本漸層與記號。 */
+  function boardBubble(px, py, c){
+    let sprite = bubbleSprites.get(c);
+    if(!sprite){
+      sprite = document.createElement("canvas");
+      sprite.width = sprite.height = Math.ceil(D * dpr);
+      const sc = sprite.getContext("2d");
+      sc.setTransform(sprite.width / D, 0, 0, sprite.height / D, 0, 0);
+      bubble(sc, D / 2, D / 2, D, c);
+      bubbleSprites.set(c, sprite);
+    }
+    ctxM.drawImage(sprite, px - D / 2, py - D / 2, D, D);
+  }
+  function mark(ctx, x, y, s, c, strong){
     ctx.save();
-    ctx.globalAlpha *= 0.55;
+    ctx.globalAlpha *= strong ? 0.9 : 0.55;
     ctx.strokeStyle = "rgba(255,255,255,.95)";
     ctx.fillStyle = "rgba(255,255,255,.95)";
     ctx.lineWidth = Math.max(1.2, s * 0.32);
@@ -205,7 +223,7 @@ const BUBB = (function(){
         for(let x = 0; x < R.COLS; x++){
           const v = st.board[y][x];
           if(!v) continue;
-          bubble(ctxM, R.cx(st.par, x, y) * D, (R.cy(y) - off) * D, D, v);
+           boardBubble(R.cx(st.par, x, y) * D, (R.cy(y) - off) * D, v);
         }
       popsFx();
       aimGuide();
@@ -231,6 +249,17 @@ const BUBB = (function(){
     ctxM.restore();
   }
   function popsFx(){
+    if(fx.impact && fx.impact.t < 170 && !reduced()){
+      const q = fx.impact, k = q.t / 170;
+      ctxM.save();
+      ctxM.globalAlpha = 1 - k;
+      ctxM.strokeStyle = colOf(q.c);
+      ctxM.lineWidth = Math.max(1.5, D * 0.085);
+      ctxM.beginPath();
+      ctxM.arc(q.x * D, q.y * D, D * (0.3 + k * 0.55), 0, Math.PI * 2);
+      ctxM.stroke();
+      ctxM.restore();
+    }
     for(let i = 0; i < fx.pops.length; i++){
       const p = fx.pops[i], k = p.t / 220;
       if(k >= 1) continue;
@@ -251,9 +280,14 @@ const BUBB = (function(){
      ★ 只畫到「第一次反彈之後再 3 顆」—— 整條畫到底就等於告訴你落點,
        而判斷反彈角度正是這個遊戲要練的東西。沒反彈的直球本來就看得到落點,無所謂。 */
   function aimGuide(){
-    if(!st || st.dead || !running) return;
+    if(!st || st.dead || !running || st.shot) return;
     if(inp.aiming && inp.cancel) return;
-    const t = R.trace(st.board, st.par, st.aim);
+    /* 瞄準與盤面沒變時沿用軌跡，避免每幀重跑逐步碰撞檢查。 */
+    if(!guideCache || guideCache.board !== st.board || guideCache.par !== st.par ||
+       guideCache.shots !== st.shots || guideCache.aim !== st.aim)
+      guideCache = { board: st.board, par: st.par, shots: st.shots, aim: st.aim,
+                     trace: R.trace(st.board, st.par, st.aim) };
+    const t = guideCache.trace;
     const pts = t.path;
     let budget = 999, bounced = false;
     ctxM.save();
@@ -281,6 +315,11 @@ const BUBB = (function(){
   function shotFx(){
     const s = st.shot;
     if(!s) return;
+    if(!reduced()){
+      for(let i = 3; i >= 1; i--)
+        bubble(ctxM, (s.x - s.vx * i * 0.23) * D, (s.y - s.vy * i * 0.23) * D,
+               D * (0.42 - i * 0.07), s.c, { alpha: 0.13 + (3 - i) * 0.08 });
+    }
     bubble(ctxM, s.x * D, s.y * D, D, s.c, { glow: !reduced() });
   }
   /* 發射器:底座 + 箭頭 + 目前這顆 + 左下角的「下一顆」(點它 = 交換) */
@@ -424,11 +463,44 @@ const BUBB = (function(){
             e.ctx.beginPath();
             e.ctx.arc(R.cx(par, x, y) * fd, R.cy(y) * fd, fd * 0.44, 0, Math.PI * 2);
             e.ctx.fill();
+            if(fd >= 6) mark(e.ctx, R.cx(par, x, y) * fd, R.cy(y) * fd,
+                             Math.max(1.5, fd * 0.18), v, true);
           }
+      }
+      /* 單機直接讀本機飛行狀態；連線讀約 110ms 一次的飛行快照。 */
+      const shot = f.st ? f.st.shot : f.shot;
+      if(shot && !dead){
+        const sx = shot.x * fd, sy = shot.y * fd;
+        e.ctx.fillStyle = colOf(shot.c);
+        e.ctx.strokeStyle = "rgba(255,255,255,.85)";
+        e.ctx.lineWidth = Math.max(1, fd * 0.13);
+        e.ctx.beginPath(); e.ctx.arc(sx, sy, Math.max(2, fd * 0.47), 0, Math.PI * 2);
+        e.ctx.fill(); e.ctx.stroke();
+      }
+      if(f.fx && f.fx.t < 230 && !reduced()){
+        const k = f.fx.t / 230;
+        e.ctx.save(); e.ctx.globalAlpha = 1 - k;
+        e.ctx.strokeStyle = "#fff";
+        e.ctx.lineWidth = Math.max(1, fd * 0.15);
+        for(const p of f.fx.pops){
+          e.ctx.beginPath();
+          e.ctx.arc(R.cx(f.fx.par, p[0], p[1]) * fd, R.cy(p[1]) * fd,
+                    fd * (0.48 + k * 0.45), 0, Math.PI * 2);
+          e.ctx.stroke();
+        }
+        e.ctx.restore();
       }
       /* 發射器的方向:「他在瞄哪裡」是看對手的樂趣(ai.js 紅線 ③ 慢慢轉的理由) */
       if(!dead){
         const lx = R.LX * fd, ly = R.LY * fd;
+        if(f.mem && f.lv && !shot){
+          const progress = clamp(f.mem.t / (60000 / Math.max(6, f.lv.spm)), 0, 1);
+          e.ctx.strokeStyle = "rgba(255,217,61,.9)";
+          e.ctx.lineWidth = Math.max(1, fd * 0.14);
+          e.ctx.beginPath();
+          e.ctx.arc(lx, ly, fd * 0.68, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+          e.ctx.stroke();
+        }
         e.ctx.strokeStyle = "rgba(255,255,255,.7)";
         e.ctx.lineWidth = Math.max(1, fd * 0.14);
         e.ctx.beginPath(); e.ctx.moveTo(lx, ly);
@@ -580,6 +652,8 @@ const BUBB = (function(){
   function pop(txt, col, size){ word(txt, col, (size || 0.9) * 0.78); }
   function shake(px){ if(!reduced()) fx.shake = Math.max(fx.shake, px); }
   function onLand(ev, parBefore){
+    guideCache = null;
+    if(ev.x >= 0) fx.impact = { x: R.cx(parBefore, ev.x, ev.y), y: R.cy(ev.y), c: ev.c, t: 0 };
     if(ev.pops.length){
       ev.pops.forEach(p => fx.pops.push({ x: R.cx(parBefore, p[0], p[1]), y: R.cy(p[1]), c: p[2], t: 0 }));
       ev.drops.forEach(p => fx.drops.push({ x: R.cx(parBefore, p[0], p[1]), y: R.cy(p[1]), c: p[2],
@@ -735,6 +809,7 @@ const BUBB = (function(){
     frame(dt);
   }
   function stepFx(dt){
+    if(fx.impact){ fx.impact.t += dt; if(fx.impact.t >= 170) fx.impact = null; }
     if(fx.shake > 0) fx.shake = Math.max(0, fx.shake - dt * 0.045);
     if(fx.hit > 0) fx.hit = Math.max(0, fx.hit - dt * 0.004);
     if(fx.push){ fx.push.t += dt; if(fx.push.t >= fx.push.dur) fx.push = null; }
@@ -796,8 +871,10 @@ const BUBB = (function(){
   function allUp(){ inp.aiming = false; inp.id = null; inp.cancel = false; inp.keys = {}; inp.turn = 0; }
   function setState(s){
     st = s;
+    guideCache = null;
     fx.pops.length = 0; fx.drops.length = 0; fx.words.length = 0; fx.beams.length = 0;
     fx.push = null; fx.shake = 0; fx.hit = 0;
+    fx.impact = null;
     allUp();
     fitBoard();
   }

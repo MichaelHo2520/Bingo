@@ -232,6 +232,10 @@ function syncSoloSeg(){
   note("bubNoteVsShield", BUB.noteOf("shield", v.shield));
   note("bubNoteVsTarget", BUB.noteOf("target", v.target));
   note("bubNoteVsRush", BUB.noteOf("rush", v.rush));
+  const moreSummary = $("bubSoloMore") && $("bubSoloMore").querySelector("summary span");
+  if(moreSummary) moreSummary.textContent = v.shield + " 秒暖身 · " +
+    (v.target === "high" ? "打第一名" : "隨機攻擊") + " · " +
+    (v.rush ? "最後加倍" : "一般結尾");
   const names = Solo.lineup().map(l => l.emoji + " " + l.name);
   note("bubNoteFoeN", (names.length > 1)
     ? ("場上會有 <b>" + (names.length + 1) + " 個人</b>(你 + " + names.length + " 台電腦),而且<b>電腦之間也會互打</b>。")
@@ -268,7 +272,10 @@ BUBB.mount({
     return (typeof MP !== "undefined") ? MP.canPlay() : false;
   },
   onFrame(dt){
-    if(Solo.active()) Solo.onFrame(dt);
+    /* 設定／說明遮罩開著時，單機所有參賽者一起停；連線仍照常走。 */
+    if(Solo.active()){
+      if(!bubVeilOpen()) Solo.onFrame(dt);
+    }
     else if(typeof MP !== "undefined" && MP.onFrame) MP.onFrame(dt);
   }
 });
@@ -283,6 +290,7 @@ $("bubSoloCfgBack").addEventListener("click", () => showHomeLayer("pick"));
 segPick("bubModeSeg", "mode", v => Solo.setMode(v));
 $("bubHelpBtn").addEventListener("click", openBubGuide);
 $("bubSoloHelpBtn").addEventListener("click", openBubGuide);
+if($("bubSoloSettingsBtn")) $("bubSoloSettingsBtn").addEventListener("click", openSettings);
 $("bubGuideClose").addEventListener("click", closeBubGuide);
 $("bubGuideVeil").addEventListener("click", e => { if(e.target === $("bubGuideVeil")) closeBubGuide(); });
 segPick("bubLvSeg", "lv", v => Solo.setLevel(v));

@@ -274,9 +274,13 @@ const MP = MPCore.create((function(){
   }
   function pubActive(){
     if(!liveRef || !st) return;
+    const shot = st.shot;
     liveRef.child(ctx.me()).update({
       rid: curRound, seq: ++seq,
       a: Math.round(st.aim * 100), c: st.cur,
+      sx: shot ? Math.round(shot.x * 100) : 0,
+      sy: shot ? Math.round(shot.y * 100) : 0,
+      sc: shot ? shot.c : 0,
       p: R.pendCount(st), d: st.dead ? 1 : 0
     });
   }
@@ -285,10 +289,14 @@ const MP = MPCore.create((function(){
     const b = R.encBoard(st.board);
     if(!force && b === lastBoard){ pubActive(); return; }
     lastBoard = b;
+    const shot = st.shot;
     /* ⚠ par(q)一定要跟著盤面一起送 —— 少了它對手小盤會畫錯半格(rules.js 紅線 ①) */
     liveRef.child(ctx.me()).update({
       rid: curRound, seq: ++seq, b: b, q: st.par,
       a: Math.round(st.aim * 100), c: st.cur,
+      sx: shot ? Math.round(shot.x * 100) : 0,
+      sy: shot ? Math.round(shot.y * 100) : 0,
+      sc: shot ? shot.c : 0,
       p: R.pendCount(st), l: st.popped, ko: koOf(ctx.me()), d: st.dead ? 1 : 0,
       /* ★ 「我是被誰打死的」——**只有我自己知道**(垃圾是誰送的只寫在我收到的那筆
          攻擊事件裡,別台看不到)。要讓全場都能播報「A 💥 K.O. B」就得跟著快照送出去。
@@ -318,6 +326,8 @@ const MP = MPCore.create((function(){
       if(typeof v.b === "string"){ f.bd = R.decBoard(v.b); f.q = v.q | 0; }
       if(typeof v.a === "number") f.a = v.a;
       f.c = v.c || 0;
+      f.shot = (v.sc && Number.isFinite(v.sx) && Number.isFinite(v.sy))
+        ? { x: v.sx / 100, y: v.sy / 100, c: v.sc } : null;
       f.p = v.p || 0;
       if(typeof v.l === "number") f.l = v.l;   // 總共打掉幾顆 —— 淘汰賽的「第一名」看它
       /* ★ 死亡的**轉換**才播報(v2.15.3)。
@@ -628,6 +638,10 @@ const MP = MPCore.create((function(){
     const set = (id, v) => { const el = $(id); if(el) el.textContent = v; };
     set("bubStatPop", st.popped);
     set("bubStatLv", R.level(st));
+    const pressLeft = Math.max(1, R.pressN(st) - st.since);
+    set("bubStatPress", pressLeft);
+    const pressBox = $("bubStatPressBox");
+    if(pressBox) pressBox.classList.toggle("bub-stat-press-hot", pressLeft <= 2);
     if(endAt){
       const left = Math.max(0, Math.round((endAt - nowSrv()) / 1000));
       set("bubStatTime", Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"));

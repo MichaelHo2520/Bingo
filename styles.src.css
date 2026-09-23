@@ -14285,17 +14285,17 @@ body.solo-on .blk-react-row{display:none}
 .bub-fnote b{opacity:1;font-weight:800;color:var(--accent)}
 .bub-setup-summary{margin:6px 0 12px;padding:9px 12px;border-radius:12px;
   background:rgba(255,255,255,.07);color:var(--text);font-size:13px;font-weight:800;text-align:center}
-.bub-setup-help,.bub-setup-more{border:1px solid var(--panel-line);border-radius:14px;
-  margin:10px 0;background:rgba(255,255,255,.035)}
-.bub-setup-help > summary,.bub-setup-more > summary{cursor:pointer;padding:12px 14px;
-  color:var(--text);font-size:14px;font-weight:800;list-style:none}
-.bub-setup-help > summary::-webkit-details-marker,.bub-setup-more > summary::-webkit-details-marker{display:none}
-.bub-setup-help > summary::after,.bub-setup-more > summary::after{content:"⌄";float:right;color:var(--accent)}
-.bub-setup-help[open] > summary::after,.bub-setup-more[open] > summary::after{transform:rotate(180deg)}
-.bub-setup-more > summary span{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:2px}
+.bub-setup-help,.bub-setup-more,.bub-solo-more{border:1px solid var(--panel-line);border-radius:14px;
+   margin:10px 0;background:rgba(255,255,255,.035)}
+.bub-setup-help > summary,.bub-setup-more > summary,.bub-solo-more > summary{cursor:pointer;padding:12px 14px;
+   color:var(--text);font-size:14px;font-weight:800;list-style:none}
+.bub-setup-help > summary::-webkit-details-marker,.bub-setup-more > summary::-webkit-details-marker,.bub-solo-more > summary::-webkit-details-marker{display:none}
+.bub-setup-help > summary::after,.bub-setup-more > summary::after,.bub-solo-more > summary::after{content:"⌄";float:right;color:var(--accent)}
+.bub-setup-help[open] > summary::after,.bub-setup-more[open] > summary::after,.bub-solo-more[open] > summary::after{transform:rotate(180deg)}
+.bub-setup-more > summary span,.bub-solo-more > summary span{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:2px}
 .bub-setup-help .bub-demo,.bub-setup-help .bub-demo-cap,.bub-setup-help .hint{margin-left:10px;margin-right:10px}
 .bub-setup-help .hint{margin-bottom:10px}
-.bub-setup-more > .field{margin:0 12px 12px}
+.bub-setup-more > .field,.bub-solo-more > .field{margin:0 12px 12px}
 .bub-score-actions{border-top:1px solid var(--panel-line);padding-top:12px;text-align:center}
 .bub-page #setVeil .set-card{background-color:var(--bg1);
   background-image:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,0) 48%),
@@ -14425,6 +14425,8 @@ body.bub-spec .bub-foe{cursor:default;pointer-events:none}
 .bub-stat{display:flex;flex-direction:column;align-items:center;line-height:1.12;min-width:50px}
 .bub-stat span{font-size:10px;font-weight:700;letter-spacing:.10em;color:var(--text);opacity:.72}
 .bub-stat b{font-family:'Fredoka','Nunito',sans-serif;font-size:19px;color:var(--text)}
+.bub-stat-press-hot b{color:#ff5d6c}
+.bub-stat-press-hot span{color:#ff5d6c;opacity:1}
 .bub-stat-tgt{max-width:88px;min-width:0}
 .bub-stat-tgt b{font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;
                 white-space:nowrap;display:block}
