@@ -186,10 +186,31 @@ const HomeLive = (function(){
   const RANK_KEY="bingo.gamerank.v1";
   let rankHadCache=false;
 
+  /* ★★ 預設順序(2026-09-23 使用者裁示):**同分時照這一張排**,不再照 GAMES 的登記順序。
+     使用者要把場次紀錄清掉重新開始,但不希望首頁回到「照上線先後」的順序 ——
+     所以把清之前伺服器上的排名(2026-09-23 19:35 讀的 game_stats)寫死成這一張。
+       你畫我猜 66 · 暗棋 46 · 台灣麻將 32 · 方塊對戰 13 · UNO 11 · 飛行棋 11 ·
+       成語接龍 10 · 麻將消消樂 5 · 跳棋 5 · 數獨 4 · 大老二 4 · 排七 3 ·
+       BINGO 2 · 五子棋 2 · 台式21點 1 · 泡泡對戰 0(新遊戲,置頂靠下面的 NEW_UNTIL)
+     ⚠ GAMES 那一張的順序**刻意不動**:伺服器狀態面板的骨架、test-twins 的逐列比對都照它,
+       而它每一列的註解是按上線先後寫的沿革。兩件事分開:登記用 GAMES、同分用這一張。
+     ⚠ 漏列的遊戲一律排在最後(不會消失),守門在 tools/test-registry.js(每個遊戲都要列)。 */
+  const DEFAULT_ORDER=["dw","dc","mj16","blocks","uno","fc","chengyu","mahjong","tq",
+                       "sudoku","big2","sevens","bingo","gomoku","bj","bubble"];
+  /* ★★ 新遊戲置頂(使用者:「新遊戲放第一個可以,但也不可以一直放,有辦法類似幾天後就自動照順序嗎」)
+     —— 期限之前排第一個、徽章寫「NEW」;期限一過**自動**回到照場次排(不必任何人動手)。
+     ⚠ 置頂只在**套用**的時候疊上去(applyRank),排名本身與 localStorage 的快取都不含它 ——
+       所以過期那天,舊快取照樣套得上,只是 NEW 那一張自己回到它該在的位置。
+     ⚠ 時間一律帶 +08:00(台灣時間的那一天結束),不寫時區的話各台手機會差好幾個小時。 */
+  const NEW_UNTIL={ bubble:"2026-09-30T23:59:59+08:00" };
+  let nowFn=()=>Date.now();                       // ★ 測試用出口:setNow() 換掉它(量得到過期前 / 過期後)
+  function isNew(key){ const t=NEW_UNTIL[key]; return !!t && nowFn()<Date.parse(t); }
+  function defIdx(key){ const i=DEFAULT_ORDER.indexOf(key); return i<0 ? 999 : i; }
+
   function cardOf(k){ return document.querySelector('.game-card[data-gk="'+k+'"]'); }
-  // → [[key, 場數], …] 由多到少;同場數照 GAMES 的原順序
+  // → [[key, 場數], …] 由多到少;同場數照 DEFAULT_ORDER(見上面那段)
   function rankRows(stats){
-    return GAMES.map((g,i)=>[g.key, (stats&&stats[g.key]&&stats[g.key].n)||0, i])
+    return GAMES.map(g=>[g.key, (stats&&stats[g.key]&&stats[g.key].n)||0, defIdx(g.key)])
       .sort((a,b)=>(b[1]-a[1])||(a[2]-b[2]))
       .map(r=>[r[0],r[1]]);
   }
@@ -199,10 +220,19 @@ const HomeLive = (function(){
        而且是**算出來的**不是查表 —— 原本那張 RANK_NUM 表每加一個遊戲就得補一個字,
        漏補的症狀是最後那張卡的徽章變空白(v1.113.0 就差點漏掉「十」)。 */
   function applyRank(rows){
-    const hot=rows.some(r=>r[1]>0);   // 一場都還沒玩過 → 不點亮前三名(那會是假的「最熱門」)
-    rows.forEach((r,i)=>{
+    /* ★ 置頂的新遊戲排最前面、徽章寫 NEW;其餘照排名從 1 開始編號
+       (NEW 那一張不佔名次 —— 不然「第 1 名」會是一個 0 場的遊戲)。 */
+    const pin=rows.filter(r=>isNew(r[0])), rest=rows.filter(r=>!isNew(r[0]));
+    const hot=rest.some(r=>r[1]>0);   // 一場都還沒玩過 → 不點亮前三名(那會是假的「最熱門」)
+    pin.forEach((r,i)=>{
       const el=cardOf(r[0]); if(!el)return;
       el.style.order=String(i);
+      const b=el.querySelector(".gc-rank");
+      if(b){ b.textContent="NEW"; b.setAttribute("data-top","new"); }
+    });
+    rest.forEach((r,i)=>{
+      const el=cardOf(r[0]); if(!el)return;
+      el.style.order=String(pin.length+i);
       const b=el.querySelector(".gc-rank");
       if(b){ b.textContent=String(i+1); b.setAttribute("data-top",(hot&&i<3)?String(i+1):"0"); }
     });
@@ -402,7 +432,7 @@ const HomeLive = (function(){
   function initRank(){
     const rows=readRank();
     rankHadCache=!!rows;
-    applyRank(rows || GAMES.map(g=>[g.key,0]));
+    applyRank(rows || rankRows({}));             // 沒有快取 → 預設順序(DEFAULT_ORDER),不是 GAMES 的登記順序
   }
   initRank();
 
@@ -629,10 +659,10 @@ const HomeLive = (function(){
     const g=row.g;
     const btns=[];
     if(row.staleInfo.length) btns.push('<button class="btn ghost svs-clear" type="button" data-key="'+g.key+'">清除這 '+row.staleInfo.length+' 間已關閉</button>');
-    // ★ 統計 = 場次 + 語音人次,兩個一起清(它們都是「這個遊戲的統計」,見 svClearStatsKey)
-    // ⚠ 語音那一段用 🎙️ 而不是「語音 N 次」:寫全的話這顆鈕在手機寬度一定折成兩行,
-    //   而「次)」單獨掉到第二行很難看。完整說法在頂上那行與 confirm 裡都有。
-    if(row.n||row.talk) btns.push('<button class="btn ghost svs-clear-stats" type="button" data-key="'+g.key+'">清除統計('+row.n+' 場'+(row.talk?" · 🎙️"+row.talk:"")+')</button>');
+    // ★ 場次與語音人次**分開兩顆**(2026-09-23 使用者裁示,理由見 svClearStatsKey 那段)
+    // ⚠ 語音那一顆用 🎙️N 而不是「語音 N 次」:寫全的話手機寬度一定折成兩行。
+    if(row.n) btns.push('<button class="btn ghost svs-clear-stats" type="button" data-key="'+g.key+'">清除場次('+row.n+' 場)</button>');
+    if(row.talk) btns.push('<button class="btn ghost svs-clear-talk" type="button" data-key="'+g.key+'">清除語音(🎙️'+row.talk+')</button>');
     const btnRow=btns.length ? '<div class="svs-row-actions">'+btns.join("")+'</div>' : "";
     const list=row.rooms.length
       ? '<div class="svs-stale">'+row.rooms.map(svRoomHtml).join("<br>")+
@@ -677,10 +707,12 @@ const HomeLive = (function(){
   async function refreshStatusPanel(){
     if(svBusy)return;
     svBusy=true;
-    const ping=$("svPing"), body=$("svBody"), clearAll=$("svClearAll"), clearStatsAll=$("svClearStatsAll");
-    // 讀取中先把兩顆清除鈕鎖起來:資料還沒到位,那時的數字是上一輪的
+    const ping=$("svPing"), body=$("svBody"), clearAll=$("svClearAll"), clearStatsAll=$("svClearStatsAll"),
+          clearTalkAll=$("svClearTalkAll");
+    // 讀取中先把三顆清除鈕鎖起來:資料還沒到位,那時的數字是上一輪的
     if(clearAll)clearAll.disabled=true;
     if(clearStatsAll)clearStatsAll.disabled=true;
+    if(clearTalkAll)clearTalkAll.disabled=true;
     if(ping)ping.innerHTML='<span class="svs-spin"></span>連線中…';
     /* ⚠ 骨架要**在第一顆請求之前**就畫上去,不可以等 game_stats 回來才畫:
        那一趟本身就可能等一兩秒,而「按下去到畫面有反應」的空窗正是要修掉的東西。
@@ -725,8 +757,12 @@ const HomeLive = (function(){
       }
       if(clearStatsAll){
         const totalN=rows.reduce((n,r)=>n+r.n,0);
-        clearStatsAll.disabled=!totalN&&!totalTalk;
-        clearStatsAll.textContent="🧹 清除全部統計紀錄("+totalN+" 場"+(totalTalk?" · 🎙️"+totalTalk:"")+")";
+        clearStatsAll.disabled=!totalN;
+        clearStatsAll.textContent="🧹 清除全部場次紀錄("+totalN+" 場)";
+      }
+      if(clearTalkAll){
+        clearTalkAll.disabled=!totalTalk;
+        clearTalkAll.textContent="🎙️ 清除全部語音紀錄("+totalTalk+" 次)";
       }
     }catch(e){
       if(ping)ping.textContent="⚠️ 讀取失敗,檢查網路或稍後再試";
@@ -761,38 +797,55 @@ const HomeLive = (function(){
     showToast("已清除全部已關閉的房間 🗑");
     refreshStatusPanel();
   }
-  /* ⚠ 場次與語音人次是**同一個遊戲的統計**,一起清:留一半下來只會讓下次打開時
-     以為「清除沒生效」。兩個都寄生在 game_stats 底下(見 svTalkN 那段)。 */
+  /* ★★ 場次與語音人次**分開清**(2026-09-23 使用者裁示:「語音的部分幫我另外記,
+     我想要可以單獨清掉語音」)。在那之前兩個是綁在一起清的(理由是「留一半下來會以為
+     清除沒生效」)—— 使用者要先把場次歸零重新開始,但語音的紀錄想自己決定。
+     ★ 資料位置**不動**:語音照舊寄生在 game_stats/talk_<key>/n(寫入端 talk.js 一行都沒改,
+       也不必去 Console 動規則);分開的是「清」這個動作。
+     ⚠⚠ 因此「清全部場次」**不可以再整包刪 game_stats** —— 那一刀會把 talk_* 一起帶走,
+       等於「按了清場次、語音也不見了」,而畫面上完全看不出來是哪一顆鈕做的。 */
   async function svClearStatsKey(key){
-    const row=svRows.find(r=>r.g.key===key); if(!row||(!row.n&&!row.talk))return;
-    if(!confirm("確定要清除「"+row.g.name+"」的統計紀錄("+row.n+" 場"+(row.talk?"、語音 "+row.talk+" 次":"")+")嗎?此動作無法復原,首頁熱門度排序會受影響。"))return;
-    await svBusyWhile("清除中…",()=>svAll([svDelete("game_stats/"+key+"/n"),svDelete("game_stats/talk_"+key+"/n")]));
-    showToast("已清除「"+row.g.name+"」的統計紀錄 🧹");
+    const row=svRows.find(r=>r.g.key===key); if(!row||!row.n)return;
+    if(!confirm("確定要清除「"+row.g.name+"」的場次紀錄("+row.n+" 場)嗎?語音紀錄不受影響。此動作無法復原,首頁熱門度排序會受影響。"))return;
+    await svBusyWhile("清除中…",()=>svAll([svDelete("game_stats/"+key+"/n")]));
+    showToast("已清除「"+row.g.name+"」的場次紀錄 🧹");
     refreshStatusPanel();
   }
+  async function svClearTalkKey(key){
+    const row=svRows.find(r=>r.g.key===key); if(!row||!row.talk)return;
+    if(!confirm("確定要清除「"+row.g.name+"」的語音紀錄("+row.talk+" 次)嗎?場次紀錄不受影響。此動作無法復原。"))return;
+    await svBusyWhile("清除中…",()=>svAll([svDelete("game_stats/talk_"+key+"/n")]));
+    showToast("已清除「"+row.g.name+"」的語音紀錄 🎙️");
+    refreshStatusPanel();
+  }
+  /* ⚠ 逐一刪 game_stats/<key>/n(規則授權的也正是那一層,見 notes/firebase-rules.json)——
+     刻意**不再**先整包刪 game_stats(理由見上面那段)。 */
   async function svClearAllStats(){
     const total=svRows.reduce((n,r)=>n+r.n,0);
-    const totalTalk=svRows.reduce((n,r)=>n+r.talk,0);
-    if(!total&&!totalTalk)return;
-    if(!confirm("確定要清除全部遊戲、共 "+total+" 場"+(totalTalk?" 與 "+totalTalk+" 次語音":"")+"的統計紀錄嗎?此動作無法復原,首頁熱門度排序會歸零重來。"))return;
-    /* ⚠ 先整包刪 game_stats,再逐一刪各遊戲的 n / talk_n 當保險:
-       資料庫規則授權的是 `game_stats/$game/n`(見 notes/firebase-rules.json)——
-       整包刪要的是 game_stats 這一層的寫入權,那**不一定**授權得到,
-       而 REST 被擋是靜靜回 401、fetch 不會 reject → 只做整包刪會變成「按了沒反應」。 */
-    const jobs=[svDelete("game_stats")];
-    for(const g of GAMES){ jobs.push(svDelete("game_stats/"+g.key+"/n")); jobs.push(svDelete("game_stats/talk_"+g.key+"/n")); }
+    if(!total)return;
+    if(!confirm("確定要清除全部遊戲、共 "+total+" 場的場次紀錄嗎?語音紀錄不受影響。此動作無法復原,首頁熱門度排序會歸零重來。"))return;
+    const jobs=GAMES.map(g=>svDelete("game_stats/"+g.key+"/n"));
     await svBusyWhile("清除中…",()=>svAll(jobs));
-    showToast("已清除全部統計紀錄 🧹");
+    showToast("已清除全部場次紀錄 🧹");
+    refreshStatusPanel();
+  }
+  async function svClearAllTalk(){
+    const totalTalk=svRows.reduce((n,r)=>n+r.talk,0);
+    if(!totalTalk)return;
+    if(!confirm("確定要清除全部遊戲、共 "+totalTalk+" 次的語音紀錄嗎?場次紀錄不受影響。此動作無法復原。"))return;
+    const jobs=GAMES.map(g=>svDelete("game_stats/talk_"+g.key+"/n"));
+    await svBusyWhile("清除中…",()=>svAll(jobs));
+    showToast("已清除全部語音紀錄 🎙️");
     refreshStatusPanel();
   }
   // 一批刪除:全部平行送(排隊上限交給 svRun),個別失敗不影響其他筆
   function svAll(jobs){ return Promise.all(jobs.map(p=>p.then(null,()=>null))); }
   /* 清除也可能要跑好幾秒(一次幾百間房)—— 同樣不可以讓畫面呆在原地什麼都不說。
-     ⚠ 期間把兩顆全域清除鈕鎖住:連按第二下等於再送一整批同樣的 DELETE。 */
+     ⚠ 期間把三顆全域清除鈕鎖住:連按第二下等於再送一整批同樣的 DELETE。 */
   async function svBusyWhile(msg,fn){
-    const ping=$("svPing"), a=$("svClearAll"), b=$("svClearStatsAll");
+    const ping=$("svPing"), a=$("svClearAll"), b=$("svClearStatsAll"), c=$("svClearTalkAll");
     if(ping)ping.innerHTML='<span class="svs-spin"></span>'+esc(msg);
-    if(a)a.disabled=true; if(b)b.disabled=true;
+    if(a)a.disabled=true; if(b)b.disabled=true; if(c)c.disabled=true;
     try{ await fn(); }catch(e){}
   }
 
@@ -929,10 +982,12 @@ const HomeLive = (function(){
     const refresh=$("svRefresh"); if(refresh)refresh.addEventListener("click",refreshStatusPanel);
     const clearAll=$("svClearAll"); if(clearAll)clearAll.addEventListener("click",svClearAllRooms);
     const clearStatsAll=$("svClearStatsAll"); if(clearStatsAll)clearStatsAll.addEventListener("click",svClearAllStats);
+    const clearTalkAll=$("svClearTalkAll"); if(clearTalkAll)clearTalkAll.addEventListener("click",svClearAllTalk);
     const body=$("svBody");
     if(body)body.addEventListener("click",e=>{
       const clearBtn=e.target.closest(".svs-clear"); if(clearBtn){ svClearKey(clearBtn.dataset.key); return; }
       const statsBtn=e.target.closest(".svs-clear-stats"); if(statsBtn){ svClearStatsKey(statsBtn.dataset.key); return; }
+      const talkBtn=e.target.closest(".svs-clear-talk"); if(talkBtn){ svClearTalkKey(talkBtn.dataset.key); return; }
     });
     // 回報卡自己一個容器(不在 #svBody 裡)→ 自己一個委派監聽
     const fb=$("svFb");
@@ -947,5 +1002,8 @@ const HomeLive = (function(){
      測試要能把它清掉再回到「第一次用」的狀態,否則那條路徑靜靜地永遠測不到。
      closeStatusPanel 是**為了 BACK_LAYERS 導出**的(見 js/game.js)——手機返回鍵
      要能關掉這個面板,而不是把使用者導出首頁。 */
-  return { boot, stop, sync, initRank, applyRank, rankRows, closeStatusPanel };
+  /* setNow:只給 e2e 用(量「NEW 置頂」在期限前 / 期限後各長什麼樣),產品程式不會呼叫 */
+  return { boot, stop, sync, initRank, applyRank, rankRows, closeStatusPanel,
+           setNow(fn){ nowFn = (typeof fn === "function") ? fn : (()=>Date.now()); },
+           DEFAULT_ORDER, NEW_UNTIL };
 })();
