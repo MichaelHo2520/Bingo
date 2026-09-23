@@ -129,7 +129,7 @@
      ★ v1.182.2 起真正的守門是 tools/test-registry.js(以 js/<game>/ 目錄為單一真相,
        反查每一張清單),它**不會跟著登記表一起漏**。 */
   #home,#gmkHome,#sdkHome,#mjHome,#m16Home,#svHome,#b2Home,#bjHome,#unHome,#dcHome,#cyHome,
-  #fcHome,#tqHome,#blkHome,
+  #fcHome,#tqHome,#blkHome,#bubHome,
   #mpConnect{flex:0 1 auto;min-height:0;
     overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   /* 填號分頁:改回 flex:1 撐滿(內容本來就有整片號碼格,不會空太多),讓準備列固定在最底,右下浮動鈕才有穩定的落點、不會壓到準備鈕 */
@@ -13571,19 +13571,19 @@ body.is-big .topbar{display:none}
    (晶片只有 22px 高),4px 看起來就是黏著框(台灣麻將 v1.178.1 的上手回報)。 */
 /* ⚠⚠ 需要列前綴的第 1 / 4 組:`.XX-room`(連線列與單機列**共用同一個 class**,
    所以一次到位)。加新遊戲要補這裡 —— 守門 tools/test-registry.js。 */
-body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room,.blk-room){
+body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room,.blk-room,.bub-room){
   display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 /* ② order:晶片列(foot)在 DOM 裡是最後一個,拉到最左邊;鈕那一列(.row)推到最右。
    ⚠⚠ 需要列前綴的第 2 / 4 組(同一份清單,但這裡要限定**直接子代**的 .row ——
      不限定的話 `body.is-big .row` 會打到那一列以外的每一條 row)。 */
-body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room,.blk-room) > .row{
+body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room,.blk-room,.bub-room) > .row{
   flex:none;order:3;margin-top:0}
 /* .mp-subrow 是共用 class 而且每頁只有一處(就在房間框裡)→ 不必列前綴。
    ⚠ 原本寫成 `.XX-room > .mp-subrow`,拿掉直接子代限制是安全的(整頁就這麼一個)。 */
 body.is-big .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* ⚠⚠ 需要列前綴的第 3 / 4 組:`.XX-room-foot`。加新遊戲要補這裡。 */
-body.is-big :is(.un-room-foot,.b2-room-foot,.bj-room-foot,.dc-room-foot,.gmk-room-foot,.sdk-room-foot,.mj-room-foot,.sv-room-foot,.fc-room-foot,.tq-room-foot,.cy-room-foot,.blk-room-foot){
+body.is-big :is(.un-room-foot,.b2-room-foot,.bj-room-foot,.dc-room-foot,.gmk-room-foot,.sdk-room-foot,.mj-room-foot,.sv-room-foot,.fc-room-foot,.tq-room-foot,.cy-room-foot,.blk-room-foot,.bub-room-foot){
   order:1;flex:1 1 0;min-width:0;margin-top:0}
 /* ③ 返回鍵 / 房名 / 局數三個一起收 —— 收掉它們讓出來的寬度就是給晶片的。
    ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」,手機實體返回鍵也不受影響。
@@ -13593,7 +13593,7 @@ body.is-big :is(.un-room-foot,.b2-room-foot,.bj-room-foot,.dc-room-foot,.gmk-roo
 body.is-big .mp-leave-btn{display:none}
 body.is-big .mp-goal{display:none}
 /* ⚠⚠ 需要列前綴的第 4 / 4 組:`.XX-room-title`。加新遊戲要補這裡。 */
-body.is-big :is(.un-room-title,.b2-room-title,.bj-room-title,.dc-room-title,.gmk-room-title,.sdk-room-title,.mj-room-title,.sv-room-title,.fc-room-title,.tq-room-title,.cy-room-title,.blk-room-title){
+body.is-big :is(.un-room-title,.b2-room-title,.bj-room-title,.dc-room-title,.gmk-room-title,.sdk-room-title,.mj-room-title,.sv-room-title,.fc-room-title,.tq-room-title,.cy-room-title,.blk-room-title,.bub-room-title){
   display:none}
 /* ④ ⛶ / ⚙️ 跟著頂列一起消失(兩條是同一件事的兩半,見檔頭)。
    ★ `.tools-docked` 只會被 dockTools() 掛到那一條列上 → 不必列前綴。 */
@@ -14184,4 +14184,308 @@ body.solo-on .blk-react-row{display:none}
        兩者是一對(見 :root 那一段),只改一個的話底部那條橫列會留一大塊空白。 */
   :root{ --blk-key:44px; --blk-bar:66px; }
   .blk-key{font-size:18px}
+}
+
+/* ==========================================================================
+   泡泡對戰 .bub-*(第十六個遊戲)
+   ──────────────────────────────────────────────────────────────────────────
+   ★ 版面骨架照抄上面的方塊對戰 .blk-*(同一套同步、同一套對局區)——
+     這裡只負責「那塊玻璃長什麼樣子」與周邊版面,盤面與特效**全部畫在 canvas 裡**
+     (js/bubble/board.js)。刻意不用 CSS @keyframes 做遊戲特效(紅線 17)。
+     ⚠ 下面的 @keyframes 只有警示條 / 快爆了 / 播報 / 最後 30 秒那幾組,都定義在自己旁邊。
+
+   ⚠⚠ .bub-stage 一律 overflow:hidden —— 它正是 BUBB.fitBoard() 量的容器。
+      捲軸一出現就縮一階、縮完又放得下、捲軸消失、又放大 → **自己震盪下去**
+      (跳棋 / 飛行棋 / 麻將消消樂 / 方塊對戰,四次了)。
+
+   ⚠ 六種泡泡的顏色寫在 board.js 裡而**不是這裡**,而且固定不隨主題變
+     (辨識度就是公平性,同方塊對戰 / UNO)。主題在這一頁只換玻璃底色、外框與文字。
+   ⚠ 這一頁**沒有控制鈕列**(拖曳瞄準 + 放手發射,換顆是點盤面左下角)——
+     方塊對戰那一大段 .blk-pad / .blk-key / --blk-bar 的紅線在這裡都不適用。
+   ========================================================================== */
+:root{
+  --bub-tw:560px;
+  --bub-glass:rgba(10,12,26,.34);
+  --bub-line:rgba(255,255,255,.12);
+  /* 死亡線的顏色。★ board.js 每次 fitBoard() 讀進去畫 —— 放在這裡是為了跟著主題走 */
+  --bub-grid:rgba(255,255,255,.22);
+}
+:root[data-theme="bubblegum"]{ --bub-glass:rgba(48,14,38,.20); --bub-line:rgba(120,50,100,.22);
+                               --bub-grid:rgba(96,40,84,.34); }
+:root[data-theme="meadow"]{ --bub-glass:rgba(10,26,14,.32); }
+:root[data-theme="arcade"]{ --bub-glass:rgba(0,0,0,.46); --bub-line:rgba(255,230,0,.22);
+                            --bub-grid:rgba(255,230,0,.30); }
+
+/* 「大 / 小」那一顆(BigMode)。⚠ class 是 .bub-bigbtn,而狀態掛在 body 上的是 .bub-big */
+.bub-bigbtn{font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:15px}
+.bub-bigbtn.on{background:var(--accent);color:#fff}
+.bub-helpbtn{font-family:'Fredoka','Nunito',sans-serif;font-weight:700}
+
+.bub-brand{font-family:'Fredoka',sans-serif;font-weight:700;font-size:clamp(21px,6.4vw,30px);
+           line-height:1.05;letter-spacing:.5px;
+           background:linear-gradient(135deg,var(--accent),var(--accent-2));
+           -webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ---------- 進場 ---------- */
+.bub-home{display:flex;flex-direction:column}
+.bub-pick{display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
+.bub-hero{text-align:center;margin:14px 0 4px}
+/* 進場插圖。⚠ 與首頁卡 .gc-art.bub-cart **指向同一個檔案**(紅線 11);
+   首頁那張一律掛 .bub-cart,**不可掛** .bub-art(96px 定義在 .gc-art 後面 → 卡會高一截)。 */
+.bub-art{width:96px;height:96px;display:block;margin:0 auto 8px}
+.bub-cart{}
+.bub-tag{font-family:'Fredoka','Nunito',sans-serif;font-weight:600;font-size:14.5px;color:var(--text)}
+.bub-howto{margin-top:14px;padding:14px 14px 12px;border-radius:14px;
+           background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
+           text-align:left;font-size:13px;line-height:1.62;color:var(--text);
+           flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
+           box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
+/* 攻擊表:四格圖。⚠ 一列四格是硬需求(同方塊對戰:排成兩列會被那個會捲的框攔腰切掉) */
+.bub-atk{margin:7px 0 8px;padding:6px 4px 5px;border-radius:12px;
+         background:rgba(0,0,0,.16);border:1px solid var(--panel-line)}
+.bub-atk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.bub-atk-it{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:0}
+.bub-atk-it svg{flex:none}
+.bub-atk-it span{font-size:10.5px;font-weight:700;line-height:1.3;color:var(--text);
+                 opacity:.86;text-align:center;white-space:nowrap}
+.bub-atk-it b{font-weight:800;opacity:1;color:var(--muted)}
+.bub-atk-hot b{color:#ffd93d}
+.bub-atk-lit{fill:var(--accent)}
+.bub-atk-dim{fill:rgba(255,255,255,.11)}
+
+/* 操作說明(進場頁 + 「?」蓋板同一份)。⚠ 四格一列:四個動作在 360px 上剛好放得下 */
+.bub-gest{margin-top:10px;padding:10px 12px 11px;border-radius:14px;
+          background:rgba(255,255,255,.05);border:1px solid var(--panel-line);text-align:left}
+.bub-gest-head{font-size:12px;font-weight:700;color:var(--text);opacity:.88;
+               line-height:1.45;margin-bottom:9px}
+.bub-gest-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 4px}
+.bub-gest-it{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center}
+.bub-gest-it svg{color:var(--accent-2);flex:none}
+.bub-gest-it span{font-size:10.5px;font-weight:700;color:var(--text);opacity:.72;line-height:1.25}
+.bub-gest-it b{display:block;font-size:11.5px;font-weight:800;opacity:1}
+.bub-gest-kb{margin-top:10px;font-size:11px;color:var(--text);opacity:.7;line-height:1.55}
+
+/* ---------- 大廳的示範局 ---------- */
+.bub-demo{display:flex;align-items:center;justify-content:center;gap:10px;
+          margin:2px 0 6px;padding:8px 10px;border-radius:12px;
+          background:rgba(0,0,0,.20);border:1px solid var(--panel-line)}
+.bub-demo-cv{display:block;border-radius:4px;background:rgba(0,0,0,.30);
+             box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.bub-demo-mid{min-width:62px;text-align:center;font-size:10.5px;font-weight:800;
+              color:var(--text);opacity:.45;transition:opacity .12s linear,color .12s linear}
+.bub-demo-fire{opacity:1;color:#ff5d6c}
+.bub-demo-cap{margin:0 0 10px;font-size:11.5px;line-height:1.5;opacity:.8;text-align:center}
+.bub-demo-cap b{font-weight:800;color:var(--accent);opacity:1}
+
+/* ---------- 設定選項底下那一行「隨選隨變」的後果 ---------- */
+.bub-fnote{margin-top:6px;font-size:12px;line-height:1.5;color:var(--text);opacity:.82;text-align:left}
+.bub-fnote b{opacity:1;font-weight:800;color:var(--accent)}
+.bub-setup-summary{margin:6px 0 12px;padding:9px 12px;border-radius:12px;
+  background:rgba(255,255,255,.07);color:var(--text);font-size:13px;font-weight:800;text-align:center}
+.bub-setup-help,.bub-setup-more{border:1px solid var(--panel-line);border-radius:14px;
+  margin:10px 0;background:rgba(255,255,255,.035)}
+.bub-setup-help > summary,.bub-setup-more > summary{cursor:pointer;padding:12px 14px;
+  color:var(--text);font-size:14px;font-weight:800;list-style:none}
+.bub-setup-help > summary::-webkit-details-marker,.bub-setup-more > summary::-webkit-details-marker{display:none}
+.bub-setup-help > summary::after,.bub-setup-more > summary::after{content:"⌄";float:right;color:var(--accent)}
+.bub-setup-help[open] > summary::after,.bub-setup-more[open] > summary::after{transform:rotate(180deg)}
+.bub-setup-more > summary span{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-top:2px}
+.bub-setup-help .bub-demo,.bub-setup-help .bub-demo-cap,.bub-setup-help .hint{margin-left:10px;margin-right:10px}
+.bub-setup-help .hint{margin-bottom:10px}
+.bub-setup-more > .field{margin:0 12px 12px}
+.bub-score-actions{border-top:1px solid var(--panel-line);padding-top:12px;text-align:center}
+.bub-page #setVeil .set-card{background-color:var(--bg1);
+  background-image:linear-gradient(180deg,rgba(255,255,255,.085),rgba(255,255,255,0) 48%),
+    linear-gradient(0deg,var(--panel),var(--panel)),linear-gradient(180deg,var(--bg1),var(--bg2))}
+.bub-page #setVeil:has(#swBgm[aria-checked="false"]) #bgmTrackRow,
+.bub-page #setVeil:has(#swBgm[aria-checked="false"]) #bgmVolRow{display:none}
+.bub-voice-group > summary{cursor:pointer;list-style:none;padding-bottom:11px}
+.bub-voice-group > summary::-webkit-details-marker{display:none}
+.bub-voice-group > summary::after{content:"⌄";float:right;color:var(--accent)}
+.bub-voice-group[open] > summary::after{transform:rotate(180deg)}
+.bub-voice-group > summary span{font-family:'Nunito',sans-serif;font-size:11px;
+  letter-spacing:0;color:var(--muted);font-weight:700;margin-left:6px}
+.bub-custom-lineup{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.bub-custom-item{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.bub-custom-lbl{font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;min-width:58px;opacity:.9}
+.bub-custom-item .seg{flex:1;min-width:0}
+.bub-custom-item .seg button{font-size:12px;padding:6px 2px}
+
+/* ---------- 房間框 / 單機列 ---------- */
+.bub-room{padding:9px 12px}
+.bub-room .row{margin-top:0}
+.bub-room-top{display:flex;align-items:center;flex-wrap:nowrap;gap:8px}
+.bub-room .bub-room-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bub-room .bub-room-title b{font-size:15px;color:var(--text)}
+.bub-room .icon-btn{width:34px;height:34px;border-radius:11px;font-size:16px}
+.bub-room .mp-act-btn{width:34px;height:34px;font-size:18px}
+.bub-room .mp-subrow{margin-top:5px}
+.bub-room-foot{display:flex;align-items:center;gap:8px;margin-top:6px}
+.bub-room-foot .mp-players{flex:1;min-width:0;margin-top:0}
+/* ⚠ 紀錄文字吃 --text(--muted 疊在半透明面板上在 bubblegum 讀不到) */
+.bub-room .mp-goal{color:var(--text);font-size:12px;font-weight:700}
+.bub-goal{margin-left:6px;font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;
+          background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 1px var(--bub-line);
+          color:var(--text);white-space:nowrap}
+
+/* ---------- 對局 ----------
+   ⚠ width 用 100% + max-width,不要寫 width:min(96vw,…)(body 自己有 padding → 橫向溢出)。
+   ⚠⚠ touch-action:none:手指在對局區上一拖就是在瞄準,少了它會先被瀏覽器當成捲動 /
+     下拉重新整理吃掉。對局區本來就不捲動(舞台 overflow:hidden),沒有副作用。 */
+.bub-play{flex:1 1 auto;min-height:0;width:100%;max-width:var(--bub-tw);margin:6px auto 0;
+          display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;
+          touch-action:none;cursor:crosshair;
+          user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+/* ⚠⚠ 只有舞台可以壓縮,HUD 一律 flex:none */
+.bub-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;
+           display:flex;align-items:center;justify-content:center;
+           overflow:hidden}
+/* 最後 30 秒攻擊加倍。⚠ 只用 box-shadow / color,不可以動任何會改尺寸的東西(舞台是被量的那一個) */
+body.bub-rush .bub-stage{animation:bub-rush-pulse 1.1s ease-in-out infinite}
+@keyframes bub-rush-pulse{
+  0%,100%{box-shadow:inset 0 0 0 2px rgba(255,93,108,.30),inset 0 0 26px rgba(255,93,108,.14)}
+  50%    {box-shadow:inset 0 0 0 2px rgba(255,93,108,.72),inset 0 0 30px rgba(255,93,108,.34)}
+}
+body.bub-rush #bubStatTime{color:#ff5d6c}
+@media (prefers-reduced-motion:reduce){
+  body.bub-rush .bub-stage{animation:none;box-shadow:inset 0 0 0 2px rgba(255,93,108,.55)}
+}
+
+/* ---------- 對手的小盤:住在盤面右側的空白帶(同方塊對戰 v2.14.0)----------
+   ⚠ 寬度由 board.js 的 fitBoard() 量出來寫成行內 style;高度一律由外面決定(量自己 = 震盪)。
+   ⚠⚠ 容器 pointer-events:none、只有每一塊小盤 auto —— 右側那一條也是瞄準的拖曳區。 */
+.bub-foes{position:absolute;right:0;top:0;bottom:0;width:78px;z-index:2;
+          display:flex;flex-direction:column;gap:8px;
+          align-items:center;justify-content:center;pointer-events:none}
+.bub-foes-over{bottom:auto;justify-content:flex-start;padding-top:2px}
+.bub-foes-over .bub-foe{background:rgba(12,10,22,.42);
+                        -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.bub-foe{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;
+         padding:3px;border-radius:10px;box-shadow:inset 0 0 0 1.5px transparent;
+         transition:box-shadow .15s linear,opacity .2s linear;cursor:pointer;
+         pointer-events:auto}
+.bub-foe-cv{display:block;border-radius:5px;background:rgba(0,0,0,.30);
+            box-shadow:inset 0 0 0 1px var(--bub-line)}
+.bub-foe-name{font-size:10.5px;font-weight:800;color:var(--text);max-width:100%;
+              overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.1}
+/* 鎖定的目標。⚠ 標記用 ::after 疊上去,不可以改 padding / border-width(會改到量出來的尺寸) */
+.bub-foe-target{box-shadow:inset 0 0 0 2.5px var(--accent-2)}
+.bub-foe-target .bub-foe-name{color:var(--accent-2);font-weight:900}
+.bub-foe-target::after{content:"🎯";position:absolute;right:-2px;top:-4px;font-size:13px;
+                       line-height:1;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.bub-foe:focus-visible{outline:none;box-shadow:inset 0 0 0 2.5px var(--accent-1, #ffd93d)}
+.bub-foe-away{opacity:.42}
+.bub-foe-lag{opacity:.72}
+.bub-foe-danger{animation:bub-foe-pulse .68s ease-in-out infinite}
+@keyframes bub-foe-pulse{
+  0%,100%{box-shadow:inset 0 0 0 2.5px rgba(255,93,108,.55)}
+  50%    {box-shadow:inset 0 0 0 2.5px rgba(255,93,108,1)}
+}
+/* ⚠⚠ 減少動態時整個關掉(全域那條 animation-duration:.001s 碰到 infinite 會變成狂閃) */
+@media (prefers-reduced-motion:reduce){
+  .bub-foe-danger{animation:none;box-shadow:inset 0 0 0 2.5px rgba(255,93,108,.9)}
+}
+
+.bub-fx{position:absolute;left:0;top:0;pointer-events:none;z-index:3}
+
+/* ---------- 現場播報(⚠ 掛在 .bub-play 上,不是 .bub-stage)---------- */
+.bub-cast{position:absolute;left:0;right:0;top:15%;z-index:4;pointer-events:none;
+          display:flex;flex-direction:column;align-items:center;gap:5px;padding:0 12px}
+.bub-cast-it{max-width:100%;padding:5px 13px;border-radius:999px;text-align:center;
+             font-weight:800;font-size:13px;line-height:1.35;color:#fff;
+             background:rgba(12,10,22,.78);box-shadow:0 3px 14px rgba(0,0,0,.4);
+             -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+             animation:bub-cast-in .22s ease-out both}
+@keyframes bub-cast-in{from{opacity:0;transform:translateY(7px) scale(.94)}
+                         to{opacity:1;transform:none}}
+.bub-cast-ko{font-size:17px;font-family:'Fredoka','Nunito',sans-serif;
+             padding:7px 17px;color:#ffd93d;box-shadow:0 4px 18px rgba(0,0,0,.5)}
+.bub-cast-streak{font-size:18px;font-family:'Fredoka','Nunito',sans-serif;
+                 padding:7px 18px;color:#0c0a16;background:#ffd93d;
+                 box-shadow:0 4px 20px rgba(255,217,61,.45)}
+.bub-cast-warn{color:#ff9aa4}
+
+/* ---------- 觀戰:沒有「我的盤面」,整個畫面讓給對手的小盤 ---------- */
+body.bub-spec .bub-wrap,
+body.bub-spec .bub-hud{display:none}
+body.bub-spec .bub-play{cursor:default}
+body.bub-spec .bub-foes{position:static;width:auto!important;flex:1 1 auto;align-self:stretch;
+                        flex-direction:row;flex-wrap:wrap;align-items:center;
+                        justify-content:center;pointer-events:auto}
+body.bub-spec .bub-foe-cv{width:auto;height:auto}
+body.bub-spec .bub-foe{cursor:default;pointer-events:none}
+
+/* ⚠⚠ HUD 的高度一定要是固定的(會震盪的循環,同方塊對戰紅線 ⑮) */
+.bub-hud{flex:none;display:flex;align-items:center;justify-content:center;gap:8px;
+         width:100%;height:42px}
+.bub-stats{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:14px}
+.bub-stat{display:flex;flex-direction:column;align-items:center;line-height:1.12;min-width:50px}
+.bub-stat span{font-size:10px;font-weight:700;letter-spacing:.10em;color:var(--text);opacity:.72}
+.bub-stat b{font-family:'Fredoka','Nunito',sans-serif;font-size:19px;color:var(--text)}
+.bub-stat-tgt{max-width:88px;min-width:0}
+.bub-stat-tgt b{font-size:14px;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+                white-space:nowrap;display:block}
+.bub-stat-lock b{color:var(--accent-2)}
+
+.bub-wrap{flex:none;display:flex;align-items:stretch;justify-content:center;gap:8px}
+/* 待處理垃圾的警示條。⚠ 高度用 transform:scaleY;寬度要與 board.js 的 GAUGE_W 同步 */
+.bub-gauge{position:relative;width:10px;flex:none;border-radius:6px;
+           background:rgba(255,255,255,.07);box-shadow:inset 0 0 0 1px var(--bub-line);
+           opacity:0;transition:opacity .25s ease}
+.bub-gauge-num{position:absolute;bottom:100%;left:50%;transform:translate(-50%,-3px);
+               font-family:'Fredoka','Nunito',sans-serif;font-size:11px;font-weight:800;
+               line-height:1;color:#ff9f43;text-shadow:0 1px 3px rgba(0,0,0,.7);
+               pointer-events:none;white-space:nowrap}
+.bub-gauge-hot .bub-gauge-num{color:#ff5d6c;font-size:12px}
+.bub-gauge-on{opacity:1}
+.bub-gauge-fill{position:absolute;left:0;right:0;bottom:0;height:100%;border-radius:5px;
+                transform-origin:bottom;transform:scaleY(0);
+                background:linear-gradient(180deg,#ff9f43,#ff5d6c);
+                transition:transform .12s linear}
+.bub-gauge-hot .bub-gauge-fill{background:linear-gradient(180deg,#ff5d6c,#ff2d55);
+                               animation:bub-pulse .62s ease-in-out infinite}
+@keyframes bub-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+
+/* 盤面:玻璃。⚠ canvas 本身一律 clearRect,底色靠這裡 —— 主題才透得過來 */
+.bub-main{display:block;border-radius:14px;background:var(--bub-glass);
+          -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+          box-shadow:inset 0 0 0 1px var(--bub-line),0 12px 30px rgba(0,0,0,.34);
+          touch-action:none}
+.bub-paused{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;
+            font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:26px;
+            color:var(--text);text-shadow:0 2px 12px rgba(0,0,0,.65)}
+
+/* ---------- 結果卡 ---------- */
+.bub-result{display:flex;flex-direction:column;gap:5px;margin:10px 0 4px}
+.bub-rrow{display:flex;justify-content:space-between;align-items:center;
+          font-size:13.5px;color:var(--text);padding:6px 11px;border-radius:10px;
+          background:rgba(255,255,255,.07)}
+.bub-rrow b{font-family:'Fredoka','Nunito',sans-serif;font-size:15px}
+.bub-fresh{margin-top:8px;text-align:center;font-family:'Fredoka','Nunito',sans-serif;
+           font-weight:700;font-size:16px;color:var(--accent-2)}
+.bub-react-row{display:flex;justify-content:center;gap:8px;margin:10px 0 2px;flex-wrap:wrap}
+body.solo-on .bub-react-row{display:none}
+
+/* ---------- 寬螢幕 / 橫置:對局區放寬 ---------- */
+@media (min-width:700px),(orientation:landscape){
+  :root{ --bub-tw:min(96vw, 880px); }
+  .bub-hud{height:46px}
+}
+/* ---------- 矮視窗(橫置手機):周邊壓到最扁,高度全留給盤面 ---------- */
+@media (max-height:620px){
+  .bub-home{overflow-y:auto;overscroll-behavior:contain}
+  .bub-home > .bub-pick{flex:none}
+  .bub-howto{min-height:0;overflow:visible;box-shadow:none}
+  .bub-hero{margin:6px 0 2px}
+  .bub-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
+  .bub-play{gap:4px;margin-top:4px}
+  .bub-room{padding:6px 10px}
+  .bub-hud{gap:6px;height:36px}
+  .bub-foes{gap:6px}
+}
+@media (max-height:480px){
+  .bub-hud{height:30px}
+  .bub-room{padding:4px 10px}
+  .bub-room .icon-btn{width:30px;height:30px;font-size:14px}
+  .bub-play{margin-top:2px;gap:3px}
 }

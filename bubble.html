@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="sunset" class="boot-wait">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="泡泡對戰">
+<meta name="theme-color" content="#2a1136">
+<!-- 退出瀏覽器的強制深色(系統深色時會自動反轉我們的配色)。理由與另一半在 styles.css 開頭 -->
+<meta name="color-scheme" content="only light">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
+<title>泡泡對戰 ｜ 單機練習 + 連線對戰</title>
+<!-- 泡泡對戰 · v2.15.0 -->
+<meta name="version" content="2.15.0+1">
+<!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
+     ⚠ app.html 的 PAGES 一定要有 bubble 這個 key,否則深層連結會靜靜退回 Bingo -->
+<script>
+if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
+  location.replace("app.html#bubble");
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+<!-- 共用 styles.css:房間橫幅 / 玩家晶片 / 表情蓋板 / 設定蓋板 / 結果卡全部沿用同樣的
+     id 與 class;盤面是檔尾追加的 .bub-* 段落 -->
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="bub-page">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="bub-brand display">泡泡對戰</div>
+      <span class="topver" id="topVer" aria-label="版本"></span>
+    </div>
+    <div class="tools">
+      <!-- 即時語音(見 notes/24)。⚠ 兩顆鈕必須留在 .tools 裡面 —— 那一整塊會被 syncTools()
+           在頂列被收掉時整組搬進房間框;挪出去就是「開了大模式再也關不掉麥克風」。 -->
+      <button class="icon-btn tk-btn" id="tkListenBtn" type="button" title="打開語音(聽別人說話)" aria-label="打開語音,聽別人說話" aria-pressed="false"></button>
+      <button class="icon-btn tk-btn" id="tkSpeakBtn" type="button" title="打開麥克風(讓別人聽到你)" aria-label="打開麥克風,讓別人聽到你" aria-pressed="false"></button>
+      <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
+      <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
+    </div>
+  </div>
+
+  <!-- ====== 進場選單(兩層)====== -->
+  <section class="panel bub-home" id="bubHome">
+    <div class="mp-head" id="bubHomeHead">
+      <a class="icon-btn as-link" href="index.html" title="回主選單" aria-label="回主選單">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+      <div class="subtitle">選擇玩法</div>
+    </div>
+
+    <div id="bubPickMode" class="bub-pick">
+      <div class="bub-hero">
+        <img class="bub-art" src="img/bub-icon.png" alt="彩色的泡泡" width="192" height="192">
+        <div class="bub-tag display">射泡泡,三顆同色就消掉,把泡泡塞給對手</div>
+      </div>
+      <!-- ⚠ 這一塊是小螢幕上唯一會縮、會捲的(其餘 flex:none)—— 最重要的東西排第一。 -->
+      <div class="bub-howto">
+        <b>怎麼玩</b>:射出去的泡泡碰到<b>三顆以上同色</b>就消掉;
+        跟天花板斷了連線的會<b>整串掉下來</b>。<b>掉得越多,塞給對手的排數越多。</b>
+        <!-- ⚠ 攻擊表由 js/bubble/main.js 的 bubAtkHtml() 注入(數字讀 BUB.rowsOf),這裡不要寫死一份 -->
+        <div class="bub-atk" id="bubAtkCard"></div>
+        被塞的泡泡會從<b>頂端整排插進來</b>(整片往下推);左邊的<b>警示條</b>亮起時,
+        趕快消掉一些就能<b>抵銷</b>。每射幾發頂端也會自己多一排。泡泡越過<b>虛線</b>就輸了。
+        <b>三個人以上時,只會塞給其中一個人</b>(預設隨機)。
+      </div>
+      <!-- 操作說明。⚠ 內容由 js/bubble/main.js 的 bubGestHtml() 注入 ——
+           房間框那顆「?」打開的蓋板印的是**同一份**。 -->
+      <div class="bub-gest" id="bubGestCard"></div>
+      <button class="btn primary block-btn home-btn" id="bubGoOnline">🌐 連線對戰</button>
+      <button class="btn ghost block-btn home-btn" id="bubGoSolo">🎮 單機練習</button>
+    </div>
+
+    <!-- 第二層:單機設定 -->
+    <div id="bubPickSolo" class="hidden">
+      <div class="mp-head">
+        <button class="icon-btn" id="bubSoloCfgBack" type="button" title="回選擇玩法" aria-label="回選擇玩法">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="subtitle">單機練習</div>
+      </div>
+      <div class="field">
+        <span class="field-label">玩法</span>
+        <div class="seg" id="bubModeSeg" aria-label="玩法">
+          <button type="button" data-mode="endless" class="on">練習</button>
+          <button type="button" data-mode="vs">對電腦</button>
+        </div>
+      </div>
+      <!-- ★ 對電腦那一整組 = 連線大廳那一組(同方塊對戰 v2.15.4),文案共用 BUB.NOTES -->
+      <div class="field hidden bub-vs-row" id="bubFoeNRow">
+        <span class="field-label">對手<span class="field-sub">(幾台電腦)</span></span>
+        <div class="seg" id="bubFoeNSeg" aria-label="幾台電腦">
+          <button type="button" data-foen="1" class="on">1 台</button>
+          <button type="button" data-foen="2">2 台</button>
+          <button type="button" data-foen="3">3 台</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteFoeN"></div>
+      </div>
+      <div class="field hidden bub-vs-row" id="bubLvRow">
+        <span class="field-label">電腦強度<span class="field-sub">(多台時只會往下配,不會比所選更強)</span></span>
+        <div class="seg" id="bubLvSeg" aria-label="電腦強度">
+          <button type="button" data-lv="easy">🙂 輕鬆</button>
+          <button type="button" data-lv="norm" class="on">😎 普通</button>
+          <button type="button" data-lv="hard">🔥 硬仗</button>
+          <button type="button" data-lv="custom">🛠️ 自訂</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteLv"></div>
+      </div>
+      <div class="field hidden bub-vs-row" id="bubCustomLvsRow">
+        <span class="field-label">自訂名單<span class="field-sub">(分別設定每台電腦)</span></span>
+        <div class="bub-custom-lineup" id="bubCustomLineup"></div>
+      </div>
+      <div class="field hidden bub-vs-row">
+        <span class="field-label">賽制</span>
+        <div class="seg" id="bubVsModeSeg" aria-label="賽制">
+          <button type="button" data-vsmode="ko" class="on">💥 K.O. 賽</button>
+          <button type="button" data-vsmode="out">☠️ 淘汰賽</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteVsMode"></div>
+      </div>
+      <div class="field hidden bub-vs-row" id="bubVsSecsRow">
+        <span class="field-label">一局多久</span>
+        <div class="seg" id="bubVsSecsSeg" aria-label="一局多久">
+          <button type="button" data-vssecs="120">2 分</button>
+          <button type="button" data-vssecs="180" class="on">3 分</button>
+          <button type="button" data-vssecs="300">5 分</button>
+        </div>
+      </div>
+      <div class="field hidden bub-vs-row">
+        <span class="field-label">開局暖身<span class="field-sub">(前幾秒沒有人會被塞)</span></span>
+        <div class="seg" id="bubVsShieldSeg" aria-label="開局暖身">
+          <button type="button" data-vsshield="0">關</button>
+          <button type="button" data-vsshield="10">10 秒</button>
+          <button type="button" data-vsshield="20" class="on">20 秒</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteVsShield"></div>
+      </div>
+      <div class="field hidden bub-vs-row">
+        <span class="field-label">攻擊目標<span class="field-sub">(兩台以上才有差)</span></span>
+        <div class="seg" id="bubVsTargetSeg" aria-label="攻擊目標">
+          <button type="button" data-vstarget="rand" class="on">🎲 隨機</button>
+          <button type="button" data-vstarget="high">👑 打第一名</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteVsTarget"></div>
+      </div>
+      <div class="field hidden bub-vs-row" id="bubVsRushRow">
+        <span class="field-label">最後 30 秒<span class="field-sub">(結尾加速)</span></span>
+        <div class="seg" id="bubVsRushSeg" aria-label="最後 30 秒加倍">
+          <button type="button" data-vsrush="0" class="on">一般</button>
+          <button type="button" data-vsrush="1">⏱️ 攻擊加倍</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteVsRush"></div>
+      </div>
+      <button class="btn primary block-btn home-btn" id="bubStartSolo">開始</button>
+      <div class="home-hint" id="bubSoloHint"></div>
+    </div>
+  </section>
+
+  <!-- ====== 連線畫面 ====== -->
+  <section class="panel hidden" id="mpConnect">
+    <div class="mp-head">
+      <button class="icon-btn" id="mpConnBack" type="button" title="回上一層" aria-label="回上一層">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="subtitle">連線對戰</div>
+    </div>
+    <div class="field">
+      <span class="field-label">你的暱稱(必填)</span>
+      <input id="mpName" class="mp-input" maxlength="8" placeholder="輸入你的名字">
+    </div>
+    <div class="or-divider"><span>建立新房間</span></div>
+    <div class="field">
+      <input id="mpRoomName" class="mp-input" maxlength="12" placeholder="房間名稱(留空用你的暱稱)">
+    </div>
+    <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
+    <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
+    <div class="mp-detect-row">
+      <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span><span id="mpLiveTxt">偵測目前房間中…</span>
+      </div>
+      <button class="mp-rescan" id="mpScan" title="重新偵測房間" aria-label="重新偵測房間">🔍</button>
+    </div>
+    <div class="room-list" id="mpRoomList"></div>
+    <div class="hint" id="mpConnMsg"></div>
+  </section>
+
+  <!-- ====== 房間橫幅 ====== -->
+  <div class="panel bub-room hidden" id="mpBar">
+    <div class="row bub-room-top">
+      <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="label bub-room-title"><b id="mpRoomTitle" class="display">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
+      <div class="mp-actions">
+        <!-- ⚠ class 是 .bub-bigbtn,而狀態掛在 body 上的是 .bub-big —— 兩個名字一定要不一樣 -->
+        <button class="icon-btn bub-helpbtn" id="bubHelpBtn" type="button" title="怎麼操作" aria-label="怎麼操作">?</button>
+        <button class="icon-btn bub-bigbtn" id="bubBig" type="button" title="大畫面" aria-label="大畫面">大</button>
+        <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
+      </div>
+    </div>
+    <div class="mp-subrow" id="mpSubrow">
+      <span class="mp-status" id="mpStatusTxt">等待中…</span>
+    </div>
+    <div class="bub-room-foot">
+      <div id="mpPlayers" class="mp-players"></div>
+    </div>
+  </div>
+
+  <!-- ====== 單機的那一列 ====== -->
+  <div class="panel bub-room hidden" id="bubSoloBar">
+    <div class="row bub-room-top">
+      <button class="icon-btn mp-leave-btn" id="bubSoloExit" title="離開" aria-label="離開">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="label bub-room-title">單機 <b id="bubSoloMode" class="display">練習</b><span class="bub-goal" id="bubGoal">無盡</span></span>
+      <span class="mp-goal" id="bubSoloRec" aria-label="紀錄"></span>
+      <button class="icon-btn" id="bubPauseBtn" type="button" title="暫停" aria-label="暫停">⏸</button>
+      <button class="icon-btn bub-helpbtn" id="bubSoloHelpBtn" type="button" title="怎麼操作" aria-label="怎麼操作">?</button>
+      <button class="icon-btn bub-bigbtn" id="bubSoloBig" type="button" title="大畫面" aria-label="大畫面">大</button>
+    </div>
+  </div>
+
+  <!-- ====== 大廳設定 ====== -->
+  <div class="scroll-area bub-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="bubSetup">
+      <div class="subtitle">對戰設定</div>
+      <div class="bub-setup-summary" id="bubSetupSummary" aria-live="polite">K.O. 賽 · 3 分鐘 · 累積排行</div>
+      <details class="bub-setup-help" id="bubSetupHelp">
+        <summary>看玩法示範與攻擊說明</summary>
+      <!-- 展開說明時跑一段電腦自動對打(同方塊對戰 v2.15.3)。⚠ 只在大廳跑,離開就停。 -->
+      <div class="bub-demo" id="bubDemo" aria-hidden="true">
+        <canvas class="bub-demo-cv" id="bubDemoA"></canvas>
+        <div class="bub-demo-mid" id="bubDemoMid"></div>
+        <canvas class="bub-demo-cv" id="bubDemoB"></canvas>
+      </div>
+      <div class="bub-demo-cap">上面是示範:<b>左邊打掉一串</b>,右邊就<b>從頂端被塞一排</b>。</div>
+      <div class="hint" id="bubRuleHint">
+        每個人拿到的<b>開局盤面與泡泡顏色順序完全一樣</b> —— 比的是誰射得準,不是誰運氣好。<br>
+        三個人以上時,你送出的泡泡<b>只會塞給其中一個人</b>;
+        點對手的小盤可以<b>指定只打他</b>,再點一次改回隨機。
+      </div>
+      </details>
+      <!-- ⚠ 每一格底下那條 .bub-fnote 是隨選隨變的白話後果,文案單一真相在 rules.js 的 NOTES -->
+      <div class="field">
+        <span class="field-label">玩法</span>
+        <div class="seg" id="bubModeSegMp" aria-label="玩法">
+          <button class="on" data-mode="ko">💥 K.O. 賽</button>
+          <button data-mode="out">☠️ 淘汰賽</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteMode"></div>
+      </div>
+      <div class="field" id="bubSecsRow">
+        <span class="field-label">一局多久</span>
+        <div class="seg" id="bubSecsSeg" aria-label="一局多久">
+          <button data-secs="120">2 分</button>
+          <button class="on" data-secs="180">3 分</button>
+          <button data-secs="300">5 分</button>
+        </div>
+      </div>
+      <div class="field" id="scoreRow">
+        <span class="field-label" id="scoreLabel">連線計分</span>
+        <div class="seg" id="scoreSeg">
+          <button class="on" data-score="rank">🏆 累積排行</button>
+          <button data-score="match">🎯 搶勝</button>
+        </div>
+        <div class="score-extra hidden" id="scoreExtra">
+          <div class="wg-group hidden" id="wgGroup">
+            <span class="wg-lbl">先到</span>
+            <div class="wg-stepper">
+              <button class="mini" id="wgMinus" aria-label="減少目標分數">－</button>
+              <span class="target-val display" id="winGoalVal">3</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標分數">＋</button>
+            </div>
+            <span class="wg-lbl">勝奪冠</span>
+          </div>
+          <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
+          <div class="bub-score-actions"><button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button></div>
+        </div>
+      </div>
+      <details class="bub-setup-more" id="bubSetupMore">
+        <summary>更多規則 <span>開局暖身、攻擊目標、結尾加速</span></summary>
+      <div class="field">
+        <span class="field-label">開局暖身<span class="field-sub">(前幾秒沒有人會被塞)</span></span>
+        <div class="seg" id="bubShieldSeg" aria-label="開局暖身">
+          <button data-shield="0">關</button>
+          <button data-shield="10">10 秒</button>
+          <button class="on" data-shield="20">20 秒</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteShield"></div>
+      </div>
+      <div class="field">
+        <span class="field-label">攻擊目標<span class="field-sub">(三個人以上才有差)</span></span>
+        <div class="seg" id="bubTargetSeg" aria-label="攻擊目標">
+          <button class="on" data-target="rand">🎲 隨機</button>
+          <button data-target="high">👑 打第一名</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteTarget"></div>
+      </div>
+      <div class="field" id="bubRushRow">
+        <span class="field-label">最後 30 秒<span class="field-sub">(結尾加速)</span></span>
+        <div class="seg" id="bubRushSeg" aria-label="最後 30 秒加倍">
+          <button class="on" data-rush="0">一般</button>
+          <button data-rush="1">⏱️ 攻擊加倍</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteRush"></div>
+      </div>
+      </details>
+    </section>
+  </div>
+
+  <!-- ====== 對局畫面 ======
+       ⚠⚠ .bub-stage 一律 overflow:hidden —— 它正是 BUBB.fitBoard() 量的那個容器,
+          任何會讓它長出捲軸的東西都會讓盤面**自己震盪**(跳棋 / 飛行棋 / 麻將 / 方塊已經四次)。
+       ⚠ 瞄準的輸入區是整個 #bubPlay(手指在盤面外面拖才看得到盤面,board.js 紅線 ④)。 -->
+  <div class="bub-play hidden" id="bubPlay">
+    <canvas class="bub-fx" id="bubFx" aria-hidden="true"></canvas>
+    <!-- 現場播報。⚠ 絕對定位 + pointer-events:none,**不可以放進 .bub-stage**(同方塊對戰紅線 ⑬) -->
+    <div class="bub-cast" id="bubCast" aria-live="polite" aria-atomic="true"></div>
+    <!-- HUD:舞台的**兄弟**,高度 CSS 固定(同方塊對戰紅線 ⑮) -->
+    <div class="bub-hud">
+      <div class="bub-stats">
+        <div class="bub-stat"><span>打掉</span><b id="bubStatPop">0</b></div>
+        <div class="bub-stat"><span>時間</span><b id="bubStatTime">0.0 秒</b></div>
+        <div class="bub-stat"><span>階</span><b id="bubStatLv">1</b></div>
+        <div class="bub-stat bub-stat-tgt hidden" id="bubStatTgtBox"><span>目標</span><b id="bubStatTgt">隨機</b></div>
+      </div>
+    </div>
+    <div class="bub-stage" id="bubStage">
+      <div class="bub-wrap" id="bubWrap">
+        <div class="bub-gauge" id="bubGauge" aria-hidden="true"><span class="bub-gauge-num" id="bubGaugeNum"></span><i class="bub-gauge-fill" id="bubGaugeFill"></i></div>
+        <canvas class="bub-main" id="bubMain" aria-label="遊戲盤面"></canvas>
+      </div>
+      <div class="bub-paused hidden" id="bubPaused">已暫停</div>
+      <!-- 對手的小盤(1~3 個)。⚠ 裡面的每一格都由 board.js 的 setFoes() 自己建 -->
+      <div class="bub-foes hidden" id="bubFoes"></div>
+    </div>
+  </div>
+
+  <!-- ====== 主要動作列 ====== -->
+  <div class="primary-bar hidden" id="primaryBar">
+    <div class="action-hint hidden" id="actionHint"></div>
+    <div class="actions" id="primaryActions">
+      <button class="btn primary hidden" id="mpReadyBtn">準備好了</button>
+    </div>
+  </div>
+
+  <!-- ====== 結果卡 ====== -->
+  <div class="veil" id="veil">
+    <div class="win-card bub-win" id="bubWinCard">
+      <div class="word display" id="winWord">本局結束</div>
+      <p id="winMsg"></p>
+      <div class="bub-result hidden" id="bubResult"></div>
+      <div class="win-champ hidden" id="winChamp"></div>
+      <div class="win-scores hidden" id="winScores"></div>
+      <div class="bub-react-row" id="bubReactRow">
+        <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
+        <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
+        <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
+        <button class="gmk-react" type="button" data-em="🤝" aria-label="送出 握手">🤝</button>
+        <button class="gmk-react more" type="button" id="winEmoteBtn" title="更多表情 / 一句話 / 語音" aria-label="開啟互動表情面板">😀</button>
+      </div>
+      <div class="actions" id="mpWinBtns">
+        <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
+        <button class="btn primary" id="mpAgain">下一局</button>
+        <button class="btn ghost" id="mpLeaveWin">離開房間</button>
+      </div>
+      <div class="actions" id="soloWinBtns">
+        <button class="btn primary" id="bubSoloAgain">再來一局</button>
+        <button class="btn ghost" id="bubSoloHome">回選單</button>
+      </div>
+      <button class="peek-link" id="winPeek">先看看盤面 👀</button>
+    </div>
+  </div>
+  <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
+
+  <!-- ====== 設定 ====== -->
+  <div class="veil" id="setVeil">
+    <div class="set-card">
+      <div class="set-head">設定</div>
+      <div class="set-body" id="setBody">
+        <div class="set-group">
+          <div class="set-group-title">外觀</div>
+          <div class="set-row">
+            <span class="set-lbl">主題</span>
+            <div class="swatches" id="swatches"></div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">聲音與震動</div>
+          <div class="set-row">
+            <span class="set-lbl">遊戲音效</span>
+            <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="開啟音效"><span class="knob"></span></button>
+          </div>
+          <div class="set-row" id="sfxVolRow">
+            <span class="set-lbl">音量</span>
+            <input class="rng" id="sfxVol" type="range" min="0" max="100" value="100" aria-label="音效音量(含勝敗音效)">
+          </div>
+          <div class="set-row" id="vibrateRow">
+            <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
+            <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
+          </div>
+          <div class="set-row">
+            <span class="set-lbl">背景音樂</span>
+            <button class="switch" id="swBgm" role="switch" aria-checked="false" aria-label="開啟背景音樂"><span class="knob"></span></button>
+          </div>
+          <div class="set-row" id="bgmTrackRow">
+            <span class="set-lbl">曲目</span>
+            <select class="set-select" id="bgmTrackSel" aria-label="背景音樂曲目"></select>
+          </div>
+          <div class="set-row" id="bgmVolRow">
+            <span class="set-lbl">音量</span>
+            <input class="rng" id="bgmVol" type="range" min="0" max="100" value="35" aria-label="背景音樂音量">
+          </div>
+        </div>
+
+        <details class="set-group bub-voice-group">
+          <summary class="set-group-title">連線語音 <span>音量與我的語音</span></summary>
+          <div class="set-row">
+            <span class="set-lbl">收到語音音量</span>
+            <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
+          </div>
+          <div class="set-row">
+            <span class="set-lbl">我的語音<span class="set-sub">(自己錄 · 連線可送)</span></span>
+            <button class="btn ghost mvc-open" id="myVoiceBtn" type="button">編輯</button>
+          </div>
+        </details>
+      </div>
+      <button class="btn primary" id="setClose">完成</button>
+      <div class="set-foot">泡泡對戰 · <span id="setVer"></span> · 開發者 Michael Ho</div>
+    </div>
+  </div>
+
+  <!-- ====== 表情 / 語音 ====== -->
+  <div class="veil" id="emoteVeil">
+    <div class="set-card emote-card">
+      <button class="card-x" id="emoteClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head" id="emoteHead">傳給全部人</div>
+      <div class="emote-to" id="emoteTo"></div>
+      <div class="emote-grid" id="emoteGrid"></div>
+      <div class="emote-sub">💬 一句話</div>
+      <div class="emote-phrases" id="emotePhrases"></div>
+      <div class="emote-sub">🔊 語音短訊</div>
+      <div class="emote-phrases" id="emoteClips"></div>
+      <div class="emote-sub hidden" id="myClipsSub">⭐ 我的語音</div>
+      <div class="emote-phrases hidden" id="emoteMyClips"></div>
+      <div class="emote-sub">🎤 語音留言</div>
+      <button class="emote-rec" id="quickVoiceBtn" type="button" title="錄一段語音送出(最多 6 秒)" aria-label="錄一段語音送出">
+        <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">錄一段話送出(6 秒)</span>
+      </button>
+      <div class="emote-input">
+        <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
+        <button class="btn" id="emoteSend" type="button">送出</button>
+      </div>
+    </div>
+  </div>
+  <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
+
+  <div class="veil" id="myVoiceVeil">
+    <div class="set-card mvc-card">
+      <button class="card-x" id="mvClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">我的語音</div>
+      <div class="mvc-hint">自己錄 3 秒短語音,連線時可在互動面板當按鈕送給別人。<b>只存在這台裝置</b>,換裝置不會跟著走。</div>
+      <div class="mvc-list" id="mvList"></div>
+      <div class="mvc-save hidden" id="mvSaveRow">
+        <input id="mvName" type="text" maxlength="8" placeholder="取個名字…" autocomplete="off" enterkeyhint="done">
+        <button class="btn primary" id="mvSave" type="button">儲存</button>
+      </div>
+      <button class="btn mvc-rec" id="mvRecBtn" type="button">🎤 錄一段新的(3 秒)</button>
+      <div class="mvc-foot"><span id="mvCount">0 / 6</span></div>
+    </div>
+  </div>
+
+  <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
+
+  <!-- ====== 操作說明(房間框那顆「?」打開)======
+       ⚠ 內容與進場頁那一張是**同一份**(main.js 的 bubGestHtml() 注入兩處)。
+       ⚠⚠ 新增蓋板要登記兩個地方:js/shared/ui-kit.js 的 BACK_LAYERS(雙胞胎,js/game.js 也有一份)
+          與 js/bubble/main.js 的 BUB_VEILS(漏了的話單機在看說明時泡泡照樣飛)。 -->
+  <div class="veil" id="bubGuideVeil">
+    <div class="set-card">
+      <button class="card-x" id="bubGuideClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">怎麼操作</div>
+      <div id="bubGuideBody"></div>
+    </div>
+  </div>
+
+  <div class="veil" id="leaveVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">🚪</div>
+      <div class="confirm-title" id="leaveTitle">離開房間?</div>
+      <p id="leaveMsg">確定要離開這個房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="leaveCancel">留在房間</button>
+        <button class="btn danger" id="leaveConfirm">離開房間</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="veil" id="kickVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">⚠️</div>
+      <div class="confirm-title">移出玩家?</div>
+      <p id="kickMsg">確定要把這位玩家移出房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="kickCancel">取消</button>
+        <button class="btn danger" id="kickConfirm">移出房間</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas class="confetti" id="confetti"></canvas>
+
+<script>
+/* ============================================================
+   與其他十五個遊戲同一個 Firebase 專案,但資料放在獨立的頂層節點 bubble_rooms / bubble_index。
+   ⚠ 需在資料庫規則開放那兩段(要自己去 Console 貼)—— 整份規則在 notes/firebase-rules.json。
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBVBN3hRMSFq7KwWmyf3IR01Y82XmfhLQ0",
+  authDomain: "bingo-82e51.firebaseapp.com",
+  databaseURL: "https://bingo-82e51-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bingo-82e51",
+  storageBucket: "bingo-82e51.firebasestorage.app",
+  messagingSenderId: "954833280596",
+  appId: "1:954833280596:web:29c1d2aa434f62db91d7c1"
+};
+</script>
+
+<!-- 載入順序固定:feedback(錯誤緩衝要最先掛)→ audio → ui-kit(定義 $)→ talk(要在連線核心之前)
+     → qr → mp-core → rules(純函式)→ ai(只相依 rules)→ board → solo → adapter → main(必須最後) -->
+<script src="js/shared/feedback.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/shared/ui-kit.js"></script>
+<script src="js/shared/talk.js"></script>
+<script src="js/shared/qr.js"></script>
+<script src="js/shared/mp-core.js"></script>
+<script src="js/bubble/rules.js"></script>
+<script src="js/bubble/ai.js"></script>
+<script src="js/bubble/board.js"></script>
+<script src="js/bubble/solo.js"></script>
+<script src="js/bubble/adapter.js"></script>
+<script src="js/bubble/main.js"></script>
+</body>
+</html>

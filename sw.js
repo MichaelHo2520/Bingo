@@ -159,6 +159,16 @@ const CORE = [
   "./js/blocks/adapter.js",
   "./js/blocks/main.js",
   "./img/blk-icon.png",
+  /* 泡泡對戰(第十六個遊戲)。★ 同方塊對戰:共用 js/shared/* 上面已經列過,不新增任何 mp3
+     (射出 / 反彈 / 消除的聲音全是 Sound.tone() 的合成音)。 */
+  "./bubble.html",
+  "./js/bubble/rules.js",
+  "./js/bubble/ai.js",
+  "./js/bubble/board.js",
+  "./js/bubble/solo.js",
+  "./js/bubble/adapter.js",
+  "./js/bubble/main.js",
+  "./img/bub-icon.png",
   "./tiaoqi.html",
   "./js/tiaoqi/rules.js",
   "./js/tiaoqi/ai.js",

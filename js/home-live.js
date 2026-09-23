@@ -152,7 +152,14 @@ const HomeLive = (function(){
          那兩段禁區(CLAUDE.md 紅線 8)。
        ⚠ **不帶 joinMid** —— 一局就是一局,對戰中不給加入。
          但**可以觀戰**:那一條走的是 adapter 的 spectate 旗標,與 joinable() 無關。 */
-    { key:"blocks", index:"blocks_index", rooms:"blocks_rooms", name:"方塊對戰", icon:"⬛", badge:"hlBadgeBlocks", max:4, href:"blocks.html" }
+    { key:"blocks", index:"blocks_index", rooms:"blocks_rooms", name:"方塊對戰", icon:"⬛", badge:"hlBadgeBlocks", max:4, href:"blocks.html" },
+    /* ★ 第十六個遊戲:泡泡對戰。max 必須與 js/bubble/adapter.js 的 maxPlayers 一致(**4**)。
+       ⚠ key / index / rooms 用 bubble,CSS 前綴與圖檔用 bub(同方塊對戰 blocks / blk 的分法);
+         key 仍然必須等於 index 去掉 "_index";index.html 那張卡的 data-gk 是 "bubble"。
+       ⚠ icon 用 🔮(U+1F52E 水晶球)—— 長得最像一顆泡泡,而且與另外十五個都不撞。
+         **不用 🫧**(U+1FAE7,Unicode 14):舊 Android / Windows 10 沒有這個字形,會變豆腐方框。
+       ⚠ **不帶 joinMid**(一局就是一局),但可以觀戰(adapter 的 spectate 旗標)。 */
+    { key:"bubble", index:"bubble_index", rooms:"bubble_rooms", name:"泡泡對戰", icon:"🔮", badge:"hlBadgeBubble", max:4, href:"bubble.html" }
   ];
 
   /* ==========================================================================

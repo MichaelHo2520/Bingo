@@ -790,6 +790,9 @@
                       ⚠ 回呼刻意**自足**(直接移 class),不叫任何函式:
                         closeBlkGuide() 只定義在 js/blocks/main.js 裡,而這個陣列是雙胞胎。 */
                    ["blkGuideVeil",()=>{const el=$("blkGuideVeil");if(el)el.classList.remove("show");}],
+                   /* ★ 泡泡對戰的操作說明蓋板(第十六個遊戲)。只有 bubble.html 有這個 id,
+                      理由與回呼的寫法同上一條(closeBubGuide() 只定義在 js/bubble/main.js 裡)。 */
+                   ["bubGuideVeil",()=>{const el=$("bubGuideVeil");if(el)el.classList.remove("show");}],
                    /* ★ 房間分享的 QR 蓋板(js/shared/qr.js 自己建的,十四頁都有)。
                       ⚠ 一定要排在 leaveVeil **前面**:兩者都可能開著,而先關的應該是
                         比較輕的那一層 —— 反過來的話「看著 QR 按返回」會直接跳離開確認。
@@ -860,7 +863,7 @@
        理由與症狀寫在 ui-kit 那一份的註解裡,守門是 tools/test-registry.js 的 1-5 節。
      ⚠ 順序有講究:**mahjong16 一定要排在 mahjong 前面**(後者是前者的子字串)。 */
   const FS_PAGES=["mahjong16","mahjong","gomoku","sudoku","sevens","big2","blackjack",
-                  "uno","darkchess","chengyu","draw","flychess","tiaoqi","blocks"];
+                  "uno","darkchess","chengyu","draw","flychess","tiaoqi","blocks","bubble"];
   function fsPageKey(){
     const f=(location.pathname.split("/").pop()||"").toLowerCase();
     for(let i=0;i<FS_PAGES.length;i++) if(f.indexOf(FS_PAGES[i])>=0) return FS_PAGES[i];
