@@ -51,6 +51,8 @@ const BUBB = (function(){
   let cvMain, ctxM;
   let guideCache = null;
   const bubbleSprites = new Map();
+  const foeSprites = new Map();
+  let foeSpriteFd = 0;
   let inkCol = "rgba(255,255,255,.9)";
   let lineCol = "rgba(255,255,255,.14)";
 
@@ -119,7 +121,7 @@ const BUBB = (function(){
       foeOver = restW < FOE_MIN;
       foeW = foeOver ? FOE_OVER : Math.min(FOE_MAX, Math.floor(restW));
     }
-    if(D !== prevD || dpr !== prevDpr) bubbleSprites.clear();
+    if(D !== prevD || dpr !== prevDpr){ bubbleSprites.clear(); foeSprites.clear(); }
     if(elFoes){
       elFoes.classList.toggle("bub-foes-over", foeOver);
       elFoes.style.width = foeW ? (foeW + "px") : "";
@@ -147,29 +149,53 @@ const BUBB = (function(){
   /* ==========================================================================
      五、畫一顆泡泡
      ──────────────────────────────────────────────────────────────────────────
-       放射漸層 + 左上高光 + 形狀記號。記號是色弱也分得出來的保險(紅線 ⑦),
-       ⚠ 透明度壓低、不搶顏色 —— 它是輔助,主角仍然是顏色。
+       玻璃球的暗邊、透光內核、弧形反射與兩處鏡面高光。
+       形狀記號仍是色弱辨識的保險(紅線 ⑦)。靜止球會預先快取成 sprite。
      ========================================================================== */
   function bubble(ctx, px, py, d, c, o){
     o = o || {};
     const r = d * 0.47;
     const col = colOf(c);
-    if(o.alpha !== undefined) ctx.globalAlpha = o.alpha;
+    ctx.save();
+    if(o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
     if(o.glow){ ctx.shadowColor = col; ctx.shadowBlur = Math.max(6, d * 0.45); }
-    const g = ctx.createRadialGradient(px - r * 0.35, py - r * 0.4, r * 0.1, px, py, r);
-    g.addColorStop(0, shade(col, 0.55));
-    g.addColorStop(0.55, col);
-    g.addColorStop(1, shade(col, -0.32));
-    ctx.fillStyle = g;
+    // 細暗邊把相鄰的同色球分開，內核在上方受光、下方收暗。
+    ctx.fillStyle = shade(col, -0.58);
     ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
-    // 高光
-    ctx.fillStyle = "rgba(255,255,255,.42)";
-    ctx.beginPath(); ctx.ellipse(px - r * 0.34, py - r * 0.42, r * 0.28, r * 0.17, -0.6, 0, Math.PI * 2); ctx.fill();
+    const core = ctx.createRadialGradient(px - r * 0.32, py - r * 0.4, r * 0.04, px + r * 0.13, py + r * 0.18, r * 1.05);
+    core.addColorStop(0, shade(col, 0.74));
+    core.addColorStop(0.32, shade(col, 0.32));
+    core.addColorStop(0.68, col);
+    core.addColorStop(0.9, shade(col, -0.18));
+    core.addColorStop(1, shade(col, -0.47));
+    ctx.fillStyle = core;
+    ctx.beginPath(); ctx.arc(px, py, r * 0.94, 0, Math.PI * 2); ctx.fill();
+    // 球殼反射以短弧呈現，留出下緣暗部，避免變成一圈白色描邊。
+    if(d >= 12){
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(255,255,255,.73)";
+      ctx.lineWidth = Math.max(0.8, d * 0.045);
+      ctx.beginPath(); ctx.arc(px, py, r * 0.83, 2.98, 4.94); ctx.stroke();
+      ctx.strokeStyle = "rgba(255,255,255,.27)";
+      ctx.lineWidth = Math.max(0.6, d * 0.025);
+      ctx.beginPath(); ctx.arc(px, py, r * 0.83, 5.44, 6.08); ctx.stroke();
+      ctx.beginPath(); ctx.arc(px, py, r * 0.85, 0.48, 1.62); ctx.stroke();
+    }
+    const glint = ctx.createRadialGradient(px - r * 0.29, py - r * 0.49, 0, px - r * 0.29, py - r * 0.49, r * 0.42);
+    glint.addColorStop(0, "rgba(255,255,255,.9)");
+    glint.addColorStop(0.42, "rgba(255,255,255,.5)");
+    glint.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = glint;
+    ctx.beginPath(); ctx.ellipse(px - r * 0.29, py - r * 0.49, r * 0.43, r * 0.28, -0.45, 0, Math.PI * 2); ctx.fill();
+    if(d >= 20){
+      ctx.fillStyle = "rgba(255,255,255,.65)";
+      ctx.beginPath(); ctx.ellipse(px + r * 0.57, py + r * 0.36, r * 0.08, r * 0.15, -0.55, 0, Math.PI * 2); ctx.fill();
+    }
     if(d >= 14) mark(ctx, px, py, r * 0.36, c);
-    ctx.globalAlpha = 1;
+    ctx.restore();
   }
-  /* 靜止珠子每幀最多數十顆；六色各畫一次後重用，保留原本漸層與記號。 */
+  /* 靜止珠子每幀最多數十顆；六色各畫一次後重用，避免重算球殼漸層。 */
   function boardBubble(px, py, c){
     let sprite = bubbleSprites.get(c);
     if(!sprite){
@@ -181,6 +207,21 @@ const BUBB = (function(){
       bubbleSprites.set(c, sprite);
     }
     ctxM.drawImage(sprite, px - D / 2, py - D / 2, D, D);
+  }
+  function foeBubble(ctx, px, py, fd, c){
+    const key = fd + ":" + dpr + ":" + c;
+    let sprite = foeSprites.get(key);
+    if(!sprite){
+      sprite = document.createElement("canvas");
+      sprite.width = sprite.height = Math.ceil(fd * dpr);
+      const sc = sprite.getContext("2d");
+      sc.setTransform(sprite.width / fd, 0, 0, sprite.height / fd, 0, 0);
+      bubble(sc, fd / 2, fd / 2, fd, c);
+      foeSprites.set(key, sprite);
+    }
+    ctx.drawImage(sprite, px - fd / 2, py - fd / 2, fd, fd);
+    // 小盤尺寸不足以容納主盤的記號，放大記號保留色弱辨識。
+    if(fd >= 6 && fd < 14) mark(ctx, px, py, Math.max(1.5, fd * 0.18), c, true);
   }
   function mark(ctx, x, y, s, c, strong){
     ctx.save();
@@ -434,6 +475,7 @@ const BUBB = (function(){
     const byH = (availH / (spec ? 1 : n) - 16) / R.H;
     const byW = w / R.COLS;
     const fd = Math.max(3, Math.floor(Math.min(byW, byH) * 2) / 2);
+    if(fd !== foeSpriteFd){ foeSprites.clear(); foeSpriteFd = fd; }
     foeEls.forEach(e => sizeCanvas(e.cv, e.ctx, Math.round(fd * R.COLS), Math.round(fd * R.H)));
   }
   function drawFoes(){
@@ -459,23 +501,18 @@ const BUBB = (function(){
           for(let x = 0; x < R.COLS; x++){
             const v = b[y][x];
             if(!v) continue;
-            e.ctx.fillStyle = colOf(v);
-            e.ctx.beginPath();
-            e.ctx.arc(R.cx(par, x, y) * fd, R.cy(y) * fd, fd * 0.44, 0, Math.PI * 2);
-            e.ctx.fill();
-            if(fd >= 6) mark(e.ctx, R.cx(par, x, y) * fd, R.cy(y) * fd,
-                             Math.max(1.5, fd * 0.18), v, true);
+            foeBubble(e.ctx, R.cx(par, x, y) * fd, R.cy(y) * fd, fd, v);
           }
       }
       /* 單機直接讀本機飛行狀態；連線讀約 110ms 一次的飛行快照。 */
       const shot = f.st ? f.st.shot : f.shot;
       if(shot && !dead){
         const sx = shot.x * fd, sy = shot.y * fd;
-        e.ctx.fillStyle = colOf(shot.c);
+        foeBubble(e.ctx, sx, sy, fd, shot.c);
         e.ctx.strokeStyle = "rgba(255,255,255,.85)";
         e.ctx.lineWidth = Math.max(1, fd * 0.13);
         e.ctx.beginPath(); e.ctx.arc(sx, sy, Math.max(2, fd * 0.47), 0, Math.PI * 2);
-        e.ctx.fill(); e.ctx.stroke();
+        e.ctx.stroke();
       }
       if(f.fx && f.fx.t < 230 && !reduced()){
         const k = f.fx.t / 230;
@@ -505,7 +542,7 @@ const BUBB = (function(){
         e.ctx.lineWidth = Math.max(1, fd * 0.14);
         e.ctx.beginPath(); e.ctx.moveTo(lx, ly);
         e.ctx.lineTo(lx + Math.sin(aimA) * fd * 1.6, ly - Math.cos(aimA) * fd * 1.6); e.ctx.stroke();
-        if(cur){ e.ctx.fillStyle = colOf(cur); e.ctx.beginPath(); e.ctx.arc(lx, ly, fd * 0.44, 0, Math.PI * 2); e.ctx.fill(); }
+        if(cur) foeBubble(e.ctx, lx, ly, fd, cur);
       }
       if(pend > 0){
         e.ctx.fillStyle = "#ff5d6c";
