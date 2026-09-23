@@ -23,6 +23,11 @@ const Solo = (function(){
   const RUSH_MS = 30000;
   const STREAK_MS = 12000;
   const STREAK_WORD = ["", "", "雙殺!", "三殺!", "四殺!!", "大殺特殺!!!"];
+  /* ★ 對電腦開局先倒數 3 秒(2026-09-23,使用者裁示:練習維持按了就開始)。
+     ⚠ 倒數扣的是 onFrame 的 dt,**不是**牆上時鐘 —— 暫停與蓋板都會停掉 onFrame,
+       倒數才會跟著停;用 performance.now() 算的話關掉蓋板時倒數早就跑完了。
+     CD_TAIL = 歸零之後再扣多久(盤面上的「開始!」要靠負數畫完,board.js CD_GO_MS 是 650)。 */
+  const CD_MS = 3000, CD_TAIL = 1000;
 
   /* 強度 band → 名單。⚠ 天花板原則:只能往下配(同方塊對戰使用者裁示) */
   const MIX = {
@@ -40,7 +45,7 @@ const Solo = (function(){
 
   let st = null, me = null, foes = [];
   let on = false, paused = false, ended = false;
-  let took = 0, hudT = 0;
+  let took = 0, hudT = 0, cdLeft = 0;
   let clock = 0, endMs = 0, rushOn = false;
   let lockTarget = null, streak = null, winnerId = "", foeVsFoe = 0;
 
@@ -122,7 +127,9 @@ const Solo = (function(){
     }
     on = true; paused = false; ended = false;
     took = 0; hudT = 0;
+    cdLeft = (mode === "vs") ? CD_MS : 0;
     BUBB.setState(st);
+    if(cdLeft > 0) BUBB.countdown(() => cdLeft);     // ⚠ 要在 setState 之後(setState 會清掉倒數)
     BUBB.play();
     showScreen("solo");
     paintBar();
@@ -186,6 +193,11 @@ const Solo = (function(){
      ⚠ 電腦的 tick 也要走 —— 只推 AI 不 tick 的話它射出去的泡泡永遠不會落地。 */
   function onFrame(dt){
     if(!on || ended || paused) return;
+    if(cdLeft > -CD_TAIL){
+      const was = cdLeft;
+      cdLeft -= dt;
+      if(was > 0) return;                          // 倒數中:電腦不動、時鐘不走(自己的盤面由 counting() 擋)
+    }
     hudT += dt;
     if(hudT >= 250){ hudT = 0; paintHud(); }       // ⚠ 一定要在「有沒有電腦」之前(方塊對戰踩過)
     if(mode !== "vs" || !foes.length) return;
@@ -443,6 +455,7 @@ const Solo = (function(){
     playing: () => on && !ended,
     active: () => on,
     paused: () => paused,
+    counting: () => on && cdLeft > 0,
     state: () => st
   };
 })();

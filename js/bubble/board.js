@@ -198,51 +198,85 @@ const BUBB = (function(){
   /* ==========================================================================
      五、畫一顆泡泡
      ──────────────────────────────────────────────────────────────────────────
-       玻璃球的暗邊、透光內核、弧形反射與兩處鏡面高光。
-       形狀記號仍是色弱辨識的保險(紅線 ⑦)。靜止球會預先快取成 sprite。
+       細深邊 → 飽和本體(左上受光、右下收暗)→ 下緣有色回光 → 右下邊光 →
+       邊緣銳利的窗光 + 小亮點 → 深色刻印的形狀記號(紅線 ⑦:色弱辨識的保險)。
+       ★★ 2026-09-23 去霧(使用者:「珠子看起來霧霧的」)。上一版霧的三個來源,都不要再加回來:
+         ① 本體左上三分之一混了 74% → 32% 的白 —— 混白 = 降彩度,整顆像蒙了一層粉
+         ② 形狀記號是 55% 的半透明白,蓋在正中央 —— 乳白貼紙
+         ③ 高光是一團柔焦的放射漸層(0.9 → 0.5 → 0)—— 亮面糊成一片就讀成「霧面」
+         透明感改由「下緣回光」給:它用的是**亮一點的本色**,不是白。
+       靜止球會預先快取成 sprite(見 blit())。
      ========================================================================== */
   function bubble(ctx, px, py, d, c, o){
     o = o || {};
-    const r = d * 0.47;
+    const r = d * 0.47, ri = r * 0.93;
     const col = colOf(c);
     ctx.save();
     if(o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
     if(o.glow){ ctx.shadowColor = col; ctx.shadowBlur = Math.max(6, d * 0.45); }
-    // 細暗邊把相鄰的同色球分開，內核在上方受光、下方收暗。
-    ctx.fillStyle = shade(col, -0.58);
+    // 細深邊:相鄰的同色球靠它分開
+    ctx.fillStyle = shade(col, -0.64);
     ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
     ctx.shadowBlur = 0;
-    const core = ctx.createRadialGradient(px - r * 0.32, py - r * 0.4, r * 0.04, px + r * 0.13, py + r * 0.18, r * 1.05);
-    core.addColorStop(0, shade(col, 0.74));
-    core.addColorStop(0.32, shade(col, 0.32));
-    core.addColorStop(0.68, col);
-    core.addColorStop(0.9, shade(col, -0.18));
-    core.addColorStop(1, shade(col, -0.47));
-    ctx.fillStyle = core;
-    ctx.beginPath(); ctx.arc(px, py, r * 0.94, 0, Math.PI * 2); ctx.fill();
-    // 球殼反射以短弧呈現，留出下緣暗部，避免變成一圈白色描邊。
-    if(d >= 12){
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "rgba(255,255,255,.73)";
-      ctx.lineWidth = Math.max(0.8, d * 0.045);
-      ctx.beginPath(); ctx.arc(px, py, r * 0.83, 2.98, 4.94); ctx.stroke();
-      ctx.strokeStyle = "rgba(255,255,255,.27)";
-      ctx.lineWidth = Math.max(0.6, d * 0.025);
-      ctx.beginPath(); ctx.arc(px, py, r * 0.83, 5.44, 6.08); ctx.stroke();
-      ctx.beginPath(); ctx.arc(px, py, r * 0.85, 0.48, 1.62); ctx.stroke();
-    }
-    const glint = ctx.createRadialGradient(px - r * 0.29, py - r * 0.49, 0, px - r * 0.29, py - r * 0.49, r * 0.42);
-    glint.addColorStop(0, "rgba(255,255,255,.9)");
-    glint.addColorStop(0.42, "rgba(255,255,255,.5)");
-    glint.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = glint;
-    ctx.beginPath(); ctx.ellipse(px - r * 0.29, py - r * 0.49, r * 0.43, r * 0.28, -0.45, 0, Math.PI * 2); ctx.fill();
-    if(d >= 20){
-      ctx.fillStyle = "rgba(255,255,255,.65)";
-      ctx.beginPath(); ctx.ellipse(px + r * 0.57, py + r * 0.36, r * 0.08, r * 0.15, -0.55, 0, Math.PI * 2); ctx.fill();
-    }
-    if(d >= 14) mark(ctx, px, py, r * 0.36, c);
+    // 本體:白只佔受光點那一小塊,中段就是飽和的本色
+    const body = ctx.createRadialGradient(px - r * 0.28, py - r * 0.34, 0, px - r * 0.08, py - r * 0.1, r * 1.1);
+    body.addColorStop(0, shade(col, 0.30));
+    body.addColorStop(0.3, shade(col, 0.06));
+    body.addColorStop(0.58, col);
+    body.addColorStop(0.84, shade(col, -0.28));
+    body.addColorStop(1, shade(col, -0.55));
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.arc(px, py, ri, 0, Math.PI * 2); ctx.fill();
+    // 下緣回光:光穿過球從底下透出來(透明感從這裡來,不靠混白)
+    ctx.save();
+    ctx.beginPath(); ctx.arc(px, py, ri, 0, Math.PI * 2); ctx.clip();
+    const bounce = ctx.createRadialGradient(px + r * 0.18, py + r * 0.9, 0, px + r * 0.18, py + r * 0.9, r * 0.62);
+    bounce.addColorStop(0, shade(col, 0.5));
+    bounce.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.globalAlpha *= 0.4;
+    ctx.fillStyle = bounce;
+    ctx.fillRect(px - r, py, r * 2, r);
     ctx.restore();
+    // 右下邊光(亮一點的本色,不是白 —— 白的一圈會變成描邊)
+    if(d >= 12){
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.globalAlpha *= 0.7;
+      ctx.strokeStyle = shade(col, 0.55);
+      ctx.lineWidth = Math.max(0.8, d * 0.03);
+      ctx.beginPath(); ctx.arc(px, py, r * 0.8, 0.35, 1.25); ctx.stroke();
+      ctx.restore();
+    }
+    // 窗光:邊緣是銳利的(形狀本身不漸層,只有上下的亮度漸層)
+    const hx = px - r * 0.33, hy = py - r * 0.46;
+    const hl = ctx.createLinearGradient(hx, hy - r * 0.22, hx, hy + r * 0.24);
+    hl.addColorStop(0, "rgba(255,255,255,.98)");
+    hl.addColorStop(0.55, "rgba(255,255,255,.62)");
+    hl.addColorStop(1, "rgba(255,255,255,.18)");
+    ctx.fillStyle = hl;
+    ctx.beginPath(); ctx.ellipse(hx, hy, r * 0.38, r * 0.21, -0.58, 0, Math.PI * 2); ctx.fill();
+    if(d >= 16){
+      ctx.fillStyle = "rgba(255,255,255,.92)";
+      ctx.beginPath(); ctx.arc(px + r * 0.12, py - r * 0.66, r * 0.075, 0, Math.PI * 2); ctx.fill();
+    }
+    if(d >= 14) mark(ctx, px, py + r * 0.08, r * 0.34, c);
+    ctx.restore();
+  }
+  /* 快取的 sprite 一律**對齊裝置像素、1:1 貼上**。
+     ⚠ 以前是 drawImage(sprite, x, y, D, D):六角盤的列高是 0.866 顆、天花板又往下推 0.36 顆,
+       落點幾乎都是小數像素 → 每一顆都被雙線性重新取樣一次,邊緣發軟(霧感的第四個來源)。
+     ⚠ 只有「平移 + 等比 dpr」的矩陣才能 1:1;被縮放過的(目前沒有,將來加了也不會錯)退回舊的畫法。 */
+  function blit(ctx, sprite, px, py, d){
+    const m = ctx.getTransform ? ctx.getTransform() : null;
+    if(m && !m.b && !m.c && Math.abs(m.a - dpr) < 1e-6 && Math.abs(m.d - dpr) < 1e-6){
+      const dx = Math.round(m.a * px + m.e - sprite.width / 2);
+      const dy = Math.round(m.d * py + m.f - sprite.height / 2);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(sprite, dx, dy);
+      ctx.setTransform(m);
+    }else{
+      ctx.drawImage(sprite, px - d / 2, py - d / 2, d, d);
+    }
   }
   /* 靜止珠子每幀最多數十顆；六色各畫一次後重用，避免重算球殼漸層。 */
   function boardBubble(px, py, c){
@@ -255,7 +289,7 @@ const BUBB = (function(){
       bubble(sc, D / 2, D / 2, D, c);
       bubbleSprites.set(c, sprite);
     }
-    ctxM.drawImage(sprite, px - D / 2, py - D / 2, D, D);
+    blit(ctxM, sprite, px, py, D);
   }
   function foeBubble(ctx, px, py, fd, c){
     const key = fd + ":" + dpr + ":" + c;
@@ -268,24 +302,36 @@ const BUBB = (function(){
       bubble(sc, fd / 2, fd / 2, fd, c);
       foeSprites.set(key, sprite);
     }
-    ctx.drawImage(sprite, px - fd / 2, py - fd / 2, fd, fd);
+    blit(ctx, sprite, px, py, fd);
     // 小盤尺寸不足以容納主盤的記號，放大記號保留色弱辨識。
     if(fd >= 6 && fd < 14) mark(ctx, px, py, Math.max(1.5, fd * 0.18), c, true);
   }
+  /* 形狀記號:深色刻印(本色壓暗)+ 下方一道淡亮邊,看起來是壓進去的。
+     ⚠ 不可以改回半透明白 —— 那正是「霧霧的」的來源之一(見上面 ②)。
+     ★ strong = 對手小盤那種小尺寸:不畫亮邊(幾個像素的亮邊只會糊成一團),顏色再壓深一點。 */
+  function markPath(ctx, x, y, s, c){
+    ctx.beginPath();
+    if(c === 1){ ctx.arc(x, y, s * 0.55, 0, Math.PI * 2); return true; }
+    if(c === 2){ ctx.moveTo(x, y - s); ctx.lineTo(x + s * 0.9, y + s * 0.6); ctx.lineTo(x - s * 0.9, y + s * 0.6); ctx.closePath(); }
+    else if(c === 3){ ctx.rect(x - s * 0.7, y - s * 0.7, s * 1.4, s * 1.4); }
+    else if(c === 4){ ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); ctx.closePath(); }
+    else if(c === 5){ ctx.moveTo(x - s * 0.8, y - s * 0.8); ctx.lineTo(x + s * 0.8, y + s * 0.8); ctx.moveTo(x + s * 0.8, y - s * 0.8); ctx.lineTo(x - s * 0.8, y + s * 0.8); }
+    else { ctx.arc(x, y, s * 0.8, 0, Math.PI * 2); }
+    return false;
+  }
   function mark(ctx, x, y, s, c, strong){
     ctx.save();
-    ctx.globalAlpha *= strong ? 0.9 : 0.55;
-    ctx.strokeStyle = "rgba(255,255,255,.95)";
-    ctx.fillStyle = "rgba(255,255,255,.95)";
-    ctx.lineWidth = Math.max(1.2, s * 0.32);
+    ctx.lineWidth = Math.max(1.2, s * 0.34);
     ctx.lineJoin = "round"; ctx.lineCap = "round";
-    ctx.beginPath();
-    if(c === 1){ ctx.arc(x, y, s * 0.55, 0, Math.PI * 2); ctx.fill(); }
-    else if(c === 2){ ctx.moveTo(x, y - s); ctx.lineTo(x + s * 0.9, y + s * 0.6); ctx.lineTo(x - s * 0.9, y + s * 0.6); ctx.closePath(); ctx.stroke(); }
-    else if(c === 3){ ctx.rect(x - s * 0.7, y - s * 0.7, s * 1.4, s * 1.4); ctx.stroke(); }
-    else if(c === 4){ ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); ctx.closePath(); ctx.stroke(); }
-    else if(c === 5){ ctx.moveTo(x - s * 0.8, y - s * 0.8); ctx.lineTo(x + s * 0.8, y + s * 0.8); ctx.moveTo(x + s * 0.8, y - s * 0.8); ctx.lineTo(x - s * 0.8, y + s * 0.8); ctx.stroke(); }
-    else { ctx.arc(x, y, s * 0.8, 0, Math.PI * 2); ctx.stroke(); }
+    if(!strong){
+      const off = Math.max(0.5, s * 0.1);
+      ctx.strokeStyle = ctx.fillStyle = "rgba(255,255,255,.35)";
+      if(markPath(ctx, x, y + off, s, c)) ctx.fill(); else ctx.stroke();
+      y -= off * 0.6;
+    }
+    ctx.globalAlpha *= 0.9;
+    ctx.strokeStyle = ctx.fillStyle = shade(colOf(c), strong ? -0.7 : -0.6);
+    if(markPath(ctx, x, y, s, c)) ctx.fill(); else ctx.stroke();
     ctx.restore();
   }
 
@@ -332,6 +378,7 @@ const BUBB = (function(){
     /* ⚠ 天花板畫在泡泡**之後**:插排滑入時,新的那一排看起來是從天花板底下被推出來的 */
     ceiling(W, OY, now);
     ctxM.restore();
+    countdownFx(W, Hh);
     edgeFlash(W, Hh);
     drawFoes();
     drawBeams();
@@ -526,6 +573,8 @@ const BUBB = (function(){
   function aimGuide(){
     if(!st || st.dead || !running || st.shot) return;
     if(inp.aiming && inp.cancel) return;
+    /* 倒數中不畫:單機倒數時 running 是 true(擋射擊的是 canPlay),虛線會直直穿過那個大數字 */
+    if(cdFn){ const l = cdFn(); if(typeof l === "number" && l > 0) return; }
     /* 瞄準與盤面沒變時沿用軌跡，避免每幀重跑逐步碰撞檢查。 */
     if(!guideCache || guideCache.board !== st.board || guideCache.par !== st.par ||
        guideCache.shots !== st.shots || guideCache.aim !== st.aim)
@@ -668,6 +717,116 @@ const BUBB = (function(){
     ctxM.restore();
   }
   /* ★ 待處理垃圾以前是左緣一條 DOM 警示條(.bub-gauge)—— 2026-09-23 改畫在天花板上(見 ceiling()) */
+
+  /* ==========================================================================
+     六之一、開局倒數(2026-09-23 重做)
+     ──────────────────────────────────────────────────────────────────────────
+       ★ 以前是把數字塞進「已暫停」那塊 26px 的字(使用者:「不夠明顯漂亮」)。
+         現在畫在盤面上:暗幕 + 大數字彈出 + 一圈環在這一秒內耗完(3 紅 2 黃 1 綠),
+         歸零時「開始!」+ 六色碎片 + 衝擊環,CD_GO_MS 內淡掉(不擋操作)。
+       ★ 畫面**只由「還剩幾毫秒」決定** —— countdown(fn) 收的是一個函式,每一幀問一次:
+         連線給 `startAt - 伺服器時間`(每台讀同一個 startAt → 畫面自然同步),
+         單機給 Solo 自己扣的毫秒數(暫停 / 蓋板時不扣 → 倒數跟著停)。
+         正數 = 還剩多久;負數 = 已經開始多久(「開始!」那一段靠它)。
+       ⚠ 紅線 ②:不用 CSS @keyframes。
+       ⚠ 數字最多是 3:連線的 LEAD_MS 是 3.2 秒,無條件進位的話房主那台會先閃一下「4」。
+       ⚠ 字的光暈另外畫一層,本體不帶 shadow —— 帶著 shadow 填字,邊緣就是糊的(又是霧)。
+     ========================================================================== */
+  const CD_COL = { 3: "#ff5d6c", 2: "#ffd93d", 1: "#3ddc7f" };
+  const CD_GO_MS = 650;
+  const CD_GO_TXT = "開始!";
+  let cdFn = null, cdLast = "";
+  function countdown(fn){ cdFn = (typeof fn === "function") ? fn : null; cdLast = ""; }
+  function cdLabel(left){
+    if(typeof left !== "number" || !isFinite(left)) return "";
+    if(left > 0) return String(Math.min(3, Math.ceil(left / 1000)));
+    return (-left < CD_GO_MS) ? CD_GO_TXT : "";
+  }
+  function easeBack(t){ const k = 1.9; return 1 + (k + 1) * Math.pow(t - 1, 3) + k * Math.pow(t - 1, 2); }
+  function bigText(txt, px, col, stops){
+    ctxM.font = "700 " + Math.round(px) + "px Fredoka, Nunito, system-ui, sans-serif";
+    if(!reduced()){
+      ctxM.save();
+      ctxM.globalAlpha *= 0.55;
+      ctxM.fillStyle = col; ctxM.shadowColor = col; ctxM.shadowBlur = D * 0.9;
+      ctxM.fillText(txt, 0, 0);
+      ctxM.restore();
+    }
+    ctxM.lineWidth = px * 0.1;
+    ctxM.strokeStyle = "rgba(10,6,24,.85)";
+    ctxM.strokeText(txt, 0, 0);
+    const g = ctxM.createLinearGradient(0, -px * 0.45, 0, px * 0.5);
+    stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c));
+    ctxM.fillStyle = g;
+    ctxM.fillText(txt, 0, 0);
+  }
+  function countdownFx(W, H){
+    if(!cdFn) return;
+    const left = cdFn();
+    const lbl = cdLabel(left);
+    if(lbl !== cdLast){
+      if(lbl === CD_GO_TXT) T(880, { type: "triangle", dur: 0.26, vol: 0.2, slideTo: 1320 });
+      else if(lbl) T(lbl === "1" ? 660 : 520, { type: "sine", dur: 0.12, vol: 0.16 });
+      cdLast = lbl;
+    }
+    if(!lbl){ cdFn = null; return; }
+    const rm = reduced();
+    const cx = W / 2, cy = H * 0.55;
+    ctxM.save();
+    ctxM.textAlign = "center"; ctxM.textBaseline = "middle"; ctxM.lineJoin = "round";
+    if(left > 0){
+      const n = +lbl, col = CD_COL[n];
+      const f = clamp(1 - (left - (n - 1) * 1000) / 1000, 0, 1);    // 這一秒過了多少(0 → 1)
+      // 暗幕:盤面退到背景;最後 0.15 秒淡掉,接「開始!」
+      const veil = (n === 1 && f > 0.85) ? (1 - f) / 0.15 : 1;
+      ctxM.globalAlpha = veil;
+      ctxM.fillStyle = "rgba(8,5,20,.5)";
+      ctxM.fillRect(0, 0, W, H);
+      // 環:這一秒還剩多少
+      const R0 = D * 2.35;
+      ctxM.lineCap = "round";
+      ctxM.lineWidth = Math.max(3, D * 0.16);
+      ctxM.strokeStyle = "rgba(255,255,255,.12)";
+      ctxM.beginPath(); ctxM.arc(cx, cy, R0, 0, Math.PI * 2); ctxM.stroke();
+      ctxM.save();
+      ctxM.strokeStyle = col;
+      if(!rm){ ctxM.shadowColor = col; ctxM.shadowBlur = D * 0.5; }
+      ctxM.beginPath(); ctxM.arc(cx, cy, R0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - f)); ctxM.stroke();
+      ctxM.restore();
+      // 字幕
+      ctxM.font = "800 " + Math.max(11, Math.round(D * 0.46)) + "px Fredoka, Nunito, system-ui, sans-serif";
+      ctxM.fillStyle = "rgba(255,255,255,.88)";
+      ctxM.fillText("準備好了嗎?", cx, cy + R0 + D * 0.75);
+      // 數字:彈出(回彈)→ 停住 → 最後 18% 縮小淡出
+      const s = rm ? 1 : (f < 0.24 ? 0.45 + 0.55 * easeBack(f / 0.24) : (f > 0.82 ? 1 - 0.25 * (f - 0.82) / 0.18 : 1));
+      const a = rm ? 1 : (f < 0.1 ? f / 0.1 : (f > 0.82 ? 1 - (f - 0.82) / 0.18 : 1));
+      ctxM.globalAlpha = a * veil;
+      ctxM.translate(cx, cy + D * 0.12);
+      ctxM.scale(s, s);
+      bigText(lbl, D * 3.3, col, [shade(col, 0.55), col, shade(col, -0.3)]);
+    }else{
+      const t = clamp(-left / CD_GO_MS, 0, 1);
+      ctxM.globalAlpha = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45;
+      if(!rm){
+        ctxM.strokeStyle = "rgba(255,255,255,.8)";
+        ctxM.lineWidth = D * 0.12 * (1 - t) + 1;
+        ctxM.beginPath(); ctxM.arc(cx, cy, D * (1.2 + 4.2 * t), 0, Math.PI * 2); ctxM.stroke();
+        const k = 1 - Math.pow(1 - t, 2);
+        for(let i = 0; i < 18; i++){
+          const ang = i / 18 * Math.PI * 2, dist = D * (0.8 + 4.4 * k);
+          ctxM.fillStyle = COL[i % 6];
+          ctxM.beginPath();
+          ctxM.arc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, D * 0.16 * (1 - t) + 1, 0, Math.PI * 2);
+          ctxM.fill();
+        }
+      }
+      const s = rm ? 1 : 0.6 + 0.5 * easeBack(Math.min(1, t / 0.35));
+      ctxM.translate(cx, cy);
+      ctxM.scale(s, s);
+      bigText(lbl, D * 1.9, "#ffb020", ["#fffbe0", "#ffd93d", "#ff9f1a"]);
+    }
+    ctxM.restore();
+  }
 
   /* ==========================================================================
      六之二、對手的小盤(單機電腦與連線走同一條路,同方塊對戰)
@@ -1194,18 +1353,21 @@ const BUBB = (function(){
     fx.sparks.length = 0; fx.floats.length = 0;
     fx.push = null; fx.shake = 0; fx.hit = 0;
     fx.impact = null;
+    countdown(null);                    // ⚠ 新的一局不可以沿用上一局的倒數(要的話 setState 之後再給)
     allUp();
     fitBoard();
   }
   function play(){ running = true; lastT = performance.now(); allUp(); }
   function pause(){ running = false; allUp(); }
-  function stop(){ running = false; allUp(); }
+  function stop(){ running = false; countdown(null); allUp(); }
 
   return {
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,
     act, setAim, incoming, pop, shake,
     setFoes, foeAt, beamOut, beamIn, beamShield, beamFoe, foes: () => foes,
-    cast, clearCast,
+    cast, clearCast, countdown,
+    /* 倒數現在畫的是什麼("3" / "2" / "1" / "開始!" / "")—— 測試用,產品程式不讀它 */
+    cdShown: () => cdLast,
     /* ★ 測試用的出口(產品程式不會呼叫):step(dt) 手動推一幀、frames()、awake()、
        aimPoint(x,y) = 螢幕座標換算成瞄準角(e2e 驗「瞄準 + 發射」那一整條路用) */
     step: frame,

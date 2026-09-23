@@ -268,7 +268,7 @@ BUBB.mount({
     else if(typeof MP !== "undefined") MP.onEvents(evs, st);
   },
   canPlay(){
-    if(Solo.active()) return !Solo.paused() && !bubVeilOpen();
+    if(Solo.active()) return !Solo.paused() && !Solo.counting() && !bubVeilOpen();
     return (typeof MP !== "undefined") ? MP.canPlay() : false;
   },
   onFrame(dt){

@@ -143,6 +143,7 @@ const MP = MPCore.create((function(){
     Object.keys(ackd).forEach(k => delete ackd[k]);
     BUBB.setFoes([]);
     BUBB.clearCast();
+    BUBB.countdown(null);
     const res = $("bubResult");
     if(res){ res.classList.add("hidden"); res.innerHTML = ""; }
     document.body.classList.remove("bub-spec", "bub-rush");
@@ -214,6 +215,10 @@ const MP = MPCore.create((function(){
 
     counting = true; playing = true;
     BUBB.pause();
+    banner("");
+    /* ★ 倒數畫在盤面上(board.js 六之一),畫面只看「離 startAt 還有多久」——
+       這裡只負責時間到了真的開打。⚠ 要排在 setState() 之後(setState 會清掉倒數)。 */
+    BUBB.countdown(() => startAt - nowSrv());
     tickCountdown();
   }
 
@@ -228,8 +233,9 @@ const MP = MPCore.create((function(){
       pubFull(true);
       return;
     }
-    banner(String(Math.max(1, Math.ceil(left / 1000))));
-    setTimeout(tickCountdown, 120);
+    /* 最後一格對準 startAt 醒來 —— 盤面上的「開始!」是在 left 歸零那一幀冒出來的,
+       固定每 120ms 才看一次的話可以晚到 0.1 秒才真的能射 */
+    setTimeout(tickCountdown, Math.max(16, Math.min(120, left)));
   }
 
   /* ==========================================================================
