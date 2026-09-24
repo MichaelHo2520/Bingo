@@ -320,11 +320,13 @@ function syncSoloSeg(){
   set("blkVsShieldSeg", "vsshield", v.shield);
   set("blkVsTargetSeg", "vstarget", v.target);
   set("blkVsRushSeg", "vsrush", v.rush ? "1" : "0");
+  set("blkVsHcSeg", "vshc", v.hc ? "1" : "0");
   /* ★ 文案共用 BLK.NOTES —— 與大廳同一份,單機不另外抄一次(見 rules.js 的 NOTES) */
   note("blkNoteVsMode", BLK.noteOf("mode", v.mode));
   note("blkNoteVsShield", BLK.noteOf("shield", v.shield));
   note("blkNoteVsTarget", BLK.noteOf("target", v.target));
   note("blkNoteVsRush", BLK.noteOf("rush", v.rush));
+  note("blkNoteVsHc", BLK.noteOf("hcSolo", v.hc));
   /* ★★ 「對手」與「強度」這兩格的文案是**算出來的**,不是查表的 ——
      它要回答的是「我選這個會配到誰」,而混搭的名單只有 Solo.lineup() 知道。
      ⚠ 這一行存在的理由與大廳那幾行一樣:欄位名稱本身不帶資訊。 */
@@ -424,6 +426,7 @@ segPick("blkVsShieldSeg", "vsshield", v => Solo.setVs("shield", +v));
 segPick("blkVsTargetSeg", "vstarget", v => Solo.setVs("target", v));
 /* ⚠ rush 在房規裡是布林 —— dataset 拿到的是字串 "0" / "1",不轉的話 "0" 是 truthy。 */
 segPick("blkVsRushSeg", "vsrush", v => Solo.setVs("rush", v === "1"));
+segPick("blkVsHcSeg", "vshc", v => Solo.setVs("hc", v === "1"));
 $("blkStartSolo").addEventListener("click", () => Solo.start());
 
 /* ---------- 單機的列 / 結果卡 ---------- */
@@ -456,6 +459,9 @@ $("reopenWin").addEventListener("click", showResult);
   $("blkTargetSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setTarget(b.dataset.target); });
   /* ⚠ rush 在房規裡是布林 —— dataset 拿到的是字串 "0" / "1",不轉的話 "0" 是 truthy。 */
   $("blkRushSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setRush(b.dataset.rush === "1"); });
+  /* 讓分兩格:上面那格是房規(只有房主按得動),下面那格是每個人自己的(存進本機偏好) */
+  $("blkHcSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setHc(b.dataset.hc === "1"); });
+  $("blkHcMeSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b){ MP.setMyHc(b.dataset.hcme === "1"); savePrefs(); } });
   $("scoreSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setScoreMode(b.dataset.score); });
   $("wgMinus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() - 1));
   $("wgPlus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() + 1));

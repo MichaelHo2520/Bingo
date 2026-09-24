@@ -62,7 +62,9 @@ const Solo = (function(){
   /* 對戰房規 —— **與連線同一組欄位、同一組文案**(BLK.NOTES)。
      ⚠ 預設值刻意跟連線一樣(K.O. 賽 / 3 分 / 暖身 20 秒)—— 使用者要的是
        「像連線那樣的感覺」,預設值不一樣就不是同一個東西了。 */
-  let vs = { mode: "ko", secs: 180, shield: 20, target: "rand", rush: false };
+  /* ★ hc = 「🐣 讓我一點」(rules.js 紅線 ⑤)。單機沒有房主 → 開了就等於「開放 + 我選了」;
+       電腦**永遠不讓分**(讓分是給人用的旋鈕,電腦的強弱在「電腦強度」那一格)。 */
+  let vs = { mode: "ko", secs: 180, shield: 20, target: "rand", rush: false, hc: false };
   let rec = { best: 0, sprint: 0, win: 0, lose: 0 };
 
   let st = null;                        // 我的狀態
@@ -155,9 +157,9 @@ const Solo = (function(){
     /* 練習與 40 行競速沒有對手 → 用「淘汰、不開暖身」;對電腦用**整組房規**。
        ⚠ 規則只有一份,不另做一套「單機規則」。 */
     const rules = (mode === "vs")
-      ? { mode: vs.mode, secs: vs.secs, shield: vs.shield * 1000, combo: true }
+      ? { mode: vs.mode, secs: vs.secs, shield: vs.shield * 1000, combo: true, hc: !!vs.hc }
       : { mode: "out", shield: 0 };
-    st = BLK.blank({ seed: seed, rules: rules });
+    st = BLK.blank({ seed: seed, rules: rules, hc: mode === "vs" && !!vs.hc });
     me = { id: "me", name: "你", st: st, ko: 0, lastBy: "", deadT: 0, got: 0 };
     foes = [];
     clock = 0; endMs = 0; rushOn = false; streak = null; lockTarget = null; winnerId = ""; foeVsFoe = 0;
@@ -329,7 +331,8 @@ const Solo = (function(){
     const t = partOf(toId);
     if(!t) return;
     const hole = Math.floor(Math.random() * BLK.COLS);
-    const accepted = BLK.queueGarbage(t.st, n, hole, fromId);
+    const r = BLK.receive(t.st, n, hole, fromId);    // ★ 讓分在這裡面(rules.js 紅線 ⑤)
+    const accepted = r.got;
     if(accepted > 0){
       t.lastBy = fromId;
       t.got = (t.got || 0) + accepted;           // 被打了幾行(結果卡那一欄)
@@ -345,8 +348,9 @@ const Solo = (function(){
       BLKB.beamOut(j, n, revenge);
       if(revenge) BLKB.pop("反擊 ×2", "#ff5d6c", 0.86);
     }else if(toId === "me" && i >= 0){
-      if(accepted === 0) BLKB.beamShield(i, nameOf(fromId));
-      else BLKB.beamIn(i, accepted, nameOf(fromId));
+      if(accepted > 0) BLKB.beamIn(i, accepted, nameOf(fromId));
+      else if(!r.cut) BLKB.beamShield(i, nameOf(fromId));
+      if(r.cut) BLKB.pop("🐣 −" + r.cut + " 行", "#48dbfb", 0.7);
     }else if(i >= 0 && j >= 0){
       BLKB.beamFoe(i, j, n);
     }

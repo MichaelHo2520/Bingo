@@ -11,7 +11,7 @@
      • SRS wall kick(官方表逐項照抄,I 與其他分表,O 不轉)
      • 決定性 7-bag:pieceAt(seed, i) 是**查詢函式**,不是產生器
      • 移動 / 旋轉 / 軟降 / 硬降 / Ghost(**沒有 Hold** —— v2.14.0 拿掉了,見下面)
-     • 鎖定 · 消行 · 攻擊量(含 Combo 與全消)—— **沒有讓分倍率**,v2.15.2 拿掉了
+     • 鎖定 · 消行 · 攻擊量(含 Combo 與全消)· 讓分(🐣 收到的攻擊減半,見紅線 ⑤)
      • 垃圾行:排隊 → 抵銷 → 推上來;洞位由送出端決定
      • tick(st, dt):時間推進(重力、鎖定延遲),回傳事件陣列
      • save/load(無損還原,回座用)與 snap(給對手小盤看的精簡快照)
@@ -29,13 +29,14 @@
         `holdSwap()` / 快照的 `h` 欄位 / HUD 左邊那一格 / 鍵盤 `C`·`Shift` / 那顆「換」鈕。
         ⚠ **不要「順手」把它加回來** —— 它不是漏掉的功能,是刻意砍掉的難度旋鈕。
         落下中推盤會讓方塊卡進牆裡,而且對手看到的位置一定對不上。
-     ⑤ **(已不適用)** 讓分(handicap)在 v2.15.2 整個拿掉了 —— 使用者:「把讓分拿掉好了,
-        因為如果做不出可以讓人看得懂跟實際上有的功能,還不如不寫,別讓人誤會了」。
-        連帶消失的有 `HCAP` / `hcapOf()` / `scale()` / 狀態的 `send`·`recv`·`carry`·`rcarry`
-        四個欄位 / 大廳那一格與那一行 / `hcap` 這個 Firebase 節點。
-        ⚠ **不要「順手」把倍率加回來** —— 它不是漏掉的功能,是刻意砍掉的。
-        真的要做強弱平衡,旋鈕是**新手保護秒數**(看得懂、而且每個人都知道它在做什麼)。
-        ★ 編號留著不重排:⑥ 底下那幾條的「紅線 ⑥」在程式裡是寫死的字串。
+     ⑤ **讓分只有一種效果:「🐣 我收到的攻擊減半」**(2.17.0+2,使用者裁示用新設計加回來)。
+        v2.15.2 拿掉的那一版(五檔、送出 ×1.5 + 收到 ×0.5、長得跟房規一樣但其實是自己選的)
+        失敗在「看不懂、會誤會」—— 這一版的三條約束就是衝著那個來的,⚠ 不要放寬:
+        · **兩層**:房主決定這一局開不開放(房規 `rules.hc`),開放了才由**每個人自己**選要不要(`o.hc`);
+        · **只有開 / 關**,只動**收到**的那一邊,不碰送出(送出一律 1:1);
+        · 讓掉的行數**畫面上看得到**(adapter / solo 冒「🐣 −N 行」,名字前面掛 🐣)。
+        ⚠ 零頭要累積(`st.hcc`),**不可以無條件進位**:高手送的攻擊大多一次 1 行,
+          進位的話 1 行還是 1 行 = 讓分等於沒開。收攻擊一律走 `receive()`,不要在呼叫端自己減。
      ⑥ **tick() 的 dt 必須有上限。** 分頁凍結回來時 dt 可能是好幾萬毫秒,
         不夾住就會在一幀裡補算幾百次重力 → 整頁卡死(plan 5.2)。
    ========================================================================== */
@@ -208,13 +209,24 @@ const BLK = (function(){
       on:  "最後 30 秒<b>所有人的攻擊加倍</b>,畫面會變色。落後的人有機會翻盤," +
            "⚠ 但領先的人也一樣加倍。",
       off: "全程一樣的攻擊量。"
+    },
+    /* 讓分(紅線 ⑤)。⚠ 要講清楚「誰選」與「減的是哪一邊」—— 上一版就是這兩件事被讀錯 */
+    hc: {
+      on:  "開放之後,<b>每個人可以自己按「🐣 讓我一點」</b>:按了的人<b>收到的攻擊減半</b>," +
+           "打別人照樣算。名字前面會掛 🐣,大家都看得到。",
+      off: "攻擊一律照算,沒有人讓分。"
+    },
+    /* 單機對電腦的那一格:沒有房主,開了就是「我 🐣」 */
+    hcSolo: {
+      on:  "<b>你收到的攻擊減半</b>,打電腦照樣算。電腦不會讓分。",
+      off: "攻擊一律照算。覺得電腦太兇,可以開這一格。"
     }
   };
   /* 查一段文案。⚠ 查不到一律回空字串 —— 寧可那一行不見,也不要印出 "undefined"。 */
   function noteOf(field, value){
     const t = NOTES[field];
     if(!t) return "";
-    if(field === "rush") return t[value ? "on" : "off"] || "";
+    if(field === "rush" || field === "hc" || field === "hcSolo") return t[value ? "on" : "off"] || "";
     return t[value] || "";
   }
 
@@ -232,6 +244,7 @@ const BLK = (function(){
          多一個值只是讓設定畫面多一顆看不懂的鈕,而這一版的主題正好相反。 */
     out.target  = (r.target === "high") ? "high" : "rand";
     out.rush    = !!r.rush;             // 最後 30 秒攻擊加倍(只在 K.O. 賽有意義)
+    out.hc      = !!r.hc;               // 這一局開不開放讓分(房主決定;誰要讓是每個人自己選,見 blank 的 o.hc)
     return out;
   }
   function clampInt(v, lo, hi, dft){
@@ -240,8 +253,7 @@ const BLK = (function(){
     return Math.max(lo, Math.min(hi, v));
   }
 
-  /* ★ 這裡本來有一張讓分倍率表(`HCAP` / `hcapOf()`)—— v2.15.2 整個拿掉了,
-     理由與連帶消失的東西見檔頭紅線 ⑤。**攻擊量現在每個人都是 1:1。** */
+  /* ★ 讓分沒有倍率表 —— 只有「收到的減半」一種(檔頭紅線 ⑤,實作在 receive())。 */
 
   /* ==========================================================================
      四、7-bag —— 寫成 O(1) 查詢函式(紅線 ②)
@@ -349,8 +361,12 @@ const BLK = (function(){
          ⚠ revT 的初值是 -1e9 而不是 0 —— 0 會讓「開局第一顆」落在反擊窗裡面。 */
       revBy:  "",
       revT:   -1e9,
-      rush:   false                     // 最後 30 秒加倍(由 adapter 在對局中寫進來)
+      rush:   false,                    // 最後 30 秒加倍(由 adapter 在對局中寫進來)
+      /* 讓分(紅線 ⑤):這一位有沒有按 🐣 —— 房規沒開放的話按了也不算 */
+      hc:     false,
+      hcc:    0                         // 減半留下的零頭(0 或 1)
     };
+    st.hc = !!o.hc && st.rules.hc;
     st.shield = st.rules.shield;
     spawn(st);
     return st;
@@ -560,6 +576,21 @@ const BLK = (function(){
     if(from){ st.revBy = from; st.revT = st.time; }
     return n;
   }
+  /* ★ 收到一筆攻擊的**唯一入口**(adapter / solo 都走這裡,紅線 ⑤)。
+     讓分(st.hc)的人先減半、零頭留到下一筆,剩下的才進佇列。
+     回傳 { got:實際排進佇列幾行, cut:讓分讓掉幾行 } —— 兩個分開給,畫面才分得出
+     「被暖身擋掉」(got 0、cut 0)與「全部被讓掉」(got 0、cut > 0)。 */
+  function receive(st, n, hole, from){
+    n = Math.max(0, Math.round(Number(n) || 0));
+    let m = n;
+    if(st.hc && n){
+      const x = n + (st.hcc | 0);
+      m = x >> 1;
+      st.hcc = x & 1;
+    }
+    const got = m ? queueGarbage(st, m, hole, from) : 0;
+    return { got: got, cut: n - m };
+  }
   /* 把佇列推上來。一次鎖定最多 GARB_CAP 行,剩下的留著下一次 ——
      沒有這個上限的話,一波大攻擊可以讓人「一顆都還沒放就死了」。 */
   function applyPending(st){
@@ -692,11 +723,12 @@ const BLK = (function(){
       soft: st.soft ? 1 : 0, dead: st.dead ? 1 : 0, deadT: st.deadT,
       /* ⚠ 反擊的兩個欄位一定要存:漏了就是「回座之後那一次反擊憑空不見」,
          而那是 save 這一支踩過兩次的那種 bug —— 不報錯、看起來全對。 */
-      revBy: st.revBy, revT: st.revT, rush: st.rush ? 1 : 0
+      revBy: st.revBy, revT: st.revT, rush: st.rush ? 1 : 0,
+      hc: st.hc ? 1 : 0, hcc: st.hcc | 0           // 讓分與它的零頭(回座之後不可以憑空多吃一行)
     };
   }
   function load(o){
-    const st = blank({ seed: o.seed, rules: o.rules });
+    const st = blank({ seed: o.seed, rules: o.rules, hc: !!o.hc });
     st.idx = o.idx | 0;
     st.board = decBoard(o.b);
     st.cur = o.cur ? { k: o.cur[0], r: o.cur[1], x: o.cur[2], y: o.cur[3] } : null;
@@ -710,6 +742,7 @@ const BLK = (function(){
     st.revBy = o.revBy || "";
     st.revT = (typeof o.revT === "number") ? o.revT : -1e9;   /* ⚠ 不可以 `|| 0`:0 落在反擊窗裡 */
     st.rush = !!o.rush;
+    st.hcc = (o.hcc | 0) & 1;
     return st;
   }
 
@@ -792,7 +825,7 @@ const BLK = (function(){
     blank, spawn, level, gravMs, grounded, move, rotate, down, ghostY,
     hardDrop, lock, tick, revive,
     // 垃圾行
-    queueGarbage, applyPending, pushGarbage, cancel, pendCount,
+    queueGarbage, receive, applyPending, pushGarbage, cancel, pendCount,
     // 編碼
     encBoard, decBoard, save, load, snap,
     // 小工具

@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.17.0 -->
-<meta name="version" content="2.17.0+1">
+<meta name="version" content="2.17.0+2">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -174,6 +174,15 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
         <div class="blk-fnote" id="blkNoteVsRush"></div>
       </div>
+      <!-- ★ 讓分(rules.js 紅線 ⑤):只有「收到的攻擊減半」一種。單機沒有房主 → 開了就是我 🐣 -->
+      <div class="field hidden blk-vs-row" id="blkVsHcRow">
+        <span class="field-label">讓分<span class="field-sub">(覺得太難可以開)</span></span>
+        <div class="seg" id="blkVsHcSeg" aria-label="讓分">
+          <button type="button" data-vshc="0" class="on">不用</button>
+          <button type="button" data-vshc="1">🐣 讓我一點</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteVsHc"></div>
+      </div>
       <!-- ⚠ 「移動速度(慢 / 標準 / 快)」那一格 v2.15.6 拿掉了(使用者裁示)——
            一律標準,常數在 board.js 的 DAS_MS / ARR_MS。 -->
       <!-- ⚠ 「操作方式(手勢 / 兩者 / 按鈕)」那一格 v2.15.1 拿掉了 ——
@@ -319,7 +328,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
       <details class="blk-setup-more" id="blkSetupMore">
-        <summary>更多規則 <span>開局暖身、攻擊目標、結尾加速</span></summary>
+        <summary>更多規則 <span>開局暖身、攻擊目標、結尾加速、讓分</span></summary>
       <!-- ★ 新手保護:開局前這幾秒不吃垃圾行(照樣排隊、照樣顯示,就是不推上來)。
            沒有它的話,第一次玩的人開局十五秒就被埋掉,連手感都還沒摸到。 -->
       <div class="field">
@@ -354,11 +363,28 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
         <div class="blk-fnote" id="blkNoteRush"></div>
       </div>
+      <!-- ★★ 讓分,第一層:**房主**決定這一局開不開放(rules.js 紅線 ⑤)。
+           ⚠ v2.15.2 拿掉的那一版失敗在「長得跟房規一樣、其實是每個人自己選的」——
+             所以這一格是**真的**房規(只有房主按得動),每個人自己的那一格在 details 外面。 -->
+      <div class="field">
+        <span class="field-label">讓分<span class="field-sub">(房主決定開不開放)</span></span>
+        <div class="seg" id="blkHcSeg" aria-label="讓分">
+          <button class="on" data-hc="0">不開放</button>
+          <button data-hc="1">🐣 開放讓分</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteHc"></div>
+      </div>
       </details>
-      <!-- ★ 這裡本來有「我的讓分」那一格與底下那一行「這一局的讓分」——
-           v2.15.2 整套拿掉了(使用者:「做不出可以讓人看得懂跟實際上有的功能,
-           還不如不寫,別讓人誤會了」)。⚠ 不要加回來,理由見 js/blocks/rules.js 紅線 ⑤;
-           強弱平衡的旋鈕是上面那格**新手保護**。 -->
+      <!-- ★★ 讓分,第二層:房主開放了才出現,**每個人自己按**(存在 hcap/{pid},不是房規)。
+           ⚠ 放在 details 外面:開放了之後每個人都要一眼看得到自己可以選。 -->
+      <div class="field hidden" id="blkHcMeRow">
+        <span class="field-label">我要不要讓分<span class="field-sub">(每個人自己選)</span></span>
+        <div class="seg" id="blkHcMeSeg" aria-label="我要不要讓分">
+          <button class="on" data-hcme="0">不用</button>
+          <button data-hcme="1">🐣 讓我一點</button>
+        </div>
+        <div class="blk-fnote" id="blkHcList"></div>
+      </div>
     </section>
   </div>
 

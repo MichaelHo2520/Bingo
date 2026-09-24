@@ -51,7 +51,13 @@ const MP = MPCore.create((function(){
   const SECS = [120, 180, 300];
   const SHIELDS = [0, 10, 20];
   const TARGETS = ["rand", "high"];
-  let rules = { mode: "ko", secs: 180, shield: 20, target: "rand", rush: false };
+  let rules = { mode: "ko", secs: 180, shield: 20, target: "rand", rush: false, hc: false };
+  /* 讓分(rules.js 紅線 ⑤)—— 兩層:房主開放(rules.hc),開放了每個人自己選(hcap/{pid})。
+     ⚠ 自己的選擇存在 hcap 節點而不是房規:房規只有房主寫得進去(setRoomField 會擋)。
+     ⚠ 節點裡只認 `true` —— v2.15.2 以前的房間留著的是數字(舊的五檔讓分),一律當沒選。 */
+  let myHc = false;
+  let hcAll = {};                       // pid → true(全房的,大廳那一行 + 對手名字要畫)
+  let gHc = {};                         // 這一局凍結下來的名單(開局那一刻)
   const RUSH_MS = 30000;                // 「最後 30 秒」是最後幾毫秒
 
   /* ---------- 一局 ---------- */
@@ -66,7 +72,7 @@ const MP = MPCore.create((function(){
   let myDeaths = 0, lastHitBy = "", deadAt = 0, settleT = null;
   let myKiller = "";                    // 我這一次是被誰打死的(要跟著快照送出去,見 announceKO)
   let streak = null;                    // 連殺:{ id, n, t }
-  let liveRef = null, atkRef = null;
+  let liveRef = null, atkRef = null, hcapRef = null;
   let lastGame = null;                  // 最後一次收到的 game 快照(koOf / 結算查它)
   let pendKills = [];                   // 還沒確認寫進 game 的死亡:[{ n, killer }](見 declareDeaths)
   let dogT = 0, endSince = 0;           // 結算看門狗(見七之一)
@@ -96,7 +102,8 @@ const MP = MPCore.create((function(){
     secs:   { ok: v => SECS.indexOf(v) >= 0,      get: () => rules.secs,   set: v => rules.secs = v },
     shield: { ok: v => SHIELDS.indexOf(v) >= 0,   get: () => rules.shield, set: v => rules.shield = v },
     target: { ok: v => TARGETS.indexOf(v) >= 0,   get: () => rules.target, set: v => rules.target = v },
-    rush:   { ok: v => typeof v === "boolean",    get: () => rules.rush,   set: v => rules.rush = v }
+    rush:   { ok: v => typeof v === "boolean",    get: () => rules.rush,   set: v => rules.rush = v },
+    hc:     { ok: v => typeof v === "boolean",    get: () => rules.hc,     set: v => rules.hc = v }
   };
   function setMode(v){ if(FIELDS.mode.ok(v)) ctx.setRoomField("mode", v); }
   function setSecs(v){ v = +v; if(FIELDS.secs.ok(v)) ctx.setRoomField("secs", v); }
@@ -104,7 +111,14 @@ const MP = MPCore.create((function(){
   function setTarget(v){ if(FIELDS.target.ok(v)) ctx.setRoomField("target", v); }
   function setRush(v){ v = !!v; if(FIELDS.rush.ok(v)) ctx.setRoomField("rush", v); }
 
-  /* ★ 這裡本來有 setHcap()(每個人自己選的讓分)—— v2.15.2 整套拿掉了,見 rules.js 紅線 ⑤。 */
+  function setHc(v){ v = !!v; if(FIELDS.hc.ok(v)) ctx.setRoomField("hc", v); }
+  /* 我自己要不要 🐣。★ 每個人都按得動(不是房規)—— 房主沒開放的時候這一格整個收起來 */
+  function setMyHc(v){
+    myHc = !!v;
+    if(hcapRef && ctx.me() && !ctx.spectating()) hcapRef.child(ctx.me()).set(myHc);
+    paintSetup();
+  }
+  function hcOn(id){ return hcAll[id] === true; }
 
   /* ==========================================================================
      三、一局的生命週期
@@ -123,7 +137,9 @@ const MP = MPCore.create((function(){
       seed: (Math.random() * 0xffffffff) >>> 0,
       startAt: nowSrv() + LEAD_MS,
       rules: { mode: rules.mode, secs: rules.secs, shield: rules.shield * 1000,
-               target: rules.target, rush: !!rules.rush },
+               target: rules.target, rush: !!rules.rush, hc: !!rules.hc },
+      /* 讓分名單在開局這一刻凍結(同房規)—— 對局中有人改了按鈕也不影響這一局 */
+      hc: rules.hc ? ids.reduce((m, id) => { if(hcOn(id)) m[id] = true; return m; }, {}) : {},
       order: ids.slice(),
       topouts: {}, ko: {}, deaths: {}
     };
@@ -171,6 +187,8 @@ const MP = MPCore.create((function(){
     gRules = g.rules || { mode: "ko", secs: 180, shield: 0 };
     if(gRules.target !== "high") gRules.target = "rand";
     gRules.rush = !!gRules.rush;
+    gRules.hc = !!gRules.hc;
+    gHc = (gRules.hc && g.hc) ? g.hc : {};
     startAt = g.startAt || nowSrv();
     endAt = (gRules.mode === "ko") ? startAt + gRules.secs * 1000 : 0;
     order = g.order || [];
@@ -185,12 +203,13 @@ const MP = MPCore.create((function(){
 
     st = R.blank({
       seed: seed,
-      rules: { mode: gRules.mode, secs: gRules.secs, shield: gRules.shield, combo: true }
+      rules: { mode: gRules.mode, secs: gRules.secs, shield: gRules.shield, combo: true, hc: gRules.hc },
+      hc: gHc[ctx.me()] === true
     });
 
     foes = {};
     order.forEach(id => {
-      if(id !== ctx.me()) foes[id] = { name: ctx.dispName(id), ko: 0, lastHeardAt: Date.now(), connState: "good" };
+      if(id !== ctx.me()) foes[id] = { name: foeName(id), ko: 0, lastHeardAt: Date.now(), connState: "good" };
     });
     rebuildFoes();
 
@@ -320,13 +339,20 @@ const MP = MPCore.create((function(){
   function listen(){
     liveRef = ctx.ref("live");
     atkRef  = ctx.ref("attacks");
+    hcapRef = ctx.ref("hcap");
+    /* ⚠ 整份留著,不要只挑自己那一個 —— 大廳要畫「誰按了 🐣」那一行 */
+    hcapRef && hcapRef.on("value", s => {
+      hcAll = s.val() || {};
+      if(ctx.me() && typeof hcAll[ctx.me()] === "boolean") myHc = hcAll[ctx.me()];
+      paintSetup();
+    });
     if(!liveRef) return;
 
     const onLive = s => {
       const id = s.key, v = s.val() || {};
       if(id === ctx.me() && !ctx.spectating()) return;      // 自己的不必收回來
       if(!curRound || v.rid !== curRound) return;           // 紅線 ④:上一局的一律忽略
-      const f = foes[id] || (foes[id] = { name: ctx.dispName(id), ko: 0 });
+      const f = foes[id] || (foes[id] = { name: foeName(id), ko: 0 });
       f.lastHeardAt = Date.now();
       if(f.connState && f.connState !== "good") f.connState = "good";
       if(typeof v.seq === "number" && typeof f.seq === "number" && v.seq <= f.seq) return;  // 亂序不倒退
@@ -380,13 +406,15 @@ const MP = MPCore.create((function(){
       const last = ackd[a.from] || 0;
       if(a.n <= last) return;                               // 已經吃過了
       ackd[a.from] = a.n;
-      const accepted = R.queueGarbage(st, a.lines, a.hole, a.from);
+      const r = R.receive(st, a.lines, a.hole, a.from);   // ★ 讓分在這裡面(rules.js 紅線 ⑤)
+      const accepted = r.got;
       if(accepted > 0) lastHitBy = a.from;
       const i = foeIndex(a.from);
       if(i >= 0){
-        if(accepted === 0) BLKB.beamShield(i, ctx.dispName(a.from));
-        else BLKB.beamIn(i, accepted, ctx.dispName(a.from));
+        if(accepted > 0) BLKB.beamIn(i, accepted, ctx.dispName(a.from));
+        else if(!r.cut) BLKB.beamShield(i, ctx.dispName(a.from));
       }
+      if(r.cut) BLKB.pop("🐣 −" + r.cut + " 行", "#48dbfb", 0.7);
       pubFull(false);                                        // 把 ack 寫進快照(重整後才去得掉重)
     });
   }
@@ -625,7 +653,7 @@ const MP = MPCore.create((function(){
   function paintFoes(g){
     lastGame = g;
     Object.keys(foes).forEach(id => {
-      foes[id].name = ctx.dispName(id);
+      foes[id].name = foeName(id);
       foes[id].ko = (g && g.ko && g.ko[id]) || 0;
       if(g && g.topouts && g.topouts[id]){
         const wasDead = !!foes[id].dead;
@@ -654,7 +682,7 @@ const MP = MPCore.create((function(){
       const f = foes[id] || {};
       const dead = !!f.dead;
       const connState = f.connState || "good";
-      return { id: id, name: f.name || ctx.dispName(id), bd: f.bd, c: f.c,
+      return { id: id, name: f.name || foeName(id), bd: f.bd, c: f.c,
                pend: f.p || 0, ko: f.ko || 0, dead: dead,
                target: (lockTarget === id) && !dead,
                away: connState === "away", lag: connState === "lag",
@@ -662,6 +690,8 @@ const MP = MPCore.create((function(){
     });
     BLKB.setFoes(list);
   }
+  /* 對手的名字。這一局有 🐣 的人前面掛 🐣 —— 讓分要「大家都看得到」(rules.js 紅線 ⑤) */
+  function foeName(id){ return (gHc[id] === true ? "🐣 " : "") + ctx.dispName(id); }
   function foeIndex(id){
     const list = order.filter(x => x !== ctx.me());
     return list.indexOf(id);
@@ -772,6 +802,17 @@ const MP = MPCore.create((function(){
   /* ★★ 設定畫面的「隨選隨變」文案 —— **單一真相在 `rules.js` 的 `NOTES`**
      (v2.15.3 原本放在這裡,v2.15.4 因為單機也用同一組房規而搬過去)。
      ⚠ `blocks.html` 那幾個 div 是空的,兩邊各寫一份就是靜靜過期的雙胞胎。 */
+  /* 讓分:我自己那一格(房主開放了才出現)+「這一局誰 🐣」那一行。
+     ⚠ 名單用 ctx.players()(座位上的人),不是 hcAll 的 key:離開的人那一筆還留在節點上。 */
+  function paintHcs(){
+    const me = $("blkHcMeRow");
+    if(me) me.classList.toggle("hidden", !rules.hc || !ctx || ctx.spectating());
+    const el = $("blkHcList");
+    if(!el || !ctx) return;
+    const ids = rules.hc ? Object.keys(ctx.players() || {}).filter(hcOn) : [];
+    el.innerHTML = "按了的人<b>收到的攻擊減半</b>,打別人照樣算。" +
+      (ids.length ? ("<br>這一局的 🐣:" + ids.map(id => "<b>" + esc(ctx.dispName(id)) + "</b>").join("、")) : "");
+  }
   function paintSetup(){
     const seg = (id, attr, val) => {
       const el = $(id); if(!el) return;
@@ -783,6 +824,10 @@ const MP = MPCore.create((function(){
     seg("blkShieldSeg", "shield", rules.shield);
     seg("blkTargetSeg", "target", rules.target);
     seg("blkRushSeg", "rush", rules.rush ? "1" : "0");
+    seg("blkHcSeg", "hc", rules.hc ? "1" : "0");
+    seg("blkHcMeSeg", "hcme", myHc ? "1" : "0");
+    note("blkNoteHc", R.noteOf("hc", rules.hc));
+    paintHcs();
     note("blkNoteMode", R.noteOf("mode", rules.mode));
     note("blkNoteShield", R.noteOf("shield", rules.shield));
     note("blkNoteTarget", R.noteOf("target", rules.target));
@@ -857,14 +902,14 @@ const MP = MPCore.create((function(){
     winCardId: "blkWinCard",
     minPlayers: 2, maxPlayers: 4,
     spectate: true,
-    extraNodes: ["live", "attacks"],
+    extraNodes: ["live", "attacks", "hcap"],
     scoreUnit: "勝", goalDefault: 3, goalMax: 10,
 
     init(c){ ctx = c; armClock(); },
     listen: listen,
 
     roomFields(){ return { mode: rules.mode, secs: rules.secs, shield: rules.shield,
-                           target: rules.target, rush: !!rules.rush }; },
+                           target: rules.target, rush: !!rules.rush, hc: !!rules.hc }; },
     onRoomField(k, v){
       const f = FIELDS[k];
       if(!f || !f.ok(v) || v === f.get()) return;
@@ -883,6 +928,8 @@ const MP = MPCore.create((function(){
     enterLobby(){
       showScreen("lobby");
       resetRound();
+      /* 自己的 🐣 是每個人自己的 → 進大廳就把本機記著的那一個寫上去(別人才看得到) */
+      if(hcapRef && ctx.me() && !ctx.spectating()) hcapRef.child(ctx.me()).set(myHc);
       paintSetup();
     },
     backToLobby(){ showScreen("lobby"); resetRound(); },
@@ -918,13 +965,18 @@ const MP = MPCore.create((function(){
       return { word: "輸了", msg: "<b>" + wn + "</b> 贏了這一局" };
     },
     /* 玩家名單變動時被呼叫 —— 對手小盤那一排要跟著重建。 */
-    refresh(){ if(order.length) rebuildFoes(); },
+    refresh(){ paintHcs(); if(order.length) rebuildFoes(); },
+
+    /* 自己的 🐣 記在本機偏好裡,下次進房照舊(同一台通常是同一個人) */
+    ownPrefs(){ return { blkHc: myHc }; },
+    usePrefs(o){ myHc = !!(o && o.blkHc === true); },
 
     api: {
       onEvents: onEvents,
       onFrame: onFrame,
       canPlay: canPlay,
-      setMode, setSecs, setShield, setTarget, setRush,
+      setMode, setSecs, setShield, setTarget, setRush, setHc, setMyHc,
+      myHc: () => myHc,
       tapFoe: tapFoe,
       rules: () => rules,
       state: () => st,
