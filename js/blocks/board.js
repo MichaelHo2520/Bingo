@@ -100,6 +100,15 @@ const BLKB = (function(){
      三、小工具
      ========================================================================== */
   function T(f, o){ if(typeof Sound !== "undefined" && Sound.tone) Sound.tone(f, o); }
+  /* 動態配樂(js/shared/chip-bgm.js,v2.16.0+1)—— 選配的:沒載入就什麼都不做。
+     ★ 訊號只從這一支送:單機與連線走同一條顯示路徑,接這裡兩邊一起生效。
+       setState → round · play → go · pause → hold · stop → end · 每幀 → feed · 大消除 → hit */
+  function BG(name){ if(typeof ChipBGM !== "undefined" && ChipBGM[name]) ChipBGM[name](); }
+  function bgmFeed(){
+    if(typeof ChipBGM === "undefined" || !st) return;
+    const free = R.stackTop(st.board) - R.TOP;          // 可見區還空著幾排(同 checkDanger 的量法)
+    ChipBGM.feed(1 - free / R.VIS, R.pendCount(st) > 0, !!st.rush, !!st.dead);
+  }
   function clamp(v, a, b){ return v < a ? a : (v > b ? b : v); }
   function ease(t){ return 1 - Math.pow(1 - t, 3); }             // easeOutCubic
   /* hex 明暗調整(不引入任何色彩函式庫) */
@@ -925,6 +934,7 @@ const BLKB = (function(){
       else shake(2);
       if(ev.combo >= 2) pop("連擊 ×" + ev.combo, "#2fd6e4", 0.76);
       if(ev.pc){ pop("ALL CLEAR", "#3ddc7f", 0.96); shake(8); }
+      if(ev.rows.length === 4 || ev.pc || ev.combo >= 3) BG("hit");   // 配樂在下一拍補一段過門
     }else{
       T(300, { type: "sine", dur: 0.05, vol: 0.10, slideTo: 210 });
       if(ev.drop > 4) shake(2);
@@ -1228,6 +1238,7 @@ const BLKB = (function(){
     /* ★ 每幀的鉤子:單機對電腦在這裡推進電腦那一份狀態。
        ⚠ 放在自己的 tick **之前**,兩邊的時間軸才不會差一幀。 */
     if(running && cfg.onFrame) cfg.onFrame(dt);
+    if(running) bgmFeed();              // ⚠ 死了也要餵(K.O. 賽復活要靠它看到 dead 由真轉假)
     if(running && st && !st.dead && cfg.canPlay()){
       /* ⚠⚠ **手指還按著就要一路撐過鎖定**(v2.15.2 的修正)。
          使用者實機回報:「長按慢速移動,蠻容易沒有成功觸發」。
@@ -1369,10 +1380,11 @@ const BLKB = (function(){
     fx.shake = 0; fx.hit = 0; fx.beams.length = 0;
     allUp();
     fitBoard();
+    BG("round");
   }
-  function play(){ running = true; lastT = performance.now(); allUp(); }
-  function pause(){ running = false; allUp(); }
-  function stop(){ running = false; allUp(); }
+  function play(){ running = true; lastT = performance.now(); allUp(); BG("go"); }
+  function pause(){ running = false; allUp(); BG("hold"); }
+  function stop(){ running = false; allUp(); BG("end"); }
 
   return {
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,

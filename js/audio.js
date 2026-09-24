@@ -270,7 +270,19 @@
        原本 setOn / duck / setSrc 各自複製一份「ready→playBuffer / failed→playFallback / 否則 load 後再播」
        的分支,加入第三個條件會變成三份都要改 → 收斂成 applyPlayState() 一個點(v1.36.4)。 */
     function shouldPlay(){ return on && !ducked && !hidden; }
+    /* ★ 外掛產生器(v2.16.0+1,方塊對戰 / 泡泡對戰的動態配樂 js/shared/chip-bgm.js):
+         掛上之後這一頁不播音檔,改由產生器即時合成 —— 但「該不該出聲」**仍然只在這裡判**,
+         產生器只負責 play(ctx, master) / halt()(play 要可以重複呼叫:nudge / setSrc 都會再叫)。
+       ⚠ 沒掛產生器(另外十四頁 + Bingo)時,下面每一條分支都與加這個功能之前逐位元相同。 */
+    let gen=null;
     function applyPlayState(){
+      if(gen){
+        stopNode(); if(el){ try{ el.pause(); }catch(e){} }   // 音檔那兩條路一定是停的
+        if(!shouldPlay()){ gen.halt(); return; }
+        const c=ctx(); if(!c)return;                           // 還沒解鎖:等手勢後的 nudge()
+        gen.play(c, ensureMaster(c));
+        return;
+      }
       if(!shouldPlay()){ stopNode(); if(el){ try{ el.pause(); }catch(e){} } return; }   // HTMLAudio 的 pause 本來就保留位置
       if(ready){ playBuffer(); return; }
       if(failed){ playFallback(); return; }
@@ -316,7 +328,10 @@
       },
       // 手勢喚醒後補開音樂:iOS 從背景回前景時 AudioContext.resume() 可能要等真實手勢才成功,
       // 那一刻 setHidden(false) 已經呼叫過(hidden 早就是 false),所以需要一個「該播卻沒在播就補開」的入口
-      nudge(){ if(shouldPlay() && !node && !(el && !el.paused)) applyPlayState(); },
+      nudge(){ if(gen){ if(shouldPlay()) applyPlayState(); return; } if(shouldPlay() && !node && !(el && !el.paused)) applyPlayState(); },
+      // 掛上 / 拿掉外掛產生器(見 applyPlayState 上面那段);genName() 給設定面板的「音樂曲目」顯示
+      setGenerator(g){ if(g===gen)return; if(gen){ try{ gen.halt(); }catch(e){} } gen=g||null; applyPlayState(); },
+      genName(){ return gen ? (gen.name || "本遊戲專屬配樂") : ""; },
       setVolume(v){
         vol=Math.max(0,Math.min(1,+v||0));
         if(master){ try{ master.gain.setTargetAtTime(vol, master.context.currentTime, 0.05); }catch(e){ try{ master.gain.value=vol; }catch(_){} } }

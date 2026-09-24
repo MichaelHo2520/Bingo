@@ -82,6 +82,16 @@ const BUBB = (function(){
      三、小工具
      ========================================================================== */
   function T(f, o){ if(typeof Sound !== "undefined" && Sound.tone) Sound.tone(f, o); }
+  /* 動態配樂(js/shared/chip-bgm.js,v2.16.0+1)—— 選配的:沒載入就什麼都不做。
+     ★ 訊號只從這一支送:單機與連線走同一條顯示路徑,接這裡兩邊一起生效。
+       setState → round · countdown(fn) → cue · play → go · pause → hold · stop → end · 每幀 → feed · 大消除 → hit */
+  function BG(name, a){ if(typeof ChipBGM !== "undefined" && ChipBGM[name]) ChipBGM[name](a); }
+  function bgmFeed(){
+    if(typeof ChipBGM === "undefined" || !st) return;
+    /* 危險度:最低那一顆在第幾列。開局 5 排(lowest 4)≈ 0.1 · 離死亡線 2 列(DANGER_IN)≈ 0.78 */
+    const lv = (R.lowest(st.board) - 3) / (R.DEAD - 3);
+    ChipBGM.feed(lv, R.pendCount(st) > 0, !!st.rush, !!st.dead);
+  }
   function clamp(v, a, b){ return v < a ? a : (v > b ? b : v); }
   function ease(t){ return 1 - Math.pow(1 - t, 3); }
   function shade(hex, amt){
@@ -736,7 +746,10 @@ const BUBB = (function(){
   const CD_GO_MS = 650;
   const CD_GO_TXT = "開始!";
   let cdFn = null, cdLast = "";
-  function countdown(fn){ cdFn = (typeof fn === "function") ? fn : null; cdLast = ""; }
+  function countdown(fn){
+    cdFn = (typeof fn === "function") ? fn : null; cdLast = "";
+    if(cdFn) BG("cue", cdFn());         // 配樂的第一拍排在 GO 那一刻(fn 回的是「還剩幾毫秒」)
+  }
   function cdLabel(left){
     if(typeof left !== "number" || !isFinite(left)) return "";
     if(left > 0) return String(Math.min(3, Math.ceil(left / 1000)));
@@ -1136,6 +1149,7 @@ const BUBB = (function(){
       else shake(1.5);
       if(ev.combo >= 3) word("連消 ×" + ev.combo, "#2fd6e4", 0.6);
       if(ev.pc){ word("全清!", "#3ddc7f", 0.9); shake(7); }
+      if(ev.drops.length >= 4 || n >= 8 || ev.pc || ev.combo >= 3) BG("hit");   // 配樂在下一拍補一段過門
     }else{
       T(300, { type: "sine", dur: 0.05, vol: 0.10, slideTo: 210 });
     }
@@ -1260,6 +1274,7 @@ const BUBB = (function(){
     dt = Math.min(100, Math.max(0, dt || 0));
     stepFx(dt);
     if(running && cfg.onFrame) cfg.onFrame(dt);
+    if(running) bgmFeed();              // ⚠ 死了也要餵(K.O. 賽復活要靠它看到 dead 由真轉假)
     if(running && st && !st.dead && cfg.canPlay()){
       if(inp.turn) R.aim(st, st.aim + inp.turn * TURN * dt);
       const par = st.par;
@@ -1356,10 +1371,11 @@ const BUBB = (function(){
     countdown(null);                    // ⚠ 新的一局不可以沿用上一局的倒數(要的話 setState 之後再給)
     allUp();
     fitBoard();
+    BG("round");
   }
-  function play(){ running = true; lastT = performance.now(); allUp(); }
-  function pause(){ running = false; allUp(); }
-  function stop(){ running = false; countdown(null); allUp(); }
+  function play(){ running = true; lastT = performance.now(); allUp(); BG("go"); }
+  function pause(){ running = false; allUp(); BG("hold"); }
+  function stop(){ running = false; countdown(null); allUp(); BG("end"); }
 
   return {
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,

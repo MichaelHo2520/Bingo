@@ -163,8 +163,16 @@ function syncSettingsUI(){
   if(volRow)volRow.classList.toggle("dim",!bgmOn);
   const trkSel=$("bgmTrackSel");
   if(trkSel){
-    if(!trkSel.options.length) BGM_TRACKS.forEach(t=>{ const o=document.createElement("option"); o.value=t.id; o.textContent=t.name; trkSel.appendChild(o); });
-    trkSel.value=bgmTrack;
+    /* 這一頁有自己的動態配樂(方塊對戰 / 泡泡對戰,js/shared/chip-bgm.js)→ 選曲鎖住、只顯示那一首。
+       ⚠ bgmTrack 本身不動:它是跨頁共用的偏好,回到別頁還是原本選的那首。 */
+    const own=(BGM.genName&&BGM.genName())||"";
+    if(own){
+      if(trkSel.dataset.own!==own){ trkSel.innerHTML=""; const o=document.createElement("option"); o.value="__own"; o.textContent=own; trkSel.appendChild(o); trkSel.dataset.own=own; }
+      trkSel.value="__own"; trkSel.disabled=true;
+    }else{
+      if(!trkSel.options.length) BGM_TRACKS.forEach(t=>{ const o=document.createElement("option"); o.value=t.id; o.textContent=t.name; trkSel.appendChild(o); });
+      trkSel.value=bgmTrack;
+    }
   }
   const trkRow=$("bgmTrackRow"); if(trkRow)trkRow.classList.toggle("dim",!bgmOn);
   const vvEl=$("voiceVol"); if(vvEl)vvEl.value=Math.round(voiceVol*100);
