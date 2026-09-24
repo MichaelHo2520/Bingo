@@ -268,6 +268,7 @@ const Solo = (function(){
     }else if(toId === "me" && i >= 0){
       if(accepted === 0) BUBB.beamShield(i, nameOf(fromId));
       else BUBB.beamIn(i, accepted, nameOf(fromId));
+      if(accepted > 0 && accepted < n) BUBB.pop("手下留情 −" + (n - accepted) + " 排", "#48dbfb", 0.7);
     }else if(i >= 0 && j >= 0){
       BUBB.beamFoe(i, j, n);
     }

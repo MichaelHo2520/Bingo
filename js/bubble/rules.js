@@ -31,6 +31,10 @@
         不這樣做的話,清到只剩兩色時會一直拿到盤上根本沒有的顏色 → 只能亂塞,
         那不是難度,是運氣。⚠ 挑法是決定性的(seed + 序號 → 對映到現有顏色),
         不可以用 Math.random —— 對手小盤與測試都要算得出同一個結果。
+     ⑦ **「不容易死」的三條是一組的(2.17.0+2),拿掉任何一條都會回到「一條命 34 秒」**:
+        垃圾一發只插 1 排(GARB_CAP)· 被推到死亡線上先給「最後一發」(insertRow 只在
+        擠出盤面時判死)· 快爆時收到的攻擊減半(queueGarbage 的 MERCY_LOW)。
+        ⚠ 死亡一律只在兩個地方判:落地消完還壓在第 DEAD 列(land),或插排把第 DEAD 列擠出去。
    ========================================================================== */
 
 const BUB = (function(){
@@ -40,7 +44,8 @@ const BUB = (function(){
      ──────────────────────────────────────────────────────────────────────────
        第 y 列是不是交錯列:`(y + st.par) & 1`。交錯列往右偏半顆、只有 7 格。
        球心:cx = x + 0.5 (+0.5 若交錯) · cy = 0.5 + y * RH
-       第 DEAD 列是死亡線:**任何一顆泡泡停在那一列就輸**。
+       第 DEAD 列是死亡線:**自己射出去的那一發消完還有泡泡停在那一列就輸**;
+       被插排推到那一列的不會馬上輸,給一發救命(紅線 ⑦)。
      ========================================================================== */
   const COLS = 8;
   const ROWS = 13;                      // 0..12,其中第 12 列是死亡線
@@ -67,9 +72,13 @@ const BUB = (function(){
   const MAX_DT  = 100;                  // ★ tick 的 dt 上限(紅線 ⑤)
   const INIT_ROWS  = 5;                 // 開局幾排
   const REFILL     = 3;                 // 清空盤面後補幾排
-  const GARB_CAP   = 3;                 // 一發落地之後最多插進幾排垃圾
+  /* 一發落地之後最多插進幾排垃圾。★ 1 而不是 3(2.17.0+2):一次灌 2~3 排 = 直接頂過線、
+     來不及反應(模擬裡一半的死亡是這樣來的);一排一排進來,待處理的那幾排才有時間被抵銷掉 */
+  const GARB_CAP   = 1;
   /* 暖身期間最多幫你存幾排 —— 同方塊對戰的 SHIELD_CAP:保護不可以變成延後處決 */
   const SHIELD_CAP = 5;
+  /* 手下留情:最低那一顆到了這一列(離死亡線只剩 3 列空位),收到的攻擊減半(無條件進位 → 1 排還是 1 排) */
+  const MERCY_LOW  = DEAD - 4;
   const PC_ATK     = 3;                 // 全清額外
   const REVENGE_MS = 3500;              // 反擊窗(同方塊對戰)
 
@@ -230,16 +239,18 @@ const BUB = (function(){
   }
 
   /* 頂端插一排。回傳 true = 還活著。
-     ⚠ 紅線 ①:par 一定要翻面,舊的每一列才維持原本的幾何。 */
+     ⚠ 紅線 ①:par 一定要翻面,舊的每一列才維持原本的幾何。
+     ⚠ 紅線 ⑦:被推到第 DEAD 列**不算死**(那是「最後一發」,下一發落地時由 land 判);
+       只有本來就壓在死亡線上的那一列被擠出盤面才死 —— 最後一發還沒射就又被插一排,就是沒救了。 */
   function insertRow(st, cols){
     st.par ^= 1;
     const row = new Array(COLS).fill(0);
     const w = isOdd(st.par, 0) ? COLS - 1 : COLS;
     for(let x = 0; x < w; x++) row[x] = cols[x] || 1;
     st.board.unshift(row);
-    const out = st.board.pop();         // 第 DEAD 列本來就該是空的(不然早就死了)
+    const out = st.board.pop();         // 原本的第 DEAD 列
     let over = false;
-    for(let x = 0; x < COLS; x++) if(out[x] || st.board[DEAD][x]) over = true;
+    for(let x = 0; x < COLS; x++) if(out[x]) over = true;
     if(over){ st.dead = true; st.deadT = 0; }
     return !over;
   }
@@ -430,12 +441,15 @@ const BUB = (function(){
                  garb: 0, press: 0, dead: false };
     if(!s || !cell){ return ev; }
     ev.x = cell[0]; ev.y = cell[1];
+    const onLine = lowest(st.board) >= DEAD;   // 這一發是「最後一發」(紅線 ⑦)
     const r = resolve(st.board, st.par, cell[0], cell[1], s.c);
     ev.pops = r.pops; ev.drops = r.drops;
 
     /* 死亡線:消完還有東西留在第 DEAD 列 → 死。
-       ⚠ 在消除**之後**判:貼著死亡線湊成三顆消掉的那一發是救命的,不是自殺。 */
+       ⚠ 在消除**之後**判:貼著死亡線湊成三顆消掉的那一發是救命的,不是自殺。
+       最後一發沒把死亡線清乾淨也是在這裡死。 */
     if(lowest(st.board) >= DEAD){ st.dead = true; st.deadT = 0; ev.dead = true; return ev; }
+    if(onLine) ev.saved = true;         // 最後一發救回來了(畫面要大聲講)
 
     const n = r.pops.length;
     if(n){
@@ -501,6 +515,8 @@ const BUB = (function(){
      ⚠ gs 是**送出端決定的**垃圾顏色種子,接收端不可以自己重抽(對手小盤要對得上)。 */
   function queueGarbage(st, n, gs, from){
     n = Math.max(0, Math.round(Number(n) || 0));
+    /* 手下留情(紅線 ⑦):看的是**收到的這一刻**自己的盤面 —— 接收端決定,送出端的小盤不必知道 */
+    if(n && lowest(st.board) >= MERCY_LOW) n = Math.ceil(n / 2);
     if(!n) return 0;
     if(st.shield > 0 && pendCount(st) >= SHIELD_CAP) return 0;
     st.pend.push({ n: n, gs: (gs >>> 0), from: from || "", k: 0 });
@@ -633,7 +649,7 @@ const BUB = (function(){
   return {
     // 常數
     COLS, ROWS, DEAD, RH, NC, LX, LY, H, SPEED, SUB, HIT, MAX_AIM,
-    LV_MS, PRESS, AUTO_MS, MAX_DT, INIT_ROWS, REFILL, GARB_CAP, SHIELD_CAP,
+    LV_MS, PRESS, AUTO_MS, MAX_DT, INIT_ROWS, REFILL, GARB_CAP, SHIELD_CAP, MERCY_LOW,
     PC_ATK, REVENGE_MS, DEF_RULES,
     // 房規
     normRules, NOTES, noteOf, rowsOf, comboAtk,

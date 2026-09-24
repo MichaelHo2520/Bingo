@@ -67,7 +67,8 @@ const BUBAI = (function(){
       if(y >= R.DEAD - 1) s -= 60;      // 貼著死亡線又沒消到 = 自殺
     }
     const low = R.lowest(b);
-    if(low >= R.DEAD - 3) s -= (low - (R.DEAD - 4)) * 4;
+    if(low >= R.DEAD) s -= 100;         // 消完還壓在死亡線上 = 死(最後一發沒救到,rules 紅線 ⑦)
+    else if(low >= R.DEAD - 3) s -= (low - (R.DEAD - 4)) * 4;
     s += y * 0.15;                      // 同分時偏好往上塞(把低處留空)
     return { s: s, cell: t.cell, pops: r.pops.length, drops: r.drops.length };
   }

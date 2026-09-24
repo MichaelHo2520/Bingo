@@ -407,6 +407,8 @@ const MP = MPCore.create((function(){
         if(accepted === 0) BUBB.beamShield(i, ctx.dispName(a.from));
         else BUBB.beamIn(i, accepted, ctx.dispName(a.from));
       }
+      /* 快爆時減半(rules 紅線 ⑦)—— 讓被救的人知道剛剛少吃了幾排 */
+      if(accepted > 0 && accepted < a.rows) BUBB.pop("手下留情 −" + (a.rows - accepted) + " 排", "#48dbfb", 0.7);
       pubFull(false);                                        // 把 ack 寫進快照(重整後才去得掉重)
     });
   }

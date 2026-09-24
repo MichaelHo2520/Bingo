@@ -379,6 +379,7 @@ const BUBB = (function(){
           if(!v) continue;
            boardBubble(R.cx(st.par, x, y) * D, (R.cy(y) - off) * D, v);
         }
+      lastShotFx(W);
       popsFx();
       aimGuide();
       shotFx();
@@ -437,10 +438,35 @@ const BUBB = (function(){
     const y = (R.cy(R.DEAD) - 0.5) * D;
     const danger = st && R.lowest(st.board) >= R.DEAD - 2;
     ctxM.save();
+    if(lastShot()){ ctxM.restore(); return; }   // 由 lastShotFx() 畫在泡泡上面
     ctxM.setLineDash([D * 0.25, D * 0.18]);
     ctxM.strokeStyle = danger ? "rgba(255,93,108,.9)" : lineCol;
     ctxM.lineWidth = danger ? 2.5 : 1.5;
     ctxM.beginPath(); ctxM.moveTo(0, y); ctxM.lineTo(W, y); ctxM.stroke();
+    ctxM.restore();
+  }
+  /* 最後一發(rules 紅線 ⑦):閃爍的實線 + 右端一枚跨在線上的標籤 —— 這一發沒把線清乾淨就死。
+     ⚠ 要畫在泡泡**之後**:deadLine() 在泡泡底下,壓在線上的那一列會把線與字整個蓋掉。 */
+  function lastShotFx(W){
+    if(!lastShot()) return;
+    const y = (R.cy(R.DEAD) - 0.5) * D;
+    const pulse = reduced() ? 1 : (0.6 + 0.4 * Math.sin(performance.now() / 110));
+    ctxM.save();
+    ctxM.globalAlpha = pulse;
+    ctxM.strokeStyle = "#ff5d6c";
+    ctxM.lineWidth = Math.max(3, D * 0.1);
+    ctxM.beginPath(); ctxM.moveTo(0, y); ctxM.lineTo(W, y); ctxM.stroke();
+    ctxM.globalAlpha = 1;
+    const txt = "最後一發";
+    ctxM.font = "800 " + Math.round(D * 0.34) + "px Fredoka, Nunito, system-ui, sans-serif";
+    const tw = ctxM.measureText(txt).width, ph = D * 0.5, pw = tw + D * 0.4;
+    const px = W - pw - D * 0.1, py = y - ph / 2;
+    ctxM.fillStyle = "#ff5d6c";
+    roundRect(ctxM, px, py, pw, ph, ph / 2);
+    ctxM.fill();
+    ctxM.fillStyle = "#fff";
+    ctxM.textAlign = "center"; ctxM.textBaseline = "middle";
+    ctxM.fillText(txt, px + pw / 2, y + D * 0.02);
     ctxM.restore();
   }
   /* 天花板 + 待處理垃圾。
@@ -1331,7 +1357,17 @@ const BUBB = (function(){
         T(220, { type: "sine", dur: 0.10, vol: 0.10, slideTo: 150 });
       }
     }
+    /* 最後一發(rules 紅線 ⑦):被推到死亡線上先不死 —— 那一刻要大聲講,救回來也要 */
+    if(ev.saved){
+      word("救回來了!", "#3ddc7f", 0.84); shake(4);
+      T(660, { type: "triangle", dur: 0.18, vol: 0.18, slideTo: 1320 });
+    }
+    if(!ev.dead && lastShot()){
+      word("最後一發!", "#ff5d6c", 0.84);
+      T(880, { type: "square", dur: 0.10, vol: 0.12, slideTo: 440 });
+    }
   }
+  function lastShot(){ return !!(st && !st.dead && R.lowest(st.board) >= R.DEAD); }
   function incoming(n){
     fx.hit = Math.max(fx.hit, 0.8);
     T(740, { type: "square", dur: 0.07, vol: 0.10, slideTo: 420 });
