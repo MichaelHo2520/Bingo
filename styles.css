@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 6549ead0214e310c4660c749fc006ae4f52fedd3e8101fa5ad6efa669072df4c)
+    真相在 styles.src.css(sha256 8be3bdd9c5979d2013d1b01f2daf41bb5d165593be9db932ccdb06dbbb7da14d)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6156,6 +6156,7 @@ body.blk-rush #blkStatTime{color:#ff5d6c}
 .blk-foe-target:focus-visible{box-shadow:inset 0 0 0 2.5px var(--accent-2), inset 0 0 0 4.5px var(--accent-1, #ffd93d)}
 .blk-foe-away{opacity:.42}
 .blk-foe-lag{opacity:.72}
+.blk-foe.blk-foe-peek{opacity:.18;pointer-events:none}
 .blk-foe-danger{animation:blk-foe-pulse .68s ease-in-out infinite}
 @keyframes blk-foe-pulse{
   0%,100%{box-shadow:inset 0 0 0 2.5px rgba(255,93,108,.55)}

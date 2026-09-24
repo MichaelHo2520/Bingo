@@ -13939,6 +13939,13 @@ body.blk-rush #blkStatTime{color:#ff5d6c}
 .blk-foe-target:focus-visible{box-shadow:inset 0 0 0 2.5px var(--accent-2), inset 0 0 0 4.5px var(--accent-1, #ffd93d)}
 .blk-foe-away{opacity:.42}
 .blk-foe-lag{opacity:.72}
+/* 我的方塊移到小盤底下(只有疊在右上角那條路會發生)→ 暫時淡掉,讓我看清楚自己那一角。
+   判定在 board.js 的 peekFoes()(落下中那一顆 + 落點影子,帶遲滯);方塊一離開就恢復。
+   ⚠ 這裡**刻意**用 opacity 淡掉整塊 —— 上面那條「不要整塊淡掉」講的是**常駐**的樣子;
+     這一刻要看清楚的就只有我的盤面,小盤糊掉正是要的效果。
+   ⚠ 淡掉的時候也不吃指標事件:手指落在那裡要算盤面上的手勢,不是去點小盤鎖定目標。
+   ⚠ 兩個 class 疊起來寫:權重要壓過 .blk-foe-away / .blk-foe-lag 的 opacity。 */
+.blk-foe.blk-foe-peek{opacity:.18;pointer-events:none}
 
 /* 快爆了(v2.15.3):堆到只剩 4 排就開始跳。★ 這是聚會現場的笑點來源 ——
    「小明快爆了」大家一起轉頭看,而在這之前那件事只有小明自己知道。

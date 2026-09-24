@@ -421,6 +421,7 @@ const BLKB = (function(){
     hud();
     gauge();
     drawFoes();
+    peekFoes();
     drawBeams();
   }
 
@@ -685,6 +686,7 @@ const BLKB = (function(){
     elFoes.classList.toggle("hidden", !foes.length);
     if(foeEls.length !== foes.length){
       foeDanger = [];                   // ⚠ 人數變了 → index 的意思跟著變,舊的遲滯狀態要丟掉
+      peekOn.length = 0; peekRects = null;   // 同上:新建的小盤身上沒有 .blk-foe-peek
       elFoes.innerHTML = "";
       const spec = document.body.classList.contains("blk-spec");
       foeEls = foes.map(() => {
@@ -735,6 +737,7 @@ const BLKB = (function(){
     const byW = Math.floor(w / R.COLS);
     const fc = Math.max(2, Math.min(byW, byH));
     foeEls.forEach(e => sizeCanvas(e.cv, e.ctx, fc * R.COLS, fc * R.VIS));
+    peekRects = null;                   // 版面變了 → 淡出判定的方框下一次重量
   }
   function drawFoes(){
     for(let i = 0; i < foeEls.length && i < foes.length; i++){
@@ -818,6 +821,51 @@ const BLKB = (function(){
         const statusText = isTarget ? "，目前鎖定目標" : "，未鎖定";
         const label = f.name + statusText;
         if(e.wrap.getAttribute("aria-label") !== label) e.wrap.setAttribute("aria-label", label);
+      }
+    }
+  }
+  /* ---------- 我的方塊靠近時,蓋在盤面上的小盤淡掉(.blk-foe-peek)----------
+     ★ 使用者回報:小盤疊在盤面右上角(blk-foes-over 那條路)時,會擋到我自己那一角的方塊。
+       那一角「幾乎永遠是空的」(紅線 ㉗),但方塊真的移過去的那幾秒,要看清楚的是**我自己的**盤面。
+     ★ 判定是純幾何:落下中那一顆 + 它的落點影子,每一格往外放寬一點,跟每一塊小盤的方框相交就淡掉。
+       所以只有「真的蓋在盤面上」的那一條路會觸發 —— 貼右側那一條 / 側邊擺法本來就不重疊,永遠不會亮。
+     ⚠ 放寬量帶遲滯(進 0.5 格、出 1 格),不然方塊貼著邊界左右移會一直閃。
+     ⚠ 方框是**相對於主盤面畫布**的座標,快取起來(fitFoes 清掉、每 30 幀補量一次),
+       不在每一幀對每塊小盤叫 getBoundingClientRect()。 */
+  let peekRects = null;                 // [{ l, t, r, b }](相對 cvMain 左上角的 px)
+  const peekOn = [];
+  function peekFoes(){
+    if(!foeEls.length) return;
+    const spec = document.body.classList.contains("blk-spec");
+    const c = (st && !st.dead && !spec) ? st.cur : null;
+    if(c && (!peekRects || frameN % 30 === 0)){
+      const m = cvMain.getBoundingClientRect();
+      peekRects = foeEls.map(e => {
+        const r = e.wrap.getBoundingClientRect();
+        return { l: r.left - m.left, t: r.top - m.top, r: r.right - m.left, b: r.bottom - m.top };
+      });
+    }
+    let cells = null;
+    if(c){
+      cells = R.cellsOf(c.k, c.r, c.x, c.y);
+      const gy = R.ghostY(st);
+      if(gy !== c.y) cells = cells.concat(R.cellsOf(c.k, c.r, c.x, gy));
+    }
+    for(let i = 0; i < foeEls.length; i++){
+      let on = false;
+      const q = cells && peekRects && peekRects[i];
+      if(q && q.r > q.l){
+        const pad = cell * (peekOn[i] ? 1 : 0.5);
+        on = cells.some(p => {
+          if(p[1] < R.TOP) return false;
+          const x0 = p[0] * cell - pad, y0 = (p[1] - R.TOP) * cell - pad;
+          const x1 = x0 + cell + pad * 2, y1 = y0 + cell + pad * 2;
+          return x0 < q.r && x1 > q.l && y0 < q.b && y1 > q.t;
+        });
+      }
+      if(on !== !!peekOn[i]){
+        peekOn[i] = on;
+        foeEls[i].wrap.classList.toggle("blk-foe-peek", on);
       }
     }
   }
