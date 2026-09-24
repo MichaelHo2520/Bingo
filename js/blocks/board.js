@@ -103,8 +103,8 @@ const BLKB = (function(){
   function T(f, o){ if(typeof Sound !== "undefined" && Sound.tone) Sound.tone(f, o); }
   /* 動態配樂(js/shared/chip-bgm.js,v2.16.0+1)—— 選配的:沒載入就什麼都不做。
      ★ 訊號只從這一支送:單機與連線走同一條顯示路徑,接這裡兩邊一起生效。
-       setState → round · play → go · pause → hold · stop → end · 每幀 → feed · 大消除 → hit */
-  function BG(name){ if(typeof ChipBGM !== "undefined" && ChipBGM[name]) ChipBGM[name](); }
+       setState → round · countdown(fn) → cue · play → go · pause → hold · stop → end · 每幀 → feed · 大消除 → hit */
+  function BG(name, a){ if(typeof ChipBGM !== "undefined" && ChipBGM[name]) ChipBGM[name](a); }
   function bgmFeed(){
     if(typeof ChipBGM === "undefined" || !st) return;
     const free = R.stackTop(st.board) - R.TOP;          // 可見區還空著幾排(同 checkDanger 的量法)
@@ -418,6 +418,7 @@ const BLKB = (function(){
     ctxM.restore();
     pendGlow(W, H);
     edgeFlash(W, H);
+    countdownFx(W, H);
     hud();
     gauge();
     drawFoes();
@@ -606,6 +607,119 @@ const BLKB = (function(){
     ctxM.save();
     ctxM.fillStyle = g;
     ctxM.fillRect(0, 0, w, H);
+    ctxM.restore();
+  }
+
+  /* ---------- 開局倒數(2026-09-24,照抄泡泡對戰 js/bubble/board.js 六之一)----------
+       使用者:「要搬過去用,連線跟單機都要用」。以前連線是 adapter.js 的 banner("3") ——
+       塞進「已暫停」那塊 26px 的字;單機完全沒有倒數(練習 / 40 行競速 / 對電腦都是按了就開始)。
+       現在畫在盤面上:暗幕 + 大數字彈出 + 一圈環在這一秒內耗完(3 紅 2 黃 1 綠),
+       歸零時「開始!」+ 七色碎片 + 衝擊環,CD_GO_MS 內淡掉(不擋操作)。
+       ★ 畫面**只由「還剩幾毫秒」決定** —— countdown(fn) 收的是一個函式,每一幀問一次:
+         連線給 `startAt - 伺服器時間`(每台讀同一個 startAt → 畫面自然同步),
+         單機給 Solo 自己從 onFrame 的 dt 扣的毫秒數(暫停 / 蓋板時不扣 → 倒數跟著停)。
+         正數 = 還剩多久;負數 = 已經開始多久(「開始!」那一段靠它)。
+       ★ 尺寸的單位 u = W / 8(泡泡盤面是 8 顆寬、D 就是 W / 8)→ 兩頁的倒數在同寬的螢幕上一樣大。
+       ⚠ 紅線 ⑭:不用 CSS @keyframes。
+       ⚠ 數字最多是 3:連線的 LEAD_MS 是 3.2 秒,無條件進位的話房主那台會先閃一下「4」。
+       ⚠ 字的光暈另外畫一層,本體不帶 shadow —— 帶著 shadow 填字,邊緣就是糊的。 */
+  const CD_COL = { 3: "#ff5d6c", 2: "#ffd93d", 1: "#3ddc7f" };
+  const CD_GO_MS = 650;
+  const CD_GO_TXT = "開始!";
+  let cdFn = null, cdLast = "";
+  function countdown(fn){
+    cdFn = (typeof fn === "function") ? fn : null; cdLast = "";
+    if(cdFn) BG("cue", cdFn());         // 配樂的第一拍排在 GO 那一刻(fn 回的是「還剩幾毫秒」)
+  }
+  function cdLabel(left){
+    if(typeof left !== "number" || !isFinite(left)) return "";
+    if(left > 0) return String(Math.min(3, Math.ceil(left / 1000)));
+    return (-left < CD_GO_MS) ? CD_GO_TXT : "";
+  }
+  function easeBack(t){ const k = 1.9; return 1 + (k + 1) * Math.pow(t - 1, 3) + k * Math.pow(t - 1, 2); }
+  function bigText(txt, px, col, stops, u){
+    ctxM.font = "700 " + Math.round(px) + "px Fredoka, Nunito, system-ui, sans-serif";
+    if(!reduced()){
+      ctxM.save();
+      ctxM.globalAlpha *= 0.55;
+      ctxM.fillStyle = col; ctxM.shadowColor = col; ctxM.shadowBlur = u * 0.9;
+      ctxM.fillText(txt, 0, 0);
+      ctxM.restore();
+    }
+    ctxM.lineWidth = px * 0.1;
+    ctxM.strokeStyle = "rgba(10,6,24,.85)";
+    ctxM.strokeText(txt, 0, 0);
+    const g = ctxM.createLinearGradient(0, -px * 0.45, 0, px * 0.5);
+    stops.forEach((c, i) => g.addColorStop(i / (stops.length - 1), c));
+    ctxM.fillStyle = g;
+    ctxM.fillText(txt, 0, 0);
+  }
+  function countdownFx(W, H){
+    if(!cdFn) return;
+    const left = cdFn();
+    const lbl = cdLabel(left);
+    if(lbl !== cdLast){
+      if(lbl === CD_GO_TXT) T(880, { type: "triangle", dur: 0.26, vol: 0.2, slideTo: 1320 });
+      else if(lbl) T(lbl === "1" ? 660 : 520, { type: "sine", dur: 0.12, vol: 0.16 });
+      cdLast = lbl;
+    }
+    if(!lbl){ cdFn = null; return; }
+    const rm = reduced();
+    const u = W / 8;
+    const cx = W / 2, cy = H * 0.42;    // 同泡泡:整組(環頂 ~ 字幕)比 cy 偏下,所以 cy 比正中高一些
+    ctxM.save();
+    ctxM.textAlign = "center"; ctxM.textBaseline = "middle"; ctxM.lineJoin = "round";
+    if(left > 0){
+      const n = +lbl, col = CD_COL[n];
+      const f = clamp(1 - (left - (n - 1) * 1000) / 1000, 0, 1);    // 這一秒過了多少(0 → 1)
+      // 暗幕:盤面退到背景;最後 0.15 秒淡掉,接「開始!」
+      const veil = (n === 1 && f > 0.85) ? (1 - f) / 0.15 : 1;
+      ctxM.globalAlpha = veil;
+      ctxM.fillStyle = "rgba(8,5,20,.5)";
+      ctxM.fillRect(0, 0, W, H);
+      // 環:這一秒還剩多少
+      const R0 = u * 2.35;
+      ctxM.lineCap = "round";
+      ctxM.lineWidth = Math.max(3, u * 0.16);
+      ctxM.strokeStyle = "rgba(255,255,255,.12)";
+      ctxM.beginPath(); ctxM.arc(cx, cy, R0, 0, Math.PI * 2); ctxM.stroke();
+      ctxM.save();
+      ctxM.strokeStyle = col;
+      if(!rm){ ctxM.shadowColor = col; ctxM.shadowBlur = u * 0.5; }
+      ctxM.beginPath(); ctxM.arc(cx, cy, R0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (1 - f)); ctxM.stroke();
+      ctxM.restore();
+      // 字幕
+      ctxM.font = "800 " + Math.max(11, Math.round(u * 0.46)) + "px Fredoka, Nunito, system-ui, sans-serif";
+      ctxM.fillStyle = "rgba(255,255,255,.88)";
+      ctxM.fillText("準備好了嗎?", cx, cy + R0 + u * 0.75);
+      // 數字:彈出(回彈)→ 停住 → 最後 18% 縮小淡出
+      const s = rm ? 1 : (f < 0.24 ? 0.45 + 0.55 * easeBack(f / 0.24) : (f > 0.82 ? 1 - 0.25 * (f - 0.82) / 0.18 : 1));
+      const a = rm ? 1 : (f < 0.1 ? f / 0.1 : (f > 0.82 ? 1 - (f - 0.82) / 0.18 : 1));
+      ctxM.globalAlpha = a * veil;
+      ctxM.translate(cx, cy + u * 0.12);
+      ctxM.scale(s, s);
+      bigText(lbl, u * 3.3, col, [shade(col, 0.55), col, shade(col, -0.3)], u);
+    }else{
+      const t = clamp(-left / CD_GO_MS, 0, 1);
+      ctxM.globalAlpha = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.45;
+      if(!rm){
+        ctxM.strokeStyle = "rgba(255,255,255,.8)";
+        ctxM.lineWidth = u * 0.12 * (1 - t) + 1;
+        ctxM.beginPath(); ctxM.arc(cx, cy, u * (1.2 + 4.2 * t), 0, Math.PI * 2); ctxM.stroke();
+        const k = 1 - Math.pow(1 - t, 2);
+        for(let i = 0; i < 21; i++){
+          const ang = i / 21 * Math.PI * 2, dist = u * (0.8 + 4.4 * k);
+          ctxM.fillStyle = COL[i % COL.length];
+          ctxM.beginPath();
+          ctxM.arc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, u * 0.16 * (1 - t) + 1, 0, Math.PI * 2);
+          ctxM.fill();
+        }
+      }
+      const s = rm ? 1 : 0.6 + 0.5 * easeBack(Math.min(1, t / 0.35));
+      ctxM.translate(cx, cy);
+      ctxM.scale(s, s);
+      bigText(lbl, u * 1.9, "#ffb020", ["#fffbe0", "#ffd93d", "#ff9f1a"], u);
+    }
     ctxM.restore();
   }
 
@@ -1593,19 +1707,22 @@ const BLKB = (function(){
     st = s;
     fx.clear = null; fx.parts.length = 0; fx.pops.length = 0; fx.trail = null;
     fx.shake = 0; fx.hit = 0; fx.gold = 0; fx.beams.length = 0;
+    countdown(null);                    // ⚠ 新的一局不可以沿用上一局的倒數(要的話 setState 之後再給)
     allUp();
     fitBoard();
     BG("round");
   }
   function play(){ running = true; lastT = performance.now(); allUp(); BG("go"); }
   function pause(){ running = false; allUp(); BG("hold"); }
-  function stop(){ running = false; allUp(); BG("end"); }
+  function stop(){ running = false; countdown(null); allUp(); BG("end"); }
 
   return {
     mount, setState, play, pause, stop, wake, sleep, fitBoard, draw,
     act, incoming, pop, shake,
     setFoes, foeAt, beamOut, beamIn, beamShield, beamFoe, foes: () => foes,
-    cast, clearCast,
+    cast, clearCast, countdown,
+    /* 倒數現在畫的是什麼("3" / "2" / "1" / "開始!" / "")—— 測試用,產品程式不讀它 */
+    cdShown: () => cdLast,
     /* ★ 測試用的三個出口(產品程式不會呼叫它們):
        step(dt) 手動推一幀、frames() 是至今推了幾幀、awake() 是 rAF 現在排著沒有。
        ⚠ frames() 不再適合拿來守「rAF 有沒有啟動」:rAF 現在只在對局畫面才跑

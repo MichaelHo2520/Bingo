@@ -39,6 +39,14 @@ const Solo = (function(){
   const RUSH_MS = 30000;                // 「最後 30 秒」是最後幾毫秒
   const STREAK_MS = 12000;
   const STREAK_WORD = ["", "", "雙殺!", "三殺!", "四殺!!", "大殺特殺!!!"];
+  /* ★ 開局先倒數 3 秒(2026-09-24,使用者:「連線跟單機都要用」→ 練習 / 40 行競速 / 對電腦三種都倒數;
+       泡泡對戰的練習是按了就開始,這一頁不一樣,是使用者裁示)。
+     ⚠ 倒數扣的是 onFrame 的 dt,**不是**牆上時鐘 —— 暫停與蓋板都會停掉 onFrame(main.js),
+       倒數才會跟著停;用 performance.now() 算的話關掉蓋板時倒數早就跑完了。
+     ⚠ 倒數中 running 是 true(擋操作的是 main.js canPlay() 裡的 counting())→ st.time 不走,
+       40 行競速的成績天然不含那 3 秒。
+     CD_TAIL = 歸零之後再扣多久(盤面上的「開始!」要靠負數畫完,board.js CD_GO_MS 是 650)。 */
+  const CD_MS = 3000, CD_TAIL = 1000;
 
   /* ★★ 強度 band → 一份「配幾台、各是什麼難度」的名單(v2.15.4,使用者裁示「自動混搭」)。
      ⚠⚠ **每一列的第一個是「代表」** —— 只選 1 台時拿到的就是它,所以 `norm` 的第一個
@@ -75,6 +83,7 @@ const Solo = (function(){
   let me = null, foes = [];
   let on = false, paused = false, ended = false;
   let took = 0;                         // 這一局花了幾 ms(結果卡與紀錄用)
+  let cdLeft = 0;                       // 開局倒數還剩幾 ms(負數 = 已經開始多久)
   let hudT = 0;                         // HUD 的重畫節流
   /* ★★★ K.O. 賽的比賽時鐘。**不可以讀 `st.time`** —— 我死掉的那兩秒
      `R.tick(st)` 不會被呼叫(board.js 的 frame 擋著 `!st.dead`)→ `st.time` 會凍住,
@@ -185,7 +194,9 @@ const Solo = (function(){
     }
     on = true; paused = false; ended = false;
     took = 0; hudT = 0;
+    cdLeft = CD_MS;
     BLKB.setState(st);
+    BLKB.countdown(() => cdLeft);       // ⚠ 要在 setState 之後(setState 會清掉倒數)
     BLKB.play();
     showScreen("solo");
     paintBar();
@@ -258,6 +269,11 @@ const Solo = (function(){
        而且垃圾行推上來的時機會與我這邊差一整顆。 */
   function onFrame(dt){
     if(!on || ended || paused) return;
+    if(cdLeft > -CD_TAIL){
+      const was = cdLeft;
+      cdLeft -= dt;
+      if(was > 0) return;               // 倒數中:電腦不動、K.O. 賽的時鐘不走(自己的盤面由 counting() 擋)
+    }
     /* ⚠⚠ HUD 一定要在「有沒有電腦對手」**之前** —— 這裡本來第一行就是
        `… || !foe) return`,而練習與 40 行競速的 foe 是 null → 那條路每幀都早退,
        整局只剩 lock 事件會重畫一次 HUD。症狀:**計時器與「階」整局凍住**
@@ -577,6 +593,7 @@ const Solo = (function(){
     playing: () => on && !ended,
     active: () => on,
     paused: () => paused,
+    counting: () => on && cdLeft > 0,
     state: () => st,
     /* ⚠ 相容留著:v2.15.4 之前只有一台電腦,外面問的就是它。現在回第一台。 */
     foeState: () => (foes[0] ? foes[0].st : null),

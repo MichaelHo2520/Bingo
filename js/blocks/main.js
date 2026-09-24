@@ -383,12 +383,17 @@ BLKB.mount({
     else if(typeof MP !== "undefined") MP.onEvents(evs, st);
   },
   canPlay(){
-    if(Solo.active()) return !Solo.paused() && !blkVeilOpen();
+    if(Solo.active()) return !Solo.paused() && !Solo.counting() && !blkVeilOpen();
     return (typeof MP !== "undefined") ? MP.canPlay() : false;
   },
   /* 每一幀的鉤子:單機對電腦在這裡推進電腦那一份狀態 */
   onFrame(dt){
-    if(Solo.active()) Solo.onFrame(dt);
+    /* 設定／說明蓋板開著時,單機所有參賽者一起停(同泡泡對戰);連線照常走(紅線 ㉓)。
+       ⚠ 2026-09-24 以前這裡沒擋 → 蓋板開著時電腦照打,只有我停住;
+         開局倒數也扣這裡的 dt,不擋的話蓋板開著倒數照樣跑完。 */
+    if(Solo.active()){
+      if(!blkVeilOpen()) Solo.onFrame(dt);
+    }
     else if(typeof MP !== "undefined" && MP.onFrame) MP.onFrame(dt);
   }
 });
