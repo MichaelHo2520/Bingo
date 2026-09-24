@@ -912,7 +912,9 @@ const BUBB = (function(){
     }
     if(!lbl){ cdFn = null; return; }
     const rm = reduced();
-    const cx = W / 2, cy = H * 0.55;
+    /* ⚠ 0.55 → 0.42(2026-09-24,使用者:「有點偏下面」):0.55 時底下那句「準備好了嗎?」
+       幾乎貼到死亡線與發射器。整組(環頂 ~ 字幕)本來就比 cy 偏下 0.37 顆,所以 cy 要比正中再高一些。 */
+    const cx = W / 2, cy = H * 0.42;
     ctxM.save();
     ctxM.textAlign = "center"; ctxM.textBaseline = "middle"; ctxM.lineJoin = "round";
     if(left > 0){
