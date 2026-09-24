@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>泡泡對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 泡泡對戰 · v2.17.0 -->
-<meta name="version" content="2.17.0">
+<meta name="version" content="2.17.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 bubble 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -60,19 +60,23 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <img class="bub-art" src="img/bub2-icon.png" alt="彩色的泡泡" width="192" height="192">
         <div class="bub-tag display">射泡泡,三顆同色就消掉,把泡泡塞給對手</div>
       </div>
-      <!-- ⚠ 這一塊是小螢幕上唯一會縮、會捲的(其餘 flex:none)—— 最重要的東西排第一。 -->
+      <!-- ⚠ .bub-intro 是小螢幕上唯一會縮、會捲的(其餘 flex:none)—— 最重要的東西排第一。
+           ★ 「怎麼玩」與「操作說明」包在同一個捲動區(v2.17.0+1,同 blocks.html):
+             操作說明是 flex:none 的話,360×640 的「單機練習」會被推出畫面。 -->
+      <div class="bub-intro">
       <div class="bub-howto">
         <b>怎麼玩</b>:射出去的泡泡碰到<b>三顆以上同色</b>就消掉;
         跟天花板斷了連線的會<b>整串掉下來</b>。<b>掉得越多,塞給對手的排數越多。</b>
         <!-- ⚠ 攻擊表由 js/bubble/main.js 的 bubAtkHtml() 注入(數字讀 BUB.rowsOf),這裡不要寫死一份 -->
         <div class="bub-atk" id="bubAtkCard"></div>
-        被塞的泡泡會從<b>頂端整排插進來</b>(整片往下推);左邊的<b>警示條</b>亮起時,
+        被塞的泡泡會從<b>頂端整排插進來</b>(整片往下推);<b>天花板上亮起紅格子</b>時,
         趕快消掉一些就能<b>抵銷</b>。每射幾發頂端也會自己多一排。泡泡越過<b>虛線</b>就輸了。
         <b>三個人以上時,只會塞給其中一個人</b>(預設隨機)。
       </div>
       <!-- 操作說明。⚠ 內容由 js/bubble/main.js 的 bubGestHtml() 注入 ——
            房間框那顆「?」打開的蓋板印的是**同一份**。 -->
       <div class="bub-gest" id="bubGestCard"></div>
+      </div>
       <button class="btn primary block-btn home-btn" id="bubGoOnline">🌐 連線對戰</button>
       <button class="btn ghost block-btn home-btn" id="bubGoSolo">🎮 單機練習</button>
     </div>

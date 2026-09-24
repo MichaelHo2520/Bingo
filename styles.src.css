@@ -13735,11 +13735,16 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-art{width:96px;height:96px;display:block;margin:0 auto 8px}
 .blk-cart{}
 .blk-tag{font-family:'Fredoka','Nunito',sans-serif;font-weight:600;font-size:14.5px;color:var(--text)}
-.blk-howto{margin-top:14px;padding:14px 14px 12px;border-radius:14px;
+/* 「怎麼玩」+「操作說明」共用的捲動區(v2.17.0+1)。★ 進場頁唯一會縮、會捲的一塊 ——
+   以前只有 .blk-howto 會縮,操作說明是 flex:none,它一高就把兩顆開局鈕推出畫面
+   (方塊 360×800 被切掉 14px、360×640 整整 174px)。
+   ⚠ 捲動提示的內陰影畫在底下那張卡上會被蓋掉 → 改用捲動區本身的下緣漸隱(mask)。 */
+.blk-intro{margin-top:14px;flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
+           -webkit-mask-image:linear-gradient(#000 calc(100% - 14px),rgba(0,0,0,.35));
+           mask-image:linear-gradient(#000 calc(100% - 14px),rgba(0,0,0,.35))}
+.blk-howto{padding:14px 14px 12px;border-radius:14px;
            background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
-           text-align:left;font-size:13px;line-height:1.62;color:var(--text);
-           flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
-           box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
+           text-align:left;font-size:13px;line-height:1.62;color:var(--text)}
 .blk-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
 
 /* ---------- 攻擊表:四格圖(v2.15.3)----------
@@ -14136,6 +14141,17 @@ body.blk-side .blk-pad-r{right:4px}
                            0 0 0 2.5px rgba(255,255,255,.30),
                            0 0 18px 2px var(--accent-2),
                            0 2px 8px rgba(0,0,0,.30)}
+/* 「落地」鈕按住超過 150ms(board.js 的 DROP_MS)= 已經是慢降、放開不會直落 → 換成青色的一圈。
+   ★ 一顆兩用的鈕,手指要知道自己現在是哪一種;盤面上另外有氣流線(softStreaks)。
+   ⚠ 一定要排在 .blk-on 後面(同權重,後寫的贏;按住時兩個 class 同時在)。
+   ⚠ 不用 @keyframes 脈衝(紅線 ⑭)—— 靜態的顏色切換就分得出來,而且量得到。 */
+.blk-key.blk-soft{transform:scale(.95);
+                  background:radial-gradient(120% 120% at 50% 16%,
+                             rgba(190,250,255,.50), rgba(47,214,228,.30) 62%, rgba(10,70,90,.24));
+                  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5),
+                             0 0 0 2.5px rgba(47,214,228,.85),
+                             0 0 20px 3px rgba(47,214,228,.75),
+                             0 2px 8px rgba(0,0,0,.30)}
 
 /* ---------- 結果卡 ---------- */
 .blk-result{display:flex;flex-direction:column;gap:5px;margin:10px 0 4px}
@@ -14175,7 +14191,7 @@ body.solo-on .blk-react-row{display:none}
 @media (max-height:620px){
   .blk-home{overflow-y:auto;overscroll-behavior:contain}
   .blk-home > .blk-pick{flex:none}
-  .blk-howto{min-height:0;overflow:visible;box-shadow:none}
+  .blk-intro{min-height:0;overflow:visible;-webkit-mask-image:none;mask-image:none}
   .blk-hero{margin:6px 0 2px}
   .blk-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
   .blk-play{gap:4px;margin-top:4px}
@@ -14247,11 +14263,16 @@ body.solo-on .blk-react-row{display:none}
 .bub-art{width:96px;height:96px;display:block;margin:0 auto 8px}
 .bub-cart{}
 .bub-tag{font-family:'Fredoka','Nunito',sans-serif;font-weight:600;font-size:14.5px;color:var(--text)}
-.bub-howto{margin-top:14px;padding:14px 14px 12px;border-radius:14px;
+/* 「怎麼玩」+「操作說明」共用的捲動區(v2.17.0+1)。★ 進場頁唯一會縮、會捲的一塊 ——
+   以前只有 .bub-howto 會縮,操作說明是 flex:none,它一高就把兩顆開局鈕推出畫面
+   (方塊 360×800 被切掉 14px、360×640 整整 174px)。
+   ⚠ 捲動提示的內陰影畫在底下那張卡上會被蓋掉 → 改用捲動區本身的下緣漸隱(mask)。 */
+.bub-intro{margin-top:14px;flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
+           -webkit-mask-image:linear-gradient(#000 calc(100% - 14px),rgba(0,0,0,.35));
+           mask-image:linear-gradient(#000 calc(100% - 14px),rgba(0,0,0,.35))}
+.bub-howto{padding:14px 14px 12px;border-radius:14px;
            background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
-           text-align:left;font-size:13px;line-height:1.62;color:var(--text);
-           flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
-           box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
+           text-align:left;font-size:13px;line-height:1.62;color:var(--text)}
 /* 攻擊表:四格圖。⚠ 一列四格是硬需求(同方塊對戰:排成兩列會被那個會捲的框攔腰切掉) */
 .bub-atk{margin:7px 0 8px;padding:6px 4px 5px;border-radius:12px;
          background:rgba(0,0,0,.16);border:1px solid var(--panel-line)}
@@ -14484,7 +14505,7 @@ body.solo-on .bub-react-row{display:none}
 @media (max-height:620px){
   .bub-home{overflow-y:auto;overscroll-behavior:contain}
   .bub-home > .bub-pick{flex:none}
-  .bub-howto{min-height:0;overflow:visible;box-shadow:none}
+  .bub-intro{min-height:0;overflow:visible;-webkit-mask-image:none;mask-image:none}
   .bub-hero{margin:6px 0 2px}
   .bub-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
   .bub-play{gap:4px;margin-top:4px}

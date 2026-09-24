@@ -82,6 +82,7 @@ const BLKB = (function(){
     trail: null,                        // { k, r, x, y0, y1, t }
     pops: [],                           // 浮字
     hit: 0,                             // 收到攻擊的邊框閃光
+    gold: 0,                            // 大消除(Tetris / 全清 / 連擊 ≥ 3)的金色外框:輸出爆發,與紅色的「被打」分開
     beams: []                           // 攻擊光束(跨畫布,畫在 .blk-fx 上)
   };
 
@@ -372,8 +373,17 @@ const BLKB = (function(){
     ctx.globalAlpha = 0.10;
     ctx.fill();
     ctx.globalAlpha = 0.55;
-    ctx.lineWidth = Math.max(1.2, s * 0.07);
+    const lw = Math.max(1.2, s * 0.07);
+    ctx.lineWidth = lw;
     ctx.strokeStyle = col;
+    ctx.stroke();
+    /* 內圈一道細亮邊:深色的 J(藍)/ T(紫)在街機那種純暗底上只靠本色描邊太低調,
+       落點要「一眼看穿」。⚠ 亮邊畫在色邊**裡面**,不是蓋在外面 —— 外面那一圈是鄰格的地盤。 */
+    const q = lw * 0.5 + Math.max(0.8, s * 0.03);
+    roundRect(ctx, px + pad + q, py + pad + q, s - (pad + q) * 2, s - (pad + q) * 2, Math.max(1, r - q));
+    ctx.globalAlpha = 0.35;
+    ctx.lineWidth = Math.max(1, s * 0.035);
+    ctx.strokeStyle = "#fff";
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
@@ -406,6 +416,7 @@ const BLKB = (function(){
     particles();
     pops();
     ctxM.restore();
+    pendGlow(W, H);
     edgeFlash(W, H);
     hud();
     gauge();
@@ -447,9 +458,41 @@ const BLKB = (function(){
         if(p[1] >= R.TOP) ghostAt(ctxM, p[0] * cell, (p[1] - R.TOP) * cell, cell, col);
       });
     }
+    if(inp.soft && running && !R.grounded(st)) softStreaks(c, col);
     R.cellsOf(c.k, c.r, c.x, c.y).forEach(p => {
       if(p[1] >= R.TOP) cellAt(ctxM, p[0] * cell, (p[1] - R.TOP) * cell, cell, col, { glow: !reduced() });
     });
+  }
+  /* 軟降中:每一欄最上面那一格的上方拖兩道往上淡掉的氣流線 ——「我正在把它往下壓」。
+     ★ 那顆「落地」鈕是一顆兩用(短按落地 / 按住慢降),按住的前 150ms 手指分不出自己是哪一種;
+       盤面上看得到氣流線 = 已經在慢降、放開也不會直落(鈕本身另外有 .blk-soft 的狀態)。
+     ⚠ 位移是 st.time 的函式(暫停就停),不是 performance.now()。 */
+  function softStreaks(c, col){
+    const top = {};
+    R.cellsOf(c.k, c.r, c.x, c.y).forEach(p => {
+      if(top[p[0]] == null || p[1] < top[p[0]]) top[p[0]] = p[1];
+    });
+    const len = cell * 1.5, ph = ((st.time || 0) / 90) % 1;
+    ctxM.save();
+    ctxM.lineCap = "round";
+    ctxM.lineWidth = Math.max(1, cell * 0.07);
+    Object.keys(top).forEach(k => {
+      const x = +k, y0 = (top[k] - R.TOP) * cell;
+      if(y0 <= 0) return;
+      for(let j = 0; j < 2; j++){
+        const sx = (x + 0.3 + j * 0.4) * cell;
+        const off = ((ph + j * 0.5) % 1) * cell * 0.5;
+        const y1 = y0 - cell * 0.12 - off, ya = Math.max(0, y1 - len);
+        if(y1 <= ya) continue;
+        const g = ctxM.createLinearGradient(0, ya, 0, y1);
+        g.addColorStop(0, "rgba(255,255,255,0)");
+        g.addColorStop(1, col);
+        ctxM.globalAlpha = 0.5;
+        ctxM.strokeStyle = g;
+        ctxM.beginPath(); ctxM.moveTo(sx, ya); ctxM.lineTo(sx, y1); ctxM.stroke();
+      }
+    });
+    ctxM.restore();
   }
 
   /* 硬降的殘影拖尾 */
@@ -525,12 +568,43 @@ const BLKB = (function(){
 
   /* 收到攻擊時整盤外框閃一下(光束要等有對手才畫,見 P3) */
   function edgeFlash(W, H){
-    if(fx.hit <= 0) return;
+    if(fx.hit > 0){
+      ctxM.save();
+      ctxM.globalAlpha = Math.min(1, fx.hit);
+      ctxM.strokeStyle = "#ff5d6c";
+      ctxM.lineWidth = Math.max(2, cell * 0.16);
+      ctxM.strokeRect(1, 1, W - 2, H - 2);
+      ctxM.restore();
+    }
+    /* 大消除的金框:同一個位置、不同顏色 —— 紅 = 我被打,金 = 我打出去了 */
+    if(fx.gold > 0){
+      ctxM.save();
+      ctxM.globalAlpha = Math.min(1, fx.gold);
+      ctxM.strokeStyle = "#ffd93d";
+      ctxM.shadowColor = "#ffd93d";
+      ctxM.shadowBlur = reduced() ? 0 : cell * 0.6;
+      ctxM.lineWidth = Math.max(2, cell * 0.14);
+      ctxM.strokeRect(1, 1, W - 2, H - 2);
+      ctxM.restore();
+    }
+  }
+  /* 待處理垃圾 ≥ 4 行(警示條變紅的同一個門檻):盤面**左側內緣**透出一片會呼吸的紅光。
+     ★ 警示條只有 10px、在盤面外面 —— 玩的時候眼睛在盤面中間,餘光掃不到那一條,
+       等整片被推上來才發現。這一片畫在盤面裡面,眼角就看得到。
+     ⚠ 只畫靠左那一段(跟警示條同一邊)、而且很淡:它是提醒,不可以擋住左邊那幾欄。 */
+  function pendGlow(W, H){
+    if(!st || st.dead) return;
+    const n = R.pendCount(st);
+    if(n < 4) return;
+    const k = Math.min(1, (n - 3) / 5);
+    const p = reduced() ? 1 : (0.65 + 0.35 * Math.sin((st.time || 0) / 170));
+    const w = cell * 1.8;
+    const g = ctxM.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, "rgba(255,93,108," + ((0.20 + 0.22 * k) * p).toFixed(3) + ")");
+    g.addColorStop(1, "rgba(255,93,108,0)");
     ctxM.save();
-    ctxM.globalAlpha = Math.min(1, fx.hit);
-    ctxM.strokeStyle = "#ff5d6c";
-    ctxM.lineWidth = Math.max(2, cell * 0.16);
-    ctxM.strokeRect(1, 1, W - 2, H - 2);
+    ctxM.fillStyle = g;
+    ctxM.fillRect(0, 0, w, H);
     ctxM.restore();
   }
 
@@ -698,13 +772,10 @@ const BLKB = (function(){
         const gh = Math.min(H, H * Math.min(1, pend / 10));
         e.ctx.fillRect(0, H - gh, Math.max(2, fc * 0.45), gh);
       }
+      const danger = checkDanger(i, b, f.name, dead);
+      const koAge = koAgeOf(f.id || ("#" + i), dead);
       if(dead){
-        e.ctx.fillStyle = "rgba(0,0,0,.55)";
-        e.ctx.fillRect(0, 0, W, H);
-        e.ctx.fillStyle = "#fff";
-        e.ctx.font = "800 " + Math.round(H * 0.16) + "px Fredoka, Nunito, sans-serif";
-        e.ctx.textAlign = "center"; e.ctx.textBaseline = "middle";
-        e.ctx.fillText("KO", W / 2, H / 2);
+        koStamp(e.ctx, W, H, koAge);
       } else if(f.connState === "away"){
         e.ctx.fillStyle = "rgba(0,0,0,.60)";
         e.ctx.fillRect(0, 0, W, H);
@@ -719,11 +790,13 @@ const BLKB = (function(){
         e.ctx.font = "800 " + Math.max(10, Math.round(H * 0.13)) + "px Fredoka, Nunito, sans-serif";
         e.ctx.textAlign = "center"; e.ctx.textBaseline = "middle";
         e.ctx.fillText("延遲", W / 2, H / 2);
+      } else if(danger){
+        dangerBadge(e.ctx, W, H);
       }
       e.wrap.classList.toggle("blk-foe-target", !!f.target);
       e.wrap.classList.toggle("blk-foe-away", !!f.away);
       e.wrap.classList.toggle("blk-foe-lag", !!f.lag);
-      e.wrap.classList.toggle("blk-foe-danger", checkDanger(i, b, f.name, dead));
+      e.wrap.classList.toggle("blk-foe-danger", danger);
       const tag = (f.ko ? (" ×" + f.ko) : "");
       let stateTag = "";
       if(f.connState === "away") stateTag = " [離線]";
@@ -748,6 +821,71 @@ const BLKB = (function(){
       }
     }
   }
+  /* ---------- 小盤的「快爆了」警示燈 + K.O. 蓋印 ----------
+     ★ 聚會的笑點是「看朋友快輸了大家起鬨」—— 紅框脈動(.blk-foe-danger)之外,
+       小盤頂端多一盞會閃的警示燈;死掉那一刻 K.O. 章從大到小砸下來 + 一圈炸開。
+     ⚠ 警示燈是**自己畫的三角形**,不是 ⚠ 字元(U+26A0 預設是文字呈現,桌機會退回線條字形,紅線 8)。
+     ⚠ 蓋印的動畫只在「活 → 死」那個轉換開始算:一掛上去就已經死了的(觀戰中途進來、重整)直接是定格,
+       不然每次重建小盤都會再砸一次。K.O. 賽復活再死 = 再砸一次,那是對的。
+     ⚠ 用 wall clock 沒關係:這是純裝飾,不影響任何規則或判定。 */
+  const foeKo = new Map();              // id → { dead, t }
+  function koAgeOf(id, dead){
+    const now = performance.now();
+    const m = foeKo.get(id);
+    if(!m){ foeKo.set(id, { dead: dead, t: -1e9 }); return 1e9; }
+    if(dead && !m.dead) m.t = now;
+    m.dead = dead;
+    return now - m.t;
+  }
+  function koStamp(ctx, W, H, age){
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    ctx.fillRect(0, 0, W, H);
+    const still = reduced();
+    const e = still ? 1 : ease(clamp(age / 260, 0, 1));
+    if(!still && age < 460){
+      const k = age / 460;
+      ctx.save();
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = "#ffd93d";
+      ctx.lineWidth = Math.max(1.5, W * 0.05);
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, W * (0.12 + k * 0.62), 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    const fs = Math.max(10, Math.round(Math.min(W * 0.28, H * 0.15)));
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(-0.2);
+    ctx.scale(1 + 1.3 * (1 - e), 1 + 1.3 * (1 - e));
+    ctx.globalAlpha = 0.3 + 0.7 * e;
+    ctx.font = "900 " + fs + "px Fredoka, Nunito, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const tw = ctx.measureText("K.O.").width + fs * 0.55, th = fs * 1.3;
+    ctx.lineWidth = Math.max(1.5, fs * 0.12);
+    ctx.strokeStyle = "#ff5d6c";
+    roundRect(ctx, -tw / 2, -th / 2, tw, th, fs * 0.22);
+    ctx.stroke();
+    ctx.fillStyle = "#ff5d6c";
+    ctx.fillText("K.O.", 0, fs * 0.05);
+    ctx.restore();
+  }
+  function dangerBadge(ctx, W, H){
+    const s = Math.max(9, Math.min(W * 0.26, 18));
+    const cx = W / 2, y0 = Math.max(2, H * 0.025);
+    ctx.save();
+    ctx.globalAlpha = reduced() ? 1 : (0.78 + 0.22 * Math.sin(performance.now() / 140));   // ⚠ 下限不可以太低:黃色淡掉只剩黑邊 = 看起來是一個黑三角
+    ctx.fillStyle = "#ffd93d";
+    ctx.strokeStyle = "rgba(0,0,0,.6)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, y0); ctx.lineTo(cx + s * 0.6, y0 + s); ctx.lineTo(cx - s * 0.6, y0 + s);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "900 " + Math.round(s * 0.64) + "px Nunito, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("!", cx, y0 + s * 0.64);
+    ctx.restore();
+  }
+
   /* 哪一個小盤被點到(目標鎖定用)。回傳 index 或 -1 */
   function foeAt(el){
     for(let i = 0; i < foeEls.length; i++) if(foeEls[i].wrap.contains(el)) return i;
@@ -914,6 +1052,25 @@ const BLKB = (function(){
       }
     });
   }
+  /* 大消除:被消掉那幾列的**左右兩端**往外噴金色碎片(一般消行的碎片是從格子本身冒出來的) */
+  function edgeSparks(rows){
+    if(reduced()) return;
+    const W = R.COLS * cell;
+    rows.forEach(y => {
+      const py = (y - R.TOP) * cell;
+      if(py < 0) return;
+      for(let i = 0; i < 6; i++){
+        const left = i % 2 === 0;
+        fx.parts.push({
+          x: left ? 0 : W - cell * 0.16,
+          y: py + Math.random() * cell,
+          vx: (left ? 1 : -1) * (0.10 + Math.random() * 0.20) * cell,
+          vy: -(0.06 + Math.random() * 0.20) * cell,
+          s: Math.max(2, cell * 0.14), c: i < 2 ? "#fff" : "#ffd93d", t: 0, dur: 380 + Math.random() * 260
+        });
+      }
+    });
+  }
   function pop(txt, col, size){
     if(fx.pops.length >= 3) fx.pops.shift();
     for(let i = 0; i < fx.pops.length; i++){
@@ -934,7 +1091,11 @@ const BLKB = (function(){
       else shake(2);
       if(ev.combo >= 2) pop("連擊 ×" + ev.combo, "#2fd6e4", 0.76);
       if(ev.pc){ pop("ALL CLEAR", "#3ddc7f", 0.96); shake(8); }
-      if(ev.rows.length === 4 || ev.pc || ev.combo >= 3) BG("hit");   // 配樂在下一拍補一段過門
+      if(ev.rows.length === 4 || ev.pc || ev.combo >= 3){
+        BG("hit");                      // 配樂在下一拍補一段過門
+        fx.gold = 1;                    // 盤面外框金色一閃(紅框是「被打」,金框是「打出去」)
+        edgeSparks(ev.rows);
+      }
     }else{
       T(300, { type: "sine", dur: 0.05, vol: 0.10, slideTo: 210 });
       if(ev.drop > 4) shake(2);
@@ -1140,7 +1301,7 @@ const BLKB = (function(){
     endHold(h);
   }
   function endHold(h){
-    h.btn.classList.remove("blk-on");
+    h.btn.classList.remove("blk-on", "blk-soft");
     if(h.act === "drop"){
       release("soft");
       if(((st ? st.time : 0) - h.t0) < DROP_MS) act("hard");
@@ -1250,6 +1411,11 @@ const BLKB = (function(){
            → 所以修在這裡每幀同步回去,而不是去 spawn() 拿掉那一行
            (那會讓 revive / decode 接回來的狀態多一個沒有人管的欄位)。 */
       st.soft = inp.soft;
+      /* 「落地」鈕按住超過 DROP_MS → 換成「慢降」的樣子(.blk-soft):到這一刻起放開也不會直落。
+         ★ 判定跟 endHold() 同一條(st.time − t0 ≥ DROP_MS),所以鈕的樣子與放開的結果不會對不上。 */
+      padHold.forEach(h => {
+        if(h.act === "drop") h.btn.classList.toggle("blk-soft", (st.time - h.t0) >= DROP_MS);
+      });
       stepDas(dt);
       const pre = R.grounded(st) ? snapPre() : null;   // ⚠ 紅線 ③:只有貼地那幾幀才留
       const evs = R.tick(st, dt);
@@ -1281,6 +1447,7 @@ const BLKB = (function(){
   function stepFx(dt){
     if(fx.shake > 0) fx.shake = Math.max(0, fx.shake - dt * 0.045);
     if(fx.hit > 0) fx.hit = Math.max(0, fx.hit - dt * 0.004);
+    if(fx.gold > 0) fx.gold = Math.max(0, fx.gold - dt * 0.0028);
     if(fx.trail){ fx.trail.t += dt; if(fx.trail.t >= fx.trail.dur) fx.trail = null; }
     if(fx.clear){
       fx.clear.t += dt;
@@ -1372,12 +1539,12 @@ const BLKB = (function(){
        (release 由上下那兩行統一做,所以這裡只要把帳清掉。) */
     padHold.clear();
     if(st) st.soft = false;
-    if(elPad) elPad.querySelectorAll(".blk-on").forEach(b => b.classList.remove("blk-on"));
+    if(elPad) elPad.querySelectorAll(".blk-on,.blk-soft").forEach(b => b.classList.remove("blk-on", "blk-soft"));
   }
   function setState(s){
     st = s;
     fx.clear = null; fx.parts.length = 0; fx.pops.length = 0; fx.trail = null;
-    fx.shake = 0; fx.hit = 0; fx.beams.length = 0;
+    fx.shake = 0; fx.hit = 0; fx.gold = 0; fx.beams.length = 0;
     allUp();
     fitBoard();
     BG("round");

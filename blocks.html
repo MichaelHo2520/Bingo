@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.17.0 -->
-<meta name="version" content="2.17.0">
+<meta name="version" content="2.17.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -61,9 +61,13 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <img class="blk-art" src="img/blk-icon.png" alt="疊起來的方塊" width="192" height="192">
         <div class="blk-tag display">堆起來,消掉,把垃圾行送給對手</div>
       </div>
-      <!-- ⚠⚠ 這一塊是小螢幕上**唯一會縮、會捲**的(其餘全是 flex:none)——
+      <!-- ⚠⚠ .blk-intro 是小螢幕上**唯一會縮、會捲**的(其餘全是 flex:none)——
            所以順序就是優先順序:**最重要的那個東西要排第一**,後面的可以被捲到看不見。
-           攻擊表排在文字之前正是這個理由(第一版排在文字後面,截圖看到它被攔腰切掉)。 -->
+           攻擊表排在文字之前正是這個理由(第一版排在文字後面,截圖看到它被攔腰切掉)。
+           ★ 「怎麼玩」與「操作說明」包在**同一個**捲動區(v2.17.0+1):以前只有「怎麼玩」會縮,
+             操作說明那張 253px 是 flex:none → 360×800 的「單機練習」被推出畫面 14px、
+             360×640 整整 174px。兩顆開局鈕一定要一進畫面就看得到。 -->
+      <div class="blk-intro">
       <div class="blk-howto">
         <b>怎麼玩</b>:填滿一整列就會消掉。<b>一次消越多列,送給對手的垃圾行越多。</b>
         <!-- ⚠⚠ 攻擊表由 js/blocks/main.js 的 blkAtkHtml() 注入,**這裡不要寫死一份**。
@@ -80,6 +84,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            房間框那顆「?」打開的蓋板印的是**同一份**,寫死兩份就是遲早分岔的雙胞胎。
            ★ 這一格在進場的第一層 → 連線與單機**兩條路都會經過**。 -->
       <div class="blk-gest" id="blkGestCard"></div>
+      </div>
       <button class="btn primary block-btn home-btn" id="blkGoOnline">🌐 連線對戰</button>
       <button class="btn ghost block-btn home-btn" id="blkGoSolo">🎮 單機練習</button>
     </div>

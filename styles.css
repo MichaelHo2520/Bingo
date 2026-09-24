@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 9bbf20231cbda77a18779646b9b5ed12faff0e5e8fc208688120ae9223d930fd)
+    真相在 styles.src.css(sha256 6549ead0214e310c4660c749fc006ae4f52fedd3e8101fa5ad6efa669072df4c)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6030,11 +6030,12 @@ body.is-big .cy-timer{margin-left:auto}
 .blk-art{width:96px;height:96px;display:block;margin:0 auto 8px}
 .blk-cart{}
 .blk-tag{font-family:'Fredoka','Nunito',sans-serif;font-weight:600;font-size:14.5px;color:var(--text)}
-.blk-howto{margin-top:14px;padding:14px 14px 12px;border-radius:14px;
+.blk-intro{margin-top:14px;flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
+           -webkit-mask-image:linear-gradient(#000 calc(100% - 14px),rgba(0,0,0,.35));
+           mask-image:linear-gradient(#000 calc(100% - 14px),rgba(0,0,0,.35))}
+.blk-howto{padding:14px 14px 12px;border-radius:14px;
            background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
-           text-align:left;font-size:13px;line-height:1.62;color:var(--text);
-           flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
-           box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
+           text-align:left;font-size:13px;line-height:1.62;color:var(--text)}
 .blk-warn{display:inline-block;margin-top:4px;color:var(--accent-2);font-weight:800}
 .blk-atk{margin:7px 0 8px;padding:6px 4px 5px;border-radius:12px;
          background:rgba(0,0,0,.16);border:1px solid var(--panel-line)}
@@ -6264,6 +6265,13 @@ body.blk-side .blk-pad-r{right:4px}
                            0 0 0 2.5px rgba(255,255,255,.30),
                            0 0 18px 2px var(--accent-2),
                            0 2px 8px rgba(0,0,0,.30)}
+.blk-key.blk-soft{transform:scale(.95);
+                  background:radial-gradient(120% 120% at 50% 16%,
+                             rgba(190,250,255,.50), rgba(47,214,228,.30) 62%, rgba(10,70,90,.24));
+                  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.5),
+                             0 0 0 2.5px rgba(47,214,228,.85),
+                             0 0 20px 3px rgba(47,214,228,.75),
+                             0 2px 8px rgba(0,0,0,.30)}
 .blk-result{display:flex;flex-direction:column;gap:5px;margin:10px 0 4px}
 .blk-rrow{display:flex;justify-content:space-between;align-items:center;
           font-size:13.5px;color:var(--text);padding:6px 11px;border-radius:10px;
@@ -6287,7 +6295,7 @@ body.solo-on .blk-react-row{display:none}
 @media (max-height:620px){
   .blk-home{overflow-y:auto;overscroll-behavior:contain}
   .blk-home > .blk-pick{flex:none}
-  .blk-howto{min-height:0;overflow:visible;box-shadow:none}
+  .blk-intro{min-height:0;overflow:visible;-webkit-mask-image:none;mask-image:none}
   .blk-hero{margin:6px 0 2px}
   .blk-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
   .blk-play{gap:4px;margin-top:4px}
@@ -6328,11 +6336,12 @@ body.solo-on .blk-react-row{display:none}
 .bub-art{width:96px;height:96px;display:block;margin:0 auto 8px}
 .bub-cart{}
 .bub-tag{font-family:'Fredoka','Nunito',sans-serif;font-weight:600;font-size:14.5px;color:var(--text)}
-.bub-howto{margin-top:14px;padding:14px 14px 12px;border-radius:14px;
+.bub-intro{margin-top:14px;flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
+           -webkit-mask-image:linear-gradient(#000 calc(100% - 14px),rgba(0,0,0,.35));
+           mask-image:linear-gradient(#000 calc(100% - 14px),rgba(0,0,0,.35))}
+.bub-howto{padding:14px 14px 12px;border-radius:14px;
            background:rgba(255,255,255,.05);border:1px solid var(--panel-line);
-           text-align:left;font-size:13px;line-height:1.62;color:var(--text);
-           flex:0 1 auto;min-height:120px;overflow-y:auto;overscroll-behavior:contain;
-           box-shadow:inset 0 -14px 12px -12px rgba(0,0,0,.30)}
+           text-align:left;font-size:13px;line-height:1.62;color:var(--text)}
 .bub-atk{margin:7px 0 8px;padding:6px 4px 5px;border-radius:12px;
          background:rgba(0,0,0,.16);border:1px solid var(--panel-line)}
 .bub-atk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
@@ -6521,7 +6530,7 @@ body.solo-on .bub-react-row{display:none}
 @media (max-height:620px){
   .bub-home{overflow-y:auto;overscroll-behavior:contain}
   .bub-home > .bub-pick{flex:none}
-  .bub-howto{min-height:0;overflow:visible;box-shadow:none}
+  .bub-intro{min-height:0;overflow:visible;-webkit-mask-image:none;mask-image:none}
   .bub-hero{margin:6px 0 2px}
   .bub-art{transform:scale(.76);transform-origin:center top;margin-bottom:0}
   .bub-play{gap:4px;margin-top:4px}

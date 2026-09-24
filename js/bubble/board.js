@@ -41,6 +41,7 @@ const BUBB = (function(){
        只有畫面與輸入換算多一個 CEIL*D 的位移(draw 的 translate、aimFromPoint、onNext)。 */
   const CEIL = 0.36;
   const BH = R.H + CEIL;                // canvas 的總高(直徑為單位)
+  const SWAP_MS = 120;                  // 換球動畫多長(短:它不可以擋到下一次瞄準)
   const GAP = 8;                        // 盤面與小盤之間
   const FOE_MIN = 52, FOE_MAX = 170, FOE_OVER = 62;   // 右側那一欄:最窄 / 最寬 / 疊上去時的寬
   const STRIP_MIN = 84, STRIP_MAX = 150, STRIP_PAD = 22;   // 上方那一條:最矮 / 最高 / 名字 + 內距
@@ -72,6 +73,7 @@ const BUBB = (function(){
     floats: [],                         // 落點冒出來的「+N」:{ txt, x, y, c, t, dur }
     words: [],                          // 浮字
     push: null,                         // 插排的滑入:{ n, t, dur }
+    swap: null,                         // 換球的互換動畫:{ t }(SWAP_MS 內兩顆沿弧線交換位置)
     impact: null,
     beams: []
   };
@@ -464,9 +466,10 @@ const BUBB = (function(){
     const pend = st ? R.pendCount(st) : 0;
     if(pend > 0) busyTo = D * 0.22 + Math.min(pend, 6) * D * 0.76 + D * 1.9;
     ctxM.fillStyle = ceilEdge;
+    const badgeFrom = st ? W - D * 1.35 : W;   // 右端留給插排倒數(pressBadge)
     for(let x = 0; x < R.COLS; x++){
       const rx = (x + 0.5) * D;
-      if(rx < busyTo) continue;
+      if(rx < busyTo || rx > badgeFrom) continue;
       ctxM.beginPath(); ctxM.arc(rx, OY * 0.5, Math.max(1, D * 0.045), 0, Math.PI * 2); ctxM.fill();
     }
     if(st){
@@ -479,6 +482,7 @@ const BUBB = (function(){
       }
       ctxM.strokeStyle = edge; ctxM.lineWidth = lw;
       ctxM.beginPath(); ctxM.moveTo(0, OY - lw / 2); ctxM.lineTo(W, OY - lw / 2); ctxM.stroke();
+      if(!st.dead) pressBadge(W, OY, pressLeft, now);
       const n = R.pendCount(st);
       if(n > 0){
         const held = st.shield > 0;
@@ -508,6 +512,38 @@ const BUBB = (function(){
         ctxM.fillText(txt, tx, OY / 2 + 1);
       }
     }
+    ctxM.restore();
+  }
+  /* 天花板右端的插排倒數:「▼ N」= 再 N 發天花板就往下推一排(v2.17.0+1,Gemini 建議 2.3)。
+     ★ 砲台右邊那排小點照樣留著,但玩的時候眼睛在盤面**上半部**(要瞄的地方),
+       右下角又常被右手拇指蓋住 —— 抬頭看泡泡時就要順便看得到還剩幾發。
+     ⚠ 顏色跟小點同一套門檻(≤ 2 發變紅、會閃),兩處說的永遠是同一件事。
+     ⚠ 箭頭是畫的,不用 ⏱ / ▼ 字元(紅線 8)。
+     ⚠ 待處理垃圾最多畫到 6 格 + 「+N 排」≈ 6.7 顆寬,這一塊佔最右邊 1.3 顆 —— 兩者碰不到。 */
+  function pressBadge(W, OY, left, now){
+    left = Math.max(0, left);
+    const hot = left <= 2;
+    const a = (hot && !reduced()) ? (0.65 + 0.35 * Math.sin(now / 120)) : 0.8;
+    const fs = Math.max(9, Math.round(OY * 0.72));
+    const txt = String(left);
+    ctxM.save();
+    ctxM.font = "800 " + fs + "px Fredoka, Nunito, system-ui, sans-serif";
+    ctxM.textAlign = "right"; ctxM.textBaseline = "middle";
+    const tx = W - D * 0.22, ty = OY / 2 + 1;
+    const tw = ctxM.measureText(txt).width;
+    const col = hot ? "#ff5d6c" : inkCol;
+    ctxM.globalAlpha = a;
+    ctxM.lineWidth = 3; ctxM.strokeStyle = "rgba(0,0,0,.5)";
+    ctxM.strokeText(txt, tx, ty);
+    ctxM.fillStyle = col;
+    ctxM.fillText(txt, tx, ty);
+    // 往下的箭頭(一條短桿 + 三角):天花板要往下推
+    const s = OY * 0.36, ax = tx - tw - s * 0.95, ay = OY / 2;
+    ctxM.strokeStyle = col; ctxM.lineWidth = Math.max(1.2, s * 0.28); ctxM.lineCap = "round";
+    ctxM.beginPath(); ctxM.moveTo(ax, ay - s); ctxM.lineTo(ax, ay + s * 0.1); ctxM.stroke();
+    ctxM.beginPath();
+    ctxM.moveTo(ax - s * 0.62, ay - s * 0.05); ctxM.lineTo(ax + s * 0.62, ay - s * 0.05); ctxM.lineTo(ax, ay + s);
+    ctxM.closePath(); ctxM.fill();
     ctxM.restore();
   }
   function roundRect(c, x, y, w, h, r){
@@ -592,7 +628,7 @@ const BUBB = (function(){
                      trace: R.trace(st.board, st.par, st.aim) };
     const t = guideCache.trace;
     const pts = t.path;
-    let budget = 999, bounced = false;
+    let budget = 999, bounced = false, drawnTo = 0;
     ctxM.save();
     ctxM.strokeStyle = guideCol;
     ctxM.lineWidth = Math.max(1.5, D * 0.07);
@@ -609,11 +645,33 @@ const BUBB = (function(){
         budget = 0; break;
       }
       ctxM.lineTo(b[0] * D, b[1] * D);
+      drawnTo = i;
       if(bounced) budget -= len;
       if(i < pts.length - 1 && !bounced){ bounced = true; budget = 3; }
     }
     ctxM.stroke();
     ctxM.restore();
+    /* 落點虛線球(v2.17.0+1,Gemini 建議 2.1):預瞄線**真的畫到終點**的時候,在吸附的那一格
+       畫一顆同色的虛線圓 —— 六角格的吸附點跟「線的盡頭」常常差半顆,這一顆就是實際會黏的地方。
+       ⚠⚠ 紅線 ⑭ 照樣成立:線被「反彈後 3 顆」截斷的時候**不畫**(那一發的落點本來就要靠自己判斷)。
+         所以判準是「最後一段有沒有畫到」,不是「有沒有反彈」—— 近距離反彈、線畫得到底的照樣顯示。
+       ⚠ 位置跟盤面上的泡泡一樣要扣 pushOff()(插排滑入那 0.2 秒,不扣就會跟格子錯開)。
+       ★ 刻意**不**做「會不會消掉」的提示:同色有沒有連到三顆,盤面上看得到,那是玩家自己的判斷。 */
+    if(drawnTo === pts.length - 1 && t.cell){
+      const gx = R.cx(st.par, t.cell[0], t.cell[1]) * D;
+      const gy = (R.cy(t.cell[1]) - pushOff()) * D;
+      const col = colOf(st.cur);
+      ctxM.save();
+      ctxM.fillStyle = col;
+      ctxM.globalAlpha = 0.18;
+      ctxM.beginPath(); ctxM.arc(gx, gy, D * 0.44, 0, Math.PI * 2); ctxM.fill();
+      ctxM.globalAlpha = 0.9;
+      ctxM.strokeStyle = col;
+      ctxM.lineWidth = Math.max(1.5, D * 0.07);
+      ctxM.setLineDash([D * 0.14, D * 0.1]);
+      ctxM.stroke();
+      ctxM.restore();
+    }
   }
   function shotFx(){
     const s = st.shot;
@@ -659,20 +717,64 @@ const BUBB = (function(){
     ctxM.strokeStyle = colOf(st.cur); ctxM.lineWidth = Math.max(1.5, D * 0.08);
     ctxM.beginPath(); ctxM.moveTo(-tw / 2, -tl + D * 0.06); ctxM.lineTo(tw / 2, -tl + D * 0.06); ctxM.stroke();
     ctxM.restore();
-    if(!st.shot && !st.dead) bubble(ctxM, x, y, D, st.cur);
-    else if(!st.dead) bubble(ctxM, x, y, D * 0.8, st.cur, { alpha: 0.35 });
-    // 下一顆
     const n = nextPos();
-    ctxM.fillStyle = "rgba(255,255,255,.07)";
-    ctxM.beginPath(); ctxM.arc(n.x, n.y, D * 0.5, 0, Math.PI * 2); ctxM.fill();
-    bubble(ctxM, n.x, n.y, D * 0.72, st.next);
-    ctxM.save();
-    ctxM.font = "800 " + Math.max(9, Math.round(D * 0.28)) + "px Nunito, system-ui, sans-serif";
-    ctxM.textAlign = "center"; ctxM.textBaseline = "middle";
-    ctxM.fillStyle = inkCol; ctxM.globalAlpha = 0.72;
-    ctxM.fillText("⇄ 換", n.x + D * 0.95, n.y);
-    ctxM.restore();
+    swapPlate(n);
+    /* 換球的那 SWAP_MS:兩顆沿著弧線互換位置(新的目前這顆從左下飛上砲口、換下來的那顆落回托座)。
+       ★ 「按了換」要看得出換了什麼 —— 瞬間變色的話,手指剛離開那一下根本沒看到。 */
+    const sw = fx.swap ? ease(Math.min(1, fx.swap.t / SWAP_MS)) : 1;
+    const lift = Math.sin(Math.PI * sw);
+    const cx0 = n.x + (x - n.x) * sw, cy0 = n.y + (y - n.y) * sw - lift * D * 0.55;
+    const nx0 = x + (n.x - x) * sw,   ny0 = y + (n.y - y) * sw + lift * D * 0.25;
+    if(!st.shot && !st.dead) bubble(ctxM, cx0, cy0, D * (0.72 + 0.28 * sw), st.cur);
+    else if(!st.dead) bubble(ctxM, x, y, D * 0.8, st.cur, { alpha: 0.35 });
+    bubble(ctxM, nx0, ny0, D * (1 - 0.28 * sw), st.next);
     pressDots(x, y, now);
+  }
+  /* 「下一顆」的托座 = 換球鈕(v2.17.0+1,Gemini 建議 2.2)。
+     ★ 以前是一片很淡的圓 + 旁邊一行「⇄ 換」—— 而那行字的**中心**就落在命中圈(onNext 的 0.95 顆)邊上,
+       右半截按下去是「瞄準」不是「換」:想換沒換到、想瞄卻換了,兩種不安都是從這裡來的。
+     → 畫成一顆有邊界的鈕:底托 + 一圈雙向旋轉箭頭 + 「換」字,**全部畫在命中圈裡面**。
+     ⚠ 命中圈本身(onNext)沒有動 —— 動的是「看起來可以按的範圍」,讓它跟真的範圍對得上。
+     ⚠ 箭頭是畫出來的,不是 ⇄ / 🔄 字元(那兩個在桌機會退回線條字形或吃不到顏色,紅線 8)。 */
+  function swapPlate(n){
+    const R0 = D * 0.6;
+    const spin = fx.swap ? ease(Math.min(1, fx.swap.t / SWAP_MS)) * Math.PI : 0;
+    ctxM.save();
+    ctxM.fillStyle = "rgba(255,255,255,.08)";
+    ctxM.strokeStyle = gunCol;
+    ctxM.lineWidth = Math.max(1, D * 0.035);
+    ctxM.globalAlpha = 1;
+    ctxM.beginPath(); ctxM.arc(n.x, n.y, R0, 0, Math.PI * 2); ctxM.fill();
+    ctxM.globalAlpha = 0.45;
+    ctxM.stroke();
+    // 兩段弧 + 箭頭(順時針),換球時轉半圈
+    const ra = D * 0.5, aw = D * 0.1;
+    ctxM.globalAlpha = 0.8;
+    ctxM.strokeStyle = inkCol; ctxM.fillStyle = inkCol;
+    ctxM.lineWidth = Math.max(1.2, D * 0.05);
+    ctxM.lineCap = "round";
+    for(let j = 0; j < 2; j++){
+      const a0 = spin + j * Math.PI - Math.PI * 0.35, a1 = a0 + Math.PI * 0.55;
+      ctxM.beginPath(); ctxM.arc(n.x, n.y, ra, a0, a1); ctxM.stroke();
+      const hx = n.x + Math.cos(a1) * ra, hy = n.y + Math.sin(a1) * ra;
+      const tx = -Math.sin(a1), ty = Math.cos(a1);          // 切線方向(順時針前進)
+      const ox = Math.cos(a1), oy = Math.sin(a1);           // 法線(往外)
+      ctxM.beginPath();
+      ctxM.moveTo(hx + tx * aw * 1.3, hy + ty * aw * 1.3);
+      ctxM.lineTo(hx + ox * aw, hy + oy * aw);
+      ctxM.lineTo(hx - ox * aw, hy - oy * aw);
+      ctxM.closePath(); ctxM.fill();
+    }
+    // 「換」:貼在托座右緣,仍在命中圈(0.95 顆)以內
+    const fs = Math.max(9, Math.round(D * 0.26));
+    ctxM.globalAlpha = 0.85;
+    ctxM.font = "800 " + fs + "px Nunito, system-ui, sans-serif";
+    ctxM.textAlign = "center"; ctxM.textBaseline = "middle";
+    ctxM.lineWidth = 3; ctxM.strokeStyle = "rgba(0,0,0,.45)";
+    ctxM.strokeText("換", n.x + D * 0.74, n.y - D * 0.34);
+    ctxM.fillStyle = inkCol;
+    ctxM.fillText("換", n.x + D * 0.74, n.y - D * 0.34);
+    ctxM.restore();
   }
   function pressDots(x, y, now){
     const N = R.pressN(st), left = Math.max(0, N - st.since);
@@ -967,13 +1069,16 @@ const BUBB = (function(){
         const gh = Math.min(H, H * Math.min(1, pend / 6));
         e.ctx.fillRect(0, H - gh, Math.max(2, fd * 0.4), gh);
       }
-      if(dead) overlay(e.ctx, W, H, "rgba(0,0,0,.55)", "#fff", "KO", 0.16);
+      const danger = checkDanger(i, b, f.name, dead);
+      const koAge = koAgeOf(f.id || ("#" + i), dead);
+      if(dead) koStamp(e.ctx, W, H, koAge);
       else if(f.connState === "away") overlay(e.ctx, W, H, "rgba(0,0,0,.60)", "#ffaa00", "中斷", 0.13);
       else if(f.connState === "lag") overlay(e.ctx, W, H, "rgba(0,0,0,.35)", "#ffd166", "延遲", 0.13);
+      else if(danger) dangerBadge(e.ctx, W, H);
       e.wrap.classList.toggle("bub-foe-target", !!f.target);
       e.wrap.classList.toggle("bub-foe-away", !!f.away);
       e.wrap.classList.toggle("bub-foe-lag", !!f.lag);
-      e.wrap.classList.toggle("bub-foe-danger", checkDanger(i, b, f.name, dead));
+      e.wrap.classList.toggle("bub-foe-danger", danger);
       let tag = f.ko ? (" ×" + f.ko) : "";
       if(f.connState === "away") tag += " [離線]";
       else if(f.connState === "lag") tag += " [延遲]";
@@ -990,6 +1095,66 @@ const BUBB = (function(){
         if(e.wrap.getAttribute("aria-label") !== label) e.wrap.setAttribute("aria-label", label);
       }
     }
+  }
+  /* ---------- 小盤的「快爆了」警示燈 + K.O. 蓋印(照抄 js/blocks/board.js 那一份)----------
+     ⚠ 警示燈自己畫,不用 ⚠ 字元(紅線 8)。蓋印只在「活 → 死」那一刻開始算,
+       一掛上去就已經死了的直接定格。wall clock 沒關係:純裝飾。 */
+  const foeKo = new Map();              // id → { dead, t }
+  function koAgeOf(id, dead){
+    const now = performance.now();
+    const m = foeKo.get(id);
+    if(!m){ foeKo.set(id, { dead: dead, t: -1e9 }); return 1e9; }
+    if(dead && !m.dead) m.t = now;
+    m.dead = dead;
+    return now - m.t;
+  }
+  function koStamp(ctx, W, H, age){
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    ctx.fillRect(0, 0, W, H);
+    const still = reduced();
+    const e = still ? 1 : ease(clamp(age / 260, 0, 1));
+    if(!still && age < 460){
+      const k = age / 460;
+      ctx.save();
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = "#ffd93d";
+      ctx.lineWidth = Math.max(1.5, W * 0.05);
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, W * (0.12 + k * 0.62), 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    }
+    const fs = Math.max(10, Math.round(Math.min(W * 0.28, H * 0.15)));
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.rotate(-0.2);
+    ctx.scale(1 + 1.3 * (1 - e), 1 + 1.3 * (1 - e));
+    ctx.globalAlpha = 0.3 + 0.7 * e;
+    ctx.font = "900 " + fs + "px Fredoka, Nunito, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const tw = ctx.measureText("K.O.").width + fs * 0.55, th = fs * 1.3;
+    ctx.lineWidth = Math.max(1.5, fs * 0.12);
+    ctx.strokeStyle = "#ff5d6c";
+    roundRect(ctx, -tw / 2, -th / 2, tw, th, fs * 0.22);
+    ctx.stroke();
+    ctx.fillStyle = "#ff5d6c";
+    ctx.fillText("K.O.", 0, fs * 0.05);
+    ctx.restore();
+  }
+  function dangerBadge(ctx, W, H){
+    const s = Math.max(9, Math.min(W * 0.26, 18));
+    const cx = W / 2, y0 = Math.max(2, H * 0.025);
+    ctx.save();
+    ctx.globalAlpha = reduced() ? 1 : (0.78 + 0.22 * Math.sin(performance.now() / 140));   // ⚠ 下限不可以太低:黃色淡掉只剩黑邊 = 看起來是一個黑三角
+    ctx.fillStyle = "#ffd93d";
+    ctx.strokeStyle = "rgba(0,0,0,.6)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, y0); ctx.lineTo(cx + s * 0.6, y0 + s); ctx.lineTo(cx - s * 0.6, y0 + s);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#1a1a1a";
+    ctx.font = "900 " + Math.round(s * 0.64) + "px Nunito, sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("!", cx, y0 + s * 0.64);
+    ctx.restore();
   }
   function overlay(ctx, W, H, bg, fg, txt, k){
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
@@ -1185,7 +1350,10 @@ const BUBB = (function(){
       T(420, { type: "square", dur: 0.05, vol: 0.12, slideTo: 760 });
       cfg.onEvents([ev], st);
     }else if(name === "swap"){
-      if(R.swap(st)) T(660, { type: "sine", dur: 0.05, vol: 0.10, slideTo: 880 });
+      if(R.swap(st)){
+        T(660, { type: "sine", dur: 0.05, vol: 0.10, slideTo: 880 });
+        if(!reduced()) fx.swap = { t: 0 };
+      }
     }
   }
   function setAim(a){ if(st && live()) R.aim(st, a); }
@@ -1301,6 +1469,7 @@ const BUBB = (function(){
     if(fx.shake > 0) fx.shake = Math.max(0, fx.shake - dt * 0.045);
     if(fx.hit > 0) fx.hit = Math.max(0, fx.hit - dt * 0.004);
     if(fx.push){ fx.push.t += dt; if(fx.push.t >= fx.push.dur) fx.push = null; }
+    if(fx.swap){ fx.swap.t += dt; if(fx.swap.t >= SWAP_MS) fx.swap = null; }
     for(let i = fx.pops.length - 1; i >= 0; i--){ fx.pops[i].t += dt; if(fx.pops[i].t >= 220) fx.pops.splice(i, 1); }
     for(let i = fx.drops.length - 1; i >= 0; i--){
       const p = fx.drops[i];
@@ -1366,7 +1535,7 @@ const BUBB = (function(){
     guideCache = null;
     fx.pops.length = 0; fx.drops.length = 0; fx.words.length = 0; fx.beams.length = 0;
     fx.sparks.length = 0; fx.floats.length = 0;
-    fx.push = null; fx.shake = 0; fx.hit = 0;
+    fx.push = null; fx.swap = null; fx.shake = 0; fx.hit = 0;
     fx.impact = null;
     countdown(null);                    // ⚠ 新的一局不可以沿用上一局的倒數(要的話 setState 之後再給)
     allUp();
