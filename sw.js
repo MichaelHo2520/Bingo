@@ -3,7 +3,7 @@
    網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
    CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
-const VERSION = "2.16.0";
+const VERSION = "2.17.0";
 const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
@@ -19,6 +19,7 @@ const CORE = [
   "./js/shared/ui-kit.js",
   "./js/shared/mp-order.js",
   "./js/shared/mp-core.js",
+  "./js/shared/chip-bgm.js",   // 動態配樂 ChipBGM(v2.17.0,只有方塊 / 泡泡載入;曲譜在各自的 music.js)
   "./js/shared/talk.js",       // 即時語音 WebRTC(v1.183.0 起十四頁全部載入,含 Bingo)
   "./js/shared/qr.js",         // 房間分享:QR 編碼器 + 邀請蓋板(十四頁全部載入,含 Bingo)
                                // ★ QR 編碼器刻意自己實作、不吃 CDN —— 外部資源這支 SW 不攔截,
@@ -154,6 +155,7 @@ const CORE = [
   "./blocks.html",
   "./js/blocks/rules.js",
   "./js/blocks/ai.js",
+  "./js/blocks/music.js",      // 配樂《貨郎》的曲譜(v2.17.0)
   "./js/blocks/board.js",
   "./js/blocks/solo.js",
   "./js/blocks/adapter.js",
@@ -164,6 +166,7 @@ const CORE = [
   "./bubble.html",
   "./js/bubble/rules.js",
   "./js/bubble/ai.js",
+  "./js/bubble/music.js",      // 配樂《泡泡跳跳》的曲譜(v2.17.0)
   "./js/bubble/board.js",
   "./js/bubble/solo.js",
   "./js/bubble/adapter.js",
