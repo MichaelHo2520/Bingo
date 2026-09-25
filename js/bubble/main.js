@@ -331,6 +331,7 @@ $("reopenWin").addEventListener("click", showResult);
   $("bubShieldSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setShield(b.dataset.shield); });
   $("bubTargetSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setTarget(b.dataset.target); });
   $("bubRushSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setRush(b.dataset.rush === "1"); });
+  $("bubLockSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setLock(b.dataset.lock === "1"); });
   $("scoreSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setScoreMode(b.dataset.score); });
   $("wgMinus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() - 1));
   $("wgPlus").addEventListener("click", () => MP.setWinGoal(MP.winGoal() + 1));

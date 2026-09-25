@@ -55,7 +55,7 @@ const MP = MPCore.create((function(){
   const SECS = [120, 180, 300];
   const SHIELDS = [0, 10, 20];
   const TARGETS = ["rand", "high"];
-  let rules = { mode: "ko", secs: 180, shield: 20, target: "rand", rush: false };
+  let rules = { mode: "ko", secs: 180, shield: 20, target: "rand", rush: false, lock: true };
   const RUSH_MS = 30000;                // 「最後 30 秒」是最後幾毫秒
 
   /* ---------- 一局 ---------- */
@@ -100,13 +100,15 @@ const MP = MPCore.create((function(){
     secs:   { ok: v => SECS.indexOf(v) >= 0,      get: () => rules.secs,   set: v => rules.secs = v },
     shield: { ok: v => SHIELDS.indexOf(v) >= 0,   get: () => rules.shield, set: v => rules.shield = v },
     target: { ok: v => TARGETS.indexOf(v) >= 0,   get: () => rules.target, set: v => rules.target = v },
-    rush:   { ok: v => typeof v === "boolean",    get: () => rules.rush,   set: v => rules.rush = v }
+    rush:   { ok: v => typeof v === "boolean",    get: () => rules.rush,   set: v => rules.rush = v },
+    lock:   { ok: v => typeof v === "boolean",    get: () => rules.lock,   set: v => rules.lock = v }
   };
   function setMode(v){ if(FIELDS.mode.ok(v)) ctx.setRoomField("mode", v); }
   function setSecs(v){ v = +v; if(FIELDS.secs.ok(v)) ctx.setRoomField("secs", v); }
   function setShield(v){ v = +v; if(FIELDS.shield.ok(v)) ctx.setRoomField("shield", v); }
   function setTarget(v){ if(FIELDS.target.ok(v)) ctx.setRoomField("target", v); }
   function setRush(v){ v = !!v; if(FIELDS.rush.ok(v)) ctx.setRoomField("rush", v); }
+  function setLock(v){ v = !!v; if(FIELDS.lock.ok(v)) ctx.setRoomField("lock", v); }
 
   /* ★ 這裡本來有 setHcap()(每個人自己選的讓分)—— v2.15.2 整套拿掉了,見 rules.js 紅線 ⑤。 */
 
@@ -127,7 +129,7 @@ const MP = MPCore.create((function(){
       seed: (Math.random() * 0xffffffff) >>> 0,
       startAt: nowSrv() + LEAD_MS,
       rules: { mode: rules.mode, secs: rules.secs, shield: rules.shield * 1000,
-               target: rules.target, rush: !!rules.rush },
+               target: rules.target, rush: !!rules.rush, lock: rules.lock !== false },
       order: ids.slice(),
       topouts: {}, ko: {}, deaths: {}
     };
@@ -176,6 +178,7 @@ const MP = MPCore.create((function(){
     gRules = g.rules || { mode: "ko", secs: 180, shield: 0 };
     if(gRules.target !== "high") gRules.target = "rand";
     gRules.rush = !!gRules.rush;
+    gRules.lock = (gRules.lock !== false);   // ⚠ 舊房間沒有這個欄位 = 照舊可以鎖定
     startAt = g.startAt || nowSrv();
     endAt = (gRules.mode === "ko") ? startAt + gRules.secs * 1000 : 0;
     order = g.order || [];
@@ -462,7 +465,7 @@ const MP = MPCore.create((function(){
   function pickTarget(){
     const alive = aliveFoes();
     if(!alive.length) return null;
-    if(lockTarget && alive.indexOf(lockTarget) >= 0) return lockTarget;
+    if(lockTarget && lockOk() && alive.indexOf(lockTarget) >= 0) return lockTarget;
     if(gRules && gRules.target === "high"){
       const score = id => (gRules.mode === "ko") ? koOf(id) : ((foes[id] && foes[id].l) || 0);
       let best = -1;
@@ -688,11 +691,18 @@ const MP = MPCore.create((function(){
     const list = order.filter(x => x !== ctx.me());
     return list.indexOf(id);
   }
+  /* 這一局准不准點小盤鎖定(房規 lock,v2.19.0+2)。⚠ 看的是**開局凍結**的 gRules,不是大廳那份 rules */
+  function lockOk(){ return !(gRules && gRules.lock === false); }
   /* 點對手的小盤 = 鎖定 / 取消鎖定攻擊目標 */
   function tapFoe(i){
     const list = order.filter(x => x !== ctx.me());
     const id = list[i];
     if(!id) return;
+    if(!lockOk()){
+      lockTarget = null;
+      showToast("房主關掉了鎖定 —— " + ((gRules && gRules.target === "high") ? "一律打第一名" : "隨機攻擊"));
+      return;
+    }
     const wasLocked = (lockTarget === id);
     lockTarget = wasLocked ? null : id;
     const fallback = (gRules && gRules.target === "high") ? "打第一名" : "隨機攻擊";
@@ -809,10 +819,12 @@ const MP = MPCore.create((function(){
     seg("bubShieldSeg", "shield", rules.shield);
     seg("bubTargetSeg", "target", rules.target);
     seg("bubRushSeg", "rush", rules.rush ? "1" : "0");
+    seg("bubLockSeg", "lock", rules.lock !== false ? "1" : "0");
     note("bubNoteMode", R.noteOf("mode", rules.mode));
     note("bubNoteShield", R.noteOf("shield", rules.shield));
     note("bubNoteTarget", R.noteOf("target", rules.target));
     note("bubNoteRush", R.noteOf("rush", rules.rush));
+    note("bubNoteLock", R.noteOf("lock", rules.lock !== false));
     const row = $("bubSecsRow");
     if(row) row.classList.toggle("hidden", rules.mode !== "ko");
     /* ⚠ 「最後 30 秒加倍」只有 K.O. 賽有意義(淘汰賽沒有時間限制)——
@@ -890,7 +902,7 @@ const MP = MPCore.create((function(){
     listen: listen,
 
     roomFields(){ return { mode: rules.mode, secs: rules.secs, shield: rules.shield,
-                           target: rules.target, rush: !!rules.rush }; },
+                           target: rules.target, rush: !!rules.rush, lock: rules.lock !== false }; },
     onRoomField(k, v){
       const f = FIELDS[k];
       if(!f || !f.ok(v) || v === f.get()) return;
@@ -950,7 +962,7 @@ const MP = MPCore.create((function(){
       onEvents: onEvents,
       onFrame: onFrame,
       canPlay: canPlay,
-      setMode, setSecs, setShield, setTarget, setRush,
+      setMode, setSecs, setShield, setTarget, setRush, setLock,
       tapFoe: tapFoe,
       rules: () => rules,
       state: () => st,

@@ -188,7 +188,8 @@ const BLK = (function(){
     shield:  20000,                     // 新手保護:開局前幾毫秒不吃垃圾(0 = 關)
     combo:   true,                      // Combo 攻擊
     target:  "rand",                    // 攻擊目標:"rand" 隨機 · "high" 打第一名
-    rush:    false                      // 最後 30 秒攻擊加倍(只在 K.O. 賽有意義)
+    rush:    false,                     // 最後 30 秒攻擊加倍(只在 K.O. 賽有意義)
+    lock:    true                       // 可不可以點小盤鎖定攻擊對象(false = 房主禁止)
   };
   /* ★★ 房規的「隨選隨變」文案(v2.15.3 進 adapter,v2.15.4 搬來這裡)。
      ⚠⚠ 搬來的理由:**單機也用同一組房規了** —— 文案留在 `adapter.js` 的話
@@ -219,6 +220,13 @@ const BLK = (function(){
            "⚠ 但領先的人也一樣加倍。",
       off: "全程一樣的攻擊量。"
     },
+    /* 點小盤鎖定(v2.19.0+1,使用者:「房主的規則再增加一條,禁止鎖定個人」)。
+       ⚠ 關掉之後攻擊目標只剩上面那一格(隨機 / 打第一名)說了算 —— 文案要講到這件事 */
+    lock: {
+      on:  "三個人以上時,<b>點對手的小盤就只打他</b>,再點一下取消。",
+      off: "<b>不能指定要打誰</b>,點小盤沒有作用 —— 垃圾行一律照上面的「攻擊目標」送。" +
+           "不想有人被聯手針對時開這個。"
+    },
     /* 讓分(紅線 ⑤)。⚠ 要講清楚「誰選」與「減的是哪一邊」—— 上一版就是這兩件事被讀錯 */
     hc: {
       on:  "開放之後,<b>每個人可以自己按「🐣 讓我一點」</b>:按了的人<b>收到的攻擊減半</b>," +
@@ -235,7 +243,7 @@ const BLK = (function(){
   function noteOf(field, value){
     const t = NOTES[field];
     if(!t) return "";
-    if(field === "rush" || field === "hc" || field === "hcSolo") return t[value ? "on" : "off"] || "";
+    if(field === "rush" || field === "hc" || field === "hcSolo" || field === "lock") return t[value ? "on" : "off"] || "";
     return t[value] || "";
   }
 
@@ -253,6 +261,7 @@ const BLK = (function(){
          多一個值只是讓設定畫面多一顆看不懂的鈕,而這一版的主題正好相反。 */
     out.target  = (r.target === "high") ? "high" : "rand";
     out.rush    = !!r.rush;             // 最後 30 秒攻擊加倍(只在 K.O. 賽有意義)
+    out.lock    = (r.lock !== false);   // ⚠ 舊房間沒有這個欄位 = 照舊可以鎖定
     out.hc      = !!r.hc;               // 這一局開不開放讓分(房主決定;誰要讓是每個人自己選,見 blank 的 o.hc)
     return out;
   }

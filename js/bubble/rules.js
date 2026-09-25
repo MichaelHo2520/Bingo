@@ -110,7 +110,8 @@ const BUB = (function(){
     shield:  20000,                     // 開局暖身(ms,0 = 關)
     combo:   true,
     target:  "rand",                    // "rand" 隨機 · "high" 打第一名
-    rush:    false                      // 最後 30 秒攻擊加倍
+    rush:    false,                     // 最後 30 秒攻擊加倍
+    lock:    true                       // 可不可以點小盤鎖定攻擊對象(false = 房主禁止)
   };
   /* 房規的「隨選隨變」文案 —— 單機與大廳共用這一份(同方塊對戰 v2.15.4 的理由)。
      ★ 判準:講現場會發生什麼事,不要講這個欄位叫什麼。 */
@@ -133,12 +134,19 @@ const BUB = (function(){
       on:  "最後 30 秒<b>所有人的攻擊加倍</b>,畫面會變色。落後的人有機會翻盤," +
            "⚠ 但領先的人也一樣加倍。",
       off: "全程一樣的攻擊量。"
+    },
+    /* 點小盤鎖定(v2.19.0+2,使用者:「房主的規則再增加一條,禁止鎖定個人」)。
+       ⚠ 關掉之後攻擊目標只剩上面那一格(隨機 / 打第一名)說了算 —— 文案要講到這件事 */
+    lock: {
+      on:  "三個人以上時,<b>點對手的小盤就只打他</b>,再點一下取消。",
+      off: "<b>不能指定要打誰</b>,點小盤沒有作用 —— 塞過去的泡泡一律照上面的「攻擊目標」送。" +
+           "不想有人被聯手針對時開這個。"
     }
   };
   function noteOf(field, value){
     const t = NOTES[field];
     if(!t) return "";
-    if(field === "rush") return t[value ? "on" : "off"] || "";
+    if(field === "rush" || field === "lock") return t[value ? "on" : "off"] || "";
     return t[value] || "";
   }
   function clampInt(v, lo, hi, dft){
@@ -155,7 +163,8 @@ const BUB = (function(){
       shield:  clampInt(r.shield, 0, 60000, DEF_RULES.shield),
       combo:   (r.combo === undefined) ? true : !!r.combo,
       target:  (r.target === "high") ? "high" : "rand",
-      rush:    !!r.rush
+      rush:    !!r.rush,
+      lock:    (r.lock !== false)       // ⚠ 舊房間沒有這個欄位 = 照舊可以鎖定
     };
   }
 

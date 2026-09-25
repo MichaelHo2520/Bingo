@@ -464,6 +464,7 @@ $("reopenWin").addEventListener("click", showResult);
   $("blkTargetSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setTarget(b.dataset.target); });
   /* ⚠ rush 在房規裡是布林 —— dataset 拿到的是字串 "0" / "1",不轉的話 "0" 是 truthy。 */
   $("blkRushSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setRush(b.dataset.rush === "1"); });
+  $("blkLockSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setLock(b.dataset.lock === "1"); });
   /* 讓分兩格:上面那格是房規(只有房主按得動),下面那格是每個人自己的(存進本機偏好) */
   $("blkHcSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b) MP.setHc(b.dataset.hc === "1"); });
   $("blkHcMeSeg").addEventListener("click", e => { const b = e.target.closest("button"); if(b){ MP.setMyHc(b.dataset.hcme === "1"); savePrefs(); } });

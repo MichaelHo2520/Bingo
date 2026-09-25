@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>泡泡對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 泡泡對戰 · v2.19.0 -->
-<meta name="version" content="2.19.0+1">
+<meta name="version" content="2.19.0+2">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 bubble 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -293,7 +293,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
       <details class="bub-setup-more" id="bubSetupMore">
-        <summary>更多規則 <span>開局暖身、攻擊目標、結尾加速</span></summary>
+        <summary>更多規則 <span>開局暖身、攻擊目標、鎖定、結尾加速</span></summary>
       <div class="field">
         <span class="field-label">開局暖身<span class="field-sub">(前幾秒沒有人會被塞)</span></span>
         <div class="seg" id="bubShieldSeg" aria-label="開局暖身">
@@ -310,6 +310,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-target="high">👑 打第一名</button>
         </div>
         <div class="bub-fnote" id="bubNoteTarget"></div>
+      </div>
+      <!-- 點小盤鎖定(v2.19.0+2,使用者:「房主的規則再增加一條,禁止鎖定個人」)。
+           ⚠ 預設**可以**(照舊);禁止之後攻擊目標只看上面那一格。舊房間沒有這個欄位也當成可以。 -->
+      <div class="field">
+        <span class="field-label">點小盤鎖定<span class="field-sub">(指定只打某一個人)</span></span>
+        <div class="seg" id="bubLockSeg" aria-label="點小盤鎖定">
+          <button class="on" data-lock="1">🎯 可以</button>
+          <button data-lock="0">🚫 禁止</button>
+        </div>
+        <div class="bub-fnote" id="bubNoteLock"></div>
       </div>
       <div class="field" id="bubRushRow">
         <span class="field-label">最後 30 秒<span class="field-sub">(結尾加速)</span></span>

@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.19.0 -->
-<meta name="version" content="2.19.0">
+<meta name="version" content="2.19.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -328,7 +328,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         </div>
       </div>
       <details class="blk-setup-more" id="blkSetupMore">
-        <summary>更多規則 <span>開局暖身、攻擊目標、結尾加速、讓分</span></summary>
+        <summary>更多規則 <span>開局暖身、攻擊目標、鎖定、結尾加速、讓分</span></summary>
       <!-- ★ 新手保護:開局前這幾秒不吃垃圾行(照樣排隊、照樣顯示,就是不推上來)。
            沒有它的話,第一次玩的人開局十五秒就被埋掉,連手感都還沒摸到。 -->
       <div class="field">
@@ -344,7 +344,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
            「三個人一起玩,我消掉方塊會怎麼讓對方增加?是每個人都會增加還是要怎麼樣?」
            ⚠ `rules.js` 的 `target` 欄位從第一版就在,但 `pickTarget()` 一直沒讀它 ——
              這一版才真的接上。「打第一名」是給聚會用的自動平衡:強的人會被全場追打。
-           ⚠ 手動鎖定(點對手的小盤)**在兩種模式下都還能用**,而且優先於這個房規。 -->
+           ⚠ 手動鎖定(點對手的小盤)**在兩種模式下都還能用**,而且優先於這個房規
+             (房主可以用下一格「點小盤鎖定」整個禁止)。 -->
       <div class="field">
         <span class="field-label">攻擊目標<span class="field-sub">(三個人以上才有差)</span></span>
         <div class="seg" id="blkTargetSeg" aria-label="攻擊目標">
@@ -352,6 +353,16 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
           <button data-target="high">👑 打第一名</button>
         </div>
         <div class="blk-fnote" id="blkNoteTarget"></div>
+      </div>
+      <!-- 點小盤鎖定(v2.19.0+1,使用者:「房主的規則再增加一條,禁止鎖定個人」)。
+           ⚠ 預設**可以**(照舊);禁止之後攻擊目標只看上面那一格。舊房間沒有這個欄位也當成可以。 -->
+      <div class="field">
+        <span class="field-label">點小盤鎖定<span class="field-sub">(指定只打某一個人)</span></span>
+        <div class="seg" id="blkLockSeg" aria-label="點小盤鎖定">
+          <button class="on" data-lock="1">🎯 可以</button>
+          <button data-lock="0">🚫 禁止</button>
+        </div>
+        <div class="blk-fnote" id="blkNoteLock"></div>
       </div>
       <!-- 最後 30 秒加倍。⚠ 預設**關**:它會讓結尾更刺激,但領先的人也一樣加倍
            → 有滾雪球的風險,先讓使用者自己在現場試。只在 K.O. 賽出現。 -->
