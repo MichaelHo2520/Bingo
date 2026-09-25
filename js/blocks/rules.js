@@ -142,7 +142,16 @@ const BLK = (function(){
   const LV_MS  = 30000;                 // 幾毫秒升一階
   const LOCK_MS     = 500;              // 鎖定延遲
   const LOCK_RESETS = 15;               // 貼地後最多用移動/旋轉拖幾次
-  const SOFT_MULT   = 20;               // 軟降是重力的幾倍
+  /* 軟降(按住「落地」鈕 / 鍵盤 ↓)的速度:**固定 ms / 格,不跟著階數變快**(2.18.0+3)。
+     使用者:「慢速下降常常會突然變成瞬間到最下面,然後還可以動」。
+     ★ 以前是「重力的 20 倍」—— 第 1 階 50ms/格還算看得清楚,但第 6 階(2 分半)已經
+       19ms/格、第 12 階 5ms/格 = 一幀就到底;而軟降到底**不會鎖**(那是落地的事)
+       → 看起來就是「瞬間到最下面、還可以動」。軟降要的是「看得見它在降」,
+       這件事跟難度無關,所以速度釘死;難度只由重力表決定。
+     ⚠ 下限:至少是重力的 SOFT_MIN_X 倍 —— 最後幾階重力本身就快,70ms 會比重力沒快多少,
+       按住等於沒按。 */
+  const SOFT_MS     = 70;               // 軟降一格幾 ms(≈ 每秒 14 格,整個盤面約 1.4 秒)
+  const SOFT_MIN_X  = 2;                // 軟降至少是重力的幾倍
   const MAX_DT      = 100;              // ★ tick 的 dt 上限(紅線 ⑥)
   const GARB_CAP    = 8;                // 一次鎖定最多推上來幾行
   /* 新手保護期間最多幫你存幾行。★ 這個數字的用途是「不要讓保護變成延後處決」——
@@ -378,6 +387,10 @@ const BLK = (function(){
   }
   function gravMs(st){
     return GRAV[level(st) - 1];
+  }
+  /* 軟降時一格幾 ms(見 SOFT_MS 的註解) */
+  function softMs(st){
+    return Math.min(SOFT_MS, gravMs(st) / SOFT_MIN_X);
   }
 
   /* 生出下一顆。k 有給就用指定的那一顆(**不動 idx**)。
@@ -642,8 +655,8 @@ const BLK = (function(){
     }
     if(!st.cur) return ev;
 
-    /* 重力。軟降 = 重力的 SOFT_MULT 倍 */
-    const step = Math.max(1, st.soft ? gravMs(st) / SOFT_MULT : gravMs(st));
+    /* 重力。軟降 = 固定速度 softMs()(不是重力的倍數,見 SOFT_MS) */
+    const step = Math.max(1, st.soft ? softMs(st) : gravMs(st));
     st.fall += dt;
     let guard = ROWS + 2;               // 一幀最多補算這麼多格
     while(st.fall >= step && guard-- > 0){
@@ -811,7 +824,7 @@ const BLK = (function(){
     // 常數
     COLS, ROWS, VIS, TOP, NKIND, KINDS, GARB,
     I, J, L, O, S, T, Z,
-    GRAV, LV_MS, LOCK_MS, LOCK_RESETS, SOFT_MULT, MAX_DT, GARB_CAP, SHIELD_CAP,
+    GRAV, LV_MS, LOCK_MS, LOCK_RESETS, SOFT_MS, SOFT_MIN_X, MAX_DT, GARB_CAP, SHIELD_CAP,
     ATK, PC_ATK, REVENGE_MS, DEF_RULES,
     // 形狀與 kick(純資料,board.js 查表用)
     CELLS, BOXN, BASE, SPAWN_X, SPAWN_Y, KICK_JLSTZ, KICK_I, kicksOf, cellsOf,
@@ -822,7 +835,7 @@ const BLK = (function(){
     // 房規
     normRules, comboAtk, NOTES, noteOf,
     // 一局
-    blank, spawn, level, gravMs, grounded, move, rotate, down, ghostY,
+    blank, spawn, level, gravMs, softMs, grounded, move, rotate, down, ghostY,
     hardDrop, lock, tick, revive,
     // 垃圾行
     queueGarbage, receive, applyPending, pushGarbage, cancel, pendCount,

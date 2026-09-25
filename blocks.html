@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.18.0 -->
-<meta name="version" content="2.18.0+2">
+<meta name="version" content="2.18.0+3">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -491,9 +491,9 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <!-- ★★ **一顆鈕兩種用法**:短按 = 直接落地、按住 = 慢慢降(軟降)。
              使用者:「我又不想要右手邊那個有落下又有下的按鈕,這樣會搞不太清楚是做什麼」
              —— 下降本來就只需要一個概念,分成兩顆才是問題的來源。
-             ⚠ 按下去**立刻**開始降(不等 150ms 判斷),不然短按會有延遲感;
+             ⚠ 按下去**立刻**開始降(不等 200ms 判斷),不然短按會有延遲感;
                放開得快才補一個落地。判定在 board.js 的 padUp()。
-             ⚠ 它是唯一**不可逆**的動作 → 與旋轉之間刻意拉開(.blk-pad-r 的 gap 18px)。 -->
+             ⚠ 它是唯一**不可逆**的動作 → 與旋轉之間刻意拉開(.blk-pad-r 的 gap 28px)。 -->
         <div class="blk-pad-row">
           <button class="blk-key blk-key-drop" type="button" data-act="drop"
                   aria-label="落地(按住就慢慢降)">

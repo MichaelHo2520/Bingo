@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 8be3bdd9c5979d2013d1b01f2daf41bb5d165593be9db932ccdb06dbbb7da14d)
+    真相在 styles.src.css(sha256 8cc760cb84f46be6da6e666adf4ca047f0bbdb5a178aca884319fe6e7c932024)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6227,13 +6227,13 @@ body.blk-spec .blk-foe{cursor:default;pointer-events:none}
 .blk-paused{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;
             font-family:'Fredoka','Nunito',sans-serif;font-weight:700;font-size:26px;
             color:var(--text);text-shadow:0 2px 12px rgba(0,0,0,.65)}
-.blk-pad{flex:none;width:100%;height:var(--blk-bar);padding:0 8px;
-         display:flex;align-items:center;justify-content:space-between;
+.blk-pad{flex:none;width:100%;height:var(--blk-bar);padding:2px 4px 0;
+         display:flex;align-items:flex-start;justify-content:space-between;
          pointer-events:none;z-index:2}
 .blk-pad-l,.blk-pad-r{display:flex;flex-direction:row;align-items:center;
-                      gap:10px;pointer-events:auto}
-.blk-pad-r{gap:18px}
-.blk-pad-row{display:flex;align-items:center;gap:10px}
+                      gap:14px;pointer-events:auto}
+.blk-pad-r{gap:28px}
+.blk-pad-row{display:flex;align-items:center;gap:14px}
 body.blk-side .blk-pad{position:absolute;inset:0;height:auto;padding:0;display:block}
 body.blk-side .blk-pad-l,
 body.blk-side .blk-pad-r{position:absolute;bottom:8px}

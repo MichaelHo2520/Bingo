@@ -14085,18 +14085,31 @@ body.blk-spec .blk-foe{cursor:default;pointer-events:none}
 /* ⚠⚠ 整層 pointer-events:none、只有兩個拇指簇 auto ——
    ① 側邊那一種擺法時它蓋在對局區上,不然會把手勢整個吃掉;
    ② 橫列那一種擺法時中間那一段空白也還是手勢感應區(「兩者」模式下有人會在那裡拖)。 */
-.blk-pad{flex:none;width:100%;height:var(--blk-bar);padding:0 8px;
-         display:flex;align-items:center;justify-content:space-between;
+/* ★ 鈕**貼著這一列的頂端**,不是置中(2.18.0+3)。使用者:「最下方的按鈕還是不太好按,
+     希望可以稍微再往上一點,但是不要蓋到棋盤,也不要把棋盤給壓縮」。
+     ⚠ 三個條件同時成立的路只有這一條:列高 --blk-bar **不動**(動了盤面就縮一階,
+       而且 pickPad() 的輸入跟著變)→ 只把鈕在列裡往上推。置中時上下各空 12px,
+       貼頂之後鈕往上 10px,多出來的空白全部留在最下面(拇指根、iPhone 的 home 條)。
+     ⚠ 左右 padding 8 → 4:兩簇往螢幕邊多靠 4px,中間那段讓給拉開的 gap。 */
+.blk-pad{flex:none;width:100%;height:var(--blk-bar);padding:2px 4px 0;
+         display:flex;align-items:flex-start;justify-content:space-between;
          pointer-events:none;z-index:2}
-/* ⚠ gap 10px。v2.14.0 中途曾經是 14px(= 熱區外擴 7 的兩倍,為了「相接而不重疊」)——
-   命中改成**吸附最近的那一顆**之後那個理由就沒了:重疊區的歸屬由「誰比較近」決定,
-   永遠是唯一解。→ 兩套規則只留一套,間距可以收回來讓拇指簇更緊湊。 */
+/* ⚠ 兩顆之間 14px(2.18.0+3 從 10 放回來;使用者:「按鈕稍微再拉開一點」)。
+   ⚠⚠ 左簇的 ◀ ▶ 住在**同一個** .blk-pad-row 裡 → 它們的間距吃的是 .blk-pad-row 的 gap,
+     不是這一條(右簇是兩個 row 各一顆,吃的才是 .blk-pad-r 的 gap)。改間距兩條一起看。
+   v2.14.0 收到 10 的理由是「命中改成吸附最近的那一顆,重疊區永遠是唯一解」——
+   那條仍然成立,但吸附只決定**誰贏**,決定不了「拇指壓下去的那一片同時碰到兩顆」
+   的手感;兩顆之間至少要有一截看得見的空隙,盲按時才分得出左右。
+   ⚠ 兩種擺法共用同一組 gap(不可以只給橫列加寬):sideRes() 量的是拇指簇的寬,
+     跟著擺法變的話 pickPad() 的輸入就跟擺法有關 → 兩種擺法互相翻來翻去(紅線 ㉚之二)。 */
 .blk-pad-l,.blk-pad-r{display:flex;flex-direction:row;align-items:center;
-                      gap:10px;pointer-events:auto}
+                      gap:14px;pointer-events:auto}
 /* ⚠ 右簇的 gap 比左簇大:那顆是**落地**(唯一不可逆的動作),
-   與旋轉擠在一起的話誤觸的代價完全不對等。 */
-.blk-pad-r{gap:18px}
-.blk-pad-row{display:flex;align-items:center;gap:10px}
+   與旋轉擠在一起的話誤觸的代價完全不對等。
+   ★ 18 → 28px(2.18.0+3,使用者點名「尤其是旋轉和下降按鈕」)。
+     吸附的分界在兩顆正中間 → 拇指要偏 14px 以上才會從 ↻ 滑到落地,以前是 9px。 */
+.blk-pad-r{gap:28px}
+.blk-pad-row{display:flex;align-items:center;gap:14px}
 
 /* 側邊那一種擺法:兩簇落在盤面左右兩側的**底角**。
    ⚠⚠ 右簇與對手小盤是「**上下分層**共用右邊那一條帶子」:小盤在上(board.js 寫
@@ -14148,7 +14161,7 @@ body.blk-side .blk-pad-r{right:4px}
                            0 0 0 2.5px rgba(255,255,255,.30),
                            0 0 18px 2px var(--accent-2),
                            0 2px 8px rgba(0,0,0,.30)}
-/* 「落地」鈕按住超過 150ms(board.js 的 DROP_MS)= 已經是慢降、放開不會直落 → 換成青色的一圈。
+/* 「落地」鈕按住超過 200ms(board.js 的 DROP_MS)= 已經是慢降、放開不會直落 → 換成青色的一圈。
    ★ 一顆兩用的鈕,手指要知道自己現在是哪一種;盤面上另外有氣流線(softStreaks)。
    ⚠ 一定要排在 .blk-on 後面(同權重,後寫的贏;按住時兩個 class 同時在)。
    ⚠ 不用 @keyframes 脈衝(紅線 ⑭)—— 靜態的顏色切換就分得出來,而且量得到。 */

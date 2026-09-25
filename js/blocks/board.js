@@ -466,7 +466,7 @@ const BLKB = (function(){
     });
   }
   /* 軟降中:每一欄最上面那一格的上方拖兩道往上淡掉的氣流線 ——「我正在把它往下壓」。
-     ★ 那顆「落地」鈕是一顆兩用(短按落地 / 按住慢降),按住的前 150ms 手指分不出自己是哪一種;
+     ★ 那顆「落地」鈕是一顆兩用(短按落地 / 按住慢降),按住的前 200ms(DROP_MS) 手指分不出自己是哪一種;
        盤面上看得到氣流線 = 已經在慢降、放開也不會直落(鈕本身另外有 .blk-soft 的狀態)。
      ⚠ 位移是 st.time 的函式(暫停就停),不是 performance.now()。 */
   function softStreaks(c, col){
@@ -1413,11 +1413,15 @@ const BLKB = (function(){
   }
   /* ★★ 「drop」是**一顆鈕兩種用法**:短按 = 直接落地、按住 = 慢慢降(軟降)。
      使用者:「我又不想要右手邊那個有落下又有下的按鈕,這樣會搞不太清楚是做什麼」。
-     ⚠ 按下去**立刻**開始軟降 —— 不可以等 150ms 才決定要做什麼,那會讓短按有延遲感
+     ⚠ 按下去**立刻**開始軟降 —— 不可以等 DROP_MS(200ms) 才決定要做什麼,那會讓短按有延遲感
        (而「按了沒反應」正是這一頁修了兩輪的東西)。放開得快的話再補一個落地,
        那時方塊只降了一兩格,看起來就是「加速墜落」,很自然。
-     ⚠ 落地是唯一不可逆的動作 → 這一顆與旋轉之間刻意拉開(CSS 的 .blk-pad-r gap)。 */
-  const DROP_MS = 150;                  // 按住超過這麼久就只是軟降,放開不補落地
+     ⚠ 落地是唯一不可逆的動作 → 這一顆與旋轉之間刻意拉開(CSS 的 .blk-pad-r gap)。
+     ★ 門檻 150 → 200ms(2.18.0+3):手指「點一下」在玩得緊張時常常壓到 150~200ms,
+       以前那一段會被判成「按住」→ 只軟降、不落地,方塊停在半空(或到底卻沒鎖)。
+       軟降同一版改成固定 70ms/格(rules.js 的 SOFT_MS),200ms 內最多先降 3 格,
+       放開再補落地看起來仍然是一次連續的墜落。 */
+  const DROP_MS = 200;                  // 按住超過這麼久就只是軟降,放開不補落地
 
   /* ⚠⚠⚠ **一根手指一筆,不可以只記「目前按著的那一顆」**(v2.15.1 的修正)。
      使用者:「如果長按左右按鈕時,這個時候去按旋轉,左、右就沒辦法繼續執行」。
@@ -1437,7 +1441,8 @@ const BLKB = (function(){
           兩者都試過都在 e2e 裡永遠判成「短按」(E11 實測:按住 360ms 還是落地了)——
           而 `st.time` 是規則層在 tick() 裡累積的,e2e 用 BLKB.step() 推得動。
        ★ 一個判定同時滿足「真機行為對」與「測得到」的時候,就選它。 */
-    padHold.set(id, { btn: b, act: b.dataset.act, t0: st ? st.time : 0 });
+    /* p0 = 按下去那一刻是第幾顆(st.pieces 在 spawn() 時 +1)→ 見 endHold() */
+    padHold.set(id, { btn: b, act: b.dataset.act, t0: st ? st.time : 0, p0: st ? st.pieces : 0 });
     b.classList.add("blk-on");
     buzz(b.dataset.act);
     /* ⚠ setPointerCapture 會丟例外(合成事件沒有真的 pointerId),而未捕捉的錯誤
@@ -1466,6 +1471,9 @@ const BLKB = (function(){
     h.btn.classList.remove("blk-on", "blk-soft");
     if(h.act === "drop"){
       release("soft");
+      /* ⚠⚠ 按著的這一小段裡**那一顆已經鎖掉了**(本來就貼地、鎖定延遲剛好走完)→
+         放開**不可以**再補落地:那一下會砸在剛生出來的下一顆身上,一次掉兩顆。 */
+      if(st && st.pieces !== h.p0) return;
       if(((st ? st.time : 0) - h.t0) < DROP_MS) act("hard");
       return;
     }
@@ -1576,7 +1584,7 @@ const BLKB = (function(){
       /* 「落地」鈕按住超過 DROP_MS → 換成「慢降」的樣子(.blk-soft):到這一刻起放開也不會直落。
          ★ 判定跟 endHold() 同一條(st.time − t0 ≥ DROP_MS),所以鈕的樣子與放開的結果不會對不上。 */
       padHold.forEach(h => {
-        if(h.act === "drop") h.btn.classList.toggle("blk-soft", (st.time - h.t0) >= DROP_MS);
+        if(h.act === "drop") h.btn.classList.toggle("blk-soft", (st.time - h.t0) >= DROP_MS || st.pieces !== h.p0);
       });
       stepDas(dt);
       const pre = R.grounded(st) ? snapPre() : null;   // ⚠ 紅線 ③:只有貼地那幾幀才留
