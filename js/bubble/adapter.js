@@ -421,7 +421,7 @@ const MP = MPCore.create((function(){
     let dead = false;
     for(let i = 0; i < evs.length; i++){
       const ev = evs[i];
-      if(ev.t !== "land") continue;
+      if(ev.t !== "land" && ev.t !== "press") continue;   // press:照時間的壓力插排,盤面變了也要發快照
       /* ⚠ ev.to 是**反擊**指名的對象(規則層決定的),它比房規與手動鎖定都優先 ——
          「打回去給剛打我的那個人」這件事一旦被隨機改掉,反擊就完全不成立了。 */
       if(ev.out > 0) sendAttack(ev.out, ev.to, ev.revenge);
@@ -744,10 +744,10 @@ const MP = MPCore.create((function(){
     const set = (id, v) => { const el = $(id); if(el) el.textContent = v; };
     set("bubStatPop", st.popped);
     set("bubStatLv", R.level(st));
-    const pressLeft = Math.max(1, R.pressN(st) - st.since);
+    const pressLeft = Math.max(1, Math.ceil(R.pressLeft(st) / 1000));   // 秒
     set("bubStatPress", pressLeft);
     const pressBox = $("bubStatPressBox");
-    if(pressBox) pressBox.classList.toggle("bub-stat-press-hot", pressLeft <= 2);
+    if(pressBox) pressBox.classList.toggle("bub-stat-press-hot", pressLeft <= 3);
     if(endAt){
       const left = Math.max(0, Math.round((endAt - nowSrv()) / 1000));
       set("bubStatTime", Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"));

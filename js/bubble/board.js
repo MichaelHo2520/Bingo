@@ -472,7 +472,7 @@ const BUBB = (function(){
   /* 天花板 + 待處理垃圾。
      ★ 被塞的排數以前是左緣一條 10px 的細條(手機上幾乎看不到,而且吃掉盤面寬度)——
        現在直接畫在天花板上:一格 = 一排,紅色越多越危險;暖身保護中是藍色(擋著、還沒插)。
-     ★ 下一發就會插排的時候,天花板下緣閃橘色 —— 那一發要先想好。 */
+     ★ 再 2 秒就會插排的時候,天花板下緣閃橘色 —— 手上那一發要先想好。 */
   function ceiling(W, OY, now){
     ctxM.save();
     const g = ctxM.createLinearGradient(0, 0, 0, OY);
@@ -499,16 +499,16 @@ const BUBB = (function(){
       ctxM.beginPath(); ctxM.arc(rx, OY * 0.5, Math.max(1, D * 0.045), 0, Math.PI * 2); ctxM.fill();
     }
     if(st){
-      const pressLeft = R.pressN(st) - st.since;
+      const pressMs = R.pressLeft(st);   // 壓力插排照時間走(v2.19.0+1)
       let edge = ceilEdge, lw = Math.max(1, D * 0.04);
-      if(pressLeft <= 1 && !st.dead){
+      if(pressMs <= 2000 && !st.dead){
         const p = reduced() ? 1 : (0.55 + 0.45 * Math.sin(now / 110));
         edge = "rgba(255,159,67," + (0.55 + 0.45 * p).toFixed(3) + ")";
         lw = Math.max(2, D * 0.08);
       }
       ctxM.strokeStyle = edge; ctxM.lineWidth = lw;
       ctxM.beginPath(); ctxM.moveTo(0, OY - lw / 2); ctxM.lineTo(W, OY - lw / 2); ctxM.stroke();
-      if(!st.dead) pressBadge(W, OY, pressLeft, now);
+      if(!st.dead) pressBadge(W, OY, Math.max(1, Math.ceil(pressMs / 1000)), now);
       const n = R.pendCount(st);
       if(n > 0){
         const held = st.shield > 0;
@@ -540,15 +540,16 @@ const BUBB = (function(){
     }
     ctxM.restore();
   }
-  /* 天花板右端的插排倒數:「▼ N」= 再 N 發天花板就往下推一排(v2.17.0+1,Gemini 建議 2.3)。
+  /* 天花板右端的插排倒數:「▼ N」= 再 N 秒天花板就往下推一排(v2.17.0+1,Gemini 建議 2.3;
+     v2.19.0+1 起單位從「發」改成「秒」—— 壓力插排照時間走,不照射了幾發)。
      ★ 砲台右邊那排小點照樣留著,但玩的時候眼睛在盤面**上半部**(要瞄的地方),
-       右下角又常被右手拇指蓋住 —— 抬頭看泡泡時就要順便看得到還剩幾發。
-     ⚠ 顏色跟小點同一套門檻(≤ 2 發變紅、會閃),兩處說的永遠是同一件事。
+       右下角又常被右手拇指蓋住 —— 抬頭看泡泡時就要順便看得到還剩幾秒。
+     ⚠ 顏色跟砲台右邊的倒數條同一套門檻(≤ 3 秒變紅、會閃),兩處說的永遠是同一件事。
      ⚠ 箭頭是畫的,不用 ⏱ / ▼ 字元(紅線 8)。
      ⚠ 待處理垃圾最多畫到 6 格 + 「+N 排」≈ 6.7 顆寬,這一塊佔最右邊 1.3 顆 —— 兩者碰不到。 */
   function pressBadge(W, OY, left, now){
     left = Math.max(0, left);
-    const hot = left <= 2;
+    const hot = left <= 3;
     const a = (hot && !reduced()) ? (0.65 + 0.35 * Math.sin(now / 120)) : 0.8;
     const fs = Math.max(9, Math.round(OY * 0.72));
     const txt = String(left);
@@ -710,7 +711,7 @@ const BUBB = (function(){
     bubble(ctxM, s.x * D, s.y * D, D, s.c, { glow: !reduced() });
   }
   /* 發射器:圓頂底座 + 會轉的砲管 + 目前這顆 + 左邊的「下一顆」(點它 = 交換)
-     + 右邊的「插排倒數」小點(一點 = 一發;最後兩發變紅)。
+     + 右邊的「插排倒數」條(會縮短;最後 3 秒變紅,v2.19.0+1 之前是一發一點的小點)。
      ★ 以前是一個空心三角形箭頭飄在一個淡圈上,看不出是「砲台」;插排倒數只在 HUD 上有個數字。 */
   function launcher(now){
     const x = R.LX * D, y = R.LY * D;
@@ -802,23 +803,27 @@ const BUBB = (function(){
     ctxM.fillText("換", n.x + D * 0.74, n.y - D * 0.34);
     ctxM.restore();
   }
+  /* 砲台右邊的插排倒數條:整條 = 這一階的間隔,越縮越短;≤ 3 秒變紅、會閃、標出剩幾秒。
+     ⚠ 以前是一發一顆的小點(照發數插排),v2.19.0+1 改照時間 → 改成會縮的條 */
   function pressDots(x, y, now){
-    const N = R.pressN(st), left = Math.max(0, N - st.since);
+    const total = R.pressMs(st), leftMs = R.pressLeft(st);
+    const secs = Math.max(1, Math.ceil(leftMs / 1000));
     const x0 = x + D * 1.25, xMax = R.COLS * D - D * 0.25;
-    const step = Math.min(D * 0.3, (xMax - x0) / Math.max(1, N - 1));
-    const r = Math.max(1.5, Math.min(D * 0.09, step * 0.36));
-    const hot = left <= 2 && !st.dead;
+    const w = Math.max(D * 0.5, xMax - x0), h = Math.max(3, D * 0.13);
+    const hot = secs <= 3 && !st.dead;
     const a = (hot && !reduced()) ? (0.65 + 0.35 * Math.sin(now / 120)) : 1;
+    const by = y + D * 0.14 - h / 2;
     ctxM.save();
     ctxM.font = "800 " + Math.max(8, Math.round(D * 0.22)) + "px Nunito, system-ui, sans-serif";
     ctxM.textAlign = "left"; ctxM.textBaseline = "alphabetic";
     ctxM.fillStyle = hot ? "#ff5d6c" : inkCol; ctxM.globalAlpha = hot ? 1 : 0.62;
-    ctxM.fillText(hot ? ("再 " + left + " 發插排") : "插排", x0 - r, y - D * 0.14);
-    for(let i = 0; i < N; i++){
-      const on = i < left;
-      ctxM.globalAlpha = on ? a : 0.28;
-      ctxM.fillStyle = on ? (hot ? "#ff5d6c" : inkCol) : inkCol;
-      ctxM.beginPath(); ctxM.arc(x0 + i * step, y + D * 0.14, r, 0, Math.PI * 2); ctxM.fill();
+    ctxM.fillText(hot ? ("再 " + secs + " 秒插排") : "插排", x0, y - D * 0.14);
+    ctxM.globalAlpha = 0.22; ctxM.fillStyle = inkCol;
+    roundRect(ctxM, x0, by, w, h, h / 2); ctxM.fill();
+    const fw = w * Math.max(0, Math.min(1, leftMs / total));
+    if(fw > 0.5){
+      ctxM.globalAlpha = a; ctxM.fillStyle = hot ? "#ff5d6c" : inkCol;
+      roundRect(ctxM, x0, by, Math.max(h, fw), h, h / 2); ctxM.fill();
     }
     ctxM.restore();
   }
@@ -1370,6 +1375,16 @@ const BUBB = (function(){
     }
   }
   function lastShot(){ return !!(st && !st.dead && R.lowest(st.board) >= R.DEAD); }
+  /* 沒有球在飛的時候到點的壓力插排(飛行中到點的在 onLand 裡跟著一起處理) */
+  function onPress(ev){
+    guideCache = null;
+    fx.push = { n: 1, t: 0, dur: 260 };
+    T(220, { type: "sine", dur: 0.10, vol: 0.10, slideTo: 150 });
+    if(!ev.dead && lastShot()){
+      word("最後一發!", "#ff5d6c", 0.84);
+      T(880, { type: "square", dur: 0.10, vol: 0.12, slideTo: 440 });
+    }
+  }
   function incoming(n){
     fx.hit = Math.max(fx.hit, 0.8);
     T(740, { type: "square", dur: 0.07, vol: 0.10, slideTo: 420 });
@@ -1488,6 +1503,7 @@ const BUBB = (function(){
       if(evs.length){
         evs.forEach(ev => {
           if(ev.t === "land") onLand(ev, par);
+          else if(ev.t === "press") onPress(ev);
           else if(ev.t === "fire" && ev.auto){ word("自動發射", "#ff9f43", 0.55); T(420, { type: "square", dur: 0.05, vol: 0.12, slideTo: 760 }); }
           else if(ev.t === "bounce") T(880, { type: "sine", dur: 0.03, vol: 0.05 });
         });

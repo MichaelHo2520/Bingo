@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>泡泡對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 泡泡對戰 · v2.19.0 -->
-<meta name="version" content="2.19.0">
+<meta name="version" content="2.19.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 bubble 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -70,7 +70,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <!-- ⚠ 攻擊表由 js/bubble/main.js 的 bubAtkHtml() 注入(數字讀 BUB.rowsOf),這裡不要寫死一份 -->
         <div class="bub-atk" id="bubAtkCard"></div>
         被塞的泡泡會從<b>頂端整排插進來</b>(整片往下推);<b>天花板上亮起紅格子</b>時,
-        趕快消掉一些就能<b>抵銷</b>。每射幾發頂端也會自己多一排。泡泡越過<b>虛線</b>就輸了。
+        趕快消掉一些就能<b>抵銷</b>。每隔一段時間頂端也會自己多一排。泡泡越過<b>虛線</b>就輸了。
         <b>三個人以上時,只會塞給其中一個人</b>(預設隨機)。
       </div>
       <!-- 操作說明。⚠ 內容由 js/bubble/main.js 的 bubGestHtml() 注入 ——
@@ -337,7 +337,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
         <div class="bub-stat"><span>打掉</span><b id="bubStatPop">0</b></div>
         <div class="bub-stat"><span>時間</span><b id="bubStatTime">0.0 秒</b></div>
         <div class="bub-stat"><span>階</span><b id="bubStatLv">1</b></div>
-        <div class="bub-stat bub-stat-press" id="bubStatPressBox"><span>插排倒數</span><b id="bubStatPress">9</b></div>
+        <div class="bub-stat bub-stat-press" id="bubStatPressBox"><span>插排倒數</span><b id="bubStatPress">25</b></div>
         <div class="bub-stat bub-stat-tgt hidden" id="bubStatTgtBox"><span>目標</span><b id="bubStatTgt">隨機</b></div>
       </div>
     </div>

@@ -113,9 +113,11 @@ const BUBAI = (function(){
   function step(st, mem, dt, lv, rnd){
     if(!st || st.dead || st.shot) return [];          // ⚠ 紅線 ④ · 早退也要回陣列
     lv = lv || LEVELS[1];
-    if(!mem.target || mem.k !== st.shots){
+    /* ⚠ 鍵要含 rowN:壓力插排照時間走(v2.19.0+1),瞄到一半盤面可能整排推下來 → 要重算 */
+    const key = st.shots + "/" + st.rowN;
+    if(!mem.target || mem.k !== key){
       mem.target = best(st, lv, rnd);
-      mem.k = st.shots;
+      mem.k = key;
       mem.swapped = false;
     }
     mem.t += dt;

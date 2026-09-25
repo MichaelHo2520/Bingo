@@ -11,7 +11,7 @@
      • 彈道:直線 + 左右牆反彈,固定步長推進(trace 與即時飛行**同一個步進函式**)
      • 吸附:撞到泡泡 / 天花板 → 落進離球心最近、而且「有東西撐著」的空格
      • 消除(三顆以上同色相連)· 掉落(跟天花板斷了連線的)· 攻擊量 · 抵銷
-     • 壓力:每射 N 發,頂端插進一整排(N 隨時間變少)
+     • 壓力:每隔 N 秒,頂端插進一整排(N 隨時間變短;**照時間,不照射了幾發**)
      • 垃圾:對手送來的是「頂端整排插入」,顏色由**送出端**的 gs 決定
      • tick(st, dt):時間推進(飛行、自動發射、暖身),回傳事件陣列
 
@@ -66,8 +66,11 @@ const BUB = (function(){
      二、時間常數與攻擊表
      ========================================================================== */
   const LV_MS   = 30000;                // 幾毫秒升一階
-  /* 每幾發插一排(index = 階 - 1)。★ 這張表就是單機練習的難度曲線本身 */
-  const PRESS   = [9, 8, 7, 7, 6, 6, 5, 5, 4];
+  /* 每幾毫秒插一排(index = 階 - 1)。★ 這張表就是單機練習的難度曲線本身。
+     ⚠ 照**時間**不照發數(v2.19.0+1,使用者:「不要因為自己射太快而壓下來」)——
+       以前「每 9 → 4 發一排」= 射得越勤快天花板壓得越快,等於懲罰手快的人。
+       數值大約是舊表 × 一發 2.7 秒(普通電腦的射速),一開始放寬一點。 */
+  const PRESS   = [25000, 23000, 21000, 19000, 17000, 15000, 14000, 13000, 12000];
   const AUTO_MS = 9000;                 // 太久沒射就自動發射(聚會節奏:不可以有人一直不射)
   const MAX_DT  = 100;                  // ★ tick 的 dt 上限(紅線 ⑤)
   const INIT_ROWS  = 5;                 // 開局幾排
@@ -272,7 +275,7 @@ const BUB = (function(){
       shot:   null,                     // 飛行中:{ x, y, vx, vy, c, rem }
       idle:   0,                        // 多久沒射了(自動發射)
       shots:  0,                        // 已經射出幾發
-      since:  0,                        // 距離上一次壓力插排射了幾發
+      since:  0,                        // 距離上一次壓力插排過了幾毫秒
       pend:   [],                       // 待處理垃圾 [{ n, gs, from }](n = 排數)
       shield: 0,
       combo:  0,
@@ -298,7 +301,14 @@ const BUB = (function(){
     return fitColor(st.board, colorAt(st.seed, i), i);
   }
   function level(st){ return Math.min(PRESS.length, 1 + Math.floor(st.time / LV_MS)); }
-  function pressN(st){ return PRESS[level(st) - 1]; }
+  function pressMs(st){ return PRESS[level(st) - 1]; }
+  /* 離下一次壓力插排還有幾毫秒(0 = 到點了,等這一發落地就插) */
+  function pressLeft(st){ return Math.max(0, pressMs(st) - st.since); }
+  /* 壓力插排本體。回傳 false = 被擠出盤面死了 */
+  function pressRow(st){
+    st.since = 0;
+    return insertRow(st, rowAt(st.seed, st.rowN++));
+  }
 
   /* ==========================================================================
      六、操作
@@ -479,12 +489,11 @@ const BUB = (function(){
       st.sent += out;
     }
 
-    /* 壓力:每射 N 發插一排(用自己的 seed —— 同一局每個人拿到的壓力排一模一樣) */
-    st.since++;
-    if(st.since >= pressN(st)){
-      st.since = 0;
+    /* 壓力:飛行途中到點的那一排在落地這一刻補插(用自己的 seed —— 同一局每個人拿到的壓力排一模一樣)。
+       ⚠ 不可以在飛行中插:整盤往下推一格 + par 翻面,飛到一半的球會突然卡進泡泡裡 */
+    if(st.since >= pressMs(st)){
       ev.press = 1;
-      if(!insertRow(st, rowAt(st.seed, st.rowN++))){ ev.dead = true; return ev; }
+      if(!pressRow(st)){ ev.dead = true; return ev; }
     }
     ev.garb = applyPending(st);
     if(st.dead){ ev.dead = true; return ev; }
@@ -549,6 +558,7 @@ const BUB = (function(){
       st.shield -= dt;
       if(st.shield <= 0){ st.shield = 0; ev.push({ t: "shield" }); }
     }
+    st.since += dt;                     // 壓力插排照時間走(暖身期間也走,同以前「暖身也照樣算發數」)
     if(st.shot){
       const s = st.shot;
       s.rem += SPEED * dt;
@@ -561,6 +571,13 @@ const BUB = (function(){
         if(hit){ ev.push(land(st, hit)); break; }
       }
     }else{
+      /* 沒有球在飛:到點就直接插(飛行中到點的交給 land) */
+      if(st.since >= pressMs(st)){
+        const pe = { t: "press", press: 1, dead: false };
+        if(!pressRow(st)) pe.dead = true;
+        ev.push(pe);
+        if(pe.dead) return ev;
+      }
       st.idle += dt;
       if(st.idle >= AUTO_MS){
         const f = fire(st);
@@ -659,7 +676,7 @@ const BUB = (function(){
     emptyBoard, isOdd, valid, cx, cy, neighbors, count, lowest, present, fitColor,
     insertRow, supported, snapCell, resolve,
     // 一局
-    blank, level, pressN, clampAim, aim, swap, canFire, fire, trace, flyStep,
+    blank, level, pressMs, pressLeft, clampAim, aim, swap, canFire, fire, trace, flyStep,
     land, tick, revive,
     // 垃圾
     queueGarbage, applyPending, cancel, pendCount,

@@ -4,7 +4,7 @@
    泡泡對戰 — 單機(Solo)
 
    兩種玩法(規則完全同一份,差別只有「什麼時候結束」與「有沒有對手」):
-     · 練習(無盡)—— 頂端每射幾發就插一排,撐到被壓過死亡線為止,記最多打掉幾顆
+     · 練習(無盡)—— 頂端每隔一段時間就插一排,撐到被壓過死亡線為止,記最多打掉幾顆
      · 對電腦     —— 1~3 台電腦,整組連線房規照搬(同方塊對戰 v2.15.4)
 
    ★ 照抄 js/blocks/solo.js 的骨架,四條紅線一樣成立:
@@ -211,7 +211,7 @@ const Solo = (function(){
       const evs = BUBAI.step(f.st, f.mem, dt, f.lv).concat(BUB.tick(f.st, dt));
       for(let j = 0; j < evs.length; j++){
         const ev = evs[j];
-        if(!ev || ev.t !== "land") continue;
+        if(!ev || (ev.t !== "land" && ev.t !== "press")) continue;   // press:照時間的壓力插排也可能把人擠死
         if(ev.pops && ev.pops.length)
           f.fx = { pops: ev.pops, par: parBefore, t: 0 };
         if(ev.out > 0) sendFrom(f.id, ev);
@@ -328,7 +328,7 @@ const Solo = (function(){
     if(!on || ended) return;
     for(let i = 0; i < evs.length; i++){
       const ev = evs[i];
-      if(ev.t !== "land") continue;
+      if(ev.t !== "land" && ev.t !== "press") continue;   // press:照時間的壓力插排(沒有球在飛時)
       if(mode === "vs" && ev.out > 0) sendFrom("me", ev);
       if(ev.dead || st.dead){
         if(mode === "vs"){
@@ -378,10 +378,10 @@ const Solo = (function(){
       set("bubStatTime", timeTxt(ended ? took : (mode === "vs" ? clock : ms())));
     }
     set("bubStatLv", BUB.level(st));
-    const pressLeft = Math.max(1, BUB.pressN(st) - st.since);
+    const pressLeft = Math.max(1, Math.ceil(BUB.pressLeft(st) / 1000));   // 秒
     set("bubStatPress", pressLeft);
     const pressBox = $("bubStatPressBox");
-    if(pressBox) pressBox.classList.toggle("bub-stat-press-hot", pressLeft <= 2);
+    if(pressBox) pressBox.classList.toggle("bub-stat-press-hot", pressLeft <= 3);
     const goal = $("bubGoal");
     if(goal) goal.textContent = (mode !== "vs") ? "無盡"
                               : (vs.mode === "ko") ? ("K.O. ×" + (me ? me.ko : 0)) : "淘汰賽";
