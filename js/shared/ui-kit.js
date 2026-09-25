@@ -1520,6 +1520,7 @@ const UPD_CHECK_MS=5*60*1000;     // 兩次連線檢查的最小間隔
 const UPD_STUCK_MS=30*60*1000;    // 上一輪重載後版號沒變 → 退化成這個慢速間隔(見 initUpdateCheck)
 const UPD_STUCK_MAX=3;            // 連續三輪都沒換到版才真的放棄
 const UPD_TICK_MS=4000;           // 心跳:也負責「pending 等到安全就套用」,所以要比檢查間隔密
+const UPD_SW_WAIT_MS=90*1000;     // 套用更新時最多等新版 SW 下載多久(超過就照樣重載,網路那麼爛等也沒用)
 const UPD_FROM_KEY="bingo.updfrom";
 const UPD_TRY_KEY="bingo.updtry";
 let updCur="", updSafe=null, updPending="", updLastAt=0, updGoing=false;
@@ -1542,7 +1543,10 @@ function initUpdateCheck(safeFn){
     const from=sessionStorage.getItem(UPD_FROM_KEY);
     if(from){
       sessionStorage.removeItem(UPD_FROM_KEY);
-      if(from!==updCur){ sessionStorage.removeItem(UPD_TRY_KEY); setTimeout(()=>showToast("已更新到 v"+updCur+" 🎉",2200),1200); }
+      if(from!==updCur){
+        sessionStorage.removeItem(UPD_TRY_KEY); setTimeout(()=>showToast("已更新到 v"+updCur+" 🎉",2200),1200);
+        if(typeof UpdUI!=="undefined") UpdUI.landed(from,updCur);   // 「這次更新了什麼」(js/shared/update.js)
+      }
       else stuck=true;
     }
   }catch(_){}
@@ -1555,9 +1559,13 @@ function initUpdateCheck(safeFn){
   updLastAt=Date.now();                              // 這頁剛載入本身就是最新的,第一次檢查等一個週期後
   // 離線時開的是快取版,一連上網就馬上查。⚠ 慢速重試中不吃這條:那時「馬上查」很可能又是白跑一趟重載
   addEventListener("online",()=>{ if(!updStuck) updLastAt=0; });
+  // 新版 SW 剛接手(js/shared/update.js 轉發)→ 伺服器上多半已經是新版了,馬上查,不必等下一個五分鐘
+  addEventListener("bingo:swready",()=>{ if(!updStuck) updLastAt=0; });
   setInterval(updTick,UPD_TICK_MS);
 }
 function updTick(){
+  // 有新版正在背景下載的話,告訴它「現在有沒有人在對局」—— 對局中它會先停手讓路(sw.js 的 BUSY_HOLD_MS)
+  if(typeof UpdUI!=="undefined") UpdUI.busy(!updSafe());
   if(updGoing)return;
   if(updPending){ if(updSafe()) updApply(); return; }   // 有新版在等 → 只等「安全」這件事
   if(document.hidden || navigator.onLine===false)return;
@@ -1582,22 +1590,40 @@ function updTick(){
     })
     .catch(()=>{});                                      // 抓失敗(沒網路 / 伺服器暫時掛):安靜跳過,下個週期再試
 }
+/* 新版 SW 還在裝 → 回傳一個「裝完(接手或失敗)」才 resolve 的 promise,並把保險計時拉長;
+   沒有在裝的就回 null(直接重載)。 */
+function updWaitSw(r,extend){
+  const w=r.installing||r.waiting;
+  if(!w)return null;
+  extend();
+  return new Promise(res=>{
+    const chk=()=>{ if(w.state==="activated"||w.state==="redundant"){ w.removeEventListener("statechange",chk); res(); } };
+    w.addEventListener("statechange",chk); chk();
+  });
+}
 function updApply(){
   if(updGoing)return;
   updGoing=true;
   showToast("發現新版本 v"+updPending+",正在更新…",1600);
   setTimeout(()=>{
     if(!updSafe()){ updGoing=false; return; }             // 這 1 秒內又進房 / 開了新局 → 取消,等下個安全時機
-    let done=false;
+    let done=false, guard=0;
     const go=()=>{
-      if(done)return; done=true;
+      if(done)return; done=true; clearTimeout(guard);
+      // 等新版下載的這段時間裡又進房 / 開了新局 → 這次不重載,等下個安全時機(那時新版已經下載好,會很快)
+      if(!updSafe()){ updGoing=false; return; }
       try{ sessionStorage.setItem(UPD_FROM_KEY,updCur); }catch(_){}   // 記下舊版號,重載後用來確認真的換版了
       location.reload();
     };
-    setTimeout(go,2500);                                  // 保險:SW 沒回應也照樣重載
-    // 先讓 SW 抓新的 sw.js(新版 install 會 skipWaiting 並清掉舊快取),再重載
+    guard=setTimeout(go,2500);                            // 保險:SW 沒回應也照樣重載
+    /* 先讓 SW 抓新的 sw.js,**等新版下載完**再重載(2026-09-25)。
+       ⚠ 以前是 update() 一回來(或 2.5 秒一到)就重載 —— 新版還在下載,重載後拿到的是
+         舊版 SW 在服務,而網路正被新版的下載塞住:玩家看到的就是「更新完反而更卡」。
+         現在下載中畫面上方有進度(js/shared/update.js),等到新版接手才重載,最多 UPD_SW_WAIT_MS。 */
     if(navigator.serviceWorker && navigator.serviceWorker.getRegistration){
-      navigator.serviceWorker.getRegistration().then(r=>r?r.update():null).then(go).catch(go);
+      navigator.serviceWorker.getRegistration()
+        .then(r=>r?r.update().then(()=>updWaitSw(r,()=>{ clearTimeout(guard); guard=setTimeout(go,UPD_SW_WAIT_MS); })):null)
+        .then(go).catch(go);
     }else go();
   },1100);
 }
@@ -1699,7 +1725,7 @@ function hardRefreshLanded(){
   try{ from=sessionStorage.getItem(HARD_FROM_KEY)||""; sessionStorage.removeItem(HARD_FROM_KEY); }catch(_){}
   const m=document.querySelector('meta[name="version"]'), v=m?m.content:"";
   setTimeout(()=>{
-    if(from && v && from!==v) showToast("已更新到 v"+v+" 🎉",2600);
+    if(from && v && from!==v){ showToast("已更新到 v"+v+" 🎉",2600); if(typeof UpdUI!=="undefined") UpdUI.landed(from,v); }
     else showToast("快取已清除(伺服器上還是 v"+v+")",3000);
   },1000);
 }

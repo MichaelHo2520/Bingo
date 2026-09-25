@@ -12,9 +12,15 @@
   const Sound=(function(){
     let ctx=null, muted=false, vol=1;   // vol:音效總音量 0~1(預設 100%,勝敗音檔與所有合成音都經過總音量節點)
     let master=null;                     // 音效總音量 GainNode(建在當前 AudioContext 上)
-    let winBuf=null, loseBuf=null;       // 勝/敗音檔(mp3/win.wav、mp3/lose.wav)解碼後的 AudioBuffer
+    let winBuf=null, loseBuf=null;       // 勝/敗音檔(mp3/win.mp3、mp3/lose.mp3;後備 .wav)解碼後的 AudioBuffer
     let winEl=null, loseEl=null;         // Web Audio 解不了時的 HTMLAudio 後備節點
-    const SFX={ win:"mp3/win.wav", lose:"mp3/lose.wav" };
+    /* 候選陣列:依序試,第一個抓得到的就用(2026-09-25 起)。
+       ★ mp3 是 win.wav / lose.wav 重編碼的(112 kbps,各約 57 KB;原本兩個合計 1.4 MB 的未壓縮 PCM)——
+         這兩個是每一頁第一次出聲就會預載的東西,六支手機同時開頁就是 8 MB 擠同一個熱點。
+       ⚠ wav 留著當後備(也是原始檔):想換音效就把新的 mp3 蓋上去,或刪掉 mp3 改放 wav。
+       ⚠ sw.js 的 CORE 列的是 mp3 那兩個,要與這裡同一版進 repo(install 抓不到會整批重試)。 */
+    const SFX={ win:["mp3/win.mp3","mp3/win.wav"], lose:["mp3/lose.mp3","mp3/lose.wav"] };
+    const sfxSrc={ win:SFX.win[0], lose:SFX.lose[0] };   // 實際抓到的那一個(HTMLAudio 後備跟著用)
     const sfxReady={win:false,lose:false}, sfxFailed={win:false,lose:false}, sfxLoading={win:false,lose:false};
     // 平時(沒在錄音)把 session 設成 playback,收到的語音才能在靜音模式下也播出;但若正在錄音(play-and-record)則不覆蓋,避免打斷錄音。
     function setPlaybackSession(){
@@ -36,9 +42,7 @@
          而 Sound.win()/lose() 本來就有「還沒載好就先走合成音」的後備(synthWin/synthLose),
          真的提早需要也不會沒聲音。
        ⚠ **不要**改成「要用的時候才載」—— 那會讓第一次贏的那一下延遲一兩秒才出聲。
-       ⚠ 這一項只解掉「搶上行」那一半。真正把那 1.37 MB 變小要重編碼成 mp3
-         (SFX 改成候選陣列 + sw.js 的 CORE 同一版進 repo),**還沒做** ——
-         見 notes/plan/PLAN-離線快取與資產瘦身.md 第一節。 */
+       ★ 另一半(把那 1.37 MB 變小)2026-09-25 做了:重編碼成 mp3,見下面 SFX 那一段。 */
     let preArmed=false;
     function armPreload(){
       if(preArmed)return; preArmed=true;
@@ -70,7 +74,9 @@
       if(sfxReady[key]||sfxFailed[key]||sfxLoading[key])return;
       const c=ac(); if(!c)return;
       sfxLoading[key]=true;
-      fetch(SFX[key]).then(r=>{ if(!r.ok)throw 0; return r.arrayBuffer(); })
+      const grab=i=>fetch(SFX[key][i]).then(r=>{ if(!r.ok)throw 0; sfxSrc[key]=SFX[key][i]; return r.arrayBuffer(); })
+        .catch(e=>{ if(i+1<SFX[key].length) return grab(i+1); throw e; });
+      grab(0)
         .then(ab=>new Promise((res,rej)=>c.decodeAudioData(ab,b=>res(b),e=>rej(e))))
         .then(b=>{ if(key==="win")winBuf=b; else loseBuf=b; sfxReady[key]=true; sfxLoading[key]=false; })
         .catch(()=>{ sfxLoading[key]=false; sfxFailed[key]=true; });   // 取不到/解不了(離線、file://)→ 交給 HTMLAudio 或合成音後備
@@ -98,7 +104,7 @@
     // HTMLAudio 後備(Web Audio 解不了時用);桌機/Android 可套音量,iOS 音量可能無效
     function playEl(key){
       if(muted)return false;
-      try{ let el=key==="win"?winEl:loseEl; if(!el){ el=new Audio(SFX[key]); if(key==="win")winEl=el; else loseEl=el; } el.volume=Math.max(0,Math.min(1,vol)); el.currentTime=0; const p=el.play(); if(p&&p.catch)p.catch(()=>{}); return true; }catch(e){ return false; }
+      try{ let el=key==="win"?winEl:loseEl; if(!el){ el=new Audio(sfxSrc[key]); if(key==="win")winEl=el; else loseEl=el; } el.volume=Math.max(0,Math.min(1,vol)); el.currentTime=0; const p=el.play(); if(p&&p.catch)p.catch(()=>{}); return true; }catch(e){ return false; }
     }
     // 合成音後備:音檔還沒載好 / 全都取不到時,至少有聲(即原本的勝敗提示音)
     function synthWin(){ [523,659,784,1047].forEach((f,i)=>tone(f,{type:"triangle",dur:0.28,vol:0.22,delay:i*0.10})); tone(1568,{type:"sine",dur:0.5,vol:0.12,delay:0.46}); }
@@ -172,7 +178,7 @@
       // 輪到你出號:清亮的兩音「叮–咚」(D6→G6),音色/音高刻意有別於其它音效,讓沒盯著螢幕的人也知道換自己了
       turn(){ tone(1175,{type:"sine",dur:0.13,vol:0.26}); tone(1568,{type:"sine",dur:0.26,vol:0.24,delay:0.14}); },
       ctx(){ return ac(); },   // 給語音留言用同一個(已解鎖)AudioContext 播放,繞過 iOS 自動播放限制
-      // 勝/敗音效:優先播使用者放的 mp3/win.wav、mp3/lose.wav;還沒載好或取不到就用合成音墊著,確保永遠有聲
+      // 勝/敗音效:優先播 mp3/win.mp3、mp3/lose.mp3(後備 .wav);還沒載好或取不到就用合成音墊著,確保永遠有聲
       win(){ if(muted)return; if(playBuf(winBuf))return; if(!sfxReady.win&&!sfxFailed.win)loadSfx("win"); if(sfxFailed.win&&playEl("win"))return; synthWin(); },
       // 平手不走這裡(平手用 win);lose 只在自己輸時播
       lose(){ if(muted)return; if(playBuf(loseBuf))return; if(!sfxReady.lose&&!sfxFailed.lose)loadSfx("lose"); if(sfxFailed.lose&&playEl("lose"))return; synthLose(); },

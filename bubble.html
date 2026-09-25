@@ -555,6 +555,7 @@ const FIREBASE_CONFIG = {
 <!-- 載入順序固定:feedback(錯誤緩衝要最先掛)→ audio → ui-kit(定義 $)→ talk(要在連線核心之前)
      → qr → mp-core → rules(純函式)→ ai(只相依 rules)→ board → solo → adapter → main(必須最後) -->
 <script src="js/shared/feedback.js"></script>
+<script src="js/shared/update.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/shared/ui-kit.js"></script>
 <script src="js/shared/talk.js"></script>

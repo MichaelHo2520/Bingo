@@ -34,6 +34,7 @@
   所以那三頁的版面一行都不用改;只有 ⛶ 按鈕改成 postMessage 請這裡代勞。
 
   設計上刻意保持極簡:內層遊戲有自動更新檢查(reload 只會重載 iframe,全螢幕反而不會掉),
+  (2026-09-25 加了一件事:換遊戲時的載入畫面 #load —— 它只看內層,不改任何導覽行為。)
   但**這一頁自己不吃那套** —— 所以它必須簡單到幾乎不需要再改。要改請一併想清楚舊使用者
   怎麼拿到新版(靠 sw.js 或關掉重開)。
 -->
@@ -45,6 +46,16 @@
   html,body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
   #stage{display:block;width:100%;height:100%;border:0}
   .noscript{color:#eee;font:16px/1.6 system-ui,sans-serif;padding:24px}
+  /* 換遊戲時的載入畫面(2026-09-25)。理由在下面 ldBegin 那一段。
+     ⚠ 這一頁不載入 styles.css,所以這裡用 #id 沒有撞名的問題(那條紅線管的是 styles.src.css) */
+  #load{position:fixed;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;padding:24px;background:#2a1136;color:#f3e9ff;font:600 15px/1.5 system-ui,-apple-system,sans-serif;
+    text-align:center;opacity:0;visibility:hidden;transition:opacity .2s,visibility 0s .2s}
+  #load.on{opacity:1;visibility:visible;transition:opacity .2s}
+  #load .spin{width:34px;height:34px;border:4px solid rgba(255,255,255,.18);border-top-color:#ffd24a;border-radius:50%;
+    animation:ldspin .8s linear infinite}
+  #load small{display:block;margin-top:4px;font-weight:400;font-size:13px;opacity:.75}
+  @keyframes ldspin{to{transform:rotate(360deg)}}
   .noscript a{color:#ffd24a}
 </style>
 </head>
@@ -53,6 +64,7 @@
      而 Web Share **受權限政策管** —— 內層是 iframe,沒有這一項就直接 NotAllowedError。
      那是「直接開 draw.html 測都正常、包進這個外殼就永遠失敗」的坑,而且只有真機按下去才會發現。 -->
 <iframe id="stage" title="遊戲" allow="fullscreen; microphone; autoplay; web-share"></iframe>
+<div id="load" aria-live="polite"><div class="spin"></div><div id="loadTxt">載入中…</div></div>
 <noscript><div class="noscript">這個遊戲需要 JavaScript。<a href="index.html">直接進入首頁</a></div></noscript>
 <script>
 (function(){
@@ -81,7 +93,48 @@
   if(fresh){ try{ history.replaceState(null, "", location.pathname + location.hash); }catch(_){} }
   // 深層連結:app.html#gomoku 直接開五子棋。iOS「加到主畫面」記的是當下網址(含 hash),
   // 所以三個遊戲照樣可以各自加一個直接開該遊戲的圖示。
+  /* ---------- 換遊戲時的載入畫面(2026-09-25) ----------
+     要解決的事:網路慢的時候,點了一個遊戲之後畫面會停在上一頁(或一片空白)好幾秒,
+     玩家分不出是「還在載」還是「當掉了」,只覺得好卡。這裡在換頁超過 0.4 秒時蓋一層
+     轉圈 + 一句話,4 秒後改說「網路比較慢」,12 秒後再建議重新整理。
+     ★ 什麼時候算「載好了」:內層的 <html class="boot-wait"> 被拿掉的那一刻 —— 那是各頁 main.js
+       **最後一行** bootReady() 做的事,也就是「按鈕真的接上電了」(見 notes/01 載入空窗那一節)。
+       比 load 事件早(load 還要等圖檔),load 事件留著當後備(file:// 讀不到內層 document 時只剩它)。
+     ★ 內層自己換頁(點首頁卡、返回、自動更新重載)外層看不到 → 在內層的 pagehide 上掛 ldBegin。
+     ⚠ 30 秒一到一定收掉:真的卡死的話讓內層自己的「請確認網路」提示接手,不要永遠蓋著。 */
+  var load = document.getElementById("load"), loadTxt = document.getElementById("loadTxt");
+  var ldT = [], ldPoll = 0, ldOld = null;
+  function ldReady(){
+    try{
+      var d = stage.contentDocument;
+      if(!d || d === ldOld || d.URL === "about:blank" || d.readyState === "loading") return false;
+      return !d.documentElement.classList.contains("boot-wait");
+    }catch(_){ return false; }
+  }
+  function ldEnd(){
+    while(ldT.length) clearTimeout(ldT.pop());
+    clearInterval(ldPoll); ldPoll = 0;
+    load.classList.remove("on");
+  }
+  function ldSay(html){ return function(){ loadTxt.innerHTML = html; load.classList.add("on"); }; }
+  function ldBegin(){
+    ldEnd();
+    try{ ldOld = stage.contentDocument; }catch(_){ ldOld = null; }
+    ldT.push(setTimeout(ldSay("載入中…"), 400));
+    ldT.push(setTimeout(ldSay("網路比較慢,還在載入…"), 4000));
+    ldT.push(setTimeout(ldSay("還是很慢<small>網路不太穩,可以再等一下,或重新整理這一頁</small>"), 12000));
+    ldT.push(setTimeout(ldEnd, 30000));
+    ldPoll = setInterval(function(){ if(ldReady()) ldEnd(); }, 150);
+  }
+  stage.addEventListener("load", function(){
+    // ⚠ 還沒設 src 時那個 about:blank 也會發 load(有的瀏覽器是非同步的)→ 不理它,不然第一頁的載入畫面會被它收掉
+    try{ if(stage.contentDocument && stage.contentDocument.URL === "about:blank") return; }catch(_){}
+    ldEnd();
+    try{ stage.contentWindow.addEventListener("pagehide", ldBegin); }catch(_){}
+  });
+
   var cur = PAGES[keyOfHash()];   // iframe 目前是哪一頁;以內層 hello 回報的為準
+  ldBegin();
   stage.src = cur + (fresh ? "?fresh=" + fresh : "");
   /* 只改 hash 是「同文件導覽」,瀏覽器不會重載這一頁 → 要自己聽(例如點了 app.html#sudoku 的書籤,
      而分頁已經開在 #bingo)。
@@ -95,7 +148,7 @@
     var k = (location.hash || "").replace(/^#/, "");
     if(!PAGES[k]) return;
     setTimeout(function(){
-      if(PAGES[k] !== cur){ cur = PAGES[k]; stage.src = PAGES[k]; }
+      if(PAGES[k] !== cur){ cur = PAGES[k]; ldBegin(); stage.src = PAGES[k]; }
     }, 250);
   });
 

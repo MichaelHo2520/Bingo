@@ -1511,6 +1511,35 @@
   }
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+  /* ---------- 更新看得見(2026-09-25,js/shared/update.js 自己建元素)----------
+     背景下載新版 / 存離線資料時的小膠囊,與更新落地後的「更新了什麼」。★ 跨十六頁。
+     ⚠ 浮在頂列上方正中,**刻意不擋點擊**(pointer-events:none):對局中也可能出現,
+       方塊 / 泡泡的操作鍵一整排都在畫面上。只有「更新了什麼」那張(.upd-news)可以點掉。
+     ⚠ 位置刻意跟 #toast(top:68px)錯開,兩個同時出現時不疊在一起。
+     ⚠ 顏色刻意**不吃主題變數**:五個主題裡有淺底有深底,這顆要在每一個上面都看得清楚。 */
+  .upd-pill{
+    position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 6px);
+    transform:translateX(-50%) translateY(-8px);z-index:75;
+    max-width:calc(100vw - 32px);box-sizing:border-box;overflow:hidden;
+    padding:5px 14px 6px;border-radius:999px;
+    background:rgba(24,14,34,.88);color:#fff;
+    font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;
+    white-space:nowrap;text-overflow:ellipsis;
+    box-shadow:0 4px 14px rgba(0,0,0,.28);
+    opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;
+  }
+  .upd-pill.upd-on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .upd-pill > span{display:block;overflow:hidden;text-overflow:ellipsis}
+  /* 進度條:膠囊底下一條細線,只在下載中才出現 */
+  .upd-pill > i{position:absolute;left:0;bottom:0;height:3px;width:0;
+    background:#5fd38a;transition:width .3s;display:none}
+  .upd-pill.upd-bar > i{display:block}
+  /* 「更新了什麼」:字可能很長 → 換行、圓角收小、可以點掉 */
+  .upd-pill.upd-news{white-space:normal;text-align:center;border-radius:14px;
+    width:max-content;max-width:min(calc(100vw - 32px),440px);
+    padding:8px 16px;pointer-events:auto;cursor:pointer}
+  .upd-pill.upd-news > span{white-space:normal}
+
   /* 設定頁最下面的版本 + 開發者(取代原本主畫面的 footer) */
   .set-foot{margin-top:14px;text-align:center;color:var(--muted);opacity:.7;
     font-size:12px;font-weight:700;letter-spacing:.02em}

@@ -1,10 +1,11 @@
 /* BINGO Service Worker
    策略:network-first（同源請求一律先走網路 → 線上永遠拿到最新版,徹底避免「改完上傳卻吃到舊快取、更新出不來」)。
-   網路失敗(離線)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
-   CACHE 名稱帶版本號:每次部署把 VERSION 跟著 App 版本一起改,activate 時會清掉舊版快取。
+   網路失敗(離線)或**太慢**(NET_WAIT_MS)才回退到快取,提供離線可玩 + 「加到主畫面」的體驗。
+   CACHE 名稱帶版本號 + 內容指紋(BUILD,由 tools/build-sw.js 產生),activate 時會清掉舊版快取。
+   ★ 2026-09-25 起發版**不再整包重抓**:每一個檔都有內容指紋(REV),舊快取裡指紋對得上的直接複製,
+     只下載真的變了的那幾個;而且**全部抓齊才接手**,抓不齊就讓舊版繼續服務。細節見 install 那一段。
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
 const VERSION = "2.19.0";
-const CACHE = "bingo-" + VERSION;
 const CORE = [
   "./",
   "./app.html",        // 外殼(PWA 的 start_url):三個遊戲跑在它的 iframe 裡,全螢幕掛在它身上
@@ -28,6 +29,8 @@ const CORE = [
                                // ★ 送出走公開 REST(databaseURL/feedbacks.json),不等 Firebase SDK
                                //   —— 十三頁的 SDK 是「進連線才動態載入」的,而回報最需要在的
                                //   時機恰恰是還沒連線 / 連線爛掉的時候
+  "./js/shared/update.js",     // 更新看得見:下載進度 / 新版就緒 / 更新了什麼(十六頁全部載入,含 Bingo)
+  "./whatsnew.json",           // 「這次更新了什麼」—— 一版一句,由 update.js 在更新落地後讀
   "./js/shared/mj-faces.js",   // 麻將牌面自繪(消消樂與台灣 16 張共用)
   "./js/shared/pk-faces.js",   // 撲克牌面自繪(排七與大老二共用,v1.76.0 抽出)
   // 台灣 16 張麻將(第五個遊戲,v1.58.0)
@@ -181,8 +184,11 @@ const CORE = [
   "./js/tiaoqi/main.js",
   "./mp3/bgm.mp3",
   "./mp3/Sunday_Morning.mp3",
-  "./mp3/win.wav",
-  "./mp3/lose.wav",
+  /* 勝 / 敗音效。★ 2026-09-25 起列的是重編碼過的 mp3(各約 60 KB),**不是**原本的 win.wav /
+     lose.wav(兩個合計 1.4 MB 的未壓縮 PCM)—— wav 仍留在 repo 當原始檔與後備
+     (js/audio.js 的 SFX 是候選陣列,mp3 抓不到才試 wav),但不再進離線清單。 */
+  "./mp3/win.mp3",
+  "./mp3/lose.mp3",
   /* 台灣麻將的語音(v1.62.0;v1.64.0 起由 tools/gen-mj16-voice-edge.py 產生)。
      ⚠ v1.72.0 起全部收在 **mp3/mj16/** 底下(舊路徑是 mp3/m16-voice-*.wav):mp3/ 根留給
      五個遊戲共用的東西。改路徑要連 js/mahjong16/sfx.js 的 ensureDefs 與兩支產生器一起改。
@@ -296,9 +302,360 @@ const CORE = [
      那時如果剛好離線就會整組沒聲音(語音層沒有合成音可以墊)。 */
 ["w","b","d"].forEach(s => { for (let v = 1; v <= 9; v++) CORE.push("./mp3/mj16/voice-tile-" + s + v + ".wav"); });
 
+/* ============================================================================
+   內容指紋(REV)—— ⚠⚠ 下面 @@REV 兩行之間是 tools/build-sw.js 產生的,**不要手改**
+   ──────────────────────────────────────────────────────────────────────────
+   REV:CORE 每一個檔的 SHA-256 前 16 碼("./" 是 index.html 的)。
+   BUILD:整份 REV 的指紋 —— 接在快取名後面,**內容一變快取名就跟著變**,
+     所以同一個版號之內重推 sw.js 也不會「新舊內容寫進同一個快取」。
+   ★ 用途只有一個:install 時分辨「這個檔跟舊快取裡那一份是不是同一個」——
+     一樣就本機複製(零流量),不一樣才下載。
+   ⚠ 跑法:`node tools/build-sw.js`(封版的 bump-version.js 會自動跑)。
+     忘了跑的後果**只會多下載、不會拿到舊檔**:指紋對不上的一律重抓,
+     而網路抓回來的內容與 REV 不符時,重試兩次後照樣收下網路那一份(見 grab)。
+     唯一的漏洞是「改了檔、REV 還是舊的、而舊快取剛好也是舊的」→ 那個檔的**離線備份**
+     停在舊版(線上照樣 network-first 拿新的)—— 守門是 test-version.js 的 E 節。
+   ========================================================================== */
+/* @@REV-BEGIN */
+const BUILD = "92e489da";
+const REV = {
+  "./": "7de2f696e04201c6",
+  "./app.html": "5ae5b5389c009647",
+  "./index.html": "7de2f696e04201c6",
+  "./styles.css": "2e29c1196a47246d",
+  "./js/audio.js": "fec2c75c8b2efe5b",
+  "./js/game.js": "60829e5e6d2711f6",
+  "./js/online.js": "576da19c11495fee",
+  "./js/home-live.js": "bc17df3b35265668",
+  "./js/main.js": "506c45c96fd7f3c4",
+  "./js/shared/ui-kit.js": "0bb5a13534aae0e5",
+  "./js/shared/mp-order.js": "149d5a5ac8c2a35c",
+  "./js/shared/mp-core.js": "4713ca2baac59556",
+  "./js/shared/chip-bgm.js": "371e21f68e9cd8e3",
+  "./js/shared/talk.js": "223a297026e6430b",
+  "./js/shared/qr.js": "ca9efdd4fbc2a470",
+  "./js/shared/feedback.js": "2cd0d511fd17f65b",
+  "./js/shared/update.js": "7b8e2a0878319364",
+  "./whatsnew.json": "91108408943947a4",
+  "./js/shared/mj-faces.js": "6dfafa35ef46c02d",
+  "./js/shared/pk-faces.js": "aebf8618ca706ea3",
+  "./mahjong16.html": "15d93846f5750985",
+  "./js/mahjong16/rules.js": "0e46116ea56feb6f",
+  "./js/mahjong16/scoring.js": "412273575d364e2d",
+  "./js/mahjong16/table.js": "11caa2ed0ba68a88",
+  "./js/mahjong16/ai.js": "e7f8efea06dab285",
+  "./js/mahjong16/sfx.js": "26782026c1245c0c",
+  "./js/mahjong16/board.js": "6d6e2724d1f3c3ab",
+  "./js/mahjong16/fx.js": "761fe6f70da716be",
+  "./js/mahjong16/solo.js": "61ad592e7d97ed56",
+  "./js/mahjong16/adapter.js": "48302f1b521b944f",
+  "./js/mahjong16/main.js": "45dd7daffd2625af",
+  "./gomoku.html": "57010717f86f57f1",
+  "./js/gomoku/board.js": "ed482e7b7c5098ce",
+  "./js/gomoku/ai.js": "e7019b45f8af585e",
+  "./js/gomoku/solo.js": "584fe61a17b88c2e",
+  "./js/gomoku/adapter.js": "32a758404c7f5c2f",
+  "./js/gomoku/main.js": "21ea081ddd3182b0",
+  "./sudoku.html": "24db95330c21c997",
+  "./js/sudoku/gen.js": "8102555037535684",
+  "./js/sudoku/board.js": "4dc763aec73cbdfb",
+  "./js/sudoku/solo.js": "2a628bfc1011ec44",
+  "./js/sudoku/adapter.js": "c6df2b0a8d69943d",
+  "./js/sudoku/main.js": "6b40fd2d6017a10f",
+  "./mahjong.html": "d821f0ed6cb66614",
+  "./js/mahjong/gen.js": "2df83affc468e1af",
+  "./js/mahjong/board.js": "c969148ca7129100",
+  "./js/mahjong/solo.js": "766d8739af5031f1",
+  "./js/mahjong/adapter.js": "f572c5c4e53d287c",
+  "./js/mahjong/main.js": "7acac79f5e77047d",
+  "./sevens.html": "d92bf4a005b604fc",
+  "./js/sevens/rules.js": "46f1b8b9e750f273",
+  "./js/sevens/ai.js": "bffc7465d56f79aa",
+  "./js/sevens/board.js": "41ec75f45db635fb",
+  "./js/sevens/solo.js": "c1a732be756c709e",
+  "./js/sevens/adapter.js": "bc844454e1c4b830",
+  "./js/sevens/main.js": "2011bf7d3294ff96",
+  "./big2.html": "538b6041db5cef56",
+  "./js/big2/rules.js": "0eea6c37af825ba3",
+  "./js/big2/ai.js": "78d4626a42422575",
+  "./js/big2/board.js": "9e07ef3b63a3cdb7",
+  "./js/big2/solo.js": "e3278b0d97b3634e",
+  "./js/big2/adapter.js": "a8ed1789ec0e2f52",
+  "./js/big2/main.js": "d034b272dab27ae7",
+  "./blackjack.html": "a7570595b8f954e2",
+  "./js/blackjack/rules.js": "c52ff0caa15e2aaa",
+  "./js/blackjack/ai.js": "35fd38d61855a3d2",
+  "./js/blackjack/board.js": "f3ab99ac9cdb225a",
+  "./js/blackjack/solo.js": "01c97ba61298ddf7",
+  "./js/blackjack/adapter.js": "e37687ddc6ca4c37",
+  "./js/blackjack/main.js": "d07b4d67946e858f",
+  "./uno.html": "e5e71b036c5b26ff",
+  "./js/uno/rules.js": "f253bc64ac42369c",
+  "./js/uno/ai.js": "6d27d3b66798cdde",
+  "./js/uno/board.js": "8e5ed9d916b4b08c",
+  "./js/uno/solo.js": "de30f2dd97a69aa3",
+  "./js/uno/adapter.js": "79a1cd64f32a363a",
+  "./js/uno/main.js": "8fdcddf4f9144cea",
+  "./darkchess.html": "cba83abf6121c767",
+  "./js/darkchess/rules.js": "22f316b13eb1889c",
+  "./js/darkchess/ai.js": "91d63d7745ae676a",
+  "./js/darkchess/board.js": "b3577df6d9d2f3c2",
+  "./js/darkchess/solo.js": "41dad776223a3a13",
+  "./js/darkchess/adapter.js": "07fcfa28a01fe464",
+  "./js/darkchess/main.js": "13d76b0904ecc6bd",
+  "./chengyu.html": "56acc18f2e7ad2ae",
+  "./js/chengyu/gen.js": "cd7267a7744c63e3",
+  "./js/chengyu/board.js": "dd07f06ad78df164",
+  "./js/chengyu/solo.js": "ce2cbb63ac08627b",
+  "./js/chengyu/adapter.js": "0a1cd546a471619e",
+  "./js/chengyu/main.js": "755c52931c833ee0",
+  "./draw.html": "d55d4c22a8a71821",
+  "./js/draw/rules.js": "379339ee2aaef671",
+  "./js/draw/gen.js": "375f3c119c54237c",
+  "./js/draw/board.js": "1ee8c9b96d7eb9eb",
+  "./js/draw/adapter.js": "f368568ea6e316c0",
+  "./js/draw/main.js": "55687d48e2d0bc36",
+  "./flychess.html": "b95b820cd9033479",
+  "./js/flychess/rules.js": "3f2be4f4d21f1972",
+  "./js/flychess/ai.js": "ce32d2589d6b9039",
+  "./js/flychess/board.js": "aceae7366323d302",
+  "./js/flychess/solo.js": "3bd8a623f9aa530f",
+  "./js/flychess/adapter.js": "354884a21563ad6e",
+  "./js/flychess/main.js": "fb236b88052c85e8",
+  "./blocks.html": "aa87bae89e518128",
+  "./js/blocks/rules.js": "0d19ddbf181b3878",
+  "./js/blocks/ai.js": "6832149959867599",
+  "./js/blocks/music.js": "d19e2b4b4161ed96",
+  "./js/blocks/board.js": "f6686023b76df31f",
+  "./js/blocks/solo.js": "a98db34bc358b0e1",
+  "./js/blocks/adapter.js": "6262193be0bd5929",
+  "./js/blocks/main.js": "30a906877a62f3bd",
+  "./img/blk-icon.png": "f3bc6384719fec28",
+  "./bubble.html": "dd32316d424a25d3",
+  "./js/bubble/rules.js": "e713a0cbbc434adf",
+  "./js/bubble/ai.js": "fa566700f2802b17",
+  "./js/bubble/music.js": "5362630ac9dc6b45",
+  "./js/bubble/board.js": "ed67522267bf5aec",
+  "./js/bubble/solo.js": "fc22895b3d34fd0d",
+  "./js/bubble/adapter.js": "37d4a2b6b718189d",
+  "./js/bubble/main.js": "c32fc51c38e687b3",
+  "./img/bub2-icon.png": "57709a8e61b80073",
+  "./tiaoqi.html": "642ec906b8333012",
+  "./js/tiaoqi/rules.js": "0909b91951971301",
+  "./js/tiaoqi/ai.js": "b535ba23344f7089",
+  "./js/tiaoqi/board.js": "291d0a98cab0dc67",
+  "./js/tiaoqi/solo.js": "7034f048424bc112",
+  "./js/tiaoqi/adapter.js": "aa8294a54adf9a37",
+  "./js/tiaoqi/main.js": "a9ba1fbebe37249f",
+  "./mp3/bgm.mp3": "86a11a4e4464b5b4",
+  "./mp3/Sunday_Morning.mp3": "5991e85728d3c751",
+  "./mp3/win.mp3": "163179a68866b721",
+  "./mp3/lose.mp3": "66331b442af52271",
+  "./mp3/mj16/voice-pong.wav": "c2ece4c1cc6e4f70",
+  "./mp3/mj16/voice-chow.wav": "30fa02576c23cb63",
+  "./mp3/mj16/voice-kong.wav": "46eaef3308ee817d",
+  "./mp3/mj16/voice-hu.wav": "e8d4a95d5f5037c9",
+  "./mp3/mj16/voice-zimo.wav": "55ce72da34898c41",
+  "./mp3/mj16/voice-washout.wav": "9b6b5bbbc018ab2a",
+  "./mp3/mj16/voice-ready.wav": "a6f292011c45f75b",
+  "./mp3/mj16/voice-flower.wav": "5b0ec66af8c3d47c",
+  "./mp3/mj16/voice-tile-fe.wav": "ca902e12ae210ba0",
+  "./mp3/mj16/voice-tile-fs.wav": "d6825a62f0437429",
+  "./mp3/mj16/voice-tile-fw.wav": "0b804d67140d3096",
+  "./mp3/mj16/voice-tile-fn.wav": "72d2064fa6fb0349",
+  "./mp3/mj16/voice-tile-jz.wav": "d5d189dff9905282",
+  "./mp3/mj16/voice-tile-jf.wav": "8bbbfa9205107ec0",
+  "./mp3/mj16/voice-tile-jb.wav": "91056239f568f9be",
+  "./mp3/big2/la.wav": "a00471dc2d9a24b7",
+  "./mp3/big2/pass.wav": "097292a837c21a42",
+  "./mp3/fc/dice.mp3": "6a3d37146a9e0a11",
+  "./mp3/bj/bust.wav": "40bc14a61485acdd",
+  "./mp3/bj/bj.wav": "c8002c7393e9db87",
+  "./mp3/bj/dragon.wav": "2e374d2701526072",
+  "./mp3/bj/grab.wav": "431ce97d28db6da8",
+  "./mp3/uno/voice-uno.wav": "2132b04fbe9f3b44",
+  "./mp3/uno/voice-d2.wav": "7c644d1b3915541d",
+  "./mp3/uno/voice-d4.wav": "c70da0d8918aae4d",
+  "./mp3/uno/voice-r.wav": "b2577a97b0836d7e",
+  "./mp3/uno/voice-y.wav": "e0deb1f17e50d3db",
+  "./mp3/uno/voice-g.wav": "57208bc2e7bf9493",
+  "./mp3/uno/voice-b.wav": "ab7f7ecdb657f549",
+  "./mp3/是要多久.m4a": "9a7e7481f673e276",
+  "./mp3/啊西好了沒.m4a": "ed252263defa2185",
+  "./mp3/快點，來不急啦.m4a": "6795bd69ce5eaeb1",
+  "./mp3/聽牌.m4a": "e11e0b639e86197a",
+  "./mp3/你就趕快啦.m4a": "6843cd80621ccb10",
+  "./mp3/你是在哭喔.m4a": "d96388f9c6c013c3",
+  "./mp3/我要驗牌.m4a": "9040c8b70592fefa",
+  "./mp3/牌沒問題.m4a": "3af1f8f997ebee2d",
+  "./mp3/沒禮貌.m4a": "5144abbbaa66b7b5",
+  "./mp3/你禮貌嗎.m4a": "05595dcfa1b92bfc",
+  "./manifest.json": "3cf42d0a1f6a7cdf",
+  "./img/icon.svg": "d42669418cb79b0a",
+  "./img/bc-icon.png": "e520a8b45a0285a2",
+  "./img/gk-icon.png": "983bbed5de0ba7f7",
+  "./img/sk-icon.png": "dbe30839082c823b",
+  "./img/mk-icon.png": "08c6873078b30cb6",
+  "./img/m16-icon.png": "19728e2481da8a29",
+  "./img/sv-icon.png": "8bd09c4bd1d199b9",
+  "./img/b2-icon.png": "c13cf0bc86e56a8a",
+  "./img/bj-icon.png": "d8251940d04f9525",
+  "./img/un-icon.png": "ba8b0bec485b186e",
+  "./img/dc-icon.png": "4d8d06ff231c61d5",
+  "./img/cy-icon.png": "aeea8c7cf51b1e0b",
+  "./img/dw-icon.png": "97d69e718e0732c8",
+  "./img/fc-icon.png": "8f8dcb2c58568b56",
+  "./img/tq-icon.png": "eea6c36183fec479",
+  "./mp3/mj16/voice-tile-w1.wav": "1f4ced5583511361",
+  "./mp3/mj16/voice-tile-w2.wav": "24ef29f7cf7356c0",
+  "./mp3/mj16/voice-tile-w3.wav": "c53a65dfba7a712f",
+  "./mp3/mj16/voice-tile-w4.wav": "2190b22c9c37bb94",
+  "./mp3/mj16/voice-tile-w5.wav": "00e35bda645e5c30",
+  "./mp3/mj16/voice-tile-w6.wav": "38a393c650e0bc1a",
+  "./mp3/mj16/voice-tile-w7.wav": "026958d48c204346",
+  "./mp3/mj16/voice-tile-w8.wav": "0ceb28ca572f7b66",
+  "./mp3/mj16/voice-tile-w9.wav": "3a9c201b7cad4b5c",
+  "./mp3/mj16/voice-tile-b1.wav": "45c95b32498585ea",
+  "./mp3/mj16/voice-tile-b2.wav": "4a040c87d4bd4559",
+  "./mp3/mj16/voice-tile-b3.wav": "a4ae7749e28515bb",
+  "./mp3/mj16/voice-tile-b4.wav": "bfac051027d4c9be",
+  "./mp3/mj16/voice-tile-b5.wav": "ed6f033b227ad494",
+  "./mp3/mj16/voice-tile-b6.wav": "042018c3543a4785",
+  "./mp3/mj16/voice-tile-b7.wav": "ac1e450814c0a1f7",
+  "./mp3/mj16/voice-tile-b8.wav": "15a0537afd635306",
+  "./mp3/mj16/voice-tile-b9.wav": "5f2376ba21e617fd",
+  "./mp3/mj16/voice-tile-d1.wav": "e08bf9e02ab3e83d",
+  "./mp3/mj16/voice-tile-d2.wav": "1d8917ee61a2c94a",
+  "./mp3/mj16/voice-tile-d3.wav": "f6b60f85f5b59d88",
+  "./mp3/mj16/voice-tile-d4.wav": "c574e3a259fec1fb",
+  "./mp3/mj16/voice-tile-d5.wav": "8f4972285174bf60",
+  "./mp3/mj16/voice-tile-d6.wav": "c85c2a695ccf8205",
+  "./mp3/mj16/voice-tile-d7.wav": "214ea8bd21a6ecb3",
+  "./mp3/mj16/voice-tile-d8.wav": "b4bb7d1eb63d4982",
+  "./mp3/mj16/voice-tile-d9.wav": "00065f729f202bfb"
+};
+/* @@REV-END */
+const CACHE = "bingo-" + VERSION + (BUILD ? "-" + BUILD : "");
+
+/* 網路超過這麼久沒回應 → 先拿快取頂著(網路那一趟照樣在背景跑完)。
+   ★ 治的是現場最常見的「有連上熱點、但網路爛到每個請求都要等十幾秒」——
+     network-first 原本要等到那一趟**失敗**才退回快取,而爛網路常常是不失敗、只是很慢。
+   ⚠ 只在「確定快取跟這一頁是同一版」時才會用快取頂(見下面 kinds 那一段),
+     不然會拼出「新版 HTML + 舊版 JS」的頁面。 */
+const NET_WAIT_MS = 3000;
+/* 背景下載新版時,遇到有人正在對局就先停手(頁面每 4 秒送一次 bingo.busy)。
+   ⚠ 最多停這麼久 —— install 事件拖太久瀏覽器會直接把 SW 殺掉,那就白抓了;
+     停滿之後改成**單線**慢慢抓(平常是兩線)。 */
+const BUSY_HOLD_MS = 120000;
+const LANES = 2;
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const baseVer = v => String(v || "").replace(/\+.*$/, "");
+async function fingerprint(buf) {
+  const d = new Uint8Array(await crypto.subtle.digest("SHA-256", buf));
+  let s = ""; for (let i = 0; i < 8; i++) s += d[i].toString(16).padStart(2, "0");
+  return s;
+}
+
+/* 把狀態廣播給所有分頁(含 iframe 裡的遊戲頁與還沒被這支 SW 接管的頁面)。
+   頁面那一半在 js/shared/update.js:把它畫成畫面上方那顆小膠囊。 */
+async function tell(msg) {
+  msg.t = "bingo.sw"; msg.ver = VERSION;
+  try {
+    const cs = await self.clients.matchAll({ includeUncontrolled: true, type: "window" });
+    cs.forEach(c => { try { c.postMessage(msg); } catch (_) { } });
+  } catch (_) { }
+}
+
+let busyUntil = 0;
+self.addEventListener("message", e => {
+  const d = e.data || {};
+  // 頁面說「正在對局」→ 15 秒內算忙;頁面不見了(關掉 / 當掉)自己會過期,不會永遠停手
+  if (d.t === "bingo.busy") busyUntil = d.on ? Date.now() + 15000 : 0;
+});
+
+/* ============================================================================
+   install:先本機複製、再下載差額,**全部齊了才接手**
+   ──────────────────────────────────────────────────────────────────────────
+   ⚠⚠ 舊寫法是 `c.addAll(CORE).catch(()=>{})` + 一開始就 skipWaiting(),兩個問題疊在一起:
+     ① 每次發版 212 個檔(約 9.4 MB)**全部重抓** —— 包括根本沒變的 4.6 MB 音檔與圖示。
+        在熱點上這就是玩家說的「突然變很卡」,而畫面上沒有任何提示。
+     ② addAll 是全有全無:212 個裡有一個沒抓到,新快取就是**空的**;但錯誤被 catch 吞掉,
+        新版照樣接手、activate 照樣把舊快取刪掉 → 之後每個音檔都走網路、離線整個不能玩。
+        網路越爛越容易發生,所以是「越更新越慢」。
+   現在:
+     · 指紋對得上的檔從舊快取**本機複製**(零流量);一個版本通常只剩十來個檔要下載。
+     · 下載兩線並行(不再 212 個一起衝),有人在對局就先讓路(BUSY_HOLD_MS)。
+     · 每個檔重試三次;還是失敗就讓 install **失敗** → 舊版繼續服務、舊快取保留,
+       下次開頁(或更新檢查呼叫 reg.update())再試,已經抓到的那些下次不必重抓(同名快取留著)。
+     · 全部齊了才 skipWaiting()。
+   ========================================================================== */
+async function reuse(from, to, url, want) {
+  if (!want) return false;
+  const r = await from.match(url);
+  if (!r || r.status !== 200) return false;
+  let got = "";
+  try { got = await fingerprint(await r.clone().arrayBuffer()); } catch (_) { return false; }
+  if (got !== want) return false;
+  if (from !== to) await to.put(url, r);
+  return true;
+}
+/* 從網路抓一個檔。★ 第一次用 no-cache(帶 ETag 問伺服器,沒變就 304,幾乎不花流量);
+   內容跟 REV 對不上(多半是 GitHub Pages 的 CDN 還沒同步完)就等一下改用 reload 再抓。
+   ⚠ 第三次還是對不上就**照收網路那一份**:那代表 REV 過期(忘了跑 build-sw.js),
+     網路上的才是真相 —— 絕不可以因為指紋對不上就讓整個 install 永遠失敗。 */
+async function grab(url, want) {
+  let lastErr = null;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const res = await fetch(url, { cache: i === 0 ? "no-cache" : "reload" });
+      if (!res || res.status !== 200) throw new Error("HTTP " + (res && res.status));
+      if (!want || i === 2) return res;
+      const got = await fingerprint(await res.clone().arrayBuffer());
+      if (got === want) return res;
+    } catch (err) { lastErr = err; }
+    await sleep(1500 * (i + 1));
+  }
+  throw lastErr || new Error("抓不到 " + url);
+}
+async function precache() {
+  const cache = await caches.open(CACHE);
+  // 新的在後面 → 反過來找,先試最近的那一份
+  const olds = (await caches.keys()).filter(k => k !== CACHE && k.indexOf("bingo-") === 0).reverse();
+  const oldCaches = await Promise.all(olds.map(k => caches.open(k)));
+  const need = [];
+  for (const url of CORE) {
+    const want = REV[url];
+    if (await reuse(cache, cache, url, want)) continue;       // 上一次沒裝完,這個已經抓過了
+    let hit = false;
+    for (const oc of oldCaches) { if (await reuse(oc, cache, url, want)) { hit = true; break; } }
+    if (!hit) need.push(url);
+  }
+  const total = need.length, holdUntil = Date.now() + BUSY_HOLD_MS;
+  let done = 0;
+  if (total) tell({ st: "dl", done, total });
+  const lane = async idx => {
+    while (need.length) {
+      // 有人在對局:先停手;停滿 BUSY_HOLD_MS 之後只留第一線繼續抓
+      if (Date.now() < busyUntil && (Date.now() < holdUntil || idx > 0)) { await sleep(1000); continue; }
+      const url = need.shift();
+      const res = await grab(url, REV[url]);
+      await cache.put(url, res);
+      done++;
+      tell({ st: "dl", done, total });
+    }
+  };
+  const lanes = [];
+  for (let i = 0; i < LANES; i++) lanes.push(lane(i));
+  await Promise.all(lanes);
+  tell({ st: "ok", total });
+}
+
 self.addEventListener("install", e => {
-  self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE).catch(() => {})));
+  e.waitUntil(precache().then(
+    () => self.skipWaiting(),
+    err => { tell({ st: "fail" }); throw err; }      // 讓 install 失敗:舊版繼續服務,下次再試
+  ));
 });
 
 self.addEventListener("activate", e => {
@@ -306,6 +663,7 @@ self.addEventListener("activate", e => {
     const keys = await caches.keys();
     await Promise.all(keys.filter(k => k !== CACHE && k.indexOf("bingo-") === 0).map(k => caches.delete(k)));
     await self.clients.claim();
+    tell({ st: "on" });
   })());
 });
 
@@ -329,18 +687,14 @@ self.addEventListener("activate", e => {
        `fetch → decodeAudioData`(普通請求),圖檔的 <img> 也不帶 Range。
        所以「不碰 Range」幾乎不減損效益,只是把 HTMLAudio 那條後備留在原路上。
 
-   ⚠ 這一層換來的代價(講清楚,不是 bug):cache-first **不重新驗證** ——
-     開發時把一個 mp3 / png **換成新檔但檔名不變**,瀏覽器會繼續放舊的那一份,
-     直到版號改掉(CACHE 名帶版號 → activate 清舊快取)或按設定頁的「強制更新」。
-     發版時本來就會進版號,所以只有「同一版之內反覆換素材」會遇到。
+   ⚠ cache-first **不重新驗證** —— 開發時把一個 mp3 / png **換成新檔但檔名不變**,
+     同一個快取裡會繼續放舊的那一份。★ 2026-09-25 起這件事在**發版時自動解決**:
+     REV 的指紋變了 → install 會重抓那一個檔。同一版之內反覆換素材才需要按設定頁的「強制更新」。
    ============================================================================ */
 const MEDIA_RE = /\.(mp3|wav|m4a|ogg|opus|png|jpe?g|webp|gif|svg)$/i;
 
 /* 206 的回應進不了快取(規格對 Cache.put 明訂要以 TypeError reject),
    所以另外發一次**不帶 Range** 的請求把整個檔收進來,下一次就有得命中。
-   ⚠ 這一段補的正是下面那條長註解說的「network-first 會順手收快取」對
-     HTMLAudio **不成立**的洞 —— 而 CORE 裡那條「使用者自己放的 mp3 刻意不列」
-     一直靠著那個不成立的假設。
    ⚠ 要去重:同一個檔在播放期間會連發好幾個 Range 請求,不擋的話會平行抓好幾份。 */
 const warming = new Set();
 function warmFull(url) {
@@ -367,6 +721,103 @@ function mediaFirst(req) {
   });
 }
 
+/* ============================================================================
+   程式碼(HTML / JS / CSS / JSON):network-first + 「太慢就先用快取」,而且**一頁一致**
+   ──────────────────────────────────────────────────────────────────────────
+   ★ 每一頁(client)開頭那個導覽請求決定這一頁的「種類」,之後這一頁的 JS / CSS 都照它走:
+       cache  導覽太慢 / 沒網路 → 整頁都從快取拿(快取裡是同一版的一整套,拼不出新舊混搭)
+       same   網路回來的 HTML 跟快取是同一版 → 子資源也可以「太慢就先用快取」
+       other  網路上已經是別的版本(新版剛推、這支 SW 還是舊的)→ 子資源只走網路,
+              快取裡的舊 JS 一個都不拿來頂(那就是「新 HTML + 舊 JS」)
+   ★ 同理,**只有 same 的回應才寫回快取**:別的版本的檔寫進這一版的快取,
+     下一次離線開頁就會拼出混搭。新版的檔一律由新版 SW 的 install 收進它自己的快取。
+   ⚠ 這張表只活在記憶體裡(SW 閒置 30 秒就可能被收掉)—— 查不到就當 other,
+     也就是退回原本的 network-first,不會更糟。
+   ⚠⚠ 更新檢查(no-store + Range)與強制更新(reload)**一律直接走網路**、不吃這一套:
+     拿快取回給它們等於永遠查不到新版。
+   ============================================================================ */
+const kinds = new Map();   // clientId → Promise<"cache"|"same"|"other">
+function mark(id, p) {
+  if (!id) return;
+  kinds.set(id, p);
+  if (kinds.size > 40) kinds.delete(kinds.keys().next().value);
+}
+/* 只讀 HTML 開頭找 <meta name="version">(十六頁都在前 3 KB 內,test-version 的 D 節守)。
+   讀的是 clone 的那一條,不影響頁面本身的串流。 */
+async function peekVersion(res) {
+  try {
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let txt = "";
+    while (txt.length < 8192) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      txt += dec.decode(value, { stream: true });
+      const m = /<meta\s+name="version"\s+content="([^"]+)"/i.exec(txt);
+      if (m) { reader.cancel().catch(() => { }); return m[1]; }
+    }
+    reader.cancel().catch(() => { });
+  } catch (_) { }
+  return "";
+}
+const race = (p, ms) => Promise.race([p.then(r => r, () => null), sleep(ms).then(() => null)]);
+
+async function onNavigate(e) {
+  const req = e.request;
+  const key = req.url.split("#")[0].split("?")[0];
+  const cache = await caches.open(CACHE);
+  const cached = await cache.match(key);
+  let setKind = () => { };
+  mark(e.resultingClientId, new Promise(r => { setKind = r; }));
+  const net = fetch(req).then(res => {
+    if (res && res.status === 200) {
+      const a = res.clone(), b = res.clone();
+      peekVersion(a).then(v => {
+        const k = baseVer(v) === VERSION ? "same" : "other";
+        setKind(k);
+        if (k === "same") cache.put(key, b).catch(() => { });
+      });
+    } else setKind("other");
+    return res;
+  });
+  if (!cached) {
+    try { return await net; }
+    catch (_) { setKind("other"); return (await caches.match(key)) || (await caches.match("./app.html")) || Response.error(); }
+  }
+  const first = await race(net, NET_WAIT_MS);
+  if (first) return first;
+  setKind("cache");            // 已經 resolve 過(網路其實回來了)的話這一行不生效
+  net.catch(() => { });        // 網路那一趟照樣跑完,是同一版就順手更新快取
+  return cached;
+}
+
+async function onCode(e) {
+  const req = e.request;
+  const p = e.clientId ? kinds.get(e.clientId) : null;
+  const kind = p ? ((await race(p, NET_WAIT_MS)) || "other") : "other";
+  const cache = await caches.open(CACHE);
+  if (kind === "cache") { const hit = await cache.match(req); if (hit) return hit; }
+  const net = fetch(req).then(res => {
+    /* ⚠⚠ 條件是 status === 200,**不可以寫 res.ok**(v1.156.0 修)。
+       `Response.ok` 涵蓋 200~299,所以 **206(Partial Content)的 ok 是 true** ——
+       而規格對 `Cache.put` 明訂 206 要以 TypeError reject(SW console 會被 unhandled
+       rejection 塞滿,把真正的快取錯誤埋掉)。
+       ⚠ 就算條件收成 200,`.catch()` 還是要留(配額滿、私密瀏覽都會 reject)。 */
+    if (kind === "same" && res && res.status === 200) cache.put(req, res.clone()).catch(() => { });
+    return res;
+  });
+  if (kind === "same") {
+    const hit = await cache.match(req);
+    if (hit) {
+      const first = await race(net, NET_WAIT_MS);
+      if (first) return first;
+      net.catch(() => { });
+      return hit;
+    }
+  }
+  try { return await net; }
+  catch (_) { return (await caches.match(req)) || Response.error(); }
+}
+
 self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
@@ -374,37 +825,14 @@ self.addEventListener("fetch", e => {
   try { url = new URL(req.url); } catch (_) { return; }
   if (url.origin !== self.location.origin) return;   // 外部(Firebase / 字型)不攔,直接走網路
 
+  const ranged = !!req.headers.get("range");
   // 媒體且不帶 Range → cache-first(見上面那一大段)
-  if (MEDIA_RE.test(url.pathname) && !req.headers.get("range")) {
-    e.respondWith(mediaFirst(req));
+  if (MEDIA_RE.test(url.pathname) && !ranged) { e.respondWith(mediaFirst(req)); return; }
+  // 更新檢查 / 強制更新 / 帶 Range → 直接網路,失敗才退回快取(不寫回、不逾時)
+  if (ranged || req.cache === "no-store" || req.cache === "reload") {
+    e.respondWith(fetch(req).catch(() => caches.match(req).then(hit => hit || Response.error())));
     return;
   }
-
-  // network-first:先網路(順手更新快取),失敗才回退快取;導覽請求離線時退回外殼 app.html
-  e.respondWith(
-    fetch(req).then(res => {
-      /* ⚠⚠ 條件是 status === 200,**不可以寫 res.ok**(v1.156.0 修)。
-         `Response.ok` 涵蓋 200~299,所以 **206(Partial Content)的 ok 是 true** ——
-         而規格對 `Cache.put` 明訂 206 要以 TypeError reject。
-         這個專案到處都會發 Range 請求:HTMLMediaElement 一律送 Range,而
-         js/audio.js 的 BGM(new Audio(src))、win/lose 的 HTMLAudio 後備、playClipEl
-         (js/mahjong16/sfx.js 對全部 mj16 語音明確開了 {el:true})都走它。
-         ★ 後果不影響播放(return res 在 put 之外),症狀是安靜的兩件事:
-           ① SW console 被 unhandled rejection 塞滿 → 真正的快取錯誤(發版時 CORE 列錯檔名)
-              會被埋掉,而那是「離線整個不能玩」的唯一線索
-           ② 這些媒體回應永遠進不了 runtime cache —— 也就是說「network-first 會順手把
-              播過的檔收進來」這個假設**對所有走 HTMLAudio 的音檔都不成立**,
-              而上面 CORE 那條「使用者自己放的 mp3 刻意不列進 CORE」正是靠這個假設。
-              ★ ②那個洞已經補掉了:媒體改走上面的 mediaFirst,遇到 206 會用
-                warmFull() 另外抓一份完整的收進來。這裡留著是因為**非媒體**的請求
-                (以及帶 Range 的媒體)還是走這一條,①的理由照樣成立。
-         ⚠ 就算條件收成 200,`.catch()` 還是要留:同一段的兄弟 c.addAll(CORE).catch(()=>{})
-           一直都有,這裡少了純粹是漏的(配額滿、私密瀏覽都會 reject)。 */
-      if (res && res.status === 200) {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
-      }
-      return res;
-    }).catch(() => caches.match(req).then(hit => hit || (req.mode === "navigate" ? caches.match("./app.html") : Response.error())))
-  );
+  if (req.mode === "navigate") { e.respondWith(onNavigate(e)); return; }
+  e.respondWith(onCode(e));
 });

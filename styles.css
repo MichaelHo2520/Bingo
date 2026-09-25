@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 8cc760cb84f46be6da6e666adf4ca047f0bbdb5a178aca884319fe6e7c932024)
+    真相在 styles.src.css(sha256 0827e7ee1302043c40dc2ae6931b3cba6eda004f8a611c01e8b7773bb712e65a)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -771,6 +771,26 @@
     box-shadow:0 6px 18px rgba(0,0,0,.25);
   }
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .upd-pill{
+    position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 6px);
+    transform:translateX(-50%) translateY(-8px);z-index:75;
+    max-width:calc(100vw - 32px);box-sizing:border-box;overflow:hidden;
+    padding:5px 14px 6px;border-radius:999px;
+    background:rgba(24,14,34,.88);color:#fff;
+    font:600 13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;
+    white-space:nowrap;text-overflow:ellipsis;
+    box-shadow:0 4px 14px rgba(0,0,0,.28);
+    opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;
+  }
+  .upd-pill.upd-on{opacity:1;transform:translateX(-50%) translateY(0)}
+  .upd-pill > span{display:block;overflow:hidden;text-overflow:ellipsis}
+  .upd-pill > i{position:absolute;left:0;bottom:0;height:3px;width:0;
+    background:#5fd38a;transition:width .3s;display:none}
+  .upd-pill.upd-bar > i{display:block}
+  .upd-pill.upd-news{white-space:normal;text-align:center;border-radius:14px;
+    width:max-content;max-width:min(calc(100vw - 32px),440px);
+    padding:8px 16px;pointer-events:auto;cursor:pointer}
+  .upd-pill.upd-news > span{white-space:normal}
   .set-foot{margin-top:14px;text-align:center;color:var(--muted);opacity:.7;
     font-size:12px;font-weight:700;letter-spacing:.02em}
   #home{text-align:center;padding-top:8px}
