@@ -14914,3 +14914,31 @@ body.lf-page :is(.btn,.lf-floorbtn,.seg button){position:relative}
 @media(prefers-reduced-motion:reduce){.lf-hud>.lf-clock-urgent{animation:none}}
 /* 18 回合時進度條格數加倍，縮小間距。 */
 .lf-progress.lf-progress-long{gap:2px}
+/* 大樓高度固定：操作區由 board.js 的 holdAction 撐到這個寬度出現過的最高值；
+   揭曉那行說明就置中在保留下來的空間裡。結果行固定留兩行，翻牌累加換行時大樓也不會縮。 */
+.lf-action{display:flex;flex-direction:column}
+.lf-controls:has(>.lf-next-note){flex:1 1 auto;display:flex;align-items:center;justify-content:center}
+.lf-result{min-height:2.8em}
+/* 方向：頂列一對上下燈號（亮的那顆就是方向，照真電梯門口的 ▲▼），上行青綠、下行橘；
+   井道裡同色箭頭往行進方向流動，車廂標示前面也掛箭頭。三者都讀 data-dir。 */
+.lf-dir{--lf-dir-c:#8ff0c8}
+.lf-dir[data-dir="down"]{--lf-dir-c:#ffc27a}
+.lf-hud>.lf-dir{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 7px;border:1px solid var(--lf-dir-c);border-radius:999px;background:color-mix(in srgb,var(--lf-dir-c) 15%,transparent);color:var(--lf-dir-c);font-size:12px;font-weight:900;letter-spacing:.5px;white-space:nowrap;transition:color .2s,border-color .2s,background .2s}
+.lf-hud>b{white-space:nowrap}
+.lf-hud>.lf-dir{min-width:0}
+.lf-dir>span{overflow:hidden;text-overflow:ellipsis}
+.lf-lantern{flex:none;display:flex;flex-direction:column;gap:2px}
+.lf-hud .lf-lantern b{display:block;width:10px;height:7px;background:currentColor;opacity:.22;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.lf-hud .lf-lantern .lf-lantern-down{clip-path:polygon(0 0,100% 0,50% 100%)}
+.lf-dir[data-dir="up"] .lf-lantern-up,.lf-dir[data-dir="down"] .lf-lantern-down{opacity:1}
+.lf-dir.lf-moving[data-dir="up"] .lf-lantern-up,.lf-dir.lf-moving[data-dir="down"] .lf-lantern-down{animation:lf-lantern-blink .5s ease-in-out infinite alternate}
+@keyframes lf-lantern-blink{to{opacity:.45}}
+.lf-stage{--lf-dir-c:#8ff0c8}
+.lf-stage[data-dir="down"]{--lf-dir-c:#ffc27a}
+.lf-flow{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.3;background:var(--lf-dir-c);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='18'%3E%3Cpath d='M5 12l6-6 6 6' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 50% 0/22px 18px repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='18'%3E%3Cpath d='M5 12l6-6 6 6' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 50% 0/22px 18px repeat-y;animation:lf-flow 2.4s linear infinite;transition:opacity .2s}
+.lf-stage[data-dir="down"] .lf-flow{transform:scaleY(-1)}
+.lf-stage.lf-moving .lf-flow{opacity:.6;animation-duration:.6s}
+@keyframes lf-flow{to{-webkit-mask-position:50% -18px;mask-position:50% -18px}}
+.lf-stage[data-dir] .lf-car-sign::before{content:"▲ ";color:var(--lf-dir-c)}
+.lf-stage[data-dir="down"] .lf-car-sign::before{content:"▼ "}
+@media(prefers-reduced-motion:reduce){.lf-flow,.lf-dir .lf-lantern b{animation:none!important}}

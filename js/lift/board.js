@@ -24,6 +24,27 @@ const LFB = (() => {
     blocked(){Sound.tone(196,{type:"square",dur:.18,vol:.06});Sound.tone(165,{type:"square",dur:.26,vol:.06,delay:.2});},
     tick(){Sound.tone(1000,{type:"square",dur:.035,vol:.05});}
   };
+  // 方向只有一個來源：頂列燈號、井道流動箭頭與車廂上的箭頭都讀這裡設的 data-dir。
+  function direction(up,text,moving){
+    [$("lfDir"),$("lfStage")].forEach(el=>{el.dataset.dir=up?"up":"down";el.classList.toggle("lf-moving",!!moving);});
+    $("lfDirection").textContent=text;
+  }
+  // 操作區各階段高度不同（兩排目標鈕 > 三張移動牌 > 揭曉說明），大樓是吃剩下的空間，
+  // 會跟著被擠高擠矮。記住這個版面寬度出現過的最高值當下限；寬度或橫放版面一變就重量。
+  let actionMax=0,actionKey="",actionObserver;
+  function holdAction(){
+    const box=$("lfControls").parentElement;
+    if(!actionObserver){
+      actionObserver=new ResizeObserver(holdAction);actionObserver.observe($("lfControls"));actionObserver.observe($("lfHint"));
+      addEventListener("resize",holdAction);
+    }
+    const k=innerWidth+"/"+matchMedia("(max-height:480px) and (min-width:600px)").matches;
+    if(k!==actionKey){actionKey=k;actionMax=0;}
+    box.style.minHeight="";
+    const h=box.getBoundingClientRect().height;
+    if(h>actionMax)actionMax=h;
+    if(actionMax)box.style.minHeight=actionMax+"px";
+  }
   const taps=new WeakMap();
   let rosterObserver;
   function syncRoster(){
@@ -118,7 +139,7 @@ const LFB = (() => {
     // 揭曉中的秒數只是自動接續的等待時間，不是玩家要做事，所以不顯示。
     $("lfClock").classList.toggle("hidden",!online||g.stage==="reveal"||!!g.winner);
     if(g.stage!=="reveal"){$("lfCar").classList.remove("lf-open","lf-travelling");$("lfArrival").classList.remove("lf-pop");$("lfSparkles").innerHTML="";}
-    if(!$("lfCar").classList.contains("lf-travelling"))$("lfDirection").textContent=g.direction===1?"↑ 下一段向上":"↓ 下一段向下";
+    if(!$("lfCar").classList.contains("lf-travelling"))direction(g.direction===1,g.direction===1?"下一段向上":"下一段向下");
     document.querySelectorAll(".lf-floor").forEach(el=>{
       const blocked=+el.dataset.floor===g.cone;
       el.classList.toggle("lf-blocked",blocked);
@@ -176,7 +197,7 @@ const LFB = (() => {
       if(catchUp)$("lfCar").style.transition="none";
       path.forEach((floor,i)=>{
         const move=sound=>{$("lfCar").style.setProperty("--lf-step",Math.min(step,Math.max(1,delay+i*step-elapsed))+"ms");$("lfCar").style.bottom=(floor/5*100/9)+"%";$("lfCarFloor").textContent=label(floor);
-          if(path.length>1){const direction=i?floor-path[i-1]:path[1]-floor;$("lfDirection").textContent=i?(direction>0?"↑ 向上移動":"↓ 向下移動"):(direction>0?"翻牌中 · 即將向上":"翻牌中 · 即將向下");}
+          if(path.length>1){const up=(i?floor-path[i-1]:path[1]-floor)>0;direction(up,i?(up?"向上移動":"向下移動"):(up?"翻牌中 · 將向上":"翻牌中 · 將向下"),i>0);}
           document.querySelectorAll(".lf-floor").forEach(el=>el.classList.toggle("lf-active",+el.dataset.floor===floor));
           // 每段移動一聲輕響，撞到 G／40 折返是低一點的一聲；最後一段交給到站的叮咚。
           if(sound&&i>0&&i<path.length-1)(floor===0||floor===40?sfx.bounce:sfx.step)();};
@@ -196,9 +217,9 @@ const LFB = (() => {
           timers.push(setTimeout(()=>(g.last.blocked?sfx.blocked:points?sfx.hit:scorers.length?sfx.others:()=>{})(),380));
         }
         $("lfCar").classList.remove("lf-travelling");$("lfCar").classList.add("lf-open");
-        $("lfDirection").textContent=g.direction===1?"↑ 下一段向上":"↓ 下一段向下";
+        direction(g.direction===1,g.direction===1?"下一段向上":"下一段向下");
         $("lfArrival").dataset.outcome=g.last.blocked?"blocked":scorers.length?"hit":"miss";
-        const mark=g.last.blocked?document.querySelector(".lf-cone-art").outerHTML:scorers.length?"✦":"↓";
+        const mark=g.last.blocked?document.querySelector(".lf-cone-art").outerHTML:scorers.length?"✦":"○";
         const awards=scorers.length?`<div class="lf-award-title">本趟得分</div><div class="lf-awards">${scorers.map(pid=>`<div class="lf-award${pid===id?" lf-award-you":""}"><span class="lf-award-name">${esc(name(pid))}${pid===id&&name(pid)!=="你"?" · 你":""}</span><span class="lf-award-points">+${g.last.gains[pid]} 分</span></div>`).join("")}</div>`:"";
         $("lfArrival").innerHTML=`<div class="lf-arrival-head"><i aria-hidden="true">${mark}</i><small>${g.last.blocked?"施工樓層":"電梯已到站"}</small></div><div class="lf-arrival-main"><b>${label(g.floor)}<span>樓</span></b><strong>${g.last.blocked?"暫停計分":points?`+${points}<span>分</span>`:scorers.length?`${scorers.length} 人得分`:"無人得分"}</strong></div>${awards}<em>${g.last.blocked?"施工中，這趟不計分":scorers.length?points?"你的目標命中了！":"恭喜命中的玩家！":"差一點！下一趟再試試"}</em><div class="lf-arrival-line" aria-hidden="true"></div>`;
         $("lfArrival").classList.add("lf-pop");
@@ -221,6 +242,7 @@ const LFB = (() => {
     }
     paintResult();
     paintLog();
+    requestAnimationFrame(holdAction);
     if(turnKey===key){paintReach(g,id);return;}
     key=turnKey; selected=own?own.slice():[10,20]; card=5;
     clearTimeout(sendTimer);sendTimer=null;

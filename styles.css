@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 b7c5339f0e4a14d0482d5ee4ea0393daf82235a86309891c75b2baf2a95f35e6)
+    真相在 styles.src.css(sha256 d64c0868f38aacc113b864a066b0df29b1450888b6d405bb1f989a4af3674d3f)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6891,3 +6891,27 @@ body.lf-page :is(.btn,.lf-floorbtn,.seg button){position:relative}
 .lf-log-you th{color:#a6ebce}
 @media(prefers-reduced-motion:reduce){.lf-hud>.lf-clock-urgent{animation:none}}
 .lf-progress.lf-progress-long{gap:2px}
+.lf-action{display:flex;flex-direction:column}
+.lf-controls:has(>.lf-next-note){flex:1 1 auto;display:flex;align-items:center;justify-content:center}
+.lf-result{min-height:2.8em}
+.lf-dir{--lf-dir-c:#8ff0c8}
+.lf-dir[data-dir="down"]{--lf-dir-c:#ffc27a}
+.lf-hud>.lf-dir{display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 7px;border:1px solid var(--lf-dir-c);border-radius:999px;background:color-mix(in srgb,var(--lf-dir-c) 15%,transparent);color:var(--lf-dir-c);font-size:12px;font-weight:900;letter-spacing:.5px;white-space:nowrap;transition:color .2s,border-color .2s,background .2s}
+.lf-hud>b{white-space:nowrap}
+.lf-hud>.lf-dir{min-width:0}
+.lf-dir>span{overflow:hidden;text-overflow:ellipsis}
+.lf-lantern{flex:none;display:flex;flex-direction:column;gap:2px}
+.lf-hud .lf-lantern b{display:block;width:10px;height:7px;background:currentColor;opacity:.22;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.lf-hud .lf-lantern .lf-lantern-down{clip-path:polygon(0 0,100% 0,50% 100%)}
+.lf-dir[data-dir="up"] .lf-lantern-up,.lf-dir[data-dir="down"] .lf-lantern-down{opacity:1}
+.lf-dir.lf-moving[data-dir="up"] .lf-lantern-up,.lf-dir.lf-moving[data-dir="down"] .lf-lantern-down{animation:lf-lantern-blink .5s ease-in-out infinite alternate}
+@keyframes lf-lantern-blink{to{opacity:.45}}
+.lf-stage{--lf-dir-c:#8ff0c8}
+.lf-stage[data-dir="down"]{--lf-dir-c:#ffc27a}
+.lf-flow{position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.3;background:var(--lf-dir-c);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='18'%3E%3Cpath d='M5 12l6-6 6 6' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 50% 0/22px 18px repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='18'%3E%3Cpath d='M5 12l6-6 6 6' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 50% 0/22px 18px repeat-y;animation:lf-flow 2.4s linear infinite;transition:opacity .2s}
+.lf-stage[data-dir="down"] .lf-flow{transform:scaleY(-1)}
+.lf-stage.lf-moving .lf-flow{opacity:.6;animation-duration:.6s}
+@keyframes lf-flow{to{-webkit-mask-position:50% -18px;mask-position:50% -18px}}
+.lf-stage[data-dir] .lf-car-sign::before{content:"▲ ";color:var(--lf-dir-c)}
+.lf-stage[data-dir="down"] .lf-car-sign::before{content:"▼ "}
+@media(prefers-reduced-motion:reduce){.lf-flow,.lf-dir .lf-lantern b{animation:none!important}}
