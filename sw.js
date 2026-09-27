@@ -314,7 +314,7 @@ const CORE = [
 /* ============================================================================
    內容指紋(REV)—— ⚠⚠ 下面 @@REV 兩行之間是 tools/build-sw.js 產生的,**不要手改**
    ──────────────────────────────────────────────────────────────────────────
-   REV:CORE 每一個檔的 SHA-256 前 16 碼("./" 是 index.html 的)。
+   REV:CORE 每一個檔的 SHA-256 前 16 碼("./" 是 index.html 的)；文字先統一 CRLF → LF。
    BUILD:整份 REV 的指紋 —— 接在快取名後面,**內容一變快取名就跟著變**,
      所以同一個版號之內重推 sw.js 也不會「新舊內容寫進同一個快取」。
    ★ 用途只有一個:install 時分辨「這個檔跟舊快取裡那一份是不是同一個」——
@@ -326,9 +326,9 @@ const CORE = [
      停在舊版(線上照樣 network-first 拿新的)—— 守門是 test-version.js 的 E 節。
    ========================================================================== */
 /* @@REV-BEGIN */
-const BUILD = "890017f3";
+const BUILD = "3deb2fdb";
 const REV = {
-  "./lift.html": "426d7fc641f2cd21",
+  "./lift.html": "9b4dbdf9eead365d",
   "./img/lf-icon.png": "cf337f168a705ec2",
   "./js/lift/rules.js": "f3b7f0f760ac91e1",
   "./js/lift/ai.js": "a8c1329906c8219b",
@@ -336,32 +336,32 @@ const REV = {
   "./js/lift/solo.js": "2692d5bff765a731",
   "./js/lift/adapter.js": "2a96dca71e0c25a0",
   "./js/lift/main.js": "30e69edbc4dd995b",
-  "./": "3beafc75110479a2",
-  "./app.html": "3de35b77211f34b7",
-  "./index.html": "3beafc75110479a2",
-  "./styles.css": "345c640daf7bb53f",
+  "./": "032805024b459420",
+  "./app.html": "e677a9539fbbceaf",
+  "./index.html": "032805024b459420",
+  "./styles.css": "d6ad088d7347806e",
   "./js/audio.js": "fec2c75c8b2efe5b",
-  "./js/game.js": "a806b7c1ae052bf9",
+  "./js/game.js": "1ddf99e604ba0b3a",
   "./js/online.js": "576da19c11495fee",
-  "./js/home-live.js": "8458f05df11706a9",
+  "./js/home-live.js": "31b9630921a6cf3c",
   "./js/main.js": "506c45c96fd7f3c4",
-  "./js/shared/ui-kit.js": "8affffbe3665a4c0",
-  "./js/shared/mp-order.js": "149d5a5ac8c2a35c",
+  "./js/shared/ui-kit.js": "f184d714d9a3ff99",
+  "./js/shared/mp-order.js": "09dd944d84e3f1b9",
   "./js/shared/mp-core.js": "4713ca2baac59556",
   "./js/shared/chip-bgm.js": "371e21f68e9cd8e3",
   "./js/shared/talk.js": "223a297026e6430b",
   "./js/shared/qr.js": "ca9efdd4fbc2a470",
   "./js/shared/feedback.js": "2cd0d511fd17f65b",
-  "./js/shared/update.js": "7b8e2a0878319364",
+  "./js/shared/update.js": "f0079636e1113268",
   "./whatsnew.json": "91108408943947a4",
   "./js/shared/mj-faces.js": "6dfafa35ef46c02d",
   "./js/shared/pk-faces.js": "aebf8618ca706ea3",
   "./mahjong16.html": "15d93846f5750985",
-  "./js/mahjong16/rules.js": "0e46116ea56feb6f",
+  "./js/mahjong16/rules.js": "54d5f0aa9392235a",
   "./js/mahjong16/scoring.js": "412273575d364e2d",
-  "./js/mahjong16/table.js": "11caa2ed0ba68a88",
+  "./js/mahjong16/table.js": "f29f3b75856eb520",
   "./js/mahjong16/ai.js": "e7f8efea06dab285",
-  "./js/mahjong16/sfx.js": "26782026c1245c0c",
+  "./js/mahjong16/sfx.js": "d1b22cf0f31e5f5b",
   "./js/mahjong16/board.js": "6d6e2724d1f3c3ab",
   "./js/mahjong16/fx.js": "761fe6f70da716be",
   "./js/mahjong16/solo.js": "61ad592e7d97ed56",
@@ -372,26 +372,26 @@ const REV = {
   "./js/gomoku/ai.js": "e7019b45f8af585e",
   "./js/gomoku/solo.js": "584fe61a17b88c2e",
   "./js/gomoku/adapter.js": "32a758404c7f5c2f",
-  "./js/gomoku/main.js": "21ea081ddd3182b0",
+  "./js/gomoku/main.js": "ec8db254d4cf74e8",
   "./sudoku.html": "24db95330c21c997",
   "./js/sudoku/gen.js": "8102555037535684",
-  "./js/sudoku/board.js": "4dc763aec73cbdfb",
-  "./js/sudoku/solo.js": "2a628bfc1011ec44",
-  "./js/sudoku/adapter.js": "c6df2b0a8d69943d",
-  "./js/sudoku/main.js": "6b40fd2d6017a10f",
+  "./js/sudoku/board.js": "eb75816bc9b32f19",
+  "./js/sudoku/solo.js": "d84a9c4e5d790eb6",
+  "./js/sudoku/adapter.js": "e7d7ad1440431a50",
+  "./js/sudoku/main.js": "4992fa0a90dd307d",
   "./mahjong.html": "d821f0ed6cb66614",
   "./js/mahjong/gen.js": "2df83affc468e1af",
   "./js/mahjong/board.js": "c969148ca7129100",
   "./js/mahjong/solo.js": "766d8739af5031f1",
   "./js/mahjong/adapter.js": "f572c5c4e53d287c",
-  "./js/mahjong/main.js": "7acac79f5e77047d",
+  "./js/mahjong/main.js": "ed6ea89c920f82b6",
   "./sevens.html": "d92bf4a005b604fc",
   "./js/sevens/rules.js": "46f1b8b9e750f273",
   "./js/sevens/ai.js": "bffc7465d56f79aa",
   "./js/sevens/board.js": "41ec75f45db635fb",
-  "./js/sevens/solo.js": "c1a732be756c709e",
-  "./js/sevens/adapter.js": "bc844454e1c4b830",
-  "./js/sevens/main.js": "2011bf7d3294ff96",
+  "./js/sevens/solo.js": "5eabe30bd1739066",
+  "./js/sevens/adapter.js": "cfed209d21e988cb",
+  "./js/sevens/main.js": "baa7b9d18d8f9268",
   "./big2.html": "538b6041db5cef56",
   "./js/big2/rules.js": "0eea6c37af825ba3",
   "./js/big2/ai.js": "78d4626a42422575",
@@ -404,22 +404,22 @@ const REV = {
   "./js/blackjack/ai.js": "35fd38d61855a3d2",
   "./js/blackjack/board.js": "f3ab99ac9cdb225a",
   "./js/blackjack/solo.js": "01c97ba61298ddf7",
-  "./js/blackjack/adapter.js": "e37687ddc6ca4c37",
-  "./js/blackjack/main.js": "d07b4d67946e858f",
+  "./js/blackjack/adapter.js": "623c378911018283",
+  "./js/blackjack/main.js": "38e4d4c8cc6f6239",
   "./uno.html": "e5e71b036c5b26ff",
-  "./js/uno/rules.js": "f253bc64ac42369c",
+  "./js/uno/rules.js": "7692d43a588503d5",
   "./js/uno/ai.js": "6d27d3b66798cdde",
   "./js/uno/board.js": "8e5ed9d916b4b08c",
-  "./js/uno/solo.js": "de30f2dd97a69aa3",
-  "./js/uno/adapter.js": "79a1cd64f32a363a",
-  "./js/uno/main.js": "8fdcddf4f9144cea",
+  "./js/uno/solo.js": "957edb1a86949a0c",
+  "./js/uno/adapter.js": "6ef90493aba440db",
+  "./js/uno/main.js": "25d596f0b3af0ff8",
   "./darkchess.html": "cba83abf6121c767",
-  "./js/darkchess/rules.js": "22f316b13eb1889c",
-  "./js/darkchess/ai.js": "91d63d7745ae676a",
-  "./js/darkchess/board.js": "b3577df6d9d2f3c2",
-  "./js/darkchess/solo.js": "41dad776223a3a13",
-  "./js/darkchess/adapter.js": "07fcfa28a01fe464",
-  "./js/darkchess/main.js": "13d76b0904ecc6bd",
+  "./js/darkchess/rules.js": "461ecf30c7344504",
+  "./js/darkchess/ai.js": "b436a5b6d3f76eaf",
+  "./js/darkchess/board.js": "d2c0cda22cba6725",
+  "./js/darkchess/solo.js": "54a36b3317d3124d",
+  "./js/darkchess/adapter.js": "abcac1a40a171074",
+  "./js/darkchess/main.js": "6928040bc42d229c",
   "./chengyu.html": "56acc18f2e7ad2ae",
   "./js/chengyu/gen.js": "cd7267a7744c63e3",
   "./js/chengyu/board.js": "dd07f06ad78df164",
@@ -444,9 +444,9 @@ const REV = {
   "./js/blocks/ai.js": "6832149959867599",
   "./js/blocks/music.js": "d19e2b4b4161ed96",
   "./js/blocks/board.js": "f6686023b76df31f",
-  "./js/blocks/solo.js": "a98db34bc358b0e1",
+  "./js/blocks/solo.js": "c4dbce2e20703cce",
   "./js/blocks/adapter.js": "6262193be0bd5929",
-  "./js/blocks/main.js": "30a906877a62f3bd",
+  "./js/blocks/main.js": "1d6851cfaf669ac9",
   "./img/blk-icon.png": "f3bc6384719fec28",
   "./bubble.html": "dd32316d424a25d3",
   "./js/bubble/rules.js": "e713a0cbbc434adf",
@@ -568,7 +568,10 @@ const LANES = 2;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const baseVer = v => String(v || "").replace(/\+.*$/, "");
-async function fingerprint(buf) {
+async function fingerprint(buf, url) {
+  // 與 build-sw.js 相同：只統一文字換行，音檔／圖片不可改動任何 byte。
+  if (url === "./" || /\.(html|css|js|json|svg)$/i.test(url))
+    buf = new TextEncoder().encode(new TextDecoder().decode(buf).replace(/\r\n/g, "\n"));
   const d = new Uint8Array(await crypto.subtle.digest("SHA-256", buf));
   let s = ""; for (let i = 0; i < 8; i++) s += d[i].toString(16).padStart(2, "0");
   return s;
@@ -576,8 +579,10 @@ async function fingerprint(buf) {
 
 /* 把狀態廣播給所有分頁(含 iframe 裡的遊戲頁與還沒被這支 SW 接管的頁面)。
    頁面那一半在 js/shared/update.js:把它畫成畫面上方那顆小膠囊。 */
+let downloadStatus = null;
 async function tell(msg) {
   msg.t = "bingo.sw"; msg.ver = VERSION;
+  downloadStatus = msg;
   try {
     const cs = await self.clients.matchAll({ includeUncontrolled: true, type: "window" });
     cs.forEach(c => { try { c.postMessage(msg); } catch (_) { } });
@@ -589,6 +594,8 @@ self.addEventListener("message", e => {
   const d = e.data || {};
   // 頁面說「正在對局」→ 15 秒內算忙;頁面不見了(關掉 / 當掉)自己會過期,不會永遠停手
   if (d.t === "bingo.busy") busyUntil = d.on ? Date.now() + 15000 : 0;
+  if (d.t === "bingo.status" && downloadStatus && e.source)
+    e.source.postMessage(downloadStatus);
 });
 
 /* ============================================================================
@@ -612,7 +619,7 @@ async function reuse(from, to, url, want) {
   const r = await from.match(url);
   if (!r || r.status !== 200) return false;
   let got = "";
-  try { got = await fingerprint(await r.clone().arrayBuffer()); } catch (_) { return false; }
+  try { got = await fingerprint(await r.clone().arrayBuffer(), url); } catch (_) { return false; }
   if (got !== want) return false;
   if (from !== to) await to.put(url, r);
   return true;
@@ -628,7 +635,7 @@ async function grab(url, want) {
       const res = await fetch(url, { cache: i === 0 ? "no-cache" : "reload" });
       if (!res || res.status !== 200) throw new Error("HTTP " + (res && res.status));
       if (!want || i === 2) return res;
-      const got = await fingerprint(await res.clone().arrayBuffer());
+      const got = await fingerprint(await res.clone().arrayBuffer(), url);
       if (got === want) return res;
     } catch (err) { lastErr = err; }
     await sleep(1500 * (i + 1));
@@ -650,16 +657,21 @@ async function precache() {
   }
   const total = need.length, holdUntil = Date.now() + BUSY_HOLD_MS;
   let done = 0;
+  let paused = false;
   if (total) tell({ st: "dl", done, total });
   const lane = async idx => {
     while (need.length) {
+      if (idx === 0) {
+        const held = Date.now() < busyUntil && Date.now() < holdUntil;
+        if (held !== paused) { paused = held; tell({ st: "dl", done, total, paused }); }
+      }
       // 有人在對局:先停手;停滿 BUSY_HOLD_MS 之後只留第一線繼續抓
       if (Date.now() < busyUntil && (Date.now() < holdUntil || idx > 0)) { await sleep(1000); continue; }
       const url = need.shift();
       const res = await grab(url, REV[url]);
       await cache.put(url, res);
       done++;
-      tell({ st: "dl", done, total });
+      tell({ st: "dl", done, total, paused });
     }
   };
   const lanes = [];

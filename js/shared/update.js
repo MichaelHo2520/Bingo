@@ -64,7 +64,7 @@ const UpdUI = (function () {
   let dl = null;   // 最近一次下載進度 {done,total}
   function dlText(d) {
     return (firstRun ? "⬇ 存離線資料 " : "⬇ 下載新版 ") + d.done + "/" + d.total +
-           (firstRun ? "" : " · 網路會慢一點");
+           (d.paused ? " · 對局中暫停" : " · 可繼續使用");
   }
   function onMsg(e) {
     const d = e && e.data;
@@ -103,6 +103,24 @@ const UpdUI = (function () {
     // ⚠ 沒有 startMessages() 的話,addEventListener 掛上去的 message 要等 DOMContentLoaded 才開始送
     try { if (sw.startMessages) sw.startMessages(); } catch (_) { }
   }
+
+  // 手機可終止背景 SW；返回時主動重試，同名快取中已完成的檔會在 install 被重用。
+  let resumeAt = 0;
+  async function resume() {
+    if (!sw || document.hidden || navigator.onLine === false || Date.now() - resumeAt < 15000) return;
+    resumeAt = Date.now();
+    try {
+      const r = await sw.getRegistration();
+      if (!r) { resumeAt = 0; return; }
+      const w = r.installing || r.waiting;
+      if (w) w.postMessage({ t: "bingo.status" });
+      else await r.update();
+    } catch (_) { /* 離線或更新失敗：保留舊版，下次返回／連網再試。 */ }
+  }
+  addEventListener("pageshow", resume);
+  addEventListener("online", () => { resumeAt = 0; resume(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) resume(); });
+  setTimeout(resume, 1200);
 
   /* ④ 對局中請新版 SW 先停手。由更新檢查的心跳(4 秒一次)呼叫,只在真的有新版在裝時才送。 */
   let lastBusy = null, lastBusyAt = 0;
