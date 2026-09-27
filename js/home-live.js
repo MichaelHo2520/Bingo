@@ -160,7 +160,7 @@ const HomeLive = (function(){
          **不用 🫧**(U+1FAE7,Unicode 14):舊 Android / Windows 10 沒有這個字形,會變豆腐方框。
        ⚠ **不帶 joinMid**(一局就是一局),但可以觀戰(adapter 的 spectate 旗標)。 */
     { key:"bubble", index:"bubble_index", rooms:"bubble_rooms", name:"泡泡對戰", icon:"🔮", badge:"hlBadgeBubble", max:4, href:"bubble.html" },
-    { key:"lift", index:"lift_index", rooms:"lift_rooms", name:"下一站幾樓", icon:"↕", badge:"hlBadgeLift", max:8, href:"lift.html" }
+    { key:"lift", index:"lift_index", rooms:"lift_rooms", name:"電梯來了", icon:"↕", badge:"hlBadgeLift", max:8, href:"lift.html" }
   ];
 
   /* ==========================================================================
@@ -192,7 +192,7 @@ const HomeLive = (function(){
      所以把清之前伺服器上的排名(2026-09-23 19:35 讀的 game_stats)寫死成這一張。
        你畫我猜 66 · 暗棋 46 · 台灣麻將 32 · 方塊對戰 13 · UNO 11 · 飛行棋 11 ·
        成語接龍 10 · 麻將消消樂 5 · 跳棋 5 · 數獨 4 · 大老二 4 · 排七 3 ·
-       BINGO 2 · 五子棋 2 · 台式21點 1 · 泡泡對戰 0(回歸一般排名;下一站幾樓置頂靠下面的 NEW_UNTIL)
+       BINGO 2 · 五子棋 2 · 台式21點 1 · 泡泡對戰 0(回歸一般排名;電梯來了置頂靠下面的 NEW_UNTIL)
      ⚠ GAMES 那一張的順序**刻意不動**:伺服器狀態面板的骨架、test-twins 的逐列比對都照它,
        而它每一列的註解是按上線先後寫的沿革。兩件事分開:登記用 GAMES、同分用這一張。
      ⚠ 漏列的遊戲一律排在最後(不會消失),守門在 tools/test-registry.js(每個遊戲都要列)。 */
