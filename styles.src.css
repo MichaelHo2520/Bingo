@@ -14753,6 +14753,17 @@ body.lf-page .icon-btn{background:#ffffff06;border-color:#90b4c333;border-radius
 .lf-arrival strong{font-size:15px;color:#bdd3da;white-space:nowrap}
 .lf-arrival strong span{font-size:13px;margin-left:3px}
 .lf-arrival em{font-size:12px;color:#cae0d9;font-style:normal;text-align:center}
+.lf-arrival{max-height:calc(100% - 8px);overflow-y:auto;overscroll-behavior:contain}
+.lf-arrival.lf-pop{pointer-events:auto}
+.lf-award-title{font-size:11px;font-weight:800;color:#a8edda}
+.lf-awards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;width:100%;flex:none}
+.lf-award{display:flex;align-items:center;justify-content:space-between;gap:5px;min-width:0;padding:6px;border-radius:8px;background:#a8edda16;border:1px solid #a8edda33;font-size:11px}
+.lf-award-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e3f8ec}
+.lf-award-points{flex:none;font-weight:900;color:#b9f5da}
+.lf-award-you{border-color:#b9f5da;background:#a8edda25}
+.lf-player.lf-scored{border-color:#a8edda99;background:#a8edda20}
+.lf-player.lf-scored small{color:#b9f5da;opacity:1;font-weight:800}
+@media(max-height:600px){.lf-arrival{padding:10px 12px;gap:5px}.lf-arrival-main b{font-size:38px}.lf-award{padding:4px}}
 .lf-arrival[data-outcome="hit"]{border-color:#c4ffe5;background:linear-gradient(135deg,#285b50f7,#102f34f7);box-shadow:0 18px 48px #030d2299,0 0 36px #9ae7d34d,inset 0 1px #d4fff555}
 .lf-arrival[data-outcome="hit"] strong{font-size:30px;color:#c4ffe5}
 .lf-arrival[data-outcome="blocked"]{border-color:#f2c581aa;background:linear-gradient(135deg,#4d4033f7,#172c38f7)}

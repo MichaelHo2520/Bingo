@@ -1,7 +1,11 @@
 "use strict";
 const LFB = (() => {
-  let key="", animationKey="", selected=[10,20], card=5, timers=[];
+  let key="", animationKey="", landedKey="", selected=[10,20], card=5, timers=[];
   const label=f=>f===0?"G":String(f);
+  const arrivalKey=g=>(g.roundId||"solo")+"/"+(g.last?g.last.turn:0);
+  function visibleScore(g,id){
+    return g.scores[id]-(g.stage==="reveal"&&landedKey!==arrivalKey(g)?g.last.gains[id]||0:0);
+  }
   const taps=new WeakMap();
   let rosterObserver;
   function syncRoster(){
@@ -28,12 +32,12 @@ const LFB = (() => {
     const wave=document.createElement("span");wave.className="lf-tap-wave";wave.setAttribute("aria-hidden","true");button.append(wave);
     wave.animate([{opacity:.8,transform:"scale(.82)"},{opacity:0,transform:"scale(1.25)"}],{duration:420,easing:"ease-out"}).onfinish=()=>wave.remove();
   }
-  function reset(){key="";animationKey="";timers.forEach(clearTimeout);timers=[];
+  function reset(){key="";animationKey="";landedKey="";timers.forEach(clearTimeout);timers=[];
     $("lfCar").classList.remove("lf-open","lf-travelling");$("lfArrival").classList.remove("lf-pop");$("lfSparkles").innerHTML="";}
   function tickets(values){
     $("lfTargets").innerHTML=values?values.map((f,slot)=>`<div class="lf-ticket"><div><small>SECRET DESTINATION ${slot+1}</small><span>${slot+1} 分目標${f===0||f===40?" · 雙倍":""}</span></div><b>${label(f)}<span>F</span></b><i aria-hidden="true"></i></div>`).join(""):"";
   }
-  function render(g,id,name,submit,online){
+  function render(g,id,name,submit,online,onArrival){
     if(!g)return;
     const turnKey=[g.roundId||"solo",g.turn,g.stage,LF.needs(g,id).join(","),!!(g.submitted||{})[id],Object.prototype.hasOwnProperty.call(g.bids||{},id)].join("/");
     $("lfRound").textContent=`第 ${g.turn} / 9 回合`;
@@ -46,19 +50,25 @@ const LFB = (() => {
       el.classList.toggle("lf-blocked",blocked);
       el.setAttribute("aria-label",`${label(+el.dataset.floor)} 樓${blocked?"，三角錐施工障礙":""}`);
     });
-    const scoreRows=g.order.map(pid=>{
-      let state="";
-      if(g.stage==="targets")state=(!LF.needs(g,pid).length||(g.submitted||{})[pid])?"已準備":"選目標中";
-      if(g.stage==="bid")state=Object.prototype.hasOwnProperty.call(g.bids||{},pid)?"已出牌":"選牌中";
-      if(g.stage==="reveal")state=`出 ${g.last.bids[pid]} · +${g.last.gains[pid]}`;
-      const badge=g.stage==="reveal"?`<strong class="lf-reveal-card" style="--lf-delay:${g.order.indexOf(pid)*65}ms"><span>${g.last.bids[pid]}</span></strong>`:`<i class="lf-avatar" aria-hidden="true">${esc(name(pid).slice(0,1))}</i>`;
-      return {pid,html:`<div class="lf-player ${pid===id?"lf-you":""}">${badge}<span>${esc(name(pid))}${pid===id&&name(pid)!=="你"?" · 你":""}</span><b>${g.scores[pid]}<em>分</em></b><small>${state}</small></div>`};
-    });
-    // 其他人確認揭曉時快照仍會更新；相同內容保留 DOM，避免翻牌動畫重播。
-    players(scoreRows,id);
+    const akey=arrivalKey(g);
+    function paintScores(){
+      const announced=g.stage!=="reveal"||landedKey===akey;
+      const scoreRows=g.order.map(pid=>{
+        let state="";
+        if(g.stage==="targets")state=(!LF.needs(g,pid).length||(g.submitted||{})[pid])?"已準備":"選目標中";
+        if(g.stage==="bid")state=Object.prototype.hasOwnProperty.call(g.bids||{},pid)?"已出牌":"選牌中";
+        if(g.stage==="reveal")state=`出 ${g.last.bids[pid]} · ${announced?`+${g.last.gains[pid]} 分`:"等待到站"}`;
+        const badge=g.stage==="reveal"?`<strong class="lf-reveal-card" style="--lf-delay:${g.order.indexOf(pid)*65}ms"><span>${g.last.bids[pid]}</span></strong>`:`<i class="lf-avatar" aria-hidden="true">${esc(name(pid).slice(0,1))}</i>`;
+        const gained=g.stage==="reveal"&&announced&&g.last.gains[pid]>0;
+        const score=visibleScore(g,pid);
+        return {pid,html:`<div class="lf-player ${pid===id?"lf-you":""}${gained?" lf-scored":""}">${badge}<span>${esc(name(pid))}${pid===id&&name(pid)!=="你"?" · 你":""}</span><b>${score}<em>分</em></b><small>${state}</small></div>`};
+      });
+      // 相同內容保留 DOM，避免翻牌重播；分數與加分等到站才公布。
+      players(scoreRows,id);
+    }
+    paintScores();
     const own=g.targets[id];
     tickets(turnKey===key && g.stage==="targets"?selected:own);
-    const akey=(g.roundId||"solo")+"/"+(g.last?g.last.turn:0);
     if(akey!==animationKey){
       timers.forEach(clearTimeout);timers=[];animationKey=akey;
       const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -83,25 +93,31 @@ const LFB = (() => {
       if(catchUp){void $("lfCar").offsetHeight;$("lfCar").style.transition="";}
       if(revealing)timers.push(setTimeout(()=>{
         const points=id?(g.last.gains[id]||0):0;
+        landedKey=akey;paintScores();paintResult();if(onArrival)onArrival();
+        const scorers=g.order.filter(pid=>g.last.gains[pid]>0).sort((a,b)=>g.last.gains[b]-g.last.gains[a]);
         $("lfCar").classList.remove("lf-travelling");$("lfCar").classList.add("lf-open");
         $("lfDirection").textContent=g.direction===1?"↑ 下一段向上":"↓ 下一段向下";
-        $("lfArrival").dataset.outcome=g.last.blocked?"blocked":points?"hit":"miss";
-        const mark=g.last.blocked?document.querySelector(".lf-cone-art").outerHTML:points?"✦":"↓";
-        $("lfArrival").innerHTML=`<div class="lf-arrival-head"><i aria-hidden="true">${mark}</i><small>${g.last.blocked?"施工樓層":"電梯已到站"}</small></div><div class="lf-arrival-main"><b>${label(g.floor)}<span>樓</span></b><strong>${g.last.blocked?"暫停計分":points?`+${points}<span>分</span>`:id?"未命中":"本輪揭曉"}</strong></div><em>${g.last.blocked?"施工中，這趟不計分":points?"你的目標命中了！":"看看下一趟會停在哪裡"}</em><div class="lf-arrival-line" aria-hidden="true"></div>`;
+        $("lfArrival").dataset.outcome=g.last.blocked?"blocked":scorers.length?"hit":"miss";
+        const mark=g.last.blocked?document.querySelector(".lf-cone-art").outerHTML:scorers.length?"✦":"↓";
+        const awards=scorers.length?`<div class="lf-award-title">本趟得分</div><div class="lf-awards">${scorers.map(pid=>`<div class="lf-award${pid===id?" lf-award-you":""}"><span class="lf-award-name">${esc(name(pid))}${pid===id&&name(pid)!=="你"?" · 你":""}</span><span class="lf-award-points">+${g.last.gains[pid]} 分</span></div>`).join("")}</div>`:"";
+        $("lfArrival").innerHTML=`<div class="lf-arrival-head"><i aria-hidden="true">${mark}</i><small>${g.last.blocked?"施工樓層":"電梯已到站"}</small></div><div class="lf-arrival-main"><b>${label(g.floor)}<span>樓</span></b><strong>${g.last.blocked?"暫停計分":points?`+${points}<span>分</span>`:scorers.length?`${scorers.length} 人得分`:"無人得分"}</strong></div>${awards}<em>${g.last.blocked?"施工中，這趟不計分":scorers.length?points?"你的目標命中了！":"恭喜命中的玩家！":"差一點！下一趟再試試"}</em><div class="lf-arrival-line" aria-hidden="true"></div>`;
         $("lfArrival").classList.add("lf-pop");
         $("lfArrival").style.setProperty("--lf-result-ms",Math.max(1,g.deadline-(online?lfNow():Date.now()))+"ms");
         if(own)$("lfHint").textContent=g.last.blocked?"施工中，這趟不計分；命中者下一輪可重設目標。":"停靠成功，只有最後停靠的樓層算命中。";
-        if(points&&!reduced)$("lfSparkles").innerHTML=Array.from({length:12},(_,i)=>`<i style="--lf-angle:${i*30}deg;--lf-distance:${60+(i%3)*20}px;--lf-spark-delay:${i%4*40}ms"></i>`).join("");
+        if(scorers.length&&!reduced)$("lfSparkles").innerHTML=Array.from({length:12},(_,i)=>`<i style="--lf-angle:${i*30}deg;--lf-distance:${60+(i%3)*20}px;--lf-spark-delay:${i%4*40}ms"></i>`).join("");
       },Math.max(0,delay+travelTime+LF.MOTION.arrival-elapsed)));
     }
-    const result=$("lfResult");
-    if(g.last){
-      const l=g.last;
-      result.title=`${g.order.map(pid=>l.bids[pid]).join(" + ")} = ${l.total}`;
-      result.textContent=`上一趟：${label(l.from)} → ${label(l.floor)} 樓 · 共 ${l.total} 層`+
-        (l.blocked?" · 施工不計分":"")+
-        (id&&l.gains[id]>0?` · 你 +${l.gains[id]} 分`:"");
-    }else result.textContent="猜猜大家會讓電梯停在哪一樓？";
+    function paintResult(){
+      const result=$("lfResult");
+      if(g.last){
+        const l=g.last;
+        result.title=`${g.order.map(pid=>l.bids[pid]).join(" + ")} = ${l.total}`;
+        result.textContent=`上一趟：${label(l.from)} → ${label(l.floor)} 樓 · 共 ${l.total} 層`+
+          (l.blocked?" · 施工不計分":"")+
+          (id&&l.gains[id]>0&&(g.stage!=="reveal"||landedKey===akey)?` · 你 +${l.gains[id]} 分`:"");
+      }else result.textContent="猜猜大家會讓電梯停在哪一樓？";
+    }
+    paintResult();
     if(turnKey===key)return;
     key=turnKey; selected=own?own.slice():[10,20]; card=5;
     const panel=$("lfControls");panel.innerHTML="";
@@ -152,5 +168,5 @@ const LFB = (() => {
       return `<div class="lf-rank${score===g.scores[ids[0]]?" lf-rank-lead":""}${id===me?" lf-rank-you":""}"><span class="lf-rank-place">${rank}.</span><span class="lf-rank-name">${esc(name(id))}${id===me&&name(id)!=="你"?" · 你":""}</span><b>${score} 分</b></div>`;
     }).join("");
   }
-  return {render,reset,ranking,feedback};
+  return {render,reset,ranking,feedback,visibleScore};
 })();

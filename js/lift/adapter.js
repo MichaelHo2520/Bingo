@@ -2,7 +2,7 @@
 // @transaction-rules LF: submit/progress mutate the authoritative game snapshot.
 const MP = MPCore.create((()=>{
   let ctx=null, g=null;
-  function paint(){if(g)LFB.render(g,ctx.me(),ctx.dispName,send,true);}
+  function paint(){if(g)LFB.render(g,ctx.me(),ctx.dispName,send,true,ctx.renderPlayers);}
   function send(value,turn){
     if(!g || ctx.spectating() || ctx.abandoned())return;
     const round=g.roundId, stage=g.stage, id=ctx.me(), now=lfNow();
@@ -31,7 +31,7 @@ const MP = MPCore.create((()=>{
     backToLobby(){showScreen("lobby");LFB.reset();},enterPlaying(){showScreen("play");},
     onLeave(){g=null;LFB.reset();showScreen("home");},syncSetup(){},
     updateGoal(){const e=$("mpBarGoal");if(e)e.textContent="9 回合";},
-    chipTail(id){return g&&g.scores&&g.scores[id]!==undefined?`${g.scores[id]} 分`:"";},
+    chipTail(id){return g&&g.scores&&g.scores[id]!==undefined?`${LFB.visibleScore(g,id)} 分`:"";},
     lobbyStatusText(ids){return ids.length<3?"至少 3 人，邀朋友一起猜！":"等大家準備，開始九回合對戰";},
     readyHint(ids,ready){return ids.length<3?"等待至少 3 人加入":ready?"等大家按準備":"按準備好了開始";},
     refresh(){paint();},
