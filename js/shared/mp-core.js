@@ -234,10 +234,15 @@ const MPCore = (function(){
       return all;
     }
     function isSpec(id){ return SPECTATE && !players[id] && !!specs[id]; }
+    /* ★★ 玩家只在**玩家之間**編號,觀戰者接在玩家後面編。
+       ⚠ 不可以整份丟 everyone() 一起算:觀戰者一進房、名字跟某位玩家一樣(兩人都叫「玩家」、
+         或同一個人拿另一台來看),那位玩家就**在對局中當場被改名成「玩家1」**,
+         走掉又改回來 —— 看起來像憑空冒出一個玩家。觀戰者來去不可以動到玩家的名字。 */
     function dispName(id){
-      const all=everyone();
-      const raw=(all[id]&&all[id].name)||"玩家";
-      const same=Object.keys(all).filter(x=>((all[x]&&all[x].name)||"玩家")===raw);
+      const pool=players[id] ? players : everyone();
+      const nm=x=>(pool[x]&&pool[x].name)||"玩家";
+      const raw=nm(id);
+      const same=Object.keys(pool).filter(x=>nm(x)===raw);
       return same.length<=1 ? raw : raw+(same.indexOf(id)+1);
     }
     function youTag(id){ return id===meId ? '<span class="you-badge">你</span>' : ''; }

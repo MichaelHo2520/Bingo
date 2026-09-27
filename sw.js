@@ -326,7 +326,7 @@ const CORE = [
      停在舊版(線上照樣 network-first 拿新的)—— 守門是 test-version.js 的 E 節。
    ========================================================================== */
 /* @@REV-BEGIN */
-const BUILD = "0e58d0ab";
+const BUILD = "8412efc2";
 const REV = {
   "./lift.html": "49e9c764e6588655",
   "./img/lf-icon.png": "cf337f168a705ec2",
@@ -347,7 +347,7 @@ const REV = {
   "./js/main.js": "506c45c96fd7f3c4",
   "./js/shared/ui-kit.js": "f184d714d9a3ff99",
   "./js/shared/mp-order.js": "09dd944d84e3f1b9",
-  "./js/shared/mp-core.js": "4713ca2baac59556",
+  "./js/shared/mp-core.js": "99c23d80e47b5f60",
   "./js/shared/chip-bgm.js": "371e21f68e9cd8e3",
   "./js/shared/talk.js": "223a297026e6430b",
   "./js/shared/qr.js": "ca9efdd4fbc2a470",
