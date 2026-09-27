@@ -1,7 +1,7 @@
 "use strict";
 // @transaction-rules LF: submit/progress mutate the authoritative game snapshot.
 const MP = MPCore.create((()=>{
-  let ctx=null, g=null, botTimer=null, botKey="", seasonScores={}, nativeCaption, scoredBotRound=null;
+  let ctx=null, g=null, botTimer=null, botKey="", seasonScores={}, nativeCaption, scoredBotRound=null, lastTick="";
   const BOT="~lfai1",isBot=id=>id===BOT;
   const name=id=>isBot(id)?"電腦 1":ctx.dispName(id);
   const hasBot=()=>!!g&&Array.isArray(g.order)&&g.order.includes(BOT);
@@ -72,7 +72,12 @@ const MP = MPCore.create((()=>{
   setInterval(()=>{
     if(!g || g.winner || ctx.phase()!=="playing" || ctx.spectating() || ctx.abandoned())return;
     scheduleBot();
-    $("lfClock").textContent=`${Math.max(0,Math.ceil((g.deadline-lfNow())/1000))} 秒`;
+    const remain=Math.max(0,Math.ceil((g.deadline-lfNow())/1000));
+    // 最後五秒且自己還沒出手才催：變色加滴答；已經出完的人不被打擾。
+    const urgent=g.stage!=="reveal"&&remain>0&&remain<=5&&LF.waiting(g,ctx.me());
+    $("lfClock").textContent=`${remain} 秒`;$("lfClock").classList.toggle("lf-clock-urgent",urgent);
+    const tickKey=[g.roundId,g.turn,g.stage,remain].join("/");
+    if(urgent&&tickKey!==lastTick){lastTick=tickKey;LFB.tick();}
     if(lfNow()<g.deadline)return;
     const round=g.roundId, turn=g.turn, stage=g.stage, now=lfNow();
     ctx.txGame(next=>{

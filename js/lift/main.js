@@ -18,6 +18,7 @@ document.addEventListener("click",e=>{
   if(b&&!b.disabled)LFB.feedback(b);
 },true);
 lfBind("lfGoOnline",()=>{MP.openConnect();});
+lfBind("lfLogBtn",()=>LFB.toggleLog());lfBind("lfLog",()=>LFB.toggleLog(false));
 lfBind("lfStartSolo",()=>Solo.start());lfBind("lfSoloExit",()=>Solo.quit());
 lfBind("lfSoloAgain",()=>Solo.again());lfBind("lfSoloHome",()=>Solo.quit());
 lfBind("mpCreate",()=>MP.create($("mpName").value,$("mpRoomName").value));

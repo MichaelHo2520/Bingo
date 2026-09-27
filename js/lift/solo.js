@@ -27,6 +27,8 @@ const Solo = (()=>{
   }
   function finish(){
     if(g.winner){
+      // 連線的勝負音效由共用核心播；練習要自己播。同分並列也算拿下。
+      if(g.winner.ids.includes("you")){Sound.win();burst();}else Sound.lose();
       $("winWord").textContent=g.winner.ids.includes("you")?"你拿下了！":"本局結束";
       $("winMsg").textContent="九回合結算，同分並列。";
       $("lfRanking").innerHTML=LFB.ranking(g,name,"you");$("veil").classList.add("show");

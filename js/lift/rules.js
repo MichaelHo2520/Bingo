@@ -5,8 +5,12 @@ const LF = (() => {
   const FLOORS = [0,5,10,15,20,25,30,35,40];
   const validFloor = n => FLOORS.includes(n);
   const copy = x => JSON.parse(JSON.stringify(x));
-  const MOTION = Object.freeze({lead:650,step:420,arrival:80,result:1800});
-  const revealMs = path => MOTION.lead + (path.length-1)*MOTION.step + MOTION.arrival + MOTION.result;
+  // 揭曉依座位逐張翻牌，全部翻完停一下才出發；人多時縮短間隔，八人也不超過 1.4 秒翻牌。
+  const MOTION = Object.freeze({flip:250,gap:320,flipSpan:1400,hold:450,step:420,arrival:80,result:1800});
+  const flipGap = n => Math.min(MOTION.gap, Math.round(MOTION.flipSpan/Math.max(1,n)));
+  const flipAt = (i,n) => MOTION.flip + i*flipGap(n);
+  const leadMs = n => flipAt(Math.max(0,n-1),n) + MOTION.hold;
+  const revealMs = (path,n) => leadMs(n) + (path.length-1)*MOTION.step + MOTION.arrival + MOTION.result;
   function travel(floor, direction, distance){
     const path = [floor];
     while(distance > 0){
@@ -17,6 +21,25 @@ const LF = (() => {
       if(floor === 0) direction = 1;
     }
     return {floor, direction, path};
+  }
+  // 已知點數 known 加上 unknown 位各出 0／5／10（均等假設）時，停靠各樓層的機率。只用公開位置，不讀任何人的牌。
+  function outcomes(g, known, unknown){
+    let totals={[known]:1};
+    for(let i=0;i<unknown;i++){
+      const next={};
+      Object.entries(totals).forEach(([sum,w])=>[0,5,10].forEach(n=>{const k=+sum+n;next[k]=(next[k]||0)+w;}));
+      totals=next;
+    }
+    const all=Math.pow(3,unknown), floors={};
+    Object.entries(totals).forEach(([sum,w])=>{const f=travel(g.floor,g.direction,+sum).floor;floors[f]=(floors[f]||0)+w/all;});
+    return floors;
+  }
+  // 這位參賽者此刻是否還欠一個動作（給倒數提示與電腦代送用）。
+  function waiting(g,id){
+    if(!g || g.winner || !g.order || !g.order.includes(id))return false;
+    if(g.stage==="targets")return !!needs(g,id).length && !(g.submitted||{})[id];
+    if(g.stage==="bid")return !Object.prototype.hasOwnProperty.call(g.bids||{},id);
+    return false;
   }
   function newGame(ids, now){
     const targets={}, replace={}, scores={};
@@ -56,7 +79,10 @@ const LF = (() => {
     });
     g.last={turn:g.turn,from,floor:g.floor,path:move.path,total,bids:copy(g.bids),
       gains,hits,blocked:g.floor===g.cone,revealedAt:now};
-    g.replace=replace; g.stage="reveal"; g.ack={}; g.deadline=now+revealMs(move.path);
+    // 出牌紀錄是公開資訊（揭曉後大家都看過），給玩家回頭讀每個人的出牌習慣。
+    // Firebase 不存空陣列，讀回可能是 undefined，一律以 || [] 接。
+    g.log=(g.log||[]).concat([{turn:g.turn,from,floor:g.floor,total,bids:copy(g.bids),gains:copy(gains),blocked:g.floor===g.cone}]);
+    g.replace=replace; g.stage="reveal"; g.ack={}; g.deadline=now+revealMs(move.path,g.order.length);
   }
   function progress(g,now){
     if(!g || g.status!=="playing" || g.winner)return false;
@@ -91,6 +117,6 @@ const LF = (() => {
     }
     return false;
   }
-  return {FLOORS,validFloor,travel,newGame,submit,progress,needs,copy,MOTION,revealMs};
+  return {FLOORS,validFloor,travel,newGame,submit,progress,needs,waiting,outcomes,copy,MOTION,flipAt,leadMs,revealMs};
 })();
 if(typeof module!=="undefined")module.exports=LF;
