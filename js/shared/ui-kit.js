@@ -407,7 +407,7 @@ function fsRequest(){
      ★ 守門在 tools/test-registry.js 的 1-5 節(以 js/<game>/ 目錄反查)。
    ⚠ 順序有講究:**mahjong16 一定要排在 mahjong 前面**(後者是前者的子字串)。 */
 const FS_PAGES=["mahjong16","mahjong","gomoku","sudoku","sevens","big2","blackjack",
-                "uno","darkchess","chengyu","draw","flychess","tiaoqi","blocks","bubble"];
+                "uno","darkchess","chengyu","draw","flychess","tiaoqi","blocks","bubble","lift"];
 function fsPageKey(){
   const f=(location.pathname.split("/").pop()||"").toLowerCase();
   for(let i=0;i<FS_PAGES.length;i++) if(f.indexOf(FS_PAGES[i])>=0) return FS_PAGES[i];

@@ -159,7 +159,8 @@ const HomeLive = (function(){
        ⚠ icon 用 🔮(U+1F52E 水晶球)—— 長得最像一顆泡泡,而且與另外十五個都不撞。
          **不用 🫧**(U+1FAE7,Unicode 14):舊 Android / Windows 10 沒有這個字形,會變豆腐方框。
        ⚠ **不帶 joinMid**(一局就是一局),但可以觀戰(adapter 的 spectate 旗標)。 */
-    { key:"bubble", index:"bubble_index", rooms:"bubble_rooms", name:"泡泡對戰", icon:"🔮", badge:"hlBadgeBubble", max:4, href:"bubble.html" }
+    { key:"bubble", index:"bubble_index", rooms:"bubble_rooms", name:"泡泡對戰", icon:"🔮", badge:"hlBadgeBubble", max:4, href:"bubble.html" },
+    { key:"lift", index:"lift_index", rooms:"lift_rooms", name:"樓層猜猜", icon:"↕", badge:"hlBadgeLift", max:8, href:"lift.html" }
   ];
 
   /* ==========================================================================
@@ -196,7 +197,7 @@ const HomeLive = (function(){
        而它每一列的註解是按上線先後寫的沿革。兩件事分開:登記用 GAMES、同分用這一張。
      ⚠ 漏列的遊戲一律排在最後(不會消失),守門在 tools/test-registry.js(每個遊戲都要列)。 */
   const DEFAULT_ORDER=["dw","dc","mj16","blocks","uno","fc","chengyu","mahjong","tq",
-                       "sudoku","big2","sevens","bingo","gomoku","bj","bubble"];
+                       "sudoku","big2","sevens","bingo","gomoku","bj","bubble","lift"];
   /* ★★ 新遊戲置頂(使用者:「新遊戲放第一個可以,但也不可以一直放,有辦法類似幾天後就自動照順序嗎」)
      —— 期限之前排第一個、徽章寫「NEW」;期限一過**自動**回到照場次排(不必任何人動手)。
      ⚠ 置頂只在**套用**的時候疊上去(applyRank),排名本身與 localStorage 的快取都不含它 ——

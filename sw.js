@@ -7,6 +7,15 @@
    注意:外部資源(Firebase SDK、Google Fonts)不攔截,交給瀏覽器自行處理。 */
 const VERSION = "2.19.0";
 const CORE = [
+  "./lift.html",
+  "./img/lf-icon.png",
+  "./js/lift/rules.js",
+  "./js/lift/ai.js",
+  "./js/lift/board.js",
+  "./js/lift/solo.js",
+  "./js/lift/adapter.js",
+  "./js/lift/main.js",
+
   "./",
   "./app.html",        // 外殼(PWA 的 start_url):三個遊戲跑在它的 iframe 裡,全螢幕掛在它身上
   "./index.html",
@@ -317,18 +326,26 @@ const CORE = [
      停在舊版(線上照樣 network-first 拿新的)—— 守門是 test-version.js 的 E 節。
    ========================================================================== */
 /* @@REV-BEGIN */
-const BUILD = "92e489da";
+const BUILD = "dfb94788";
 const REV = {
-  "./": "7de2f696e04201c6",
-  "./app.html": "5ae5b5389c009647",
-  "./index.html": "7de2f696e04201c6",
-  "./styles.css": "2e29c1196a47246d",
+  "./lift.html": "150ab09ecc89b5c0",
+  "./img/lf-icon.png": "cf337f168a705ec2",
+  "./js/lift/rules.js": "f3b7f0f760ac91e1",
+  "./js/lift/ai.js": "a8c1329906c8219b",
+  "./js/lift/board.js": "91968289342c7bbc",
+  "./js/lift/solo.js": "2692d5bff765a731",
+  "./js/lift/adapter.js": "2a96dca71e0c25a0",
+  "./js/lift/main.js": "e72ad8d630518a61",
+  "./": "3beafc75110479a2",
+  "./app.html": "3de35b77211f34b7",
+  "./index.html": "3beafc75110479a2",
+  "./styles.css": "f66f53daa3c7a1dd",
   "./js/audio.js": "fec2c75c8b2efe5b",
-  "./js/game.js": "60829e5e6d2711f6",
+  "./js/game.js": "a806b7c1ae052bf9",
   "./js/online.js": "576da19c11495fee",
-  "./js/home-live.js": "bc17df3b35265668",
+  "./js/home-live.js": "8458f05df11706a9",
   "./js/main.js": "506c45c96fd7f3c4",
-  "./js/shared/ui-kit.js": "0bb5a13534aae0e5",
+  "./js/shared/ui-kit.js": "8affffbe3665a4c0",
   "./js/shared/mp-order.js": "149d5a5ac8c2a35c",
   "./js/shared/mp-core.js": "4713ca2baac59556",
   "./js/shared/chip-bgm.js": "371e21f68e9cd8e3",

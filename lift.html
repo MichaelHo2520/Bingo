@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-Hant" data-theme="sunset" class="boot-wait">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="樓層猜猜">
+<meta name="theme-color" content="#2a1136">
+
+<meta name="color-scheme" content="only light">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="img/icon.svg">
+<link rel="apple-touch-icon" href="img/icon.svg">
+<title>樓層猜猜 ｜ 電腦練習 + 3～8 人連線</title>
+
+<meta name="version" content="2.19.0">
+<!-- 樓層猜猜 · v2.19.0 -->
+
+<script>
+if (window.top === window.self && !window.__noshell && location.protocol !== "file:")
+  location.replace("app.html#lift");
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="lf-page">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="lf-brand display">樓層猜猜</div>
+      <span class="topver" id="topVer" aria-label="版本"></span>
+    </div>
+    <div class="tools">
+      
+      <button class="icon-btn tk-btn" id="tkListenBtn" type="button" title="打開語音(聽別人說話)" aria-label="打開語音,聽別人說話" aria-pressed="false"></button>
+      <button class="icon-btn tk-btn" id="tkSpeakBtn" type="button" title="打開麥克風(讓別人聽到你)" aria-label="打開麥克風,讓別人聽到你" aria-pressed="false"></button>
+      <button class="icon-btn" id="fsBtn" title="全螢幕" aria-label="全螢幕切換">⛶</button>
+      <button class="icon-btn" id="settingsBtn" title="設定" aria-label="設定">⚙️</button>
+    </div>
+  </div>
+
+
+  <section class="panel lf-home" id="lfHome">
+    <a class="home-back" href="index.html">‹ 回主選單</a>
+    <div class="lf-intro"><span class="lf-eyebrow">UP, DOWN &amp; ALL AROUND</span><h1 class="display">樓層猜猜<span class="lf-title-dot">.</span></h1>
+      <p>下一站，是你的那一層嗎？</p>
+      <div class="lf-cover" aria-hidden="true"><div class="lf-orbit"></div><div class="lf-cover-tower"><div class="lf-cover-display">↑ <span>20</span></div><div class="lf-cover-doors"><i></i><i></i></div><span class="lf-cover-number">40</span></div><span class="lf-cover-ticket">YOUR STOP<br><b>15</b></span><span class="lf-cover-ticket lf-cover-ticket-two">NEXT STOP<br><b>?</b></span><img class="lf-art" src="img/lf-icon.png" width="192" height="192" alt="電梯與上下方向箭頭"></div>
+      <div class="lf-cover-meta"><span>3—8 位玩家</span><i></i><span>9 回合的猜心對決</span></div></div>
+    <button class="btn primary block-btn home-btn" id="lfGoOnline">🌐 和朋友連線 · 3～8 人</button>
+    <div class="lf-practice"><label for="lfCount">電腦練習 · 總人數</label>
+      <select id="lfCount"><option value="3">3 人</option><option value="4" selected>4 人</option><option value="5">5 人</option><option value="6">6 人</option><option value="7">7 人</option><option value="8">8 人</option></select>
+      <button class="btn ghost" id="lfStartSolo">開始練習</button></div>
+    <details class="lf-guide"><summary>一分鐘看懂玩法</summary><p>先選 1 分與 2 分目標；每回合各出 0、5、10，合計成移動距離。電梯到 G 或 40 會折返，最後停靠才計分。G／40 分數加倍，同層兩張可以一起得分。</p><p>命中後重選該目標；命中施工樓層不計分，可重選兩張。三角錐從 40 逐回合往下，G 的最後一回合結算，共九回合。同分並列。練習沒有倒數。</p></details>
+    <p class="lf-credit">獨立製作的數字預測遊戲 · 原型</p>
+  </section>
+  <section class="panel hidden" id="mpConnect">
+    <div class="mp-head">
+      <button class="icon-btn" id="mpConnBack" type="button" title="回上一層" aria-label="回上一層">
+        <lfg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></lfg>
+      </button>
+      <div class="subtitle">連線對戰</div>
+    </div>
+    <div class="field">
+      <span class="field-label">你的暱稱(必填)</span>
+      <input id="mpName" class="mp-input" maxlength="8" placeholder="輸入你的名字">
+    </div>
+    <div class="or-divider"><span>建立新房間</span></div>
+    <div class="field">
+      <input id="mpRoomName" class="mp-input" maxlength="12" placeholder="房間名稱(留空用你的暱稱)">
+    </div>
+    <button class="btn primary block-btn" id="mpCreate">＋ 建立房間</button>
+    <div class="or-divider"><span>或 · 加入朋友的房間</span></div>
+    <div class="mp-detect-row">
+      <div class="mp-live" id="mpLive" data-state="loading" aria-live="polite">
+        <span class="dot" aria-hidden="true"></span><span id="mpLiveTxt">偵測目前房間中…</span>
+      </div>
+      <button class="mp-rescan" id="mpScan" title="重新偵測房間" aria-label="重新偵測房間">🔍</button>
+    </div>
+    <div class="room-list" id="mpRoomList"></div>
+    <div class="hint" id="mpConnMsg"></div>
+  </section>
+
+  
+  <div class="panel lf-room hidden" id="mpBar">
+    <div class="row lf-room-top">
+      <button class="icon-btn mp-leave-btn" id="mpLeaveBtn" title="離開房間" aria-label="離開房間">
+        <lfg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></lfg>
+      </button>
+      
+      <span class="label lf-room-title"><b id="mpRoomTitle" class="display">–</b></span>
+      <span class="mp-goal" id="mpBarGoal" aria-label="規則"></span>
+      <div class="mp-actions">
+        
+        <button class="icon-btn lf-bigbtn" id="lfBig" type="button" title="大牌桌" aria-label="大牌桌">大</button>
+        <button class="mp-act-btn" id="emoteOpenBtn" type="button" title="傳送互動表情 / 語音留言" aria-label="開啟互動表情面板">😀</button>
+      </div>
+    </div>
+    <div class="mp-subrow" id="mpSubrow">
+      <span class="mp-status" id="mpStatusTxt">等待中…</span>
+    </div>
+    <div class="lf-room-foot">
+      <div id="mpPlayers" class="mp-players"></div>
+    </div>
+  </div>
+
+<div class="panel lf-room hidden" id="lfSoloBar"><div class="row lf-room-top">
+  <button class="icon-btn mp-leave-btn" id="lfSoloExit" aria-label="離開練習">‹</button>
+  <span class="label lf-room-title">電腦練習</span><div class="mp-actions"><button class="icon-btn lf-bigbtn" type="button">大</button></div></div></div>  <div class="scroll-area lf-scroll hidden" id="scrollArea">
+    <section class="panel hidden" id="lfSetup">
+      <div class="subtitle">對戰設定</div>
+      
+      <p class="hint">3～8 人 · 9 回合 · 選目標 35 秒 · 選牌 30 秒。逾時目標自動選，移動牌自動出 5。</p>
+      <div class="field" id="scoreRow">
+        <span class="field-label" id="scoreLabel">連線計分</span>
+        <div class="seg" id="scoreSeg">
+          <button class="on" data-score="rank">🏆 累積排行</button>
+          <button data-score="match">🎯 搶勝</button>
+        </div>
+        <div class="score-extra hidden" id="scoreExtra">
+          <div class="wg-group hidden" id="wgGroup">
+            <span class="wg-lbl">先到</span>
+            <div class="wg-stepper">
+              <button class="mini" id="wgMinus" aria-label="減少目標勝場">－</button>
+              <span class="target-val display" id="winGoalVal">3</span>
+              <button class="mini" id="wgPlus" aria-label="增加目標勝場">＋</button>
+            </div>
+            <span class="wg-lbl">勝奪冠</span>
+          </div>
+          <span class="wg-lock-hint hidden" id="wgLockHint">🔒 賽季進行中,重設戰績後才能改目標</span>
+          <button class="mini score-reset" id="resetScoreBtn" type="button">↺ 重設戰績</button>
+        </div>
+      </div>
+      <p class="hint">秘密選目標，大家同時出牌。每局點數決定勝負，累積排行記錄勝場。</p>
+    </section>
+  </div>
+
+<main class="lf-play hidden" id="lfPlay">
+  <div class="lf-hud"><b id="lfRound">第 1 / 9 回合</b><span id="lfDirection">↑ 向上</span><span id="lfClock" class="hidden"></span></div>
+  <div class="lf-progress" id="lfProgress" aria-hidden="true"></div>
+  <div class="lf-stage" id="lfStage"><div class="lf-building"><div class="lf-floorlist"><div class="lf-floor" data-floor="40"><b>40</b><span>×2</span><i aria-hidden="true">▲</i></div><div class="lf-floor" data-floor="35"><b>35</b><span></span><i aria-hidden="true">▲</i></div><div class="lf-floor" data-floor="30"><b>30</b><span></span><i aria-hidden="true">▲</i></div><div class="lf-floor" data-floor="25"><b>25</b><span></span><i aria-hidden="true">▲</i></div><div class="lf-floor" data-floor="20"><b>20</b><span></span><i aria-hidden="true">▲</i></div><div class="lf-floor" data-floor="15"><b>15</b><span></span><i aria-hidden="true">▲</i></div><div class="lf-floor" data-floor="10"><b>10</b><span></span><i aria-hidden="true">▲</i></div><div class="lf-floor" data-floor="5"><b>5</b><span></span><i aria-hidden="true">▲</i></div><div class="lf-floor" data-floor="0"><b>G</b><span>×2</span><i aria-hidden="true">▲</i></div></div><div class="lf-shaft"><div class="lf-car" id="lfCar"><span class="lf-car-sign" id="lfCarFloor">G</span><div class="lf-cabin"><i class="lf-person"></i></div><div class="lf-doors"><i></i><i></i></div></div></div></div>
+  <div class="lf-side"><div class="lf-cone" id="lfCone">施工 40 樓</div><div class="lf-scores" id="lfScores"></div></div><div class="lf-arrival" id="lfArrival" aria-live="polite"></div><div class="lf-sparkles" id="lfSparkles" aria-hidden="true"></div></div>
+  <p class="lf-result" id="lfResult" aria-live="polite"></p><div class="lf-section-label">你的秘密目的地 <span>ONLY YOU KNOW</span></div><div class="lf-targets" id="lfTargets"></div>
+  <p class="lf-hint" id="lfHint" aria-live="polite"></p><div class="lf-controls" id="lfControls"></div>
+</main>  
+  <div class="primary-bar hidden" id="primaryBar">
+    <div class="action-hint hidden" id="actionHint"></div>
+    <div class="actions" id="primaryActions">
+      <button class="btn primary hidden" id="mpReadyBtn">準備好了</button>
+    </div>
+  </div>
+
+  
+  <div class="veil" id="veil">
+    <div class="win-card lf-win" id="lfWinCard">
+      <div class="word display" id="winWord">本局結束</div>
+      <p id="winMsg"></p>
+      
+      <div class="lf-ranking" id="lfRanking"></div>
+      <div class="win-champ hidden" id="winChamp"></div>
+      <div class="win-scores hidden" id="winScores"></div>
+      <div class="lf-react-row" id="lfReactRow">
+        <button class="gmk-react" type="button" data-em="👍" aria-label="送出 讚">👍</button>
+        <button class="gmk-react" type="button" data-em="😂" aria-label="送出 笑">😂</button>
+        <button class="gmk-react" type="button" data-em="😭" aria-label="送出 哭">😭</button>
+        <button class="gmk-react" type="button" data-em="🤝" aria-label="送出 握手">🤝</button>
+        <button class="gmk-react more" type="button" id="winEmoteBtn" title="更多表情 / 一句話 / 語音" aria-label="開啟互動表情面板">😀</button>
+      </div>
+      <div class="actions" id="mpWinBtns">
+        <button class="btn primary hidden" id="mpNewSeason">🏆 開新賽季</button>
+        <button class="btn primary" id="mpAgain">下一局</button>
+        <button class="btn ghost" id="mpLeaveWin">離開房間</button>
+      </div>
+      
+      <div class="actions" id="soloWinBtns">
+        <button class="btn primary" id="lfSoloAgain">再來一局</button>
+        <button class="btn ghost" id="lfSoloHome">回選單</button>
+      </div>
+      <button class="peek-link" id="winPeek">先看看大樓 👀</button>
+    </div>
+  </div>
+  <button class="peek-reopen hidden" id="reopenWin">🏆 看結果</button>
+
+  
+  <div class="veil" id="setVeil">
+    <div class="set-card">
+      <div class="set-head">設定</div>
+      <div class="set-body" id="setBody">
+        <div class="set-group">
+          <div class="set-group-title">外觀</div>
+          <div class="set-row">
+            <span class="set-lbl">主題</span>
+            <div class="swatches" id="swatches"></div>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">音效</div>
+          <div class="set-row">
+            <span class="set-lbl">開啟音效</span>
+            <button class="switch" id="swMute" role="switch" aria-checked="true" aria-label="開啟音效"><span class="knob"></span></button>
+          </div>
+          <div class="set-row" id="sfxVolRow">
+            <span class="set-lbl">音量</span>
+            <input class="rng" id="sfxVol" type="range" min="0" max="100" value="100" aria-label="音效音量(含勝敗音效)">
+          </div>
+          <div class="set-row" id="vibrateRow">
+            <span class="set-lbl">震動<span class="set-sub">(手機)</span></span>
+            <button class="switch" id="swVibrate" role="switch" aria-checked="true" aria-label="震動"><span class="knob"></span></button>
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">背景音樂</div>
+          <div class="set-row">
+            <span class="set-lbl">開啟音樂</span>
+            <button class="switch" id="swBgm" role="switch" aria-checked="false" aria-label="開啟背景音樂"><span class="knob"></span></button>
+          </div>
+          <div class="set-row" id="bgmTrackRow">
+            <span class="set-lbl">曲目</span>
+            <select class="set-select" id="bgmTrackSel" aria-label="背景音樂曲目"></select>
+          </div>
+          <div class="set-row" id="bgmVolRow">
+            <span class="set-lbl">音量</span>
+            <input class="rng" id="bgmVol" type="range" min="0" max="100" value="35" aria-label="背景音樂音量">
+          </div>
+        </div>
+
+        <div class="set-group">
+          <div class="set-group-title">語音（連線）</div>
+          <div class="set-row">
+            <span class="set-lbl">收到語音音量</span>
+            <input class="rng" id="voiceVol" type="range" min="0" max="300" value="150" aria-label="收到語音的音量(100% 為原音,可放大)">
+          </div>
+          <div class="set-row">
+            <span class="set-lbl">我的語音<span class="set-sub">(自己錄 · 連線可送)</span></span>
+            <button class="btn ghost mvc-open" id="myVoiceBtn" type="button">編輯</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn primary" id="setClose">完成</button>
+      <div class="set-foot">排七(接龍) · <span id="setVer"></span> · 開發者 Michael Ho</div>
+    </div>
+  </div>
+
+  
+  <div class="veil" id="emoteVeil">
+    <div class="set-card emote-card">
+      <button class="card-x" id="emoteClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head" id="emoteHead">傳給全部人</div>
+      <div class="emote-to" id="emoteTo"></div>
+      <div class="emote-grid" id="emoteGrid"></div>
+      <div class="emote-sub">💬 一句話</div>
+      <div class="emote-phrases" id="emotePhrases"></div>
+      <div class="emote-sub">🔊 語音短訊</div>
+      <div class="emote-phrases" id="emoteClips"></div>
+      <div class="emote-sub hidden" id="myClipsSub">⭐ 我的語音</div>
+      <div class="emote-phrases hidden" id="emoteMyClips"></div>
+      
+      <div class="emote-sub">🎤 語音留言</div>
+      <button class="emote-rec" id="quickVoiceBtn" type="button" title="錄一段語音送出(最多 6 秒)" aria-label="錄一段語音送出">
+        <span class="qv-ico" id="qvIco">🎤</span><span class="qv-label" id="qvLabel">錄一段話送出(6 秒)</span>
+      </button>
+      <div class="emote-input">
+        <input id="emoteText" type="text" maxlength="24" placeholder="自己打字…" autocomplete="off" enterkeyhint="send">
+        <button class="btn" id="emoteSend" type="button">送出</button>
+      </div>
+    </div>
+  </div>
+  <div class="emote-fly-layer" id="emoteFly" aria-hidden="true"></div>
+
+  <div class="veil" id="myVoiceVeil">
+    <div class="set-card mvc-card">
+      <button class="card-x" id="mvClose" type="button" aria-label="關閉">✕</button>
+      <div class="set-head">我的語音</div>
+      <div class="mvc-hint">自己錄 3 秒短語音,連線時可在互動面板當按鈕送給別人。<b>只存在這台裝置</b>,換裝置不會跟著走。</div>
+      <div class="mvc-list" id="mvList"></div>
+      <div class="mvc-save hidden" id="mvSaveRow">
+        <input id="mvName" type="text" maxlength="8" placeholder="取個名字…" autocomplete="off" enterkeyhint="done">
+        <button class="btn primary" id="mvSave" type="button">儲存</button>
+      </div>
+      <button class="btn mvc-rec" id="mvRecBtn" type="button">🎤 錄一段新的(3 秒)</button>
+      <div class="mvc-foot"><span id="mvCount">0 / 6</span></div>
+    </div>
+  </div>
+
+  <button class="voice-gate hidden" id="voiceGate" type="button" aria-label="播放收到的語音"><span id="voiceGateTxt">🔊 點我播放語音</span></button>
+
+  <div class="veil" id="leaveVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">🚪</div>
+      <div class="confirm-title" id="leaveTitle">離開房間?</div>
+      <p id="leaveMsg">確定要離開這個房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="leaveCancel">留在房間</button>
+        <button class="btn danger" id="leaveConfirm">離開房間</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="veil" id="kickVeil">
+    <div class="win-card confirm-card">
+      <div class="confirm-ico">⚠️</div>
+      <div class="confirm-title">移出玩家?</div>
+      <p id="kickMsg">確定要把這位玩家移出房間嗎?</p>
+      <div class="actions">
+        <button class="btn ghost" id="kickCancel">取消</button>
+        <button class="btn danger" id="kickConfirm">移出房間</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas class="confetti" id="confetti"></canvas>
+
+<script>
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBVBN3hRMSFq7KwWmyf3IR01Y82XmfhLQ0",
+  authDomain: "bingo-82e51.firebaseapp.com",
+  databaseURL: "https://bingo-82e51-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bingo-82e51",
+  storageBucket: "bingo-82e51.firebasestorage.app",
+  messagingSenderId: "954833280596",
+  appId: "1:954833280596:web:29c1d2aa434f62db91d7c1"
+};
+</script>
+
+
+
+<script src="js/shared/feedback.js"></script>
+<script src="js/shared/update.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/shared/ui-kit.js"></script>
+
+<script src="js/shared/talk.js"></script>
+<script src="js/shared/qr.js"></script>
+<script src="js/shared/mp-core.js"></script>
+
+<script src="js/lift/rules.js"></script>
+<script src="js/lift/ai.js"></script>
+<script src="js/lift/board.js"></script>
+<script src="js/lift/solo.js"></script>
+<script src="js/lift/adapter.js"></script>
+<script src="js/lift/main.js"></script>
+</body>
+</html>

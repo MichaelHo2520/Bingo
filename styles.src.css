@@ -129,7 +129,7 @@
      ★ v1.182.2 起真正的守門是 tools/test-registry.js(以 js/<game>/ 目錄為單一真相,
        反查每一張清單),它**不會跟著登記表一起漏**。 */
   #home,#gmkHome,#sdkHome,#mjHome,#m16Home,#svHome,#b2Home,#bjHome,#unHome,#dcHome,#cyHome,
-  #fcHome,#tqHome,#blkHome,#bubHome,
+  #fcHome,#tqHome,#blkHome,#bubHome,#lfHome,
   #mpConnect{flex:0 1 auto;min-height:0;
     overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   /* 填號分頁:改回 flex:1 撐滿(內容本來就有整片號碼格,不會空太多),讓準備列固定在最底,右下浮動鈕才有穩定的落點、不會壓到準備鈕 */
@@ -13603,19 +13603,19 @@ body.is-big .topbar{display:none}
    (晶片只有 22px 高),4px 看起來就是黏著框(台灣麻將 v1.178.1 的上手回報)。 */
 /* ⚠⚠ 需要列前綴的第 1 / 4 組:`.XX-room`(連線列與單機列**共用同一個 class**,
    所以一次到位)。加新遊戲要補這裡 —— 守門 tools/test-registry.js。 */
-body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room,.blk-room,.bub-room){
+body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room,.blk-room,.bub-room,.lf-room){
   display:flex;align-items:center;gap:8px;padding-top:6px;padding-bottom:6px}
 /* ② order:晶片列(foot)在 DOM 裡是最後一個,拉到最左邊;鈕那一列(.row)推到最右。
    ⚠⚠ 需要列前綴的第 2 / 4 組(同一份清單,但這裡要限定**直接子代**的 .row ——
      不限定的話 `body.is-big .row` 會打到那一列以外的每一條 row)。 */
-body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room,.blk-room,.bub-room) > .row{
+body.is-big :is(.un-room,.b2-room,.bj-room,.dc-room,.gmk-room,.sdk-room,.mj-room,.sv-room,.fc-room,.tq-room,.cy-room,.blk-room,.bub-room,.lf-room) > .row{
   flex:none;order:3;margin-top:0}
 /* .mp-subrow 是共用 class 而且每頁只有一處(就在房間框裡)→ 不必列前綴。
    ⚠ 原本寫成 `.XX-room > .mp-subrow`,拿掉直接子代限制是安全的(整頁就這麼一個)。 */
 body.is-big .mp-subrow{order:2;flex:none;margin-top:0;font-size:10px;max-width:6em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* ⚠⚠ 需要列前綴的第 3 / 4 組:`.XX-room-foot`。加新遊戲要補這裡。 */
-body.is-big :is(.un-room-foot,.b2-room-foot,.bj-room-foot,.dc-room-foot,.gmk-room-foot,.sdk-room-foot,.mj-room-foot,.sv-room-foot,.fc-room-foot,.tq-room-foot,.cy-room-foot,.blk-room-foot,.bub-room-foot){
+body.is-big :is(.un-room-foot,.b2-room-foot,.bj-room-foot,.dc-room-foot,.gmk-room-foot,.sdk-room-foot,.mj-room-foot,.sv-room-foot,.fc-room-foot,.tq-room-foot,.cy-room-foot,.blk-room-foot,.bub-room-foot,.lf-room-foot){
   order:1;flex:1 1 0;min-width:0;margin-top:0}
 /* ③ 返回鍵 / 房名 / 局數三個一起收 —— 收掉它們讓出來的寬度就是給晶片的。
    ⚠ 「回不去」不是問題:大牌桌本來就是「先按『小』再做別的」,手機實體返回鍵也不受影響。
@@ -13625,7 +13625,7 @@ body.is-big :is(.un-room-foot,.b2-room-foot,.bj-room-foot,.dc-room-foot,.gmk-roo
 body.is-big .mp-leave-btn{display:none}
 body.is-big .mp-goal{display:none}
 /* ⚠⚠ 需要列前綴的第 4 / 4 組:`.XX-room-title`。加新遊戲要補這裡。 */
-body.is-big :is(.un-room-title,.b2-room-title,.bj-room-title,.dc-room-title,.gmk-room-title,.sdk-room-title,.mj-room-title,.sv-room-title,.fc-room-title,.tq-room-title,.cy-room-title,.blk-room-title,.bub-room-title){
+body.is-big :is(.un-room-title,.b2-room-title,.bj-room-title,.dc-room-title,.gmk-room-title,.sdk-room-title,.mj-room-title,.sv-room-title,.fc-room-title,.tq-room-title,.cy-room-title,.blk-room-title,.bub-room-title,.lf-room-title){
   display:none}
 /* ④ ⛶ / ⚙️ 跟著頂列一起消失(兩條是同一件事的兩半,見檔頭)。
    ★ `.tools-docked` 只會被 dockTools() 掛到那一條列上 → 不必列前綴。 */
@@ -14311,6 +14311,73 @@ body.solo-on .blk-react-row{display:none}
    首頁那張一律掛 .bub-cart,**不可掛** .bub-art(96px 定義在 .gc-art 後面 → 卡會高一截)。 */
 .bub-art{width:96px;height:96px;display:block;margin:0 auto 8px}
 .bub-cart{}
+
+/* 樓層猜猜：原創幾何電梯，所有樣式只作用於 lf 前綴。 */
+.lf-brand{font-size:22px;font-weight:800;white-space:nowrap}
+.lf-home{padding:22px}
+.lf-intro{text-align:center;margin:10px 0 22px}
+.lf-art{width:96px;height:96px;object-fit:contain;display:block;margin:0 auto 8px}
+.lf-eyebrow{font-size:12px;font-weight:800;letter-spacing:2px;color:var(--accent)}
+.lf-intro h1{font-size:34px;margin:8px 0}
+.lf-intro p{font-size:14px;line-height:1.8;margin:8px 0;color:var(--text)}
+.lf-practice{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:18px 0}
+.lf-practice label{font-size:13px;font-weight:800;flex:1}
+.lf-practice select{background:var(--panel);color:var(--text);border:1px solid var(--accent);border-radius:10px;padding:10px;min-height:44px}
+.lf-practice .btn{flex-basis:100%}
+.lf-guide{font-size:13px;line-height:1.8;border-top:1px solid var(--accent);padding-top:12px}
+.lf-guide summary{cursor:pointer;font-weight:800;min-height:38px}
+.lf-credit{text-align:center;font-size:11px;margin-top:20px;opacity:.75}
+.lf-room{width:calc(100% - 20px);max-width:620px;padding:12px 14px}
+.lf-room-top{display:flex;align-items:center;gap:8px}
+.lf-room-title{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-room-foot{margin-top:8px}
+.lf-bigbtn{font-size:15px;font-weight:800}
+.lf-bigbtn.on{background:var(--accent);color:var(--bg)}
+.lf-play{width:calc(100% - 20px);max-width:620px;margin:0 auto 20px;padding:14px;border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);border-radius:22px;background:var(--panel);box-sizing:border-box}
+.lf-hud{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;margin-bottom:12px}
+.lf-hud b{font-size:14px}
+.lf-stage{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;height:300px}
+.lf-building{display:flex;border:2px solid #52748a;border-radius:16px;overflow:hidden;background:#142d43;color:#e8f5f7}
+.lf-floorlist{display:grid;grid-template-rows:repeat(9,1fr);flex:1;min-width:0}
+.lf-floor{display:flex;align-items:center;gap:6px;padding:0 9px;border-bottom:1px solid #365167;transition:background .2s}
+.lf-floor b{font-size:17px;min-width:23px}
+.lf-floor span{font-size:9px;color:#f6cd69;flex:1}
+.lf-floor i{display:none;color:#f6cd69;font-style:normal}
+.lf-floor.lf-blocked{background:#5e4826}
+.lf-floor.lf-blocked i{display:block}
+.lf-shaft{position:relative;width:58px;background:repeating-linear-gradient(0deg,#0b1c2e 0,#0b1c2e 30px,#193448 31px);border-left:2px solid #52748a}
+.lf-car{position:absolute;left:3px;right:3px;bottom:0;height:11.1%;background:#7dddd0;border-radius:6px;border:2px solid #c3fff1;transition:bottom 130ms linear;box-sizing:border-box;box-shadow:0 0 16px #7dddd044}
+.lf-car-sign{position:absolute;left:0;right:0;top:0;font-size:9px;text-align:center;line-height:11px;color:#132d43;font-weight:900}
+.lf-doors{position:absolute;left:4px;right:4px;bottom:2px;top:12px;display:flex;gap:2px}
+.lf-doors i{background:#305975;flex:1;border-radius:1px}
+.lf-side{min-width:0;display:flex;flex-direction:column;gap:8px}
+.lf-cone{font-size:12px;font-weight:800;padding:8px;border-radius:10px;background:#f6cd69;color:#38251b;text-align:center}
+.lf-scores{display:flex;flex-direction:column;gap:4px;overflow-y:auto}
+.lf-player{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 4px;padding:5px 7px;border-radius:9px;background:color-mix(in srgb,var(--text) 7%,transparent);font-size:11px}
+.lf-player span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-player small{grid-column:1/-1;font-size:9px;opacity:.8}
+.lf-player.lf-you{outline:1px solid var(--accent)}
+.lf-result{font-size:12px;line-height:1.6;min-height:36px;margin:10px 0}
+.lf-targets{display:flex;gap:10px}
+.lf-ticket{flex:1;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px dashed var(--accent);border-radius:12px;background:color-mix(in srgb,var(--accent) 7%,transparent)}
+.lf-ticket small{font-size:11px;font-weight:800}
+.lf-ticket b{font-size:24px}
+.lf-ticket b span{font-size:10px;margin-left:3px}
+.lf-hint{font-size:12px;line-height:1.6;margin:12px 0 8px}
+.lf-picker{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px;margin-bottom:9px}
+.lf-picker>span{grid-column:1/-1;font-size:11px;font-weight:800;margin-bottom:3px}
+.lf-floorbtn{border:1px solid color-mix(in srgb,var(--text) 25%,transparent);background:transparent;color:var(--text);font:inherit;font-size:12px;font-weight:800;padding:8px 0;border-radius:8px;min-height:40px;cursor:pointer}
+.lf-floorbtn.on,.lf-move.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 20%,transparent);box-shadow:inset 0 0 0 1px var(--accent)}
+.lf-cards{display:flex;gap:10px}
+.lf-move{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px;background:transparent;border:2px solid color-mix(in srgb,var(--text) 20%,transparent);border-radius:14px;color:var(--text);cursor:pointer;min-height:76px}
+.lf-move b{font-size:28px;line-height:1.2}
+.lf-move small{font-size:10px}
+.lf-submit{width:100%;margin-top:10px;min-height:46px}
+.lf-rank{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid color-mix(in srgb,var(--text) 12%,transparent);font-size:14px}
+body.lf-mp .topbar,body.lf-solo .topbar{max-width:620px}
+body.lf-solo .scroll-area{display:none}
+@media(max-width:380px){.lf-stage{gap:7px;height:278px}.lf-floor{padding:0 5px;gap:3px}.lf-floor span{font-size:8px}.lf-player{padding:5px;font-size:10px}.lf-hud{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.lf-car{transition:none}}
 .bub-tag{font-family:'Fredoka','Nunito',sans-serif;font-weight:600;font-size:14.5px;color:var(--text)}
 /* 「怎麼玩」+「操作說明」共用的捲動區(v2.17.0+1)。★ 進場頁唯一會縮、會捲的一塊 ——
    以前只有 .bub-howto 會縮,操作說明是 flex:none,它一高就把兩顆開局鈕推出畫面
@@ -14571,3 +14638,128 @@ body.solo-on .bub-react-row{display:none}
   .bub-room .icon-btn{width:30px;height:30px;font-size:14px}
   .bub-play{margin-top:2px;gap:3px}
 }
+
+.lf-cart{}
+
+/* 樓層猜猜的夜景與卡片材質；動態效果由實際停靠事件啟動。 */
+body.lf-page{--bg:#081421;--panel:#122638;--text:#eef8fb;--muted:#a0b4c5;background:radial-gradient(ellipse at 85% 0,#18435099,transparent 52%),radial-gradient(ellipse at 0 65%,#24304788,transparent 65%),#081421;color:var(--text);min-height:100dvh}
+body.lf-page .topbar{border-bottom:1px solid #ffffff0d;margin-bottom:12px}
+body.lf-page:before{background:radial-gradient(ellipse at 85% 0,#18435066,transparent 52%),radial-gradient(ellipse at 0 70%,#26374b55,transparent 65%);opacity:1}
+.lf-home .home-back{color:#a4c3cf;text-decoration:none;font-size:11px;letter-spacing:.5px;display:inline-block;padding:7px 0}
+body.lf-page .panel{background:linear-gradient(135deg,#172e40d9,#0f2234e8);border:1px solid #8fb9ce24;box-shadow:0 16px 36px #020a1533}
+body.lf-page .btn.primary{background:linear-gradient(120deg,#a9eed6,#71cfc4);color:#082e2e;border:1px solid #c3fff077;box-shadow:0 5px 0 #3c8e86,0 8px 24px #77ddca17;font-weight:900;transition:transform .18s,box-shadow .18s}
+body.lf-page .btn.primary:active{transform:translateY(3px);box-shadow:0 2px 0 #3c8e86}
+body.lf-page .btn.ghost{background:#ffffff05;color:#d5e7ee;border:1px solid #91b6c23b}
+body.lf-page .icon-btn{background:#ffffff06;border-color:#90b4c333;border-radius:13px}
+.lf-brand{font-size:20px;letter-spacing:.5px}
+.lf-home{padding:22px 24px 20px;overflow:hidden}
+.lf-intro{margin:15px 0 20px}
+.lf-eyebrow{font-size:9px;color:#8ce0cd;letter-spacing:3px}
+.lf-intro h1{font-size:39px;letter-spacing:2px;line-height:1.15;margin:12px 0}
+.lf-title-dot{color:#91e2cc}
+.lf-intro p{color:#a8c2cf;font-size:13px}
+.lf-cover{height:218px;position:relative;display:flex;justify-content:center;align-items:center;margin:15px -5px 8px;perspective:700px}
+.lf-orbit{position:absolute;width:220px;height:220px;border-radius:50%;border:1px solid #91e2cc16;background:radial-gradient(circle,#74cbb61c,transparent 65%);box-shadow:0 0 0 22px #82d9c606,0 0 0 44px #82d9c603}
+.lf-cover-tower{width:113px;height:179px;border:1px solid #96b9c45c;border-radius:18px 18px 9px 9px;background:linear-gradient(125deg,#53737f,#203e50 48%,#132a3b);transform:rotate(-8deg);box-shadow:12px 18px 0 #06122155,0 20px 32px #020e2277;position:relative;padding:16px 13px;box-sizing:border-box;animation:lf-cover-float 6s ease-in-out infinite}
+.lf-cover-tower:before{content:"";position:absolute;inset:-8px 8px auto;height:5px;border:1px solid #98ccd07d;background:#41616d;border-radius:3px}
+.lf-cover-display{font-size:19px;letter-spacing:3px;background:#071b25;border:1px solid #82c9c84b;border-radius:5px;color:#9ae7cd;line-height:28px;text-align:center;text-shadow:0 0 12px #99edbb66}
+.lf-cover-doors{display:flex;height:102px;margin-top:10px;gap:3px;padding:4px;background:#0b2331;border:1px solid #95b9c35b}
+.lf-cover-doors i{flex:1;background:linear-gradient(95deg,#44717a,#5c8790 22%,#355d6b 90%);border:1px solid #b3d0ce44}
+.lf-cover-number{position:absolute;bottom:7px;left:0;right:0;font-size:7px;letter-spacing:4px;color:#a8c6ca}
+.lf-cover-ticket{position:absolute;left:8%;top:48px;width:65px;padding:14px 8px;border-radius:10px;background:linear-gradient(135deg,#f6d99c,#e4b76b);color:#332b23;transform:rotate(-17deg);box-shadow:0 14px 25px #06152166;font-size:7px;letter-spacing:1.5px;text-align:left}
+.lf-cover-ticket b{display:block;font-size:32px;line-height:1.15;margin-top:8px}
+.lf-cover-ticket-two{left:auto;right:4%;top:116px;background:linear-gradient(135deg,#b2e5da,#6fbdad);transform:rotate(14deg);color:#12372f}
+.lf-cover .lf-art{position:absolute;width:96px;height:96px;right:-22px;top:-6px;opacity:.18;filter:grayscale(1);transform:rotate(16deg)}
+.lf-cover-meta{display:flex;justify-content:center;align-items:center;gap:12px;font-size:10px;color:#afc6d3;letter-spacing:1px}
+.lf-cover-meta i{width:3px;height:3px;border-radius:50%;background:#75c7b8}
+.lf-practice{margin-top:24px}
+.lf-practice label{font-size:12px;color:#b7cdd7}
+.lf-practice select{border-color:#7b9fa34d;background:#102435;font-size:12px}
+.lf-guide{border-color:#85b4be26;color:#afc4d0;font-size:12px}
+.lf-credit{font-size:9px;letter-spacing:1px;color:#8da8b6}
+.lf-room{padding:9px 12px;border-radius:16px}
+body.lf-mp .topbar,body.lf-solo .topbar{width:min(92vw,520px);max-width:520px}
+.lf-room{width:min(92vw,520px);max-width:520px}
+.lf-play{width:min(92vw,620px)}
+.lf-room-title{font-size:12px;color:#b6d1da}
+.lf-play{background:linear-gradient(145deg,#152c3ee8,#0f2133ee);border-color:#8fc0c929;border-radius:24px;padding:16px;box-shadow:0 20px 40px #020e2233}
+.lf-hud b{font-size:12px;letter-spacing:.4px}
+.lf-hud>span{font-size:10px;color:#9ebdca}
+.lf-progress{display:flex;gap:5px;margin:0 0 17px}
+.lf-progress i{height:3px;background:#42606b66;border-radius:3px;flex:1}
+.lf-progress i.done{background:#5fae9e}
+.lf-progress i.current{background:#a0ecd4;box-shadow:0 0 8px #91e2cc44}
+.lf-stage{height:320px;position:relative;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px}
+.lf-building{border:1px solid #779dae5c;border-radius:14px;background:linear-gradient(110deg,#1d3b4f,#102a3c);box-shadow:inset 0 0 20px #08182377,0 10px 20px #030c2122;padding:6px}
+.lf-floorlist{border-radius:8px;overflow:hidden}
+.lf-floor{padding:0 8px;border-bottom:1px solid #80afbf13;position:relative;transition:background .2s,box-shadow .2s}
+.lf-floor:after{content:"";position:absolute;left:55%;right:7px;top:12px;height:5px;background:repeating-linear-gradient(90deg,#92c6c719 0 7px,transparent 7px 13px)}
+.lf-floor b{font-size:15px;font-weight:900;color:#a1bfce}
+.lf-floor span{font-size:8px;color:#f6d599}
+.lf-floor.lf-blocked{background:repeating-linear-gradient(135deg,#94734b25 0 7px,#58442425 7px 14px);border-left:2px solid #dfb67f}
+.lf-floor.lf-blocked i{font-size:10px;color:#eac78d}
+.lf-floor.lf-active{background:#8dd8c41f;box-shadow:inset 3px 0 #9ee6d3}
+.lf-floor.lf-active b{color:#c4fceb}
+.lf-shaft{width:54px;margin-left:4px;border:1px solid #789aad44;border-radius:7px;background:repeating-linear-gradient(0deg,#081b2a 0,#081b2a 32px,#1b3545 33px);box-shadow:inset 0 0 12px #020b1644;overflow:hidden}
+.lf-shaft:before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:#8cb4b624}
+.lf-car{height:11.1%;left:3px;right:3px;border:1px solid #a5e4d4;border-radius:5px;background:#72b9ac;box-shadow:0 0 18px #8ee9cf39;transition:bottom 170ms cubic-bezier(.22,.7,.3,1);overflow:hidden}
+.lf-car-sign{font-size:8px;line-height:10px;background:#102c32;color:#acf4d5;z-index:2}
+.lf-cabin{position:absolute;inset:11px 3px 1px;background:linear-gradient(#f1d8a0,#a1b2a7);display:flex;justify-content:center;align-items:flex-end}
+.lf-person{width:8px;height:11px;background:#1d4357;border-radius:4px 4px 0 0;position:relative}
+.lf-person:before{content:"";position:absolute;width:5px;height:5px;background:#1d4357;border-radius:50%;top:-6px;left:1px}
+.lf-doors{top:11px;left:2px;right:2px;bottom:1px;gap:1px;overflow:hidden}
+.lf-doors i{background:linear-gradient(100deg,#56857f,#b0c7b2 18%,#729f93);transition:transform .55s cubic-bezier(.2,.8,.2,1);border:1px solid #50796e55}
+.lf-car.lf-open .lf-doors i:first-child{transform:translateX(-100%)}
+.lf-car.lf-open .lf-doors i:last-child{transform:translateX(100%)}
+.lf-cone{font-size:10px;background:#e7c69012;color:#edcf9b;border:1px solid #d0aa7044;padding:8px;border-radius:10px;letter-spacing:.5px}
+.lf-player{position:relative;grid-template-columns:21px minmax(0,1fr) auto;gap:1px 5px;background:#9cc2d508;border:1px solid #9cc2d50c;padding:7px;font-size:10px;min-height:35px;box-sizing:border-box;border-radius:11px;transition:border-color .2s}
+.lf-player small{grid-column:2/-1;font-size:8px;color:#adc4d0}
+.lf-player b{font-size:15px;font-weight:900;color:#e1f3ef}
+.lf-player b em{font-size:7px;font-style:normal;margin-left:2px;opacity:.6}
+.lf-avatar{grid-row:1/3;align-self:center;width:21px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:7px;font-size:9px;font-weight:800;font-style:normal;background:linear-gradient(135deg,#335a6a,#233f53);color:#c4e5e7}
+.lf-player.lf-you{outline:none;border-color:#81d5bc5c;background:#76c6ad11}
+.lf-you .lf-avatar{background:linear-gradient(135deg,#a8e8c9,#71b5a3);color:#133d35}
+.lf-reveal-card{position:absolute;left:5px;top:6px;width:23px;height:29px;background:linear-gradient(140deg,#edd4a8,#c7a574);border-radius:5px;color:#2a302f;text-align:center;font-size:16px;line-height:29px;box-shadow:0 3px 7px #0004;animation:lf-card-flip .55s both;animation-delay:var(--lf-delay)}
+.lf-result{font-size:10px;line-height:1.65;color:#a9c2ce;min-height:28px;padding:9px 0 5px;margin:0}
+.lf-section-label{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:800;letter-spacing:.5px;color:#d2e6ec;margin:8px 0}
+.lf-section-label span{font-size:7px;letter-spacing:1.5px;color:#86a5b5;font-weight:500}
+.lf-targets{gap:9px}
+.lf-ticket{position:relative;border:1px solid #b2c8c23c;border-radius:11px;overflow:hidden;padding:10px 12px;background:linear-gradient(130deg,#cfe4d8,#9bbcb1);color:#173b37;box-shadow:0 4px 0 #5e84796b;min-width:0}
+.lf-ticket:nth-child(2){background:linear-gradient(130deg,#ecddbb,#d1b586);color:#443626;border-color:#dfc59a55;box-shadow:0 4px 0 #8d744c66}
+.lf-ticket div{display:flex;flex-direction:column;gap:6px}
+.lf-ticket small{font-size:5px;letter-spacing:1px;opacity:.75}
+.lf-ticket div span{font-size:10px;font-weight:900}
+.lf-ticket b{font-size:30px;line-height:1;letter-spacing:-1px}
+.lf-ticket b span{font-size:8px;letter-spacing:0}
+.lf-ticket i{position:absolute;left:52%;top:0;bottom:0;border-left:1px dashed #1c514a26}
+.lf-hint{font-size:11px;color:#b4ccd8;margin:16px 0 9px}
+.lf-floorbtn{font-size:11px;border-color:#7698ad2e;border-radius:7px;background:#7b9dad06;min-height:36px;padding:7px 0;transition:transform .16s,background .16s}
+.lf-floorbtn.on{background:#a3dec625;border-color:#8cdec6;color:#c6f7e8;box-shadow:inset 0 0 0 1px #8cdec630;transform:translateY(-2px)}
+.lf-picker>span{font-size:9px;color:#88a9bc;margin-bottom:2px}
+.lf-cards{gap:12px;padding:2px 5px 9px;perspective:600px}
+.lf-move{position:relative;min-height:110px;border:1px solid #4f768985;border-radius:12px;background:linear-gradient(150deg,#325168,#203c53 70%);box-shadow:0 5px 0 #102331,0 8px 18px #040e2133;transform:rotate(-3deg);padding-top:21px;transition:transform .22s cubic-bezier(.2,.8,.2,1),border-color .22s,box-shadow .22s}
+.lf-move:nth-child(2){transform:rotate(0)}
+.lf-move:nth-child(3){transform:rotate(3deg)}
+.lf-move b{font-size:34px;font-weight:900;color:#d4e7e8}
+.lf-move small{font-size:8px;letter-spacing:1px;color:#a7c3cf;margin-top:7px}
+.lf-move.on{transform:translateY(-5px) rotate(0);border-color:#9ce3c8;background:linear-gradient(150deg,#385c68,#28534f);box-shadow:0 5px 0 #163c37,0 0 24px #8fdacb14,inset 0 0 0 1px #a1ebc522}
+.lf-card-corner{position:absolute;left:9px;top:8px;font-size:10px;color:#a7c6ce;font-weight:800}
+.lf-card-mark{position:absolute;right:8px;bottom:7px;color:#89b4ba;font-size:13px}
+.lf-submit{margin-top:9px;font-size:13px;letter-spacing:.5px;border-radius:12px}
+.lf-arrival{position:absolute;z-index:3;left:12%;right:12%;top:32%;display:flex;flex-direction:column;align-items:center;gap:4px;padding:13px;border:1px solid #b2e6da77;border-radius:16px;background:linear-gradient(130deg,#18384beb,#16372feb);box-shadow:0 16px 28px #030d2266;backdrop-filter:blur(12px);opacity:0;pointer-events:none;transform:translateY(10px) scale(.92)}
+.lf-arrival.lf-pop{animation:lf-arrive 3s both}
+.lf-arrival small{font-size:7px;color:#9fe9cd;letter-spacing:2px}
+.lf-arrival b{font-size:34px;color:#e3f8ec;line-height:1.2}
+.lf-arrival b span{font-size:10px;margin-left:5px}
+.lf-arrival em{font-size:10px;color:#cae0d9;font-style:normal}
+.lf-sparkles{position:absolute;left:50%;top:50%;pointer-events:none;z-index:4}
+.lf-sparkles i{position:absolute;width:5px;height:5px;border-radius:1px;background:#e8d0a0;animation:lf-spark .85s both;animation-delay:var(--lf-spark-delay)}
+.lf-ranking{margin:15px 0;text-align:left}
+.lf-rank:first-child{background:#8fdbbc17;color:#a6ebce;border-radius:10px}
+@keyframes lf-cover-float{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-7px) rotate(-6deg)}}
+@keyframes lf-card-flip{0%{transform:rotateY(90deg) translateY(-6px);opacity:0}60%{transform:rotateY(-12deg);opacity:1}100%{transform:rotateY(0)}}
+@keyframes lf-arrive{0%{opacity:0;transform:translateY(10px) scale(.92)}15%,80%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-8px) scale(.98)}}
+@keyframes lf-spark{0%{opacity:1;transform:rotate(var(--lf-angle)) translateX(0) scale(0)}30%{opacity:1}100%{opacity:0;transform:rotate(var(--lf-angle)) translateX(var(--lf-distance)) scale(.6)}}
+@media(max-width:380px){.lf-home{padding:18px}.lf-play{padding:13px}.lf-stage{height:296px;gap:9px}.lf-floor b{font-size:14px}.lf-player{padding:6px 5px;grid-template-columns:19px minmax(0,1fr) auto;gap:1px 3px;font-size:9px}.lf-ticket{padding:9px}.lf-ticket small{font-size:4px}.lf-move{min-height:100px}.lf-cover-ticket{left:4%}}
+@media(prefers-reduced-motion:reduce){.lf-cover-tower,.lf-reveal-card,.lf-arrival.lf-pop,.lf-sparkles i{animation:none}.lf-arrival.lf-pop{opacity:1;transform:none}.lf-car,.lf-doors i,.lf-move,.lf-floorbtn{transition:none}}
+@media(min-width:700px){body.lf-mp .topbar,body.lf-solo .topbar,.lf-room,.lf-play{width:min(95vw,620px);max-width:620px}}
