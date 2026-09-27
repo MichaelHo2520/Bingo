@@ -326,20 +326,20 @@ const CORE = [
      停在舊版(線上照樣 network-first 拿新的)—— 守門是 test-version.js 的 E 節。
    ========================================================================== */
 /* @@REV-BEGIN */
-const BUILD = "cf4545b8";
+const BUILD = "d7e2926e";
 const REV = {
-  "./lift.html": "7c03284210a5f63a",
+  "./lift.html": "cd08169afc7fa317",
   "./img/lf-icon.png": "cf337f168a705ec2",
   "./js/lift/rules.js": "27de6197f655cc57",
   "./js/lift/ai.js": "a8c1329906c8219b",
-  "./js/lift/board.js": "4c87b3cf9c21a0df",
-  "./js/lift/solo.js": "35f73c10ff21dee0",
-  "./js/lift/adapter.js": "2a96dca71e0c25a0",
+  "./js/lift/board.js": "e667a80c4f413b6f",
+  "./js/lift/solo.js": "fc34e492d0ffcd8d",
+  "./js/lift/adapter.js": "ba502fc2e9a2b375",
   "./js/lift/main.js": "30e69edbc4dd995b",
   "./": "7fc6e184ae259a19",
   "./app.html": "e677a9539fbbceaf",
   "./index.html": "7fc6e184ae259a19",
-  "./styles.css": "505e9ce0528a0d32",
+  "./styles.css": "41592539e737697e",
   "./js/audio.js": "fec2c75c8b2efe5b",
   "./js/game.js": "1ddf99e604ba0b3a",
   "./js/online.js": "576da19c11495fee",

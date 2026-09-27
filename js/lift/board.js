@@ -144,7 +144,13 @@ const LFB = (() => {
     }
     $("lfClock").classList.toggle("hidden",!online);
   }
-  function ranking(g,name){return g.order.slice().sort((a,b)=>g.scores[b]-g.scores[a]).map(id=>
-    `<div class="lf-rank"><span>${esc(name(id))}</span><b>${g.scores[id]} 分</b></div>`).join("");}
+  function ranking(g,name,me){
+    let rank=0,previous;
+    const ids=g.order.slice().sort((a,b)=>g.scores[b]-g.scores[a]);
+    return '<div class="lf-score-caption">本局得分</div>'+ids.map((id,i)=>{
+      const score=g.scores[id];if(score!==previous)rank=i+1;previous=score;
+      return `<div class="lf-rank${score===g.scores[ids[0]]?" lf-rank-lead":""}${id===me?" lf-rank-you":""}"><span class="lf-rank-place">${rank}.</span><span class="lf-rank-name">${esc(name(id))}${id===me&&name(id)!=="你"?" · 你":""}</span><b>${score} 分</b></div>`;
+    }).join("");
+  }
   return {render,reset,ranking,feedback};
 })();

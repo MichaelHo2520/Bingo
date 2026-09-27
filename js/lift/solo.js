@@ -29,7 +29,7 @@ const Solo = (()=>{
     if(g.winner){
       $("winWord").textContent=g.winner.ids.includes("you")?"你拿下了！":"本局結束";
       $("winMsg").textContent="九回合結算，同分並列。";
-      $("lfRanking").innerHTML=LFB.ranking(g,name);$("veil").classList.add("show");
+      $("lfRanking").innerHTML=LFB.ranking(g,name,"you");$("veil").classList.add("show");
     }
   }
   function quit(){clearTimeout(nextTimer);nextTimer=null;g=null;LFB.reset();$("veil").classList.remove("show");showScreen("home");}

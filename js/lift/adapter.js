@@ -36,7 +36,7 @@ const MP = MPCore.create((()=>{
     readyHint(ids,ready){return ids.length<3?"等待至少 3 人加入":ready?"等大家按準備":"按準備好了開始";},
     refresh(){paint();},
     outcome(w,{iWon}){
-      $("lfRanking").innerHTML=LFB.ranking(g,ctx.dispName);
+      $("lfRanking").innerHTML=LFB.ranking(g,ctx.dispName,ctx.me());
       return {word:iWon?"你拿下了！":"本局結束",msg:"九回合結算，同分並列。"};
     },
     ownPrefs(){return {big:BigMode.get()};},usePrefs(o){BigMode.set(!!o.big);},api:{send,state:()=>g}
