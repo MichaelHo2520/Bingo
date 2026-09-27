@@ -14327,18 +14327,18 @@ body.solo-on .blk-react-row{display:none}
 .lf-guide{font-size:13px;line-height:1.8;border-top:1px solid var(--accent);padding-top:12px}
 .lf-guide summary{cursor:pointer;font-weight:800;min-height:38px}
 .lf-credit{text-align:center;font-size:11px;margin-top:20px;opacity:.75}
-.lf-room{width:calc(100% - 20px);max-width:620px;padding:12px 14px}
+.lf-room{padding:12px 14px}
 .lf-room-top{display:flex;align-items:center;gap:8px}
 .lf-room-title{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lf-room-foot{margin-top:8px}
 .lf-bigbtn{font-size:15px;font-weight:800}
 .lf-bigbtn.on{background:var(--accent);color:var(--bg)}
-.lf-play{width:calc(100% - 20px);max-width:620px;margin:0 auto 20px;padding:14px;border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);border-radius:22px;background:var(--panel);box-sizing:border-box}
+.lf-play{margin:0 auto 20px;padding:14px;border:1px solid color-mix(in srgb,var(--accent) 28%,transparent);border-radius:22px;background:var(--panel);box-sizing:border-box}
 .lf-hud{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px;margin-bottom:12px}
 .lf-hud b{font-size:14px}
 .lf-stage{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;height:300px}
 .lf-building{display:flex;border:2px solid #52748a;border-radius:16px;overflow:hidden;background:#142d43;color:#e8f5f7}
-.lf-floorlist{display:grid;grid-template-rows:repeat(9,1fr);flex:1;min-width:0}
+.lf-floorlist{display:grid;grid-template-rows:repeat(9,minmax(0,1fr));flex:1;min-width:0}
 .lf-floor{display:flex;align-items:center;gap:6px;padding:0 9px;border-bottom:1px solid #365167;transition:background .2s}
 .lf-floor b{font-size:17px;min-width:23px}
 .lf-floor span{font-size:9px;color:#f6cd69;flex:1}
@@ -14374,7 +14374,6 @@ body.solo-on .blk-react-row{display:none}
 .lf-move small{font-size:10px}
 .lf-submit{width:100%;margin-top:10px;min-height:46px}
 .lf-rank{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid color-mix(in srgb,var(--text) 12%,transparent);font-size:14px}
-body.lf-mp .topbar,body.lf-solo .topbar{max-width:620px}
 body.lf-solo .scroll-area{display:none}
 @media(max-width:380px){.lf-stage{gap:7px;height:278px}.lf-floor{padding:0 5px;gap:3px}.lf-floor span{font-size:8px}.lf-player{padding:5px;font-size:10px}.lf-hud{font-size:10px}}
 @media(prefers-reduced-motion:reduce){.lf-car{transition:none}}
@@ -14678,9 +14677,6 @@ body.lf-page .icon-btn{background:#ffffff06;border-color:#90b4c333;border-radius
 .lf-guide{border-color:#85b4be26;color:#afc4d0;font-size:12px}
 .lf-credit{font-size:9px;letter-spacing:1px;color:#8da8b6}
 .lf-room{padding:9px 12px;border-radius:16px}
-body.lf-mp .topbar,body.lf-solo .topbar{width:min(92vw,520px);max-width:520px}
-.lf-room{width:min(92vw,520px);max-width:520px}
-.lf-play{width:min(92vw,620px)}
 .lf-room-title{font-size:12px;color:#b6d1da}
 .lf-play{background:linear-gradient(145deg,#152c3ee8,#0f2133ee);border-color:#8fc0c929;border-radius:24px;padding:16px;box-shadow:0 20px 40px #020e2233}
 .lf-hud b{font-size:12px;letter-spacing:.4px}
@@ -14691,7 +14687,7 @@ body.lf-mp .topbar,body.lf-solo .topbar{width:min(92vw,520px);max-width:520px}
 .lf-progress i.current{background:#a0ecd4;box-shadow:0 0 8px #91e2cc44}
 .lf-stage{height:320px;position:relative;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px}
 .lf-building{border:1px solid #779dae5c;border-radius:14px;background:linear-gradient(110deg,#1d3b4f,#102a3c);box-shadow:inset 0 0 20px #08182377,0 10px 20px #030c2122;padding:6px}
-.lf-floorlist{border-radius:8px;overflow:hidden}
+.lf-floorlist{border:1px solid transparent;border-radius:8px;overflow:hidden}
 .lf-floor{padding:0 8px;border-bottom:1px solid #80afbf13;position:relative;transition:background .2s,box-shadow .2s}
 .lf-floor:after{content:"";position:absolute;left:55%;right:7px;top:12px;height:5px;background:repeating-linear-gradient(90deg,#92c6c719 0 7px,transparent 7px 13px)}
 .lf-floor b{font-size:15px;font-weight:900;color:#a1bfce}
@@ -14700,9 +14696,10 @@ body.lf-mp .topbar,body.lf-solo .topbar{width:min(92vw,520px);max-width:520px}
 .lf-floor.lf-blocked i{font-size:10px;color:#eac78d}
 .lf-floor.lf-active{background:#8dd8c41f;box-shadow:inset 3px 0 #9ee6d3}
 .lf-floor.lf-active b{color:#c4fceb}
-.lf-shaft{width:54px;margin-left:4px;border:1px solid #789aad44;border-radius:7px;background:repeating-linear-gradient(0deg,#081b2a 0,#081b2a 32px,#1b3545 33px);box-shadow:inset 0 0 12px #020b1644;overflow:hidden}
+.lf-shaft{width:54px;margin-left:4px;border:1px solid #789aad44;border-radius:7px;background:#081b2a;box-shadow:inset 0 0 12px #020b1644;overflow:hidden}
+.lf-shaft:after{content:"";position:absolute;inset:0;background-image:linear-gradient(to bottom,transparent calc(100% - 1px),#36516780 0);background-size:100% calc(100% / 9);pointer-events:none}
 .lf-shaft:before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:#8cb4b624}
-.lf-car{height:11.1%;left:3px;right:3px;border:1px solid #a5e4d4;border-radius:5px;background:#72b9ac;box-shadow:0 0 18px #8ee9cf39;transition:bottom var(--lf-step,420ms) linear;overflow:hidden}
+.lf-car{height:calc(100% / 9);left:3px;right:3px;border:1px solid #a5e4d4;border-radius:5px;background:#72b9ac;box-shadow:0 0 18px #8ee9cf39;transition:bottom var(--lf-step,420ms) linear;overflow:hidden;z-index:1}
 .lf-car-sign{font-size:8px;line-height:10px;background:#102c32;color:#acf4d5;z-index:2}
 .lf-cabin{position:absolute;inset:11px 3px 1px;background:linear-gradient(#f1d8a0,#a1b2a7);display:flex;justify-content:center;align-items:flex-end}
 .lf-person{width:8px;height:11px;background:#1d4357;border-radius:4px 4px 0 0;position:relative}
@@ -14719,7 +14716,7 @@ body.lf-mp .topbar,body.lf-solo .topbar{width:min(92vw,520px);max-width:520px}
 .lf-avatar{grid-row:1/3;align-self:center;width:21px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:7px;font-size:9px;font-weight:800;font-style:normal;background:linear-gradient(135deg,#335a6a,#233f53);color:#c4e5e7}
 .lf-player.lf-you{outline:none;border-color:#81d5bc5c;background:#76c6ad11}
 .lf-you .lf-avatar{background:linear-gradient(135deg,#a8e8c9,#71b5a3);color:#133d35}
-.lf-reveal-card{position:absolute;left:5px;top:6px;width:23px;height:29px;background:linear-gradient(140deg,#edd4a8,#c7a574);border-radius:5px;color:#2a302f;text-align:center;font-size:16px;line-height:29px;box-shadow:0 3px 7px #0004;animation:lf-card-flip .55s both;animation-delay:var(--lf-delay)}
+.lf-reveal-card{grid-column:1;grid-row:1/3;align-self:center;display:flex;align-items:center;justify-content:center;width:32px;min-width:32px;height:34px;padding:3px;border:1px solid #f8e5c066;box-sizing:border-box;background:linear-gradient(140deg,#edd4a8,#c7a574);border-radius:6px;color:#2a302f;text-align:center;font-size:15px;line-height:1;font-variant-numeric:tabular-nums;box-shadow:0 3px 7px #0004;animation:lf-card-flip .55s both;animation-delay:var(--lf-delay)}
 .lf-result{font-size:10px;line-height:1.65;color:#a9c2ce;min-height:28px;padding:9px 0 5px;margin:0}
 .lf-section-label{display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:800;letter-spacing:.5px;color:#d2e6ec;margin:8px 0}
 .lf-section-label span{font-size:7px;letter-spacing:1.5px;color:#86a5b5;font-weight:500}
@@ -14762,7 +14759,6 @@ body.lf-mp .topbar,body.lf-solo .topbar{width:min(92vw,520px);max-width:520px}
 @keyframes lf-spark{0%{opacity:1;transform:rotate(var(--lf-angle)) translateX(0) scale(0)}30%{opacity:1}100%{opacity:0;transform:rotate(var(--lf-angle)) translateX(var(--lf-distance)) scale(.6)}}
 @media(max-width:380px){.lf-home{padding:18px}.lf-play{padding:13px}.lf-stage{height:296px;gap:9px}.lf-floor b{font-size:14px}.lf-player{padding:6px 5px;grid-template-columns:19px minmax(0,1fr) auto;gap:1px 3px;font-size:9px}.lf-ticket{padding:9px}.lf-ticket small{font-size:4px}.lf-move{min-height:100px}.lf-cover-ticket{left:4%}}
 @media(prefers-reduced-motion:reduce){.lf-cover-tower,.lf-reveal-card,.lf-arrival.lf-pop,.lf-sparkles i{animation:none}.lf-arrival.lf-pop{opacity:1;transform:none}.lf-car,.lf-doors i,.lf-move,.lf-floorbtn{transition:none}}
-@media(min-width:700px){body.lf-mp .topbar,body.lf-solo .topbar,.lf-room,.lf-play{width:min(95vw,620px);max-width:620px}}
 
 /* 對局以可視高度分配空間，操作區不參與捲動；矮螢幕只捲上方資訊。 */
 body.lf-page:is(.lf-solo,.lf-mp){min-height:0;padding:8px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:8px}
@@ -14778,6 +14774,9 @@ body.lf-mp .lf-room-foot,body.lf-mp .mp-subrow{display:none}
 .lf-building{min-height:0;padding:4px;border-radius:10px}
 .lf-side{min-height:0;gap:6px}
 .lf-scores{min-height:0}
+.lf-floor{min-height:0;line-height:1}
+.lf-player{grid-template-columns:32px minmax(0,1fr) auto}
+.lf-avatar{justify-self:center}
 .lf-result{flex:none;min-height:0;margin:0;padding:0;font-size:10px;line-height:1.4}
 .lf-action{flex:none;border-top:1px solid #85b4be26;padding-top:8px}
 .lf-targets{gap:8px}
@@ -14804,5 +14803,20 @@ body.lf-mp .lf-room-foot,body.lf-mp .mp-subrow{display:none}
 .lf-floor.lf-blocked:after{display:none}
 .lf-floor.lf-blocked{box-shadow:inset 0 0 12px #e69c4818}
 .lf-car.lf-travelling{box-shadow:0 0 22px #8ee9cf66,inset 0 0 8px #e3fff44d}
-@media(max-width:380px){.lf-stage{gap:7px}.lf-play{padding:8px}.lf-player{min-height:32px;padding:4px 5px}.lf-avatar{height:21px}.lf-ticket{padding:6px 8px}.lf-room .icon-btn,.lf-room .mp-act-btn{width:32px;height:32px}.lf-room .tools-docked,.lf-room .mp-actions,.lf-room-top{gap:4px}body.lf-mp:not(.is-big) .lf-room .row:has(> .tools-docked .tk-btn.on){padding-right:140px}}
+@media(max-width:380px){.lf-stage{gap:7px}.lf-play{padding:8px}.lf-player{grid-template-columns:30px minmax(0,1fr) auto;min-height:32px;padding:4px 5px}.lf-reveal-card{width:30px;min-width:30px;font-size:14px}.lf-avatar{height:21px}.lf-ticket{padding:6px 8px}.lf-room .icon-btn,.lf-room .mp-act-btn{width:32px;height:32px}.lf-room .tools-docked,.lf-room .mp-actions,.lf-room-top{gap:4px}body.lf-mp:not(.is-big) .lf-room .row:has(> .tools-docked .tk-btn.on){padding-right:140px}}
 @media(max-height:480px) and (min-width:600px){.lf-play{flex-direction:row;gap:12px}.lf-action{width:46%;border-top:0;border-left:1px solid #85b4be26;padding:0 0 0 10px;align-self:center}.lf-view{height:100%}.lf-stage{flex-basis:150px}.lf-result{font-size:9px}}
+
+/* 同一條外框邊界涵蓋進場、大廳、對局及底部操作，內層設定卡填滿容器。 */
+body.lf-page{--lf-shell-width:min(92vw,520px)}
+body.lf-page > :is(.topbar,.panel,.scroll-area,.primary-bar,.lf-play){width:var(--lf-shell-width);max-width:none}
+.lf-scroll > .panel{width:100%;max-width:none}
+body.lf-page .primary-bar > :is(.actions,.status){width:100%;max-width:none}
+@media(min-width:700px) and (min-height:640px){body.lf-page{--lf-shell-width:min(95vw,620px)}}
+
+/* 選擇保持亮起，點按另有短暫彈跳與光圈；動態由頁面回饋函式啟動。 */
+body.lf-page :is(.btn,.lf-floorbtn,.seg button){position:relative}
+.lf-tap-wave{position:absolute;inset:0;border:2px solid #c7ffe8;border-radius:inherit;pointer-events:none;z-index:2;opacity:0}
+.lf-floorbtn.on{background:#b1f1d73b;border-color:#c7ffe8;box-shadow:inset 0 0 0 1px #c7ffe8,0 0 14px #8fdacb30}
+.lf-floorbtn.on:after{content:"";position:absolute;right:3px;top:3px;width:4px;height:4px;border-radius:50%;background:#d5fff0}
+.lf-move.on{border-color:#d0fff0;box-shadow:0 5px 0 #163c37,0 0 22px #8fdacb40,inset 0 0 0 1px #a1ebc566}
+.lf-move.on:after{content:"✓";position:absolute;right:7px;top:6px;width:19px;height:19px;line-height:19px;border-radius:50%;font-size:12px;font-weight:900;color:#163c37;background:#b7f4d9}

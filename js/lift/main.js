@@ -12,6 +12,11 @@ function showScreen(which){
   BigMode.sync();syncPageBack();
 }
 const lfBind=(id,fn)=>{const el=$(id);if(el)el.addEventListener("click",fn);};
+// 在選擇處理前給回饋；同一選項重按也會回應，不延遲出牌或網路交易。
+document.addEventListener("click",e=>{
+  const b=e.target.closest("#lfHome button,#lfControls button,#lfSetup .seg button");
+  if(b&&!b.disabled)LFB.feedback(b);
+},true);
 lfBind("lfGoOnline",()=>{MP.openConnect();});
 lfBind("lfStartSolo",()=>Solo.start());lfBind("lfSoloExit",()=>Solo.quit());
 lfBind("lfSoloAgain",()=>Solo.again());lfBind("lfSoloHome",()=>Solo.quit());

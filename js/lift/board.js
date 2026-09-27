@@ -2,6 +2,15 @@
 const LFB = (() => {
   let key="", animationKey="", selected=[10,20], card=5, timers=[], busyUntil=0;
   const label=f=>f===0?"G":String(f);
+  const taps=new WeakMap();
+  function feedback(button){
+    if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+    const previous=taps.get(button);if(previous)previous.cancel();
+    taps.set(button,button.animate([{scale:"1",filter:"brightness(1)"},{scale:"1.08",filter:"brightness(1.3)",offset:.4},{scale:"1",filter:"brightness(1)"}],{duration:360,easing:"cubic-bezier(.2,.8,.2,1)"}));
+    button.querySelectorAll(".lf-tap-wave").forEach(el=>el.remove());
+    const wave=document.createElement("span");wave.className="lf-tap-wave";wave.setAttribute("aria-hidden","true");button.append(wave);
+    wave.animate([{opacity:.8,transform:"scale(.82)"},{opacity:0,transform:"scale(1.25)"}],{duration:420,easing:"ease-out"}).onfinish=()=>wave.remove();
+  }
   function reset(){key="";animationKey="";busyUntil=0;timers.forEach(clearTimeout);timers=[];
     $("lfCar").classList.remove("lf-open","lf-travelling");$("lfArrival").classList.remove("lf-pop");$("lfSparkles").innerHTML="";}
   function tickets(values){
@@ -26,7 +35,8 @@ const LFB = (() => {
       if(g.stage==="targets")state=(!LF.needs(g,pid).length||(g.submitted||{})[pid])?"已準備":"選目標中";
       if(g.stage==="bid")state=Object.prototype.hasOwnProperty.call(g.bids||{},pid)?"已出牌":"選牌中";
       if(g.stage==="reveal")state=`出 ${g.last.bids[pid]} · +${g.last.gains[pid]}`;
-      return `<div class="lf-player ${pid===id?"lf-you":""}"><i class="lf-avatar" aria-hidden="true">${esc(name(pid).slice(0,1))}</i><span>${esc(name(pid))}${pid===id?" · 你":""}</span><b>${g.scores[pid]}<em>分</em></b><small>${state}</small>${g.stage==="reveal"?`<strong class="lf-reveal-card" style="--lf-delay:${g.order.indexOf(pid)*65}ms">${g.last.bids[pid]}</strong>`:""}</div>`;
+      const badge=g.stage==="reveal"?`<strong class="lf-reveal-card" style="--lf-delay:${g.order.indexOf(pid)*65}ms"><span>${g.last.bids[pid]}</span></strong>`:`<i class="lf-avatar" aria-hidden="true">${esc(name(pid).slice(0,1))}</i>`;
+      return `<div class="lf-player ${pid===id?"lf-you":""}">${badge}<span>${esc(name(pid))}${pid===id?" · 你":""}</span><b>${g.scores[pid]}<em>分</em></b><small>${state}</small></div>`;
     }).join("");
     // 其他人確認揭曉時快照仍會更新；相同內容保留 DOM，避免翻牌動畫重播。
     if($("lfScores").innerHTML!==scoresHTML)$("lfScores").innerHTML=scoresHTML;
@@ -46,7 +56,7 @@ const LFB = (() => {
       $("lfCar").style.setProperty("--lf-step",step+"ms");
       $("lfArrival").classList.remove("lf-pop");$("lfSparkles").innerHTML="";
       path.forEach((floor,i)=>{
-        const move=()=>{$("lfCar").style.bottom=(floor/40*88)+"%";$("lfCarFloor").textContent=label(floor);
+        const move=()=>{$("lfCar").style.bottom=(floor/5*100/9)+"%";$("lfCarFloor").textContent=label(floor);
           if(path.length>1){const direction=i?floor-path[i-1]:path[1]-floor;$("lfDirection").textContent=direction>0?"↑ 向上移動":"↓ 向下移動";}
           document.querySelectorAll(".lf-floor").forEach(el=>el.classList.toggle("lf-active",+el.dataset.floor===floor));};
         if(i===0)move();else timers.push(setTimeout(move,delay+(i-1)*step));
@@ -71,6 +81,7 @@ const LFB = (() => {
     if(turnKey===key)return;
     key=turnKey; selected=own?own.slice():[10,20]; card=5;
     const panel=$("lfControls");panel.innerHTML="";
+    if(!matchMedia("(prefers-reduced-motion: reduce)").matches)panel.animate([{opacity:.45,transform:"translateY(4px)"},{opacity:1,transform:"translateY(0)"}],{duration:240,easing:"ease-out"});
     const hint=$("lfHint");
     if(g.winner){hint.textContent="本局結束，看看排行榜！";return;}
     if(!own){hint.textContent="觀戰中：目標與選牌在揭曉前保密。";return;}
@@ -113,5 +124,5 @@ const LFB = (() => {
   }
   function ranking(g,name){return g.order.slice().sort((a,b)=>g.scores[b]-g.scores[a]).map(id=>
     `<div class="lf-rank"><span>${esc(name(id))}</span><b>${g.scores[id]} 分</b></div>`).join("");}
-  return {render,reset,ranking};
+  return {render,reset,ranking,feedback};
 })();
