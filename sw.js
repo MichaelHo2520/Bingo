@@ -326,24 +326,24 @@ const CORE = [
      停在舊版(線上照樣 network-first 拿新的)—— 守門是 test-version.js 的 E 節。
    ========================================================================== */
 /* @@REV-BEGIN */
-const BUILD = "a55d2008";
+const BUILD = "cf4545b8";
 const REV = {
-  "./lift.html": "9b4dbdf9eead365d",
+  "./lift.html": "7c03284210a5f63a",
   "./img/lf-icon.png": "cf337f168a705ec2",
   "./js/lift/rules.js": "27de6197f655cc57",
   "./js/lift/ai.js": "a8c1329906c8219b",
-  "./js/lift/board.js": "ad144a624f49e4c0",
+  "./js/lift/board.js": "4c87b3cf9c21a0df",
   "./js/lift/solo.js": "35f73c10ff21dee0",
   "./js/lift/adapter.js": "2a96dca71e0c25a0",
   "./js/lift/main.js": "30e69edbc4dd995b",
-  "./": "032805024b459420",
+  "./": "7fc6e184ae259a19",
   "./app.html": "e677a9539fbbceaf",
-  "./index.html": "032805024b459420",
-  "./styles.css": "084df281a47ee260",
+  "./index.html": "7fc6e184ae259a19",
+  "./styles.css": "505e9ce0528a0d32",
   "./js/audio.js": "fec2c75c8b2efe5b",
   "./js/game.js": "1ddf99e604ba0b3a",
   "./js/online.js": "576da19c11495fee",
-  "./js/home-live.js": "31b9630921a6cf3c",
+  "./js/home-live.js": "01959bde46c371ec",
   "./js/main.js": "506c45c96fd7f3c4",
   "./js/shared/ui-kit.js": "f184d714d9a3ff99",
   "./js/shared/mp-order.js": "09dd944d84e3f1b9",

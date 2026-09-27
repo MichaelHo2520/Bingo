@@ -3,6 +3,23 @@ const LFB = (() => {
   let key="", animationKey="", selected=[10,20], card=5, timers=[];
   const label=f=>f===0?"G":String(f);
   const taps=new WeakMap();
+  let rosterObserver;
+  function syncRoster(){
+    const list=$("lfOpponents");
+    $("lfRoster").classList.toggle("lf-more",list.scrollHeight-list.clientHeight-list.scrollTop>2);
+  }
+  function players(rows,id){
+    const own=rows.find(row=>row.pid===id);
+    const self=$("lfSelf"),list=$("lfOpponents");
+    const ownHTML=own?own.html:"",otherHTML=rows.filter(row=>row.pid!==id).map(row=>row.html).join("");
+    if(self.innerHTML!==ownHTML)self.innerHTML=ownHTML;
+    if(list.innerHTML!==otherHTML){const top=list.scrollTop;list.innerHTML=otherHTML;list.scrollTop=top;}
+    if(!rosterObserver){
+      list.addEventListener("scroll",syncRoster,{passive:true});
+      rosterObserver=new ResizeObserver(syncRoster);rosterObserver.observe(list);
+    }
+    requestAnimationFrame(syncRoster);
+  }
   function feedback(button){
     if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;
     const previous=taps.get(button);if(previous)previous.cancel();
@@ -24,22 +41,21 @@ const LFB = (() => {
     $("lfPlay").dataset.stage=g.stage;
     if(g.stage!=="reveal"){$("lfCar").classList.remove("lf-open","lf-travelling");$("lfArrival").classList.remove("lf-pop");$("lfSparkles").innerHTML="";}
     if(!$("lfCar").classList.contains("lf-travelling"))$("lfDirection").textContent=g.direction===1?"↑ 下一段向上":"↓ 下一段向下";
-    $("lfCone").textContent=`施工 ${label(g.cone)} 樓`;
     document.querySelectorAll(".lf-floor").forEach(el=>{
       const blocked=+el.dataset.floor===g.cone;
       el.classList.toggle("lf-blocked",blocked);
       el.setAttribute("aria-label",`${label(+el.dataset.floor)} 樓${blocked?"，三角錐施工障礙":""}`);
     });
-    const scoresHTML=g.order.map(pid=>{
+    const scoreRows=g.order.map(pid=>{
       let state="";
       if(g.stage==="targets")state=(!LF.needs(g,pid).length||(g.submitted||{})[pid])?"已準備":"選目標中";
       if(g.stage==="bid")state=Object.prototype.hasOwnProperty.call(g.bids||{},pid)?"已出牌":"選牌中";
       if(g.stage==="reveal")state=`出 ${g.last.bids[pid]} · +${g.last.gains[pid]}`;
       const badge=g.stage==="reveal"?`<strong class="lf-reveal-card" style="--lf-delay:${g.order.indexOf(pid)*65}ms"><span>${g.last.bids[pid]}</span></strong>`:`<i class="lf-avatar" aria-hidden="true">${esc(name(pid).slice(0,1))}</i>`;
-      return `<div class="lf-player ${pid===id?"lf-you":""}">${badge}<span>${esc(name(pid))}${pid===id?" · 你":""}</span><b>${g.scores[pid]}<em>分</em></b><small>${state}</small></div>`;
-    }).join("");
+      return {pid,html:`<div class="lf-player ${pid===id?"lf-you":""}">${badge}<span>${esc(name(pid))}${pid===id&&name(pid)!=="你"?" · 你":""}</span><b>${g.scores[pid]}<em>分</em></b><small>${state}</small></div>`};
+    });
     // 其他人確認揭曉時快照仍會更新；相同內容保留 DOM，避免翻牌動畫重播。
-    if($("lfScores").innerHTML!==scoresHTML)$("lfScores").innerHTML=scoresHTML;
+    players(scoreRows,id);
     const own=g.targets[id];
     tickets(turnKey===key && g.stage==="targets"?selected:own);
     const akey=(g.roundId||"solo")+"/"+(g.last?g.last.turn:0);

@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 f0b3ecf9f1a9ade54a69c253d2794f188b5c769c9f7f281b045f0bf2e79c993d)
+    真相在 styles.src.css(sha256 77a558bd4a5beaf932efef6770b0adda9bc6727f289323aa2e6afbfd6c6de90d)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6394,7 +6394,6 @@ body.solo-on .blk-react-row{display:none}
 .lf-doors{position:absolute;left:4px;right:4px;bottom:2px;top:12px;display:flex;gap:2px}
 .lf-doors i{background:#305975;flex:1;border-radius:1px}
 .lf-side{min-width:0;display:flex;flex-direction:column;gap:8px}
-.lf-cone{font-size:12px;font-weight:800;padding:8px;border-radius:10px;background:#f6cd69;color:#38251b;text-align:center}
 .lf-scores{display:flex;flex-direction:column;gap:4px;overflow-y:auto}
 .lf-player{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1px 4px;padding:5px 7px;border-radius:9px;background:color-mix(in srgb,var(--text) 7%,transparent);font-size:11px}
 .lf-player span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -6700,7 +6699,6 @@ body.lf-page .icon-btn{background:#ffffff06;border-color:#90b4c333;border-radius
 .lf-doors i{background:linear-gradient(100deg,#56857f,#b0c7b2 18%,#729f93);transition:transform .55s cubic-bezier(.2,.8,.2,1);border:1px solid #50796e55}
 .lf-car.lf-open .lf-doors i:first-child{transform:translateX(-100%)}
 .lf-car.lf-open .lf-doors i:last-child{transform:translateX(100%)}
-.lf-cone{font-size:10px;background:#e7c69012;color:#edcf9b;border:1px solid #d0aa7044;padding:8px;border-radius:10px;letter-spacing:.5px}
 .lf-player{position:relative;grid-template-columns:21px minmax(0,1fr) auto;gap:1px 5px;background:#9cc2d508;border:1px solid #9cc2d50c;padding:7px;font-size:10px;min-height:35px;box-sizing:border-box;border-radius:11px;transition:border-color .2s}
 .lf-player small{grid-column:2/-1;font-size:8px;color:#adc4d0}
 .lf-player b{font-size:15px;font-weight:900;color:#e1f3ef}
@@ -6769,20 +6767,28 @@ body.lf-page:is(.lf-solo,.lf-mp) .topbar{display:none}
 body.lf-mp .lf-room-foot,body.lf-mp .mp-subrow{display:none}
 .lf-room{flex:none;padding:5px 10px;margin:0}
 .lf-room .icon-btn{width:36px;height:36px;border-radius:10px}
-.lf-play{flex:1 1 0;min-height:0;display:flex;flex-direction:column;margin:0;padding:10px;gap:8px;overflow:hidden;border-radius:18px}
+.lf-play{flex:1 1 0;min-height:0;max-height:760px;display:flex;flex-direction:column;margin:0;padding:10px;gap:8px;overflow:hidden;border-radius:18px}
 .lf-view{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .lf-hud{flex:none;margin:0}
 .lf-progress{flex:none;margin:0}
-.lf-stage{flex:1 0 150px;height:auto;min-height:150px;gap:10px}
+.lf-stage{flex:1 0 230px;height:auto;min-height:230px;gap:10px}
 .lf-building{min-height:0;padding:4px;border-radius:10px}
 .lf-side{min-height:0;gap:6px}
-.lf-scores{min-height:0}
+.lf-scores{flex:1;min-height:0;overflow:hidden;gap:6px}
+.lf-self{flex:none}
+.lf-self:empty{display:none}
+.lf-roster{position:relative;flex:1;min-height:0;overflow:hidden}
+.lf-opponents{height:100%;min-height:0;display:flex;flex-direction:column;gap:4px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#8fcbbb55 transparent;-webkit-overflow-scrolling:touch}
+.lf-opponents:focus-visible{outline:1px solid #9ee6d3;outline-offset:-1px;border-radius:9px}
+.lf-roster.lf-more:after{content:"↓ 更多玩家";position:absolute;left:0;right:0;bottom:0;padding:12px 0 3px;text-align:center;font-size:9px;color:#b6d8df;background:linear-gradient(transparent,#112b3dec 55%);pointer-events:none}
+.lf-opponents .lf-player{flex:none}
 .lf-floor{min-height:0;line-height:1}
-.lf-player{grid-template-columns:32px minmax(0,1fr) auto}
+.lf-player{grid-template-columns:32px minmax(0,1fr) auto;padding:5px 6px;min-height:36px}
 .lf-avatar{justify-self:center}
 .lf-result{flex:none;min-height:0;margin:0;padding:0;font-size:10px;line-height:1.4}
 .lf-action{flex:none;border-top:1px solid #85b4be26;padding-top:8px}
-.lf-targets{gap:8px}
+.lf-targets{flex:none;flex-direction:column;gap:7px;margin-top:4px}
+.lf-targets:empty{display:none}
 .lf-ticket{padding:7px 9px;min-height:43px;border-radius:9px;box-shadow:none}
 .lf-ticket small{display:none}
 .lf-ticket div{gap:0}
@@ -6798,7 +6804,6 @@ body.lf-mp .lf-room-foot,body.lf-mp .mp-subrow{display:none}
 .lf-move b{font-size:29px}
 .lf-move small{margin-top:3px}
 .lf-card-corner{top:5px;left:7px}
-.lf-cone{display:flex;align-items:center;justify-content:center;gap:5px;padding:3px 5px;flex:none;font-size:10px}
 .lf-cone-art{display:block;width:21px;height:24px;flex:none}
 .lf-cone-marker{display:none;position:absolute;right:5px;top:50%;transform:translateY(-50%);z-index:1;width:23px;height:calc(100% - 2px);max-height:26px}
 .lf-floor.lf-blocked .lf-cone-marker{display:block}
@@ -6807,7 +6812,7 @@ body.lf-mp .lf-room-foot,body.lf-mp .mp-subrow{display:none}
 .lf-floor.lf-blocked{box-shadow:inset 0 0 12px #e69c4818}
 .lf-car.lf-travelling{box-shadow:0 0 22px #8ee9cf66,inset 0 0 8px #e3fff44d}
 @media(max-width:380px){.lf-stage{gap:7px}.lf-play{padding:8px}.lf-player{grid-template-columns:30px minmax(0,1fr) auto;min-height:32px;padding:4px 5px}.lf-reveal-card{width:30px;min-width:30px;font-size:14px}.lf-avatar{height:21px}.lf-ticket{padding:6px 8px}.lf-room .icon-btn,.lf-room .mp-act-btn{width:32px;height:32px}.lf-room .tools-docked,.lf-room .mp-actions,.lf-room-top{gap:4px}body.lf-mp:not(.is-big) .lf-room .row:has(> .tools-docked .tk-btn.on){padding-right:140px}}
-@media(max-height:480px) and (min-width:600px){.lf-play{flex-direction:row;gap:12px}.lf-action{width:46%;border-top:0;border-left:1px solid #85b4be26;padding:0 0 0 10px;align-self:center}.lf-view{height:100%}.lf-stage{flex-basis:150px}.lf-result{font-size:9px}}
+@media(max-height:480px) and (min-width:600px){.lf-play{flex-direction:row;gap:12px}.lf-action{width:46%;border-top:0;border-left:1px solid #85b4be26;padding:0 0 0 10px;align-self:center}.lf-view{height:100%}.lf-stage{flex-basis:230px}.lf-result{font-size:9px}}
 body.lf-page{--lf-shell-width:min(92vw,520px)}
 body.lf-page > :is(.topbar,.panel,.scroll-area,.primary-bar,.lf-play){width:var(--lf-shell-width);max-width:none}
 .lf-scroll > .panel{width:100%;max-width:none}
