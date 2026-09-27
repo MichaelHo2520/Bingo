@@ -14840,6 +14840,7 @@ body.lf-mp .lf-room-foot{display:flex;min-width:0;margin-top:4px}
 .lf-win>p{font-size:12px;line-height:1.4;margin:0 0 12px}
 .lf-win .lf-ranking{margin:0 0 12px}
 .lf-score-caption{font-size:11px;font-weight:800;color:#adc9ce;text-align:left;margin:0 0 5px}
+.lf-bot-scores-hidden{display:none!important}
 .lf-score-caption:has(+.win-scores.hidden){display:none}
 .lf-rank{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:6px;padding:7px 8px;font-size:12px;align-items:center;min-height:30px;box-sizing:border-box}
 .lf-rank-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

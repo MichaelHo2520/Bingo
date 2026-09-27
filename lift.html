@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="img/icon.svg">
 <link rel="apple-touch-icon" href="img/icon.svg">
-<title>下一站幾樓 ｜ 電腦練習 + 3～8 人連線</title>
+<title>下一站幾樓 ｜ 電腦練習 + 2～8 人連線</title>
 
 <meta name="version" content="2.19.0">
 <!-- 下一站幾樓 · v2.19.0 -->
@@ -54,8 +54,8 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="lf-intro"><span class="lf-eyebrow">UP, DOWN &amp; ALL AROUND</span><h1 class="display">下一站幾樓<span class="lf-title-dot">.</span></h1>
       <p>下一站，是你的那一層嗎？</p>
       <div class="lf-cover" aria-hidden="true"><div class="lf-orbit"></div><div class="lf-cover-tower"><div class="lf-cover-display">↑ <span>20</span></div><div class="lf-cover-doors"><i></i><i></i></div><span class="lf-cover-number">40</span></div><span class="lf-cover-ticket">YOUR STOP<br><b>15</b></span><span class="lf-cover-ticket lf-cover-ticket-two">NEXT STOP<br><b>?</b></span><img class="lf-art" src="img/lf-icon.png" width="192" height="192" alt="電梯與上下方向箭頭"></div>
-      <div class="lf-cover-meta"><span>3—8 位玩家</span><i></i><span>9 回合的猜心對決</span></div></div>
-    <button class="btn primary block-btn home-btn" id="lfGoOnline">🌐 和朋友連線 · 3～8 人</button>
+  <div class="lf-cover-meta"><span>2—8 人連線</span><i></i><span>兩人自動補電腦</span></div></div>
+    <button class="btn primary block-btn home-btn" id="lfGoOnline">🌐 和朋友連線 · 2～8 人</button>
     <div class="lf-practice"><label for="lfCount">電腦練習 · 總人數</label>
       <select id="lfCount"><option value="3">3 人</option><option value="4" selected>4 人</option><option value="5">5 人</option><option value="6">6 人</option><option value="7">7 人</option><option value="8">8 人</option></select>
       <button class="btn ghost" id="lfStartSolo">開始練習</button></div>
@@ -118,7 +118,7 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <section class="panel hidden" id="lfSetup">
       <div class="subtitle">對戰設定</div>
       
-      <p class="hint">3～8 人 · 9 回合 · 選目標 35 秒 · 選牌 30 秒。逾時目標自動選，移動牌自動出 5。</p>
+      <p class="hint">2～8 人連線；兩位真人自動加入一位電腦，三位以上不補人。9 回合 · 選目標 35 秒 · 選牌 30 秒。逾時目標自動選，移動牌自動出 5。</p>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">
