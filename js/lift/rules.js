@@ -41,10 +41,14 @@ const LF = (() => {
     if(g.stage==="bid")return !Object.prototype.hasOwnProperty.call(g.bids||{},id);
     return false;
   }
-  function newGame(ids, now){
+  // 一局 9 或 18 回合。施工三角錐每回合往下 5 層，第 9 回合到 G；18 回合時第 10 回合留在 G，之後每回合往上爬回 40。
+  const ROUNDS=[9,18];
+  const totalRounds = g => g && g.rounds===18 ? 18 : 9;
+  const coneAt = turn => turn<=9 ? 45-turn*5 : (turn-10)*5;
+  function newGame(ids, now, rounds){
     const targets={}, replace={}, scores={};
     ids.forEach(id => { targets[id]=[10,20]; replace[id]=[0,1]; scores[id]=0; });
-    return {order:ids.slice(), floor:0, direction:1, turn:1, cone:40,
+    return {order:ids.slice(), floor:0, direction:1, turn:1, cone:coneAt(1), rounds:rounds===18?18:9,
       stage:"targets", targets, replace, scores, submitted:{}, bids:{}, ack:{},
       deadline:now+35000, last:null};
   }
@@ -105,18 +109,18 @@ const LF = (() => {
     }
     if(g.stage==="reveal"){
       if(!expired)return false;
-      if(g.turn===9){
+      if(g.turn>=totalRounds(g)){
         const best=Math.max(...g.order.map(id=>g.scores[id]));
         g.winner={ids:g.order.filter(id=>g.scores[id]===best),by:"points"};
         // 共用核心累積的是勝場；本局點數保留在 scores，避免將多局點數誤稱勝場。
         return true;
       }
-      g.turn++; g.cone-=5; g.submitted={}; g.ack={}; g.bids={};
+      g.turn++; g.cone=coneAt(g.turn); g.submitted={}; g.ack={}; g.bids={};
       g.stage=g.order.some(id=>needs(g,id).length)?"targets":"bid";
       g.deadline=now+(g.stage==="targets"?35000:30000); return true;
     }
     return false;
   }
-  return {FLOORS,validFloor,travel,newGame,submit,progress,needs,waiting,outcomes,copy,MOTION,flipAt,leadMs,revealMs};
+  return {FLOORS,ROUNDS,totalRounds,coneAt,validFloor,travel,newGame,submit,progress,needs,waiting,outcomes,copy,MOTION,flipAt,leadMs,revealMs};
 })();
 if(typeof module!=="undefined")module.exports=LF;

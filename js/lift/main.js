@@ -31,6 +31,7 @@ lfBind("mpNewSeason",()=>{MP.resetScores();MP.again();});
 lfBind("winPeek",peekBoard);lfBind("reopenWin",showResult);
 $("mpName").addEventListener("change",savePrefs);
 $("mpName").addEventListener("input",()=>$("mpName").classList.remove("needs-name"));
+$("lfRoundSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b)MP.setRounds(+b.dataset.rounds);});
 $("scoreSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(b)MP.setScoreMode(b.dataset.score);});
 lfBind("wgMinus",()=>MP.setWinGoal(MP.winGoal()-1));lfBind("wgPlus",()=>MP.setWinGoal(MP.winGoal()+1));
 lfBind("resetScoreBtn",()=>MP.resetScores());

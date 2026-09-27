@@ -1,7 +1,17 @@
 "use strict";
 // @transaction-rules LF: submit/progress mutate the authoritative game snapshot.
 const MP = MPCore.create((()=>{
-  let ctx=null, g=null, botTimer=null, botKey="", seasonScores={}, nativeCaption, scoredBotRound=null, lastTick="";
+  let ctx=null, g=null, botTimer=null, botKey="", seasonScores={}, nativeCaption, scoredBotRound=null, lastTick="", rounds=9;
+  // 回合數是房間層級設定：房主在大廳決定，訪客唯讀；對局中以 game.rounds 為準。
+  const validRounds=v=>LF.ROUNDS.includes(v);
+  function ruleHint(){
+    return `2～8 人連線；兩位真人自動加入一位電腦，三位以上不補人。${rounds} 回合${rounds===18?"（三角錐到 G 後再往上爬回 40）":""} · 選目標 35 秒 · 選牌 30 秒。逾時目標自動選，移動牌自動出 5。`;
+  }
+  function setRounds(v){
+    if(!validRounds(v))return;
+    if(!ctx.setRoomField("rounds",v,{lobbyOnly:true,denyMsg:"只有房主能改回合數",busyMsg:"對戰中不能改回合數"}))return;
+    rounds=v;ctx.syncSetup();ctx.updateGoal();savePrefs();
+  }
   const BOT="~lfai1",isBot=id=>id===BOT;
   const name=id=>isBot(id)?"電腦 1":ctx.dispName(id);
   const hasBot=()=>!!g&&Array.isArray(g.order)&&g.order.includes(BOT);
@@ -90,22 +100,34 @@ const MP = MPCore.create((()=>{
     minPlayers:2,maxPlayers:8,winCardId:"lfWinCard",spectate:true,rejoinMidGame:true,
     init(c){ctx=c;nativeCaption=$("winScores").previousElementSibling;const box=document.createElement("div");box.id="lfBotSeason";box.className="win-scores hidden";box.addEventListener("click",e=>{if(e.target.closest("#lfBotNewSeason")){MP.resetScores();MP.again();}});$("winScores").after(box);},
     listen(){const ref=ctx.ref("scores");if(ref)ref.on("value",s=>{seasonScores=s.val()||{};paintSeason();});},
-    lobbyGame(){return {};},newGame(ids){return LF.newGame(ids.length===2?ids.concat(BOT):ids,lfNow());},
+    roomFields(){return {rounds};},
+    onRoomField(k,v){
+      if(k!=="rounds"||!validRounds(v)||v===rounds)return;
+      rounds=v;ctx.unreadyOnFieldChange();ctx.syncSetup();ctx.updateGoal();
+    },
+    readRoom(r){if(validRounds(r.rounds))rounds=r.rounds;},
+    lobbyGame(){return {};},newGame(ids){return LF.newGame(ids.length===2?ids.concat(BOT):ids,lfNow(),rounds);},
     resetRound(){clearBot();g=null;LFB.reset();paintSeason();},applyGame(next,playing){g=next;if(playing){paint();scheduleBot();}},
     openConnect(){showScreen("connect");},enterLobby(){showScreen("lobby");},
     backToLobby(){clearBot();showScreen("lobby");LFB.reset();},enterPlaying(){showScreen("play");},
     onLeave(){clearBot();g=null;seasonScores={};scoredBotRound=null;LFB.reset();paintSeason();showScreen("home");},
-    syncSetup(){queueMicrotask(()=>{paintSeason();if(MP.isOnline()&&ctx.phase()==="lobby"&&!ctx.spectating())setActionHint(readyText(Object.keys(ctx.players()),MP.amReady()));});},
+    syncSetup(){
+      const seg=$("lfRoundSeg"),host=ctx.isHost();
+      seg.classList.toggle("readonly",!host);
+      [...seg.children].forEach(b=>{const on=+b.dataset.rounds===rounds;b.classList.toggle("on",on);b.setAttribute("aria-pressed",String(on));});
+      $("lfRoundLabel").textContent=host?"回合數":"回合數（房主決定）";
+      $("lfRuleHint").textContent=ruleHint();
+      queueMicrotask(()=>{paintSeason();if(MP.isOnline()&&ctx.phase()==="lobby"&&!ctx.spectating())setActionHint(readyText(Object.keys(ctx.players()),MP.amReady()));});},
     extraChips(){return (ctx.phase()==="playing"?hasBot():Object.keys(ctx.players()).length===2)?[{id:BOT,name:name(BOT),ready:true}]:[];},
-    updateGoal(){const e=$("mpBarGoal");if(e)e.textContent="9 回合";},
+    updateGoal(){const e=$("mpBarGoal");if(e)e.textContent=`${ctx.phase()==="playing"&&g?LF.totalRounds(g):rounds} 回合`;},
     chipTail(id){return g&&g.scores&&g.scores[id]!==undefined?`${LFB.visibleScore(g,id)} 分`:"";},
     lobbyStatusText(ids){return ids.length<2?"邀一位朋友加入，兩人即可玩！":ids.length===2?"兩位真人 + 電腦 1，準備好就開始！":"等大家準備，開始九回合對戰";},
     readyHint:readyText,
     refresh(){paint();},
     outcome(w,{iWon}){
       $("lfRanking").innerHTML=LFB.ranking(g,name,ctx.me());recordBotWin();queueMicrotask(paintSeason);
-      return {word:iWon?"你拿下了！":"本局結束",msg:"九回合結算，同分並列。"};
+      return {word:iWon?"你拿下了！":"本局結束",msg:`${LF.totalRounds(g)} 回合結算，同分並列。`};
     },
-    ownPrefs(){return {big:BigMode.get()};},usePrefs(o){BigMode.set(!!o.big);},api:{send,state:()=>g}
+    ownPrefs(){return {big:BigMode.get(),rounds};},usePrefs(o){BigMode.set(!!o.big);if(validRounds(o.rounds))rounds=o.rounds;},api:{send,setRounds,rounds:()=>rounds,state:()=>g}
   };
 })());

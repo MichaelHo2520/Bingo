@@ -14912,3 +14912,5 @@ body.lf-page :is(.btn,.lf-floorbtn,.seg button){position:relative}
 .lf-log-hit sup{font-size:7px;margin-left:1px}
 .lf-log-you th{color:#a6ebce}
 @media(prefers-reduced-motion:reduce){.lf-hud>.lf-clock-urgent{animation:none}}
+/* 18 回合時進度條格數加倍，縮小間距。 */
+.lf-progress.lf-progress-long{gap:2px}

@@ -18,7 +18,7 @@ const Solo = (()=>{
     if(g.stage==="bid")g.order.slice(1).forEach(id=>{if(!Object.prototype.hasOwnProperty.call(g.bids||{},id))LF.submit(g,id,LFAI.bid(g,id,Math.random),g.turn,Date.now());});
   }
   function start(){
-    count=+$("lfCount").value;g=LF.newGame(["you",...Array.from({length:count-1},(_,i)=>"bot"+(i+1))],Date.now());g.status="playing";
+    count=+$("lfCount").value;g=LF.newGame(["you",...Array.from({length:count-1},(_,i)=>"bot"+(i+1))],Date.now(),+$("lfRounds").value);g.status="playing";
     LFB.reset();$("veil").classList.remove("show");showScreen("solo");bots();paint();
   }
   function send(value,turn){
@@ -30,7 +30,7 @@ const Solo = (()=>{
       // 連線的勝負音效由共用核心播；練習要自己播。同分並列也算拿下。
       if(g.winner.ids.includes("you")){Sound.win();burst();}else Sound.lose();
       $("winWord").textContent=g.winner.ids.includes("you")?"你拿下了！":"本局結束";
-      $("winMsg").textContent="九回合結算，同分並列。";
+      $("winMsg").textContent=`${LF.totalRounds(g)} 回合結算，同分並列。`;
       $("lfRanking").innerHTML=LFB.ranking(g,name,"you");$("veil").classList.add("show");
     }
   }

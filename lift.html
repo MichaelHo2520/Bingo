@@ -56,10 +56,11 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
       <div class="lf-cover" aria-hidden="true"><div class="lf-orbit"></div><div class="lf-cover-tower"><div class="lf-cover-display">↑ <span>20</span></div><div class="lf-cover-doors"><i></i><i></i></div><span class="lf-cover-number">40</span></div><span class="lf-cover-ticket">YOUR STOP<br><b>15</b></span><span class="lf-cover-ticket lf-cover-ticket-two">NEXT STOP<br><b>?</b></span><img class="lf-art" src="img/lf-icon.png" width="192" height="192" alt="電梯與上下方向箭頭"></div>
   <div class="lf-cover-meta"><span>2—8 人連線</span><i></i><span>兩人自動補電腦</span></div></div>
     <button class="btn primary block-btn home-btn" id="lfGoOnline">🌐 和朋友連線 · 2～8 人</button>
-    <div class="lf-practice"><label for="lfCount">電腦練習 · 總人數</label>
-      <select id="lfCount"><option value="3">3 人</option><option value="4" selected>4 人</option><option value="5">5 人</option><option value="6">6 人</option><option value="7">7 人</option><option value="8">8 人</option></select>
+    <div class="lf-practice"><label for="lfCount">電腦練習</label>
+      <select id="lfCount" aria-label="總人數"><option value="3">3 人</option><option value="4" selected>4 人</option><option value="5">5 人</option><option value="6">6 人</option><option value="7">7 人</option><option value="8">8 人</option></select>
+      <select id="lfRounds" aria-label="回合數"><option value="9" selected>9 回合</option><option value="18">18 回合</option></select>
       <button class="btn ghost" id="lfStartSolo">開始練習</button></div>
-    <details class="lf-guide"><summary>一分鐘看懂玩法</summary><p>先選 1 分與 2 分目標；每回合各出 0、5、10，合計成移動距離。電梯到 G 或 40 會折返，最後停靠才計分。G／40 分數加倍，同層兩張可以一起得分。</p><p>命中後重選該目標；命中施工樓層不計分，可重選兩張。三角錐從 40 逐回合往下，G 的最後一回合結算，共九回合。同分並列。練習沒有倒數。</p></details>
+    <details class="lf-guide"><summary>一分鐘看懂玩法</summary><p>先選 1 分與 2 分目標；每回合各出 0、5、10，合計成移動距離。電梯到 G 或 40 會折返，最後停靠才計分。G／40 分數加倍，同層兩張可以一起得分。</p><p>命中後重選該目標；命中施工樓層不計分，可重選兩張。三角錐從 40 逐回合往下，到 G 的那一回合結算，共九回合；選十八回合時，三角錐到 G 後會再逐回合往上爬回 40。同分並列。練習沒有倒數。</p></details>
     <p class="lf-credit">獨立製作的數字預測遊戲 · 原型</p>
   </section>
   <section class="panel hidden" id="mpConnect">
@@ -118,7 +119,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <section class="panel hidden" id="lfSetup">
       <div class="subtitle">對戰設定</div>
       
-      <p class="hint">2～8 人連線；兩位真人自動加入一位電腦，三位以上不補人。9 回合 · 選目標 35 秒 · 選牌 30 秒。逾時目標自動選，移動牌自動出 5。</p>
+      <div class="field">
+        <span class="field-label" id="lfRoundLabel">回合數</span>
+        <div class="seg" id="lfRoundSeg" aria-label="回合數">
+          <button class="on" data-rounds="9" aria-pressed="true">9 回合</button>
+          <button data-rounds="18" aria-pressed="false">18 回合</button>
+        </div>
+      </div>
+      <p class="hint" id="lfRuleHint">2～8 人連線；兩位真人自動加入一位電腦，三位以上不補人。9 回合 · 選目標 35 秒 · 選牌 30 秒。逾時目標自動選，移動牌自動出 5。</p>
       <div class="field" id="scoreRow">
         <span class="field-label" id="scoreLabel">連線計分</span>
         <div class="seg" id="scoreSeg">

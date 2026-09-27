@@ -110,8 +110,10 @@ const LFB = (() => {
     if(!g)return;
     current={g,id,name};
     const turnKey=[g.roundId||"solo",g.turn,g.stage,LF.needs(g,id).join(","),!!(g.submitted||{})[id],Object.prototype.hasOwnProperty.call(g.bids||{},id)].join("/");
-    $("lfRound").textContent=`第 ${g.turn} / 9 回合`;
-    $("lfProgress").innerHTML=Array.from({length:9},(_,i)=>`<i class="${i<g.turn-1?"done":i===g.turn-1?"current":""}"></i>`).join("");
+    const rounds=LF.totalRounds(g);
+    $("lfRound").textContent=`第 ${g.turn} / ${rounds} 回合`;
+    $("lfProgress").classList.toggle("lf-progress-long",rounds>9);
+    $("lfProgress").innerHTML=Array.from({length:rounds},(_,i)=>`<i class="${i<g.turn-1?"done":i===g.turn-1?"current":""}"></i>`).join("");
     $("lfPlay").dataset.stage=g.stage;
     // 揭曉中的秒數只是自動接續的等待時間，不是玩家要做事，所以不顯示。
     $("lfClock").classList.toggle("hidden",!online||g.stage==="reveal"||!!g.winner);
@@ -261,7 +263,7 @@ const LFB = (() => {
     }else{
       hint.textContent="看看大家出了什麼牌，停靠後自動接續。";
       const note=document.createElement("div");note.className="lf-next-note";note.setAttribute("role","status");
-      note.textContent=g.turn===9?"到站後自動結算本局":"到站後自動進入第 "+(g.turn+1)+" 回合";panel.append(note);
+      note.textContent=g.turn>=rounds?"到站後自動結算本局":"到站後自動進入第 "+(g.turn+1)+" 回合";panel.append(note);
     }
   }
   function ranking(g,name,me){

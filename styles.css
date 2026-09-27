@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 7e9a213b923a866637096572adb3bf56506c03d13f66d07a78b27c1a59e82147)
+    真相在 styles.src.css(sha256 b7c5339f0e4a14d0482d5ee4ea0393daf82235a86309891c75b2baf2a95f35e6)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6890,3 +6890,4 @@ body.lf-page :is(.btn,.lf-floorbtn,.seg button){position:relative}
 .lf-log-hit sup{font-size:7px;margin-left:1px}
 .lf-log-you th{color:#a6ebce}
 @media(prefers-reduced-motion:reduce){.lf-hud>.lf-clock-urgent{animation:none}}
+.lf-progress.lf-progress-long{gap:2px}
