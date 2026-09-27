@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 1bea3a55767442cc53de945a35042976783b05aa88f4ada19bffb30485a98411)
+    真相在 styles.src.css(sha256 9671a66dc6952ba6bdcd53e3bf626ad08f99bb94dbd66afa6dd4061c92ade4fe)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6694,7 +6694,7 @@ body.lf-mp .topbar,body.lf-solo .topbar{width:min(92vw,520px);max-width:520px}
 .lf-floor.lf-active b{color:#c4fceb}
 .lf-shaft{width:54px;margin-left:4px;border:1px solid #789aad44;border-radius:7px;background:repeating-linear-gradient(0deg,#081b2a 0,#081b2a 32px,#1b3545 33px);box-shadow:inset 0 0 12px #020b1644;overflow:hidden}
 .lf-shaft:before{content:"";position:absolute;top:0;bottom:0;left:50%;width:1px;background:#8cb4b624}
-.lf-car{height:11.1%;left:3px;right:3px;border:1px solid #a5e4d4;border-radius:5px;background:#72b9ac;box-shadow:0 0 18px #8ee9cf39;transition:bottom 170ms cubic-bezier(.22,.7,.3,1);overflow:hidden}
+.lf-car{height:11.1%;left:3px;right:3px;border:1px solid #a5e4d4;border-radius:5px;background:#72b9ac;box-shadow:0 0 18px #8ee9cf39;transition:bottom var(--lf-step,420ms) linear;overflow:hidden}
 .lf-car-sign{font-size:8px;line-height:10px;background:#102c32;color:#acf4d5;z-index:2}
 .lf-cabin{position:absolute;inset:11px 3px 1px;background:linear-gradient(#f1d8a0,#a1b2a7);display:flex;justify-content:center;align-items:flex-end}
 .lf-person{width:8px;height:11px;background:#1d4357;border-radius:4px 4px 0 0;position:relative}
@@ -6755,3 +6755,44 @@ body.lf-mp .topbar,body.lf-solo .topbar{width:min(92vw,520px);max-width:520px}
 @media(max-width:380px){.lf-home{padding:18px}.lf-play{padding:13px}.lf-stage{height:296px;gap:9px}.lf-floor b{font-size:14px}.lf-player{padding:6px 5px;grid-template-columns:19px minmax(0,1fr) auto;gap:1px 3px;font-size:9px}.lf-ticket{padding:9px}.lf-ticket small{font-size:4px}.lf-move{min-height:100px}.lf-cover-ticket{left:4%}}
 @media(prefers-reduced-motion:reduce){.lf-cover-tower,.lf-reveal-card,.lf-arrival.lf-pop,.lf-sparkles i{animation:none}.lf-arrival.lf-pop{opacity:1;transform:none}.lf-car,.lf-doors i,.lf-move,.lf-floorbtn{transition:none}}
 @media(min-width:700px){body.lf-mp .topbar,body.lf-solo .topbar,.lf-room,.lf-play{width:min(95vw,620px);max-width:620px}}
+body.lf-page:is(.lf-solo,.lf-mp){min-height:0;padding:8px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:8px}
+body.lf-page:is(.lf-solo,.lf-mp) .topbar{display:none}
+body.lf-mp .lf-room-foot,body.lf-mp .mp-subrow{display:none}
+.lf-room{flex:none;padding:5px 10px;margin:0}
+.lf-room .icon-btn{width:36px;height:36px;border-radius:10px}
+.lf-play{flex:1 1 0;min-height:0;display:flex;flex-direction:column;margin:0;padding:10px;gap:8px;overflow:hidden;border-radius:18px}
+.lf-view{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.lf-hud{flex:none;margin:0}
+.lf-progress{flex:none;margin:0}
+.lf-stage{flex:1 0 150px;height:auto;min-height:150px;gap:10px}
+.lf-building{min-height:0;padding:4px;border-radius:10px}
+.lf-side{min-height:0;gap:6px}
+.lf-scores{min-height:0}
+.lf-result{flex:none;min-height:0;margin:0;padding:0;font-size:10px;line-height:1.4}
+.lf-action{flex:none;border-top:1px solid #85b4be26;padding-top:8px}
+.lf-targets{gap:8px}
+.lf-ticket{padding:7px 9px;min-height:43px;border-radius:9px;box-shadow:none}
+.lf-ticket small{display:none}
+.lf-ticket div{gap:0}
+.lf-ticket div span{font-size:10px}
+.lf-ticket b{font-size:24px}
+.lf-hint{font-size:10px;line-height:1.4;margin:6px 0}
+.lf-picker{gap:3px;margin:0 0 5px}
+.lf-picker>span{line-height:1;margin:0;font-size:9px}
+.lf-floorbtn{min-height:36px;padding:6px 0}
+.lf-submit{margin-top:5px;min-height:42px;padding:9px 8px;font-size:12px}
+.lf-cards{gap:10px;padding:0 4px 5px}
+.lf-move{min-height:76px;padding:17px 6px 9px}
+.lf-move b{font-size:29px}
+.lf-move small{margin-top:3px}
+.lf-card-corner{top:5px;left:7px}
+.lf-cone{display:flex;align-items:center;justify-content:center;gap:5px;padding:3px 5px;flex:none;font-size:10px}
+.lf-cone-art{display:block;width:21px;height:24px;flex:none}
+.lf-cone-marker{display:none;position:absolute;right:5px;top:50%;transform:translateY(-50%);z-index:1;width:23px;height:calc(100% - 2px);max-height:26px}
+.lf-floor.lf-blocked .lf-cone-marker{display:block}
+.lf-cone-marker .lf-cone-art{width:100%;height:100%}
+.lf-floor.lf-blocked:after{display:none}
+.lf-floor.lf-blocked{box-shadow:inset 0 0 12px #e69c4818}
+.lf-car.lf-travelling{box-shadow:0 0 22px #8ee9cf66,inset 0 0 8px #e3fff44d}
+@media(max-width:380px){.lf-stage{gap:7px}.lf-play{padding:8px}.lf-player{min-height:32px;padding:4px 5px}.lf-avatar{height:21px}.lf-ticket{padding:6px 8px}.lf-room .icon-btn,.lf-room .mp-act-btn{width:32px;height:32px}.lf-room .tools-docked,.lf-room .mp-actions,.lf-room-top{gap:4px}body.lf-mp:not(.is-big) .lf-room .row:has(> .tools-docked .tk-btn.on){padding-right:140px}}
+@media(max-height:480px) and (min-width:600px){.lf-play{flex-direction:row;gap:12px}.lf-action{width:46%;border-top:0;border-left:1px solid #85b4be26;padding:0 0 0 10px;align-self:center}.lf-view{height:100%}.lf-stage{flex-basis:150px}.lf-result{font-size:9px}}
