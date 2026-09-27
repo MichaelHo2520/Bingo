@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 cd0516447a710d829b939669646900a87d73a376b609b69333ada3ea6ff1ed31)
+    真相在 styles.src.css(sha256 f0b3ecf9f1a9ade54a69c253d2794f188b5c769c9f7f281b045f0bf2e79c993d)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6735,22 +6735,35 @@ body.lf-page .icon-btn{background:#ffffff06;border-color:#90b4c333;border-radius
 .lf-card-corner{position:absolute;left:9px;top:8px;font-size:10px;color:#a7c6ce;font-weight:800}
 .lf-card-mark{position:absolute;right:8px;bottom:7px;color:#89b4ba;font-size:13px}
 .lf-submit{margin-top:9px;font-size:13px;letter-spacing:.5px;border-radius:12px}
-.lf-arrival{position:absolute;z-index:3;left:12%;right:12%;top:32%;display:flex;flex-direction:column;align-items:center;gap:4px;padding:13px;border:1px solid #b2e6da77;border-radius:16px;background:linear-gradient(130deg,#18384beb,#16372feb);box-shadow:0 16px 28px #030d2266;backdrop-filter:blur(12px);opacity:0;pointer-events:none;transform:translateY(10px) scale(.92)}
-.lf-arrival.lf-pop{animation:lf-arrive 3s both}
-.lf-arrival small{font-size:7px;color:#9fe9cd;letter-spacing:2px}
-.lf-arrival b{font-size:34px;color:#e3f8ec;line-height:1.2}
-.lf-arrival b span{font-size:10px;margin-left:5px}
-.lf-arrival em{font-size:10px;color:#cae0d9;font-style:normal}
+.lf-arrival{position:absolute;z-index:3;left:50%;top:50%;width:min(84%,360px);box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 20px;border:1px solid #b2e6daaa;border-radius:20px;background:linear-gradient(135deg,#24485af7,#102c32f7);box-shadow:0 18px 48px #030d2299,0 0 28px #9ae7d328,inset 0 1px #d4fff533;backdrop-filter:blur(16px);opacity:0;pointer-events:none;transform:translate(-50%,-50%) scale(.9);overflow:hidden}
+.lf-arrival.lf-pop{animation:lf-arrive .48s cubic-bezier(.2,.8,.2,1) both}
+.lf-arrival-head{display:flex;align-items:center;gap:7px}
+.lf-arrival-head i{font-size:20px;color:#b0f5dd;font-style:normal;line-height:1}
+.lf-arrival-head svg{width:20px;height:24px;display:block}
+.lf-arrival small{font-size:11px;color:#a8edda;letter-spacing:2px;font-weight:800}
+.lf-arrival-main{display:flex;align-items:center;justify-content:center;gap:24px;width:100%}
+.lf-arrival b{font-size:52px;color:#e3f8ec;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 0 20px #a5f5db40}
+.lf-arrival b span{font-size:13px;margin-left:5px}
+.lf-arrival strong{font-size:15px;color:#bdd3da;white-space:nowrap}
+.lf-arrival strong span{font-size:13px;margin-left:3px}
+.lf-arrival em{font-size:12px;color:#cae0d9;font-style:normal;text-align:center}
+.lf-arrival[data-outcome="hit"]{border-color:#c4ffe5;background:linear-gradient(135deg,#285b50f7,#102f34f7);box-shadow:0 18px 48px #030d2299,0 0 36px #9ae7d34d,inset 0 1px #d4fff555}
+.lf-arrival[data-outcome="hit"] strong{font-size:30px;color:#c4ffe5}
+.lf-arrival[data-outcome="blocked"]{border-color:#f2c581aa;background:linear-gradient(135deg,#4d4033f7,#172c38f7)}
+.lf-arrival[data-outcome="blocked"] small,.lf-arrival[data-outcome="blocked"] strong{color:#f2cf97}
+.lf-arrival-line{position:absolute;left:0;right:0;bottom:0;height:3px;background:linear-gradient(90deg,#d8e7aa,#88e4ce);transform-origin:left;animation:lf-result-time var(--lf-result-ms,1800ms) linear both}
+.lf-next-note{min-height:40px;display:flex;align-items:center;justify-content:center;color:#a7c7ce;font-size:12px;letter-spacing:.5px;text-align:center}
 .lf-sparkles{position:absolute;left:50%;top:50%;pointer-events:none;z-index:4}
 .lf-sparkles i{position:absolute;width:5px;height:5px;border-radius:1px;background:#e8d0a0;animation:lf-spark .85s both;animation-delay:var(--lf-spark-delay)}
 .lf-ranking{margin:15px 0;text-align:left}
 .lf-rank:first-child{background:#8fdbbc17;color:#a6ebce;border-radius:10px}
 @keyframes lf-cover-float{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-7px) rotate(-6deg)}}
 @keyframes lf-card-flip{0%{transform:rotateY(90deg) translateY(-6px);opacity:0}60%{transform:rotateY(-12deg);opacity:1}100%{transform:rotateY(0)}}
-@keyframes lf-arrive{0%{opacity:0;transform:translateY(10px) scale(.92)}15%,80%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-8px) scale(.98)}}
+@keyframes lf-arrive{0%{opacity:0;transform:translate(-50%,calc(-50% + 14px)) scale(.9)}65%{opacity:1;transform:translate(-50%,calc(-50% - 2px)) scale(1.02)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes lf-result-time{from{transform:scaleX(1)}to{transform:scaleX(0)}}
 @keyframes lf-spark{0%{opacity:1;transform:rotate(var(--lf-angle)) translateX(0) scale(0)}30%{opacity:1}100%{opacity:0;transform:rotate(var(--lf-angle)) translateX(var(--lf-distance)) scale(.6)}}
 @media(max-width:380px){.lf-home{padding:18px}.lf-play{padding:13px}.lf-stage{height:296px;gap:9px}.lf-floor b{font-size:14px}.lf-player{padding:6px 5px;grid-template-columns:19px minmax(0,1fr) auto;gap:1px 3px;font-size:9px}.lf-ticket{padding:9px}.lf-ticket small{font-size:4px}.lf-move{min-height:100px}.lf-cover-ticket{left:4%}}
-@media(prefers-reduced-motion:reduce){.lf-cover-tower,.lf-reveal-card,.lf-arrival.lf-pop,.lf-sparkles i{animation:none}.lf-arrival.lf-pop{opacity:1;transform:none}.lf-car,.lf-doors i,.lf-move,.lf-floorbtn{transition:none}}
+@media(prefers-reduced-motion:reduce){.lf-cover-tower,.lf-reveal-card,.lf-arrival.lf-pop,.lf-sparkles i,.lf-arrival-line{animation:none}.lf-arrival.lf-pop{opacity:1;transform:translate(-50%,-50%)}.lf-car,.lf-doors i,.lf-move,.lf-floorbtn{transition:none}}
 body.lf-page:is(.lf-solo,.lf-mp){min-height:0;padding:8px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:8px}
 body.lf-page:is(.lf-solo,.lf-mp) .topbar{display:none}
 body.lf-mp .lf-room-foot,body.lf-mp .mp-subrow{display:none}

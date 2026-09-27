@@ -5,6 +5,8 @@ const LF = (() => {
   const FLOORS = [0,5,10,15,20,25,30,35,40];
   const validFloor = n => FLOORS.includes(n);
   const copy = x => JSON.parse(JSON.stringify(x));
+  const MOTION = Object.freeze({lead:650,step:420,arrival:80,result:1800});
+  const revealMs = path => MOTION.lead + (path.length-1)*MOTION.step + MOTION.arrival + MOTION.result;
   function travel(floor, direction, distance){
     const path = [floor];
     while(distance > 0){
@@ -38,9 +40,6 @@ const LF = (() => {
     } else if(g.stage==="bid"){
       if(![0,5,10].includes(values) || Object.prototype.hasOwnProperty.call(g.bids||{},id))return false;
       g.bids=g.bids||{}; g.bids[id]=values;
-    } else if(g.stage==="reveal"){
-      if((g.ack||{})[id])return false;
-      g.ack=g.ack||{}; g.ack[id]=true;
     } else return false;
     progress(g,now); return true;
   }
@@ -56,8 +55,8 @@ const LF = (() => {
       replace[id]=(g.floor===g.cone && matched.length)?[0,1]:matched;
     });
     g.last={turn:g.turn,from,floor:g.floor,path:move.path,total,bids:copy(g.bids),
-      gains,hits,blocked:g.floor===g.cone};
-    g.replace=replace; g.stage="reveal"; g.ack={}; g.deadline=now+10000;
+      gains,hits,blocked:g.floor===g.cone,revealedAt:now};
+    g.replace=replace; g.stage="reveal"; g.ack={}; g.deadline=now+revealMs(move.path);
   }
   function progress(g,now){
     if(!g || g.status!=="playing" || g.winner)return false;
@@ -79,7 +78,7 @@ const LF = (() => {
       settle(g,now); return true;
     }
     if(g.stage==="reveal"){
-      if(!expired && !g.order.every(id=>(g.ack||{})[id]))return false;
+      if(!expired)return false;
       if(g.turn===9){
         const best=Math.max(...g.order.map(id=>g.scores[id]));
         g.winner={ids:g.order.filter(id=>g.scores[id]===best),by:"points"};
@@ -92,6 +91,6 @@ const LF = (() => {
     }
     return false;
   }
-  return {FLOORS,validFloor,travel,newGame,submit,progress,needs,copy};
+  return {FLOORS,validFloor,travel,newGame,submit,progress,needs,copy,MOTION,revealMs};
 })();
 if(typeof module!=="undefined")module.exports=LF;

@@ -326,20 +326,20 @@ const CORE = [
      停在舊版(線上照樣 network-first 拿新的)—— 守門是 test-version.js 的 E 節。
    ========================================================================== */
 /* @@REV-BEGIN */
-const BUILD = "3deb2fdb";
+const BUILD = "a55d2008";
 const REV = {
   "./lift.html": "9b4dbdf9eead365d",
   "./img/lf-icon.png": "cf337f168a705ec2",
-  "./js/lift/rules.js": "f3b7f0f760ac91e1",
+  "./js/lift/rules.js": "27de6197f655cc57",
   "./js/lift/ai.js": "a8c1329906c8219b",
-  "./js/lift/board.js": "39d2611cbf5653e3",
-  "./js/lift/solo.js": "2692d5bff765a731",
+  "./js/lift/board.js": "ad144a624f49e4c0",
+  "./js/lift/solo.js": "35f73c10ff21dee0",
   "./js/lift/adapter.js": "2a96dca71e0c25a0",
   "./js/lift/main.js": "30e69edbc4dd995b",
   "./": "032805024b459420",
   "./app.html": "e677a9539fbbceaf",
   "./index.html": "032805024b459420",
-  "./styles.css": "d6ad088d7347806e",
+  "./styles.css": "084df281a47ee260",
   "./js/audio.js": "fec2c75c8b2efe5b",
   "./js/game.js": "1ddf99e604ba0b3a",
   "./js/online.js": "576da19c11495fee",

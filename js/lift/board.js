@@ -1,6 +1,6 @@
 "use strict";
 const LFB = (() => {
-  let key="", animationKey="", selected=[10,20], card=5, timers=[], busyUntil=0;
+  let key="", animationKey="", selected=[10,20], card=5, timers=[];
   const label=f=>f===0?"G":String(f);
   const taps=new WeakMap();
   function feedback(button){
@@ -11,14 +11,14 @@ const LFB = (() => {
     const wave=document.createElement("span");wave.className="lf-tap-wave";wave.setAttribute("aria-hidden","true");button.append(wave);
     wave.animate([{opacity:.8,transform:"scale(.82)"},{opacity:0,transform:"scale(1.25)"}],{duration:420,easing:"ease-out"}).onfinish=()=>wave.remove();
   }
-  function reset(){key="";animationKey="";busyUntil=0;timers.forEach(clearTimeout);timers=[];
+  function reset(){key="";animationKey="";timers.forEach(clearTimeout);timers=[];
     $("lfCar").classList.remove("lf-open","lf-travelling");$("lfArrival").classList.remove("lf-pop");$("lfSparkles").innerHTML="";}
   function tickets(values){
     $("lfTargets").innerHTML=values?values.map((f,slot)=>`<div class="lf-ticket"><div><small>SECRET DESTINATION ${slot+1}</small><span>${slot+1} 分目標${f===0||f===40?" · 雙倍":""}</span></div><b>${label(f)}<span>F</span></b><i aria-hidden="true"></i></div>`).join(""):"";
   }
   function render(g,id,name,submit,online){
     if(!g)return;
-    const turnKey=[g.roundId||"solo",g.turn,g.stage,LF.needs(g,id).join(","),!!(g.submitted||{})[id],Object.prototype.hasOwnProperty.call(g.bids||{},id),!!(g.ack||{})[id]].join("/");
+    const turnKey=[g.roundId||"solo",g.turn,g.stage,LF.needs(g,id).join(","),!!(g.submitted||{})[id],Object.prototype.hasOwnProperty.call(g.bids||{},id)].join("/");
     $("lfRound").textContent=`第 ${g.turn} / 9 回合`;
     $("lfProgress").innerHTML=Array.from({length:9},(_,i)=>`<i class="${i<g.turn-1?"done":i===g.turn-1?"current":""}"></i>`).join("");
     $("lfPlay").dataset.stage=g.stage;
@@ -48,27 +48,35 @@ const LFB = (() => {
       const reduced=matchMedia("(prefers-reduced-motion: reduce)").matches;
       const revealing=g.stage==="reveal"&&g.last;
       const path=revealing&&!reduced?g.last.path:[g.floor];
-      const delay=revealing&&!reduced?650:0, step=420;
+      const delay=revealing&&!reduced?LF.MOTION.lead:0, step=LF.MOTION.step;
       const travelTime=(path.length-1)*step;
-      busyUntil=revealing?Date.now()+delay+travelTime+650:0;
+      const elapsed=revealing&&g.last.revealedAt?Math.max(0,(online?lfNow():Date.now())-g.last.revealedAt):0;
       $("lfCar").classList.remove("lf-open");
       $("lfCar").classList.toggle("lf-travelling",!!revealing&&path.length>1);
       $("lfCar").style.setProperty("--lf-step",step+"ms");
       $("lfArrival").classList.remove("lf-pop");$("lfSparkles").innerHTML="";
+      const catchUp=elapsed>=delay&&elapsed>0&&!reduced;
+      if(catchUp)$("lfCar").style.transition="none";
       path.forEach((floor,i)=>{
-        const move=()=>{$("lfCar").style.bottom=(floor/5*100/9)+"%";$("lfCarFloor").textContent=label(floor);
+        const move=()=>{$("lfCar").style.setProperty("--lf-step",Math.min(step,Math.max(1,delay+i*step-elapsed))+"ms");$("lfCar").style.bottom=(floor/5*100/9)+"%";$("lfCarFloor").textContent=label(floor);
           if(path.length>1){const direction=i?floor-path[i-1]:path[1]-floor;$("lfDirection").textContent=direction>0?"↑ 向上移動":"↓ 向下移動";}
           document.querySelectorAll(".lf-floor").forEach(el=>el.classList.toggle("lf-active",+el.dataset.floor===floor));};
-        if(i===0)move();else timers.push(setTimeout(move,delay+(i-1)*step));
+        if(i===0 || delay+i*step<=elapsed)move();
+        else timers.push(setTimeout(move,Math.max(0,delay+(i-1)*step-elapsed)));
       });
+      if(catchUp){void $("lfCar").offsetHeight;$("lfCar").style.transition="";}
       if(revealing)timers.push(setTimeout(()=>{
         const points=id?(g.last.gains[id]||0):0;
         $("lfCar").classList.remove("lf-travelling");$("lfCar").classList.add("lf-open");
         $("lfDirection").textContent=g.direction===1?"↑ 下一段向上":"↓ 下一段向下";
-        $("lfArrival").innerHTML=`<small>${g.last.blocked?"UNDER CONSTRUCTION":"ARRIVAL"}</small><b>${label(g.floor)}<span>樓</span></b><em>${g.last.blocked?"施工中，這趟不計分":points?`命中！ +${points} 分`:"下一趟，再猜一次"}</em>`;
+        $("lfArrival").dataset.outcome=g.last.blocked?"blocked":points?"hit":"miss";
+        const mark=g.last.blocked?document.querySelector(".lf-cone-art").outerHTML:points?"✦":"↓";
+        $("lfArrival").innerHTML=`<div class="lf-arrival-head"><i aria-hidden="true">${mark}</i><small>${g.last.blocked?"施工樓層":"電梯已到站"}</small></div><div class="lf-arrival-main"><b>${label(g.floor)}<span>樓</span></b><strong>${g.last.blocked?"暫停計分":points?`+${points}<span>分</span>`:id?"未命中":"本輪揭曉"}</strong></div><em>${g.last.blocked?"施工中，這趟不計分":points?"你的目標命中了！":"看看下一趟會停在哪裡"}</em><div class="lf-arrival-line" aria-hidden="true"></div>`;
         $("lfArrival").classList.add("lf-pop");
+        $("lfArrival").style.setProperty("--lf-result-ms",Math.max(1,g.deadline-(online?lfNow():Date.now()))+"ms");
+        if(own)$("lfHint").textContent=g.last.blocked?"施工中，這趟不計分；命中者下一輪可重設目標。":"停靠成功，只有最後停靠的樓層算命中。";
         if(points&&!reduced)$("lfSparkles").innerHTML=Array.from({length:12},(_,i)=>`<i style="--lf-angle:${i*30}deg;--lf-distance:${60+(i%3)*20}px;--lf-spark-delay:${i%4*40}ms"></i>`).join("");
-      },delay+travelTime+80));
+      },Math.max(0,delay+travelTime+LF.MOTION.arrival-elapsed)));
     }
     const result=$("lfResult");
     if(g.last){
@@ -114,11 +122,9 @@ const LFB = (() => {
       const b=document.createElement("button");b.className="btn primary lf-submit";b.textContent="蓋牌，等大家揭曉";
       b.onclick=()=>submit(card,g.turn);panel.append(b);
     }else{
-      hint.textContent=g.last.blocked?"施工中！命中施工樓層的人可以重設兩個目標。":"停靠成功！只有最後停靠的樓層算命中。";
-      const b=document.createElement("button");b.className="btn primary lf-submit";
-      b.textContent=g.turn===9?"查看本局排名":"我看好了，繼續";
-      b.disabled=!!(g.ack||{})[id] || Date.now()<busyUntil;b.onclick=()=>submit(null,g.turn);panel.append(b);
-      if(!(g.ack||{})[id] && Date.now()<busyUntil)timers.push(setTimeout(()=>{if(b.isConnected)b.disabled=false;},busyUntil-Date.now()));
+      hint.textContent="看看大家出了什麼牌，停靠後自動接續。";
+      const note=document.createElement("div");note.className="lf-next-note";note.setAttribute("role","status");
+      note.textContent=g.turn===9?"到站後自動結算本局":"到站後自動進入第 "+(g.turn+1)+" 回合";panel.append(note);
     }
     $("lfClock").classList.toggle("hidden",!online);
   }
