@@ -15,7 +15,7 @@
 <link rel="apple-touch-icon" href="img/icon.svg">
 <title>方塊對戰 ｜ 單機練習 + 連線對戰</title>
 <!-- 方塊對戰 · v2.20.0 -->
-<meta name="version" content="2.20.0">
+<meta name="version" content="2.20.0+1">
 <!-- 外殼:沒被 app.html 包住就自己跳進去(理由見 app.html;__noshell 是 e2e 測試頁的逃生口)
      ⚠ app.html 的 PAGES 一定要有 blocks 這個 key,否則深層連結會靜靜退回 Bingo -->
 <script>
@@ -557,6 +557,18 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="set-card">
       <div class="set-head">設定</div>
       <div class="set-body" id="setBody">
+        <!-- ★ 右簇兩顆換位置(2.20.0+1)。使用者:「讓使用者可以自行選擇要不要交換旋轉跟下降的按鈕位置」。
+             ⚠ 個人偏好,不是房規 —— 存 blocks.pad.v1(main.js 的 setPadSwap)。
+             ⚠ 對局中大畫面會收掉 ⚙️ → 「?」蓋板(#blkGuideVeil)有同一格的第二顆開關,單機 / 連線都按得到。
+             ⚠ 只換 .blk-pad-r 裡兩顆的**順序**(CSS row-reverse),28px 的 gap 與簇寬都不動 → pickPad() 的輸入不變。 -->
+        <div class="set-group">
+          <div class="set-group-title">操作</div>
+          <div class="set-row">
+            <span class="set-lbl">旋轉 ⇄ 落地<span class="set-sub">(右邊兩顆換位置)</span></span>
+            <button class="switch" id="swPadSwap" role="switch" aria-checked="false" aria-label="交換旋轉與落地按鈕的位置"><span class="knob"></span></button>
+          </div>
+        </div>
+
         <div class="set-group">
           <div class="set-group-title">外觀</div>
           <div class="set-row">
@@ -662,9 +674,14 @@ if (window.top === window.self && !window.__noshell && location.protocol !== "fi
     <div class="set-card">
       <button class="card-x" id="blkGuideClose" type="button" aria-label="關閉">✕</button>
       <div class="set-head">怎麼操作</div>
-      <!-- ⚠ 這裡原本還有一格「操作方式」(手勢 / 兩者 / 按鈕),v2.15.1 拿掉了 ——
-           只剩按鍵,沒有旋鈕可以調,所以這個蓋板現在純粹是說明。 -->
+      <!-- ⚠ 這裡原本還有一格「操作方式」(手勢 / 兩者 / 按鈕),v2.15.1 拿掉了(不要加回來,紅線 ㉖)。
+           ★ 2.20.0+1 起多一格「旋轉 ⇄ 落地」換位置 —— 對局中「大畫面」會收掉頂列的 ⚙️,
+             「?」是單機與連線**對局中唯一**摸得到的入口。與設定頁那一格是同一個狀態(main.js 的 applyPadSwap 兩顆一起同步)。 -->
       <div id="blkGuideBody"></div>
+      <div class="set-row">
+        <span class="set-lbl">旋轉 ⇄ 落地<span class="set-sub">(右邊兩顆換位置)</span></span>
+        <button class="switch" id="swPadSwap2" role="switch" aria-checked="false" aria-label="交換旋轉與落地按鈕的位置"><span class="knob"></span></button>
+      </div>
     </div>
   </div>
 

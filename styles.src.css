@@ -14138,6 +14138,9 @@ body.blk-spec .blk-foe{cursor:default;pointer-events:none}
    ★ 18 → 28px(2.18.0+3,使用者點名「尤其是旋轉和下降按鈕」)。
      吸附的分界在兩顆正中間 → 拇指要偏 14px 以上才會從 ↻ 滑到落地,以前是 9px。 */
 .blk-pad-r{gap:28px}
+/* ★ 使用者自選「旋轉 ⇄ 落地」換位置(2.20.0+1,設定頁那一格 → main.js 切 body.blk-swap)。
+   ⚠ 只換順序:gap 與簇寬不變 → sideRes() / pickPad() 量到的數字一樣,兩種擺法都不會因此翻面。 */
+body.blk-swap .blk-pad-r{flex-direction:row-reverse}
 .blk-pad-row{display:flex;align-items:center;gap:14px}
 
 /* 側邊那一種擺法:兩簇落在盤面左右兩側的**底角**。

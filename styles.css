@@ -1,5 +1,5 @@
 /*! styles.css —— 這是**產生檔**,改這裡會被下一次 build 蓋掉。
-    真相在 styles.src.css(sha256 d64c0868f38aacc113b864a066b0df29b1450888b6d405bb1f989a4af3674d3f)
+    真相在 styles.src.css(sha256 bb578074e6966d27e53861fd748024c66b0b526f7a0a29945d88c824f7511e9e)
     改樣式:改 styles.src.css → node tools/build-css.js
     為什麼要剝註解、為什麼產生檔沿用這個檔名:notes/13-CSS與版面.md */
   :root{color-scheme:only light}
@@ -6253,6 +6253,7 @@ body.blk-spec .blk-foe{cursor:default;pointer-events:none}
 .blk-pad-l,.blk-pad-r{display:flex;flex-direction:row;align-items:center;
                       gap:14px;pointer-events:auto}
 .blk-pad-r{gap:28px}
+body.blk-swap .blk-pad-r{flex-direction:row-reverse}
 .blk-pad-row{display:flex;align-items:center;gap:14px}
 body.blk-side .blk-pad{position:absolute;inset:0;height:auto;padding:0;display:block}
 body.blk-side .blk-pad-l,

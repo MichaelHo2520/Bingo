@@ -375,6 +375,31 @@ function blkVeilOpen(){
   return false;
 }
 
+/* ---------- 旋轉 / 落地換位置(個人偏好,2.20.0+1)----------
+   ★ 只切 body.blk-swap,CSS 把 .blk-pad-r 改成 row-reverse —— 兩顆的 DOM、data-act、gap 都不動,
+     nearestKey() 每次按壓現量 getBoundingClientRect(),所以吸附自己跟著走。
+   ⚠ 獨立 key:不進 bingo.prefs.v1(共用 key 要 merge 寫,紅線 game-pages 9),也不進 blocks.solo.v1
+     (那是單機房規,會過 normRules())。 */
+const PAD_KEY = "blocks.pad.v1";
+let padSwap = false;
+function loadPadSwap(){
+  try{ padSwap = !!(JSON.parse(localStorage.getItem(PAD_KEY)) || {}).swap; }catch(e){ padSwap = false; }
+  applyPadSwap();
+}
+function setPadSwap(on){
+  padSwap = !!on;
+  try{ localStorage.setItem(PAD_KEY, JSON.stringify({ swap: padSwap })); }catch(e){}
+  applyPadSwap();
+}
+function applyPadSwap(){
+  document.body.classList.toggle("blk-swap", padSwap);
+  /* ⚠ 兩顆開關同一個狀態:設定頁(#swPadSwap)+「?」蓋板(#swPadSwap2,對局中大畫面收掉 ⚙️ 時唯一的入口) */
+  ["swPadSwap", "swPadSwap2"].forEach(id => {
+    const sw = $(id); if(sw) sw.setAttribute("aria-checked", padSwap ? "true" : "false");
+  });
+}
+["swPadSwap", "swPadSwap2"].forEach(id => $(id).addEventListener("click", () => setPadSwap(!padSwap)));
+
 /* ---------- 盤面 ----------
    ★ 規則事件要分流到單機 / 連線。盤面自己不知道在哪一種模式(見 board.js 檔頭)。 */
 BLKB.mount({
@@ -527,6 +552,7 @@ BigMode.init({
   after: () => BLKB.fitBoard()
 });
 loadPrefs();
+loadPadSwap();
 Solo.loadOwn();
 syncSettingsUI();
 paintGestCards();

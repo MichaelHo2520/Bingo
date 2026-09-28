@@ -326,7 +326,7 @@ const CORE = [
      停在舊版(線上照樣 network-first 拿新的)—— 守門是 test-version.js 的 E 節。
    ========================================================================== */
 /* @@REV-BEGIN */
-const BUILD = "535ef0bd";
+const BUILD = "b05e1f4d";
 const REV = {
   "./lift.html": "9b5c7c42a8162f20",
   "./img/lf-icon.png": "cf337f168a705ec2",
@@ -339,7 +339,7 @@ const REV = {
   "./": "b69be11b192c699a",
   "./app.html": "ac8e20ebab908f41",
   "./index.html": "b69be11b192c699a",
-  "./styles.css": "5e40dffe3868d94f",
+  "./styles.css": "fb708a7e25998c00",
   "./js/audio.js": "fec2c75c8b2efe5b",
   "./js/game.js": "1ddf99e604ba0b3a",
   "./js/online.js": "576da19c11495fee",
@@ -439,14 +439,14 @@ const REV = {
   "./js/flychess/solo.js": "3bd8a623f9aa530f",
   "./js/flychess/adapter.js": "354884a21563ad6e",
   "./js/flychess/main.js": "fb236b88052c85e8",
-  "./blocks.html": "874176e4a632d0e1",
+  "./blocks.html": "561a035ef1dd9195",
   "./js/blocks/rules.js": "0d19ddbf181b3878",
   "./js/blocks/ai.js": "6832149959867599",
   "./js/blocks/music.js": "d19e2b4b4161ed96",
   "./js/blocks/board.js": "f6686023b76df31f",
   "./js/blocks/solo.js": "c4dbce2e20703cce",
   "./js/blocks/adapter.js": "6262193be0bd5929",
-  "./js/blocks/main.js": "1d6851cfaf669ac9",
+  "./js/blocks/main.js": "93bf1cf7f5144422",
   "./img/blk-icon.png": "f3bc6384719fec28",
   "./bubble.html": "98ab543dbdcc50a7",
   "./js/bubble/rules.js": "e713a0cbbc434adf",
