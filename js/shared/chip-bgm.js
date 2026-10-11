@@ -13,7 +13,7 @@
      ⚠ 所以這一支**絕不可以自己開 AudioContext、自己決定要不要出聲**。
    ⚠ 手機喇叭放不出 600Hz 以下(notes/05)。各層的音量是量出來的 ——
      改音色或音量之後一律開 tools/t-bgm-lab.html 看量表,不要靠耳機判斷。
-   原型與量表:tools/t-bgm-lab.html · 計畫:notes/plan/PLAN-方塊泡泡動態配樂.md
+   原型與量表:tools/t-bgm-lab.html · 設計與量表見 notes/05-音訊.md「方塊 / 泡泡的動態配樂」
    ========================================================================== */
 const ChipBGM = (function(){
   "use strict";

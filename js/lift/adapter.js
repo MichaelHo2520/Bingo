@@ -121,7 +121,7 @@ const MP = MPCore.create((()=>{
     extraChips(){return (ctx.phase()==="playing"?hasBot():Object.keys(ctx.players()).length===2)?[{id:BOT,name:name(BOT),ready:true}]:[];},
     updateGoal(){const e=$("mpBarGoal");if(e)e.textContent=`${ctx.phase()==="playing"&&g?LF.totalRounds(g):rounds} 回合`;},
     chipTail(id){return g&&g.scores&&g.scores[id]!==undefined?`${LFB.visibleScore(g,id)} 分`:"";},
-    lobbyStatusText(ids){return ids.length<2?"邀一位朋友加入，兩人即可玩！":ids.length===2?"兩位真人 + 電腦 1，準備好就開始！":"等大家準備，開始九回合對戰";},
+    lobbyStatusText(ids){return ids.length<2?"邀一位朋友加入，兩人即可玩！":ids.length===2?"兩位真人 + 電腦 1，準備好就開始！":`等大家準備，開始${rounds}回合對戰`;},
     readyHint:readyText,
     refresh(){paint();},
     outcome(w,{iWon}){

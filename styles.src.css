@@ -6957,7 +6957,6 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
      ★★ 「位置不准跳」的三個數字(照大老二 v1.78.0 那一組):
           --bj-trh  牌桌那一塊的**下限**(莊家一格 + 四列閒家剛好)
           --bj-acth 動作列(最高的那一組內容:選取列 + 一排鈕)
-          --bj-mh   我的手牌那一塊(頭列 + 一排大牌)★ 寫死,不隨張數變
         牌桌 `flex:1 1 auto` 把盤面剩下的空間吃掉,手牌貼底 → 補一張牌不會推走任何東西。
         ⚠ 改任何一塊的牌大小 / padding 就要回頭重算這三個數字。
 
@@ -6972,9 +6971,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          /* 三種牌寬:我的手牌(大)· 莊家(中)· 其他閒家(小)。
             ⚠ 三個都從 --bj-cw 推回來 —— 只改一個會變成「莊家的牌比我的還大」。 */
          --bj-cw:clamp(44px,12.5vw,62px); --bj-hgap:6px;
-         --bj-trh:236px; --bj-acth:104px;
-         /* 我的手牌那一塊:頭列 22 + gap 3 + 牌高(--bj-cw × 1.42)+ padding 8 */
-         --bj-mh:calc(var(--bj-cw) * 1.42 + 33px); }
+         --bj-trh:236px; --bj-acth:104px; }
   /* 連線多一圈倒數(.bj-cdwrap 在動作列裡面)→ 預留它的高度。
      ⚠ 房規把倒數設成 0(關掉)時那一圈不出現,那時會多留一塊空白 ——
        **刻意的**:寧可多一塊固定空白,也不要手牌跟著設定跳一次(同大老二)。
@@ -7298,29 +7295,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     rgba(150,96,0,.68),rgba(24,14,0,.40) 72%,rgba(0,0,0,0))}
   .bj-cut.grab .bj-cutw{color:#ffd489}
 
-  /* ---------- 我的手牌 ----------
-     ★★ 格位是**固定的**(照大老二 v1.77.0):容器寬 = --bj-slots × 一格、靠左填,
-        所以補一張牌只讓右邊長出來,已經在手上的牌一格都不動。
-        ⚠ slots 用**上限**(五小龍開著 = 5)而不是目前張數:用目前張數的話容器會跟著長,
-          那就等於沒固定。
-     ★ 高度寫死 --bj-mh:頭列 + 一排大牌,不隨張數變。 */
-  .bj-mine{flex:none;min-height:var(--bj-mh);display:flex;flex-direction:column;gap:3px;
-    padding:4px 8px;border:2px solid transparent;border-radius:11px;
-    background:rgba(255,255,255,.09)}
-  .bj-mine.dealer{background:rgba(255,210,74,.13)}
-  .bj-mine.bust{background:rgba(224,83,63,.14)}
-  .bj-mine.idle{opacity:.72}
-  .bj-mhd{display:flex;align-items:center;gap:5px;min-width:0;height:22px}
-  .bj-mnm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    font:900 13px/1.3 'Nunito',sans-serif;color:var(--text)}
-  .bj-mhd .bj-pt{font-size:13px;padding:2px 8px}
-  /* ⚠ min() 那一層不可省:窄螢幕放不下 5 格時容器收成 100%,
-     每行幾格因此只跟**視窗寬**有關、與手上剩幾張無關 —— 換行點才不會跟著跳 */
-  .bj-mcs{display:flex;flex-wrap:wrap;justify-content:flex-start;align-content:flex-start;
-    gap:var(--bj-hgap);
-    width:min(100%,calc(var(--bj-slots,5) * (var(--bj-cw) + var(--bj-hgap))));
-    min-height:calc(var(--bj-cw) * 1.42)}
-  .bj-mwait{font:800 12.5px/1 'Nunito',sans-serif;color:var(--muted);align-self:center}
+  /* 「我的手牌」那一塊(.bj-mine / --bj-mh)已拿掉:我的牌就在牌桌自己那一格。 */
 
   /* ---------- 牌 ---------- */
   .bj-card{--bjw:var(--bj-cw);
@@ -7598,8 +7573,6 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        牌多的那一格會把後面的推出容器 → 最後一個人**靜靜地捲到看不見**。
        平分之後 4 個人 × 104 = 416 < 可用寬度,一定放得下(牌自己會擠窄,見 .bj-scs)。 */
     .bj-seat{flex:1 1 0;min-width:104px}
-    .bj-mine{padding:3px 8px}
-    .bj-mhd{height:19px}
   }
 
   /* ==========================================================================
@@ -11078,10 +11051,9 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        這一顆」= 使用者說的「誤觸」有一半是這條造成的。放大是在製造它要解決的問題。
        → 改成 **底色晶片 + 內描邊的環**:它永遠等於節距,不可能溢出去壓到鄰居。
      ⚠ `:active` 的縮小留著(那是**變小**,不會壓到鄰居),而且縮的是圓、不是熱區。 */
-  /* ⚠ v2.7.0 起**沒有任何元素掛 `.dw-pens`**(五顆色塊收成一顆筆鈕,見下面的筆盤那一段)——
-     這一條刻意留著當**歷史說明的錨點**(上面那整段註解是「熱區怎麼算出來的」的推導,
-     而那套推導在筆鈕與色票上照樣成立)。⚠ 要清死 class 的人請連同上面那段一起搬,不要只刪這一行。 */
-  .dw-pens{flex:none;display:flex;align-self:stretch;align-items:stretch;gap:0}
+  /* ⚠ `.dw-pens`(包五顆色塊的那一排容器)v2.7.0 起沒有任何元素掛它(五顆色塊收成一顆筆鈕,
+     見下面的筆盤那一段),規則已刪;上面那整段「熱區怎麼算出來的」推導留著,
+     在筆鈕與色票(`.dw-sw`)上照樣成立。 */
   .dw-sw{width:32px;min-height:30px;flex:none;padding:0;border:none;background:none;cursor:pointer;
     display:grid;place-items:center;border-radius:999px;
     -webkit-tap-highlight-color:transparent;transition:background .12s,box-shadow .12s}
@@ -11899,9 +11871,18 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
            display:flex;flex-direction:column;align-items:center;gap:8px}
   /* ⚠ overflow:auto 是**保險**不是常態:fitBoard() 的格子有下限(13px),極端矮的視窗上
      棋盤會比舞台高 —— 沒有這一條就是「盤面壓在動作列上面」,而且骰子按不到。 */
+  /* ★★★ 但**捲軸一定要隱形**(同跳棋 .tq-stage):這一格同時是 fitBoard() 量的容器,
+       桌機的實體捲軸會吃掉 15px 的 clientWidth → 盤面縮一階 → 捲軸消失 → 又放大 → 自己震盪。
+       保險本身留著(捲得動,只是看不到捲軸)。 */
   .fc-stage{flex:1 1 auto;min-height:0;width:100%;position:relative;z-index:0;
-            display:flex;align-items:center;justify-content:center;overflow:auto}
-  .fc-acts{flex:none;min-height:52px;display:flex;align-items:center;justify-content:center;
+            display:flex;align-items:center;justify-content:center;
+            overflow:auto;scrollbar-width:none}
+  .fc-stage::-webkit-scrollbar{width:0;height:0}
+  /* ★★★ 這一列的高度是**寫死的**,不是 min-height(同跳棋 .tq-acts):
+       盤面能有多高 = .fc-play − .fc-acts,這一列長高一點盤面就縮一階。
+       58px = 骰子本身(--fc-d)—— 它是這一列裡最高的一格,提示字最多兩行(.fc-hint 的
+       max-height:2.7em ≈ 35px)塞得進去,所以字長短再也推不動盤面。 */
+  .fc-acts{flex:none;height:58px;display:flex;align-items:center;justify-content:center;
            gap:12px;width:100%;position:relative}
 
   /* ---------- 棋盤 ----------
@@ -12481,7 +12462,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
     .fc-play{gap:5px;margin-top:4px}
     .fc-room{padding:6px 10px}
     .fc-room .mp-subrow,.fc-room-foot{margin-top:3px}
-    .fc-acts{min-height:46px}
+    .fc-acts{height:48px}     /* ⚠ 固定高(= 縮小後的骰子 --fc-d:48px),理由見它本尊那條 */
     /* ⚠ 立體骰只改 --fc-d 這一個變數(面的 translateZ 是它的一半,自己會跟著縮);
        padding 與圓角在**面**上,不在盒子上。 */
     .fc-die{--fc-d:48px;border-radius:15px}
@@ -13317,58 +13298,6 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
   .fb-acts .fb-btn{flex:1;min-width:0;width:auto;margin-top:0}
   .fb-acts .fb-btn:disabled{opacity:.55;cursor:default}
 
-  /* --------------------------------------------------------------------------
-     首頁格子裡的第 15 張卡 —— 「💬 問題回報」(index.html 專用)
-     ──────────────────────────────────────────────────────────────────────────
-     ★★ 為什麼放在格子**裡面**:首頁是 14 張卡 / 3 欄 → 最後一列本來就空一格
-        (下面那個大螢幕段是 5 欄 → 14 張也剛好空一格)→ 補進那個洞是**零額外高度**。
-        而首頁的驗收點正是「最後一張卡的下緣還在視窗裡嗎」(notes/13 第八節)——
-        格子底下另開一條橫幅要多吃約 56px,會把那條邊界推緊一階。
-     ⚠⚠ `order:99` **不可以省**:js/home-live.js 的 applyRank() 會給十四張遊戲卡
-        `style.order = 0…13`,而 order 的預設值是 **0** → 不寫死的話這張卡會跟
-        第一名同組、被排到格子中間去。★ 而且那只在「已經有熱門度統計」時才發生 ——
-        全新的資料庫(十四個都 0、applyRank 不點亮前三名)看起來完全正常。
-     ⚠ 這張卡刻意**不帶 `data-gk`**(applyRank 找不到它)也**沒有 `.gc-rank`**,
-        所以它不吃 `.game-card[data-gk]{position:relative}` —— 這裡也不需要定位脈絡。
-     ⚠ 面貌:借 .game-card 的骨架(等高 / hover 抬起 / 點下去縮),差別只有
-        **虛線邊框 + 更淡的底**。一眼要看得出「這一格不是遊戲」,但又不能像 disabled
-        (它是真的按得下去的東西)→ 所以邊框虛線化、底色減半,而**文字維持 --text**
-        (CLAUDE.md 紅線 9 的第二次:--muted 疊在半透明底上會讀不到)。 */
-  .fb-gcard{order:99;border-style:dashed;background:rgba(128,128,128,.10)}
-  .fb-gcard:hover{border-style:dashed}
-  /* 插圖那一格:同樣 46px 佔位讓它與遊戲卡等高,裡面塞一顆自繪 SVG。
-     ⚠ **不掛 .gc-art** —— 那條(46×46 的 block)是給 <img> 的。
-     ⚠⚠ 裡面**不可以**改回 💬 emoji:彩色 emoji 不吃 color,而 💬 的字形是**白色氣球**
-        → bubblegum(唯一的淺底主題)上幾乎看不見(CLAUDE.md 紅線 8 的 ⚠⚠)。
-        SVG 吃 stroke="currentColor" → 五個主題都跟著 --text 走。 */
-  .fb-gc-art{display:flex;align-items:center;justify-content:center;
-    flex:none;width:46px;height:46px}
-  .fb-gc-art svg{width:34px;height:34px;display:block}
-  .fb-gcard .gc-name{font-weight:800}
-
-  /* 前 3 次進首頁輕輕脈動一次就停(次數由 feedback.js 記在自己的 localStorage key)。
-     ⚠ 動畫只碰 border-color 與 box-shadow —— **不碰 transform**,不然會與
-       .game-card:hover 的 translateY 打架(手指還在卡片上時會抖)。
-     ⚠ 跑 3 個週期就自己停,不寫 infinite:首頁是每次都會回來的畫面,
-       永遠在動的東西會變成「一直有東西在閃」而不是提示。
-     ★ prefers-reduced-motion 不必在這裡處理:本檔前面有一條全域的
-       `*{animation-duration:.001s!important}`,開了就自動不動。 */
-  .fb-gcard.fb-hint{animation:fb-nudge 2.2s ease-in-out 3}
-  @keyframes fb-nudge{
-    0%,100%{border-color:var(--panel-line);box-shadow:none}
-    50%{border-color:var(--accent);box-shadow:0 0 0 3px rgba(128,128,128,.14)}
-  }
-  /* 橫置矮視窗:首頁在那裡是**五欄**、插圖縮成 40px(遊戲卡那一段的同名 @media)——
-     這一格要**逐項跟著縮**,不然它會是那一列裡唯一高一階的。
-     ⚠⚠ 這一條非得寫在**這裡**不可:@media **不加權重**,而 .fb-gc-art 的本體就在
-       上面幾行、遠在那一段之後 → 寫進遊戲卡那一段的 @media 會被本體蓋掉、完全不生效
-       (`.hl-badge` 那一條的 ⚠ 講的是同一件事)。★ 五欄 × 3 列 = 15 格,14 張遊戲卡
-       + 這一張剛好填滿,同樣是零額外高度。 */
-  @media (max-height:560px){
-    .fb-gc-art{width:40px;height:40px}
-    .fb-gc-art svg{width:29px;height:29px}
-  }
-
   /* ==========================================================================
      大螢幕 / 摺疊機展開(Galaxy Z Fold 7)—— 第一段:版面放寬
      ──────────────────────────────────────────────────────────────────────────
@@ -13386,7 +13315,7 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
        沒有新的 class、沒有新的 DOM、沒有 flex / grid 結構變動,而且全部包在
        media query 裡 → **手機與橫向矮視窗一個 px 都不會動**。
        (要讓正方形盤面那幾頁真的滿版得改成兩欄版面,那是另一個決定,
-        評估寫在 notes/plan/PLAN-摺疊機大螢幕滿版.md,這裡不做。)
+        評估與不做理由見 notes/13-CSS與版面.md 第十八節。)
 
      ── ★★ 為什麼條件是「寬 700 以上**而且**高 640 以上」 ─────────────────────
        只寫 min-width 會誤傷**橫向手機** —— 844x390 / 915x412 / 932x430 都寬過 700,
@@ -13544,11 +13473,6 @@ body.m16-big .mj-room .row:has(> .tools-docked){padding-right:0}
          同一個 <img> 上,不是這一條。 */
     .gc-art{width:58px;height:58px}
     .gc-name{font-size:17px}
-    /* 回報卡那一格的 💬 跟著放大(它不是 <img>,所以不吃上面那條 .gc-art)。
-       ⚠ 這一條可以寫在這裡是因為 .fb-gc-art 的本體定義在**這一段之前** ——
-         方向與矮視窗那一條相反,不要照抄。 */
-    .fb-gc-art{width:58px;height:58px}
-    .fb-gc-art svg{width:42px;height:42px}
   }
 
 /* ==========================================================================

@@ -945,14 +945,17 @@
     function patchGame(p){ if(!canWriteGame())return; p.rev=gameRev+1; roomRef.child("game").update(p); }
     // 需原子遞增 rev 的多寫者操作(叫號 tap、達標 tryWin、跳過斷線者):用 transaction 避免併發覆蓋。
     // mut(g) 直接改 g;回傳 false 代表中止交易(不寫,例如號碼已被叫過、已有贏家)。
-    function txGame(mut){
+    /* opts.local===false → 不做本地樂觀套用(Firebase 第三個參數 applyLocally;與 mp-core.js 那份同語意)。
+       寫 winner 的 tryWin 要帶它:樂觀的「我贏」會觸發 showOutcome 往 scores/{me} +1、放彩帶,
+       而 scores 在另一個節點,game 回退時不會跟著退(notes/07 踩坑 #8)。 */
+    function txGame(mut,opts){
       if(!canWriteGame())return;
       roomRef.child("game").transaction(g=>{
         if(!g)return;                   // 節點不存在/尚未快取 → 回傳 undefined 中止交易(勿回傳 null,那會寫入 null 刪掉節點)
         if(mut(g)===false)return;       // mut 要求中止(號碼已被叫過、已有贏家等)→ 中止,不寫
         g.rev=(g.rev||0)+1;
         return g;
-      });
+      }, undefined, !(opts && opts.local===false));
     }
     // 收到 game 快照:rev 更舊 → 過期,丟棄;否則套用整包狀態並派發到對應相位。
     // 取代舊的 8 個 child 監聽,所有欄位一次到齊,不再有「跨欄位事件到達順序」問題;
@@ -1382,7 +1385,8 @@
       // 記錄「自己在第幾次叫號時達標」;同一次叫號同時達標 = 平手(見 showOutcome)。winAt 是 per-player 節點,獨立寫。
       if(myWinAt===null){ myWinAt=calledList.length; if(meId)roomRef.child("players/"+meId+"/winAt").set(myWinAt); }
       // winner 收進 game 節點:交易確保只有第一位達標者寫得進(已有 winner 則中止),並原子遞增 rev
-      txGame(g=>{ if(g.winner)return false; g.winner={ id:meId, name:meName, lines:done, at:myWinAt }; });
+      // ★ { local:false }:搶輸的那台不可以先樂觀看到「我贏」而多記一分(見 txGame 註解;守門 t-grace-bingo-e2e 第六節)
+      txGame(g=>{ if(g.winner)return false; g.winner={ id:meId, name:meName, lines:done, at:myWinAt }; }, { local:false });
     }
     // 聽牌廣播:本端(game.js refreshLines)偵測到自己只差一號就達標時呼叫。一局只播一次(reachAnnounced 去重)。
     // 廣播對象為全部人,且 handleEmote 對 kind==="reach" 會「連自己也播」→ 聽牌者本人也聽得到「聽牌」語音。
